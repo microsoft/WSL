@@ -23,8 +23,8 @@ Abstract:
 #include "SocketChannel.h"
 #include "WslDistributionConfig.h"
 
-#define WSL_USE_VIRTIO_9P(_Config) (WI_IsFlagSet(UtilGetFeatureFlags((_Config)), LxInitFeatureVirtIo9p))
-#define WSL_USE_VIRTIO_FS(_Config) (WI_IsFlagSet(UtilGetFeatureFlags((_Config)), LxInitFeatureVirtIoFs))
+#define WSL_USE_VIRTIO_9P() (WI_IsFlagSet(UtilGetFeatureFlags(), LxInitFeatureVirtIo9p))
+#define WSL_USE_VIRTIO_FS() (WI_IsFlagSet(UtilGetFeatureFlags(), LxInitFeatureVirtIoFs))
 #define WSLG_SHARED_FOLDER "wslg"
 
 #define INIT_MAKE_SECURITY(_uid, _gid, _mode) {_uid, _gid, _mode}

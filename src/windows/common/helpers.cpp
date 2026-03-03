@@ -178,6 +178,11 @@ private:
         launcher.AddOption(wslrelay::disable_telemetry_option);
     }
 
+    if (WI_IsFlagSet(Flags, LaunchWslRelayFlags::ConnectPipe))
+    {
+        launcher.AddOption(wslrelay::connect_pipe_option);
+    }
+
     return launcher.Launch(UserToken, WI_IsFlagSet(Flags, LaunchWslRelayFlags::HideWindow));
 }
 } // namespace
@@ -259,16 +264,6 @@ wsl::windows::common::helpers::unique_proc_attribute_list wsl::windows::common::
     THROW_IF_WIN32_BOOL_FALSE(InitializeProcThreadAttributeList(List.get(), AttributeCount, 0, &Size));
 
     return List;
-}
-
-[[nodiscard]] HANDLE wsl::windows::common::helpers::DuplicateHandle(_In_ HANDLE Handle, _In_ DWORD DesiredAccess, _In_ BOOL InheritHandle, _In_ DWORD Options)
-{
-    // N.B. This function does not return a wil::unique_handle so that the caller
-    //      can pick its own desired type (e.g. wil::unique_event).
-    HANDLE Result;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(GetCurrentProcess(), Handle, GetCurrentProcess(), &Result, DesiredAccess, InheritHandle, Options));
-
-    return Result;
 }
 
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
@@ -501,11 +496,10 @@ bool wsl::windows::common::helpers::IsWslSupportInterfacePresent()
 void wsl::windows::common::helpers::LaunchDebugConsole(
     _In_ LPCWSTR PipeName, _In_ bool ConnectExistingPipe, _In_ HANDLE UserToken, _In_opt_ HANDLE LogFile, _In_ bool DisableTelemetry)
 {
-    wslrelay::RelayMode relayMode;
+    LaunchWslRelayFlags flags{};
     wil::unique_hfile pipe;
     if (ConnectExistingPipe)
     {
-        relayMode = wslrelay::RelayMode::DebugConsoleRelay;
         // Connect to an existing pipe. The connection should be:
         //     Asynchronous (FILE_FLAG_OVERLAPPED)
         //     Anonymous (SECURITY_SQOS_PRESENT | SECURITY_ANONYMOUS)
@@ -515,21 +509,20 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
     }
     else
     {
-        relayMode = wslrelay::RelayMode::DebugConsole;
-        // Create a new pipe server. The pipe should be:
+        // Create a new pipe server the child process will connect to. The pipe should be:
         //     Bi-directional: PIPE_ACCESS_DUPLEX
         //     Asynchronous: FILE_FLAG_OVERLAPPED
         //     Raw: PIPE_TYPE_BYTE | PIPE_READMODE_BYTE
         //     Blocking: PIPE_WAIT
+        WI_SetFlag(flags, LaunchWslRelayFlags::ConnectPipe);
         pipe.reset(CreateNamedPipeW(
             PipeName, (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr));
     }
 
     THROW_LAST_ERROR_IF(!pipe);
 
-    LaunchWslRelayFlags flags{};
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
-    wil::unique_handle info{LaunchWslRelay(relayMode, LogFile, nullptr, pipe.get(), {}, nullptr, UserToken, flags)};
+    wil::unique_handle info{LaunchWslRelay(wslrelay::RelayMode::DebugConsole, LogFile, nullptr, pipe.get(), {}, nullptr, UserToken, flags)};
 }
 
 [[nodiscard]] wil::unique_handle wsl::windows::common::helpers::LaunchInteropServer(
@@ -550,7 +543,7 @@ void wsl::windows::common::helpers::LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HA
 
     THROW_LAST_ERROR_IF(!pipe);
 
-    LaunchWslRelayFlags flags{};
+    LaunchWslRelayFlags flags = LaunchWslRelayFlags::ConnectPipe;
     WI_SetFlagIf(flags, LaunchWslRelayFlags::DisableTelemetry, DisableTelemetry);
     wil::unique_handle info{LaunchWslRelay(wslrelay::RelayMode::KdRelay, nullptr, nullptr, pipe.get(), Port, ExitEvent, UserToken, flags)};
 }

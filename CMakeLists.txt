@@ -4,10 +4,20 @@ set(CMAKE_SYSTEM_VERSION 10.0.26100.0)
 project(wsl)
 
 # Rationalize TARGET_PLATFORM
+# When neither CMAKE_GENERATOR_PLATFORM nor TARGET_PLATFORM is set, default to the host architecture.
+if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "" AND "${TARGET_PLATFORM}" STREQUAL "")
+    if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "ARM64")
+        set(TARGET_PLATFORM "arm64")
+    else()
+        set(TARGET_PLATFORM "x64")
+    endif()
+    message(STATUS "No platform specified, defaulting to '${TARGET_PLATFORM}' based on host architecture.")
+endif()
+
 if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "arm64" OR "${TARGET_PLATFORM}" STREQUAL "arm64")
     set(TARGET_PLATFORM "arm64")
     set(TEST_DISTRO_PLATFORM "arm64")
-elseif("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64|amd64|" OR "${TARGET_PLATFORM}" MATCHES "x64|amd64|")
+elseif("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64|amd64" OR "${TARGET_PLATFORM}" MATCHES "x64|amd64")
     set(TARGET_PLATFORM "x64")
     set(TEST_DISTRO_PLATFORM "amd64")
 else()
@@ -66,7 +76,6 @@ find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
-find_nuget_package(StrawberryPerl PERL /)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
 
@@ -92,7 +101,6 @@ find_nuget_package(Microsoft.Windows.SDK.NET.Ref WINDOWS_SDK_DOTNET /)
 find_nuget_package(Microsoft.Xaml.Behaviors.WinUI.Managed XAML_BEHAVIORS /)
 find_nuget_package(WinUIEx WINUIEX /)
 
-set(BIN2CPIO ${CMAKE_CURRENT_LIST_DIR}/tools/bin2cpio/bin2cpio.pl)
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
 # Default to debug build if unspecified
@@ -260,17 +268,31 @@ else()
     message(FATAL_ERROR "Unsupported platform: '${TARGET_PLATFORM}'")
 endif()
 
-# Determine the Visual Studio installation directory which contains LLVM tools
-# N.B. The version is set to VS2022 to ensure local runs match pipeline behavior
-execute_process(
-    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,18.0)" -products * -property installationPath
-    OUTPUT_VARIABLE VS_INSTALL_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    COMMAND_ERROR_IS_FATAL ANY
-)
+# Determine the Visual Studio installation directory which contains LLVM tools.
+# Supported versions: VS2022 and VS2026.
+# Prefer VS2022 to keep local clang-format output aligned with pipeline expectations.
+function(find_vs_install_dir VERSION_RANGE OUTPUT_VAR)
+    execute_process(
+        COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "${VERSION_RANGE}" -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath -prerelease -latest
+        OUTPUT_VARIABLE _vs_install_dir
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+
+    set(${OUTPUT_VAR} "${_vs_install_dir}" PARENT_SCOPE)
+endfunction()
+
+find_vs_install_dir("[17.0,18.0)" VS_INSTALL_DIR)
 
 if (NOT VS_INSTALL_DIR)
-    message(FATAL_ERROR "Could not determine Visual Studio 2022 installation directory.")
+    find_vs_install_dir("[18.0,19.0)" VS_INSTALL_DIR)
+    if (VS_INSTALL_DIR)
+        message(WARNING "Visual Studio 2022 was not found; using Visual Studio 2026 instead. clang-format output may differ from pipeline expectations.")
+    endif()
+endif()
+
+if (NOT VS_INSTALL_DIR)
+    message(FATAL_ERROR "Could not determine Visual Studio installation directory.")
 endif()
 
 if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
@@ -280,7 +302,7 @@ else()
 endif()
 
 if (NOT EXISTS ${LLVM_INSTALL_DIR})
-    message(FATAL_ERROR "C++ Clang Compiler for Windows is not installed. Please install it from the Visual Studio Installer.")
+    message(FATAL_ERROR "C++ Clang Compiler for Windows is not installed at ${LLVM_INSTALL_DIR}. Please install it from the Visual Studio Installer.")
 endif()
 
 # Generate the clang-format script which contains a path to clang-format.exe

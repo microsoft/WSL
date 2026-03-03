@@ -258,33 +258,21 @@ struct NetworkSettings
 {
     NetworkSettings() = default;
 
-    NetworkSettings(
-        const GUID& interfaceGuid,
-        EndpointIpAddress preferredIpAddress,
-        EndpointRoute gateway,
-        std::wstring macAddress,
-        std::wstring deviceName,
-        uint32_t interfaceIndex,
-        uint32_t mediaType,
-        const std::wstring& dnsServerList) :
+    NetworkSettings(const GUID& interfaceGuid, EndpointIpAddress preferredIpAddress, EndpointRoute gateway, std::wstring macAddress, uint32_t interfaceIndex, uint32_t mediaType) :
         InterfaceGuid(interfaceGuid),
         PreferredIpAddress(std::move(preferredIpAddress)),
         MacAddress(std::move(macAddress)),
-        DeviceName(std::move(deviceName)),
         InterfaceIndex(interfaceIndex),
         InterfaceType(mediaType)
     {
         Routes.emplace(std::move(gateway));
-        DnsServers = wsl::shared::string::Split(dnsServerList, L',');
     }
 
     GUID InterfaceGuid{};
     EndpointIpAddress PreferredIpAddress{};
     std::set<EndpointIpAddress> IpAddresses{}; // Does not include PreferredIpAddress.
     std::set<EndpointRoute> Routes{};
-    std::vector<std::wstring> DnsServers{};
     std::wstring MacAddress;
-    std::wstring DeviceName;
     IF_INDEX InterfaceIndex = 0;
     IFTYPE InterfaceType = 0;
     ULONG IPv4InterfaceMtu = 0;
@@ -344,11 +332,6 @@ struct NetworkSettings
         });
     }
 
-    std::wstring DnsServersString() const
-    {
-        return wsl::shared::string::Join(DnsServers, L',');
-    }
-
     // will return ULONG_MAX if there's no configured MTU
     ULONG GetEffectiveMtu() const noexcept
     {
@@ -386,7 +369,6 @@ std::shared_ptr<NetworkSettings> GetHostEndpointSettings();
         TraceLoggingValue((settings)->PreferredIpAddress.PrefixLength, "preferredIpAddressPrefixLength"), \
         TraceLoggingValue((settings)->IpAddressesString().c_str(), "ipAddresses"), \
         TraceLoggingValue((settings)->RoutesString().c_str(), "routes"), \
-        TraceLoggingValue((settings)->DnsServersString().c_str(), "dnsServerList"), \
         TraceLoggingValue((settings)->MacAddress.c_str(), "macAddress"), \
         TraceLoggingValue((settings)->IPv4InterfaceMtu, "IPv4InterfaceMtu"), \
         TraceLoggingValue((settings)->IPv6InterfaceMtu, "IPv6InterfaceMtu"), \

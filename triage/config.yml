@@ -21,7 +21,7 @@ logs_rules:
         
         The script will output the path of the log file once done.
 
-        If this is a networking issue, please use [collect-networking-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-networking-logs.ps1), following the instructions in [Collect WSL logs for networking issues](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#collect-wsl-logs-for-networking-issues)
+        If this is a networking issue, please use `.\collect-wsl-logs.ps1 -LogProfile networking` instead, following the instructions in [Collect WSL logs for networking issues](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#collect-wsl-logs-for-networking-issues)
         
         Once completed please upload the output files to this GitHub issue.
          

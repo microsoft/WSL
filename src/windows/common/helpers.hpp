@@ -62,7 +62,8 @@ enum class LaunchWslRelayFlags
 {
     None = 0,
     DisableTelemetry = 1,
-    HideWindow = 2
+    HideWindow = 2,
+    ConnectPipe = 4
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(LaunchWslRelayFlags);
@@ -116,8 +117,6 @@ std::wstring_view ConsumeArgument(_In_ std::wstring_view CommandLine, _In_ std::
 void CreateConsole(_In_ LPCWSTR ConsoleTitle = nullptr);
 
 unique_proc_attribute_list CreateProcThreadAttributeList(_In_ DWORD AttributeCount);
-
-[[nodiscard]] HANDLE DuplicateHandle(_In_ HANDLE Handle, _In_ DWORD DesiredAccess = 0, _In_ BOOL InheritHandle = FALSE, _In_ DWORD Options = DUPLICATE_SAME_ACCESS);
 
 std::vector<gsl::byte> GenerateConfigurationMessage(
     _In_ const std::wstring& DistributionName,

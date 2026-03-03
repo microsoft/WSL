@@ -178,33 +178,6 @@ class NetworkTests
     friend class BridgedTests;
     friend class VirtioProxyTests;
 
-    static std::wstring SockaddrToString(const SOCKADDR_INET* sockAddr)
-    {
-        constexpr auto ipv4AddressStringLength = 16;
-        constexpr auto ipv6AddressStringLength = 48;
-
-        std::wstring address(std::max(ipv4AddressStringLength, ipv6AddressStringLength), L'\0');
-
-        switch (sockAddr->si_family)
-        {
-        case AF_INET:
-        {
-            RtlIpv4AddressToStringW(&sockAddr->Ipv4.sin_addr, address.data());
-            break;
-        }
-        case AF_INET6:
-        {
-            RtlIpv6AddressToStringW(&sockAddr->Ipv6.sin6_addr, address.data());
-            break;
-        }
-        default:
-            break;
-        }
-
-        address.resize(std::wcslen(address.data()));
-        return address;
-    }
-
     struct IpAddress
     {
         std::wstring Address;
@@ -243,7 +216,7 @@ class NetworkTests
                 }
             }
 
-            return SockaddrToString(address) + L"/" + std::to_wstring(PrefixLength);
+            return wsl::windows::common::string::SockAddrInetToWstring(*address) + L"/" + std::to_wstring(PrefixLength);
         }
     };
 
@@ -812,7 +785,7 @@ class NetworkTests
         }
         else
         {
-            LogSkipped("Host does not have IPv4 internet connectivity. Skipping IPv4 DNS tests.");
+            LogInfo("Host does not have IPv4 internet connectivity. Skipping IPv4 DNS tests.");
         }
 
         if (HostHasInternetConnectivity(AF_INET6))
@@ -823,7 +796,7 @@ class NetworkTests
         }
         else
         {
-            LogSkipped("Host does not have IPv6 internet connectivity. Skipping IPv6 DNS tests.");
+            LogInfo("Host does not have IPv6 internet connectivity. Skipping IPv6 DNS tests.");
         }
     }
 
@@ -1037,7 +1010,6 @@ class NetworkTests
 
         wsl::shared::hns::DNS dns;
         dns.ServerList = L"1.1.1.1,1.1.1.2";
-        dns.Domain = L"microsoft.com";
         dns.Search = L"foo.microsoft.com,bar.microsoft.com";
         dns.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
         RunGns(dns, ModifyRequestType::Update, GuestEndpointResourceType::DNS);
@@ -1047,7 +1019,6 @@ class NetworkTests
         const std::wstring expected = std::wstring(LX_INIT_RESOLVCONF_FULL_HEADER) +
                                       L"nameserver 1.1.1.1\n"
                                       L"nameserver 1.1.1.2\n"
-                                      L"domain microsoft.com\n"
                                       L"search foo.microsoft.com bar.microsoft.com\n";
         VERIFY_ARE_EQUAL(expected, out.c_str());
     }
@@ -4612,6 +4583,9 @@ class VirtioProxyTests
         const std::wregex pattern(L"(.|\\n)*nameserver [0-9. ]+(.|\\n)*");
 
         VERIFY_IS_TRUE(std::regex_match(out, pattern));
+
+        // Verify that /etc/resolv.conf contains a 'search' line with DNS suffixes
+        VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
     }
 
     TEST_METHOD(GuestPortIsReleased)

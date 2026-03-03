@@ -42,6 +42,12 @@ static constexpr auto c_wslSettingsProgIDPropertyName = L"WSLSETTINGSPROGID";
         return NOERROR; \
     }
 
+#define WSL_INSTALL_LOG(Name, ...) \
+    { \
+        WSL_LOG(Name, __VA_ARGS__); \
+        WriteInstallLog(std::format("MSI install: {}", Name)); \
+    }
+
 #ifndef WSL_OFFICIAL_BUILD
 void TrustPackageCertificate(LPCWSTR Path)
 {
@@ -519,8 +525,7 @@ extern "C" UINT __stdcall CleanMsixState(MSIHANDLE install)
 extern "C" UINT __stdcall DeprovisionMsix(MSIHANDLE install)
 try
 {
-    WSL_LOG("DeprovisionMsix");
-    WriteInstallLog("MSI install: DeprovisionMsix");
+    WSL_INSTALL_LOG("DeprovisionMsix");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
     const auto result = packageManager.DeprovisionPackageForAllUsersAsync(wsl::windows::common::wslutil::c_msixPackageFamilyName).get();
@@ -543,8 +548,7 @@ catch (...)
 extern "C" UINT __stdcall RemoveMsixAsSystem(MSIHANDLE install)
 try
 {
-    WSL_LOG("RemoveMsixAsSystem");
-    WriteInstallLog("MSI install: RemoveMsixAsSystem");
+    WSL_INSTALL_LOG("RemoveMsixAsSystem");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -573,8 +577,7 @@ catch (...)
 extern "C" UINT __stdcall RemoveMsixAsUser(MSIHANDLE install)
 try
 {
-    WSL_LOG("RemoveMsixAsUser");
-    WriteInstallLog("MSI install: RemoveMsixAsUser");
+    WSL_INSTALL_LOG("RemoveMsixAsUser");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -643,8 +646,7 @@ wsl::windows::common::filesystem::TempFile ExtractMsix(MSIHANDLE install)
 extern "C" UINT __stdcall InstallMsixAsUser(MSIHANDLE install)
 try
 {
-    WSL_LOG("InstallMsixAsUser");
-    WriteInstallLog("MSI install: InstallMsixAsUser");
+    WSL_INSTALL_LOG("InstallMsixAsUser");
 
     // RegisterPackageByFamilyNameAsync() cannot be run as SYSTEM.
     //  If this thread runs as SYSTEM, simply skip this step.
@@ -687,8 +689,7 @@ try
     // Release a file handle to the MSIX file so that it can be installed.
     msixFile.Handle.reset();
 
-    WSL_LOG("InstallMsix", TraceLoggingValue(msixFile.Path.c_str(), "Path"));
-    WriteInstallLog("MSI install: InstallMsix");
+    WSL_INSTALL_LOG("InstallMsix", TraceLoggingValue(msixFile.Path.c_str(), "Path"));
 
     winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -790,8 +791,7 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
 {
     try
     {
-        WSL_LOG("WslFinalizeInstallation");
-        WriteInstallLog(std::format("MSI install: WslFinalizeInstallation"));
+        WSL_INSTALL_LOG("WslFinalizeInstallation");
     }
     CATCH_LOG();
 
@@ -801,9 +801,7 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
 extern "C" UINT __stdcall WslValidateInstallation(MSIHANDLE install)
 try
 {
-    WSL_LOG("WslValidateInstallation");
-
-    WriteInstallLog(std::format("MSI install: WslValidateInstallation"));
+    WSL_INSTALL_LOG("WslValidateInstallation");
 
     // TODO: Use a more precise version check so we don't install if the Windows build doesn't support lifted.
 
@@ -869,6 +867,46 @@ extern "C" UINT __stdcall UnregisterLspCategories(MSIHANDLE install)
         RegisterLspCategoriesImpl(0); // '0' means removing the entry.
     }
     CATCH_LOG();
+
+    // Failures in this method aren't fatal.
+    return NOERROR;
+}
+
+extern "C" UINT __stdcall CreateInitrd(MSIHANDLE install)
+try
+{
+    WSL_INSTALL_LOG("CreateInitrd");
+
+    const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
+    THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
+
+    const auto toolsPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY;
+    const auto initPath = toolsPath / L"init";
+    const auto initrdPath = toolsPath / LXSS_VM_MODE_INITRD_NAME;
+    wsl::windows::common::filesystem::CreateCpioInitrd(initPath, initrdPath);
+
+    return NOERROR;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+
+    return ERROR_INSTALL_FAILURE;
+}
+
+extern "C" UINT __stdcall RemoveInitrd(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("RemoveInitrd");
+
+        const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
+        THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
+
+        const auto initrdPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
+        THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(initrdPath.c_str()));
+    }
+    CATCH_LOG()
 
     // Failures in this method aren't fatal.
     return NOERROR;

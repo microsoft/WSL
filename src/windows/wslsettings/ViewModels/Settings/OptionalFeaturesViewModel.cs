@@ -82,7 +82,14 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
         {
             if (ValidateInput(value, Constants.IntegerRegex))
             {
-                Set(ref _vMIdleTimeout!, Convert.ToInt32(value));
+                if (Int32.TryParse(value, out int parsedValue))
+                {
+                    Set(ref _vMIdleTimeout!, parsedValue);
+                }
+                else
+                {
+                    OnPropertyChanged();
+                }
             }
         }
     }

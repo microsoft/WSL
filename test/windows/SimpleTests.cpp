@@ -296,5 +296,60 @@ class SimpleTests
         VERIFY_IS_TRUE(output.find(L"/mnt/c/Program Files (x86)/Common Files") != std::wstring::npos);
         VERIFY_IS_TRUE(output.find(L"/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin") != std::wstring::npos);
     }
+
+    TEST_METHOD(CreateCpioInitrd)
+    {
+        using wsl::windows::common::filesystem::CreateCpioInitrd;
+        using wsl::windows::common::filesystem::TempFile;
+        using wsl::windows::common::filesystem::TempFileFlags;
+
+        auto validateCpio = [](size_t sourceSize) {
+            // Create source file with specified size
+            TempFile sourceFile(GENERIC_WRITE, 0, CREATE_ALWAYS, TempFileFlags::None);
+            std::vector<char> sourceData(sourceSize, 'X');
+            DWORD written;
+            THROW_IF_WIN32_BOOL_FALSE(
+                WriteFile(sourceFile.Handle.get(), sourceData.data(), static_cast<DWORD>(sourceData.size()), &written, nullptr));
+            sourceFile.Handle.reset();
+
+            // Create CPIO archive
+            TempFile destFile(0, 0, CREATE_ALWAYS, TempFileFlags::None, L"img");
+            CreateCpioInitrd(sourceFile.Path, destFile.Path);
+
+            // Read and validate the CPIO archive
+            wil::unique_hfile cpioHandle{CreateFileW(
+                destFile.Path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            THROW_LAST_ERROR_IF(!cpioHandle);
+
+            LARGE_INTEGER cpioSize{};
+            THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(cpioHandle.get(), &cpioSize));
+            VERIFY_ARE_EQUAL(cpioSize.QuadPart % 512, 0LL); // Archive padded to 512-byte boundary
+
+            char header[111] = {};
+            DWORD bytesRead;
+            THROW_IF_WIN32_BOOL_FALSE(ReadFile(cpioHandle.get(), header, 110, &bytesRead, nullptr));
+            VERIFY_ARE_EQUAL(bytesRead, 110u);
+
+            // Parse CPIO newc header: magic(6) ino mode uid gid nlink mtime filesize devmajor devminor rdevmajor rdevminor namesize check
+            DWORD fileSize, nameSize;
+            VERIFY_ARE_EQUAL(sscanf_s(header, "070701%*8x%*8x%*8x%*8x%*8x%*8x%8x%*8x%*8x%*8x%*8x%8x", &fileSize, &nameSize), 2);
+
+            // Verify filename matches source file
+            auto expectedName = sourceFile.Path.filename().string();
+            VERIFY_ARE_EQUAL(nameSize, static_cast<DWORD>(expectedName.size() + 1));
+
+            std::string filename(nameSize, '\0');
+            THROW_IF_WIN32_BOOL_FALSE(ReadFile(cpioHandle.get(), filename.data(), nameSize, &bytesRead, nullptr));
+            VERIFY_ARE_EQUAL(filename.c_str(), expectedName);
+
+            VERIFY_ARE_EQUAL(fileSize, static_cast<DWORD>(sourceSize));
+        };
+
+        // Test various sizes to exercise 4-byte alignment padding
+        for (size_t size : {0, 1, 2, 3, 4, 5, 100, 1024, 4096, 65536})
+        {
+            validateCpio(size);
+        }
+    }
 };
 } // namespace SimpleTests

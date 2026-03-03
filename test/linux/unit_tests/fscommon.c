@@ -3405,13 +3405,6 @@ Return Value:
 
     int Result;
 
-    if (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
-    {
-        LxtLogInfo("TODO: debug this test on virtiofs");
-        Result = 0;
-        goto ErrorExit;
-    }
-
     LxtCheckResult(LxtFsDeleteLoopCommon(FS_DELETELOOP_TEST_DIR));
 
 ErrorExit:
@@ -3777,16 +3770,9 @@ int FsCommonTestNoatimeFlag(PLXT_ARGS Args)
     // Plan 9 and virtiofs do not forward O_NOATIME to the server.
     //
 
-    if (g_LxtFsInfo.FsType == LxtFsTypePlan9)
+    if (g_LxtFsInfo.FsType == LxtFsTypePlan9 || g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
     {
-        LxtLogInfo("Test not supported on Plan 9.");
-        Result = 0;
-        goto ErrorExit;
-    }
-
-    if (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
-    {
-        LxtLogInfo("Test not supported on virtiofs.");
+        LxtLogInfo("This test is not supported for plan9 or virtiofs.");
         Result = 0;
         goto ErrorExit;
     }

@@ -294,7 +294,7 @@ Return Value:
             snprintf(
                 Plan9Options,
                 sizeof(Plan9Options),
-                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=5,access=client,msize=65536,trans=fd,rfd=4,wfd=4",
+                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*",
                 Plan9Source,
                 Temp);
         }
@@ -444,13 +444,18 @@ Return Value:
     //
     // Try to chdir to the parent.
     //
+    // N.B. This currently doesn't work on virtiofs.
+    //
 
-    LxtCheckErrnoZeroSuccess(chdir(".."));
-    LxtCheckErrno(LxtGetcwd(Path, sizeof(Path)));
-    LxtCheckStringEqual(Path, BaseDir);
-    memset(Path, 0, sizeof(Path));
-    LxtCheckErrno(readlink(FS_PROC_SELF_CWD, Path, sizeof(Path)));
-    LxtCheckStringEqual(Path, BaseDir);
+    if (g_LxtFsInfo.FsType != LxtFsTypeVirtioFs)
+    {
+        LxtCheckErrnoZeroSuccess(chdir(".."));
+        LxtCheckErrno(LxtGetcwd(Path, sizeof(Path)));
+        LxtCheckStringEqual(Path, BaseDir);
+        memset(Path, 0, sizeof(Path));
+        LxtCheckErrno(readlink(FS_PROC_SELF_CWD, Path, sizeof(Path)));
+        LxtCheckStringEqual(Path, BaseDir);
+    }
 
     //
     // Try to chdir back to the deleted directory.

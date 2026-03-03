@@ -298,10 +298,12 @@
     <value>舊版發佈不支援 WSL 2。</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>您目前的電腦設定不支援 WSL2。
-請啟用「虛擬機器平台」選擇性元件，並確保 BIOS 中已啟用虛擬化。
-啟用以下項目，以執行 [虛擬機器平台]: wsl.exe --install --no-distribution
-如需詳細資訊，請瀏覽 https://aka.ms/enablevirtualization</value>
+    <value>WSL2 無法啟動，因為此機未啟用虛擬化。
+請確保您的電腦韌體設定中啟用了「虛擬機平台」這個選用元件，並且虛擬化功能已開啟。
+
+啟用「虛擬機器平台」時，執行： wsl.exe --install --no-distribution
+
+詳情請造訪 https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

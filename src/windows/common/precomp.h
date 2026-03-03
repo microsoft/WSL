@@ -160,7 +160,7 @@ Abstract:
 #include "LxssDynamicFunction.h"
 #include "relay.hpp"
 #include "svccomm.hpp"
-#include "svccommio.hpp"
+#include "ConsoleState.h"
 #include "disk.hpp"
 #include "WslSecurity.h"
 #include "ExecutionContext.h"
