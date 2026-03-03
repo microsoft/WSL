@@ -2028,14 +2028,12 @@ class NetworkTests
     static std::tuple<unique_kill_process, uint16_t> BindGuestPortZero(bool Ipv6 = false)
     {
         auto [stdErrRead, stdErrWrite] = CreateSubprocessPipe(false, true);
-        auto [stdOutRead, stdOutWrite] = CreateSubprocessPipe(false, true);
         const std::wstring protocol = Ipv6 ? L"TCP6-LISTEN:0" : L"TCP4-LISTEN:0";
         const std::wstring wslCmd = L"socat -dd " + protocol + L" STDOUT";
         auto cmd = LxssGenerateWslCommandLine(wslCmd.data());
 
-        auto process = LxsstuStartProcess(cmd.data(), nullptr, stdOutWrite.get(), stdErrWrite.get());
+        auto process = LxsstuStartProcess(cmd.data(), nullptr, nullptr, stdErrWrite.get());
         stdErrWrite.reset();
-        stdOutWrite.reset();
 
         // Parse the assigned port from socat's debug output.
         // socat -dd prints a line like: "... listening on AF=2 0.0.0.0:PORT"
@@ -2046,8 +2044,19 @@ class NetworkTests
 
         while (!found)
         {
+            // Grow the buffer if full to avoid zero-byte reads and infinite loops.
+            if (writeOffset == output.size())
+            {
+                output.resize(output.size() * 2);
+            }
+
             DWORD bytesRead = 0;
             if (!ReadFile(stdErrRead.get(), output.data() + writeOffset, static_cast<DWORD>(output.size() - writeOffset), &bytesRead, nullptr))
+            {
+                break;
+            }
+
+            if (bytesRead == 0)
             {
                 break;
             }
@@ -2058,15 +2067,20 @@ class NetworkTests
             auto pos = outputView.find("listening on");
             if (pos != std::string_view::npos)
             {
-                // Find the last ':' after "listening on" to extract the port
-                auto colonPos = outputView.rfind(':');
-                if (colonPos != std::string_view::npos && colonPos > pos)
+                // Find the first ':' after "listening on" to extract the port
+                auto colonPos = outputView.find(':', pos);
+                if (colonPos != std::string_view::npos)
                 {
                     auto portStr = outputView.substr(colonPos + 1);
                     auto end = portStr.find_first_not_of("0123456789");
                     if (end != std::string_view::npos)
                     {
                         portStr = portStr.substr(0, end);
+                    }
+
+                    if (portStr.empty())
+                    {
+                        continue;
                     }
 
                     assignedPort = static_cast<uint16_t>(std::stoi(std::string(portStr)));
