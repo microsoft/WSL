@@ -656,15 +656,12 @@ bool wsl::windows::common::relay::StandardInputRelay(
 
                 if (!DetachSequence.empty())
                 {
-                    if (DetachSequence.size() >= 2)
+                    if (CurrentSequence.size() >= DetachSequence.size())
                     {
-                        if (CurrentSequence.size() >= DetachSequence.size())
-                        {
-                            CurrentSequence.pop_front();
-                        }
-
-                        CurrentSequence.push_back(CurrentInputRecord->Event.KeyEvent.uChar.AsciiChar);
+                        CurrentSequence.pop_front();
                     }
+
+                    CurrentSequence.push_back(CurrentInputRecord->Event.KeyEvent.uChar.AsciiChar);
                 }
 
                 //
