@@ -47,6 +47,7 @@ _(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       L
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       L"Specifies the container init process executable") \
 _(Env,            "env",                 L"e",              Kind::Value,       L"Key=Value pairs for environment variables") \
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       L"File containing key=value pairs of env variables") \
+_(Follow,         "follow",              L"f",              Kind::Flag,        L"Follow log output") \
 _(Format,         "format",              NO_ALIAS,          Kind::Value,       L"Output formatting (json or table) (Default:table)") \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L"Arguments to pass to container's init process") \
 _(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       L"Group Id for the process") \

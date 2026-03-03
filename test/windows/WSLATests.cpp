@@ -64,7 +64,7 @@ class WSLATests
         m_defaultSession = CreateSession(m_defaultSessionSettings);
 
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
 
         auto hasImage = [&](const std::string& imageName) {
             return std::ranges::any_of(
@@ -111,7 +111,7 @@ class WSLATests
         WSLA_SESSION_SETTINGS settings{};
         settings.DisplayName = Name;
         settings.CpuCount = 4;
-        settings.MemoryMb = 2024;
+        settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
         settings.MaximumStorageSizeMb = 4096; // 4GB.
@@ -184,7 +184,7 @@ class WSLATests
     }
 
     static RunningWSLAProcess::ProcessResult ExpectCommandResult(
-        IWSLASession* session, const std::vector<std::string>& command, int expectResult, bool expectSignal = false, int timeout = 600000)
+        IWSLASession* session, const std::vector<std::string>& command, int expectResult, int timeout = 600000)
     {
         auto result = RunCommand(session, command, timeout);
 
@@ -235,6 +235,8 @@ class WSLATests
                     fd,
                     EscapeString(expected).c_str(),
                     EscapeString(it->second).c_str());
+
+                return;
             }
         }
     }
@@ -318,10 +320,40 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
+    TEST_METHOD(CreateSessionValidation)
+    {
+        WSL2_TEST_ONLY();
+
+        auto sessionManager = OpenSessionManager();
+
+        // Reject NULL DisplayName.
+        {
+            auto settings = GetDefaultSessionSettings(nullptr);
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
+        }
+
+        // Reject DisplayName at exact boundary (no room for null terminator).
+        {
+            std::wstring boundaryName(std::size(WSLA_SESSION_INFORMATION{}.DisplayName), L'x');
+            auto settings = GetDefaultSessionSettings(boundaryName.c_str());
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
+        }
+
+        // Reject too long DisplayName.
+        {
+            std::wstring longName(std::size(WSLA_SESSION_INFORMATION{}.DisplayName) + 1, L'x');
+            auto settings = GetDefaultSessionSettings(longName.c_str());
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
+        }
+    }
+
     void ExpectImagePresent(IWSLASession& Session, const char* Image, bool Present = true)
     {
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
+        THROW_IF_FAILED(Session.ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
         std::vector<std::string> tags;
         for (const auto& e : images)
@@ -388,26 +420,323 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // TODO: Add more test coverage once ListImages() is fully implemented.
-
-        // Validate that images with multiple tags are correctly returned.
+        // Setup: Ensure debian:latest is available
         ExpectImagePresent(*m_defaultSession, "debian:latest");
 
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
+        // Create additional tags for testing
+        WSLA_TAG_IMAGE_OPTIONS tagOptions{};
+        tagOptions.Image = "debian:latest";
+        tagOptions.Repo = "debian";
+        tagOptions.Tag = "test-tag1";
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+        tagOptions.Tag = "test-tag2";
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
         auto cleanup = wil::scope_exit([&]() {
-            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Force = false, .NoPrune = false};
-
+            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-tag1", .Flags = WSLADeleteImageFlagsNone};
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+
+            options.Image = "debian:test-tag2";
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
         });
 
-        ExpectImagePresent(*m_defaultSession, "debian:test-list-images");
-        ExpectImagePresent(*m_defaultSession, "debian:latest");
+        LogInfo("Test: Basic listing with nullptr options");
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+            VERIFY_IS_TRUE(images.size() > 0);
+
+            // Find debian images and verify they exist
+            bool foundLatest = false, foundTag1 = false, foundTag2 = false;
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName == "debian:latest")
+                {
+                    foundLatest = true;
+                }
+                if (imageName == "debian:test-tag1")
+                {
+                    foundTag1 = true;
+                }
+                if (imageName == "debian:test-tag2")
+                {
+                    foundTag2 = true;
+                }
+            }
+
+            VERIFY_IS_TRUE(foundLatest);
+            VERIFY_IS_TRUE(foundTag1);
+            VERIFY_IS_TRUE(foundTag2);
+        }
+
+        LogInfo("Test: Verify all fields are populated");
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+            std::string commonHash;
+            int debianTagCount = 0;
+
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName.starts_with("debian:"))
+                {
+                    debianTagCount++;
+
+                    // Verify Hash field
+                    VERIFY_IS_TRUE(strlen(image.Hash) > 0);
+                    VERIFY_IS_TRUE(std::string(image.Hash).starts_with("sha256:"));
+
+                    // All debian tags should have the same hash (same underlying image)
+                    if (commonHash.empty())
+                    {
+                        commonHash = image.Hash;
+                    }
+                    else
+                    {
+                        VERIFY_ARE_EQUAL(commonHash, std::string(image.Hash));
+                    }
+
+                    // Verify Size field
+                    VERIFY_IS_TRUE(image.Size > 0);
+
+                    // Verify Created timestamp
+                    VERIFY_IS_TRUE(image.Created > 0);
+                }
+            }
+
+            VERIFY_IS_TRUE(debianTagCount >= 3); // At least debian:latest, test-tag1, test-tag2
+        }
+
+        LogInfo("Test: Multiple tags for same image return separate entries");
+        {
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = "debian";
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Should find at least our 3 debian tags
+            VERIFY_IS_TRUE(images.size() >= 3);
+
+            // Verify each tag is a separate entry
+            std::set<std::string> imageTags;
+            for (const auto& image : images)
+            {
+                imageTags.insert(image.Image);
+            }
+
+            VERIFY_IS_TRUE(imageTags.contains("debian:latest"));
+            VERIFY_IS_TRUE(imageTags.contains("debian:test-tag1"));
+            VERIFY_IS_TRUE(imageTags.contains("debian:test-tag2"));
+        }
+
+        LogInfo("Test: Filter by specific reference");
+        {
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = "debian:test-tag1";
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // When filtering by exact tag, Docker returns all tags for that image
+            // So we should get debian:latest, debian:test-tag1, debian:test-tag2
+            bool foundTag1 = false;
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName == "debian:test-tag1")
+                {
+                    foundTag1 = true;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag1);
+        }
+
+        LogInfo("Test: Digests flag");
+        {
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsDigests;
+            options.Reference = "debian:latest";
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Check if digests are available (they may not be for all images)
+            bool hasDigest = false;
+            for (const auto& image : images)
+            {
+                if (strlen(image.Digest) > 0)
+                {
+                    hasDigest = true;
+                    // Digest should be in format repo@sha256:...
+                    VERIFY_IS_TRUE(std::string(image.Digest).find("@sha256:") != std::string::npos);
+                }
+            }
+            // Note: Pulled images from registry should have digests, locally built may not
+        }
+
+        LogInfo("Test: Before/Since filters");
+        {
+            // Get all images to find their IDs
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> allImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
+
+            std::string debianId, pythonId;
+            for (const auto& image : allImages)
+            {
+                std::string imageName = image.Image;
+                if (imageName == "debian:latest")
+                {
+                    debianId = image.Hash;
+                }
+                else if (imageName == "python:3.12-alpine")
+                {
+                    pythonId = image.Hash;
+                }
+            }
+
+            VERIFY_IS_FALSE(debianId.empty());
+            VERIFY_IS_FALSE(pythonId.empty());
+
+            // Test 'since' filter - images created after debian
+            {
+                WSLA_LIST_IMAGES_OPTIONS options{};
+                options.Flags = WSLAListImagesFlagsNone;
+                options.Since = debianId.c_str();
+
+                wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                VERIFY_IS_TRUE(images.size() > 0);
+
+                bool foundPython = false;
+                for (const auto& image : images)
+                {
+                    LogInfo("Image: %hs, Hash: %hs, Created: %lld", image.Image, image.Hash, image.Created);
+                    if (std::string{image.Image} == "python:3.12-alpine")
+                    {
+                        foundPython = true;
+                    }
+                }
+
+                VERIFY_IS_TRUE(foundPython);
+            }
+
+            // Test 'before' filter - images created before python
+            {
+                WSLA_LIST_IMAGES_OPTIONS options{};
+                options.Flags = WSLAListImagesFlagsNone;
+                options.Before = pythonId.c_str();
+                wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                VERIFY_IS_TRUE(images.size() > 0);
+
+                bool foundDebian = false;
+                for (const auto& image : images)
+                {
+                    if (std::string{image.Image} == "debian:latest")
+                    {
+                        foundDebian = true;
+                    }
+                }
+
+                VERIFY_IS_TRUE(foundDebian);
+            }
+        }
+
+        LogInfo("Test: Dangling filter");
+        {
+            // Setup a dangling image
+            LoadTestImage(L"alpine-latest.tar");
+            WSLA_TAG_IMAGE_OPTIONS tagOptions{};
+            tagOptions.Image = "debian:latest";
+            tagOptions.Repo = "alpine";
+            tagOptions.Tag = "latest";
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+
+            auto alpineCleanup = wil::scope_exit([&]() {
+                RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "image", "prune", "-f"});
+                WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsNone};
+                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            });
+
+            // List only dangling images
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsDanglingTrue;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> danglingImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, danglingImages.addressof(), danglingImages.size_address<ULONG>()));
+
+            VERIFY_ARE_EQUAL(1, danglingImages.size());
+
+            // All dangling images should have <none>:<none> as the tag
+            for (const auto& image : danglingImages)
+            {
+                std::string imageName = image.Image;
+                VERIFY_ARE_EQUAL(imageName, std::string("<none>:<none>"));
+            }
+
+            // List non-dangling images
+            options.Flags = WSLAListImagesFlagsDanglingFalse;
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> nonDanglingImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, nonDanglingImages.addressof(), nonDanglingImages.size_address<ULONG>()));
+            VERIFY_IS_TRUE(nonDanglingImages.size() > 0);
+
+            // None of these should be <none>:<none>
+            for (const auto& image : nonDanglingImages)
+            {
+                std::string imageName = image.Image;
+                VERIFY_ARE_NOT_EQUAL(imageName, std::string("<none>:<none>"));
+            }
+        }
+
+        LogInfo("Test: Label filter");
+        {
+            // Test with nullptr (no label filter)
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Labels = nullptr;
+            options.LabelsCount = 0;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Test with single label filter
+            {
+                WSLA_LABEL labels[] = {{.Key = "test.label", .Value = nullptr}};
+                options.Labels = labels;
+                options.LabelsCount = 1;
+
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+            }
+
+            // Test with multiple label filters (labels are AND'ed together)
+            {
+                WSLA_LABEL labels[] = {{.Key = "test.label1", .Value = nullptr}, {.Key = "test.label2", .Value = "value"}};
+                options.Labels = labels;
+                options.LabelsCount = 2;
+
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+            }
+
+            // Note: To fully test label filtering with actual matches, would need to:
+            // 1. Build an image with specific labels using docker build --label
+            // 2. Filter with matching labels
+            // 3. Verify the filtered image appears
+            // This only tests the API usage not fail without requiring image builds
+        }
 
         cleanup.reset();
-        ExpectImagePresent(*m_defaultSession, "debian:test-list-images", false);
-        ExpectImagePresent(*m_defaultSession, "debian:latest");
+        ExpectImagePresent(*m_defaultSession, "debian:test-tag1", false);
+        ExpectImagePresent(*m_defaultSession, "debian:test-tag2", false);
+        ExpectImagePresent(*m_defaultSession, "debian:latest", true);
     }
 
     // TODO: Test that invalid tars are correctly handled.
@@ -492,15 +821,15 @@ class WSLATests
         // Test delete failed if image in use.
         WSLA_DELETE_IMAGE_OPTIONS options{};
         options.Image = "alpine:latest";
-        options.Force = FALSE;
+        options.Flags = WSLADeleteImageFlagsNone;
         wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
 
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
             m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
-        // Force should suuceed.
-        options.Force = TRUE;
+        // Force should succeed.
+        options.Flags = WSLADeleteImageFlagsForce;
         VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
         VERIFY_IS_TRUE(deletedImages.size() > 0);
         VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);
@@ -508,7 +837,7 @@ class WSLATests
         // Verify that the image is no longer in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
 
-        // Test delete failed if image not exists.
+        // Test delete failed if image does not exist.
         VERIFY_ARE_EQUAL(
             WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
     }
@@ -919,8 +1248,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "debian:test-tag";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(
@@ -938,7 +1266,7 @@ class WSLATests
 
             // Verify they have the same image hash.
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             std::string latestHash;
             std::string testTagHash;
@@ -966,8 +1294,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "myrepo/myimage:v1.0.0";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(
@@ -988,8 +1315,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "debian:test-by-id";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(
@@ -999,7 +1325,7 @@ class WSLATests
             });
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             std::string imageId;
             for (const auto& image : images)
@@ -1022,8 +1348,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "test:duplicate-tag";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(
@@ -1069,6 +1394,82 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(InspectImage)
+    {
+        WSL2_TEST_ONLY();
+
+        // Test inspect debian:latest
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectImage("debian:latest", &output));
+
+            // Verify output is valid JSON
+            VERIFY_IS_NOT_NULL(output.get());
+            VERIFY_IS_TRUE(std::strlen(output.get()) > 0);
+            LogInfo("Inspect output: %hs", output.get());
+
+            // Parse and validate JSON structure
+            auto inspectResult = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(output.get());
+
+            // Verify all fields exposed in wsla_schema::InspectImage
+            VERIFY_IS_TRUE(inspectResult.Id.find("sha256:") == 0);
+
+            VERIFY_IS_TRUE(inspectResult.RepoTags.has_value());
+            VERIFY_IS_FALSE(inspectResult.RepoTags->empty());
+            bool foundTag = false;
+            for (const auto& tag : inspectResult.RepoTags.value())
+            {
+                if (tag.find("debian:latest") != std::string::npos)
+                {
+                    foundTag = true;
+                    break;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag);
+
+            // skip testing RepoDigests for loaded test image.
+            VERIFY_IS_FALSE(inspectResult.Created.empty());
+            VERIFY_IS_TRUE(inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
+            VERIFY_ARE_EQUAL("linux", inspectResult.Os);
+            VERIFY_IS_TRUE(inspectResult.Size > 0);
+            VERIFY_IS_TRUE(inspectResult.Metadata.has_value());
+            VERIFY_IS_TRUE(inspectResult.Metadata->size() > 0);
+
+            VERIFY_IS_TRUE(inspectResult.Config.has_value());
+            const auto& config = inspectResult.Config.value();
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_IS_TRUE(config.Cmd->size() > 0);
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(0, config.Entrypoint->size());
+            VERIFY_IS_TRUE(config.Env.has_value());
+            VERIFY_IS_TRUE(config.Env->size() > 0);
+            VERIFY_IS_FALSE(config.Labels.has_value());
+        }
+
+        // Negative test: Image not found
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
+            ValidateCOMErrorMessage(L"No such image: nonexistent:image");
+        }
+
+        // Negative test: Bad image name input
+        {
+            wil::unique_cotaskmem_ansistring output;
+
+            std::string longImageName(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a');
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->InspectImage(longImageName.c_str(), &output));
+
+            // Invalid name.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), m_defaultSession->InspectImage("debian latest", &output));
+            ValidateCOMErrorMessage(L"invalid reference format");
+
+            // Attempt to fake to call search endpoint. Our implementation escaped the image name correctly.
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("search/debian:latest", &output));
+            ValidateCOMErrorMessage(L"No such image: search/debian:latest");
+        }
+    }
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
@@ -1090,51 +1491,50 @@ class WSLATests
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         }
 
-        // Save the image to a tar file.
         {
             std::filesystem::path imageTar = L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{CreateFileW(
-                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
             auto cleanup =
                 wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
-        }
+            // Save the image to a tar file.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
+            }
 
-        // Load the saved image to verify it's valid.
-        {
-            std::filesystem::path imageTar = L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{
-                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            // Load the image from a saved tar
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
-            // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
-            auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess().WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(0, result.Code);
-            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            // Load the saved image to verify it's valid.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                // Load the image from a saved tar
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                // Verify that the image is in the list of images.
+                ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+                WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+                auto container = launcher.Launch(*m_defaultSession);
+                auto result = container.GetInitProcess().WaitAndCaptureOutput();
+                VERIFY_ARE_EQUAL(0, result.Code);
+                VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            }
         }
 
         // Try to save an invalid image.
         {
             std::filesystem::path imageTar = L"HelloWorldError.tar";
+            auto cleanfile =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
             wil::unique_handle imageTarFileHandle{CreateFileW(
                 imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
@@ -1154,6 +1554,10 @@ class WSLATests
         // Load the exported tar file to verify it's a valid image and can be launched.
         // Finally, stop and delete the container, then try to export again to verify it fails as expected.
         {
+            std::filesystem::path containerTar = L"HelloWorldExported.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(containerTar.c_str())); });
+
             // Load the image from a saved tar and launch a container
             {
                 std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
@@ -1172,7 +1576,6 @@ class WSLATests
                 VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
 
                 // Export the container to a tar file.
-                std::filesystem::path containerTar = L"HelloWorldExported.tar";
                 wil::unique_handle containerTarFileHandle{CreateFileW(
                     containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
@@ -1185,13 +1588,11 @@ class WSLATests
 
             // Load the exported container to verify it's valid.
             {
-                std::filesystem::path containerTar = L"HelloWorldExported.tar";
                 wil::unique_handle containerTarFileHandle{CreateFileW(
                     containerTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
-                auto cleanup =
-                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(containerTar.c_str())); });
                 LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
                 VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(containerTarFileHandle.get()), nullptr, fileSize.QuadPart));
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "hello-world:latest");
@@ -1204,11 +1605,11 @@ class WSLATests
                 // Stop and delete the above container and try to export.
 
                 std::filesystem::path imageTarFile = L"HelloWorldExportError.tar";
+                auto cleanfile =
+                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTarFile.c_str())); });
                 wil::unique_handle contTarFileHandle{CreateFileW(
                     imageTarFile.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == contTarFileHandle.get());
-                auto cleanfile =
-                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTarFile.c_str())); });
                 VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
 
@@ -3891,6 +4292,7 @@ class WSLATests
             WSLAContainerLauncher launcher("debian:latest", "logs-test-4", {"/bin/bash", "-c", "echo -n OK"});
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK"}});
 
             // Testing would with more granularity would be difficult, but these flags are just forwarded to docker,
             // so validate that they're wired correctly.
@@ -4015,7 +4417,7 @@ class WSLATests
 
         // Test duplicate keys
         {
-            std::vector<WSLA_LABEL> labels(2);
+            std::vector<WSLA_LABEL> labels;
             labels.push_back({.Key = "key", .Value = "value"});
             labels.push_back({.Key = "key", .Value = "value2"});
 
@@ -4027,7 +4429,7 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> container;
             auto hr = m_defaultSession->CreateContainer(&options, &container);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
         }
 
         // Test wsla metadata key conflict
@@ -4323,6 +4725,8 @@ class WSLATests
             }
 
             auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
+            auto id = container.Id();
+
             VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
@@ -4331,6 +4735,217 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 0);
+        }
+    }
+
+    TEST_METHOD(ContainerNameGeneration)
+    {
+        WSL2_TEST_ONLY();
+
+        {
+            // Create a container with a specific name
+            auto container = WSLAContainerLauncher("debian:latest", "test-container-name").Create(*m_defaultSession.get());
+
+            // Validate that the container name is correct.
+            VERIFY_ARE_EQUAL(container.Name(), "test-container-name");
+        }
+
+        {
+            // Create a container without name.
+            auto container = WSLAContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+
+            // Validate that the service generates a name for the container.
+            VERIFY_ARE_NOT_EQUAL(container.Name(), "");
+        }
+    }
+
+    struct BlockingOperation
+    {
+        NON_COPYABLE(BlockingOperation);
+        NON_MOVABLE(BlockingOperation);
+
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation) : m_operation(std::move(Operation))
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+
+            m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
+            m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
+
+            // Wait for the operation to be running before continuing.
+            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
+        }
+
+        ~BlockingOperation()
+        {
+            if (m_operationThread.joinable())
+            {
+                m_operationThread.join();
+            }
+
+            if (m_ioThread.joinable())
+            {
+                m_ioThread.join();
+            }
+        }
+
+        void RunOperation(wil::unique_handle Handle)
+        {
+            m_result.set_value(m_operation(Handle.get()));
+
+            // Fail if the operation completed before the test signaled completion.
+            // Don't use VERIFY macros since this is running in a separate thread.
+            WI_ASSERT(m_testCompleteEvent.is_signaled());
+        }
+
+        void RunIO(wil::unique_handle Handle)
+        {
+            std::vector<char> buffer(1024 * 1024);
+            while (true)
+            {
+                DWORD bytesRead{};
+                if (!ReadFile(Handle.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+                {
+                    if (GetLastError() != ERROR_BROKEN_PIPE)
+                    {
+                        LogError("Unexpected ReadFile() error: %u", GetLastError());
+                    }
+
+                    break;
+                }
+
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                if (!m_startedEvent.is_signaled())
+                {
+                    m_startedEvent.SetEvent();
+                }
+
+                // Block until the test completes.
+                if (!m_testCompleteEvent.wait(60 * 1000))
+                {
+                    LogError("Timed out waiting for test completion");
+                    break;
+                }
+            }
+        }
+
+        void Complete()
+        {
+            m_testCompleteEvent.SetEvent();
+
+            VERIFY_SUCCEEDED(m_result.get_future().get());
+        }
+
+        std::function<HRESULT(HANDLE)> m_operation;
+        wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
+        wil::unique_event m_testCompleteEvent{wil::EventOptions::ManualReset};
+        std::thread m_operationThread;
+        std::thread m_ioThread;
+        std::promise<HRESULT> m_result;
+    };
+
+    // This test case validates that multiple operations can happen in parallel in the same session.
+    TEST_METHOD(ParallelSessionOperations)
+    {
+        WSL2_TEST_ONLY();
+
+        // Start a blocking export
+        BlockingOperation operation(
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr); });
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
+
+        // Validate that various operations can be done while the export is in progress.
+
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+
+            if (containers.size() > 0)
+            {
+                LogError("Unexpected container found: %hs", containers[0].Name);
+                VERIFY_FAIL();
+            }
+        }
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-parallel-operation", {"echo", "OK"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            auto containerRef = OpenContainer(m_defaultSession.get(), "test-parallel-operation");
+        }
+
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
+        }
+    }
+
+    TEST_METHOD(ParallelContainerOperations)
+    {
+        WSL2_TEST_ONLY();
+
+        WSLAContainerLauncher launcher("debian:latest", "test-parallel-container-operations", {"echo", "OK"});
+
+        auto container = launcher.Launch(*m_defaultSession);
+
+        auto process = container.GetInitProcess();
+        ValidateProcessOutput(process, {{1, "OK\n"}});
+
+        // Start a blocking export
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
+
+        // Validate that various operations can be done while the export is in progress.
+        {
+            VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 0);
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+        }
+
+        {
+            wil::unique_handle stdoutLogs;
+            wil::unique_handle stderrLogs;
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, false));
+
+            ValidateHandleOutput(stdoutLogs.get(), "OK\n");
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.Inspect().State.Status, "exited");
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.Labels().size(), 0);
+        }
+
+        {
+            // Validate that another export can run.
+            BlockingOperation secondExport([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+            secondExport.Complete();
+        }
+
+        {
+            // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
+            auto [result, _] = WSLAProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 };

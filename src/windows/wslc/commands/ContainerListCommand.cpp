@@ -16,7 +16,6 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
-#include "TablePrinter.h"
 #include "Task.h"
 
 using namespace wsl::windows::wslc::execution;

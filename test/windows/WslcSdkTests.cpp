@@ -189,7 +189,7 @@ class WslcSdkTests
         WslcSessionSettings sessionSettings;
         VERIFY_SUCCEEDED(WslcSessionInitSettings(c_testSessionName, m_storagePath.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetCpuCount(&sessionSettings, 4));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetMemory(&sessionSettings, 2024));
+        VERIFY_SUCCEEDED(WslcSessionSettingsSetMemory(&sessionSettings, 2048));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
 
         WslcVhdRequirements vhdReqs{};

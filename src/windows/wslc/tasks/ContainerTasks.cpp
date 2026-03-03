@@ -42,12 +42,6 @@ void CreateContainer(CLIExecutionContext& context)
     PrintMessage(MultiByteToWide(result.Id));
 }
 
-void CreateSession(CLIExecutionContext& context)
-{
-    std::optional<SessionOptions> options = std::nullopt;
-    context.Data.Add<Data::Session>(SessionService::CreateSession(options));
-}
-
 void DeleteContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -65,7 +59,7 @@ void ExecContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
-    auto result = ContainerService::Exec(
+    context.ExitCode = ContainerService::Exec(
         context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ContainerId>()), context.Data.Get<Data::ContainerOptions>());
 }
 
@@ -175,7 +169,7 @@ void RunContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     PullImageCallback callback;
-    ContainerService::Run(
+    context.ExitCode = ContainerService::Run(
         context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>(), &callback);
 }
 
@@ -242,12 +236,21 @@ void StopContainers(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Time))
     {
-        options.Timeout = validation::GetIntegerFromString<LONGLONG>(context.Args.Get<ArgType::Time>());
+        options.Timeout = validation::GetIntegerFromString<LONG>(context.Args.Get<ArgType::Time>());
     }
 
     for (const auto& id : containersToStop)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
     }
+}
+
+void ViewContainerLogs(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerId = context.Args.Get<ArgType::ContainerId>();
+    bool follow = context.Args.Contains(ArgType::Follow);
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow);
 }
 } // namespace wsl::windows::wslc::task

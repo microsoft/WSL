@@ -58,9 +58,10 @@ public:
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(ListImages)(_In_opt_ const WSLA_LIST_IMAGES_OPTIONS* Options, _Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLA_DELETE_IMAGE_OPTIONS* Options, _Out_ WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLA_TAG_IMAGE_OPTIONS* Options) override;
+    IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
@@ -86,7 +87,6 @@ public:
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
 
     common::relay::MultiHandleWait CreateIOContext();
-    WSLAVirtualMachine& GetVirtualMachine();
 
 private:
     ULONG m_id = 0;
@@ -108,9 +108,13 @@ private:
     wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
+
+    // N.B. m_lock must be acquired before acquiring m_containersLock
+    // This lock is used to protect m_containers. Doing this instead of acquiring m_lock exlusively allows for containers to be created/destroyed while operations that hold a shared m_lock are running.
+    std::mutex m_containersLock;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
-    std::recursive_mutex m_lock;
+    wil::srwlock m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLAFeatureFlags m_featureFlags{};

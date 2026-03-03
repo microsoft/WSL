@@ -119,8 +119,30 @@ struct WSLA_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     char Hash[256];
+    char Digest[256];
     ULONGLONG Size;
-    ULONGLONG DownloadTimestamp;
+    LONGLONG Created; // Unix timestamp
+    char ParentId[256];
+};
+
+typedef enum _WSLAListImagesFlags
+{
+    WSLAListImagesFlagsNone = 0,
+    WSLAListImagesFlagsAll = 1,           // Show all images (default hides intermediate images)
+    WSLAListImagesFlagsDigests = 2,       // Include digest information
+    WSLAListImagesFlagsDanglingTrue = 4,  // Show only dangling images (untagged)
+    WSLAListImagesFlagsDanglingFalse = 8, // Show only non-dangling images (tagged)
+    // Note: If neither dangling flag is set, no dangling filter is passed (default: both).
+} WSLAListImagesFlags;
+
+struct WSLA_LIST_IMAGES_OPTIONS
+{
+    DWORD Flags; // WSLAListImagesFlags (can combine with bitwise OR)
+    [unique] LPCSTR Reference; // Filter by reference (name[:tag])
+    [unique] LPCSTR Before; // Filter: show images created before this image
+    [unique] LPCSTR Since; // Filter: show images created since this image
+    [unique, size_is(LabelsCount)] const struct WSLA_LABEL* Labels;
+    ULONG LabelsCount;
 };
 
 typedef enum _WSLAProcessFlags
@@ -375,13 +397,13 @@ typedef enum _WSLALogsFlags
 interface IWSLAContainer : IUnknown
 {
     HRESULT Attach([out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
-    HRESULT Stop([in] WSLASignal Signal, [in] LONGLONG TimeoutSeconds);
+    HRESULT Stop([in] WSLASignal Signal, [in] LONG TimeoutSeconds);
     HRESULT Start([in] WSLAContainerStartFlags Flags);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT Export([in] ULONG TarHandle);
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
-    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    HRESULT Exec([in, ref] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);
@@ -405,19 +427,25 @@ struct WSLA_DELETED_IMAGE_INFORMATION
     WSLADeletedImageType Type;
 };
 
+typedef enum _WSLADeleteImageFlags
+{
+    WSLADeleteImageFlagsNone = 0,
+    WSLADeleteImageFlagsForce = 1,
+    WSLADeleteImageFlagsNoPrune = 2,
+} WSLADeleteImageFlags;
+
+struct WSLA_DELETE_IMAGE_OPTIONS
+{
+    LPCSTR Image; // Image can be ID or Repo:Tag.
+    DWORD Flags; // WSLADeleteImageFlags
+    // TODO: Platforms: a json array of OCI platform strings.
+};
+
 struct WSLA_TAG_IMAGE_OPTIONS
 {
     LPCSTR Image; // Source image name or ID.
     LPCSTR Repo;  // Target repository name.
     LPCSTR Tag;   // Target tag name.
-};
-
-struct WSLA_DELETE_IMAGE_OPTIONS
-{
-    LPCSTR Image; // Image can be ID or Repo:Tag.
-    BOOL Force;
-    BOOL NoPrune;
-    // TODO: Platforms: a json array of OCI platform strings.
 };
 
 typedef enum _WSLASessionState
@@ -442,29 +470,30 @@ interface IWSLASession : IUnknown
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
-    HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
+    HRESULT ListImages([in, unique] const struct WSLA_LIST_IMAGES_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const struct WSLA_TAG_IMAGE_OPTIONS* Options);
+    HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
 
     // Container management.
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
-    HRESULT OpenContainer([in] LPCSTR Id, [out] IWSLAContainer** Container);
+    HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in] LPCSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
     // Disk management.
-    HRESULT FormatVirtualDisk([in] LPCWSTR Path);
+    HRESULT FormatVirtualDisk([in, ref] LPCWSTR Path);
 
     // Terminate the VM and containers.
     HRESULT Terminate();
 
     // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
-    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
+    HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly);
+    HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath);
     HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
 
@@ -559,10 +588,10 @@ interface IWSLASessionManager : IUnknown
     HRESULT GetVersion([out] WSLA_VERSION* Version);
 
     // Session management.
-    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
+    HRESULT CreateSession([in, ref] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLASession** Session);
-    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
+    HRESULT OpenSessionByName([in, ref] LPCWSTR DisplayName, [out] IWSLASession** Session);
 }
 
 cpp_quote("#define WSLA_E_BASE (0x0600)")
