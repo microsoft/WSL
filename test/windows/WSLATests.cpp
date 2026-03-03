@@ -3911,7 +3911,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
         }
 
-        // Validate that behavior is correct if a read spans accross multiple streams.
+        // Validate that behavior is correct if a read spans across multiple streams.
         {
             std::vector<char> input;
 

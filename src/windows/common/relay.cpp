@@ -1610,7 +1610,7 @@ void DockerIORelayHandle::Collect()
 
 HANDLE DockerIORelayHandle::GetHandle() const
 {
-    if (ActiveHandle != nullptr && !PendingBuffer.empty())
+    if (ActiveHandle != nullptr && ActiveHandle->GetState() == IOHandleStatus::Pending)
     {
         return ActiveHandle->GetHandle();
     }
