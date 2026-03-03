@@ -562,7 +562,7 @@ void GnsPortTracker::ResolvePortZeroBind(DeferredPortLookup lookup)
     // The bind() syscall is being completed asynchronously on the seccomp dispatcher
     // thread after CompleteRequest() unblocks it. Poll getsockname() briefly until
     // the kernel assigns a port.
-    constexpr int maxRetries = 10;
+    constexpr int maxRetries = 25;
     constexpr auto retryDelay = std::chrono::milliseconds(100);
 
     in_port_t port = 0;
@@ -611,7 +611,7 @@ void GnsPortTracker::ResolvePortZeroBind(DeferredPortLookup lookup)
 
     if (port == 0)
     {
-        GNS_LOG_INFO("Port-0 bind: kernel did not assign a port for pid {} after retries", lookup.Pid);
+        GNS_LOG_ERROR("Port-0 bind: kernel did not assign a port for pid {} after retries", lookup.Pid);
         return;
     }
 
