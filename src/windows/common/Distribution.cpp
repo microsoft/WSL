@@ -168,20 +168,40 @@ DistributionList ReadFromManifest(const std::wstring& url)
 
 DistributionList ReadFromJsonContent(const std::wstring& content)
 {
-    auto distros = wsl::shared::FromJson<DistributionList, nlohmann::ordered_json>(content.c_str());
-    return FilterAndFinalizeManifest(std::move(distros));
+    try
+    {
+        auto distros = wsl::shared::FromJson<DistributionList, nlohmann::ordered_json>(content.c_str());
+        return FilterAndFinalizeManifest(std::move(distros));
+    }
+    catch (...)
+    {
+        const auto hr = wil::ResultFromCaughtException();
+        THROW_HR_WITH_USER_ERROR(
+            hr,
+            wsl::shared::Localization::MessageCouldFetchDistributionList(
+                wsl::windows::policies::c_customDistributionManifest, wsl::windows::common::wslutil::GetSystemErrorString(hr)));
+    }
 }
 
 DistributionList ReadFromJsonOrUrl(const std::wstring& value)
 {
-    // Detect if the value is direct JSON (starts with '{') or a URL
-    const auto trimmed = value.substr(value.find_first_not_of(L" \t\r\n"));
-    if (!trimmed.empty() && trimmed.front() == L'{')
+    // Trim leading and trailing whitespace from user-entered policy values
+    const auto first = value.find_first_not_of(L" \t\r\n");
+    if (first == std::wstring::npos)
     {
-        return ReadFromJsonContent(value);
+        return ReadFromManifest(value);
     }
 
-    return ReadFromManifest(value);
+    const auto last = value.find_last_not_of(L" \t\r\n");
+    const auto trimmed = value.substr(first, last - first + 1);
+
+    // Detect if the value is direct JSON (starts with '{') or a URL
+    if (trimmed.front() == L'{')
+    {
+        return ReadFromJsonContent(trimmed);
+    }
+
+    return ReadFromManifest(trimmed);
 }
 
 std::optional<TDistribution> LookupDistributionInManifest(const DistributionList& manifest, LPCWSTR name, bool legacy)
@@ -245,7 +265,7 @@ AvailableDistributions wsl::windows::common::distribution::GetAvailable()
 
     if (policyValue.has_value())
     {
-        WSL_LOG("Distribution list overridden by policy", TraceLoggingValue(policyValue->c_str(), "value"));
+        WSL_LOG("Distribution list overridden by policy", TraceLoggingValue(policyValue->size(), "length"));
 
         distributions.Manifest = ReadFromJsonOrUrl(*policyValue);
         distributions.PolicyOverridden = true;
