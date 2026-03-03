@@ -47,8 +47,6 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const wil:
 {
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
-
-    // TODO add callback support for load operation
     THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
