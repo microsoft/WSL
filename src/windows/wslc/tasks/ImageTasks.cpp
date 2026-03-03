@@ -93,4 +93,20 @@ void PullImage(CLIExecutionContext& context)
     PullImageCallback callback;
     services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
 }
+
+void LoadImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    if (context.Args.Contains(ArgType::Input))
+    {
+        auto& input = context.Args.Get<ArgType::Input>();
+        services::ImageService::Load(session, WideToMultiByte(input));
+        return;
+    }
+
+    // TODO Read from stdin if no input argument is provided.
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Requested load but no input provided.");
+}
 } // namespace wsl::windows::wslc::task

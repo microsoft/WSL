@@ -243,12 +243,14 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
 
     wsl::windows::common::relay::MultiHandleWait io;
-    io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-        std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
+    io.AddHandle(
+        std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+            std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
     if (stderrLogs) // This handle is only used for non-tty processes.
     {
-        io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-            std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(
+            std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+                std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.

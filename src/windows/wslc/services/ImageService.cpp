@@ -43,15 +43,35 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
+void ImageService::Load(wsl::windows::wslc::models::Session& session, const wil::unique_hfile& imageFile)
+{
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+
+    // TODO add callback support for load operation
+    THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+}
+
+void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::string& input)
+{
+    // Check if the input is a valid file path.
+    if (!std::filesystem::exists(input))
+    {
+        THROW_HR(E_INVALIDARG);
+    }
+
+    std::filesystem::path inputPath(input);
+    wil::unique_hfile imageFile{
+        CreateFileW(inputPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!imageFile);
+    Load(session, imageFile);
+}
+
 void ImageService::Push()
 {
 }
 
 void ImageService::Save()
-{
-}
-
-void ImageService::Load()
 {
 }
 
