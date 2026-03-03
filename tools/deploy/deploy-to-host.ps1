@@ -2,7 +2,7 @@
 
 [cmdletbinding(PositionalBinding = $false)]
 param (
-    [ValidateSet("X64", "arm64")][string]$Platform = "X64",
+    [ValidateSet("X64", "arm64")][string]$Platform = $null,
     [ValidateSet("Debug", "Release")][string]$BuildType = "Debug",
     [string]$BuildOutputPath = [string](Get-Location),
     [string]$PackageCertPath = $null,
@@ -12,10 +12,15 @@ param (
 
 $ErrorActionPreference = "Stop"
 
+if (-not $Platform)
+{
+    $Platform = if ($env:PROCESSOR_ARCHITECTURE -ieq "ARM64") { "arm64" } else { "X64" }
+}
+
 $PackagePath = "$BuildOutputPath\bin\$Platform\$BuildType\wsl.msi"
 
 # msiexec.exe doesn't like symlinks, so use the canonical path
-$Target = (Get-ChildItem $PackagePath)[0].Target
+$Target = (Get-ChildItem $PackagePath).Target
 if ($Target)
 {
     $PackagePath = $Target
