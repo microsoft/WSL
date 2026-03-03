@@ -3377,8 +3377,7 @@ class WSLATests
             ValidateProcessOutput(
                 process,
                 {{1,
-                  "OCI runtime exec failed: exec failed: unable to start container process: chdir to cwd (\"/notfound\") set "
-                  "in "
+                  "OCI runtime exec failed: exec failed: unable to start container process: chdir to cwd (\"/notfound\") set in "
                   "config.json failed: no such file or directory: unknown\r\n"}},
                 126);
         }
