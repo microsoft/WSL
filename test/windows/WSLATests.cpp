@@ -2653,6 +2653,79 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ContainerStartAfterStop)
+    {
+        WSL2_TEST_ONLY();
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            {
+                // Validate that the container can be restarted.
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach), S_OK);
+                auto restartedProcess = container.GetInitProcess();
+                ValidateProcessOutput(restartedProcess, {{1, "OK\n"}});
+            }
+
+            {
+                // Validate that the container can be restarted without the attach flag.
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), S_OK);
+                auto restartedProcess = container.GetInitProcess();
+                VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
+
+                wil::unique_handle stdoutLogs;
+                wil::unique_handle stderrLogs;
+                VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+
+                ValidateHandleOutput(stdoutLogs.get(), "OK\nOK\nOK\n");
+                ValidateHandleOutput(stderrLogs.get(), "");
+            }
+        }
+
+        // Validate that containers can be restarted after being explicitely stopped.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start-2", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            auto initProcess = container.GetInitProcess();
+            initProcess.Get().Signal(WSLASignalSIGKILL);
+            VERIFY_ARE_EQUAL(initProcess.Wait(), WSLASignalSIGKILL + 128);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            // Validate that deleted containers can't be started.
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
+        }
+
+        // Validate restart behavior for a container with the autorm flag set
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start-3", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            // Validate that deleted containers can't be started.
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
+        }
+    }
+
     TEST_METHOD(OpenContainer)
     {
         WSL2_TEST_ONLY();
@@ -3304,7 +3377,8 @@ class WSLATests
             ValidateProcessOutput(
                 process,
                 {{1,
-                  "OCI runtime exec failed: exec failed: unable to start container process: chdir to cwd (\"/notfound\") set in "
+                  "OCI runtime exec failed: exec failed: unable to start container process: chdir to cwd (\"/notfound\") set "
+                  "in "
                   "config.json failed: no such file or directory: unknown\r\n"}},
                 126);
         }
