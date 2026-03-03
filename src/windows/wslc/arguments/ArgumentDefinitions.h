@@ -53,7 +53,6 @@ _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L
 _(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       L"Group Id for the process") \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  L"Image name") \
-_(Info,           "info",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_InfoArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       L"Name of the container") \
 _(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container") \
@@ -71,6 +70,7 @@ _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       L
 _(TTY,            "tty",                 L"t",              Kind::Flag,        L"Open a TTY with the container process.") \
 _(User,           "user",                L"u",              Kind::Value,       L"User ID for the process (name|uid|uid:gid)") \
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details") \
+_(Version,        "version",             L"v",              Kind::Flag,        Localization::WSLCCLI_InfoArgDescription()) \
 _(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container") \
 _(Volume,         "volume",              NO_ALIAS,          Kind::Value,       L"Bind mount a volume to the container") \
 // clang-format on

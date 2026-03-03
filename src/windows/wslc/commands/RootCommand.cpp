@@ -41,7 +41,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 std::vector<Argument> RootCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Info),
+        Argument::Create(ArgType::Version),
     };
 }
 
@@ -59,6 +59,14 @@ std::wstring RootCommand::LongDescription() const
 
 void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    if (context.Args.Contains(ArgType::Version))
+    {
+        std::wostringstream versionOut;
+        versionOut << s_ExecutableName << L" v" << s_PackageVersion;
+        wsl::windows::common::wslutil::PrintMessage(versionOut.str(), stdout);
+        return;
+    }
+
     OutputHelp();
 }
 } // namespace wsl::windows::wslc
