@@ -1394,6 +1394,82 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(InspectImage)
+    {
+        WSL2_TEST_ONLY();
+
+        // Test inspect debian:latest
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectImage("debian:latest", &output));
+
+            // Verify output is valid JSON
+            VERIFY_IS_NOT_NULL(output.get());
+            VERIFY_IS_TRUE(std::strlen(output.get()) > 0);
+            LogInfo("Inspect output: %hs", output.get());
+
+            // Parse and validate JSON structure
+            auto inspectResult = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(output.get());
+
+            // Verify all fields exposed in wsla_schema::InspectImage
+            VERIFY_IS_TRUE(inspectResult.Id.find("sha256:") == 0);
+
+            VERIFY_IS_TRUE(inspectResult.RepoTags.has_value());
+            VERIFY_IS_FALSE(inspectResult.RepoTags->empty());
+            bool foundTag = false;
+            for (const auto& tag : inspectResult.RepoTags.value())
+            {
+                if (tag.find("debian:latest") != std::string::npos)
+                {
+                    foundTag = true;
+                    break;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag);
+
+            // skip testing RepoDigests for loaded test image.
+            VERIFY_IS_FALSE(inspectResult.Created.empty());
+            VERIFY_IS_TRUE(inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
+            VERIFY_ARE_EQUAL("linux", inspectResult.Os);
+            VERIFY_IS_TRUE(inspectResult.Size > 0);
+            VERIFY_IS_TRUE(inspectResult.Metadata.has_value());
+            VERIFY_IS_TRUE(inspectResult.Metadata->size() > 0);
+
+            VERIFY_IS_TRUE(inspectResult.Config.has_value());
+            const auto& config = inspectResult.Config.value();
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_IS_TRUE(config.Cmd->size() > 0);
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(0, config.Entrypoint->size());
+            VERIFY_IS_TRUE(config.Env.has_value());
+            VERIFY_IS_TRUE(config.Env->size() > 0);
+            VERIFY_IS_FALSE(config.Labels.has_value());
+        }
+
+        // Negative test: Image not found
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
+            ValidateCOMErrorMessage(L"No such image: nonexistent:image");
+        }
+
+        // Negative test: Bad image name input
+        {
+            wil::unique_cotaskmem_ansistring output;
+
+            std::string longImageName(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a');
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->InspectImage(longImageName.c_str(), &output));
+
+            // Invalid name.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), m_defaultSession->InspectImage("debian latest", &output));
+            ValidateCOMErrorMessage(L"invalid reference format");
+
+            // Attempt to fake to call search endpoint. Our implementation escaped the image name correctly.
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("search/debian:latest", &output));
+            ValidateCOMErrorMessage(L"No such image: search/debian:latest");
+        }
+    }
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
