@@ -189,7 +189,7 @@ try
     appendOption(L"client_mac", networkSettings->MacAddress);
 
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
-    //appendOption(L"gateway_ip", default_route); // TODO: determine if this is needed or not.
+    // appendOption(L"gateway_ip", default_route); // TODO: determine if this is needed or not.
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
