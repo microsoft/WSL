@@ -40,7 +40,10 @@ using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 using wsl::windows::service::wsla::WSLAVolumeMount;
 
+using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
+using namespace std::chrono_literals;
+
 namespace wsla_schema = wsl::windows::common::wsla_schema;
 
 using DockerInspectContainer = wsl::windows::common::docker_schema::InspectContainer;
@@ -444,7 +447,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslaContainerStateCreated,
+        m_state != WslaContainerStateCreated && m_state != WslaContainerStateExited,
         "Cannot start container '%hs', state: %i",
         m_name.c_str(),
         m_state);
@@ -477,6 +480,8 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
         m_initProcessControl = nullptr;
     });
 
+    m_stoppedNotifiedEvent.ResetEvent();
+
     try
     {
         m_dockerClient.StartContainer(m_id);
@@ -491,6 +496,8 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 {
     if (event == ContainerEvent::Stop)
     {
+        m_stoppedNotifiedEvent.SetEvent();
+
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
@@ -536,6 +543,15 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
     {
         return;
     }
+    else if (m_state != WslaContainerStateRunning)
+    {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            m_state != WslaContainerStateRunning,
+            "Cannot stop container '%hs', state: %i",
+            m_id.c_str(),
+            m_state);
+    }
 
     try
     {
@@ -567,6 +583,17 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
         DeleteExclusiveLockHeld();
+    }
+    else
+    {
+        // Wait for the stop notification to arrive before returning.
+        // This is required so that a caller that Stops() and immediately calls Start() again doesn't see the container
+        // switch back to 'stopped' state due to the delayed event notification.
+
+        auto io = m_wslaSession.CreateIOContext();
+        io.AddHandle(std::make_unique<EventHandle>(m_stoppedNotifiedEvent.get()), MultiHandleWait::CancelOnCompleted);
+
+        io.Run({60s});
     }
 }
 
@@ -807,7 +834,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     }
 
     // Map volume mounts using WSLA's host-side data.
-    wslaInspect.Mounts.reserve(m_mountedVolumes.size());
+    wslaInspect.Mounts.reserve(m_mountedVolumes.size() + dockerInspect.HostConfig.Tmpfs.size());
     for (const auto& volume : m_mountedVolumes)
     {
         wsla_schema::InspectMount mountInfo{};
@@ -816,6 +843,18 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
         mountInfo.Source = wsl::shared::string::WideToMultiByte(volume.HostPath);
         mountInfo.Destination = volume.ContainerPath;
         mountInfo.ReadWrite = !volume.ReadOnly;
+        wslaInspect.Mounts.push_back(std::move(mountInfo));
+    }
+
+    // Map tmpfs mounts from Docker inspect data.
+    for (const auto& entry : dockerInspect.HostConfig.Tmpfs)
+    {
+        wsla_schema::InspectMount mountInfo{};
+        mountInfo.Type = "tmpfs";
+        mountInfo.Destination = entry.first;
+        // Tmpfs mounts are read-write by default. We currently do not parse tmpfs options
+        // (e.g. "ro") for inspect output; Docker enforces actual mount behavior.
+        mountInfo.ReadWrite = true;
         wslaInspect.Mounts.push_back(std::move(mountInfo));
     }
 
@@ -939,6 +978,21 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // Mount volumes.
     auto volumeErrorCleanup = MountVolumes(volumes, virtualMachine);
+
+    // Process tmpfs mounts from container options.
+    if (containerOptions.TmpfsCount > 0)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Tmpfs, "Tmpfs is null with TmpfsCount=%lu", containerOptions.TmpfsCount);
+
+        for (ULONG i = 0; i < containerOptions.TmpfsCount; i++)
+        {
+            const auto& tmpfs = containerOptions.Tmpfs[i];
+
+            THROW_HR_IF_NULL_MSG(E_INVALIDARG, tmpfs.Destination, "Tmpfs mount at index %lu has null destination", i);
+
+            request.HostConfig.Tmpfs[tmpfs.Destination] = tmpfs.Options != nullptr ? tmpfs.Options : "";
+        }
+    }
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);

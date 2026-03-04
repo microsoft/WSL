@@ -163,6 +163,19 @@ void wsl::windows::common::WSLAContainerLauncher::AddLabel(const std::string& Ke
     m_labels.push_back(label);
 }
 
+void wsl::windows::common::WSLAContainerLauncher::AddTmpfs(const std::string& ContainerPath, const std::string& Options)
+{
+    // Store a copy of the path/options strings to the launcher to ensure the pointers in WSLA_TMPFS_MOUNT remain valid.
+    const auto& containerPath = m_tmpfsContainerPaths.emplace_back(ContainerPath);
+    const auto& options = m_tmpfsOptions.emplace_back(Options);
+
+    WSLA_TMPFS_MOUNT tmpfs{};
+    tmpfs.Destination = containerPath.c_str();
+    tmpfs.Options = options.c_str();
+
+    m_tmpfsMounts.push_back(tmpfs);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session, WSLAContainerStartFlags Flags)
 {
     auto [result, container] = CreateNoThrow(Session);
@@ -259,6 +272,9 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 
     options.LabelsCount = static_cast<ULONG>(m_labels.size());
     options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;
+
+    options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
+    options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;

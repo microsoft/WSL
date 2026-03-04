@@ -60,6 +60,7 @@ public:
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
     void AddLabel(const std::string& Key, const std::string& Value);
+    void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
 
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> CreateNoThrow(IWSLASession& Session);
     RunningWSLAContainer Create(IWSLASession& Session);
@@ -98,5 +99,8 @@ private:
     std::vector<WSLA_LABEL> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
+    std::vector<WSLA_TMPFS_MOUNT> m_tmpfsMounts;
+    std::deque<std::string> m_tmpfsContainerPaths;
+    std::deque<std::string> m_tmpfsOptions;
 };
 } // namespace wsl::windows::common

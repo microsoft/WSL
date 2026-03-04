@@ -2674,6 +2674,43 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
+        // Validate that tmpfs mounts are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest",
+                "test-tmpfs",
+                {"/bin/sh", "-c", "mount | grep 'tmpfs on /mnt/wsla-tmpfs1' && mount | grep 'tmpfs on /mnt/wsla-tmpfs2'"});
+
+            launcher.AddTmpfs("/mnt/wsla-tmpfs1", "rw,noexec,nosuid,size=65536k");
+            launcher.AddTmpfs("/mnt/wsla-tmpfs2", "");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
+        // Validate that relative tmpfs paths are rejected by Docker.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-relative", {"/bin/cat"});
+            launcher.AddTmpfs("relative-path", "");
+
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+
+            ValidateCOMErrorMessage(L"invalid mount path: 'relative-path' mount path must be absolute");
+        }
+
+        // Validate that invalid tmpfs options are rejected by Docker.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-invalid-opts", {"/bin/cat"});
+            launcher.AddTmpfs("/mnt/wsla-tmpfs", "invalid_option_xyz");
+
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+
+            ValidateCOMErrorMessage(L"invalid tmpfs option [\"invalid_option_xyz\"]");
+        }
+
         // Validate error paths
         {
             WSLAContainerLauncher launcher("debian:latest", std::string(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
@@ -2726,6 +2763,79 @@ class WSLATests
             wil::com_ptr<IWSLAContainer> container;
             VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, &container));
             VERIFY_SUCCEEDED(container->Delete());
+        }
+    }
+
+    TEST_METHOD(ContainerStartAfterStop)
+    {
+        WSL2_TEST_ONLY();
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            {
+                // Validate that the container can be restarted.
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach), S_OK);
+                auto restartedProcess = container.GetInitProcess();
+                ValidateProcessOutput(restartedProcess, {{1, "OK\n"}});
+            }
+
+            {
+                // Validate that the container can be restarted without the attach flag.
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), S_OK);
+                auto restartedProcess = container.GetInitProcess();
+                VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
+
+                wil::unique_handle stdoutLogs;
+                wil::unique_handle stderrLogs;
+                VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+
+                ValidateHandleOutput(stdoutLogs.get(), "OK\nOK\nOK\n");
+                ValidateHandleOutput(stderrLogs.get(), "");
+            }
+        }
+
+        // Validate that containers can be restarted after being explicitly stopped.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start-2", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            auto initProcess = container.GetInitProcess();
+            initProcess.Get().Signal(WSLASignalSIGKILL);
+            VERIFY_ARE_EQUAL(initProcess.Wait(), WSLASignalSIGKILL + 128);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            // Validate that deleted containers can't be started.
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
+        }
+
+        // Validate restart behavior for a container with the autorm flag set
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start-3", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            // Validate that deleted containers can't be started.
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
         }
     }
 
@@ -2898,9 +3008,13 @@ class WSLATests
             WSLAContainerLauncher launcher(
                 "debian:latest", "test-container-2", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
-            auto container = launcher.Launch(*m_defaultSession);
+            auto container = launcher.Create(*m_defaultSession);
+
+            // Validate that a created container cannot be stopped.
+            VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that the container is in running state.
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
@@ -3178,9 +3292,12 @@ class WSLATests
                 }
 
                 VERIFY_IS_FALSE(it->Type.empty());
-                VERIFY_IS_FALSE(it->Source.empty());
-
                 VERIFY_ARE_EQUAL(it->Type, expectedType);
+
+                if (expectedType != "tmpfs")
+                {
+                    VERIFY_IS_FALSE(it->Source.empty());
+                }
                 VERIFY_ARE_EQUAL(it->ReadWrite, expectedReadWrite);
             }
         };
@@ -3207,6 +3324,7 @@ class WSLATests
             launcher.AddPort(1236, 8001, AF_INET);
             launcher.AddVolume(testFolder.wstring(), "/test-volume", false);
             launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true);
+            launcher.AddTmpfs("/mnt/wsla-tmpfs-inspect", "");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto details = container.Inspect();
@@ -3226,8 +3344,10 @@ class WSLATests
             // Verify port mappings match what we configured.
             expectPorts(details.Ports, {{"8000/tcp", {"1234", "1235"}}, {"8001/tcp", {"1236"}}});
 
-            // Verify volume mounts match what we configured.
-            expectMounts(details.Mounts, {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}});
+            // Verify mounts match what we configured.
+            expectMounts(
+                details.Mounts,
+                {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}, {"/mnt/wsla-tmpfs-inspect", "tmpfs", true}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());
@@ -3985,6 +4105,19 @@ class WSLATests
             insert(input, 12, "foo");
 
             VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
+        }
+
+        // Validate that behavior is correct if a read spans across multiple streams.
+        {
+            std::vector<char> input;
+
+            std::string largeStdout(LX_RELAY_BUFFER_SIZE + 150, 'a');
+            std::string largeStderr(LX_RELAY_BUFFER_SIZE + 12, 'b');
+            insert(input, 1, largeStdout);
+            insert(input, 2, largeStderr);
+            insert(input, 1, "regularStdout");
+
+            runTest(input, largeStdout + "regularStdout", largeStderr);
         }
     }
 
