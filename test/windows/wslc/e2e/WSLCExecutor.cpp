@@ -90,7 +90,7 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine)
     auto cmd = L"\"" + wslcPath.wstring() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
     const auto output = process.RunAndCaptureOutput();
-    return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = static_cast<HRESULT>(output.ExitCode)};
+    return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = output.ExitCode};
 }
 
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)

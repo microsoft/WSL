@@ -25,7 +25,7 @@ struct WSLCExecutionResult
     std::wstring CommandLine{};
     std::optional<std::wstring> Stdout{};
     std::optional<std::wstring> Stderr{};
-    std::optional<HRESULT> ExitCode{};
+    std::optional<DWORD> ExitCode{};
     void Dump() const;
     void Verify(const WSLCExecutionResult& expected) const;
     std::vector<std::wstring> GetStdoutLines() const;

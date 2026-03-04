@@ -24,13 +24,13 @@ using namespace WEX::Logging;
 
 const TestImage& DebianTestImage()
 {
-    static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / "debian-latest.tar"};
+    static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / L"debian-latest.tar"};
     return image;
 }
 
 const TestImage& InvalidTestImage()
 {
-    static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", "INVALID_PATH"};
+    static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", L"INVALID_PATH"};
     return image;
 }
 
