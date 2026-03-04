@@ -1757,15 +1757,6 @@ struct WSLA_SIGNAL
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Signal));
 };
 
-enum WslaMapPortFlags
-{
-    WslaMapPortFlagNone = 0,
-    WslaMapPortFlagReserveHostPort = 1,
-    WslaMapPortFlagActivatePortRelay = 2,
-    WslaMapPortFlagStopPortRelay = 4,
-    WslaMapPortFlagReleaseHostPort = 8,
-};
-
 struct WSLA_MAP_PORT
 {
     static inline auto Type = LxMessageWSLAMapPort;
@@ -1776,9 +1767,9 @@ struct WSLA_MAP_PORT
     uint16_t WindowsPort{};
     uint16_t LinuxPort{};
     uint32_t AddressFamily{};
-    WslaMapPortFlags Flags{};
+    bool Stop{};
 
-    PRETTY_PRINT(FIELD(Header), FIELD(WindowsPort), FIELD(LinuxPort), FIELD(AddressFamily), FIELD(Flags));
+    PRETTY_PRINT(FIELD(Header), FIELD(WindowsPort), FIELD(LinuxPort), FIELD(AddressFamily), FIELD(Stop));
 };
 
 struct WSLA_CONNECT_RELAY

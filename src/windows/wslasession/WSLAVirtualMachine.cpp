@@ -658,7 +658,7 @@ void WSLAVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ WslaMapPortFlags Flags)
+void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove)
 {
     std::lock_guard lock(m_portRelaylock);
 
@@ -668,7 +668,7 @@ void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _I
     message.WindowsPort = WindowsPort;
     message.LinuxPort = LinuxPort;
     message.AddressFamily = Family;
-    message.Flags = Flags;
+    message.Stop = Remove;
 
     DWORD bytesTransfered{};
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(m_portRelayChannelWrite.get(), &message, sizeof(message), &bytesTransfered, nullptr));
@@ -678,34 +678,17 @@ void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _I
     THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
 
     THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
-    THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Flags=%u", WindowsPort, LinuxPort, Family, Flags);
-}
-
-void WSLAVirtualMachine::ReserveHostPort(_In_ int Family, _In_ short WindowsPort)
-{
-    MapPortImpl(Family, WindowsPort, 0, WslaMapPortFlagReserveHostPort);
+    THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
 
 void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
 {
-    auto flags = static_cast<WslaMapPortFlags>(WslaMapPortFlagReserveHostPort | WslaMapPortFlagActivatePortRelay);
-    MapPortImpl(Family, WindowsPort, LinuxPort, flags);
-}
-
-void WSLAVirtualMachine::ActivatePortRelay(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
-{
-    MapPortImpl(Family, WindowsPort, LinuxPort, WslaMapPortFlagActivatePortRelay);
+    MapPortImpl(Family, WindowsPort, LinuxPort, false);
 }
 
 void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort)
 {
-    auto flags = static_cast<WslaMapPortFlags>(WslaMapPortFlagStopPortRelay | WslaMapPortFlagReleaseHostPort);
-    MapPortImpl(Family, WindowsPort, 0, flags);
-}
-
-void WSLAVirtualMachine::ReleaseHostPort(_In_ int Family, _In_ short WindowsPort)
-{
-    MapPortImpl(Family, WindowsPort, 0, WslaMapPortFlagReleaseHostPort);
+    MapPortImpl(Family, WindowsPort, 0, true);
 }
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)

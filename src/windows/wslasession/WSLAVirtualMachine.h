@@ -61,11 +61,8 @@ public:
 
     void Initialize();
 
-    void ReserveHostPort(_In_ int Family, _In_ short WindowsPort);
     void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
-    void ActivatePortRelay(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
     void UnmapPort(_In_ int Family, _In_ short WindowsPort);
-    void ReleaseHostPort(_In_ int Family, _In_ short WindowsPort);
     void Unmount(_In_ const char* Path);
 
     HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);
@@ -104,7 +101,7 @@ public:
     }
 
 private:
-    void MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ WslaMapPortFlags Flags);
+    void MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove);
 
     // Initial setup during Connect()
     void ConfigureInitialMounts();
