@@ -61,7 +61,7 @@ _(Progress,       "progress",            NO_ALIAS,          Kind::Value,       L
 _(Publish,        "publish",             L"p",              Kind::Value,       L"Publish a port from a container to host") \
 _(Pull,           "pull",                NO_ALIAS,          Kind::Value,       L"Image pull policy (always|missing|never) (default:never)") \
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        L"Outputs the container IDs only") \
-_(Remove,         "remove",              L"rm",             Kind::Flag,        L"Remove the container after it stops") \
+_(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        L"Remove the container after it stops") \
 _(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       L"Use this scheme for registry connection") \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  L"Session ID") \
