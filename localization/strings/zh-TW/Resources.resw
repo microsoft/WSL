@@ -728,7 +728,7 @@ Windows 版本： {}</value>
     <value>橋接器網路需要設定 wsl2.vmSwitch。</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>無法從 '{}' 擷取清單發佈。{}</value>
+    <value>未能從 '{}' 取得分配清單。{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1880,30 +1880,30 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>VM 在關機前閒置的毫秒數。</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
-    <value>Build, run, debug, and profile your apps running on WSL from Visual Studio</value>
+    <value>從 Visual Studio 組建、執行、偵錯並分析在 WSL 上執行的應用程式</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
-    <value>Run and debug your apps on WSL from Visual Studio</value>
+    <value>從 Visual Studio 執行並偵錯您在 WSL 上的應用程式</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
-    <value>Learn more about WSL in Visual Studio for .NET developers</value>
+    <value>深入了解 Visual Studio 中適用於 .NET 開發人員的 WSL</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
-    <value>Learn more about Visual Studio and WSL for C++ developers</value>
+    <value>深入了解關於 Visual Studio 與適用於 C++ 開發人員的 WSL</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
-    <value>You can easily run and debug your .NET Core and cross platform C++ apps in Linux without leaving Visual Studio using Windows Subsystem for Linux (WSL). If you are a cross-platform developer, you can use this method as a simple way to test more of your target environments.</value>
+    <value>透過 Windows 子系統 Linux 版 (WSL)，您可以在 Linux 上輕鬆執行和偵錯 .NET Core 及跨平台 C++ 應用程式，而無需離開 Visual Studio。如果您是跨平台開發者，可以利用此方法簡單測試更多目標環境。</value>
   </data>
   <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Visual Studio 整合</value>
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
     <value>Visual Studio Integration</value>
