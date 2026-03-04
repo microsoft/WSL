@@ -24,7 +24,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> SessionShellCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::SessionId, true),
+        Argument::Create(ArgType::SessionId),
     };
 }
 
@@ -35,7 +35,7 @@ std::wstring SessionShellCommand::ShortDescription() const
 
 std::wstring SessionShellCommand::LongDescription() const
 {
-    return {L"Attaches to an active session."};
+    return {L"Attaches to an active session. If no session ID is provided, the default session will be used."};
 }
 
 void SessionShellCommand::ExecuteInternal(CLIExecutionContext& context) const
