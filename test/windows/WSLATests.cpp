@@ -2780,14 +2780,14 @@ class WSLATests
 
             {
                 // Validate that the container can be restarted.
-                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach), S_OK);
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach, nullptr), S_OK);
                 auto restartedProcess = container.GetInitProcess();
                 ValidateProcessOutput(restartedProcess, {{1, "OK\n"}});
             }
 
             {
                 // Validate that the container can be restarted without the attach flag.
-                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), S_OK);
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), S_OK);
                 auto restartedProcess = container.GetInitProcess();
                 VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
 
@@ -2809,21 +2809,21 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             auto initProcess = container.GetInitProcess();
             initProcess.Get().Signal(WSLASignalSIGKILL);
             VERIFY_ARE_EQUAL(initProcess.Wait(), WSLASignalSIGKILL + 128);
 
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());
 
             // Validate that deleted containers can't be started.
-            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
         }
 
         // Validate restart behavior for a container with the autorm flag set
@@ -2836,7 +2836,7 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
             // Validate that deleted containers can't be started.
-            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
         }
     }
 
@@ -3015,7 +3015,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that the container is in running state.
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
