@@ -1,3 +1,4 @@
+
 /*++
 
 Copyright (c) Microsoft. All rights reserved.
@@ -41,7 +42,7 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
-        std::string&& NetworkMode,
+        WSLA_CONTAINER_NETWORK_TYPE NetworkMode,
         std::vector<WSLAVolumeMount>&& volumes,
         std::vector<WSLAPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
@@ -130,7 +131,7 @@ private:
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;
-    std::string m_networkMode;
+    WSLA_CONTAINER_NETWORK_TYPE m_networkMode;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;

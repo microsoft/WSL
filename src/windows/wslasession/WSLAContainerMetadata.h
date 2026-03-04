@@ -23,6 +23,13 @@ namespace wsl::windows::service::wsla {
 // Label key used to store WSLA container metadata in Docker container labels.
 constexpr auto WSLAContainerMetadataLabel = "com.microsoft.wsl.container.metadata";
 
+enum class PortMappingState
+{
+    None,             // Nothing done yet
+    HostPortReserved, // Host socket bound in relay process, relay not active
+    RelayActivated,   // Host socket bound AND relay forwarding traffic
+};
+
 struct WSLAPortMapping
 {
     uint16_t HostPort{};
@@ -31,7 +38,7 @@ struct WSLAPortMapping
     int Family{};
 
     // Runtime-only field. Not serialized to JSON.
-    bool MappedToHost{};
+    PortMappingState State = PortMappingState::None;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAPortMapping, HostPort, VmPort, ContainerPort, Family);
 };

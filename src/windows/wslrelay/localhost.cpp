@@ -523,9 +523,98 @@ std::optional<WSLA_MAP_PORT> ReceiveServiceMessage()
     return message;
 }
 
+using PortMap = std::map<std::tuple<uint16_t, uint32_t>, std::shared_ptr<PortRelay>>;
+using Update = std::function<void()>;
+
+// Validate and stage a host port reservation. The socket is bound eagerly so bind errors
+// are reported before any mutation is committed.
+static HRESULT StageReserveHostPort(
+    PortMap& ports, const PortMap::key_type& key, const WSLA_MAP_PORT& message, uint32_t RelayPort, std::optional<Update>& staged, bool startRelay)
+try
+{
+    if (ports.find(key) != ports.end())
+    {
+        return HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+    }
+
+    if (startRelay && message.LinuxPort == 0 || !startRelay && message.LinuxPort != 0)
+    {
+        return E_INVALIDARG;
+    }
+
+    WI_ASSERT(!staged.has_value());
+    auto listener = CreatePortListener(message.WindowsPort, message.LinuxPort, RelayPort, message.AddressFamily);
+    staged.emplace([&ports, key, listener = std::move(listener)]() mutable { ports.emplace(key, std::move(listener)); });
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+// Validate and stage activating the relay on a previously reserved port.
+static HRESULT StageActivatePortRelay(PortMap& ports, const PortMap::key_type& key, const WSLA_MAP_PORT& message, std::optional<Update>& staged)
+{
+    auto it = ports.find(key);
+    if (it == ports.end())
+    {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+
+    if (it->second->LinuxPort != 0)
+    {
+        return HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+    }
+
+    WI_ASSERT(!staged.has_value());
+    staged.emplace([relay = it->second, linuxPort = message.LinuxPort]() { relay->LinuxPort = linuxPort; });
+
+    return S_OK;
+}
+
+// Validate and stage stopping the relay (sets LinuxPort to 0, keeping the host socket bound).
+static HRESULT StageStopPortRelay(PortMap& ports, const PortMap::key_type& key, std::optional<Update>& staged)
+{
+    auto it = ports.find(key);
+    if (it == ports.end())
+    {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+
+    // If the linux port is zero, the port relay is not active.
+    if (it->second->LinuxPort == 0)
+    {
+        return HRESULT_FROM_WIN32(ERROR_INVALID_OPERATION);
+    }
+
+    WI_ASSERT(!staged.has_value());
+    staged.emplace([relay = it->second]() { relay->LinuxPort = 0; });
+
+    return S_OK;
+}
+
+// Validate and stage releasing (removing) the host port binding entirely.
+static HRESULT StageReleaseHostPort(PortMap& ports, const PortMap::key_type& key, std::optional<Update>& staged, bool stoppingRelay = true)
+{
+    auto it = ports.find(key);
+    if (it == ports.end())
+    {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+
+    // If linux port is set, port relay is active so we cannot release the host port.
+    if (!stoppingRelay && it->second->LinuxPort != 0)
+    {
+        return HRESULT_FROM_WIN32(ERROR_BUSY);
+    }
+
+    WI_ASSERT(!staged.has_value());
+    staged.emplace([&ports, key]() { ports.erase(key); });
+
+    return S_OK;
+}
+
 void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
 {
-    std::map<std::tuple<uint16_t, uint32_t>, std::shared_ptr<PortRelay>> ports;
+    PortMap ports;
 
     std::thread acceptThread;
     wil::unique_event acceptThreadEvent{wil::EventOptions::ManualReset};
@@ -540,100 +629,99 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
         }
     };
 
+    auto startAcceptThread = [&]() {
+        if (acceptThread.joinable())
+        {
+            return; // Already running.
+        }
+
+        std::vector<std::shared_ptr<PortRelay>> relays;
+        for (auto& e : ports)
+        {
+            relays.emplace_back(e.second);
+        }
+
+        acceptThread = std::thread([&, relays = std::move(relays)]() mutable {
+            try
+            {
+                AcceptThread(relays, VmId, acceptThreadEvent.get());
+            }
+            CATCH_LOG();
+        });
+    };
+
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { stopAcceptThread(); });
 
     while (true)
     {
-        // Receive a message
         auto message = ReceiveServiceMessage();
         if (!message.has_value())
         {
             return;
         }
 
-        std::tuple<uint16_t, uint16_t> key{message->WindowsPort, message->AddressFamily};
+        PortMap::key_type key{message->WindowsPort, message->AddressFamily};
+        auto flags = message->Flags;
 
-        HRESULT result = E_UNEXPECTED;
+        HRESULT result = S_OK;
         auto sendResponse = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             WSL_LOG(
                 "PortMapping",
                 TraceLoggingValue(result, "Result"),
                 TraceLoggingValue(message->WindowsPort, "WindowsPort"),
                 TraceLoggingValue(message->LinuxPort, "LinuxPort"),
-                TraceLoggingValue(message->Stop, "Remove"));
+                TraceLoggingValue(static_cast<uint32_t>(flags), "Flags"));
 
             THROW_LAST_ERROR_IF(!WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), &result, sizeof(result), nullptr, nullptr));
         });
 
-        // Check if the binding is valid.
-        bool update = false;
-        auto it = ports.find(key);
-        if (message->Stop)
+        if (WI_IsAnyFlagSet(flags, WslaMapPortFlagReserveHostPort | WslaMapPortFlagActivatePortRelay) && 
+            WI_IsAnyFlagSet(flags, WslaMapPortFlagStopPortRelay | WslaMapPortFlagReleaseHostPort))
         {
-            if (it == ports.end())
-            {
-                result = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-                continue;
-            }
-            else
-            {
-                ports.erase(it);
-                update = true;
-            }
-        }
-        else
-        {
-            if (it != ports.end())
-            {
-                if (it->second->LinuxPort == 0 && message->LinuxPort != 0)
-                {
-                    it->second->LinuxPort = message->LinuxPort;
-                    update = true;
-                }
-                else
-                {
-                    result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
-                    continue;
-                }
-            }
-            else
-            {
-                try
-                {
-                    ports.emplace(key, CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily));
-                    update = true;
-                }
-                catch (...)
-                {
-                    result = wil::ResultFromCaughtException();
-                    continue;
-                }
-            }
+            result = E_INVALIDARG;
+            continue;
         }
 
-        // Update the ports list
-        if (update)
+        // Stage all requested operations. Each validates preconditions and returns a deferred
+        // mutation. If any step fails, nothing is committed.
+        std::optional<Update> staged;
+
+        if (SUCCEEDED(result) && WI_IsFlagSet(flags, WslaMapPortFlagReserveHostPort))
         {
-            stopAcceptThread();
+            result = StageReserveHostPort(ports, key, *message, RelayPort, staged, WI_IsFlagSet(flags, WslaMapPortFlagActivatePortRelay));
         }
 
-        // Start the accept thread, if needed
-        if (!acceptThread.joinable())
+        else if (SUCCEEDED(result) && WI_IsFlagSet(flags, WslaMapPortFlagActivatePortRelay))
         {
-            std::vector<std::shared_ptr<PortRelay>> relays;
-            for (auto& e : ports)
-            {
-                relays.emplace_back(e.second);
-            }
-
-            acceptThread = std::thread([&, relays = std::move(relays)]() mutable {
-                try
-                {
-                    AcceptThread(relays, VmId, acceptThreadEvent.get());
-                }
-                CATCH_LOG();
-            });
+            result = StageActivatePortRelay(ports, key, *message, staged);
         }
+
+        if (SUCCEEDED(result) && WI_IsFlagSet(flags, WslaMapPortFlagReleaseHostPort))
+        {
+            result = StageReleaseHostPort(ports, key, staged, WI_IsFlagSet(flags, WslaMapPortFlagStopPortRelay));
+        }
+        
+        else if (SUCCEEDED(result) && WI_IsFlagSet(flags, WslaMapPortFlagStopPortRelay))
+        {
+            result = StageStopPortRelay(ports, key, staged);
+        }
+
+        // If we succeeded, there must be something to commit.
+        // If we failed, there must be nothing to commit.
+        WI_ASSERT(staged.has_value() || FAILED(result));
+        WI_ASSERT(!staged.has_value() || SUCCEEDED(result));
+
+        if (FAILED(result) || !staged.has_value())
+        {
+            continue;
+        }
+
+        // Commit: stop the accept thread, apply all staged mutations, then restart.
+        stopAcceptThread();
+
+        staged.value()();
+
+        startAcceptThread();
 
         result = S_OK;
     }
