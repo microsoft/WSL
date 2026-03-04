@@ -38,7 +38,7 @@ Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliase
     }
 }
 
-// This is the header applied before every help output, for product and copyright information.
+// This is the header applied before every help output.
 // It is separate in case we need to show it in other contexts, such as error messages, or
 // during specific command executions.
 void Command::OutputIntroHeader() const

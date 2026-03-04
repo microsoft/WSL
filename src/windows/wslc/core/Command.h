@@ -31,7 +31,6 @@ using namespace wsl::windows::wslc::argument;
 namespace wsl::windows::wslc {
 
 constexpr std::wstring_view s_ExecutableName = L"wslc";
-constexpr std::wstring_view s_PackageVersion = L"" WSL_PACKAGE_VERSION;
 
 struct Command
 {

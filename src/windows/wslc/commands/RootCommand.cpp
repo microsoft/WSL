@@ -66,9 +66,7 @@ void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (context.Args.Contains(ArgType::Version))
     {
-        std::wostringstream versionOut;
-        versionOut << s_ExecutableName << L" v" << s_PackageVersion;
-        wsl::windows::common::wslutil::PrintMessage(versionOut.str(), stdout);
+        wsl::windows::common::wslutil::PrintMessage(std::format(L"{} v{}", s_ExecutableName, WSL_PACKAGE_VERSION));
         return;
     }
 
