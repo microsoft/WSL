@@ -22,9 +22,9 @@ class ImageService
 public:
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
     void Push();
     void Save();
-    void Load();
     void Tag();
     void Prune();
     void Inspect();

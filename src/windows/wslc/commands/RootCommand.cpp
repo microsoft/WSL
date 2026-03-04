@@ -39,6 +39,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
     return commands;
 }
 
