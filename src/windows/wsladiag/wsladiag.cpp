@@ -683,7 +683,7 @@ static int Run(std::wstring_view commandLine)
 
     THROW_IF_FAILED(result);
 
-    THROW_IF_FAILED(container->Start(startFlags)); // TODO: Error message
+    THROW_IF_FAILED(container->Start(startFlags, nullptr)); // TODO: Error message
 
     if (WI_IsFlagSet(startFlags, WSLAContainerStartFlagsAttach))
     {
@@ -726,7 +726,7 @@ static int Attach(std::wstring_view commandLine)
     wil::unique_handle stdinLogs;
     wil::unique_handle stdoutLogs;
     wil::unique_handle stderrLogs;
-    THROW_IF_FAILED(container->Attach((ULONG*)&stdinLogs, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs));
+    THROW_IF_FAILED(container->Attach(nullptr, (ULONG*)&stdinLogs, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs));
 
     if (stdoutLogs)
     {

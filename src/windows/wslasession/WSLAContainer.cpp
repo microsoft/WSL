@@ -389,7 +389,7 @@ void WSLAContainerImpl::CopyTo(IWSLAContainer** Container) const
     THROW_IF_FAILED(m_comWrapper.CopyTo(Container));
 }
 
-void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const
+void WSLAContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -404,7 +404,7 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const
 
     try
     {
-        ioHandle = m_dockerClient.AttachContainer(m_id);
+        ioHandle = m_dockerClient.AttachContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
@@ -440,7 +440,7 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const
     *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get())));
 }
 
-void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
+void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys)
 {
     // Acquire an exclusive lock since this method modifies m_initProcessControl, m_initProcess and m_state.
     auto lock = m_lock.lock_exclusive();
@@ -455,17 +455,27 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
     // Attach to the container's init process so no IO is lost.
     std::unique_ptr<WSLAProcessIO> io;
 
-    if (WI_IsFlagSet(Flags, WSLAContainerStartFlagsAttach))
+    try
     {
-        if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
+        if (WI_IsFlagSet(Flags, WSLAContainerStartFlagsAttach))
         {
-            io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+            auto detachKeys = DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys);
+
+            if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
+            {
+                io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id, detachKeys).release()});
+            }
+            else
+            {
+                wil::unique_handle stream{reinterpret_cast<HANDLE>(m_dockerClient.AttachContainer(m_id, detachKeys).release())};
+                io = CreateRelayedProcessIO(std::move(stream), m_initProcessFlags);
+            }
         }
-        else
-        {
-            wil::unique_handle stream{reinterpret_cast<HANDLE>(m_dockerClient.AttachContainer(m_id).release())};
-            io = CreateRelayedProcessIO(std::move(stream), m_initProcessFlags);
-        }
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // N.B. This can happen if 'DetachKeys' is invalid.
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to attach to container '%hs' during start", m_id.c_str());
     }
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient, m_eventTracker);
@@ -484,7 +494,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
 
     try
     {
-        m_dockerClient.StartContainer(m_id);
+        m_dockerClient.StartContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
@@ -694,7 +704,7 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process) const
     THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
 }
 
-void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
+void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachKeys, IWSLAProcess** Process)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
 
@@ -732,6 +742,11 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     if (WI_IsFlagSet(Options->Flags, WSLAProcessFlagsStdin))
     {
         request.AttachStdin = true;
+    }
+
+    if (DetachKeys != nullptr)
+    {
+        request.DetachKeys = DetachKeys;
     }
 
     try
@@ -1277,7 +1292,7 @@ WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const W
 {
 }
 
-HRESULT WSLAContainer::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
+HRESULT WSLAContainer::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
 {
     COMServiceExecutionContext context;
 
@@ -1285,7 +1300,7 @@ HRESULT WSLAContainer::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
     *Stdout = 0;
     *Stderr = 0;
 
-    return CallImpl(&WSLAContainerImpl::Attach, Stdin, Stdout, Stderr);
+    return CallImpl(&WSLAContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
 }
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
@@ -1304,12 +1319,12 @@ HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
     return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
 }
 
-HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
+HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachKeys, IWSLAProcess** Process)
 {
     COMServiceExecutionContext context;
 
     *Process = nullptr;
-    return CallImpl(&WSLAContainerImpl::Exec, Options, Process);
+    return CallImpl(&WSLAContainerImpl::Exec, Options, DetachKeys, Process);
 }
 
 HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds)
@@ -1319,11 +1334,11 @@ HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds)
     return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutSeconds);
 }
 
-HRESULT WSLAContainer::Start(WSLAContainerStartFlags Flags)
+HRESULT WSLAContainer::Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLAContainerImpl::Start, Flags);
+    return CallImpl(&WSLAContainerImpl::Start, Flags, DetachKeys);
 }
 
 HRESULT WSLAContainer::Inspect(LPSTR* Output)

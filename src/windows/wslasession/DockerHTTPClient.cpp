@@ -252,9 +252,15 @@ void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULO
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::StartContainer(const std::string& Id)
+void DockerHTTPClient::StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys)
 {
-    Transaction(verb::post, URL::Create("/containers/{}/start", Id));
+    auto url = URL::Create("/containers/{}/start", Id);
+    if (DetachKeys.has_value())
+    {
+        url.SetParameter("detachKeys", DetachKeys.value());
+    }
+
+    Transaction(verb::post, url);
 }
 
 void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds)
@@ -296,7 +302,7 @@ docker_schema::InspectExec DockerHTTPClient::InspectExec(const std::string& Id)
     return Transaction<EmptyRequest, docker_schema::InspectExec>(verb::get, URL::Create("/exec/{}/json", Id));
 }
 
-wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
+wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys)
 {
     std::map<boost::beast::http::field, std::string> headers{
         {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
@@ -306,6 +312,11 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     url.SetParameter("stdin", true);
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
+
+    if (DetachKeys.has_value())
+    {
+        url.SetParameter("detachKeys", DetachKeys.value());
+    }
 
     auto [response, socket] = SendRequest(verb::post, url, {}, headers);
 

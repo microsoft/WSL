@@ -25,11 +25,11 @@ Abstract:
     if ((_Ex).HasErrorMessage()) \
     { \
         THROW_HR_WITH_USER_ERROR_MSG( \
-            E_FAIL, (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
+            (_Ex).HResultFromStatusCode(), (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
     } \
     else \
     { \
-        THROW_HR_MSG(E_FAIL, "Error: %hs. " _Msg, (_Ex).what(), ##__VA_ARGS__); \
+        THROW_HR_MSG((_Ex).HResultFromStatusCode(), "Error: %hs. " _Msg, (_Ex).what(), ##__VA_ARGS__); \
     }
 
 #define CATCH_AND_THROW_DOCKER_USER_ERROR(_Msg, ...) \
@@ -76,6 +76,18 @@ public:
         return static_cast<uint16_t>(m_response.result());
     }
 
+    HRESULT HResultFromStatusCode() const noexcept
+    {
+        if (StatusCode() == 400)
+        {
+            return E_INVALIDARG;
+        }
+        else
+        {
+            return E_FAIL;
+        }
+    }
+
 private:
     boost::beast::http::message<false, boost::beast::http::buffer_body> m_response{};
     std::string m_url;
@@ -112,13 +124,13 @@ public:
     // Container management.
     std::vector<common::docker_schema::ContainerInfo> ListContainers(bool all = false);
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
-    void StartContainer(const std::string& Id);
+    void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
     common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
     common::docker_schema::InspectExec InspectExec(const std::string& Id);
-    wil::unique_socket AttachContainer(const std::string& Id);
+    wil::unique_socket AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
@@ -224,6 +236,11 @@ private:
         }
 
         auto [response, body] = SendRequestAndReadResponse(Method, Url, requestString);
+
+        WSL_LOG(
+            "HTTPTransaction",
+            TraceLoggingValue(Url.Get().c_str(), "URL"),
+            TraceLoggingValue(response.result_int(), "StatusCode"));
 
         if (response.result_int() < 200 || response.result_int() >= 300)
         {
