@@ -150,8 +150,6 @@ auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, std::set<uint16_t>& al
 }
 
 // Builds port mapping list from container options and returns the network mode string.
-// Note: For bridge mode, VM ports are initially set to 0 and allocated from the VM port pool
-// at Create time via AllocateVmPorts(), then passed to Docker as explicit HostConfig.PortBindings.
 std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options)
 {
     WSLA_CONTAINER_NETWORK_TYPE networkType = options.ContainerNetwork.ContainerNetworkType;
@@ -191,7 +189,8 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const W
 
         if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
         {
-            // In bridged mode, VM port will be allocated from the VM port pool at Create time.
+            // Note: For bridge mode, VM ports are initially set to 0 and later allocated from the VM port pool
+            // at time via AllocateVmPorts().
             ports.push_back({port.HostPort, 0, port.ContainerPort, port.Family});
         }
         else if (networkType == WSLA_CONTAINER_NETWORK_HOST)
