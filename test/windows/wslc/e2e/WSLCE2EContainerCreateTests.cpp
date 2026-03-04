@@ -43,13 +43,13 @@ class WSLCE2EContainerCreateTests
     TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
         auto result = RunWslc(L"container create --help");
-        result.Verify({.Stdout = GetOutput(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
     {
         auto result = RunWslc(L"container create --name " + WslcContainerName);
-        result.Verify({.Stdout = GetOutput(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
@@ -97,7 +97,7 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
-    std::wstring GetOutput() const
+    std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
         output << GetWslcHeader()        //

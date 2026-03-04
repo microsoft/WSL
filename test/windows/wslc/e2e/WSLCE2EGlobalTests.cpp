@@ -34,16 +34,16 @@ class WSLCE2EGlobalTests
 
     TEST_METHOD(WSLCE2E_HelpCommand)
     {
-        RunWslcAndVerify(L"--help", {.Stdout = GetOutput(), .Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(L"--help", {.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_InvalidCommand_DisplaysErrorMessage)
     {
-        RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
+        RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
 private:
-    std::wstring GetOutput() const
+    std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
         output << GetWslcHeader()        //

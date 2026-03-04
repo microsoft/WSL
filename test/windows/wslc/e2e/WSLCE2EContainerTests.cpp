@@ -34,16 +34,16 @@ class WSLCE2EContainerTests
 
     TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        RunWslc(L"container --help").Verify({.Stdout = GetOutput(), .Stderr = L"", .ExitCode = S_OK});
+        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
     {
-        RunWslc(L"container INVALID_CMD").Verify({.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
+        RunWslc(L"container INVALID_CMD").Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
 private:
-    std::wstring GetOutput() const
+    std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
         output << GetWslcHeader()        //
