@@ -174,30 +174,22 @@ try
 
     // TODO: Determine gateway MAC address
     std::wstring device_options;
-    auto client_ip = networkSettings->PreferredIpAddress.AddressString;
-    if (!client_ip.empty())
-    {
-        device_options += L"client_ip=" + client_ip;
-    }
-
-    if (!networkSettings->MacAddress.empty())
-    {
-        if (!device_options.empty())
+    auto appendOption = [&device_options](const std::wstring& key, const std::wstring& value) {
+        if (!value.empty())
         {
-            device_options += L';';
+            if (!device_options.empty())
+            {
+                device_options += L';';
+            }
+            device_options += key + L'=' + value;
         }
-        device_options += L"client_mac=" + networkSettings->MacAddress;
-    }
+    };
+
+    appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
+    appendOption(L"client_mac", networkSettings->MacAddress);
 
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
-    if (!default_route.empty())
-    {
-        if (!device_options.empty())
-        {
-            device_options += L';';
-        }
-        device_options += L"gateway_ip=" + default_route;
-    }
+    //appendOption(L"gateway_ip", default_route); // TODO: determine if this is needed or not.
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
