@@ -4937,8 +4937,7 @@ class WSLATests
         // Verify port mapping.
         // Two containers created with the same host port, only the first Start() succeeds.
         {
-            WSLAContainerLauncher launcher(
-                "debian:latest", "deferred-port", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_BRIDGE);
+            WSLAContainerLauncher launcher("debian:latest", "deferred-port", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_BRIDGE);
             launcher.AddPort(1240, 8000, AF_INET);
 
             // Both Create() calls should succeed because ports are not reserved until Start().
@@ -4968,8 +4967,7 @@ class WSLATests
                 std::filesystem::remove_all(hostFolder, ec);
             });
 
-            WSLAContainerLauncher launcher(
-                "debian:latest", "deferred-volume", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_HOST);
+            WSLAContainerLauncher launcher("debian:latest", "deferred-volume", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_HOST);
             launcher.AddVolume(hostFolder.wstring(), "/deferred-volume", false);
 
             // Create the container — volume should NOT be mounted yet.
