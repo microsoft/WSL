@@ -1907,6 +1907,6 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
     <value>Visual Studio Integration</value>
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Integração com Visual Studio</value>
   </data>
 </root>

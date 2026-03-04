@@ -1900,6 +1900,6 @@ Também pode aceder a mais Opções remotas do VS Code através da paleta de com
     <value>Visual Studio Integration</value>
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Integração do Visual Studio</value>
   </data>
 </root>
