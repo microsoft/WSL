@@ -4929,6 +4929,66 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(DeferredPortAndVolumeMappingOnStart)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        // Verify port mapping.
+        // Two containers created with the same host port, only the first Start() succeeds.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "deferred-port", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_BRIDGE);
+            launcher.AddPort(1240, 8000, AF_INET);
+
+            // Both Create() calls should succeed because ports are not reserved until Start().
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
+
+            launcher.SetName("deferred-port-2");
+            auto container2 = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container2.State(), WslaContainerStateCreated);
+
+            // Start container — should succeed.
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            // Start container 2 — should fail because the host port is already reserved by container 1.
+            VERIFY_ARE_EQUAL(container2.Get().Start(WSLAContainerStartFlagsNone), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(container2.State(), WslaContainerStateCreated);
+        }
+
+        // Verify mount volume is deferred to Start()
+        {
+            auto hostFolder = std::filesystem::current_path() / "test-deferred-volume";
+            std::filesystem::create_directories(hostFolder);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                std::error_code ec;
+                std::filesystem::remove_all(hostFolder, ec);
+            });
+
+            WSLAContainerLauncher launcher(
+                "debian:latest", "deferred-volume", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_HOST);
+            launcher.AddVolume(hostFolder.wstring(), "/deferred-volume", false);
+
+            // Create the container — volume should NOT be mounted yet.
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_SUCCEEDED(result);
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
+            ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 1);
+
+            // Start the container — volume should now be mounted.
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
+            ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 0);
+
+            // Verify the volume is unmounted after container is stopped.
+            VERIFY_SUCCEEDED(container->Get().Stop(WSLASignalSIGKILL, 0));
+            ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 1);
+        }
+    }
+
     struct BlockingOperation
     {
         NON_COPYABLE(BlockingOperation);

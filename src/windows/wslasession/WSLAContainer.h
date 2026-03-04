@@ -1,4 +1,3 @@
-
 /*++
 
 Copyright (c) Microsoft. All rights reserved.
@@ -112,6 +111,7 @@ private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
+    __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void DisconnectComWrapper();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 

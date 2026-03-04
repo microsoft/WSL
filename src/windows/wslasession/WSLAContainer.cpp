@@ -150,7 +150,8 @@ auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, std::set<uint16_t>& al
 }
 
 // Builds port mapping list from container options and returns the network mode string.
-// Note: For bridge mode, VM ports are set to 0 and will be resolved from Docker's inspect data after StartContainer().
+// Note: For bridge mode, VM ports are initially set to 0 and allocated from the VM port pool
+// at Create time via AllocateVmPorts(), then passed to Docker as explicit HostConfig.PortBindings.
 std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options)
 {
     WSLA_CONTAINER_NETWORK_TYPE networkType = options.ContainerNetwork.ContainerNetworkType;
@@ -379,7 +380,6 @@ WSLAContainerImpl::~WSLAContainerImpl()
 
     auto lock = m_lock.lock_exclusive();
     ReleaseResources();
-    DisconnectComWrapper();
 }
 
 void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noexcept
@@ -549,7 +549,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         {
             Transition(WslaContainerStateExited);
 
-            ReleaseResources();
+            ReleaseRuntimeResources();
 
             if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
             {
@@ -611,7 +611,7 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
 
     Transition(WslaContainerStateExited);
 
-    ReleaseResources();
+    ReleaseRuntimeResources();
 
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
@@ -655,7 +655,6 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLo
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
     ReleaseResources();
-    DisconnectComWrapper();
 
     Transition(WslaContainerStateDeleted);
 }
@@ -1143,8 +1142,14 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         {
             if (port.VmPort != 0)
             {
-                virtualMachine.TryAllocatePort(port.VmPort);
-                allocatedVmPorts.insert(port.VmPort);
+                if (virtualMachine.TryAllocatePort(port.VmPort))
+                {
+                    allocatedVmPorts.insert(port.VmPort);
+                }
+                else
+                {
+                    THROW_WIN32_MSG(ERROR_BUSY, "VM port %hu for container '%hs' is already in use", port.VmPort, name.c_str());
+                }
             }
         }
     }
@@ -1275,17 +1280,26 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     return std::make_unique<RelayedProcessIO>(std::move(fds));
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseResources()
+__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseRuntimeResources()
 {
-    WSL_LOG("ReleaseResources", TraceLoggingValue(m_id.c_str(), "ID"));
+    WSL_LOG("ReleaseRuntimeResources", TraceLoggingValue(m_id.c_str(), "ID"));
 
     // Release runtime resources (port relays, volume mounts) that were set up at Start().
     UnmapPorts(m_mappedPorts, m_virtualMachine);
     UnmountVolumes(m_mountedVolumes, m_virtualMachine);
+}
 
-    // Release VM port allocations since restart is not currently supported.
-    // TODO: If restart support is added, VM ports should be preserved across stop/start cycles.
+__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseResources()
+{
+    WSL_LOG("ReleaseResources", TraceLoggingValue(m_id.c_str(), "ID"));
+
+    ReleaseRuntimeResources();
+
+    // Release VM port allocations back to the pool.
     ReleaseVmPorts(m_allocatedVmPorts, m_virtualMachine);
+
+    // Disconnect the COM wrapper so no new RPC calls can reach this container.
+    DisconnectComWrapper();
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DisconnectComWrapper()
