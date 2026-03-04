@@ -404,11 +404,6 @@ struct PortRelay
         }
     }
 
-    bool IsActive() const
-    {
-        return LinuxPort != 0;
-    }
-
     bool ScheduleAccept()
     {
         WI_VERIFY(!Pending);
@@ -473,7 +468,7 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
         std::vector<HANDLE> events{ExitEvent};
         for (auto& e : ports)
         {
-            if (!e->Pending && e->IsActive())
+            if (!e->Pending)
             {
                 while (e->ScheduleAccept())
                 {
@@ -544,6 +539,7 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
 
     while (true)
     {
+        // Receive a message
         auto message = ReceiveServiceMessage();
         if (!message.has_value())
         {
@@ -564,6 +560,7 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
             THROW_LAST_ERROR_IF(!WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), &result, sizeof(result), nullptr, nullptr));
         });
 
+        // Check if the binding is valid.
         bool update = false;
         auto it = ports.find(key);
         if (message->Stop)
@@ -583,16 +580,8 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
         {
             if (it != ports.end())
             {
-                if (it->second->LinuxPort == 0 && message->LinuxPort != 0)
-                {
-                    it->second->LinuxPort = message->LinuxPort;
-                    update = true;
-                }
-                else
-                {
-                    result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
-                    continue;
-                }
+                result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+                continue;
             }
             else
             {
@@ -609,11 +598,13 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
             }
         }
 
+        // Update the ports list
         if (update)
         {
             stopAcceptThread();
         }
 
+        // Start the accept thread, if needed
         if (!acceptThread.joinable())
         {
             std::vector<std::shared_ptr<PortRelay>> relays;
