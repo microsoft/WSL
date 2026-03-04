@@ -379,6 +379,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
 
     auto lock = m_lock.lock_exclusive();
     ReleaseResources();
+    DisconnectComWrapper();
 }
 
 void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noexcept
@@ -547,6 +548,9 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         if (previousState == WslaContainerStateRunning)
         {
             Transition(WslaContainerStateExited);
+
+            ReleaseResources();
+
             if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
             {
                 DeleteExclusiveLockHeld();
@@ -607,6 +611,8 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
 
     Transition(WslaContainerStateExited);
 
+    ReleaseResources();
+
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
         DeleteExclusiveLockHeld();
@@ -649,6 +655,7 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLo
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
     ReleaseResources();
+    DisconnectComWrapper();
 
     Transition(WslaContainerStateDeleted);
 }
@@ -1127,13 +1134,18 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     labels.erase(metadataIt);
 
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
+    // Only needed for containers that haven't stopped yet — stopped containers release their
+    // VM port allocations, so those ports are available for reuse.
     std::set<uint16_t> allocatedVmPorts;
-    for (const auto& port : metadata.Ports)
+    if (dockerContainer.State == ContainerState::Created)
     {
-        if (port.VmPort != 0)
+        for (const auto& port : metadata.Ports)
         {
-            virtualMachine.TryAllocatePort(port.VmPort);
-            allocatedVmPorts.insert(port.VmPort);
+            if (port.VmPort != 0)
+            {
+                virtualMachine.TryAllocatePort(port.VmPort);
+                allocatedVmPorts.insert(port.VmPort);
+            }
         }
     }
 
@@ -1265,21 +1277,24 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
 
 __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseResources()
 {
-    WSL_LOG("ReleaseContainerResources", TraceLoggingValue(m_id.c_str(), "ID"));
+    WSL_LOG("ReleaseResources", TraceLoggingValue(m_id.c_str(), "ID"));
 
-    // Disconnect the COM wrapper so no new RPC calls can reach this container.
+    // Release runtime resources (port relays, volume mounts) that were set up at Start().
+    UnmapPorts(m_mappedPorts, m_virtualMachine);
+    UnmountVolumes(m_mountedVolumes, m_virtualMachine);
+
+    // Release VM port allocations since restart is not currently supported.
+    // TODO: If restart support is added, VM ports should be preserved across stop/start cycles.
+    ReleaseVmPorts(m_allocatedVmPorts, m_virtualMachine);
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DisconnectComWrapper()
+{
     if (m_comWrapper)
     {
         m_comWrapper->Disconnect();
         m_comWrapper.Reset();
     }
-
-    UnmountVolumes(m_mountedVolumes, m_virtualMachine);
-    UnmapPorts(m_mappedPorts, m_virtualMachine);
-    ReleaseVmPorts(m_allocatedVmPorts, m_virtualMachine);
-
-    m_mountedVolumes.clear();
-    m_mappedPorts.clear();
 }
 
 __requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLA_CONTAINER_STATE State) noexcept
