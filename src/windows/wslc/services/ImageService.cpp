@@ -43,15 +43,21 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
+void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
+{
+    wil::unique_hfile imageFile{CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!imageFile);
+
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+    THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+}
+
 void ImageService::Push()
 {
 }
 
 void ImageService::Save()
-{
-}
-
-void ImageService::Load()
 {
 }
 

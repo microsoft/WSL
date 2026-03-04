@@ -57,6 +57,42 @@ void ValidateContainerName(LPCSTR Name)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
 }
 
+wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
+{
+    wsla_schema::InspectImage wslaInspect{};
+
+    // Direct field mappings
+    wslaInspect.Id = dockerInspect.Id;
+    wslaInspect.RepoTags = dockerInspect.RepoTags;
+    wslaInspect.RepoDigests = dockerInspect.RepoDigests;
+    wslaInspect.Parent = dockerInspect.Parent;
+    wslaInspect.Comment = dockerInspect.Comment;
+    wslaInspect.Created = dockerInspect.Created;
+    wslaInspect.Author = dockerInspect.Author;
+    wslaInspect.Architecture = dockerInspect.Architecture;
+    wslaInspect.Os = dockerInspect.Os;
+    wslaInspect.Size = dockerInspect.Size;
+    wslaInspect.Metadata = dockerInspect.Metadata;
+
+    // Convert Config from docker_schema to wsla_schema
+    if (dockerInspect.Config.has_value())
+    {
+        wsla_schema::ImageConfig wslaConfig{};
+        const auto& dockerConfig = dockerInspect.Config.value();
+
+        wslaConfig.Cmd = dockerConfig.Cmd;
+        wslaConfig.Entrypoint = dockerConfig.Entrypoint;
+        wslaConfig.Env = dockerConfig.Env;
+        wslaConfig.Labels = dockerConfig.Labels;
+        wslaConfig.User = dockerConfig.User;
+        wslaConfig.WorkingDir = dockerConfig.WorkingDir;
+
+        wslaInspect.Config = wslaConfig;
+    }
+
+    return wslaInspect;
+}
+
 } // namespace
 
 namespace wsl::windows::service::wsla {
@@ -359,6 +395,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ContextPath);
     RETURN_HR_IF(E_INVALIDARG, *ContextPath == L'\0');
+    RETURN_HR_IF(E_INVALIDARG, ImageTag != nullptr && strlen(ImageTag) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     wil::unique_handle dockerfileFileHandle;
     if (DockerfileHandle != 0 && DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
@@ -510,6 +547,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     auto [repo, tag] = ParseImage(ImageName);
 
@@ -588,6 +626,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrID) > WSLA_MAX_IMAGE_NAME_LENGTH);
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -653,6 +692,7 @@ try
     if (Options != nullptr)
     {
         RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingFalse));
+        RETURN_HR_IF(E_INVALIDARG, Options->Reference != nullptr && strlen(Options->Reference) > WSLA_MAX_IMAGE_NAME_LENGTH);
     }
 
     auto lock = m_lock.lock_shared();
@@ -811,6 +851,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
     RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
     RETURN_HR_IF_NULL(E_POINTER, Count);
 
@@ -877,8 +918,10 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
     RETURN_HR_IF_NULL(E_POINTER, Options->Repo);
     RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Repo) + strlen(Options->Tag) + 1 > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
 
@@ -901,6 +944,49 @@ try
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), errorMessage, e.StatusCode() == 409);
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::InspectImage(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ImageNameOrId);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrId) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
+
+    *Output = nullptr;
+
+    auto lock = m_lock.lock_shared();
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    docker_schema::InspectImage dockerInspect;
+    try
+    {
+        dockerInspect = m_dockerClient->InspectImage(ImageNameOrId);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage = "Failed to inspect image";
+        if (e.HasErrorMessage())
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+    }
+
+    // Convert to WSLA schema
+    auto wslaInspect = ConvertInspectImage(dockerInspect);
+
+    // Serialize to JSON
+    std::string wslaJson = wsl::shared::ToJson(wslaInspect);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslaJson.c_str()).release();
 
     return S_OK;
 }

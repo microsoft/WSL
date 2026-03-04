@@ -54,6 +54,7 @@ _(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       L
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  L"Image name") \
 _(Info,           "info",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_InfoArgDescription()) \
+_(Input,          "input",               L"i",              Kind::Value,       L"Provides path to the tar archive file containing the image") \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       L"Name of the container") \
 _(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container") \
