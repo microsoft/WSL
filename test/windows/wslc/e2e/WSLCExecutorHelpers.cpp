@@ -16,9 +16,23 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCExecutorHelpers.h"
 
+extern std::wstring g_testDataPath;
+
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
+
+TestImage GetDebianTestImageInfo()
+{
+    static std::filesystem::path imagePath = std::filesystem::path{g_testDataPath} / "debian-latest.tar";
+    return TestImage{L"debian", L"latest", imagePath};
+}
+
+TestImage GetInvalidTestImageInfo()
+{
+    static std::filesystem::path imagePath = "INVALID_PATH";
+    return TestImage{L"mcr.microsoft.com/invalid-image", L"latest", imagePath};
+}
 
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
@@ -73,5 +87,24 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
             break;
         }
     }
+}
+
+void EnsureImageIsLoaded(const TestImage& image)
+{
+    auto result = RunWslc(L"image list");
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+    auto outputLines = result.GetStdoutLines();
+    for (const auto& line : outputLines)
+    {
+        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        {
+            return;
+        }
+    }
+
+    // Image not found, load it
+    auto loadResult = RunWslc(std::format(L"image load --input {}", image.Path.wstring()));
+    loadResult.Verify({.Stderr = L"", .ExitCode = S_OK});
 }
 } // namespace WSLCE2ETests
