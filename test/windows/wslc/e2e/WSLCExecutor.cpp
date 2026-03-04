@@ -101,8 +101,9 @@ void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expect
 std::wstring GetWslcHeader()
 {
     std::wstringstream header;
-    header << L"Windows Subsystem for Linux Container CLI (Preview) v1.0.0\r\n"
-           << L"Copyright (c) Microsoft Corporation. All rights reserved.\r\n\r\n";
+    header << L"Copyright (c) Microsoft Corporation. All rights reserved.\r\n"
+           << L"For privacy information about this product please visit https://aka.ms/privacy.\r\n"
+           << L"\r\n";
     return header.str();
 }
 } // namespace WSLCE2ETests

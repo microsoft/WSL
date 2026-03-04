@@ -68,7 +68,7 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + DebianImage.NameAndTag());
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         std::wstring containerId = result.GetStdoutOneLine();
 
@@ -81,12 +81,12 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + DebianImage.NameAndTag());
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
         // Attempt to create another container with the same name
-        result = RunWslc(L"container create --name " + WslcContainerName + L" " + DebianImage.NameAndTag());
+        result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
             {.Stderr = std::format(L"Conflict. The container name \"/{}\" is already in use by container \"{}\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n", WslcContainerName, containerId),
              .ExitCode = 1});
