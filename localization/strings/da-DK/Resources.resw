@@ -722,7 +722,7 @@ Systemet skal muligvis genstartes, så ændringerne kan træde i kraft.</value>
     <value>Sammenknyttet netværk kræver, at wsl2.vmSwitch er angivet.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Det lykkedes ikke at hente listedistributionen fra '{}'. {}</value>
+    <value>Distributionslisten kunne ikke hentes fra '{}'. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1055,7 +1055,7 @@ Går tilbage til NAT-netværk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Egenskaben '{}' kunne ikke læses fra distributionen {} </value>
+    <value>Det lykkedes ikke at læse egenskaben "{}" fra distributionen {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">

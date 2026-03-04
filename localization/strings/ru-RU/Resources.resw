@@ -729,7 +729,7 @@
     <value>Для работы со связанными сетями необходимо установить wsl2.vmSwitch.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Не удалось получить дистрибутив списка из "{}". {}</value>
+    <value>Не удалось получить список рассылки из "{}". {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1062,7 +1062,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Не удалось прочитать свойство "{}" из дистрибутива {} </value>
+    <value>Не удалось прочитать свойство "{}" из дистрибутива {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1881,30 +1881,30 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Число миллисекунд бездействия виртуальной машины до ее завершения.</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
-    <value>Build, run, debug, and profile your apps running on WSL from Visual Studio</value>
+    <value>Создавайте, запускайте, отлаживайте и профилируйте приложения на WSL из Visual Studio</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
-    <value>Run and debug your apps on WSL from Visual Studio</value>
+    <value>Запускайте и отлаживайте приложения в WSL из Visual Studio</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
-    <value>Learn more about WSL in Visual Studio for .NET developers</value>
+    <value>Подробнее о WSL в Visual Studio для разработчиков .NET</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
-    <value>Learn more about Visual Studio and WSL for C++ developers</value>
+    <value>Подробнее о Visual Studio и WSL для разработчиков C++</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
-    <value>You can easily run and debug your .NET Core and cross platform C++ apps in Linux without leaving Visual Studio using Windows Subsystem for Linux (WSL). If you are a cross-platform developer, you can use this method as a simple way to test more of your target environments.</value>
+    <value>Вы можете легко запускать и отлаживать приложения .NET Core и кроссплатформенные приложения C++ в Linux, не выходя из Visual Studio, с помощью подсистемы Windows для Linux (WSL). Если вы кроссплатформенный разработчик, этот метод помогает легко тестировать больше целевых сред.</value>
   </data>
   <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Интеграция Visual Studio</value>
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
     <value>Visual Studio Integration</value>

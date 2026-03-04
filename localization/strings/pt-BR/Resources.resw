@@ -729,7 +729,7 @@ Talvez seja necessário reiniciar o sistema para que as alterações entrem em v
     <value>A rede em ponte requer que wsl2.vmSwitch seja definido.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Falha ao buscar a distribuição de lista de '{}'. {}</value>
+    <value>Falha ao buscar a lista de distribuição de '{}'. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1062,7 +1062,7 @@ Voltando à rede NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Falha ao ler a propriedade '{}' da distribuição {} </value>
+    <value>Falha ao ler a propriedade '{}' da distribuição {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1907,6 +1907,6 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
     <value>Visual Studio Integration</value>
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Integração com Visual Studio</value>
   </data>
 </root>
