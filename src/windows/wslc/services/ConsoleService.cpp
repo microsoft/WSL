@@ -21,7 +21,7 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 
-static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh = false)
+static bool RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh = false)
 {
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
@@ -39,6 +39,8 @@ static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
 
     wil::unique_event exitEvent(wil::EventOptions::ManualReset);
 
+    bool completed = false;
+
     // Create a thread to relay stdin to the pipe.
     std::thread inputThread([&]() {
         auto updateTerminal = [&console, &Process]() {
@@ -46,7 +48,11 @@ static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
             LOG_IF_FAILED(Process.Get().ResizeTty(windowSize.Y, windowSize.X));
         };
 
-        wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), Tty, updateTerminal, exitEvent.get());
+        // TODO: Make this configurable (default to ctrl-p, ctrl-q).
+        std::vector<char> detachSequence{0x10, 0x11};
+
+        completed = wsl::windows::common::relay::StandardInputRelay(
+            GetStdHandle(STD_INPUT_HANDLE), Tty, updateTerminal, exitEvent.get(), detachSequence);
     });
 
     auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -56,6 +62,10 @@ static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
 
     // Relay the contents of the pipe to stdout.
     wsl::windows::common::relay::InterruptableRelay(Tty, GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
+
+    joinThread.reset();
+
+    return completed;
 }
 
 static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
@@ -108,7 +118,11 @@ int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWS
 {
     if (WI_IsFlagSet(process.Flags(), WSLAProcessFlagsTty))
     {
-        RelayInteractiveTty(process, process.GetStdHandle(WSLAFDTty).get());
+        if (!RelayInteractiveTty(process, process.GetStdHandle(WSLAFDTty).get()))
+        {
+            wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
+            return 0;
+        }
     }
     else
     {

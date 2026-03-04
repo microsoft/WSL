@@ -128,6 +128,8 @@ private:
     __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
+
+    wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLASession& m_wslaSession;

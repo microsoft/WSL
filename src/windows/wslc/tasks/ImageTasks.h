@@ -20,4 +20,5 @@ namespace wsl::windows::wslc::task {
 void GetImages(CLIExecutionContext& context);
 void ListImages(CLIExecutionContext& context);
 void PullImage(CLIExecutionContext& context);
+void LoadImage(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task
