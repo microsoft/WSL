@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
-#include "WSLCExecutorHelpers.h"
+#include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
 
@@ -24,7 +24,7 @@ class WSLCE2EContainerCreateTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
-        EnsureImageIsLoaded(ValidTestImage);
+        EnsureImageIsLoaded(DebianImage);
         return true;
     }
 
@@ -54,11 +54,11 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidTestImage.NameAndTag());
+        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
         std::wstringstream expectedError;
-        expectedError << L"Image '" << InvalidTestImage.NameAndTag() << L"' not found, pulling\r\n"
+        expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
                       << L"pull access denied for library/"
-                      << InvalidTestImage.Name << L", repository does not exist or may require 'docker login': denied: requested access to the resource is denied\r\n"
+                      << InvalidImage.Name << L", repository does not exist or may require 'docker login': denied: requested access to the resource is denied\r\n"
                       << L"Error code: WSLA_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
@@ -68,7 +68,7 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + ValidTestImage.NameAndTag());
+        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + DebianImage.NameAndTag());
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         std::wstring containerId = result.GetStdoutOneLine();
 
@@ -81,12 +81,12 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + ValidTestImage.NameAndTag());
+        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + DebianImage.NameAndTag());
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
         // Attempt to create another container with the same name
-        result = RunWslc(L"container create --name " + WslcContainerName + L" " + ValidTestImage.NameAndTag());
+        result = RunWslc(L"container create --name " + WslcContainerName + L" " + DebianImage.NameAndTag());
         result.Verify(
             {.Stderr = std::format(L"Conflict. The container name \"/{}\" is already in use by container \"{}\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n", WslcContainerName, containerId),
              .ExitCode = 1});
@@ -94,8 +94,8 @@ class WSLCE2EContainerCreateTests
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
-    const TestImage ValidTestImage = GetDebianTestImageInfo();
-    const TestImage InvalidTestImage = GetInvalidTestImageInfo();
+    const TestImage& DebianImage = DebianTestImage();
+    const TestImage& InvalidImage = InvalidTestImage();
 
     std::wstring GetOutput() const
     {

@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCExecutorHelpers.cpp
+    WSLCE2EHelpers.cpp
 
 Abstract:
 
@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
-#include "WSLCExecutorHelpers.h"
+#include "WSLCE2EHelpers.h"
 
 extern std::wstring g_testDataPath;
 
@@ -22,16 +22,16 @@ namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
 
-TestImage GetDebianTestImageInfo()
+const TestImage& DebianTestImage()
 {
-    static std::filesystem::path imagePath = std::filesystem::path{g_testDataPath} / "debian-latest.tar";
-    return TestImage{L"debian", L"latest", imagePath};
+    static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / "debian-latest.tar"};
+    return image;
 }
 
-TestImage GetInvalidTestImageInfo()
+const TestImage& InvalidTestImage()
 {
-    static std::filesystem::path imagePath = "INVALID_PATH";
-    return TestImage{L"mcr.microsoft.com/invalid-image", L"latest", imagePath};
+    static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", "INVALID_PATH"};
+    return image;
 }
 
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)

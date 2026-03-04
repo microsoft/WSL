@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCExecutorHelpers.h
+    WSLCE2EHelpers.h
 
 Abstract:
 
-    This file contains helper functions for WSLCExecutor tests.
+    This file contains helper functions for WSLCE2E tests.
 --*/
 
 #pragma once
@@ -28,8 +28,8 @@ struct TestImage
     }
 };
 
-TestImage GetDebianTestImageInfo();
-TestImage GetInvalidTestImageInfo();
+const TestImage& DebianTestImage();
+const TestImage& InvalidTestImage();
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId);
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
