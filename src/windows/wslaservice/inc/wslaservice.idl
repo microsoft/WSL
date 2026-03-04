@@ -191,6 +191,12 @@ struct WSLA_LABEL
     [string] LPCSTR Value;
 };
 
+struct WSLA_TMPFS_MOUNT
+{
+    LPCSTR Destination;
+    [unique] LPCSTR Options;
+};
+
 struct WSLA_LABEL_INFORMATION
 {
     [string] LPSTR Key;
@@ -254,6 +260,8 @@ struct WSLA_CONTAINER_OPTIONS
 
     ULONGLONG ShmSize;
     struct WSLA_CONTAINER_NETWORK ContainerNetwork;
+    [unique, size_is(TmpfsCount)] const struct WSLA_TMPFS_MOUNT* Tmpfs;
+    ULONG TmpfsCount;
 };
 
 enum WSLA_CONTAINER_STATE

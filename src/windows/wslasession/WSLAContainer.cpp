@@ -807,7 +807,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     }
 
     // Map volume mounts using WSLA's host-side data.
-    wslaInspect.Mounts.reserve(m_mountedVolumes.size());
+    wslaInspect.Mounts.reserve(m_mountedVolumes.size() + dockerInspect.HostConfig.Tmpfs.size());
     for (const auto& volume : m_mountedVolumes)
     {
         wsla_schema::InspectMount mountInfo{};
@@ -816,6 +816,18 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
         mountInfo.Source = wsl::shared::string::WideToMultiByte(volume.HostPath);
         mountInfo.Destination = volume.ContainerPath;
         mountInfo.ReadWrite = !volume.ReadOnly;
+        wslaInspect.Mounts.push_back(std::move(mountInfo));
+    }
+
+    // Map tmpfs mounts from Docker inspect data.
+    for (const auto& entry : dockerInspect.HostConfig.Tmpfs)
+    {
+        wsla_schema::InspectMount mountInfo{};
+        mountInfo.Type = "tmpfs";
+        mountInfo.Destination = entry.first;
+        // Tmpfs mounts are read-write by default. We currently do not parse tmpfs options
+        // (e.g. "ro") for inspect output; Docker enforces actual mount behavior.
+        mountInfo.ReadWrite = true;
         wslaInspect.Mounts.push_back(std::move(mountInfo));
     }
 
@@ -939,6 +951,21 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // Mount volumes.
     auto volumeErrorCleanup = MountVolumes(volumes, virtualMachine);
+
+    // Process tmpfs mounts from container options.
+    if (containerOptions.TmpfsCount > 0)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Tmpfs, "Tmpfs is null with TmpfsCount=%lu", containerOptions.TmpfsCount);
+
+        for (ULONG i = 0; i < containerOptions.TmpfsCount; i++)
+        {
+            const auto& tmpfs = containerOptions.Tmpfs[i];
+
+            THROW_HR_IF_NULL_MSG(E_INVALIDARG, tmpfs.Destination, "Tmpfs mount at index %lu has null destination", i);
+
+            request.HostConfig.Tmpfs[tmpfs.Destination] = tmpfs.Options != nullptr ? tmpfs.Options : "";
+        }
+    }
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
