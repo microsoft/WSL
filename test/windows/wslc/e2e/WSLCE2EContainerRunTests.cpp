@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCE2EContainerCreateTests.cpp
+    WSLCE2EContainerRunTests.cpp
 
 Abstract:
 
