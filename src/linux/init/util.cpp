@@ -1718,6 +1718,14 @@ Return Value:
 --*/
 
 {
+
+    LOG_INFO("UtilMount Source {} Target {} Type {} Flags {:x} Options {}", 
+        Source ? Source : "null", 
+        Target ? Target : "null", 
+        Type ? Type : "null", 
+        MountFlags, 
+        Options ? Options : "null" );
+
     //
     // Ensure the mount point exists.
     //

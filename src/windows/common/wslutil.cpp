@@ -1542,3 +1542,20 @@ catch (...)
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
 }
+
+#define WSL_PREAMBLE "[wsl-log] "
+
+void wsl::windows::common::wslutil::WslLog(LPCSTR Format, ...)
+{
+
+    va_list args;
+    int preambleLength = ARRAYSIZE(WSL_PREAMBLE) - 1;
+    char traceWBuf[1024] = WSL_PREAMBLE;
+    va_start(args, Format);
+
+    _vsnprintf(&traceWBuf[preambleLength], ARRAYSIZE(traceWBuf) - preambleLength, Format, args);
+
+    OutputDebugStringA(traceWBuf);
+
+    va_end(args);
+}

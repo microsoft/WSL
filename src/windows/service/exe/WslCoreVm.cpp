@@ -29,6 +29,7 @@ Abstract:
 
 using msl::utilities::SafeInt;
 using wsl::windows::common::helpers::WindowsBuildNumbers;
+using wsl::windows::common::wslutil::WslLog;
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::string;
 using namespace std::string_literals;
@@ -80,6 +81,23 @@ RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 
     // Convert from bytes to megabytes. Ensure that we don't truncate a 512kb file to 0mb.
     return std::max(fileSizeBytes.QuadPart / static_cast<INT64>(_1MB), 1i64);
+}
+
+INT64
+RequiredExtraMmioSpaceForVirtioFsDaxInMb(_In_ UINT64 DaxSizeMb, _In_ HANDLE UserToken)
+{
+    // If DAX is enabled for VirtioFS, all fixed drives will need to be 
+    // exposed as VirtioFS shares to support DAX. Each VirtioFS share requires 
+    // some MMIO space, so calculate the total MMIO space needed based on the number of fixed drives.
+    auto fixedDrivesMask = wsl::windows::common::filesystem::EnumerateFixedDrives(UserToken).first;
+    auto fixedDrivesCount = std::popcount(fixedDrivesMask);
+    INT64 daxSizeInMb = (DaxSizeMb + EXTRA_MMIO_SIZE_PER_VIRTIOFS_DEVICE_IN_MB) * fixedDrivesCount;
+    
+    daxSizeInMb = wsl::windows::common::helpers::RoundUpToNearestPowerOfTwo(daxSizeInMb);
+
+    WslLog("%s: fixed drives mask/count=0x%x/%d MmioSpaceMB=%d(0x%x)", __FUNCTION__, 
+        fixedDrivesMask, fixedDrivesCount, daxSizeInMb, daxSizeInMb );
+    return daxSizeInMb;
 }
 } // namespace
 
@@ -320,7 +338,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Create the utility VM and store the runtime ID.
-    std::wstring json = GenerateConfigJson();
+    std::wstring json = GenerateConfigJson(m_userToken.get());
     m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
@@ -841,6 +859,8 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
 {
     THROW_HR_IF(HCS_E_TERMINATED, !m_system);
 
+    WslLog("%s: Admin=%d", __FUNCTION__, Admin);
+
     // Allow the Plan 9 server to create NT symlinks.
     //
     // N.B. This may fail for unelevated users, however symlink creation will
@@ -859,11 +879,16 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
         // Add virtiofs devices associating indices with paths from the fixed drive bitmap. These devices support
         // multiple mounts in the guest, so this only needs to be done once.
         auto fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives(UserToken).first;
+        WslLog("%s: fixedDrives=0x%x", __FUNCTION__, fixedDrives);
         while (fixedDrives != 0)
         {
             ULONG index;
             WI_VERIFY(_BitScanForward(&index, fixedDrives) != FALSE);
             const wchar_t fixedDrivePath[] = {gsl::narrow_cast<wchar_t>(L'A' + index), L':', L'\\', L'\0'};
+
+            WslLog("%s: fixedDrivePath=%ls, options=%s", __FUNCTION__, 
+                fixedDrivePath, LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS);
+
             AddVirtioFsShare(Admin, fixedDrivePath, TEXT(LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS), UserToken);
             fixedDrives ^= (1 << index);
         }
@@ -1243,6 +1268,10 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     ULONG featureFlags{};
     WI_SetFlagIf(featureFlags, LxInitFeatureVirtIo9p, m_vmConfig.EnableVirtio9p);
     WI_SetFlagIf(featureFlags, LxInitFeatureVirtIoFs, m_vmConfig.EnableVirtioFs);
+    if (m_vmConfig.EnableVirtioFs)
+    {
+        WI_SetFlagIf(featureFlags, LxInitFeatureVirtIoFsDax, m_vmConfig.VirtioFsDaxSize > 0);
+    }
     WI_SetFlagIf(featureFlags, LxInitFeatureDnsTunneling, m_vmConfig.EnableDnsTunneling);
 
     // Create an instance, this takes ownership of the sockets.
@@ -1392,7 +1421,7 @@ void WslCoreVm::FreeLun(_In_ ULONG lun)
     m_lunBitmap.set(lun, false);
 }
 
-std::wstring WslCoreVm::GenerateConfigJson()
+std::wstring WslCoreVm::GenerateConfigJson(_In_ HANDLE UserToken)
 {
     hcs::ComputeSystem systemSettings{};
     systemSettings.Owner = wsl::windows::common::wslutil::c_vmOwner;
@@ -1475,6 +1504,13 @@ std::wstring WslCoreVm::GenerateConfigJson()
         highMmioGapInMB += WSLG_SHARED_MEMORY_SIZE_MB + EXTRA_MMIO_SIZE_PER_VIRTIOFS_DEVICE_IN_MB;
     }
 
+    // If we are using virtiofs and DAX, add enough MMIO space for the virtiofs
+    // device to support the maximum DAX size configured.
+    if (m_vmConfig.EnableVirtioFs && (m_vmConfig.VirtioFsDaxSize > 0))
+    {
+        highMmioGapInMB += RequiredExtraMmioSpaceForVirtioFsDaxInMb(m_vmConfig.VirtioFsDaxSize, UserToken);
+    }
+
     // If using pmem for the system distro, add MMIO space for the device.
     if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypePmem)
     {
@@ -1488,6 +1524,8 @@ std::wstring WslCoreVm::GenerateConfigJson()
         TraceLoggingValue(privateSystemDistro, "privateSystemDistro"),
         TraceLoggingValue(static_cast<DWORD>(m_systemDistroDeviceType), "systemDistroDeviceType"),
         TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+
+    WslLog("%s: High MMIO MB 0x%lx", __FUNCTION__, highMmioGapInMB);
 
     vmSettings.ComputeTopology.Memory.HighMmioGapInMB = highMmioGapInMB;
 
@@ -2164,13 +2202,34 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
         tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
         WI_ASSERT(!FindVirtioFsShare(tag.c_str(), Admin));
 
+        UINT32 flags = VIRTIO_FS_FLAGS_TYPE_FILES;
+        if (m_vmConfig.VirtioFsDaxSize != 0)
+        {
+            uint64_t maxDaxSize = (1ULL << (32 - VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT)) - 1;
+            THROW_HR_IF_MSG(
+                E_INVALIDARG, 
+                (m_vmConfig.VirtioFsDaxSize & ~maxDaxSize) != 0 ? true : false,
+                "VirtioFsDaxSize too large %llu, max is %llu", 
+                m_vmConfig.VirtioFsDaxSize, maxDaxSize);
+
+            flags |= static_cast<UINT32>(m_vmConfig.VirtioFsDaxSize << VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT);
+        }
+
+        WslLog("%s: Path=%ls, Options=%ls (parsed=%ls), Admin=%d, DaxSize=%llu flags=0x%X", __FUNCTION__,
+            sharePath.c_str(),
+            Options,
+            key.OptionsString().c_str(),
+            Admin,
+            m_vmConfig.VirtioFsDaxSize,
+            flags);
+
         (void)m_guestDeviceManager->AddGuestDevice(
             VIRTIO_FS_DEVICE_ID,
             Admin ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID,
             tag.c_str(),
             key.OptionsString().c_str(),
             sharePath.c_str(),
-            VIRTIO_FS_FLAGS_TYPE_FILES,
+            flags,
             UserToken);
 
         m_virtioFsShares.emplace(std::move(key), tag);

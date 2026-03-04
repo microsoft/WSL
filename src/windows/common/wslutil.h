@@ -208,4 +208,6 @@ void WriteInstallLog(const std::string& Content);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 
+void WslLog(LPCSTR, ...);
+
 } // namespace wsl::windows::common::wslutil

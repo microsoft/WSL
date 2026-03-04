@@ -8,6 +8,8 @@
 #define VIRTIO_FS_FLAGS_TYPE_FILES 0x8000
 #define VIRTIO_FS_FLAGS_TYPE_SECTIONS 0x4000
 
+#define VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT 16
+
 inline const std::wstring c_defaultDeviceTag = L"default";
 
 // These device types and class IDs are implemented by the external wsldevicehost vdev.

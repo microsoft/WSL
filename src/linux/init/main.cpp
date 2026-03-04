@@ -2357,6 +2357,8 @@ Return Value:
 
 try
 {
+    LOG_INFO("MountDiskPartition DevicePath {} Type {} Target {} Flags {:x} Options {}", DevicePath, Type, Target, Flags, Options);
+
     *Step = LxMiniInitMountStepFindPartition;
     if (!wsl::shared::string::StartsWith(DevicePath, DEVFS_PATH "/"))
     {
@@ -3188,6 +3190,8 @@ Return Value:
 --*/
 try
 {
+
+    LOG_INFO("ProcessMessage: type {}", Type);
 
     //
     // Validate the message and handle operations that do not require creating a child process.

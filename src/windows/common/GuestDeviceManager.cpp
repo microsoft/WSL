@@ -67,7 +67,7 @@ void GuestDeviceManager::AddSharedMemoryDevice(_In_ const GUID& ImplementationCl
 
     // For virtiofs hdv, the flags parameter has been overloaded. Flags are placed in the lower
     // 16 bits, while the shared memory size in megabytes are placed in the upper 16 bits.
-    static constexpr auto VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT = 16;
+    //static constexpr auto VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT = 16;
     UINT32 flags = (SizeMb << VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT);
     WI_SetFlag(flags, VIRTIO_FS_FLAGS_TYPE_SECTIONS);
     (void)AddHdvShareWithOptions(VIRTIO_FS_DEVICE_ID, ImplementationClsid, Tag, {}, objectLifetime.Path.c_str(), flags, UserToken);

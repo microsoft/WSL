@@ -1,4 +1,3 @@
-
 //
 // Copyright (c) Microsoft Corporation.  All rights reserved.
 //
@@ -872,6 +871,7 @@ typedef enum _LX_INIT_FEATURE_FLAGS
     LxInitFeatureRootfsCompressed = 0x8,
     LxInitFeatureSystemDistro = 0x10,
     LxInitFeatureDnsTunneling = 0x20,
+    LxInitFeatureVirtIoFsDax = 0x40,
 } LX_INIT_FEATURE_FLAGS,
     *PLX_INIT_FEATURE_FLAGS;
 

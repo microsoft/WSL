@@ -82,6 +82,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::NestedVirtualization, EnableNestedVirtualization),
         ConfigKey(ConfigSetting::Virtio9p, EnableVirtio9p),
         ConfigKey(ConfigSetting::Virtiofs, EnableVirtioFs),
+        ConfigKey(ConfigSetting::VirtiofsDaxSize, MemoryString(VirtioFsDaxSize)),
         ConfigKey(ConfigSetting::KernelDebugPort, KernelDebugPort),
         ConfigKey(ConfigSetting::GpuSupport, EnableGpuSupport),
         ConfigKey(ConfigSetting::GuiApplications, EnableGuiApps),

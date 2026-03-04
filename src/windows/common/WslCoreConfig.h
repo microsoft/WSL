@@ -26,7 +26,7 @@ Abstract:
         T_VALUE(c, EnableGpuSupport), T_VALUE(c, EnableGuiApps), T_VALUE(c, EnableHardwarePerformanceCounters), \
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
         T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
-        T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
+        T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), T_VALUE(c, VirtioFsDaxSize), \
         T_ENUM(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), \
         T_VALUE(c, KernelDebugPort), T_SET(c, KernelModulesPath), T_STRING(c, KernelModulesList), T_SET(c, KernelPath), \
         T_VALUE(c, LoadDefaultKernelModules), T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), \
@@ -244,6 +244,7 @@ namespace ConfigSetting {
     static constexpr auto NestedVirtualization = "wsl2.nestedVirtualization";
     static constexpr auto Virtio9p = "wsl2.virtio9p";
     static constexpr auto Virtiofs = "wsl2.virtiofs";
+    static constexpr auto VirtiofsDaxSize = "wsl2.virtiofsDaxSize";
     static constexpr auto KernelDebugPort = "wsl2.kernelDebugPort";
     static constexpr auto GpuSupport = "wsl2.gpuSupport";
     static constexpr auto GuiApplications = "wsl2.guiApplications";
@@ -324,6 +325,7 @@ struct Config
     bool EnableVirtio9p = false;
     bool EnableVirtio = !shared::Arm64 || windows::common::helpers::IsWindows11OrAbove();
     bool EnableVirtioFs = false;
+    UINT64 VirtioFsDaxSize = 0;
     int KernelDebugPort = 0;
     bool EnableGpuSupport = true;
     bool EnableGuiApps = true;

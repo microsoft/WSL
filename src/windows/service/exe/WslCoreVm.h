@@ -208,7 +208,7 @@ private:
     _Requires_lock_held_(m_lock)
     void FreeLun(_In_ ULONG Lun);
 
-    std::wstring GenerateConfigJson();
+    std::wstring GenerateConfigJson(_In_ HANDLE UserToken);
 
     static std::pair<int, LX_MINI_MOUNT_STEP> GetMountResult(_In_ wsl::shared::SocketChannel& Channel);
 

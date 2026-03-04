@@ -181,6 +181,13 @@ Return Value:
 --*/
 
 {
+
+    LOG_INFO("MountFilesystem FsType {} Source {} Target {} Options {}", 
+        FsType ? FsType : "null", 
+        Source ? Source : "null", 
+        Target ? Target : "null", 
+        Options ? Options : "null");
+
     const char* const Argv[] = {
         MOUNT_COMMAND, MOUNT_INTERNAL_ONLY_ARG, MOUNT_TYPES_ARG, FsType, Source, Target, MOUNT_OPTIONS_ARG, Options, nullptr};
 
@@ -242,6 +249,12 @@ Return Value:
 
 try
 {
+    LOG_INFO("MountWithRetry Source {} Target {} FsType {} Options {}", 
+        Source ? Source : "null", 
+        Target ? Target : "null", 
+        FsType ? FsType : "null", 
+        Options ? Options : "null");
+
     //
     // Verify the target directory exists before mounting.
     //
@@ -296,12 +309,30 @@ try
 {
     if (!UtilIsUtilityVm())
     {
+        LOG_INFO(
+            "MountDrvfs (drvfs) Source {} Target {} Options {}",
+            Source ? Source : "null",
+            Target ? Target : "null",
+            Options ? Options : "null");
+
         return MountFilesystem(DRVFS_FS_TYPE, Source, Target, Options, ExitCode);
     }
     else if (WSL_USE_VIRTIO_FS())
     {
+        LOG_INFO(
+            "MountDrvfs (virtiofs) Source {} Target {} Options {}",
+            Source ? Source : "null",
+            Target ? Target : "null",
+            Options ? Options : "null");
+
         return MountVirtioFs(Source, Target, Options, Admin, Config, ExitCode);
     }
+
+    LOG_INFO(
+        "MountDrvfs (Plan9) Source {} Target {} Options {}",
+        Source ? Source : "null",
+        Target ? Target : "null",
+        Options ? Options : "null");
 
     return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
 }
@@ -532,6 +563,17 @@ try
     //
 
     auto [Plan9Options, MountOptions] = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config);
+    if (WSL_USE_VIRTIO_FS_DAX())
+    {
+        MountOptions += "dax,";
+    }
+
+    LOG_INFO(
+        "MountVirtioFs: Source {} Target {} Options {} MountOptions {}",
+        Source ? Source : "null",
+        Target ? Target : "null",
+        Options ? Options : "null",
+        MountOptions.c_str());
 
     //
     // Construct a request to add a virtiofs share.

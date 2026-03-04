@@ -1968,6 +1968,8 @@ Return Value:
 
 try
 {
+    LOG_INFO("ConfigMountDrvFsVolumes: DrvFsVolumes {:x}", DrvFsVolumes);
+    
     if (DrvFsVolumes == 0)
     {
         return;
@@ -2045,6 +2047,9 @@ try
         }
 
         Source[0] = 'A' + Index;
+        LOG_INFO("ConfigMountDrvFsVolumes: Calling MountDrvfs()... Source {} Target {} Options {}", 
+            Source, Target, Options);
+
         if (MountDrvfs(Source, Target.c_str(), Options.c_str(), Admin, Config) < 0)
         {
             EMIT_USER_WARNING(wsl::shared::Localization::MessageDrvfsMountFailed(Source));
