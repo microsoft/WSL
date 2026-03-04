@@ -719,7 +719,6 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachK
 
     if (DetachKeys != nullptr)
     {
-
         request.DetachKeys = DetachKeys;
     }
 
