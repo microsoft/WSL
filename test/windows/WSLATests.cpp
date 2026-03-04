@@ -2901,6 +2901,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that the container is in running state.
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
