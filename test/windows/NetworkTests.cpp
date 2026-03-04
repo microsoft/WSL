@@ -2067,13 +2067,18 @@ class NetworkTests
             auto pos = outputView.find("listening on");
             if (pos != std::string_view::npos)
             {
+                // Limit the search to just the "listening on" line to avoid
+                // matching colons in subsequent debug lines socat may emit.
+                auto lineEnd = outputView.find('\n', pos);
+                auto line = outputView.substr(pos, lineEnd != std::string_view::npos ? lineEnd - pos : std::string_view::npos);
+
                 // Find the last ':' before the port digits. For IPv6, socat outputs
                 // "listening on AF=10 :::PORT", so using find() would match the
                 // first colon in the address instead of the port separator.
-                auto colonPos = outputView.rfind(':');
-                if (colonPos != std::string_view::npos && colonPos > pos)
+                auto colonPos = line.rfind(':');
+                if (colonPos != std::string_view::npos)
                 {
-                    auto portStr = outputView.substr(colonPos + 1);
+                    auto portStr = line.substr(colonPos + 1);
                     auto end = portStr.find_first_not_of("0123456789");
                     if (end != std::string_view::npos)
                     {
