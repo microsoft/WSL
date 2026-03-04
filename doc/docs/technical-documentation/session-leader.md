@@ -21,6 +21,6 @@ When running in a WSL1 distribution, the session leader forks(), and uses the ch
 - The current directory
 - The standard file descriptors (stdin, stdout, stderr)
 
-## Creating a WSL2 process
+### Creating a WSL2 process
 
 When running in a WSL2 distribution, the session leader forks() to create a [relay](relay.md) process, which is responsible for creating the user process and relaying its output back to [wsl.exe](wsl.exe.md)
