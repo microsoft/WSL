@@ -276,8 +276,9 @@ struct CreateExec
     std::vector<std::string> Env;
     std::optional<std::string> User;
     std::string WorkingDir;
+    std::optional<std::string> DetachKeys;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir, User);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir, User, DetachKeys);
 };
 
 struct StartExec

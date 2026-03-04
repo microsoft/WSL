@@ -404,14 +404,14 @@ typedef enum _WSLALogsFlags
 ]
 interface IWSLAContainer : IUnknown
 {
-    HRESULT Attach([out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
+    HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
     HRESULT Stop([in] WSLASignal Signal, [in] LONG TimeoutSeconds);
-    HRESULT Start([in] WSLAContainerStartFlags Flags);
+    HRESULT Start([in] WSLAContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT Export([in] ULONG TarHandle);
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
-    HRESULT Exec([in, ref] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    HRESULT Exec([in, ref] const struct WSLA_PROCESS_OPTIONS* Options, [in, unique] LPCSTR DetachKeys, [out] IWSLAProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);

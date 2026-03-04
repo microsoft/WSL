@@ -19,6 +19,7 @@ Abstract:
 #include "WSLAContainerLauncher.h"
 #include "WslCoreFilesystem.h"
 
+using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
 using wsl::windows::common::RunningWSLAContainer;
 using wsl::windows::common::RunningWSLAProcess;
@@ -2733,7 +2734,7 @@ class WSLATests
         {
             WSLAContainerLauncher launcher("debian:latest", "dummy", {"/does-not-exist"});
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
 
             ValidateCOMErrorMessage(
                 L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create "
@@ -2779,14 +2780,14 @@ class WSLATests
 
             {
                 // Validate that the container can be restarted.
-                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach), S_OK);
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach, nullptr), S_OK);
                 auto restartedProcess = container.GetInitProcess();
                 ValidateProcessOutput(restartedProcess, {{1, "OK\n"}});
             }
 
             {
                 // Validate that the container can be restarted without the attach flag.
-                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), S_OK);
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), S_OK);
                 auto restartedProcess = container.GetInitProcess();
                 VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
 
@@ -2808,21 +2809,21 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             auto initProcess = container.GetInitProcess();
             initProcess.Get().Signal(WSLASignalSIGKILL);
             VERIFY_ARE_EQUAL(initProcess.Wait(), WSLASignalSIGKILL + 128);
 
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());
 
             // Validate that deleted containers can't be started.
-            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
         }
 
         // Validate restart behavior for a container with the autorm flag set
@@ -2835,7 +2836,7 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
             // Validate that deleted containers can't be started.
-            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
         }
     }
 
@@ -3014,7 +3015,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that the container is in running state.
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
@@ -3100,10 +3101,10 @@ class WSLATests
             VERIFY_SUCCEEDED(result);
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
-            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone, nullptr));
 
             // Verify that Start() can't be called again on a running container.
-            VERIFY_ARE_EQUAL(container->Get().Start(WSLAContainerStartFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container->Get().Start(WSLAContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
 
@@ -4216,7 +4217,7 @@ class WSLATests
             container.SetDeleteOnClose(false);
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach, nullptr));
 
             auto initProcess = container.GetInitProcess();
             auto stdoutHandle = initProcess.GetStdHandle(1);
@@ -4622,11 +4623,11 @@ class WSLATests
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
             VERIFY_ARE_EQUAL(
-                container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
+                container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
                 HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Start the container.
-            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsAttach));
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsAttach, nullptr));
 
             // Get its original std handles.
             auto process = container->GetInitProcess();
@@ -4634,7 +4635,7 @@ class WSLATests
             auto originalStdout = process.GetStdHandle(1);
 
             // Attach to the container with separate handles.
-            VERIFY_SUCCEEDED(container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_SUCCEEDED(container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead originalReader(originalStdout.get());
             PartialHandleRead attachedReader(attachedStdout.get());
@@ -4669,12 +4670,12 @@ class WSLATests
             // Validate that attaching to an exited container fails.
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
             VERIFY_ARE_EQUAL(
-                container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
+                container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
                 HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Validate that attaching to a deleted container fails.
             VERIFY_SUCCEEDED(container->Get().Delete());
-            VERIFY_ARE_EQUAL(container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr), RPC_E_DISCONNECTED);
 
             container->SetDeleteOnClose(false);
         }
@@ -4691,7 +4692,7 @@ class WSLATests
             wil::unique_handle attachedStdin;
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead originalReader(originalStdout.get());
             PartialHandleRead attachedReader(attachedStdout.get());
@@ -4713,7 +4714,7 @@ class WSLATests
 
             wil::unique_handle attachedTty;
             wil::unique_handle dummy;
-            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedTty, (ULONG*)&dummy, (ULONG*)&dummy));
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedTty, (ULONG*)&dummy, (ULONG*)&dummy));
 
             PartialHandleRead originalReader(originalTty.get());
             PartialHandleRead attachedReader(attachedTty.get());
@@ -4751,7 +4752,7 @@ class WSLATests
             wil::unique_handle attachedStdin;
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead attachedReader(attachedStdout.get());
 
@@ -4892,7 +4893,7 @@ class WSLATests
             auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
             auto id = container.Id();
 
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
             // verifyContainerDeleted("test-auto-remove");
@@ -5169,6 +5170,104 @@ class WSLATests
             // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
             auto [result, _] = WSLAProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+    }
+
+    TEST_METHOD(InteractiveDetach)
+    {
+        WSL2_TEST_ONLY();
+
+        auto validateDetaches = [](HANDLE TtyIn, HANDLE TtyOut, const std::vector<char>& Input) {
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(TtyIn, Input.data(), static_cast<DWORD>(Input.size()), nullptr, nullptr));
+
+            std::string output;
+            auto onRead = [&](const gsl::span<char>& data) { output.append(data.data(), data.size()); };
+
+            wsl::windows::common::relay::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(TtyOut, std::move(onRead)));
+
+            io.Run(60s);
+
+            // N.B. In the case of exec, the output can either be 'read escape sequence' or 'exec attach failed [...]' based on timing.
+            std::set<std::string> expectedOutputs{
+                "", "\r\n", "exec attach failed: error on attach stdin: read escape sequence\r\n", "read escape sequence\r\n"};
+
+            if (expectedOutputs.find(output) == expectedOutputs.end())
+            {
+                LogError("Unexpected output: %hs", output.c_str());
+                VERIFY_FAIL();
+            }
+        };
+
+        auto runDetachTest = [&](LPCSTR DetachKeys, const std::vector<char>& DetachSequence) {
+            WSLAContainerLauncher launcher("debian:latest", "test-detach", {"sleep", "9999999"}, {}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach, DetachKeys));
+
+            auto initProcess = container.GetInitProcess();
+
+            // Validate detaching from a started container with the attach flag.
+            {
+                auto tty = initProcess.GetStdHandle(WSLAFDTty);
+                validateDetaches(tty.get(), tty.get(), DetachSequence);
+            }
+
+            // Validate detaching from an attached tty.
+            {
+                wil::unique_handle attachedTty;
+                wil::unique_handle unused;
+                VERIFY_SUCCEEDED(container.Get().Attach(DetachKeys, (ULONG*)&attachedTty, (ULONG*)&unused, (ULONG*)&unused));
+
+                validateDetaches(attachedTty.get(), attachedTty.get(), DetachSequence);
+            }
+
+            // Validate detaching from an exec'd process.
+            {
+                WSLAProcessLauncher processLauncher({}, {"sleep", "9999999"}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+
+                if (DetachKeys != nullptr)
+                {
+                    processLauncher.SetDetachKeys(DetachKeys);
+                }
+
+                auto process = processLauncher.Launch(container.Get());
+                auto tty = process.GetStdHandle(WSLAFDTty);
+
+                validateDetaches(tty.get(), tty.get(), DetachSequence);
+            }
+        };
+
+        {
+            // Validate that by default ttys can be detached via ctrlp-ctrlq.
+            runDetachTest(nullptr, {0x10, 0x11});
+
+            // Validate other detach keys.
+            runDetachTest("ctrl-a", {0x1});
+            runDetachTest("a,b,c,d,ctrl-z", {'a', 'b', 'c', 'd', 0x1a});
+        }
+
+        {
+            // Validate that invalid detach keys fail with the appropriate error.
+            // N.B. Docker doesn't set an error message for this specific case.
+            WSLAContainerLauncher launcher("debian:latest", "test-detach", {"cat"}, {}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+            auto container = launcher.Create(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach, "invalid"), E_INVALIDARG);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
+
+            wil::unique_handle unused;
+            VERIFY_ARE_EQUAL(container.Get().Attach("invalid", (ULONG*)&unused, (ULONG*)&unused, (ULONG*)&unused), E_INVALIDARG);
+
+            WSLAProcessLauncher processLauncher({}, {"cat"}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+            processLauncher.SetDetachKeys("invalid");
+
+            // N.B. Docker returns HTTP 500 if the detach keys are invalid, but unlike other cases there's a proper error message.
+            auto [result, _] = processLauncher.LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+
+            ValidateCOMErrorMessage(L"Invalid escape keys (invalid) provided");
         }
     }
 };
