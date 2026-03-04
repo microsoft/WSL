@@ -95,7 +95,7 @@ void UnmapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
         {
             try
             {
-                vm.UnmapPort(e.Family, e.HostPort);
+                vm.UnmapPort(e.Family, e.HostPort, e.VmPort);
                 e.MappedToHost = false;
             }
             CATCH_LOG();

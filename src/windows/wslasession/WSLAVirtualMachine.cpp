@@ -686,9 +686,9 @@ void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ s
     MapPortImpl(Family, WindowsPort, LinuxPort, false);
 }
 
-void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort)
+void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
 {
-    MapPortImpl(Family, WindowsPort, 0, true);
+    MapPortImpl(Family, WindowsPort, LinuxPort, true);
 }
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)

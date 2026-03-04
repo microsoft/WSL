@@ -1296,7 +1296,7 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    m_virtualMachine->UnmapPort(Family, WindowsPort);
+    m_virtualMachine->UnmapPort(Family, WindowsPort, LinuxPort);
     return S_OK;
 }
 CATCH_RETURN();
