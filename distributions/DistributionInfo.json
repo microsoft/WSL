@@ -62,8 +62,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 15 SP7",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20251201.0/SUSE-Linux-Enterprise-15-SP7-15.7.x86_64-30.1-Build30.1.wsl",
-                    "Sha256": "0x60924e13286ed15bdcf9069e3a24d3394fb858954de3bdfcb1ea576900b81b2e"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260304.0/SUSE-Linux-Enterprise-15-SP7-15.7.x86_64-30.46-Build30.46.wsl",
+                    "Sha256": "0x59db8db946bac83729274f4b7dddd91c0fd30badd15f9adc1e5bd56722541b4c"
                 }
             },
             {
