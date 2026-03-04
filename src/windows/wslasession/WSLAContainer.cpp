@@ -40,7 +40,10 @@ using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 using wsl::windows::service::wsla::WSLAVolumeMount;
 
+using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
+using namespace std::chrono_literals;
+
 namespace wsla_schema = wsl::windows::common::wsla_schema;
 
 using DockerInspectContainer = wsl::windows::common::docker_schema::InspectContainer;
@@ -444,7 +447,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslaContainerStateCreated,
+        m_state != WslaContainerStateCreated && m_state != WslaContainerStateExited,
         "Cannot start container '%hs', state: %i",
         m_name.c_str(),
         m_state);
@@ -477,6 +480,8 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
         m_initProcessControl = nullptr;
     });
 
+    m_stoppedNotifiedEvent.ResetEvent();
+
     try
     {
         m_dockerClient.StartContainer(m_id);
@@ -491,6 +496,8 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 {
     if (event == ContainerEvent::Stop)
     {
+        m_stoppedNotifiedEvent.SetEvent();
+
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
@@ -536,6 +543,15 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
     {
         return;
     }
+    else if (m_state != WslaContainerStateRunning)
+    {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            m_state != WslaContainerStateRunning,
+            "Cannot stop container '%hs', state: %i",
+            m_id.c_str(),
+            m_state);
+    }
 
     try
     {
@@ -567,6 +583,17 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
         DeleteExclusiveLockHeld();
+    }
+    else
+    {
+        // Wait for the stop notification to arrive before returning.
+        // This is required so that a caller that Stops() and immediately calls Start() again doesn't see the container
+        // switch back to 'stopped' state due to the delayed event notification.
+
+        auto io = m_wslaSession.CreateIOContext();
+        io.AddHandle(std::make_unique<EventHandle>(m_stoppedNotifiedEvent.get()), MultiHandleWait::CancelOnCompleted);
+
+        io.Run({60s});
     }
 }
 
