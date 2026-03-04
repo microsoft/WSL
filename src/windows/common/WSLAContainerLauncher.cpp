@@ -171,7 +171,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
         return std::make_pair(result, std::optional<RunningWSLAContainer>{});
     }
 
-    result = container.value().Get().Start(Flags);
+    result = container.value().Get().Start(Flags, nullptr);
 
     return std::make_pair(result, std::move(container));
 }
