@@ -593,8 +593,6 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
         auto io = m_wslaSession.CreateIOContext();
         io.AddHandle(std::make_unique<EventHandle>(m_stoppedNotifiedEvent.get()), MultiHandleWait::CancelOnCompleted);
 
-        lock.reset();
-
         io.Run({60s});
     }
 }
