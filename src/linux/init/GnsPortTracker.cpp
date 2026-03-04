@@ -600,6 +600,7 @@ void GnsPortTracker::ResolvePortZeroBind(DeferredPortLookup lookup)
         }
         else
         {
+            GNS_LOG_ERROR("Port-0 bind: unexpected address family ({}) for pid {}", resolvedFamily, lookup.Pid);
             return;
         }
 

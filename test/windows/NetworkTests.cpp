@@ -2067,9 +2067,11 @@ class NetworkTests
             auto pos = outputView.find("listening on");
             if (pos != std::string_view::npos)
             {
-                // Find the first ':' after "listening on" to extract the port
-                auto colonPos = outputView.find(':', pos);
-                if (colonPos != std::string_view::npos)
+                // Find the last ':' before the port digits. For IPv6, socat outputs
+                // "listening on AF=10 :::PORT", so using find() would match the
+                // first colon in the address instead of the port separator.
+                auto colonPos = outputView.rfind(':');
+                if (colonPos != std::string_view::npos && colonPos > pos)
                 {
                     auto portStr = outputView.substr(colonPos + 1);
                     auto end = portStr.find_first_not_of("0123456789");
@@ -3981,7 +3983,11 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
-        // TODO: debug port release on mirrored.
+        // Skip port-release verification in mirrored mode. The host reserves a contiguous
+        // ephemeral port range via HcnReserveGuestNetworkServicePortRange that no Windows
+        // process can bind for the lifetime of the VM. Port-0 binds resolve to ports within
+        // this range, so even after the guest releases the port the host still cannot bind
+        // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
     }
 
