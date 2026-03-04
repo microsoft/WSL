@@ -63,7 +63,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
         {
             const std::wstring message = L"Container '" + containerNameOrId + L"' found in container list output but status '" +
                                          status + L"' was not found in the same line";
-            VERIFY_IS_TRUE(line.find(status) != std::wstring::npos, message.c_str());
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(status), message.c_str());
             return;
         }
     }
