@@ -4950,11 +4950,11 @@ class WSLATests
             VERIFY_ARE_EQUAL(container2.State(), WslaContainerStateCreated);
 
             // Start container — should succeed.
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             // Start container 2 — should fail because the host port is already reserved by container 1.
-            VERIFY_ARE_EQUAL(container2.Get().Start(WSLAContainerStartFlagsNone), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(container2.Get().Start(WSLAContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
             VERIFY_ARE_EQUAL(container2.State(), WslaContainerStateCreated);
         }
 
@@ -4978,7 +4978,7 @@ class WSLATests
             ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 1);
 
             // Start the container — volume should now be mounted.
-            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
             ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 0);
 
