@@ -342,7 +342,7 @@ try
             long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
             long long int ReclaimWindow[20] = {}; // 10 minutes
             long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling;
+            bool ReclaimIdling = false;
 
             //
             // Fall back to drop cache if the required cgroup path is not present.
@@ -429,7 +429,7 @@ try
                 if (PageReportingOrder != 0 && (Start - Stop) > IdleThreshold)
                 {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
-                    const long long int Stop = GetUserCpuTime();
+                    Stop = GetUserCpuTime();
                     THROW_LAST_ERROR_IF(Stop == -1);
                     if ((Stop - Start) < IdleThreshold)
                     {

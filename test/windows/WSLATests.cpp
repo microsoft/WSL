@@ -1394,6 +1394,82 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(InspectImage)
+    {
+        WSL2_TEST_ONLY();
+
+        // Test inspect debian:latest
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectImage("debian:latest", &output));
+
+            // Verify output is valid JSON
+            VERIFY_IS_NOT_NULL(output.get());
+            VERIFY_IS_TRUE(std::strlen(output.get()) > 0);
+            LogInfo("Inspect output: %hs", output.get());
+
+            // Parse and validate JSON structure
+            auto inspectResult = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(output.get());
+
+            // Verify all fields exposed in wsla_schema::InspectImage
+            VERIFY_IS_TRUE(inspectResult.Id.find("sha256:") == 0);
+
+            VERIFY_IS_TRUE(inspectResult.RepoTags.has_value());
+            VERIFY_IS_FALSE(inspectResult.RepoTags->empty());
+            bool foundTag = false;
+            for (const auto& tag : inspectResult.RepoTags.value())
+            {
+                if (tag.find("debian:latest") != std::string::npos)
+                {
+                    foundTag = true;
+                    break;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag);
+
+            // skip testing RepoDigests for loaded test image.
+            VERIFY_IS_FALSE(inspectResult.Created.empty());
+            VERIFY_IS_TRUE(inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
+            VERIFY_ARE_EQUAL("linux", inspectResult.Os);
+            VERIFY_IS_TRUE(inspectResult.Size > 0);
+            VERIFY_IS_TRUE(inspectResult.Metadata.has_value());
+            VERIFY_IS_TRUE(inspectResult.Metadata->size() > 0);
+
+            VERIFY_IS_TRUE(inspectResult.Config.has_value());
+            const auto& config = inspectResult.Config.value();
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_IS_TRUE(config.Cmd->size() > 0);
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(0, config.Entrypoint->size());
+            VERIFY_IS_TRUE(config.Env.has_value());
+            VERIFY_IS_TRUE(config.Env->size() > 0);
+            VERIFY_IS_FALSE(config.Labels.has_value());
+        }
+
+        // Negative test: Image not found
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
+            ValidateCOMErrorMessage(L"No such image: nonexistent:image");
+        }
+
+        // Negative test: Bad image name input
+        {
+            wil::unique_cotaskmem_ansistring output;
+
+            std::string longImageName(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a');
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->InspectImage(longImageName.c_str(), &output));
+
+            // Invalid name.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), m_defaultSession->InspectImage("debian latest", &output));
+            ValidateCOMErrorMessage(L"invalid reference format");
+
+            // Attempt to fake to call search endpoint. Our implementation escaped the image name correctly.
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("search/debian:latest", &output));
+            ValidateCOMErrorMessage(L"No such image: search/debian:latest");
+        }
+    }
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
@@ -1415,51 +1491,50 @@ class WSLATests
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         }
 
-        // Save the image to a tar file.
         {
             std::filesystem::path imageTar = L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{CreateFileW(
-                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
             auto cleanup =
                 wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
-        }
+            // Save the image to a tar file.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
+            }
 
-        // Load the saved image to verify it's valid.
-        {
-            std::filesystem::path imageTar = L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{
-                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            // Load the image from a saved tar
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
-            // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
-            auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess().WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(0, result.Code);
-            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            // Load the saved image to verify it's valid.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                // Load the image from a saved tar
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                // Verify that the image is in the list of images.
+                ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+                WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+                auto container = launcher.Launch(*m_defaultSession);
+                auto result = container.GetInitProcess().WaitAndCaptureOutput();
+                VERIFY_ARE_EQUAL(0, result.Code);
+                VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            }
         }
 
         // Try to save an invalid image.
         {
             std::filesystem::path imageTar = L"HelloWorldError.tar";
+            auto cleanfile =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
             wil::unique_handle imageTarFileHandle{CreateFileW(
                 imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
@@ -1479,6 +1554,10 @@ class WSLATests
         // Load the exported tar file to verify it's a valid image and can be launched.
         // Finally, stop and delete the container, then try to export again to verify it fails as expected.
         {
+            std::filesystem::path containerTar = L"HelloWorldExported.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(containerTar.c_str())); });
+
             // Load the image from a saved tar and launch a container
             {
                 std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
@@ -1497,7 +1576,6 @@ class WSLATests
                 VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
 
                 // Export the container to a tar file.
-                std::filesystem::path containerTar = L"HelloWorldExported.tar";
                 wil::unique_handle containerTarFileHandle{CreateFileW(
                     containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
@@ -1510,12 +1588,9 @@ class WSLATests
 
             // Load the exported container to verify it's valid.
             {
-                std::filesystem::path containerTar = L"HelloWorldExported.tar";
                 wil::unique_handle containerTarFileHandle{CreateFileW(
                     containerTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
-                auto cleanup =
-                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(containerTar.c_str())); });
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
                 VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(containerTarFileHandle.get()), nullptr, fileSize.QuadPart));
@@ -1530,11 +1605,11 @@ class WSLATests
                 // Stop and delete the above container and try to export.
 
                 std::filesystem::path imageTarFile = L"HelloWorldExportError.tar";
+                auto cleanfile =
+                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTarFile.c_str())); });
                 wil::unique_handle contTarFileHandle{CreateFileW(
                     imageTarFile.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == contTarFileHandle.get());
-                auto cleanfile =
-                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTarFile.c_str())); });
                 VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
 
@@ -3911,6 +3986,19 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
         }
+
+        // Validate that behavior is correct if a read spans across multiple streams.
+        {
+            std::vector<char> input;
+
+            std::string largeStdout(LX_RELAY_BUFFER_SIZE + 150, 'a');
+            std::string largeStderr(LX_RELAY_BUFFER_SIZE + 12, 'b');
+            insert(input, 1, largeStdout);
+            insert(input, 2, largeStderr);
+            insert(input, 1, "regularStdout");
+
+            runTest(input, largeStdout + "regularStdout", largeStderr);
+        }
     }
 
     TEST_METHOD(ContainerRecoveryFromStorage)
@@ -4721,26 +4809,53 @@ class WSLATests
         }
     }
 
-    // This test case validates that multiple operations can happen in parallel in the same session.
-    TEST_METHOD(ParallelSessionOperations)
+    struct BlockingOperation
     {
-        WSL2_TEST_ONLY();
+        NON_COPYABLE(BlockingOperation);
+        NON_MOVABLE(BlockingOperation);
 
-        wil::unique_handle pipeRead;
-        wil::unique_handle pipeWrite;
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation) : m_operation(std::move(Operation))
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
 
-        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+            m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
+            m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
 
-        wil::unique_event exportStarted{wil::EventOptions::ManualReset};
-        wil::unique_event testComplete{wil::EventOptions::ManualReset};
+            // Wait for the operation to be running before continuing.
+            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
+        }
 
-        auto exportIoThread = std::thread([&]() {
+        ~BlockingOperation()
+        {
+            if (m_operationThread.joinable())
+            {
+                m_operationThread.join();
+            }
+
+            if (m_ioThread.joinable())
+            {
+                m_ioThread.join();
+            }
+        }
+
+        void RunOperation(wil::unique_handle Handle)
+        {
+            m_result.set_value(m_operation(Handle.get()));
+
+            // Fail if the operation completed before the test signaled completion.
+            // Don't use VERIFY macros since this is running in a separate thread.
+            WI_ASSERT(m_testCompleteEvent.is_signaled());
+        }
+
+        void RunIO(wil::unique_handle Handle)
+        {
             std::vector<char> buffer(1024 * 1024);
-            DWORD total{};
             while (true)
             {
                 DWORD bytesRead{};
-                if (!ReadFile(pipeRead.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+                if (!ReadFile(Handle.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
                 {
                     if (GetLastError() != ERROR_BROKEN_PIPE)
                     {
@@ -4755,36 +4870,45 @@ class WSLATests
                     break;
                 }
 
-                total += bytesRead;
-
-                if (!exportStarted.is_signaled())
+                if (!m_startedEvent.is_signaled())
                 {
-                    exportStarted.SetEvent();
+                    m_startedEvent.SetEvent();
                 }
 
                 // Block until the test completes.
-                testComplete.wait(60 * 1000);
+                if (!m_testCompleteEvent.wait(60 * 1000))
+                {
+                    LogError("Timed out waiting for test completion");
+                    break;
+                }
             }
-        });
+        }
 
-        auto exportThread = std::thread([&]() {
-            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(pipeWrite.get()), "debian:latest", nullptr));
+        void Complete()
+        {
+            m_testCompleteEvent.SetEvent();
 
-            pipeWrite.reset();
-            if (!testComplete.is_signaled()) // Sanity check.
-            {
-                LogError("Export completed before test completed");
-            }
-        });
+            VERIFY_SUCCEEDED(m_result.get_future().get());
+        }
 
-        auto cleanup = wil::scope_exit([&]() {
-            testComplete.SetEvent();
-            exportIoThread.join();
-            exportThread.join();
-        });
+        std::function<HRESULT(HANDLE)> m_operation;
+        wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
+        wil::unique_event m_testCompleteEvent{wil::EventOptions::ManualReset};
+        std::thread m_operationThread;
+        std::thread m_ioThread;
+        std::promise<HRESULT> m_result;
+    };
 
-        // Wait for the export to be in progress
-        exportStarted.wait(60 * 1000);
+    // This test case validates that multiple operations can happen in parallel in the same session.
+    TEST_METHOD(ParallelSessionOperations)
+    {
+        WSL2_TEST_ONLY();
+
+        // Start a blocking export
+        BlockingOperation operation(
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr); });
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
 
         // Validate that various operations can be done while the export is in progress.
 
@@ -4813,6 +4937,60 @@ class WSLATests
         {
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
+        }
+    }
+
+    TEST_METHOD(ParallelContainerOperations)
+    {
+        WSL2_TEST_ONLY();
+
+        WSLAContainerLauncher launcher("debian:latest", "test-parallel-container-operations", {"echo", "OK"});
+
+        auto container = launcher.Launch(*m_defaultSession);
+
+        auto process = container.GetInitProcess();
+        ValidateProcessOutput(process, {{1, "OK\n"}});
+
+        // Start a blocking export
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
+
+        // Validate that various operations can be done while the export is in progress.
+        {
+            VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 0);
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+        }
+
+        {
+            wil::unique_handle stdoutLogs;
+            wil::unique_handle stderrLogs;
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, false));
+
+            ValidateHandleOutput(stdoutLogs.get(), "OK\n");
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.Inspect().State.Status, "exited");
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.Labels().size(), 0);
+        }
+
+        {
+            // Validate that another export can run.
+            BlockingOperation secondExport([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+            secondExport.Complete();
+        }
+
+        {
+            // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
+            auto [result, _] = WSLAProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 };
