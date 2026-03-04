@@ -24,13 +24,13 @@ using namespace WEX::Logging;
 
 const TestImage& DebianTestImage()
 {
-    static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / "debian-latest.tar"};
+    static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / L"debian-latest.tar"};
     return image;
 }
 
 const TestImage& InvalidTestImage()
 {
-    static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", "INVALID_PATH"};
+    static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", L"INVALID_PATH"};
     return image;
 }
 
@@ -63,7 +63,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
         {
             const std::wstring message = L"Container '" + containerNameOrId + L"' found in container list output but status '" +
                                          status + L"' was not found in the same line";
-            VERIFY_IS_TRUE(line.find(status) != std::wstring::npos, message.c_str());
+            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, line.find(status), message.c_str());
             return;
         }
     }

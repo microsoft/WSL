@@ -42,18 +42,21 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
+        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container create --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
     {
+        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container create --name " + WslcContainerName);
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
+        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
         std::wstringstream expectedError;
         expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
@@ -65,6 +68,7 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_Valid)
     {
+        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
@@ -78,6 +82,7 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_DuplicateContainerName)
     {
+        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
