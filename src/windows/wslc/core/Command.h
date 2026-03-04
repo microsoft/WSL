@@ -29,6 +29,9 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc {
+
+constexpr std::wstring_view s_ExecutableName = L"wslc";
+
 struct Command
 {
     // The character used to split between commands and their parents in FullName.

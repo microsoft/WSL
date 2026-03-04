@@ -58,34 +58,28 @@ public:
     ~WSLAContainerImpl();
 
     void Start(WSLAContainerStartFlags Flags);
-
-    void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
+    void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
     void Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds);
     void Delete();
-    void Export(ULONG TarHandle);
+    void Export(ULONG TarHandle) const;
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
-    void GetInitProcess(_Out_ IWSLAProcess** process);
+    void GetInitProcess(_Out_ IWSLAProcess** process) const;
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process);
-    void Inspect(LPSTR* Output);
-    void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
-    void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count);
+    void Inspect(LPSTR* Output) const;
+    void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
+    void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count) const;
 
-    void CopyTo(IWSLAContainer** Container);
+    void CopyTo(IWSLAContainer** Container) const;
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
-    WSLA_CONTAINER_STATE State() noexcept;
+    WSLA_CONTAINER_STATE State() const noexcept;
 
     __requires_lock_held(m_lock) void Transition(WSLA_CONTAINER_STATE State) noexcept;
 
-    void OnProcessReleased(DockerExecProcessControl* process);
+    void OnProcessReleased(DockerExecProcessControl* process) noexcept;
 
     const std::string& ID() const noexcept;
-
-    // Called when the container stop event is observed so the
-    // implementation can update its internal state and notify
-    // any exec processes.
-    void OnStopped();
 
     // Returns the container flags used to decide whether to
     // auto-delete the container on stop.
@@ -113,21 +107,27 @@ public:
         IORelay& Relay);
 
 private:
+    __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld();
+
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
-    void DisconnectComWrapper();
-    void ReleaseResources();
+    __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
-    wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect);
+    wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
 
-    std::recursive_mutex m_lock;
+    mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
     std::string m_id;
     WSLAProcessFlags m_initProcessFlags{};
     WSLAContainerFlags m_containerFlags{};
-    std::vector<DockerExecProcessControl*> m_processes;
+    mutable std::mutex m_processesLock;
+    __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
+    __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
+    __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
+
+    wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLASession& m_wslaSession;
@@ -138,8 +138,6 @@ private:
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
-    Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
-    DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     IORelay& m_ioRelay;

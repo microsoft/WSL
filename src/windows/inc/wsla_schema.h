@@ -70,4 +70,35 @@ struct InspectContainer
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Ports, Mounts);
 };
 
+struct ImageConfig
+{
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
+    std::optional<std::vector<std::string>> Env;
+    std::optional<std::map<std::string, std::string>> Labels;
+    std::string User;
+    std::string WorkingDir;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, Cmd, Entrypoint, Env, Labels, User, WorkingDir);
+};
+
+struct InspectImage
+{
+    std::string Id;
+    std::optional<std::vector<std::string>> RepoTags;
+    std::optional<std::vector<std::string>> RepoDigests;
+    std::string Parent;
+    std::string Comment;
+    std::string Created;
+    std::string Author;
+    std::string Architecture;
+    std::string Os;
+    uint64_t Size{};
+    std::optional<std::map<std::string, std::string>> Metadata;
+    std::optional<ImageConfig> Config;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config);
+};
+
 } // namespace wsl::windows::common::wsla_schema

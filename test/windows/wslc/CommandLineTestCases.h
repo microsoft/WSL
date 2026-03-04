@@ -21,6 +21,8 @@ Abstract:
 // Root command tests
 COMMAND_LINE_TEST_CASE(L"", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--help", L"root", true)
+COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
+COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
 // Session command tests
 COMMAND_LINE_TEST_CASE(L"session list", L"list", true)
@@ -72,6 +74,17 @@ COMMAND_LINE_TEST_CASE(L"container logs cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --follow cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs cont1 -f", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs", L"logs", false)
+
+// Image command
+COMMAND_LINE_TEST_CASE(L"image list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"images", L"images", true) // Aliased off the root changes the name
+COMMAND_LINE_TEST_CASE(L"image ls", L"list", true)
+COMMAND_LINE_TEST_CASE(L"image list --format json", L"list", true)
+COMMAND_LINE_TEST_CASE(L"image list --format badformat", L"list", false)
+COMMAND_LINE_TEST_CASE(L"image list -v", L"list", true)
+COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
+COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
+COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
 
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
