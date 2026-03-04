@@ -4986,8 +4986,6 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        std::vector<char> ctrlPctrlQ; // Ctrl+P, Ctrl+Q
-
         auto validateDetaches = [](HANDLE TtyIn, HANDLE TtyOut, const std::vector<char>& Input) {
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(TtyIn, Input.data(), static_cast<DWORD>(Input.size()), nullptr, nullptr));
 
