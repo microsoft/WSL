@@ -2781,7 +2781,7 @@ private:
             }
             else
             {
-                THROW_WIN32_IF(ERROR_NO_DATA, !targetFound);
+                THROW_WIN32_IF(ERROR_NOT_FOUND, !targetFound);
             }
         }
     }

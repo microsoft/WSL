@@ -518,6 +518,8 @@ class WslcSdkTests
 
         // Positive: load a saved image tar and verify the image can be run.
         {
+            // TODO: Remove the image before attempting to load it
+
             std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
             wil::unique_handle imageTarFileHandle{
                 CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
@@ -535,23 +537,6 @@ class WslcSdkTests
             auto output = RunContainerAndCapture(m_defaultSession, "hello-world:latest", {});
             VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
         }
-
-        // Negative: attempt to load a non-tar file.
-        // TODO: Currently this portion is successful despite not being a tar. Needs debugging.
-        //{
-        //    std::filesystem::path pathToSelf = wil::QueryFullProcessImageNameW<std::wstring>(GetCurrentProcess());
-        //    wil::unique_handle selfFileHandle{
-        //        CreateFileW(pathToSelf.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        //    VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == selfFileHandle.get());
-
-        //    LARGE_INTEGER fileSize{};
-        //    VERIFY_IS_TRUE(GetFileSizeEx(selfFileHandle.get(), &fileSize));
-
-        //    WslcLoadImageOptions opts{};
-        //    opts.ImageHandle = selfFileHandle.get();
-        //    opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
-        //    VERIFY_ARE_EQUAL(WslcSessionImageLoad(m_defaultSession, &opts), S_OK);
-        //}
 
         // Negative: null options pointer must fail.
         VERIFY_ARE_EQUAL(WslcSessionImageLoad(m_defaultSession, nullptr), E_POINTER);
@@ -577,6 +562,29 @@ class WslcSdkTests
             opts.ImageHandle = GetCurrentProcess();
             opts.ContentLength = 0;
             VERIFY_ARE_EQUAL(WslcSessionImageLoad(m_defaultSession, &opts), E_INVALIDARG);
+        }
+    }
+
+    TEST_METHOD(LoadImageNonTar)
+    {
+        WSL2_TEST_ONLY();
+        // The load should fail but it just silently ignores the load currently.
+        SKIP_TEST_NOT_IMPL();
+
+        // Negative: attempt to load a non-tar file.
+        {
+            std::filesystem::path pathToSelf = wil::QueryFullProcessImageNameW<std::wstring>(GetCurrentProcess());
+            wil::unique_handle selfFileHandle{
+                CreateFileW(pathToSelf.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == selfFileHandle.get());
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(selfFileHandle.get(), &fileSize));
+
+            WslcLoadImageOptions opts{};
+            opts.ImageHandle = selfFileHandle.get();
+            opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
+            VERIFY_FAILED(WslcSessionImageLoad(m_defaultSession, &opts));
         }
     }
 
@@ -698,7 +706,7 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerVolume)
+    TEST_METHOD(ContainerVolumeUnit)
     {
         WSL2_TEST_ONLY();
 
@@ -721,14 +729,31 @@ class WslcSdkTests
         {
             WslcContainerSettings containerSettings;
             VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
-            WslcContainerVolume containerVolumes[1] = {nullptr, "path"};
+            WslcContainerVolume containerVolumes[1] = {nullptr, "/mnt/path"};
             VERIFY_ARE_EQUAL(WslcContainerSettingsSetVolumes(&containerSettings, containerVolumes, ARRAYSIZE(containerVolumes)), E_INVALIDARG);
         }
 
         {
             WslcContainerSettings containerSettings;
             VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
-            WslcContainerVolume containerVolumes[1] = {L"path", nullptr};
+            auto currentDirectory = std::filesystem::current_path();
+            WslcContainerVolume containerVolumes[1] = {currentDirectory.c_str(), nullptr};
+            VERIFY_ARE_EQUAL(WslcContainerSettingsSetVolumes(&containerSettings, containerVolumes, ARRAYSIZE(containerVolumes)), E_INVALIDARG);
+        }
+
+        // Relative paths must fail.
+        {
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
+            WslcContainerVolume containerVolumes[1] = {L"relative", "/mnt/path"};
+            VERIFY_ARE_EQUAL(WslcContainerSettingsSetVolumes(&containerSettings, containerVolumes, ARRAYSIZE(containerVolumes)), E_INVALIDARG);
+        }
+
+        {
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
+            auto currentDirectory = std::filesystem::current_path();
+            WslcContainerVolume containerVolumes[1] = {currentDirectory.c_str(), "./mnt/path"};
             VERIFY_ARE_EQUAL(WslcContainerSettingsSetVolumes(&containerSettings, containerVolumes, ARRAYSIZE(containerVolumes)), E_INVALIDARG);
         }
 
@@ -738,6 +763,21 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
             VERIFY_SUCCEEDED(WslcContainerSettingsSetVolumes(&containerSettings, nullptr, 0));
         }
+
+        // Absolute paths should succeed
+        {
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
+            auto currentDirectory = std::filesystem::current_path();
+            WslcContainerVolume containerVolumes[1] = {currentDirectory.c_str(), "/mnt/path"};
+            VERIFY_SUCCEEDED(WslcContainerSettingsSetVolumes(&containerSettings, containerVolumes, ARRAYSIZE(containerVolumes)));
+        }
+
+    }
+
+    TEST_METHOD(ContainerVolumeFunctional)
+    {
+        WSL2_TEST_ONLY();
 
         // Functional: mount a read-write and a read-only directory into the container.
         {
@@ -1034,14 +1074,9 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        auto output = RunContainerAndCapture(m_defaultSession, "debian:latest", {"/bin/echo", "signal-test"});
-        // WslcProcessSignal is tested via a separately created process below.
-        // Since we cannot get a valid WslcProcess after RunContainerAndCapture returns,
-        // we verify E_NOTIMPL via a dedicated container.
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcProcessInitSettings(&procSettings));
-        const char* argv[] = {"/bin/sleep", "999"};
+        const char* argv[] = {"/bin/sleep", "99"};
         VERIFY_SUCCEEDED(WslcProcessSettingsSetCmdLineArgs(&procSettings, argv, ARRAYSIZE(argv)));
 
         WslcContainerSettings containerSettings;
@@ -1056,10 +1091,6 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcContainerGetInitProcess(container.get(), &process));
 
         VERIFY_ARE_EQUAL(WslcProcessSignal(process.get(), WSLC_SIGNAL_SIGKILL), E_NOTIMPL);
-
-        // Clean up via the container-level stop (which is implemented).
-        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 30));
-        VERIFY_SUCCEEDED(WslcContainerDelete(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
     }
 
     TEST_METHOD(ProcessGetPidNotImplemented)

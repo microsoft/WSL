@@ -653,7 +653,7 @@ class WSLATests
         LogInfo("Test: Dangling filter");
         {
             // Setup a dangling image
-            LoadTestImage(L"alpine-latest.tar");
+            LoadTestImage("alpine:latest");
             WSLA_TAG_IMAGE_OPTIONS tagOptions{};
             tagOptions.Image = "debian:latest";
             tagOptions.Repo = "alpine";

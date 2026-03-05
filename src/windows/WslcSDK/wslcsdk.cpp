@@ -115,6 +115,24 @@ void GetErrorInfoFromCOM(PWSTR* errorMessage)
         }
     }
 }
+
+void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
+{
+    THROW_HR_IF(E_INVALIDARG, path.empty());
+
+    if (containerPath)
+    {
+        auto pathString = path.native();
+        // Not allowed to mount to root
+        THROW_HR_IF(E_INVALIDARG, pathString.length() < 2);
+        // Must be absolute
+        THROW_HR_IF(E_INVALIDARG, pathString[0] != L'/');
+    }
+    else
+    {
+        THROW_HR_IF(E_INVALIDARG, path.is_relative());
+    }
+}
 } // namespace
 
 // SESSION DEFINITIONS
@@ -553,7 +571,9 @@ try
     for (uint32_t i = 0; i < volumeCount; ++i)
     {
         RETURN_HR_IF_NULL(E_INVALIDARG, volumes[i].windowsPath);
+        EnsureAbsolutePath(volumes[i].windowsPath, false);
         RETURN_HR_IF_NULL(E_INVALIDARG, volumes[i].containerPath);
+        EnsureAbsolutePath(volumes[i].containerPath, true);
     }
 
     internalType->volumes = volumes;
