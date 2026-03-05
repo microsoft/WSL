@@ -47,7 +47,7 @@ public:
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
-    void OnContainerReleased();
+    void OnContainerReleased() noexcept;
 
 private:
     void OnEvent(ContainerEvent Event, std::optional<int> ExitCode);
@@ -66,7 +66,7 @@ public:
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
-    void OnContainerReleased();
+    void OnContainerReleased() noexcept;
 
     void SetPid(int Pid);
     void SetExitCode(int ExitCode);

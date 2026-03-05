@@ -95,7 +95,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONGLONG timeout = -1)
+static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONG timeout = -1)
 {
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
@@ -129,7 +129,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     // Start the created container
     WSLAContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLAContainerStartFlagsAttach, !runOptions.Detach);
-    THROW_IF_FAILED(container.Start(startFlags)); // TODO: Error message
+    THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLAContainerStartFlagsAttach))
@@ -158,7 +158,7 @@ void ContainerService::Start(Session& session, const std::string& id)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Start(WSLAContainerStartFlags::WSLAContainerStartFlagsNone)); // TODO: Error message
+    THROW_IF_FAILED(container->Start(WSLAContainerStartFlags::WSLAContainerStartFlagsNone, nullptr)); // TODO: Error message, detach keys
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)

@@ -160,9 +160,52 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
     Transaction<docker_schema::EmptyRequest>(verb::post, url);
 }
 
-std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
+std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const ListImagesFilters& filters)
 {
-    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, URL::Create("/images/json"));
+    auto url = URL::Create("/images/json");
+
+    url.SetParameter("all", all);
+    url.SetParameter("digests", digests);
+
+    // Build filters JSON if any filters are set
+    nlohmann::json filtersJson;
+
+    if (filters.reference.has_value())
+    {
+        filtersJson["reference"] = nlohmann::json::array({filters.reference.value()});
+    }
+
+    if (filters.before.has_value())
+    {
+        filtersJson["before"] = nlohmann::json::array({filters.before.value()});
+    }
+
+    if (filters.since.has_value())
+    {
+        filtersJson["since"] = nlohmann::json::array({filters.since.value()});
+    }
+
+    if (filters.dangling.has_value())
+    {
+        filtersJson["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
+    }
+
+    if (!filters.labels.empty())
+    {
+        filtersJson["label"] = filters.labels;
+    }
+
+    if (!filtersJson.empty())
+    {
+        url.SetParameter("filters", filtersJson.dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, url);
+}
+
+docker_schema::InspectImage DockerHTTPClient::InspectImage(const std::string& NameOrId)
+{
+    return Transaction<docker_schema::EmptyRequest, docker_schema::InspectImage>(verb::get, URL::Create("/images/{}/json", NameOrId));
 }
 
 std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTPClient::DeleteImage(const char* Image, bool Force, bool NoPrune)
@@ -209,9 +252,15 @@ void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULO
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::StartContainer(const std::string& Id)
+void DockerHTTPClient::StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys)
 {
-    Transaction(verb::post, URL::Create("/containers/{}/start", Id));
+    auto url = URL::Create("/containers/{}/start", Id);
+    if (DetachKeys.has_value())
+    {
+        url.SetParameter("detachKeys", DetachKeys.value());
+    }
+
+    Transaction(verb::post, url);
 }
 
 void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds)
@@ -253,7 +302,7 @@ docker_schema::InspectExec DockerHTTPClient::InspectExec(const std::string& Id)
     return Transaction<EmptyRequest, docker_schema::InspectExec>(verb::get, URL::Create("/exec/{}/json", Id));
 }
 
-wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
+wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys)
 {
     std::map<boost::beast::http::field, std::string> headers{
         {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
@@ -263,6 +312,11 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     url.SetParameter("stdin", true);
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
+
+    if (DetachKeys.has_value())
+    {
+        url.SetParameter("detachKeys", DetachKeys.value());
+    }
 
     auto [response, socket] = SendRequest(verb::post, url, {}, headers);
 

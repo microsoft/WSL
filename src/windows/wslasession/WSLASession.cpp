@@ -57,6 +57,42 @@ void ValidateContainerName(LPCSTR Name)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
 }
 
+wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
+{
+    wsla_schema::InspectImage wslaInspect{};
+
+    // Direct field mappings
+    wslaInspect.Id = dockerInspect.Id;
+    wslaInspect.RepoTags = dockerInspect.RepoTags;
+    wslaInspect.RepoDigests = dockerInspect.RepoDigests;
+    wslaInspect.Parent = dockerInspect.Parent;
+    wslaInspect.Comment = dockerInspect.Comment;
+    wslaInspect.Created = dockerInspect.Created;
+    wslaInspect.Author = dockerInspect.Author;
+    wslaInspect.Architecture = dockerInspect.Architecture;
+    wslaInspect.Os = dockerInspect.Os;
+    wslaInspect.Size = dockerInspect.Size;
+    wslaInspect.Metadata = dockerInspect.Metadata;
+
+    // Convert Config from docker_schema to wsla_schema
+    if (dockerInspect.Config.has_value())
+    {
+        wsla_schema::ImageConfig wslaConfig{};
+        const auto& dockerConfig = dockerInspect.Config.value();
+
+        wslaConfig.Cmd = dockerConfig.Cmd;
+        wslaConfig.Entrypoint = dockerConfig.Entrypoint;
+        wslaConfig.Env = dockerConfig.Env;
+        wslaConfig.Labels = dockerConfig.Labels;
+        wslaConfig.User = dockerConfig.User;
+        wslaConfig.WorkingDir = dockerConfig.WorkingDir;
+
+        wslaInspect.Config = wslaConfig;
+    }
+
+    return wslaInspect;
+}
+
 } // namespace
 
 namespace wsl::windows::service::wsla {
@@ -80,6 +116,7 @@ try
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
 
+    // N.B. No locking is required because Initialize() is always called before the session is returned to the caller.
     m_id = Settings->SessionId;
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
     m_featureFlags = Settings->FeatureFlags;
@@ -278,7 +315,7 @@ try
 
     auto [repo, tag] = ParseImage(ImageUri);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     auto requestContext = m_dockerClient->PullImage(repo, tag);
 
@@ -358,6 +395,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ContextPath);
     RETURN_HR_IF(E_INVALIDARG, *ContextPath == L'\0');
+    RETURN_HR_IF(E_INVALIDARG, ImageTag != nullptr && strlen(ImageTag) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     wil::unique_handle dockerfileFileHandle;
     if (DockerfileHandle != 0 && DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
@@ -365,7 +403,7 @@ try
         dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(DockerfileHandle)));
     }
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -490,7 +528,7 @@ try
 
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -509,12 +547,13 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     auto [repo, tag] = ParseImage(ImageName);
 
     THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -587,7 +626,8 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
-    std::lock_guard lock{m_lock};
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrID) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -636,36 +676,161 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
 }
 
-HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+DEFINE_ENUM_FLAG_OPERATORS(WSLAListImagesFlags);
+
+HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
 
+    RETURN_HR_IF_NULL(E_POINTER, Images);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
     *Count = 0;
     *Images = nullptr;
 
-    std::lock_guard lock{m_lock};
+    if (Options != nullptr)
+    {
+        RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingFalse));
+        RETURN_HR_IF(E_INVALIDARG, Options->Reference != nullptr && strlen(Options->Reference) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    }
+
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto images = m_dockerClient->ListImages();
+    // Extract options for Docker API
+    bool all = false;
+    bool digests = false;
+    DockerHTTPClient::ListImagesFilters filters;
 
-    // Compute the number of entries.
-    auto entries = std::accumulate<decltype(images.begin()), size_t>(
-        images.begin(), images.end(), 0, [](auto sum, const auto& e) { return sum + e.RepoTags.size(); });
+    if (Options != nullptr)
+    {
+        all = WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsAll);
+        digests = WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDigests);
+
+        if (Options->Reference != nullptr)
+        {
+            filters.reference = Options->Reference;
+        }
+
+        if (Options->Before != nullptr)
+        {
+            filters.before = Options->Before;
+        }
+
+        if (Options->Since != nullptr)
+        {
+            filters.since = Options->Since;
+        }
+
+        // Check dangling flags (mutually exclusive in practice)
+        if (WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingTrue))
+        {
+            filters.dangling = true;
+        }
+        else if (WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingFalse))
+        {
+            filters.dangling = false;
+        }
+        // If neither flag is set, filters.dangling remains std::nullopt (show all)
+
+        // Construct labels
+        if (Options->Labels != nullptr && Options->LabelsCount > 0)
+        {
+            for (ULONG i = 0; i < Options->LabelsCount; ++i)
+            {
+                const auto& label = Options->Labels[i];
+                if (label.Key != nullptr)
+                {
+                    std::string labelFilter = label.Key;
+                    if (label.Value != nullptr)
+                    {
+                        labelFilter += "=";
+                        labelFilter += label.Value;
+                    }
+                    filters.labels.push_back(labelFilter);
+                }
+            }
+        }
+    }
+
+    std::vector<docker_schema::Image> images;
+    try
+    {
+        images = m_dockerClient->ListImages(all, digests, filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
+
+    // Compute the number of entries - one entry per tag, or one per image if no tags
+    auto entries = std::accumulate<decltype(images.begin()), size_t>(images.begin(), images.end(), 0, [](auto sum, const auto& e) {
+        return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
+    });
 
     auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(entries);
 
     size_t index = 0;
     for (const auto& e : images)
     {
-        // TODO: download_timestamp
-        for (const auto& tag : e.RepoTags)
+        // Build a map from repo name to digest for this image
+        // RepoDigests format: "repo@sha256:digest"
+        std::map<std::string, std::string> repoToDigest;
+        for (const auto& repoDigest : e.RepoDigests)
         {
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+            size_t atPos = repoDigest.find('@');
+            THROW_HR_IF(E_UNEXPECTED, atPos == std::string::npos || atPos == 0);
+            std::string repoName = repoDigest.substr(0, atPos);
+            repoToDigest[repoName] = repoDigest;
+        }
+
+        if (e.RepoTags.empty())
+        {
+            // Image has no tags (dangling image)
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, "<none>:<none>") != 0);
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+
+            // Set digest if available
+            if (!e.RepoDigests.empty())
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, e.RepoDigests[0].c_str()) != 0);
+            }
+            else
+            {
+                output[index].Digest[0] = '\0';
+            }
+
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
             output[index].Size = e.Size;
+            output[index].Created = e.Created;
             index++;
+        }
+        else
+        {
+            // Image has tags - create one entry per tag
+            for (const auto& tag : e.RepoTags)
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+
+                // Extract repo name from tag (format: "repo:tag")
+                // and lookup corresponding digest from the map
+                auto repoName = ParseImage(tag).first;
+                size_t colonPos = tag.find(':');
+                auto it = repoToDigest.find(repoName);
+                if (it != repoToDigest.end())
+                {
+                    THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, it->second.c_str()) != 0);
+                }
+                else
+                {
+                    output[index].Digest[0] = '\0';
+                }
+
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
+                output[index].Size = e.Size;
+                output[index].Created = e.Created;
+                index++;
+            }
         }
     }
 
@@ -677,6 +842,8 @@ try
 }
 CATCH_RETURN();
 
+DEFINE_ENUM_FLAG_OPERATORS(WSLADeleteImageFlags);
+
 HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count)
 try
 {
@@ -684,20 +851,22 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
     RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
     RETURN_HR_IF_NULL(E_POINTER, Count);
 
     *DeletedImages = nullptr;
     *Count = 0;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     std::vector<docker_schema::DeletedImage> deletedImages;
     try
     {
-        deletedImages = m_dockerClient->DeleteImage(Options->Image, !!Options->Force, !!Options->NoPrune);
+        deletedImages = m_dockerClient->DeleteImage(
+            Options->Image, WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsForce), WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsNoPrune));
     }
     catch (const DockerHTTPException& e)
     {
@@ -749,10 +918,12 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
     RETURN_HR_IF_NULL(E_POINTER, Options->Repo);
     RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Repo) + strlen(Options->Tag) + 1 > WSLA_MAX_IMAGE_NAME_LENGTH);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -778,6 +949,49 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLASession::InspectImage(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ImageNameOrId);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrId) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
+
+    *Output = nullptr;
+
+    auto lock = m_lock.lock_shared();
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    docker_schema::InspectImage dockerInspect;
+    try
+    {
+        dockerInspect = m_dockerClient->InspectImage(ImageNameOrId);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage = "Failed to inspect image";
+        if (e.HasErrorMessage())
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+    }
+
+    // Convert to WSLA schema
+    auto wslaInspect = ConvertInspectImage(dockerInspect);
+
+    // Serialize to JSON
+    std::string wslaJson = wsl::shared::ToJson(wslaInspect);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslaJson.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container)
 try
 {
@@ -788,7 +1002,8 @@ try
     // Validate that Image is not null.
     RETURN_HR_IF(E_INVALIDARG, containerOptions->Image == nullptr);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Validate that name & images are valid.
@@ -803,9 +1018,11 @@ try
 
     try
     {
+        std::lock_guard containersLock{m_containersLock};
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
             *this,
+            m_virtualMachine.value(),
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -838,7 +1055,8 @@ try
     ValidateContainerName(Id);
 
     // Look for an exact ID match first.
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+    std::lock_guard containersLock{m_containersLock};
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
@@ -884,7 +1102,8 @@ try
     *Count = 0;
     *Containers = nullptr;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+    std::lock_guard containersLock{m_containersLock};
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
@@ -917,7 +1136,7 @@ try
         *Errno = -1; // Make sure not to return 0 if something fails.
     }
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, Errno);
@@ -943,7 +1162,7 @@ try
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Path), !std::filesystem::path(Path).is_absolute());
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
@@ -959,6 +1178,12 @@ try
 }
 CATCH_RETURN();
 
+WSLA_CONTAINER_STATE WSLAContainerImpl::State() const noexcept
+{
+    auto lock = m_lock.lock_shared();
+    return m_state;
+}
+
 HRESULT WSLASession::Terminate()
 try
 {
@@ -966,7 +1191,9 @@ try
     // This allows a session to be unblocked if a stuck operation is holding the lock.
     m_sessionTerminatingEvent.SetEvent();
 
-    std::lock_guard lock{m_lock};
+    // Acquire an exclusive lock to ensure that no operation is running.
+    auto lock = m_lock.lock_exclusive();
+    std::lock_guard containersLock(m_containersLock);
 
     // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
@@ -996,8 +1223,12 @@ try
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-            m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
-            exitCode = m_dockerdProcess->Wait(10 * 1000);
+            try
+            {
+                m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
+                exitCode = m_dockerdProcess->Wait(10 * 1000);
+            }
+            CATCH_LOG();
         }
 
         WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));
@@ -1025,7 +1256,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->MountWindowsFolder(WindowsPath, LinuxPath, ReadOnly);
@@ -1037,7 +1268,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->UnmountWindowsFolder(LinuxPath);
@@ -1049,7 +1280,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort);
@@ -1062,7 +1293,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     m_virtualMachine->UnmapPort(Family, WindowsPort, LinuxPort);
@@ -1091,16 +1322,11 @@ MultiHandleWait WSLASession::CreateIOContext()
     return io;
 }
 
-WSLAVirtualMachine& WSLASession::GetVirtualMachine()
-{
-    std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
-    return *m_virtualMachine;
-}
-
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+    std::lock_guard containersLock(m_containersLock);
+
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.get() == Container; }) == 1);
 }
 
@@ -1125,6 +1351,7 @@ void WSLASession::RecoverExistingContainers()
             auto container = WSLAContainerImpl::Open(
                 dockerContainer,
                 *this,
+                m_virtualMachine.value(),
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),

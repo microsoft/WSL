@@ -36,7 +36,8 @@ public:
     NON_MOVABLE(WSLAContainerImpl);
 
     WSLAContainerImpl(
-        WSLASession* wslaSession,
+        WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
@@ -53,28 +54,27 @@ public:
 
     ~WSLAContainerImpl();
 
-    void Start(WSLAContainerStartFlags Flags);
-
-    void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
-    void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
+    void Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys);
+    void Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
+    void Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds);
     void Delete();
-    void Export(ULONG TarHandle);
+    void Export(ULONG TarHandle) const;
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
-    void GetInitProcess(_Out_ IWSLAProcess** process);
-    void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process);
-    void Inspect(LPSTR* Output);
-    void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
-    void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count);
+    void GetInitProcess(_Out_ IWSLAProcess** process) const;
+    void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachKeys, _Out_ IWSLAProcess** Process);
+    void Inspect(LPSTR* Output) const;
+    void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
+    void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count) const;
 
-    void CopyTo(IWSLAContainer** Container);
+    void CopyTo(IWSLAContainer** Container) const;
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
-    WSLA_CONTAINER_STATE State() noexcept;
+    WSLA_CONTAINER_STATE State() const noexcept;
 
     __requires_lock_held(m_lock) void Transition(WSLA_CONTAINER_STATE State) noexcept;
 
-    void OnProcessReleased(DockerExecProcessControl* process);
+    void OnProcessReleased(DockerExecProcessControl* process) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -93,6 +93,7 @@ public:
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -101,35 +102,42 @@ public:
     static std::unique_ptr<WSLAContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay);
 
 private:
+    __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld();
+
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
-    void ReleaseResources();
+    __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
-    wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect);
+    wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
 
-    std::recursive_mutex m_lock;
+    mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
     std::string m_id;
     WSLAProcessFlags m_initProcessFlags{};
     WSLAContainerFlags m_containerFlags{};
-    std::vector<DockerExecProcessControl*> m_processes;
+    mutable std::mutex m_processesLock;
+    __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
+    __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
+    __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
+
+    wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
-    WSLASession* m_wslaSession = nullptr;
+    WSLASession& m_wslaSession;
+    WSLAVirtualMachine& m_virtualMachine;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
-    Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
-    DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
@@ -143,14 +151,14 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
-    IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
-    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
+    IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
+    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
-    IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process) override;
-    IFACEMETHOD(Start)(WSLAContainerStartFlags Flags) override;
+    IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _In_opt_ LPCSTR DetachKeys, _Out_ IWSLAProcess** Process) override;
+    IFACEMETHOD(Start)(WSLAContainerStartFlags Flags, _In_opt_ LPCSTR DetachKeys) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLAContainerId Id) override;
