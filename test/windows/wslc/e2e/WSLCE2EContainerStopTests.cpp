@@ -45,7 +45,25 @@ class WSLCE2EContainerStopTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(L"container stop --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignal)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        {
+            result = RunWslc(std::format(L"container stop {} -s 0 -t 0", WslcContainerName));
+            result.Verify({.Stderr = L"Invalid signal value: 0 is out of valid range (1-31).\r\n", .ExitCode = 1});
+        }
+
+        {
+            result = RunWslc(std::format(L"container stop {} -s 32 -t 0", WslcContainerName));
+            result.Verify({.Stderr = L"Invalid signal value: 32 is out of valid range (1-31).\r\n", .ExitCode = 1});
+        }
     }
 
     TEST_METHOD(WSLCE2E_Container_Stop_KillsRunningContainer)
@@ -54,7 +72,7 @@ class WSLCE2EContainerStopTests
 
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
