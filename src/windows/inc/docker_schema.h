@@ -372,11 +372,20 @@ struct BuildKitVertex
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
 };
 
+struct BuildKitStatus
+{
+    std::string id;
+    std::string vertex;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+};
+
 struct BuildKitSolveStatus
 {
     std::vector<BuildKitVertex> vertexes;
+    std::vector<BuildKitStatus> statuses;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes, statuses);
 };
 
 struct CreateImageProgressDetails

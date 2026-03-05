@@ -35,6 +35,7 @@ Abstract:
 #define WSLC_ARGUMENTS(_) \
 _(All,            "all",                 L"a",              Kind::Flag,        L"Show all regardless of state.") \
 _(Attach,         "attach",              L"a",              Kind::Flag,        Localization::WSLCCLI_AttachArgDescription()) \
+_(BuildArg,       "build-arg",           NO_ALIAS,          Kind::Value,       L"Set build-time variables (KEY=VALUE)") \
 _(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       L"Write the container ID to the provided path.") \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L"The command to run") \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
