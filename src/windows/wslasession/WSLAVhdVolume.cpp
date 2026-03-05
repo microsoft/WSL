@@ -43,7 +43,8 @@ WSLAVhdVolumeImpl::~WSLAVhdVolumeImpl()
 {
     try
     {
-        ReleaseResources();
+        // TODO: Replace with Detach once WSLA session has the means to persist volumes accross restarts.
+        Delete();
     }
     CATCH_LOG();
 }
@@ -113,10 +114,16 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
 
 void WSLAVhdVolumeImpl::Delete()
 {
-    ReleaseResources();
+    Detach();
+
+    auto hostPath = std::exchange(m_hostPath, std::filesystem::path{});
+    if (!hostPath.empty())
+    {
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str()));
+    }
 }
 
-void WSLAVhdVolumeImpl::ReleaseResources()
+void WSLAVhdVolumeImpl::Detach()
 {
     if (m_virtualMachine != nullptr)
     {
@@ -128,12 +135,6 @@ void WSLAVhdVolumeImpl::ReleaseResources()
 
         m_virtualMachine->DetachDisk(m_lun);
         m_virtualMachine = nullptr;
-    }
-
-    if (!m_hostPath.empty())
-    {
-        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_hostPath.c_str()));
-        m_hostPath.clear();
     }
 }
 

@@ -51,7 +51,7 @@ public:
     const std::string& VirtualMachinePath() const noexcept { return m_virtualMachinePath; }
 
 private:
-    void ReleaseResources();
+    void Detach();
 
     std::wstring m_name;
     std::wstring m_type;
