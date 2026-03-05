@@ -18,7 +18,7 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-constexpr std::wstring_view s_DefaultSessionName = L"wsla-cli";
+const std::wstring s_DefaultSessionName = L"wsla-cli";
 
 struct Session
 {

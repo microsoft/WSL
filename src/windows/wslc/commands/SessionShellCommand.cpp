@@ -35,7 +35,7 @@ std::wstring SessionShellCommand::ShortDescription() const
 
 std::wstring SessionShellCommand::LongDescription() const
 {
-    return {L"Attaches to an active session. If no session ID is provided, the default session will be used."};
+    return {L"Attaches to an active session. If no session ID is provided, the wslc default session will be used."};
 }
 
 void SessionShellCommand::ExecuteInternal(CLIExecutionContext& context) const
