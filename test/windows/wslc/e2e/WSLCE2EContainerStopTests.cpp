@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCE2EContainerKillTests.cpp
+    WSLCE2EContainerStopTests.cpp
 
 Abstract:
 
@@ -18,9 +18,9 @@ Abstract:
 
 namespace WSLCE2ETests {
 
-class WSLCE2EContainerKillTests
+class WSLCE2EContainerStopTests
 {
-    WSL_TEST_CLASS(WSLCE2EContainerKillTests)
+    WSL_TEST_CLASS(WSLCE2EContainerStopTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {
@@ -40,15 +40,15 @@ class WSLCE2EContainerKillTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Kill_HelpCommand)
+    TEST_METHOD(WSLCE2E_Container_Stop_HelpCommand)
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(L"container kill --help");
+        auto result = RunWslc(L"container stop --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Kill_KillsRunningContainer)
+    TEST_METHOD(WSLCE2E_Container_Stop_KillsRunningContainer)
     {
         WSL2_TEST_ONLY();
 
@@ -61,8 +61,8 @@ class WSLCE2EContainerKillTests
         // Verify container is running
         VerifyContainerIsListed(containerId, L"running");
 
-        // Kill the container
-        result = RunWslc(std::format(L"container kill {}", containerId));
+        // Stop the container
+        result = RunWslc(std::format(L"container stop {} -t 0", containerId));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         // Verify the container is no longer running
@@ -86,12 +86,12 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Kills containers.\r\n\r\n";
+        return L"Stops containers.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
     {
-        return L"Usage: wslc container kill [<options>] [<container-id>]\r\n\r\n";
+        return L"Usage: wslc container stop [<options>] [<container-id>]\r\n\r\n";
     }
 
     std::wstring GetAvailableCommands() const
@@ -106,7 +106,8 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  --session       Specify the session to use\r\n"
-                << L"  -s,--signal     Signal to send (default: SIGKILL)\r\n"
+                << L"  -s,--signal     Signal to send (default: SIGTERM)\r\n"
+                << L"  -t,--time       Time in seconds to wait before executing (default 5)\r\n"
                 << L"  -h,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
