@@ -82,6 +82,7 @@ public:
     void SetTtySize(ULONG Rows, ULONG Columns);
     void SetWorkingDirectory(std::string&& WorkingDirectory);
     void SetUser(std::string&& User);
+    void SetDetachKeys(std::string&& DetachKeys);
 
     std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>, int> LaunchNoThrow(IWSLASession& Session);
     std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
@@ -105,6 +106,7 @@ protected:
     std::string m_executable;
     std::string m_workingDirectory;
     std::string m_user;
+    std::optional<std::string> m_detachKeys;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
     DWORD m_rows = 0;

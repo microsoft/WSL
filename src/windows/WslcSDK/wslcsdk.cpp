@@ -436,7 +436,7 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    RETURN_HR(internalType->container->Start(ConvertFlags(flags)));
+    RETURN_HR(internalType->container->Start(ConvertFlags(flags), nullptr));
 }
 CATCH_RETURN();
 

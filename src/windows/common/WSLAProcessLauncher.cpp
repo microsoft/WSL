@@ -36,6 +36,11 @@ void WSLAProcessLauncher::SetWorkingDirectory(std::string&& WorkingDirectory)
     m_workingDirectory = std::move(WorkingDirectory);
 }
 
+void WSLAProcessLauncher::SetDetachKeys(std::string&& DetachKeys)
+{
+    m_detachKeys = std::move(DetachKeys);
+}
+
 void WSLAProcessLauncher::SetUser(std::string&& User)
 {
     m_user = std::move(User);
@@ -193,7 +198,7 @@ std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher
     auto [options, commandLine, env] = CreateProcessOptions();
 
     wil::com_ptr<IWSLAProcess> process;
-    auto result = Container.Exec(&options, &process);
+    auto result = Container.Exec(&options, m_detachKeys.has_value() ? m_detachKeys->c_str() : nullptr, &process);
     if (FAILED(result))
     {
         return std::make_pair(result, std::optional<ClientRunningWSLAProcess>());
