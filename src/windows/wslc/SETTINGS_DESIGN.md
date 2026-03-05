@@ -25,6 +25,18 @@ Four formats are in common use across the Linux container ecosystem:
 - Verbose for simple key-value data (braces, commas, quoted keys)
 - A single missing comma or trailing comma breaks the entire file
 
+**Sample:**
+```json
+{
+  "session": {
+    "cpuCount": 4,
+    "memorySizeMb": 8192,
+    "maxStorageSizeMb": 51200,
+    "defaultStoragePath": "C:\\Users\\user\\wslc\\storage"
+  }
+}
+```
+
 ### 1.2 TOML
 
 **Used by:** Podman (`containers.conf`), containerd (`config.toml`), Docker BuildKit (`buildkitd.toml`), Cargo (`Cargo.toml`)
@@ -42,6 +54,22 @@ Four formats are in common use across the Linux container ecosystem:
 - Slightly less familiar to developers who primarily know Docker/Kubernetes
 - Verbosity increases with deeply nested tables
 
+**Sample:**
+```toml
+[session]
+# Number of virtual CPUs allocated to the session
+cpu_count = 4
+
+# Memory limit for the session in megabytes
+memory_size_mb = 8192
+
+# Maximum disk image size in megabytes
+max_storage_size_mb = 51200
+
+# Default path for container storage
+default_storage_path = "C:\\Users\\user\\wslc\\storage"
+```
+
 ### 1.3 YAML
 
 **Used by:** Kubernetes manifests, Docker Compose (`compose.yaml`), Helm charts, GitHub Actions
@@ -57,6 +85,22 @@ Four formats are in common use across the Linux container ecosystem:
 - Multiple equivalent representations of the same data cause inconsistency
 - Significantly over-engineered for a small settings file with flat-to-shallow structure
 - No existing YAML parser in the wslc dependency tree
+
+**Sample:**
+```yaml
+session:
+  # Number of virtual CPUs allocated to the session
+  cpuCount: 4
+
+  # Memory limit for the session in megabytes
+  memorySizeMb: 8192
+
+  # Maximum disk image size in megabytes
+  maxStorageSizeMb: 51200
+
+  # Default path for container storage
+  defaultStoragePath: "C:\\Users\\user\\wslc\\storage"
+```
 
 ### 1.4 INI
 
@@ -74,6 +118,24 @@ Four formats are in common use across the Linux container ecosystem:
 - Does not scale to the settings complexity `wslc` will need (e.g., per-registry options, volume mounts defaults, environment variable lists)
 - Associated with legacy tooling; rarely chosen for new container-native CLIs
 
+**Sample:**
+```ini
+[session]
+; Number of virtual CPUs allocated to the session
+cpu_count = 4
+
+; Memory limit for the session in megabytes
+memory_size_mb = 8192
+
+; Maximum disk image size in megabytes
+max_storage_size_mb = 51200
+
+; Default path for container storage
+default_storage_path = C:\Users\user\wslc\storage
+```
+
+> Note: INI has no standard for typed integers — parsers treat all values as strings, requiring the application to convert them. Path quoting rules also vary by parser.
+
 ### 1.5 Format Comparison Matrix
 
 | Criterion | JSON | TOML | YAML | INI |
@@ -89,39 +151,49 @@ Four formats are in common use across the Linux container ecosystem:
 
 ---
 
-## 2. Recommended Format: TOML
+## 2. Recommended Format: YAML (JSON as fallback)
 
-**TOML is the recommended format.** The rationale:
+**YAML is the preferred format, with JSON as the backup option.** The rationale:
 
-1. **Comment support is non-negotiable for a user-facing settings file.** Without comments, users cannot annotate their choices, and the file cannot include inline guidance (e.g., `# Available values: always | missing | never`). JSON's lack of comments is its primary disqualifier for this use case.
+1. **YAML dominates the container ecosystem that `wslc` users already live in.** Kubernetes manifests, Docker Compose files, Helm charts, and most CI/CD pipelines (GitHub Actions, GitLab CI) are all YAML. Users of WSL containers are overwhelmingly familiar with YAML and will feel at home editing a YAML settings file without consulting documentation.
 
-2. **TOML is the established choice for Linux container daemon configuration.** Both Podman (`containers.conf`) and containerd (`config.toml`) use it. Users who configure those tools will recognize the format immediately.
+2. **Comment support is non-negotiable for a user-facing settings file.** Both YAML and JSON-with-comments variants support `#` comments; plain JSON does not. This alone disqualifies JSON as the primary choice — users must be able to annotate their settings and the file must be able to ship with inline guidance (e.g., `# Options: always | missing | never`).
 
-3. **TOML's explicit type system and no-whitespace-sensitivity make it safer than YAML** for hand-editing. YAML's implicit coercions and indentation sensitivity are well-documented sources of user frustration in config files.
+3. **YAML's readability advantage is meaningful at this scale.** The `wslc` settings file is shallow (one or two levels of nesting at most) and small. At this scale, YAML's indentation structure produces the most human-readable result and imposes the least syntactic noise. The whitespace-sensitivity concern — YAML's most common criticism — is largely mitigated when the file is short, flat, and ships with a well-formatted template that users edit in place.
 
 4. **INI does not support typed arrays or nested structures** that `wslc` settings will need (e.g., default environment variable lists, per-registry options).
 
-5. **The JSON library cost argument is weak.** The cost of integrating a small TOML parser (e.g., `toml++`, header-only, MIT license) is low and pays off in user experience. Alternatively, JSON with a parallel machine-generated comment scaffold (as some tools implement) is an acceptable fallback but is more complex to implement correctly.
+5. **TOML is not recommended** despite its container daemon usage (Podman, containerd) because it is less familiar to the broader developer audience and offers no significant advantage over YAML for a settings file of this complexity.
 
-> **Fallback option:** If adding a new parser dependency is blocked, JSON remains acceptable with the trade-off that the file ships with a commented-out schema reference or a `wslc settings --schema` command that prints all valid keys and their types.
+**Backup option — JSON:** If adding a YAML parser dependency is blocked, or if the team prioritizes zero new dependencies, JSON is acceptable. The trade-offs are: no comment support (the file cannot include inline guidance), and a more verbose syntax. The existing `nlohmann/json` library covers JSON at no added cost. To partially mitigate the lack of comments, the `wslc settings --list` command would become more important as the primary way to discover available keys and their current values.
+
+### File Extension
+
+- **Primary (YAML):** `settings.yaml`
+- **Fallback (JSON):** `settings.json`
 
 ---
 
 ## 3. File Location
 
 ```
-%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.toml
+%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.yaml
+```
+
+Fallback (JSON):
+```
+%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.json
 ```
 
 **Rationale:**
 - `%LOCALAPPDATA%\Microsoft\WSL\` is the natural home for WSL user data on Windows (consistent with WSL's existing conventions)
 - Per-user, not system-wide — settings affect only the invoking user
 - The `wslc\` subdirectory scopes it cleanly away from WSL service data
-- `settings.toml` is the conventional name for TOML-format settings files (cf. `buildkitd.toml`, `config.toml`)
+- `settings.yaml` is widely recognized; `.yaml` is the preferred extension over `.yml` per the YAML FAQ
 
 A backup copy is maintained alongside the primary file:
 ```
-%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.toml.bak
+%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.yaml.bak
 ```
 
 ---
@@ -146,7 +218,7 @@ The primary usage (`wslc settings` with no flags) opens the file for editing, mo
 
 ### 4.2 Editor Behavior
 
-The file is opened via `ShellExecuteW` with the file path, which respects the user's `.toml` file association. If no application is associated, Notepad is used as the fallback. This matches winget's behavior and requires no custom editor logic.
+The file is opened via `ShellExecuteW` with the file path, which respects the user's `.yaml` file association. If no application is associated, Notepad is used as the fallback. This matches winget's behavior and requires no custom editor logic.
 
 The command does not wait for the editor to close — it opens the file and exits immediately, just like `winget settings`.
 
@@ -154,41 +226,41 @@ The command does not wait for the editor to close — it opens the file and exit
 
 On first invocation of any `wslc` command, if the settings file does not exist, it is created at the standard location with all keys commented out and their defaults shown inline:
 
-```toml
+```yaml
 # wslc user settings
 # https://aka.ms/wslc-settings
 
-[defaults]
-# Output format for list commands. Options: table | json
-# format = "table"
+defaults:
+  # Output format for list commands. Options: table | json
+  # format: "table"
 
-# Session to connect to if --session is not specified on the command line.
-# session = ""
+  # Session to connect to if --session is not specified on the command line.
+  # session: ""
 
-# Image pull policy. Options: always | missing | never
-# pull = "never"
+  # Image pull policy. Options: always | missing | never
+  # pull: "never"
 
-# Progress display type. Options: ansi | none
-# progress = "ansi"
+  # Progress display type. Options: ansi | none
+  # progress: "ansi"
 
-[registry]
-# Default scheme for registry connections. Options: https | http
-# scheme = "https"
+registry:
+  # Default scheme for registry connections. Options: https | http
+  # scheme: "https"
 ```
 
 Commenting out all entries rather than writing the defaults explicitly prevents `wslc` from mistaking user-set values from file defaults when applying command-line override precedence.
 
 ### 4.4 Backup and Recovery
 
-Before opening the editor (or on any settings write operation), `wslc` copies the current valid settings to `settings.toml.bak`. On startup, settings are loaded with the following precedence:
+Before opening the editor (or on any settings write operation), `wslc` copies the current valid settings to `settings.yaml.bak`. On startup, settings are loaded with the following precedence:
 
-1. `settings.toml` (if it parses without syntax errors and passes schema validation)
-2. `settings.toml.bak` (if the primary fails; a warning is printed to stderr)
+1. `settings.yaml` (if it parses without syntax errors and passes schema validation)
+2. `settings.yaml.bak` (if the primary fails; a warning is printed to stderr)
 3. Built-in defaults (if both fail; a warning is printed to stderr)
 
 ```
-Warning: settings.toml could not be parsed. Using backup settings.
-Warning: settings.toml.bak could not be parsed. Using built-in defaults.
+Warning: settings.yaml could not be parsed. Using backup settings.
+Warning: settings.yaml.bak could not be parsed. Using built-in defaults.
 ```
 
 No warning is printed if neither file exists (first run).
@@ -238,10 +310,10 @@ Settings are organized into sections that correspond to wslc's command groups.
 Settings from the file represent the user's persistent defaults. They are overridden by explicit command-line arguments, which are overridden by nothing. The precedence chain from lowest to highest:
 
 ```
-Built-in defaults  <  settings.toml  <  command-line flags
+Built-in defaults  <  settings.yaml  <  command-line flags
 ```
 
-Example: if `settings.toml` contains `pull = "missing"` and the user runs `wslc run --pull always myimage`, the effective pull policy is `always`. If `--pull` is not given, it is `missing`. If the key is not in settings, it falls back to the built-in default (`never`).
+Example: if `settings.yaml` contains `pull: "missing"` and the user runs `wslc run --pull always myimage`, the effective pull policy is `always`. If `--pull` is not given, it is `missing`. If the key is not in settings, it falls back to the built-in default (`never`).
 
 This means commands must check whether an argument was explicitly provided by the user versus not present at all (not yet set in `ArgMap`), rather than checking for a default value. The existing `ArgMap::Contains()` method already provides this distinction cleanly.
 
@@ -279,10 +351,10 @@ Settings are loaded once at startup in `CoreMain`, before command dispatch, and 
 
 ### Settings File Write (for `--reset`)
 
-`--reset` overwrites `settings.toml` with the commented-out defaults template (the same content generated on first run) after prompting:
+`--reset` overwrites `settings.yaml` with the commented-out defaults template (the same content generated on first run) after prompting:
 
 ```
-This will reset all settings to defaults. Your current settings.toml will be saved as settings.toml.bak. Continue? [y/N]
+This will reset all settings to defaults. Your current settings.yaml will be saved as settings.yaml.bak. Continue? [y/N]
 ```
 
 ### No Live Reload
@@ -294,7 +366,7 @@ Settings are read once per invocation. There is no file-watcher or live-reload m
 ## 9. Out of Scope for Initial Implementation
 
 - **`wslc settings set <key> <value>`** — programmatic key setting without opening an editor. Useful for scripting. Deferred to v2; manual editing covers the primary use case.
-- **System-wide settings** — a machine-level settings file (e.g., `%ProgramData%\Microsoft\WSL\wslc\settings.toml`) that applies to all users. Deferred; per-user is sufficient for v1.
+- **System-wide settings** — a machine-level settings file (e.g., `%ProgramData%\Microsoft\WSL\wslc\settings.yaml`) that applies to all users. Deferred; per-user is sufficient for v1.
 - **Settings profiles** — named profiles for different environments. Deferred.
 - **Schema export** — `wslc settings --schema` to print a JSON Schema or TOML template. Useful for editor autocompletion; deferred.
 - **Environment variable overrides** — `WSLC_DEFAULTS_FORMAT=json` style overrides. Useful for CI pipelines; deferred.
