@@ -169,7 +169,7 @@ default_storage_path = C:\Users\user\wslc\storage
 
 ### File Extension
 
-- **Primary (YAML):** `settings.yaml`
+- **Primary (YAML):** `UserSettings.yaml`
 - **Fallback (JSON):** `settings.json`
 
 ---
@@ -177,23 +177,18 @@ default_storage_path = C:\Users\user\wslc\storage
 ## 3. File Location
 
 ```
-%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.yaml
-```
-
-Fallback (JSON):
-```
-%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.json
+%LOCALAPPDATA%\Microsoft\WSL\wslc\UserSettings.yaml
 ```
 
 **Rationale:**
 - `%LOCALAPPDATA%\Microsoft\WSL\` is the natural home for WSL user data on Windows (consistent with WSL's existing conventions)
 - Per-user, not system-wide — settings affect only the invoking user
 - The `wslc\` subdirectory scopes it cleanly away from WSL service data
-- `settings.yaml` is widely recognized; `.yaml` is the preferred extension over `.yml` per the YAML FAQ
+- `UserSettings.yaml` is widely recognized; `.yaml` is the preferred extension over `.yml` per the YAML FAQ
 
 A backup copy is maintained alongside the primary file:
 ```
-%LOCALAPPDATA%\Microsoft\WSL\wslc\settings.yaml.bak
+%LOCALAPPDATA%\Microsoft\WSL\wslc\UserSettings.yaml.bak
 ```
 
 ---
@@ -230,96 +225,54 @@ On first invocation of any `wslc` command, if the settings file does not exist, 
 # wslc user settings
 # https://aka.ms/wslc-settings
 
-defaults:
-  # Output format for list commands. Options: table | json
-  # format: "table"
+session:
+  # Number of virtual CPUs allocated to the session
+  # cpuCount: 4
 
-  # Session to connect to if --session is not specified on the command line.
-  # session: ""
+  # Memory limit for the session in megabytes
+  # memorySizeMb: 8192
 
-  # Image pull policy. Options: always | missing | never
-  # pull: "never"
+  # Maximum disk image size in megabytes
+  # maxStorageSizeMb: 51200
 
-  # Progress display type. Options: ansi | none
-  # progress: "ansi"
-
-registry:
-  # Default scheme for registry connections. Options: https | http
-  # scheme: "https"
+  # Default path for container storage
+  # defaultStoragePath: "C:\\Users\\user\\wslc\\storage"
 ```
 
 Commenting out all entries rather than writing the defaults explicitly prevents `wslc` from mistaking user-set values from file defaults when applying command-line override precedence.
 
 ### 4.4 Backup and Recovery
 
-Before opening the editor (or on any settings write operation), `wslc` copies the current valid settings to `settings.yaml.bak`. On startup, settings are loaded with the following precedence:
+Before opening the editor (or on any settings write operation), `wslc` copies the current valid settings to `UserSettings.yaml.bak`. On startup, settings are loaded with the following precedence:
 
-1. `settings.yaml` (if it parses without syntax errors and passes schema validation)
-2. `settings.yaml.bak` (if the primary fails; a warning is printed to stderr)
+1. `UserSettings.yaml` (if it parses without syntax errors and passes schema validation)
+2. `UserSettings.yaml.bak` (if the primary fails; a warning is printed to stderr)
 3. Built-in defaults (if both fail; a warning is printed to stderr)
 
 ```
-Warning: settings.yaml could not be parsed. Using backup settings.
-Warning: settings.yaml.bak could not be parsed. Using built-in defaults.
+Warning: UserSettings.yaml could not be parsed. Using backup settings.
+Warning: UserSettings.yaml.bak could not be parsed. Using built-in defaults.
 ```
 
 No warning is printed if neither file exists (first run).
 
 ---
 
-## 5. Settings Schema
-
-Settings are organized into sections that correspond to wslc's command groups.
-
-### `[defaults]` — Global command defaults
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `format` | string | `"table"` | Output format for list/inspect commands (`table` \| `json`) |
-| `session` | string | `""` | Session name to connect to when `--session` is not passed |
-| `pull` | string | `"never"` | Image pull policy (`always` \| `missing` \| `never`) |
-| `progress` | string | `"ansi"` | Progress output type (`ansi` \| `none`) |
-| `quiet` | bool | `false` | Suppress non-essential output by default |
-
-### `[container]` — Container command defaults
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `user` | string | `""` | Default user (`uid`, `uid:gid`, or username) for `run`/`exec` |
-| `entrypoint` | string | `""` | Default entrypoint override for new containers |
-| `remove` | bool | `false` | Auto-remove containers after they stop (equivalent to `--rm`) |
-| `dns` | string | `""` | Default DNS server IP for new containers |
-| `no_dns` | bool | `false` | Disable DNS configuration in new containers by default |
-
-### `[registry]` — Registry connection defaults
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `scheme` | string | `"https"` | Default registry connection scheme (`https` \| `http`) |
-
-### Future sections (reserved, not in initial implementation)
-
-- `[volume]` — Default volume mount paths
-- `[network]` — Default port publish rules
-- `[env]` — Default environment variables for all containers
-
----
-
-## 6. Argument Override Precedence
+## 5. Argument Override Precedence
 
 Settings from the file represent the user's persistent defaults. They are overridden by explicit command-line arguments, which are overridden by nothing. The precedence chain from lowest to highest:
 
 ```
-Built-in defaults  <  settings.yaml  <  command-line flags
+Built-in defaults  <  UserSettings.yaml  <  command-line flags
 ```
 
-Example: if `settings.yaml` contains `pull: "missing"` and the user runs `wslc run --pull always myimage`, the effective pull policy is `always`. If `--pull` is not given, it is `missing`. If the key is not in settings, it falls back to the built-in default (`never`).
+Example: if `UserSettings.yaml` contains `pull: "missing"` and the user runs `wslc run --pull always myimage`, the effective pull policy is `always`. If `--pull` is not given, it is `missing`. If the key is not in settings, it falls back to the built-in default (`never`).
 
 This means commands must check whether an argument was explicitly provided by the user versus not present at all (not yet set in `ArgMap`), rather than checking for a default value. The existing `ArgMap::Contains()` method already provides this distinction cleanly.
 
 ---
 
-## 7. Validation
+## 6. Validation
 
 ### Syntax Validation
 
@@ -343,7 +296,7 @@ After parsing, each known key is validated against its expected type and allowed
 
 ---
 
-## 8. Implementation Notes
+## 7. Implementation Notes
 
 ### Settings Loading
 
@@ -351,10 +304,10 @@ Settings are loaded once at startup in `CoreMain`, before command dispatch, and 
 
 ### Settings File Write (for `--reset`)
 
-`--reset` overwrites `settings.yaml` with the commented-out defaults template (the same content generated on first run) after prompting:
+`--reset` overwrites `UserSettings.yaml` with the commented-out defaults template (the same content generated on first run) after prompting:
 
 ```
-This will reset all settings to defaults. Your current settings.yaml will be saved as settings.yaml.bak. Continue? [y/N]
+This will reset all settings to defaults. Your current UserSettings.yaml will be saved as UserSettings.yaml.bak. Continue? [y/N]
 ```
 
 ### No Live Reload
@@ -363,10 +316,10 @@ Settings are read once per invocation. There is no file-watcher or live-reload m
 
 ---
 
-## 9. Out of Scope for Initial Implementation
+## 8. Out of Scope for Initial Implementation
 
 - **`wslc settings set <key> <value>`** — programmatic key setting without opening an editor. Useful for scripting. Deferred to v2; manual editing covers the primary use case.
-- **System-wide settings** — a machine-level settings file (e.g., `%ProgramData%\Microsoft\WSL\wslc\settings.yaml`) that applies to all users. Deferred; per-user is sufficient for v1.
+- **System-wide settings** — a machine-level settings file (e.g., `%ProgramData%\Microsoft\WSL\wslc\UserSettings.yaml`) that applies to all users. Deferred; per-user is sufficient for v1.
 - **Settings profiles** — named profiles for different environments. Deferred.
 - **Schema export** — `wslc settings --schema` to print a JSON Schema or TOML template. Useful for editor autocompletion; deferred.
 - **Environment variable overrides** — `WSLC_DEFAULTS_FORMAT=json` style overrides. Useful for CI pipelines; deferred.
