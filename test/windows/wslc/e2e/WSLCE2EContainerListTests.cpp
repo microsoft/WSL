@@ -89,6 +89,36 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_NOT_EQUAL(outputLines.end(), std::find(outputLines.begin(), outputLines.end(), containerId));
     }
 
+    TEST_METHOD(WSLCE2E_Container_List_NoOptions_RunningContainers)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Find container in list output with no options
+        result = RunWslc(L"container list");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto outputLines = result.GetStdoutLines();
+        std::optional<std::wstring> foundContainerLine{};
+        for (const auto& line : outputLines)
+        {
+            if (line.find(containerId) != std::wstring::npos)
+            {
+                foundContainerLine = line;
+                break;
+            }
+        }
+
+        // Verify we found the container in the list output
+        VERIFY_IS_TRUE(foundContainerLine.has_value());
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"running"));
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
