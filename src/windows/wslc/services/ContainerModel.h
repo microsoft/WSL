@@ -61,6 +61,7 @@ struct ContainerInformation
     std::string Name;
     std::string Image;
     WSLA_CONTAINER_STATE State;
+    ULONGLONG StateChangedAt;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
 };

@@ -281,6 +281,7 @@ struct WSLA_CONTAINER
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     WSLAContainerId Id;
     enum WSLA_CONTAINER_STATE State;
+    ULONGLONG StateChangedAt;
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
 };

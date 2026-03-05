@@ -60,6 +60,7 @@ public:
     void Delete();
     void Export(ULONG TarHandle) const;
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
+    void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
     void GetInitProcess(_Out_ IWSLAProcess** process) const;
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachKeys, _Out_ IWSLAProcess** Process);
     void Inspect(LPSTR* Output) const;
@@ -132,6 +133,7 @@ private:
     wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
+    std::chrono::system_clock::time_point m_stateChangedAt{std::chrono::system_clock::now()};
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;
     std::vector<WSLAPortMapping> m_mappedPorts;

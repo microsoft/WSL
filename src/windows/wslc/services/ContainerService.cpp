@@ -100,23 +100,54 @@ static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASign
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state)
+std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state, ULONGLONG stateChangedAt)
 {
+    std::wstring stateString;
     switch (state)
     {
     case WSLA_CONTAINER_STATE::WslaContainerStateCreated:
-        return L"created";
+        stateString = L"created";
+        break;
     case WSLA_CONTAINER_STATE::WslaContainerStateRunning:
-        return L"running";
+        stateString = L"running";
+        break;
     case WSLA_CONTAINER_STATE::WslaContainerStateDeleted:
-        return L"stopped";
+        stateString = L"stopped";
+        break;
     case WSLA_CONTAINER_STATE::WslaContainerStateExited:
-        return L"exited";
+        stateString = L"exited";
+        break;
     case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
+
+    if (stateChangedAt == 0)
+    {
+        return stateString;
+    }
+
+    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(stateChangedAt);
+    if (elapsed < 0)
+    {
+        elapsed = 0;
+    }
+
+    if (elapsed < 60)
+    {
+        return std::format(L"{} {} seconds ago", stateString, elapsed);
+    }
+    else if (elapsed < 3600)
+    {
+        return std::format(L"{} {} minutes ago", stateString, elapsed / 60);
+    }
+    else if (elapsed < 86400)
+    {
+        return std::format(L"{} {} hours ago", stateString, elapsed / 3600);
+    }
+
+    return std::format(L"{} {} days ago", stateString, elapsed / 86400);
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
@@ -199,6 +230,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Image = current.Image;
         entry.State = current.State;
         entry.Id = current.Id;
+        entry.StateChangedAt = current.StateChangedAt;
         result.emplace_back(std::move(entry));
     }
 
