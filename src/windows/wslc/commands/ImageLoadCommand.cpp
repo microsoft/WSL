@@ -20,7 +20,6 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
-using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 // Image Load Command
