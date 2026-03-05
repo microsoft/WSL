@@ -79,7 +79,7 @@ public:
 
     // Volume management.
     IFACEMETHOD(CreateVolume)(_In_ const WSLA_VOLUME_OPTIONS* Options) override;
-    IFACEMETHOD(DeleteVolume)(_In_ LPCWSTR Name) override;
+    IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
 
     IFACEMETHOD(Terminate()) override;
 
@@ -118,7 +118,7 @@ private:
     // This lock is used to protect m_containers. Doing this instead of acquiring m_lock exlusively allows for containers to be created/destroyed while operations that hold a shared m_lock are running.
     std::mutex m_containersLock;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
-    std::unordered_map<std::wstring, std::unique_ptr<WSLAVhdVolumeImpl>> m_volumes;
+    std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>> m_volumes;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;

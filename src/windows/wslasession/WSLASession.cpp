@@ -1179,14 +1179,14 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Name);
     RETURN_HR_IF_NULL(E_POINTER, Options->Type);
 
-    std::wstring name = Options->Name;
-    std::wstring type = Options->Type;
+    std::string name = Options->Name;
+    std::string type = Options->Type;
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
-    THROW_HR_IF_MSG(E_INVALIDARG, type != L"vhd", "Unsupported volume type: %ls", type.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, type != "vhd", "Unsupported volume type: %hs", type.c_str());
 
     auto volume = WSLAVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), *m_virtualMachine);
     WI_VERIFY(m_volumes.insert({name, std::move(volume)}).second);
@@ -1203,13 +1203,13 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::DeleteVolume(LPCWSTR Name)
+HRESULT WSLASession::DeleteVolume(LPCSTR Name)
 try
 {
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
-    std::wstring name = Name;
+    std::string name = Name;
 
     auto lock = m_lock.lock_exclusive();
 

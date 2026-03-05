@@ -48,7 +48,7 @@ struct WSLAVolumeMount
 
 struct WSLANamedVolumeMount
 {
-    std::wstring VolumeName;
+    std::string VolumeName;
     std::string ContainerPath;
     bool ReadOnly{};
 

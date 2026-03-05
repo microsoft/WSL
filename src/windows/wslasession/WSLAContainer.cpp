@@ -288,13 +288,13 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
     return wsl::shared::ToJson(wrapper);
 }
 
-std::pair<std::unordered_set<std::wstring>, std::vector<WSLANamedVolumeMount>> ProcessNamedVolumes(
+std::pair<std::unordered_set<std::string>, std::vector<WSLANamedVolumeMount>> ProcessNamedVolumes(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
-    const std::unordered_map<std::wstring, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
     std::unordered_set<std::string>& containerMountTargets,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
-    std::unordered_set<std::wstring> namedVolumes;
+    std::unordered_set<std::string> namedVolumes;
     std::vector<WSLANamedVolumeMount> namedVolumeMounts;
 
     for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
@@ -308,7 +308,7 @@ std::pair<std::unordered_set<std::wstring>, std::vector<WSLANamedVolumeMount>> P
             "Duplicate container mount path '%hs'",
             nv.ContainerPath);
 
-        auto volumeName = wsl::shared::string::MultiByteToWide(nv.Name);
+        std::string volumeName = nv.Name;
         namedVolumes.insert(volumeName);
 
         auto volume = sessionVolumes.find(volumeName);
@@ -334,9 +334,9 @@ std::pair<std::unordered_set<std::wstring>, std::vector<WSLANamedVolumeMount>> P
     return {std::move(namedVolumes), std::move(namedVolumeMounts)};
 }
 
-std::unordered_set<std::wstring> CreateNamedVolumeSetFromMetadata(const std::vector<WSLANamedVolumeMount>& namedVolumeMounts)
+std::unordered_set<std::string> CreateNamedVolumeSetFromMetadata(const std::vector<WSLANamedVolumeMount>& namedVolumeMounts)
 {
-    std::unordered_set<std::wstring> namedVolumes;
+    std::unordered_set<std::string> namedVolumes;
     for (const auto& namedVolume : namedVolumeMounts)
     {
         namedVolumes.insert(namedVolume.VolumeName);
@@ -354,7 +354,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Name,
     std::string&& Image,
     std::vector<WSLAVolumeMount>&& volumes,
-    std::unordered_set<std::wstring>&& namedVolumes,
+    std::unordered_set<std::string>&& namedVolumes,
     std::vector<WSLAPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
@@ -947,7 +947,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLASession& wslaSession,
     WSLAVirtualMachine& virtualMachine,
-    const std::unordered_map<std::wstring, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,

@@ -239,9 +239,9 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerStartFlags);")
 // Options for creating a named volume.
 struct WSLA_VOLUME_OPTIONS
 {
-    LPCWSTR Name;
-    LPCWSTR Type;
-    [unique] LPCWSTR Options;
+    LPCSTR Name;
+    LPCSTR Type;
+    [unique] LPCSTR Options;
 };
 
 // Named volume mount — name refers to a volume by name.
@@ -518,7 +518,7 @@ interface IWSLASession : IUnknown
 
     // Volume management.
     HRESULT CreateVolume([in] const struct WSLA_VOLUME_OPTIONS* Options);
-    HRESULT DeleteVolume([in] LPCWSTR Name);
+    HRESULT DeleteVolume([in] LPCSTR Name);
 
     // Terminate the VM and containers.
     HRESULT Terminate();

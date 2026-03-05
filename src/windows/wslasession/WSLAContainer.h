@@ -45,7 +45,7 @@ public:
         std::string&& Name,
         std::string&& Image,
         std::vector<WSLAVolumeMount>&& volumes,
-        std::unordered_set<std::wstring>&& namedVolumes,
+        std::unordered_set<std::string>&& namedVolumes,
         std::vector<WSLAPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
@@ -81,7 +81,7 @@ public:
     void OnProcessReleased(DockerExecProcessControl* process) noexcept;
 
     const std::string& ID() const noexcept;
-    const std::unordered_set<std::wstring>& NamedVolumes() const noexcept
+    const std::unordered_set<std::string>& NamedVolumes() const noexcept
     {
         return m_namedVolumes;
     }
@@ -102,7 +102,7 @@ public:
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLASession& wslaSession,
         WSLAVirtualMachine& virtualMachine,
-        const std::unordered_map<std::wstring, std::unique_ptr<WSLAVhdVolumeImpl>>& SessionVolumes,
+        const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& SessionVolumes,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -145,7 +145,7 @@ private:
     WSLAVirtualMachine& m_virtualMachine;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
-    std::unordered_set<std::wstring> m_namedVolumes;
+    std::unordered_set<std::string> m_namedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
     ContainerEventTracker& m_eventTracker;
