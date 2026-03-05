@@ -2539,7 +2539,7 @@ class WSLATests
         cleanup.release();
     }
 
-    TEST_METHOD(NamedVolumeOptionsValidation)
+    TEST_METHOD(NamedVolumeOptionsParseTest)
     {
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
