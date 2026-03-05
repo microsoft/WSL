@@ -22,11 +22,36 @@ class WSLCE2EImageListTests
 {
     WSL_TEST_CLASS(WSLCE2EImageListTests)
 
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        EnsureImageIsLoaded(DebianImage);
+        return true;
+    }
+
     TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
     {
         WSL2_TEST_ONLY();
         auto result = RunWslc(L"image list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
+
+    TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(L"image list");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto outputLines = result.GetStdoutLines();
+        for (const auto& line : outputLines)
+        {
+            if (line.find(DebianImage.NameAndTag()) != std::string::npos)
+            {
+                return;
+            }
+        }
+
+        VERIFY_FAIL(L"Failed to find the loaded image in the output");
     }
 
 private:
