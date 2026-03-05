@@ -1185,7 +1185,7 @@ try
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    THROW_HR_IF(WSLA_E_VOLUME_ALREADY_EXISTS, m_volumes.contains(name));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
     THROW_HR_IF_MSG(E_INVALIDARG, type != L"vhd", "Unsupported volume type: %ls", type.c_str());
 
     auto volume = WSLAVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), *m_virtualMachine);
@@ -1217,7 +1217,7 @@ try
     std::lock_guard containersLock{m_containersLock};
     for (const auto& container : m_containers)
     {
-        THROW_HR_IF(WSLA_E_VOLUME_IN_USE, container->NamedVolumes().contains(name));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), container->NamedVolumes().contains(name));
     }
 
     it->second->Delete();

@@ -2430,7 +2430,7 @@ class WSLATests
 
         // Create volume and validate duplicate volume name handling.
         VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
-        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), WSLA_E_VOLUME_ALREADY_EXISTS);
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Verify volume VHD exists and mount point is present in the VM.
         VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
@@ -2524,7 +2524,7 @@ class WSLATests
         auto holderContainer = std::move(holderContainerResult.value());
         holderContainer.SetDeleteOnClose(false);
 
-        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLA_E_VOLUME_IN_USE);
+        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION));
 
         // Verify that after deleting the container, the volume can be deleted.
         VERIFY_SUCCEEDED(holderContainer.Get().Delete());
