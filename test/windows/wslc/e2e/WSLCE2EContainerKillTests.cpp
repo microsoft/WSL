@@ -46,6 +46,27 @@ class WSLCE2EContainerKillTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
+    TEST_METHOD(WSLCE2E_Container_Kill_KillsRunningContainer)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Kill the container
+        result = RunWslc(std::format(L"container kill {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify the container is no longer running
+        VerifyContainerIsListed(containerId, L"exited");
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
