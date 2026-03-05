@@ -1001,9 +1001,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     std::vector<WSLAVolumeMount> volumes;
     volumes.reserve(containerOptions.VolumesCount);
 
-    std::vector<std::string> binds;
-    binds.reserve(containerOptions.VolumesCount);
-
     if (containerOptions.VolumesCount > 0)
     {
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
@@ -1021,14 +1018,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
-
-        auto options = volume.ReadOnly ? "ro" : "rw";
-        auto bind = std::format("{}:{}:{}", parentVMPath, volume.ContainerPath, options);
-
-        binds.push_back(std::move(bind));
     }
-
-    request.HostConfig.Binds = std::move(binds);
 
     // Process tmpfs mounts from container options.
     if (containerOptions.TmpfsCount > 0)
@@ -1150,6 +1140,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     // Only needed for containers that haven't stopped yet — stopped containers release their
     // VM port allocations, so those ports are available for reuse.
     std::set<uint16_t> allocatedVmPorts;
+    auto vmPortCleanup = wil::scope_exit_log(
+        WI_DIAGNOSTICS_INFO, [&allocatedVmPorts, &virtualMachine]() { ReleaseVmPorts(allocatedVmPorts, virtualMachine); });
+
     if (dockerContainer.State == ContainerState::Created)
     {
         for (const auto& port : metadata.Ports)
@@ -1191,6 +1184,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
+    vmPortCleanup.release();
     return container;
 }
 
