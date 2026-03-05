@@ -16,10 +16,89 @@ Abstract:
 #include "WSLAVhdVolume.h"
 #include "WSLAVirtualMachine.h"
 #include "WslCoreFilesystem.h"
+#include <charconv>
 
 namespace wsl::windows::service::wsla {
 
 static constexpr ULONGLONG c_defaultVolumeSizeBytes = 10ULL * 1024 * 1024 * 1024;
+
+namespace {
+
+std::unordered_map<std::string, std::string>& parsedOptions ParseVolumeOptions(const wchar_t* Options, std::unordered_map<std::string, std::string>& parsedOptions)
+try
+{
+    if (Options == nullptr || Options[0] == L'\0')
+    {
+        return {};
+    }
+
+    try
+    {
+        return wsl::shared::FromJson<std::unordered_map<std::string, std::string>>(Options);
+    }
+    CATCH_LOG();
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(Options));
+}
+
+ULONGLONG ParseSizeBytesString(const std::wstring& sizeBytesString)
+{
+    if (sizeBytesString.empty())
+    {
+        sizeBytes = c_defaultVolumeSizeBytes;
+        return S_OK;
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(Options), sizeBytesString[0] == '-');
+
+    try{
+        return std::stoull(sizeBytesString);
+    }
+    CATCH_LOG();        
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(Options));
+}
+
+ULONGLONG ParseSizeBytes(const WSLA_VOLUME_OPTIONS& options)
+{
+    if (Options == nullptr || Options[0] == L'\0')
+    {
+        return c_defaultVolumeSizeBytes;
+    }
+
+    std::unordered_map<std::string, std::string> parsedOptions;
+
+    try
+    {
+        parsedOptions = wsl::shared::FromJson<std::unordered_map<std::string, std::string>>(Options);
+    }
+    CATCH_LOG();
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(Options));
+
+    auto result = ParseVolumeOptions(options.Options, parsedOptions);
+    THROW_USER_ERROR_IF(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(options.Options), FAILED(result));
+
+    const auto it = parsedOptions.find("SizeBytes");
+    if (it == parsedOptions.end())
+    {
+        return c_defaultVolumeSizeBytes;
+    }
+
+    const auto& sizeBytesString = it->second;
+    if (sizeBytesString.empty())
+    {
+        return c_defaultVolumeSizeBytes;
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()),
+        sizeBytesString[0] == '-');
+
+    ULONGLONG sizeBytes =  
+
+    return sizeBytes;
+}
+
+} // namespace
 
 WSLAVhdVolumeImpl::WSLAVhdVolumeImpl(
     std::wstring&& Name, std::wstring&& Type, std::filesystem::path&& HostPath, ULONGLONG SizeBytes, ULONG Lun, std::string&& VirtualMachinePath, WSLAVirtualMachine* VirtualMachine) :
@@ -51,21 +130,7 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
 
     std::wstring name = Options.Name;
     std::wstring type = Options.Type;
-
-    std::map<std::wstring, std::wstring> options;
-
-    if (Options.Options != nullptr)
-    {
-        options = wsl::shared::FromJson<std::map<std::wstring, std::wstring>>(Options.Options);
-    }
-
-    ULONGLONG sizeBytes = c_defaultVolumeSizeBytes;
-    if (auto it = options.find(L"SizeBytes"); it != options.end())
-    {
-        sizeBytes = std::stoull(it->second);
-    }
-
-    THROW_HR_IF_MSG(E_INVALIDARG, sizeBytes == 0, "SizeBytes must be greater than 0");
+    ULONGLONG sizeBytes = ParseSizeBytes(Options);
 
     const auto hostPath = StoragePath / "volumes" / (name + L".vhdx");
 

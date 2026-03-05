@@ -312,7 +312,8 @@ std::pair<std::unordered_set<std::wstring>, std::vector<WSLANamedVolumeMount>> P
         namedVolumes.insert(volumeName);
 
         auto volume = sessionVolumes.find(volumeName);
-        THROW_HR_IF_MSG(WSLA_E_VOLUME_NOT_FOUND, volume == sessionVolumes.end(), "Named volume not found: '%hs'", nv.Name);
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLA_E_VOLUME_NOT_FOUND, wsl::shared::Localization::MessageWslaVolumeNotFound(nv.Name), volume == sessionVolumes.end());
 
         WSLANamedVolumeMount namedVolumeMount{};
         namedVolumeMount.VolumeName = std::move(volumeName);

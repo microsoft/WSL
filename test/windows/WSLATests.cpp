@@ -2539,6 +2539,55 @@ class WSLATests
         cleanup.release();
     }
 
+    TEST_METHOD(NamedVolumeOptionsValidation)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        const std::wstring volumeName = L"wsla-volume-name";
+
+        auto validateInvalidOptionsFailure =
+            [&](std::wstring options, HRESULT expectedResult, std::wstring expectedMessage) {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+                auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+                WSLA_VOLUME_OPTIONS volumeOptions{};
+                volumeOptions.Name = volumeName.c_str();
+                volumeOptions.Type = L"vhd";
+                volumeOptions.Options = options.c_str();
+
+                VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), expectedResult);
+                ValidateCOMErrorMessage(expectedMessage);
+            };
+
+        auto validateValidOptionsSuccess = [&](std::wstring options) {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+            WSLA_VOLUME_OPTIONS volumeOptions{};
+            volumeOptions.Name = volumeName.c_str();
+            volumeOptions.Type = L"vhd";
+            volumeOptions.Options = options.c_str();
+
+            VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        };
+
+        validateInvalidOptionsFailure(L"not-json", E_INVALIDARG, L"Invalid volume options: not-json");
+        validateInvalidOptionsFailure(L"{\"SizeBytes\":\"abc\"}", E_INVALIDARG, L"Invalid size: abc");
+        validateInvalidOptionsFailure(L"{\"SizeBytes\":\"-1\"}", E_INVALIDARG, L"Invalid size: -1");
+        validateInvalidOptionsFailure(L"{\"SizeBytes\":\"+-1\"}", E_INVALIDARG, L"Invalid size: +-1");
+        validateInvalidOptionsFailure(L"{\"SizeBytes\":\"123abc\"}", E_INVALIDARG, L"Invalid size: 123abc");
+        validateInvalidOptionsFailure(L"{\"SizeBytes\":\"18446744073709551616\"}", E_INVALIDARG, L"Invalid size: 18446744073709551616");
+    
+        validateValidOptionsSuccess(L"{\"SizeBytes\":\"1073741824\"}");
+        validateValidOptionsSuccess(L"{\"SizeBytes\":\"0\"}");
+        validateValidOptionsSuccess(L"{\"SizeBytes\":\"\"}");
+        validateValidOptionsSuccess(L"{}");
+        validateValidOptionsSuccess(L"");
+    }
+
     TEST_METHOD(CreateContainer)
     {
         WSL2_TEST_ONLY();
