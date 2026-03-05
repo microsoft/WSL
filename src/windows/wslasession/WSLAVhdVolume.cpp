@@ -22,13 +22,7 @@ namespace wsl::windows::service::wsla {
 static constexpr ULONGLONG c_defaultVolumeSizeBytes = 10ULL * 1024 * 1024 * 1024;
 
 WSLAVhdVolumeImpl::WSLAVhdVolumeImpl(
-    std::wstring&& Name,
-    std::wstring&& Type,
-    std::filesystem::path&& HostPath,
-    ULONGLONG SizeBytes,
-    ULONG Lun,
-    std::string&& VirtualMachinePath,
-    WSLAVirtualMachine* VirtualMachine) :
+    std::wstring&& Name, std::wstring&& Type, std::filesystem::path&& HostPath, ULONGLONG SizeBytes, ULONG Lun, std::string&& VirtualMachinePath, WSLAVirtualMachine* VirtualMachine) :
     m_name(std::move(Name)),
     m_type(std::move(Type)),
     m_hostPath(std::move(HostPath)),
@@ -50,9 +44,7 @@ WSLAVhdVolumeImpl::~WSLAVhdVolumeImpl()
 }
 
 std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
-    const WSLA_VOLUME_OPTIONS& Options,
-    const std::filesystem::path& StoragePath,
-    WSLAVirtualMachine& VirtualMachine)
+    const WSLA_VOLUME_OPTIONS& Options, const std::filesystem::path& StoragePath, WSLAVirtualMachine& VirtualMachine)
 {
     THROW_HR_IF_NULL(E_POINTER, Options.Name);
     THROW_HR_IF_NULL(E_POINTER, Options.Type);
@@ -77,9 +69,8 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
 
     const auto hostPath = StoragePath / "volumes" / (name + L".vhdx");
 
-    auto createVhdCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str()));
-    });
+    auto createVhdCleanup =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str())); });
 
     std::filesystem::create_directories(hostPath.parent_path());
 
@@ -97,13 +88,7 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
 
     auto volume = std::make_unique<WSLAVhdVolumeImpl>(
-        std::move(name),
-        std::move(type),
-        std::filesystem::path(hostPath),
-        sizeBytes,
-        lun,
-        std::move(virtualMachinePath),
-        &VirtualMachine);
+        std::move(name), std::move(type), std::filesystem::path(hostPath), sizeBytes, lun, std::move(virtualMachinePath), &VirtualMachine);
 
     mountCleanup.release();
     attachCleanup.release();

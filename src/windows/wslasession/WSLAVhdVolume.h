@@ -29,26 +29,23 @@ public:
     NON_COPYABLE(WSLAVhdVolumeImpl);
     NON_MOVABLE(WSLAVhdVolumeImpl);
 
-    WSLAVhdVolumeImpl(
-        std::wstring&& Name,
-        std::wstring&& Type,
-        std::filesystem::path&& HostPath,
-        ULONGLONG SizeBytes,
-        ULONG Lun,
-        std::string&& VirtualMachinePath,
-        WSLAVirtualMachine* VirtualMachine);
+    WSLAVhdVolumeImpl(std::wstring&& Name, std::wstring&& Type, std::filesystem::path&& HostPath, ULONGLONG SizeBytes, ULONG Lun, std::string&& VirtualMachinePath, WSLAVirtualMachine* VirtualMachine);
 
     ~WSLAVhdVolumeImpl();
 
     static std::unique_ptr<WSLAVhdVolumeImpl> Create(
-        _In_ const WSLA_VOLUME_OPTIONS& Options,
-        _In_ const std::filesystem::path& StoragePath,
-        _In_ WSLAVirtualMachine& VirtualMachine);
+        _In_ const WSLA_VOLUME_OPTIONS& Options, _In_ const std::filesystem::path& StoragePath, _In_ WSLAVirtualMachine& VirtualMachine);
 
     void Delete();
 
-    const std::wstring& Name() const noexcept { return m_name; }
-    const std::string& VirtualMachinePath() const noexcept { return m_virtualMachinePath; }
+    const std::wstring& Name() const noexcept
+    {
+        return m_name;
+    }
+    const std::string& VirtualMachinePath() const noexcept
+    {
+        return m_virtualMachinePath;
+    }
 
 private:
     void Detach();

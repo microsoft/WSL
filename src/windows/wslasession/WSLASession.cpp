@@ -1194,7 +1194,10 @@ try
     const auto inserted = m_volumes.find(name);
     WI_ASSERT(inserted != m_volumes.end());
 
-    WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"), TraceLoggingValue(inserted->second->VirtualMachinePath().c_str(), "VirtualMachinePath"));
+    WSL_LOG(
+        "VolumeCreated",
+        TraceLoggingValue(name.c_str(), "VolumeName"),
+        TraceLoggingValue(inserted->second->VirtualMachinePath().c_str(), "VirtualMachinePath"));
 
     return S_OK;
 }
@@ -1240,7 +1243,7 @@ try
     std::lock_guard containersLock(m_containersLock);
 
     m_containers.clear();
-    
+
     m_volumes.clear();
 
     // Stop the IO relay.

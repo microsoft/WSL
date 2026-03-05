@@ -2438,7 +2438,8 @@ class WSLATests
 
         // Verify the same named volume can be mounted more than once with different container paths.
         {
-            WSLAContainerLauncher duplicateNamedVolumes("debian:latest", "named-volume-dup", {"/bin/sh", "-c", "echo duplicated >/data-a/dup.txt ; cat /data-b/dup.txt"});
+            WSLAContainerLauncher duplicateNamedVolumes(
+                "debian:latest", "named-volume-dup", {"/bin/sh", "-c", "echo duplicated >/data-a/dup.txt ; cat /data-b/dup.txt"});
             duplicateNamedVolumes.AddNamedVolume(volumeNameUtf8, "/data-a", false);
             duplicateNamedVolumes.AddNamedVolume(volumeNameUtf8, "/data-b", true);
 
@@ -2488,7 +2489,8 @@ class WSLATests
                 std::filesystem::remove_all(testFolder, ec);
             });
 
-            WSLAContainerLauncher duplicateCrossTypeTargets("debian:latest", "named-volume-dup-cross-target", {"echo", "dup-cross-target"});
+            WSLAContainerLauncher duplicateCrossTypeTargets(
+                "debian:latest", "named-volume-dup-cross-target", {"echo", "dup-cross-target"});
             duplicateCrossTypeTargets.AddVolume(testFolder.wstring(), "/data", false);
             duplicateCrossTypeTargets.AddNamedVolume(volumeNameUtf8, "/data", false);
 
@@ -2498,7 +2500,8 @@ class WSLATests
 
         // Verify CreateContainer with named volume mounts the volume into the container.
         {
-            WSLAContainerLauncher writer("debian:latest", "named-volume-writer", {"/bin/sh", "-c", "echo wsla-named-volume >/data/marker.txt"});
+            WSLAContainerLauncher writer(
+                "debian:latest", "named-volume-writer", {"/bin/sh", "-c", "echo wsla-named-volume >/data/marker.txt"});
             writer.AddNamedVolume(volumeNameUtf8, "/data", false);
 
             auto writerContainer = writer.Launch(*m_defaultSession);

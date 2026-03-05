@@ -81,7 +81,10 @@ public:
     void OnProcessReleased(DockerExecProcessControl* process) noexcept;
 
     const std::string& ID() const noexcept;
-    const std::unordered_set<std::wstring>& NamedVolumes() const noexcept { return m_namedVolumes; }
+    const std::unordered_set<std::wstring>& NamedVolumes() const noexcept
+    {
+        return m_namedVolumes;
+    }
 
     // Called when the container stop event is observed so the
     // implementation can update its internal state and notify
