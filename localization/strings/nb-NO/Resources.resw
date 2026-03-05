@@ -722,7 +722,7 @@ Systemet må kanskje startes på nytt slik at endringene kan tre i kraft.</value
     <value>Brolagt nettverk krever at wsl2.vmSwitch angis.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Kan ikke hente listedistribusjonen fra {}. {}</value>
+    <value>Kunne ikke hente distribusjonslisten fra {}. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1055,7 +1055,7 @@ Faller tilbake til NAT-nettverk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Kan ikke lese egenskapen {} fra distribusjonen {} </value>
+    <value>Kan ikke lese egenskapen {} fra distribusjonen {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1874,32 +1874,32 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
     <value>Antall millisekunder en virtuell maskin er inaktiv, før den avsluttes.</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
-    <value>Build, run, debug, and profile your apps running on WSL from Visual Studio</value>
+    <value>Bygg, kjør, feilsøk og profiler apper som kjører på WSL fra Visual Studio</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
-    <value>Run and debug your apps on WSL from Visual Studio</value>
+    <value>Kjør og feilsøk apper på WSL fra Visual Studio</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
-    <value>Learn more about WSL in Visual Studio for .NET developers</value>
+    <value>Mer informasjon om WSL i Visual Studio for .NET-utviklere</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
-    <value>Learn more about Visual Studio and WSL for C++ developers</value>
+    <value>Mer informasjon om Visual Studio og WSL for C++-utviklere</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
-    <value>You can easily run and debug your .NET Core and cross platform C++ apps in Linux without leaving Visual Studio using Windows Subsystem for Linux (WSL). If you are a cross-platform developer, you can use this method as a simple way to test more of your target environments.</value>
+    <value>Du kan enkelt kjøre og feilsøke .NET Core- og tverrplattform C++-apper i Linux uten å forlate Visual Studio ved hjelp av Windows-undersystem for Linux (WSL). Som tverrplattformutvikler kan du bruke denne metoden som en enkel måte å teste flere av målmiljøene på.</value>
   </data>
   <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Visual Studio-integrasjon</value>
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Visual Studio-integrasjon</value>
   </data>
 </root>

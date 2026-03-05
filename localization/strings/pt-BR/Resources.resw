@@ -1881,30 +1881,30 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
     <value>O número de milissegundos em que uma VM está ociosa, antes de ser desligada.</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
-    <value>Build, run, debug, and profile your apps running on WSL from Visual Studio</value>
+    <value>Crie, execute, depure e crie o perfil de seus aplicativos em execução no WSL no Visual Studio</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
-    <value>Run and debug your apps on WSL from Visual Studio</value>
+    <value>Execute e depure seus aplicativos no WSL do Visual Studio</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
-    <value>Learn more about WSL in Visual Studio for .NET developers</value>
+    <value>Saiba mais sobre o WSL no Visual Studio para desenvolvedores do .NET</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
-    <value>Learn more about Visual Studio and WSL for C++ developers</value>
+    <value>Saiba mais sobre o Visual Studio e o WSL para desenvolvedores C++</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
     <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
-    <value>You can easily run and debug your .NET Core and cross platform C++ apps in Linux without leaving Visual Studio using Windows Subsystem for Linux (WSL). If you are a cross-platform developer, you can use this method as a simple way to test more of your target environments.</value>
+    <value>Você pode facilmente executar e depurar seus aplicativos .NET Core e C++ multiplataforma no Linux sem sair do Visual Studio usando o Subsistema do Windows para Linux (WSL). Se você for um desenvolvedor multiplataforma, poderá usar esse método como uma maneira simples de testar mais de seus ambientes de destino.</value>
   </data>
   <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
-    <value>Visual Studio Integration</value>
+    <value>Integração com Visual Studio</value>
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
     <value>Integração com Visual Studio</value>

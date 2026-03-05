@@ -728,7 +728,7 @@ Windows バージョン: {}</value>
     <value>ブリッジ ネットワークを使用するには、wsl2.vmSwitch を設定する必要があります。</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>'{}' からリスト ディストリビューションをフェッチできませんでした。{}</value>
+    <value>'{}' から配布リストをフェッチできませんでした。{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
