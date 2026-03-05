@@ -3163,7 +3163,11 @@ class WSLATests
             // Verify that a running container can be deleted with the force flag.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsForce));
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsForce), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+
+            // Validate that invalid flags are rejected.
+            VERIFY_ARE_EQUAL(container.Get().Delete(static_cast<WSLADeleteFlags>(0x2)), E_INVALIDARG);
         }
+
     }
 
     TEST_METHOD(ContainerNetwork)

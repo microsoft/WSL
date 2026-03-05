@@ -609,8 +609,6 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
 
 void WSLAContainerImpl::Delete(WSLADeleteFlags Flags)
 {
-    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLADeleteFlagsValid), "Invalid flags: %i", Flags);
-
     // Acquire an exclusive lock since this method modifies m_state.
     auto lock = m_lock.lock_exclusive();
 
@@ -1356,6 +1354,8 @@ HRESULT WSLAContainer::Delete(WSLADeleteFlags Flags)
 try
 {
     COMServiceExecutionContext context;
+
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLADeleteFlagsValid), "Invalid flags: %i", Flags);
 
     // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
     auto [lock, impl] = LockImpl();
