@@ -3167,7 +3167,6 @@ class WSLATests
             // Validate that invalid flags are rejected.
             VERIFY_ARE_EQUAL(container.Get().Delete(static_cast<WSLADeleteFlags>(0x2)), E_INVALIDARG);
         }
-
     }
 
     TEST_METHOD(ContainerNetwork)
