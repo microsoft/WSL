@@ -46,14 +46,24 @@ struct WSLAVolumeMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly);
 };
 
+struct WSLANamedVolumeMount
+{
+    std::wstring VolumeName;
+    std::string ContainerPath;
+    bool ReadOnly{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLANamedVolumeMount, VolumeName, ContainerPath, ReadOnly);
+};
+
 struct WSLAContainerMetadataV1
 {
     WSLAContainerFlags Flags{WSLAContainerFlagsNone};
     WSLAProcessFlags InitProcessFlags{WSLAProcessFlagsNone};
     std::vector<WSLAPortMapping> Ports;
     std::vector<WSLAVolumeMount> Volumes;
+    std::vector<WSLANamedVolumeMount> NamedVolumes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes, NamedVolumes);
 };
 
 struct WSLAContainerMetadata

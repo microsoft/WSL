@@ -150,6 +150,19 @@ void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& 
     m_volumes.push_back(vol);
 }
 
+void wsl::windows::common::WSLAContainerLauncher::AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly)
+{
+    const auto& name = m_volumeNames.emplace_back(Name);
+    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
+
+    WSLA_NAMED_VOLUME volume{};
+    volume.Name = name.c_str();
+    volume.ContainerPath = containerPath.c_str();
+    volume.ReadOnly = ReadOnly ? TRUE : FALSE;
+
+    m_namedVolumes.push_back(volume);
+}
+
 void wsl::windows::common::WSLAContainerLauncher::AddLabel(const std::string& Key, const std::string& Value)
 {
     // Store a copy of the key/value strings to the launcher to ensure the pointers in WSLA_LABEL remain valid.
@@ -269,6 +282,9 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 
     options.VolumesCount = static_cast<ULONG>(m_volumes.size());
     options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
+
+    options.NamedVolumesCount = static_cast<ULONG>(m_namedVolumes.size());
+    options.NamedVolumes = m_namedVolumes.size() > 0 ? m_namedVolumes.data() : nullptr;
 
     options.LabelsCount = static_cast<ULONG>(m_labels.size());
     options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;

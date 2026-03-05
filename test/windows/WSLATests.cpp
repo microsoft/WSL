@@ -2405,6 +2405,137 @@ class WSLATests
         VERIFY_ARE_EQUAL(m_defaultSession->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     }
 
+    TEST_METHOD(NamedVolumesTest)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        const std::wstring volumeName = L"wsla-test-named-volume";
+        const std::string volumeNameUtf8 = wsl::shared::string::WideToMultiByte(volumeName);
+        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + L".vhdx");
+
+        // Best-effort cleanup in case of leftovers from a previous failed run.
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        });
+
+        WSLA_VOLUME_OPTIONS volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Type = L"vhd";
+        volumeOptions.Options = nullptr;
+
+        // Create volume and validate duplicate volume name handling.
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), WSLA_E_VOLUME_ALREADY_EXISTS);
+
+        // Verify volume VHD exists and mount point is present in the VM.
+        VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+        ExpectMount(m_defaultSession.get(), std::format("/mnt/wsla-volumes/{}", volumeNameUtf8), std::optional<std::string>{"*ext4*"});
+
+        // Verify the same named volume can be mounted more than once with different container paths.
+        {
+            WSLAContainerLauncher duplicateNamedVolumes("debian:latest", "named-volume-dup", {"/bin/sh", "-c", "echo duplicated >/data-a/dup.txt ; cat /data-b/dup.txt"});
+            duplicateNamedVolumes.AddNamedVolume(volumeNameUtf8, "/data-a", false);
+            duplicateNamedVolumes.AddNamedVolume(volumeNameUtf8, "/data-b", true);
+
+            auto duplicateNamedVolumesContainer = duplicateNamedVolumes.Launch(*m_defaultSession);
+            auto duplicateNamedVolumesProcess = duplicateNamedVolumesContainer.GetInitProcess();
+            ValidateProcessOutput(duplicateNamedVolumesProcess, {{1, "duplicated\n"}});
+        }
+
+        // Verify duplicate named volume container mount targets are rejected.
+        {
+            WSLAContainerLauncher duplicateNamedVolumeTargets("debian:latest", "named-volume-dup-target", {"echo", "dup-target"});
+            duplicateNamedVolumeTargets.AddNamedVolume(volumeNameUtf8, "/data", false);
+            duplicateNamedVolumeTargets.AddNamedVolume(volumeNameUtf8, "/data", false);
+
+            auto [result, _] = duplicateNamedVolumeTargets.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
+        // Verify duplicate container mount targets are rejected.
+        {
+            auto testFolderA = std::filesystem::current_path() / "named-volume-dup-volume-a";
+            auto testFolderB = std::filesystem::current_path() / "named-volume-dup-volume-b";
+            std::filesystem::create_directories(testFolderA);
+            std::filesystem::create_directories(testFolderB);
+
+            auto volumeCleanup = wil::scope_exit([&]() {
+                std::error_code ec;
+                std::filesystem::remove_all(testFolderA, ec);
+                std::filesystem::remove_all(testFolderB, ec);
+            });
+
+            WSLAContainerLauncher duplicateVolumes("debian:latest", "named-volume-dup-target", {"echo", "dup-target"});
+            duplicateVolumes.AddVolume(testFolderA.wstring(), "/data", false);
+            duplicateVolumes.AddVolume(testFolderB.wstring(), "/data", false);
+
+            auto [result, _] = duplicateVolumes.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
+        // Verify duplicate container mount targets are rejected across bind and named volumes.
+        {
+            auto testFolder = std::filesystem::current_path() / "named-volume-dup-cross-target";
+            std::filesystem::create_directories(testFolder);
+
+            auto volumeCleanup = wil::scope_exit([&]() {
+                std::error_code ec;
+                std::filesystem::remove_all(testFolder, ec);
+            });
+
+            WSLAContainerLauncher duplicateCrossTypeTargets("debian:latest", "named-volume-dup-cross-target", {"echo", "dup-cross-target"});
+            duplicateCrossTypeTargets.AddVolume(testFolder.wstring(), "/data", false);
+            duplicateCrossTypeTargets.AddNamedVolume(volumeNameUtf8, "/data", false);
+
+            auto [result, _] = duplicateCrossTypeTargets.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
+        // Verify CreateContainer with named volume mounts the volume into the container.
+        {
+            WSLAContainerLauncher writer("debian:latest", "named-volume-writer", {"/bin/sh", "-c", "echo wsla-named-volume >/data/marker.txt"});
+            writer.AddNamedVolume(volumeNameUtf8, "/data", false);
+
+            auto writerContainer = writer.Launch(*m_defaultSession);
+            auto writerProcess = writerContainer.GetInitProcess();
+            ValidateProcessOutput(writerProcess, {});
+
+            WSLAContainerLauncher reader("debian:latest", "named-volume-reader", {"/bin/sh", "-c", "cat /data/marker.txt"});
+            reader.AddNamedVolume(volumeNameUtf8, "/data", true);
+
+            auto readerContainer = reader.Launch(*m_defaultSession);
+            auto readerProcess = readerContainer.GetInitProcess();
+            ValidateProcessOutput(readerProcess, {{1, "wsla-named-volume\n"}});
+        }
+
+        // Verify we cannot delete a named volume while a container references it.
+        WSLAContainerLauncher holder("debian:latest", "named-volume-holder", {"sleep", "99999"});
+        holder.AddNamedVolume(volumeNameUtf8, "/data", false);
+
+        auto [holderCreateResult, holderContainerResult] = holder.CreateNoThrow(*m_defaultSession);
+        VERIFY_SUCCEEDED(holderCreateResult);
+        VERIFY_IS_TRUE(holderContainerResult.has_value());
+
+        auto holderContainer = std::move(holderContainerResult.value());
+        holderContainer.SetDeleteOnClose(false);
+
+        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLA_E_VOLUME_IN_USE);
+
+        // Verify that after deleting the container, the volume can be deleted.
+        VERIFY_SUCCEEDED(holderContainer.Get().Delete());
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+        ExpectMount(m_defaultSession.get(), std::format("/mnt/wsla-volumes/{}", volumeNameUtf8), std::nullopt);
+        VERIFY_IS_FALSE(std::filesystem::exists(volumeVhdPath));
+
+        cleanup.release();
+    }
+
     TEST_METHOD(CreateContainer)
     {
         WSL2_TEST_ONLY();

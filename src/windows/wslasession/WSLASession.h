@@ -17,9 +17,11 @@ Abstract:
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
 #include "WSLAContainer.h"
+#include "WSLAVhdVolume.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
+#include <unordered_map>
 
 namespace wsl::windows::service::wsla {
 
@@ -75,6 +77,10 @@ public:
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
+    // Volume management.
+    IFACEMETHOD(CreateVolume)(_In_ const WSLA_VOLUME_OPTIONS* Options) override;
+    IFACEMETHOD(DeleteVolume)(_In_ LPCWSTR Name) override;
+
     IFACEMETHOD(Terminate()) override;
 
     // ISupportErrorInfo
@@ -92,7 +98,6 @@ private:
     ULONG m_id = 0;
 
     void ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid);
-    void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();
@@ -113,6 +118,7 @@ private:
     // This lock is used to protect m_containers. Doing this instead of acquiring m_lock exlusively allows for containers to be created/destroyed while operations that hold a shared m_lock are running.
     std::mutex m_containersLock;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
+    std::unordered_map<std::wstring, std::unique_ptr<WSLAVhdVolumeImpl>> m_volumes;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;

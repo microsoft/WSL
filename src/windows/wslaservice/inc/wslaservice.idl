@@ -236,6 +236,22 @@ typedef enum _WSLAContainerStartFlags
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerStartFlags);")
 
+// Options for creating a named volume.
+struct WSLA_VOLUME_OPTIONS
+{
+    LPCWSTR Name;
+    LPCWSTR Type;
+    [unique] LPCWSTR Options;
+};
+
+// Named volume mount — name refers to a volume by name.
+struct WSLA_NAMED_VOLUME
+{
+    LPCSTR Name;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+};
+
 struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
@@ -260,6 +276,10 @@ struct WSLA_CONTAINER_OPTIONS
 
     ULONGLONG ShmSize;
     struct WSLA_CONTAINER_NETWORK ContainerNetwork;
+
+    [unique, size_is(NamedVolumesCount)] struct WSLA_NAMED_VOLUME* NamedVolumes;
+    ULONG NamedVolumesCount;
+
     [unique, size_is(TmpfsCount)] const struct WSLA_TMPFS_MOUNT* Tmpfs;
     ULONG TmpfsCount;
 };
@@ -496,6 +516,10 @@ interface IWSLASession : IUnknown
     // Disk management.
     HRESULT FormatVirtualDisk([in, ref] LPCWSTR Path);
 
+    // Volume management.
+    HRESULT CreateVolume([in] const struct WSLA_VOLUME_OPTIONS* Options);
+    HRESULT DeleteVolume([in] LPCWSTR Name);
+
     // Terminate the VM and containers.
     HRESULT Terminate();
 
@@ -606,3 +630,6 @@ cpp_quote("#define WSLA_E_BASE (0x0600)")
 cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")
 cpp_quote("#define WSLA_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 2) /* 0x80040602 */")
 cpp_quote("#define WSLA_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 3) /* 0x80040603 */")
+cpp_quote("#define WSLA_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 4) /* 0x80040604 */")
+cpp_quote("#define WSLA_E_VOLUME_ALREADY_EXISTS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 5) /* 0x80040605 */")
+cpp_quote("#define WSLA_E_VOLUME_IN_USE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 6) /* 0x80040606 */")

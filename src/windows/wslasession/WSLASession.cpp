@@ -232,7 +232,7 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, P
         std::tie(diskLun, diskDevice) = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false);
 
         // Then format it.
-        Ext4Format(diskDevice);
+        m_virtualMachine->Ext4Format(diskDevice);
     }
 
     // Mount the device to /root.
@@ -1023,6 +1023,7 @@ try
             *containerOptions,
             *this,
             m_virtualMachine.value(),
+            m_volumes,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -1146,15 +1147,6 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::Ext4Format(const std::string& Device)
-{
-    constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
-    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
-    auto result = launcher.Launch(*m_virtualMachine).WaitAndCaptureOutput();
-
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
-}
-
 HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
 try
 {
@@ -1172,17 +1164,69 @@ try
     auto detachDisk = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, lun]() { m_virtualMachine->DetachDisk(lun); });
 
     // Format it to ext4.
-    Ext4Format(device);
+    m_virtualMachine->Ext4Format(device);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-WSLA_CONTAINER_STATE WSLAContainerImpl::State() const noexcept
+HRESULT WSLASession::CreateVolume(const WSLA_VOLUME_OPTIONS* Options)
+try
 {
-    auto lock = m_lock.lock_shared();
-    return m_state;
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Name);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Type);
+
+    std::wstring name = Options->Name;
+    std::wstring type = Options->Type;
+
+    auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    THROW_HR_IF(WSLA_E_VOLUME_ALREADY_EXISTS, m_volumes.contains(name));
+    THROW_HR_IF_MSG(E_INVALIDARG, type != L"vhd", "Unsupported volume type: %ls", type.c_str());
+
+    auto volume = WSLAVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), *m_virtualMachine);
+    WI_VERIFY(m_volumes.insert({name, std::move(volume)}).second);
+
+    const auto inserted = m_volumes.find(name);
+    WI_ASSERT(inserted != m_volumes.end());
+
+    WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"), TraceLoggingValue(inserted->second->VirtualMachinePath().c_str(), "VirtualMachinePath"));
+
+    return S_OK;
 }
+CATCH_RETURN();
+
+HRESULT WSLASession::DeleteVolume(LPCWSTR Name)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Name);
+    std::wstring name = Name;
+
+    auto lock = m_lock.lock_exclusive();
+
+    auto it = m_volumes.find(name);
+    THROW_HR_IF(WSLA_E_VOLUME_NOT_FOUND, it == m_volumes.end());
+
+    // Check if the volume is in use by any container.
+    std::lock_guard containersLock{m_containersLock};
+    for (const auto& container : m_containers)
+    {
+        THROW_HR_IF(WSLA_E_VOLUME_IN_USE, container->NamedVolumes().contains(name));
+    }
+
+    it->second->Delete();
+    m_volumes.erase(it);
+    WSL_LOG("VolumeDeleted", TraceLoggingValue(name.c_str(), "VolumeName"));
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLASession::Terminate()
 try
@@ -1195,8 +1239,9 @@ try
     auto lock = m_lock.lock_exclusive();
     std::lock_guard containersLock(m_containersLock);
 
-    // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
+    
+    m_volumes.clear();
 
     // Stop the IO relay.
     // This stops:
