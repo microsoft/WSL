@@ -772,7 +772,6 @@ class WslcSdkTests
             WslcContainerVolume containerVolumes[1] = {currentDirectory.c_str(), "/mnt/path"};
             VERIFY_SUCCEEDED(WslcContainerSettingsSetVolumes(&containerSettings, containerVolumes, ARRAYSIZE(containerVolumes)));
         }
-
     }
 
     TEST_METHOD(ContainerVolumeFunctional)
