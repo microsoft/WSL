@@ -23,64 +23,60 @@ static constexpr ULONGLONG c_defaultVolumeSizeBytes = 10ULL * 1024 * 1024 * 1024
 
 namespace {
 
-ULONGLONG ParseSizeBytes(const WSLA_VOLUME_OPTIONS& options)
-{
-    if (options.Options == nullptr || options.Options[0] == '\0')
+    ULONGLONG ParseSizeBytes(const WSLA_VOLUME_OPTIONS& options)
     {
-        return c_defaultVolumeSizeBytes;
+        if (options.Options == nullptr || options.Options[0] == '\0')
+        {
+            return c_defaultVolumeSizeBytes;
+        }
+
+        std::unordered_map<std::string, std::string> parsedOptions;
+        try
+        {
+            parsedOptions = wsl::shared::FromJson<std::unordered_map<std::string, std::string>>(options.Options);
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(options.Options));
+        }
+
+        const auto it = parsedOptions.find("SizeBytes");
+        if (it == parsedOptions.end())
+        {
+            return c_defaultVolumeSizeBytes;
+        }
+
+        const auto& sizeBytesString = it->second;
+        if (sizeBytesString.empty())
+        {
+            return c_defaultVolumeSizeBytes;
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()), sizeBytesString[0] == '-');
+
+        ULONGLONG sizeBytes = 0;
+        size_t parsedCount = 0;
+
+        try
+        {
+            sizeBytes = std::stoull(sizeBytesString, &parsedCount);
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()));
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()), parsedCount != sizeBytesString.size());
+
+        if (sizeBytes == 0)
+        {
+            return c_defaultVolumeSizeBytes;
+        }
+
+        return sizeBytes;
     }
-
-    std::unordered_map<std::string, std::string> parsedOptions;
-    try
-    {
-        parsedOptions = wsl::shared::FromJson<std::unordered_map<std::string, std::string>>(options.Options);
-    }
-    catch (...)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(options.Options));
-    }
-
-    const auto it = parsedOptions.find("SizeBytes");
-    if (it == parsedOptions.end())
-    {
-        return c_defaultVolumeSizeBytes;
-    }
-
-    const auto& sizeBytesString = it->second;
-    if (sizeBytesString.empty())
-    {
-        return c_defaultVolumeSizeBytes;
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG,
-        wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()),
-        sizeBytesString[0] == '-');
-
-    ULONGLONG sizeBytes = 0;
-    size_t parsedCount = 0;
-
-    try
-    {
-        sizeBytes = std::stoull(sizeBytesString, &parsedCount);
-    }
-    catch (...)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()));
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG,
-        wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()),
-        parsedCount != sizeBytesString.size());
-
-    if (sizeBytes == 0)
-    {
-        return c_defaultVolumeSizeBytes;
-    }
-
-    return sizeBytes;
-}
 
 } // namespace
 

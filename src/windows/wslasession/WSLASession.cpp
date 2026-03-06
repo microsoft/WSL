@@ -50,11 +50,11 @@ void ValidateName(LPCSTR Name)
     {
         if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslaInvalidName(Name));
         }
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
 }
 
 wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
