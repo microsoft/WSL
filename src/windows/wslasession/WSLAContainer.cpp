@@ -625,9 +625,11 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLo
         m_name.c_str(),
         m_state);
 
+    WI_ASSERT(m_state != WslaContainerStateInvalid);
+
     try
     {
-        m_dockerClient.DeleteContainer(m_id, Flags);
+        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLADeleteImageFlagsForce));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
