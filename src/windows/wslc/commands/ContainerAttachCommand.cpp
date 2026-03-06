@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ContainerStartCommand.cpp
+    ContainerAttachCommand.cpp
 
 Abstract:
 
@@ -43,6 +43,8 @@ std::wstring ContainerAttachCommand::LongDescription() const
 
 void ContainerAttachCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession << AttachContainer(context.Args.Get<ArgType::ContainerId>());
+    context              //
+        << CreateSession //
+        << AttachContainer(context.Args.Get<ArgType::ContainerId>());
 }
 } // namespace wsl::windows::wslc

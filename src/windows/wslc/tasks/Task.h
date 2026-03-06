@@ -32,6 +32,7 @@ struct Task
     }
 
     Task() = default;
+    virtual ~Task() = default;
 
     Task(const Task&) = default;
     Task& operator=(const Task&) = default;

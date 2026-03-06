@@ -110,11 +110,14 @@ int ContainerService::Attach(Session& session, const std::string& id)
 
     wsl::windows::common::ClientRunningWSLAProcess runningProcess(std::move(process), {});
 
-    wil::unique_handle stdinLogs;
-    wil::unique_handle stdoutLogs;
-    wil::unique_handle stderrLogs;
-    THROW_IF_FAILED(container->Attach(
-        nullptr, reinterpret_cast<ULONG*>(&stdinLogs), reinterpret_cast<ULONG*>(&stdoutLogs), reinterpret_cast<ULONG*>(&stderrLogs)));
+    ULONG stdinLogsHandle = 0;
+    ULONG stdoutLogsHandle = 0;
+    ULONG stderrLogsHandle = 0;
+    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogsHandle, &stdoutLogsHandle, &stderrLogsHandle));
+
+    wil::unique_handle stdinLogs(ULongToHandle(stdinLogsHandle));
+    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
+    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
 
     if (stdoutLogs)
     {
