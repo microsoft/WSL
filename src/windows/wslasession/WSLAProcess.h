@@ -33,7 +33,7 @@ public:
     IFACEMETHOD(GetExitEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(GetStdHandle)(_In_ ULONG Index, _Out_ ULONG* Handle) override;
     IFACEMETHOD(GetPid)(_Out_ int* Pid) override;
-    IFACEMETHOD(GetState)(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code) override;
+    IFACEMETHOD(GetState)(_Out_ WSLAProcessState* State, _Out_ int* Code) override;
     IFACEMETHOD(ResizeTty)(_In_ ULONG Rows, _In_ ULONG Columns) override;
 
     wil::unique_handle GetStdHandle(int Index);

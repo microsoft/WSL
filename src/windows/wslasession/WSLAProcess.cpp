@@ -85,7 +85,7 @@ int WSLAProcess::GetPid() const
     return m_control->GetPid();
 }
 
-HRESULT WSLAProcess::GetState(WSLA_PROCESS_STATE* State, int* Code)
+HRESULT WSLAProcess::GetState(WSLAProcessState* State, int* Code)
 try
 {
     std::tie(*State, *Code) = m_control->GetState();
