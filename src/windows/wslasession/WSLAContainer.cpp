@@ -133,9 +133,11 @@ auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, std::set<uint16_t>& al
 
     // Count ports that need VM port allocation (bridge mode ports have VmPort == 0).
     auto portsToAllocate = static_cast<uint16_t>(std::ranges::count_if(ports, [](const auto& p) { return p.VmPort == 0; }));
+
     if (portsToAllocate > 0)
     {
         allocatedPorts = vm.AllocatePorts(portsToAllocate);
+
         auto it = allocatedPorts.begin();
         for (auto& port : ports)
         {
@@ -149,7 +151,7 @@ auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, std::set<uint16_t>& al
     return errorCleanup;
 }
 
-auto AllocateVmPorts(std::set<uint16_t> vmPorts, WSLAVirtualMachine& vm)
+auto AllocateVmPorts(std::set<uint16_t>& vmPorts, WSLAVirtualMachine& vm)
 {
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&vmPorts, &vm]() { ReleaseVmPorts(vmPorts, vm); });
 
@@ -1156,12 +1158,12 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         "Cannot open WSLA container %hs: missing WSLA metadata label",
         dockerContainer.Id.c_str());
 
+    WI_ASSERT(dockerContainer.State != ContainerState::Running);
+
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     labels.erase(metadataIt);
 
     auto networkMode = DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode);
-
-
 
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
     // Only required for Bridge mode. In network mode the container's ports aren't allocated from the pool.
@@ -1170,13 +1172,12 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     {
         for (const auto& port : metadata.Ports)
         {
+            WI_ASSERT(port.VmPort != 0);
             vmPorts.insert(port.VmPort);
         }
     }
 
     auto errorCleanup = AllocateVmPorts(vmPorts, virtualMachine);
-
-    WI_ASSERT(dockerContainer.State != ContainerState::Running);
 
     auto container = std::make_unique<WSLAContainerImpl>(
         wslaSession,
