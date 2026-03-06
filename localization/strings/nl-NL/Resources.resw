@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -436,13 +436,6 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
             --from-file &lt;Path&gt;
                 Een distributie installeren vanaf een lokaal bestand.
 
-            --fs-type
-              Geef het bestandssysteemtype op dat moet worden gebruikt voor de hoofdmap van de distributie.
-              Standaard is ext4.
-
-            --fs-mount-options
-              Geef aanvullende koppelingsopties op voor het bestandssysteem.
-
             --legacy
                 Het verouderde distributiemanifest gebruiken.
 
@@ -482,9 +475,6 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
 
             --resize &lt;MemoryString&gt;
                 De grootte van de schijf van de distributie wijzigen in de opgegeven grootte.
-
-            --set-fs-mount-options &lt;Options&gt;
-              Stel de koppelingsopties van het bestandssysteem in voor de hoofdmap van de distributie.
 
     --mount &lt;Disk&gt;
         Hiermee wordt een fysieke of virtuele schijf in alle WSL 2-distributies toegevoegd en gekoppeld.
@@ -561,13 +551,6 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
                 Hiermee geef je op dat het opgegeven bestand een VHD- of VHDX-bestand is en geen TAR-bestand.
                 Met deze bewerking wordt een kopie gemaakt van het VHD-bestand op de opgegeven installatielocatie.
 
-            --fs-type
-              Geef het bestandssysteemtype op dat moet worden gebruikt voor de hoofdmap van de distributie.
-              Standaard is ext4.
-
-            --fs-mount-options
-              Geef aanvullende koppelingsopties op voor het bestandssysteem.
-
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Hiermee importeer je het opgegeven VHD-bestand als een nieuwe distributie.
         Deze virtuele harde schijf moet zijn geformatteerd met het ext4-type bestandssysteem.
@@ -608,12 +591,10 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--fs-type
-"}{Locked="--fs-mount-options
-"}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

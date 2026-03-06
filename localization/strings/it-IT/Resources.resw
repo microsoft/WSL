@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -442,13 +442,6 @@ Argomenti per la gestione del sottosistema Windows per Linux:
             --from-file &lt;Path&gt;
                 Installa una distribuzione da un file locale.
 
-            --fs-type
-              Specifica il tipo di file system da usare per la radice della distribuzione.
-              Il valore predefinito è ext4.
-
-            --fs-mount-options
-              Specifica opzioni di montaggio aggiuntive per il file system.
-
             --legacy
                 Usa il manifesto della distribuzione legacy.
 
@@ -488,9 +481,6 @@ Argomenti per la gestione del sottosistema Windows per Linux:
 
             --resize &lt;MemoryString&gt;
                 Ridimensiona il disco della distribuzione alle dimensioni specificate.
-
-            --set-fs-mount-options &lt;Options&gt;
-              Imposta le opzioni di montaggio del file system per la radice della distribuzione.
 
     --mount &lt;Disk&gt;
         Collega e monta un disco fisico o virtuale in tutte le distribuzioni WSL2.
@@ -567,13 +557,6 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
                 Specifica che il file fornito è un file con estensione vhd o vhdx, non un file TAR.
                 Questa operazione crea una copia del file VHD nel percorso di installazione specificato.
 
-            --fs-type
-              Specifica il tipo di file system da usare per la radice della distribuzione.
-              Il valore predefinito è ext4.
-
-            --fs-mount-options
-              Specifica opzioni di montaggio aggiuntive per il file system.
-
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Importa il file VHD specificato come nuova distribuzione.
         Questo disco rigido virtuale deve essere formattato con il tipo di file system ext4.
@@ -614,12 +597,10 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--fs-type
-"}{Locked="--fs-mount-options
-"}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

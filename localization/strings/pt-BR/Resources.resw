@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -443,13 +443,6 @@ Argumentos para gerenciar o Subsistema do Windows para Linux:
             --from-file &lt;Path&gt;
                 Instala uma distribuição de um arquivo local.
 
-            --fs-type
-              Especifica o tipo de sistema de arquivos a ser usado para a raiz da distribuição.
-              O padrão é ext4.
-
-            --fs-mount-options
-              Especifica opções de montagem adicionais para o sistema de arquivos.
-
             --legacy
                 Usa o manifesto de distribuição herdado.
 
@@ -489,9 +482,6 @@ Argumentos para gerenciar o Subsistema do Windows para Linux:
 
             --resize &lt;MemoryString&gt;
                 Redimensiona o disco da distribuição para o tamanho especificado.
-
-            --set-fs-mount-options &lt;Options&gt;
-              Define as opções de montagem do sistema de arquivos para a raiz da distribuição.
 
     --mount &lt;Disk&gt;
         Anexa e monta um disco físico ou virtual em todas as distribuições do WSL 2.
@@ -568,13 +558,6 @@ Argumentos para gerenciar as distribuições no Subsistema do Windows para Linux
                 Especifica que o arquivo fornecido é um arquivo .vhd ou .vhdx, não um arquivo tar.
                 Esta operação faz uma cópia do arquivo VHD no local de instalação especificado.
 
-            --fs-type
-              Especifica o tipo de sistema de arquivos a ser usado para a raiz da distribuição.
-              O padrão é ext4.
-
-            --fs-mount-options
-              Especifica opções de montagem adicionais para o sistema de arquivos.
-
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Importa o arquivo VHD especificado como uma nova distribuição.
         Este disco rígido virtual deve ser formatado com o tipo de sistema de arquivos ext4.
@@ -615,12 +598,10 @@ Argumentos para gerenciar as distribuições no Subsistema do Windows para Linux
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--fs-type
-"}{Locked="--fs-mount-options
-"}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
