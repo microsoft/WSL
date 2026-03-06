@@ -1,4 +1,4 @@
-# wslc User Settings — Design Document
+# Wslc User Settings
 
 ## Overview
 
@@ -12,7 +12,7 @@ Four formats are in common use across the Linux container ecosystem:
 
 ### 1.1 JSON
 
-**Used by:** Docker daemon (`/etc/docker/daemon.json`), Docker user config (`~/.docker/config.json`), winget (`settings.json`)
+**Used by:** Docker daemon (`/etc/docker/daemon.json`), Docker user config (`~/.docker/config.json`)
 
 **Pros:**
 - Zero new library cost — `nlohmann/json` is already a dependency of `wslc`
@@ -199,23 +199,18 @@ A backup copy is maintained alongside the primary file:
 
 ```
 wslc settings              Open settings file in default editor (or Notepad)
-wslc settings --edit       Same as above (explicit flag)
-wslc settings --get <key>  Print the current value of a specific key
-wslc settings --list       Print all current settings and their effective values
 wslc settings --reset      Restore settings to built-in defaults (prompts for confirmation)
 ```
 
-The primary usage (`wslc settings` with no flags) opens the file for editing, modeled after `winget settings`. This is the most common workflow: a user wants to change something, they open it, edit, save, and the next invocation picks up the change.
-
-`--get` and `--list` are useful for scripting and for verifying the effective configuration without opening an editor.
+The primary usage (`wslc settings` with no flags) opens the file for editing. This is the most common workflow: a user wants to change something, they open it, edit, save, and the next invocation picks up the change.
 
 `--reset` is a safe escape hatch when a user has broken their settings and wants to start fresh.
 
 ### 4.2 Editor Behavior
 
-The file is opened via `ShellExecuteW` with the file path, which respects the user's `.yaml` file association. If no application is associated, Notepad is used as the fallback. This matches winget's behavior and requires no custom editor logic.
+The file is opened via `ShellExecuteW` with the file path, which respects the user's `.yaml` file association. If no application is associated, Notepad is used as the fallback.
 
-The command does not wait for the editor to close — it opens the file and exits immediately, just like `winget settings`.
+The command does not wait for the editor to close — it opens the file and exits immediately.
 
 ### 4.3 First Run / File Creation
 
@@ -276,14 +271,14 @@ This means commands must check whether an argument was explicitly provided by th
 
 ### Syntax Validation
 
-TOML syntax errors (malformed keys, unclosed strings, invalid escape sequences) are caught on parse and trigger the backup/fallback recovery flow described in §4.4.
+YAML syntax errors (malformed structure, invalid indentation, unclosed strings, invalid escape sequences) are caught on parse and trigger the backup/fallback recovery flow described in §4.4.
 
 ### Schema Validation
 
 After parsing, each known key is validated against its expected type and allowed values:
 
-- **Type errors** (e.g., `format = 42` when a string is expected) → treat as a schema error, use backup/defaults, and print a warning identifying the offending key
-- **Invalid enum values** (e.g., `pull = "sometimes"`) → same: warn and fall back
+- **Type errors** (e.g., `cpuCount: "four"` when an integer is expected) → treat as a schema error, use backup/defaults, and print a warning identifying the offending key
+- **Invalid enum values** (e.g., `memorySizeMb: -1` when a positive integer is expected) → same: warn and fall back
 - **Unknown keys** → warn but do not fail; allows forward compatibility when a newer settings file is used with an older `wslc` binary:
   ```
   Warning: Unknown settings key 'defaults.experimental'. Ignoring.
