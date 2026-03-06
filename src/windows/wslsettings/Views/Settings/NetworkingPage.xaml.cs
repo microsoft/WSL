@@ -39,6 +39,7 @@ public sealed partial class NetworkingPage : Page
     override protected void OnNavigatedFrom(NavigationEventArgs e)
     {
         App.GetService<IWslConfigService>().WslConfigChanged -= ViewModel.OnConfigChanged;
+        App.GetService<IWslConfigService>().PendingChangesChanged -= ViewModel.OnPendingChangesChanged;
     }
 
     private void Settings_ResetButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -60,5 +61,10 @@ public sealed partial class NetworkingPage : Page
 
         TextBox? textBox = sender as TextBox;
         ViewModel.SetInitialAutoProxyTimeout_ResetEnabled(textBox!.Text);
+    }
+
+    private async void ApplyChanges_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        await SettingsApplyHelper.ShowApplyChangesDialogAsync(XamlRoot);
     }
 }

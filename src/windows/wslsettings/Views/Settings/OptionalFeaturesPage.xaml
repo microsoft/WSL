@@ -12,6 +12,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock x:Uid="Settings_OptionalFeaturesPageTitle" Style="{ThemeResource PageHeaderTextBlockStyle}" Margin="{StaticResource MediumSmallBottomMargin}" HorizontalAlignment="Left"/>
         <TextBlock x:Uid="Settings_ErrorTryAgainLater" x:Name="Settings_ErrorTryAgainLater" Grid.Row="1" HorizontalAlignment="Left" AutomationProperties.LiveSetting="Assertive"
@@ -54,5 +55,8 @@
                 </ctControls:SettingsExpander>
             </StackPanel>
         </ScrollViewer>
+        <Button x:Uid="Settings_ApplyChangesButton" Grid.Row="3" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right" Margin="0,12,0,0"
+            Visibility="{x:Bind ViewModel.HasPendingChanges, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+            Click="ApplyChanges_Click"/>
     </Grid>
 </Page>

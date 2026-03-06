@@ -35,6 +35,7 @@ public sealed partial class FileSystemPage : Page
     override protected void OnNavigatedFrom(NavigationEventArgs e)
     {
         App.GetService<IWslConfigService>().WslConfigChanged -= ViewModel.OnConfigChanged;
+        App.GetService<IWslConfigService>().PendingChangesChanged -= ViewModel.OnPendingChangesChanged;
     }
 
     private void Settings_ResetButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -70,5 +71,10 @@ public sealed partial class FileSystemPage : Page
         {
             RuntimeHelper.SetupSettingsExpanderFocusManagement(expander, textBox);
         }
+    }
+
+    private async void ApplyChanges_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        await SettingsApplyHelper.ShowApplyChangesDialogAsync(XamlRoot);
     }
 }

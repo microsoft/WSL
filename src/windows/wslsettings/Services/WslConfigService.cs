@@ -11,6 +11,7 @@ public class WslConfigService : IWslConfigService
     private WslConfig? _wslConfigDefaults { get; init; }
     private readonly object? _wslCoreConfigInterfaceLockObj = null;
     private FileSystemWatcher? _wslConfigFileSystemWatcher = null;
+    private readonly Dictionary<WslConfigEntry, PendingSettingState> _pendingSettings = new();
 
     public WslConfigService()
     {
@@ -37,10 +38,17 @@ public class WslConfigService : IWslConfigService
 
     public IWslConfigSetting GetWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting)
     {
-        WslConfigSettingManaged? wslConfigSetting = null;
+        WslConfigSettingManaged? wslConfigSetting;
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            wslConfigSetting = new WslConfigSettingManaged(WslCoreConfigInterface.GetWslConfigSetting(defaultSetting ? _wslConfigDefaults : _wslConfig, wslConfigEntry));
+            if (!defaultSetting && _pendingSettings.TryGetValue(wslConfigEntry, out var pendingSettingState))
+            {
+                wslConfigSetting = pendingSettingState.Pending.Clone();
+            }
+            else
+            {
+                wslConfigSetting = GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting);
+            }
         }
 
         return wslConfigSetting;
@@ -48,21 +56,107 @@ public class WslConfigService : IWslConfigService
 
     public uint SetWslConfigSetting(IWslConfigSetting wslConfigSetting)
     {
-        var wslConfigSettingsManaged = wslConfigSetting as WslConfigSettingManaged;
-        if (wslConfigSettingsManaged == null)
+        var settingManaged = wslConfigSetting as WslConfigSettingManaged;
+        if (settingManaged == null)
         {
             throw new ArgumentNullException("wslConfigSetting");
         }
 
-        uint result = 0;
+        bool hasPendingChangesChanged = false;
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
-            result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, wslConfigSettingsManaged.ConfigSetting);
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            var currentPersisted = GetPersistedWslConfigSetting(settingManaged.ConfigEntry, false);
+            var pendingValue = settingManaged.GetValueObject();
+
+            var hadPendingBefore = _pendingSettings.Count > 0;
+            if (currentPersisted.Equals(pendingValue))
+            {
+                _pendingSettings.Remove(settingManaged.ConfigEntry);
+            }
+            else
+            {
+                if (_pendingSettings.TryGetValue(settingManaged.ConfigEntry, out var pendingSettingState))
+                {
+                    pendingSettingState.Pending = settingManaged.Clone();
+                }
+                else
+                {
+                    _pendingSettings[settingManaged.ConfigEntry] = new PendingSettingState
+                    {
+                        Current = currentPersisted,
+                        Pending = settingManaged.Clone(),
+                    };
+                }
+            }
+
+            hasPendingChangesChanged = hadPendingBefore != (_pendingSettings.Count > 0);
         }
 
-        return result;
+        OnPendingChangesChanged(hasPendingChangesChanged);
+        return 0;
+    }
+
+    public bool HasPendingChanges
+    {
+        get
+        {
+            lock (_wslCoreConfigInterfaceLockObj!)
+            {
+                return _pendingSettings.Count > 0;
+            }
+        }
+    }
+
+    public IReadOnlyList<WslConfigPendingChange> GetPendingChanges()
+    {
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            return _pendingSettings.Values.Select(pendingSettingState => new WslConfigPendingChange
+            {
+                ConfigEntry = pendingSettingState.Pending.ConfigEntry,
+                CurrentValue = pendingSettingState.Current.GetValueObject(),
+                PendingValue = pendingSettingState.Pending.GetValueObject()
+            }).ToList();
+        }
+    }
+
+    public uint CommitPendingChanges()
+    {
+        List<PendingSettingState> pendingSettings;
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            pendingSettings = _pendingSettings.Values.ToList();
+        }
+
+        foreach (var pendingSetting in pendingSettings)
+        {
+            var result = PersistWslConfigSetting(pendingSetting.Pending);
+            if (result != 0)
+            {
+                return result;
+            }
+        }
+
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            _pendingSettings.Clear();
+        }
+
+        _onPendingChangesChangedHandler?.Invoke();
+        _onWslConfigChangedHandler?.Invoke();
+        return 0;
+    }
+
+    public void ClearPendingChanges()
+    {
+        bool hadPendingChanges;
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            hadPendingChanges = _pendingSettings.Count > 0;
+            _pendingSettings.Clear();
+        }
+
+        OnPendingChangesChanged(hadPendingChanges);
     }
 
     private WslConfigChangedEventHandler? _onWslConfigChangedHandler = null;
@@ -78,6 +172,19 @@ public class WslConfigService : IWslConfigService
         }
     }
 
+    private PendingChangesChangedEventHandler? _onPendingChangesChangedHandler = null;
+    public event PendingChangesChangedEventHandler PendingChangesChanged
+    {
+        add
+        {
+            _onPendingChangesChangedHandler += value;
+        }
+        remove
+        {
+            _onPendingChangesChangedHandler -= value;
+        }
+    }
+
     private void OnWslConfigFileChanged(object sender, FileSystemEventArgs e)
     {
         lock (_wslCoreConfigInterfaceLockObj!)
@@ -89,6 +196,38 @@ public class WslConfigService : IWslConfigService
         }
 
         _onWslConfigChangedHandler?.Invoke();
+    }
+
+    private uint PersistWslConfigSetting(WslConfigSettingManaged wslConfigSettingsManaged)
+    {
+        uint result;
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
+            result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, wslConfigSettingsManaged.ConfigSetting);
+            _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+        }
+
+        return result;
+    }
+
+    private WslConfigSettingManaged GetPersistedWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting)
+    {
+        return new WslConfigSettingManaged(WslCoreConfigInterface.GetWslConfigSetting(defaultSetting ? _wslConfigDefaults : _wslConfig, wslConfigEntry));
+    }
+
+    private void OnPendingChangesChanged(bool raiseEvent)
+    {
+        if (raiseEvent)
+        {
+            _onPendingChangesChangedHandler?.Invoke();
+        }
+    }
+
+    private sealed class PendingSettingState
+    {
+        public required WslConfigSettingManaged Current { get; init; }
+        public required WslConfigSettingManaged Pending { get; set; }
     }
 }
 
@@ -112,6 +251,72 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
     public bool BoolValue { get { return ConfigSetting.BoolValue; } }
     public NetworkingConfiguration NetworkingConfigurationValue { get { return ConfigSetting.NetworkingConfigurationValue; } }
     public MemoryReclaimMode MemoryReclaimModeValue { get { return ConfigSetting.MemoryReclaimModeValue; } }
+
+    public WslConfigSettingManaged Clone()
+    {
+        var nativeInternal = new WslConfigSetting.__Internal();
+        nativeInternal.ConfigEntry = ConfigSetting.ConfigEntry;
+        switch (ConfigSetting.ConfigEntry)
+        {
+        case WslConfigEntry.SwapFilePath:
+        case WslConfigEntry.IgnoredPorts:
+        case WslConfigEntry.KernelPath:
+        case WslConfigEntry.SystemDistroPath:
+        case WslConfigEntry.KernelModulesPath:
+            // Create via the managed clone constructor so string memory is owned
+            var clone = WslConfigSetting.__CreateInstance(nativeInternal);
+            clone.StringValue = ConfigSetting.StringValue;
+            return new WslConfigSettingManaged(clone);
+        case WslConfigEntry.ProcessorCount:
+        case WslConfigEntry.InitialAutoProxyTimeout:
+        case WslConfigEntry.VMIdleTimeout:
+            nativeInternal.Int32Value = ConfigSetting.Int32Value;
+            break;
+        case WslConfigEntry.MemorySizeBytes:
+        case WslConfigEntry.SwapSizeBytes:
+        case WslConfigEntry.VhdSizeBytes:
+            nativeInternal.UInt64Value = ConfigSetting.UInt64Value;
+            break;
+        case WslConfigEntry.NetworkingMode:
+            nativeInternal.NetworkingConfigurationValue = ConfigSetting.NetworkingConfigurationValue;
+            break;
+        case WslConfigEntry.AutoMemoryReclaim:
+            nativeInternal.MemoryReclaimModeValue = ConfigSetting.MemoryReclaimModeValue;
+            break;
+        default:
+            nativeInternal.BoolValue = (byte)(ConfigSetting.BoolValue ? 1 : 0);
+            break;
+        }
+
+        return new WslConfigSettingManaged(WslConfigSetting.__CreateInstance(nativeInternal));
+    }
+
+    public object GetValueObject()
+    {
+        switch (ConfigSetting.ConfigEntry)
+        {
+        case WslConfigEntry.SwapFilePath:
+        case WslConfigEntry.IgnoredPorts:
+        case WslConfigEntry.KernelPath:
+        case WslConfigEntry.SystemDistroPath:
+        case WslConfigEntry.KernelModulesPath:
+            return ConfigSetting.StringValue;
+        case WslConfigEntry.ProcessorCount:
+        case WslConfigEntry.InitialAutoProxyTimeout:
+        case WslConfigEntry.VMIdleTimeout:
+            return ConfigSetting.Int32Value;
+        case WslConfigEntry.MemorySizeBytes:
+        case WslConfigEntry.SwapSizeBytes:
+        case WslConfigEntry.VhdSizeBytes:
+            return ConfigSetting.UInt64Value;
+        case WslConfigEntry.NetworkingMode:
+            return ConfigSetting.NetworkingConfigurationValue;
+        case WslConfigEntry.AutoMemoryReclaim:
+            return ConfigSetting.MemoryReclaimModeValue;
+        default:
+            return ConfigSetting.BoolValue;
+        }
+    }
 
 #nullable enable
     public uint SetValue(object? value)
