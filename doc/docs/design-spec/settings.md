@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document proposes a user settings feature for `wslc`, allowing users to persist default values for frequently-used options (format, pull policy, default session, registry scheme, etc.) in a configuration file, eliminating the need to re-specify them on every invocation.
+This document proposes a user settings feature for `wslc`, allowing users to persist default values for frequently-used options (session settings, registry, storage options, etc.) in a configuration file, eliminating the need to re-specify them on every invocation.
 
 ---
 
@@ -153,7 +153,7 @@ default_storage_path = C:\Users\user\wslc\storage
 
 ## 2. Recommended Format: YAML (JSON as fallback)
 
-**YAML is the preferred format, with JSON as the backup option.** The rationale:
+After some quick discussions with several team members, **YAML is the preferred format, with JSON as the backup option.** The rationale:
 
 1. **YAML dominates the container ecosystem that `wslc` users already live in.** Kubernetes manifests, Docker Compose files, Helm charts, and most CI/CD pipelines (GitHub Actions, GitLab CI) are all YAML. Users of WSL containers are overwhelmingly familiar with YAML and will feel at home editing a YAML settings file without consulting documentation.
 
@@ -170,14 +170,14 @@ default_storage_path = C:\Users\user\wslc\storage
 ### File Extension
 
 - **Primary (YAML):** `UserSettings.yaml`
-- **Fallback (JSON):** `settings.json`
+- **Fallback (JSON):** `UserSettings.json`
 
 ---
 
 ## 3. File Location
 
 ```
-%LOCALAPPDATA%\Microsoft\WSL\wslc\UserSettings.yaml
+%LOCALAPPDATA%\Microsoft\wslc\UserSettings.yaml
 ```
 
 **Rationale:**
@@ -188,7 +188,7 @@ default_storage_path = C:\Users\user\wslc\storage
 
 A backup copy is maintained alongside the primary file:
 ```
-%LOCALAPPDATA%\Microsoft\WSL\wslc\UserSettings.yaml.bak
+%LOCALAPPDATA%\Microsoft\wslc\UserSettings.yaml.bak
 ```
 
 ---
@@ -238,7 +238,8 @@ Commenting out all entries rather than writing the defaults explicitly prevents 
 
 ### 4.4 Backup and Recovery
 
-Before opening the editor (or on any settings write operation), `wslc` copies the current valid settings to `UserSettings.yaml.bak`. On startup, settings are loaded with the following precedence:
+A user might make a mistake that could make the settings file unparsable. To protect against this there will be a backup settings file with the latest known good settings file.
+Before opening the editor (i.e. `wslc settings`, or any future settings write event), `wslc` copies the current valid settings to `UserSettings.yaml.bak`. On startup, settings are loaded with the following precedence:
 
 1. `UserSettings.yaml` (if it parses without syntax errors and passes schema validation)
 2. `UserSettings.yaml.bak` (if the primary fails; a warning is printed to stderr)
@@ -261,7 +262,7 @@ Settings from the file represent the user's persistent defaults. They are overri
 Built-in defaults  <  UserSettings.yaml  <  command-line flags
 ```
 
-Example: if `UserSettings.yaml` contains `pull: "missing"` and the user runs `wslc run --pull always myimage`, the effective pull policy is `always`. If `--pull` is not given, it is `missing`. If the key is not in settings, it falls back to the built-in default (`never`).
+Example: if `UserSettings.yaml` contains `memorySizeMb: 8192` and the user runs `wslc session --memory 4096`, the effective memory size is `4096`. If `--memory` is not given, it is `8192`. If the key is not in settings, it falls back to the built-in default.
 
 This means commands must check whether an argument was explicitly provided by the user versus not present at all (not yet set in `ArgMap`), rather than checking for a default value. The existing `ArgMap::Contains()` method already provides this distinction cleanly.
 
@@ -273,7 +274,7 @@ This means commands must check whether an argument was explicitly provided by th
 
 YAML syntax errors (malformed structure, invalid indentation, unclosed strings, invalid escape sequences) are caught on parse and trigger the backup/fallback recovery flow described in §4.4.
 
-### Schema Validation
+### Setting Value Validation
 
 After parsing, each known key is validated against its expected type and allowed values:
 
@@ -285,24 +286,20 @@ After parsing, each known key is validated against its expected type and allowed
   ```
 - **Out-of-range numeric values** → warn and fall back to the default for that key only (not the entire file)
 
-### Validation Command
-
-`wslc settings --list` shows each key, its source (file | backup | default), and its effective value, making it easy to diagnose misconfiguration without running a container operation.
-
 ---
 
 ## 7. Implementation Notes
 
 ### Settings Loading
 
-Settings are loaded once at startup in `CoreMain`, before command dispatch, and stored in `CLIExecutionContext`. Commands read from `context.Settings` (a new typed struct) when an argument is not present in `context.Args`.
+Settings are loaded once at startup in `CoreMain`, before command dispatch, and stored in `CLIExecutionContext`. Settings will be implemented as a singleton and globally accessible.
 
 ### Settings File Write (for `--reset`)
 
 `--reset` overwrites `UserSettings.yaml` with the commented-out defaults template (the same content generated on first run) after prompting:
 
 ```
-This will reset all settings to defaults. Your current UserSettings.yaml will be saved as UserSettings.yaml.bak. Continue? [y/N]
+This will reset all settings to defaults. Continue? [y/N]
 ```
 
 ### No Live Reload
