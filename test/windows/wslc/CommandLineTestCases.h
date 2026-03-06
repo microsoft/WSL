@@ -78,6 +78,15 @@ COMMAND_LINE_TEST_CASE(L"container logs cont1 -f", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs", L"logs", false)
 
 // Image command
+COMMAND_LINE_TEST_CASE(L"image build C:\\context", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context --tag test:latest", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context --file Dockerfile.custom", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context -f -", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test:latest -f Dockerfile.other", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build", L"build", false)
+COMMAND_LINE_TEST_CASE(L"build C:\\context", L"build", true)
+COMMAND_LINE_TEST_CASE(L"build C:\\context -t test", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image list", L"list", true)
 COMMAND_LINE_TEST_CASE(L"images", L"images", true) // Aliased off the root changes the name
 COMMAND_LINE_TEST_CASE(L"image ls", L"list", true)
