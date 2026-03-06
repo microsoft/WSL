@@ -383,6 +383,7 @@ set(LINUX_LDFLAGS -target ${LLVM_TARGET}
                   -static)
 
 set(COMMON_LINUX_LINK_LIBRARIES configfile)
+file(GLOB COMMON_LINUX_HEADERS "${CMAKE_CURRENT_LIST_DIR}/src/shared/inc/*.h")
 
 if(DEFINED ENV{WSL_DEV_BINARY_PATH})
     set(WSL_DEV_BINARY_PATH $ENV{WSL_DEV_BINARY_PATH})

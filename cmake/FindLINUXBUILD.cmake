@@ -1,4 +1,5 @@
 function(build_linux_objects sources headers)
+    list(APPEND headers ${COMMON_LINUX_HEADERS})
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 
     foreach(e ${sources})
