@@ -34,7 +34,7 @@ public:
     ~WSLAVhdVolumeImpl();
 
     static std::unique_ptr<WSLAVhdVolumeImpl> Create(
-        _In_ const WSLA_VOLUME_OPTIONS& Options, _In_ const std::filesystem::path& StoragePath, _In_ WSLAVirtualMachine& VirtualMachine);
+        _In_ const WSLAVolumeOptions& Options, _In_ const std::filesystem::path& StoragePath, _In_ WSLAVirtualMachine& VirtualMachine);
 
     void Delete();
 

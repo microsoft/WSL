@@ -37,9 +37,9 @@ private:
 struct SessionOptions
 {
     static SessionOptions Default();
-    const WSLA_SESSION_SETTINGS* Get() const;
+    const WSLASessionSettings* Get() const;
 
 private:
-    WSLA_SESSION_SETTINGS m_sessionSettings{};
+    WSLASessionSettings m_sessionSettings{};
 };
 } // namespace wsl::windows::wslc::models

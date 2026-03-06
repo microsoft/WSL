@@ -28,7 +28,7 @@ public:
     ~RunningWSLAContainer();
     IWSLAContainer& Get();
 
-    WSLA_CONTAINER_STATE State();
+    WSLAContainerState State();
     ClientRunningWSLAProcess GetInitProcess();
     void SetDeleteOnClose(bool deleteOnClose);
     void Reset();
@@ -54,7 +54,7 @@ public:
         const std::string& Name = "",
         const std::vector<std::string>& Arguments = {},
         const std::vector<std::string>& Environment = {},
-        WSLA_CONTAINER_NETWORK_TYPE containerNetworkType = WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
+        WSLAContainerNetworkType containerNetworkType = WSLAContainerNetworkTypeHost,
         WSLAProcessFlags Flags = WSLAProcessFlagsNone);
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
@@ -84,13 +84,13 @@ public:
 private:
     std::string m_image;
     std::string m_name;
-    std::vector<WSLA_PORT_MAPPING> m_ports;
-    std::vector<WSLA_VOLUME> m_volumes;
-    std::vector<WSLA_NAMED_VOLUME> m_namedVolumes;
+    std::vector<WSLAPortMapping> m_ports;
+    std::vector<WSLAVolume> m_volumes;
+    std::vector<WSLANamedVolume> m_namedVolumes;
     std::deque<std::wstring> m_hostPaths;
     std::deque<std::string> m_volumeNames;
     std::deque<std::string> m_containerPaths;
-    WSLA_CONTAINER_NETWORK_TYPE m_containerNetworkType;
+    WSLAContainerNetworkType m_containerNetworkType;
     std::vector<std::string> m_entrypoint;
     WSLASignal m_stopSignal = WSLASignalNone;
     WSLAContainerFlags m_containerFlags = WSLAContainerFlagsNone;
@@ -99,10 +99,10 @@ private:
     std::vector<std::string> m_dnsServers;
     std::vector<std::string> m_dnsSearchDomains;
     std::vector<std::string> m_dnsOptions;
-    std::vector<WSLA_LABEL> m_labels;
+    std::vector<WSLALabel> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
-    std::vector<WSLA_TMPFS_MOUNT> m_tmpfsMounts;
+    std::vector<WSLATmpfsMount> m_tmpfsMounts;
     std::deque<std::string> m_tmpfsContainerPaths;
     std::deque<std::string> m_tmpfsOptions;
 };

@@ -40,12 +40,12 @@ public:
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
     int GetExitCode();
-    WSLA_PROCESS_STATE State();
+    WSLAProcessState State();
 
     WSLAProcessFlags Flags() const;
 
 protected:
-    virtual void GetState(WSLA_PROCESS_STATE* State, int* Code) = 0;
+    virtual void GetState(WSLAProcessState* State, int* Code) = 0;
 
     WSLAProcessFlags m_flags{};
 };
@@ -62,7 +62,7 @@ public:
     IWSLAProcess& Get();
 
 protected:
-    void GetState(WSLA_PROCESS_STATE* State, int* Code) override;
+    void GetState(WSLAProcessState* State, int* Code) override;
 
 private:
     wil::com_ptr<IWSLAProcess> m_process;
@@ -100,7 +100,7 @@ public:
     std::string FormatResult(const int code);
 
 protected:
-    std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();
+    std::tuple<WSLAProcessOptions, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();
 
     WSLAProcessFlags m_flags{};
     std::string m_executable;

@@ -23,7 +23,7 @@ static constexpr ULONGLONG c_defaultVolumeSizeBytes = 10ULL * 1024 * 1024 * 1024
 
 namespace {
 
-    ULONGLONG ParseSizeBytes(const WSLA_VOLUME_OPTIONS& options)
+    ULONGLONG ParseSizeBytes(const WSLAVolumeOptions& options)
     {
         if (options.Options == nullptr || options.Options[0] == '\0')
         {
@@ -37,7 +37,7 @@ namespace {
         }
         catch (...)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidVolumeOptions(options.Options));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslaInvalidVolumeOptions(options.Options));
         }
 
         const auto it = parsedOptions.find("SizeBytes");
@@ -102,7 +102,7 @@ WSLAVhdVolumeImpl::~WSLAVhdVolumeImpl()
 }
 
 std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
-    const WSLA_VOLUME_OPTIONS& Options, const std::filesystem::path& StoragePath, WSLAVirtualMachine& VirtualMachine)
+    const WSLAVolumeOptions& Options, const std::filesystem::path& StoragePath, WSLAVirtualMachine& VirtualMachine)
 {
     THROW_HR_IF_NULL(E_POINTER, Options.Name);
     THROW_HR_IF_NULL(E_POINTER, Options.Type);
