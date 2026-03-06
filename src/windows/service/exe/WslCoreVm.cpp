@@ -2628,24 +2628,6 @@ try
 
                     respondWithTag(newTag, result);
                 }
-                else if (message->MessageType == LxInitMessageQueryVirtioFsDevice)
-                {
-                    std::wstring newTag;
-                    const auto result = wil::ResultFromException([this, span, &newTag]() {
-                        const auto* query = gslhelpers::try_get_struct<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE>(span);
-                        THROW_HR_IF(E_UNEXPECTED, !query);
-
-                        const std::string tag = wsl::shared::string::FromSpan(span, query->TagOffset);
-                        const auto tagWide = wsl::shared::string::MultiByteToWide(tag);
-                        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-                        const auto foundShare = FindVirtioFsShare(tagWide.c_str());
-                        THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
-
-                        newTag = foundShare->Path;
-                    });
-
-                    respondWithTag(newTag, result);
-                }
                 else
                 {
                     THROW_HR_MSG(E_UNEXPECTED, "Unexpected MessageType %d", message->MessageType);
