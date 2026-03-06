@@ -32,7 +32,6 @@ target_link_libraries(wsltests
                       ${COMMON_LINK_LIBRARIES}
                       VirtDisk.lib
                       Wer.lib
-                      Dbghelp.lib
                       sfc.lib)
 
 add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk)

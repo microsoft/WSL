@@ -262,6 +262,7 @@ set(COMMON_LINK_LIBRARIES
     MI.lib
     Wintrust.lib
     msi.lib
+    Dbghelp.lib
     wsldeps.lib)
 
 # Linux

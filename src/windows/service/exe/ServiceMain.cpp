@@ -165,6 +165,8 @@ try
 
     WSL_LOG("Service starting", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
+    wsl::windows::common::wslutil::ConfigureCrashHandler();
+
     // Don't kill the process on unknown C++ exceptions.
     wil::g_fResultFailFastUnknownExceptions = false;
 

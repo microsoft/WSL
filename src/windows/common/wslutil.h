@@ -42,6 +42,7 @@ inline constexpr GUID WslTerminalNamespace = {0xbe9372fe, 0x59e1, 0x4876, {0xbd,
 // {2bde4a90-d05f-401c-9492-e40884ead1d8}
 inline constexpr GUID GeneratedProfilesTerminalNamespace = {0x2bde4a90, 0xd05f, 0x401c, {0x94, 0x92, 0xe4, 0x8, 0x84, 0xea, 0xd1, 0xd8}};
 
+inline auto c_crashFolderKeyName = L"CrashDumpFolder";
 inline auto c_msixPackageFamilyName = L"MicrosoftCorporationII.WindowsSubsystemForLinux_8wekyb3d8bbwe";
 inline auto c_githubUrlOverrideRegistryValue = L"GitHubUrlOverride";
 inline auto c_vhdFileExtension = L".vhd";
@@ -84,6 +85,8 @@ template <typename TInterface>
 wil::com_ptr<TInterface> CoGetCallContext();
 
 void CoInitializeSecurity();
+
+void ConfigureCrashHandler();
 
 void ConfigureCrt();
 

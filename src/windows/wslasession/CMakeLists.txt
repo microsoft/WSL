@@ -47,7 +47,8 @@ target_link_libraries(wslasession
                       ${COMMON_LINK_LIBRARIES}
                       common
                       legacy_stdio_definitions
-                      VirtDisk.lib)
+                      VirtDisk.lib
+                      Dbghelp.lib)
 
 target_precompile_headers(wslasession REUSE_FROM common)
 set_target_properties(wslasession PROPERTIES FOLDER windows)

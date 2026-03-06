@@ -64,10 +64,11 @@ try
     wsl::windows::common::EnableContextualizedErrors(true);
 
     // Initialize telemetry.
-    // TODO-WSLA: Create a dedicated WSLA provider
     WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
 
     WSL_LOG("Service starting", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+
+    wsl::windows::common::wslutil::ConfigureCrashHandler();
 
     // Don't kill the process on unknown C++ exceptions.
     wil::g_fResultFailFastUnknownExceptions = false;
