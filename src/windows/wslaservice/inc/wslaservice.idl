@@ -416,6 +416,14 @@ typedef enum _WSLALogsFlags
     WSLALogsFlagsTimestamps = 2,
 } WSLALogsFlags;
 
+typedef enum _WSLADeleteFlags
+{
+    WSLADeleteFlagsNone = 0,
+    WSLADeleteFlagsForce = 1,
+    WSLADeleteFlagsValid = WSLADeleteFlagsForce
+    // TODO: Flags to remove anonymous volumes, bridge links, etc.
+} WSLADeleteFlags;
+
 
 [
     uuid(7577FE8D-DE85-471E-B870-11669986F332),
@@ -427,7 +435,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
     HRESULT Stop([in] WSLASignal Signal, [in] LONG TimeoutSeconds);
     HRESULT Start([in] WSLAContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
-    HRESULT Delete(); // TODO: Look into lifetime logic.
+    HRESULT Delete([in] WSLADeleteFlags Flags);
     HRESULT Export([in] ULONG TarHandle);
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);

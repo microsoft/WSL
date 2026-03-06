@@ -42,9 +42,9 @@ class WSLATests
     wil::com_ptr<IWSLASession> m_defaultSession;
     static inline auto c_testSessionName = L"wsla-test";
 
-    void LoadTestImage(PCWSTR imageName)
+    void LoadTestImage(std::string_view imageName)
     {
-        std::filesystem::path imagePath = std::filesystem::path{g_testDataPath} / imageName;
+        std::filesystem::path imagePath = GetTestImagePath(imageName);
         wil::unique_hfile imageFile{
             CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         THROW_LAST_ERROR_IF(!imageFile);
@@ -74,12 +74,12 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            LoadTestImage(L"debian-latest.tar");
+            LoadTestImage("debian:latest");
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            LoadTestImage(L"python-3_12-alpine.tar");
+            LoadTestImage("python:3.12-alpine");
         }
 
         // Hacky way to delete all containers.
@@ -654,7 +654,7 @@ class WSLATests
         LogInfo("Test: Dangling filter");
         {
             // Setup a dangling image
-            LoadTestImage(L"alpine-latest.tar");
+            LoadTestImage("alpine:latest");
             WSLA_TAG_IMAGE_OPTIONS tagOptions{};
             tagOptions.Image = "debian:latest";
             tagOptions.Repo = "alpine";
@@ -745,7 +745,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+        std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
         wil::unique_handle imageTarFileHandle{
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -805,7 +805,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Prepare alpine image to delete.
-        LoadTestImage(L"alpine-latest.tar");
+        LoadTestImage("alpine:latest");
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
@@ -1475,7 +1475,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
         {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+            std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
             wil::unique_handle imageTarFileHandle{
                 CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -1561,7 +1561,7 @@ class WSLATests
 
             // Load the image from a saved tar and launch a container
             {
-                std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+                std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
                 wil::unique_handle imageTarFileHandle{CreateFileW(
                     imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -1617,7 +1617,7 @@ class WSLATests
                 ULONG outFile = HandleToULong(contTarFileHandle.get());
 
                 container.Get().Stop(WSLASignalSIGILL, 10);
-                container.Get().Delete();
+                container.Get().Delete(WSLADeleteFlagsNone);
                 VERIFY_ARE_EQUAL(container.Get().Export(outFile), RPC_E_DISCONNECTED);
 
                 VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
@@ -1839,35 +1839,6 @@ class WSLATests
         ValidateNetworking(WSLANetworkingModeVirtioProxy);
     }
 
-    void WaitForOutput(HANDLE Handle, const char* Content)
-    {
-        std::string output;
-        DWORD index = 0;
-        while (true) // TODO: timeout
-        {
-            constexpr auto bufferSize = 100;
-            output.resize(output.size() + bufferSize);
-            DWORD bytesRead = 0;
-            if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
-            {
-                LogError("ReadFile failed with %lu", GetLastError());
-                VERIFY_FAIL();
-            }
-            output.resize(index + bytesRead);
-            if (bytesRead == 0)
-            {
-                LogError("Process exited, output: %hs", output.c_str());
-                VERIFY_FAIL();
-            }
-
-            index += bytesRead;
-            if (output.find(Content) != std::string::npos)
-            {
-                break;
-            }
-        }
-    }
-
     void ValidatePortMapping(WSLANetworkingMode networkingMode)
     {
         WSL2_TEST_ONLY();
@@ -1888,7 +1859,7 @@ class WSLATests
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
             auto process = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", cmd}).Launch(*session);
-            WaitForOutput(process.GetStdHandle(2).get(), "listening on");
+            WaitForOutput(process.GetStdHandle(2), "listening on");
 
             return process;
         };
@@ -1968,7 +1939,7 @@ class WSLATests
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
                 .Launch(*session);
 
-        WaitForOutput(process.GetStdHandle(2).get(), "listening on");
+        WaitForOutput(process.GetStdHandle(2), "listening on");
 
         for (auto i = 0; i < 100; i++)
         {
@@ -2818,7 +2789,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 wil::com_ptr<IWSLAContainer> openedContainer;
                 VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &openedContainer));
-                VERIFY_SUCCEEDED(openedContainer->Delete());
+                VERIFY_SUCCEEDED(openedContainer->Delete(WSLADeleteFlagsNone));
             });
 
             auto process = container.GetInitProcess();
@@ -2945,7 +2916,7 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> container;
             VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, &container));
-            VERIFY_SUCCEEDED(container->Delete());
+            VERIFY_SUCCEEDED(container->Delete(WSLADeleteFlagsNone));
         }
     }
 
@@ -3002,7 +2973,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Validate that deleted containers can't be started.
             VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
@@ -3182,7 +3153,7 @@ class WSLATests
             VERIFY_SUCCEEDED(sameContainer->GetState(&state));
             VERIFY_ARE_EQUAL(state, WslaContainerStateExited);
 
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Test StopContainer
@@ -3210,7 +3181,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
             expectContainerList({});
         }
 
@@ -3234,7 +3205,7 @@ class WSLATests
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that running containers can't be deleted.
-            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Kill the container.
             auto initProcess = container.GetInitProcess();
@@ -3255,13 +3226,13 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that stopped containers can be deleted.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Verify that stopping a deleted container returns ERROR_INVALID_STATE.
             VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGTERM, 0), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers can't be deleted again.
-            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers don't show up in the container list.
             expectContainerList({});
@@ -3293,7 +3264,7 @@ class WSLATests
             VERIFY_SUCCEEDED(container->Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
 
-            VERIFY_SUCCEEDED(container->Get().Delete());
+            VERIFY_SUCCEEDED(container->Get().Delete(WSLADeleteFlagsNone));
 
             WSLA_CONTAINER_STATE state{};
             VERIFY_ARE_EQUAL(container->Get().GetState(&state), RPC_E_DISCONNECTED);
@@ -3308,7 +3279,7 @@ class WSLATests
 
             // Delete the container to avoid leaving it dangling after test completion.
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Terminate the session
             ResetTestSession();
@@ -3317,6 +3288,37 @@ class WSLATests
             WSLA_CONTAINER_STATE state = WslaContainerStateRunning;
             VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
             VERIFY_ARE_EQUAL(state, WslaContainerStateInvalid);
+        }
+    }
+
+    TEST_METHOD(DeleteContainer)
+    {
+        WSL2_TEST_ONLY();
+        WSLAContainerLauncher launcher("debian:latest", "test-container-delete", {"sleep", "99999"});
+
+        {
+            // Verify that a created container can be deleted.
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
+
+            // Verify that a deleted container can't be deleted again.
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+        }
+
+        {
+            // Verify that a running container can't be deleted by default.
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Verify that a running container can be deleted with the force flag.
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsForce));
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsForce), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+
+            // Validate that invalid flags are rejected.
+            VERIFY_ARE_EQUAL(container.Get().Delete(static_cast<WSLADeleteFlags>(0x2)), E_INVALIDARG);
         }
     }
 
@@ -3361,7 +3363,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             expectContainerList({});
         }
@@ -3383,7 +3385,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             expectContainerList({});
         }
@@ -3417,7 +3419,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             expectContainerList({});
         }
@@ -3533,7 +3535,7 @@ class WSLATests
                 {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}, {"/mnt/wsla-tmpfs-inspect", "tmpfs", true}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Test an exited container still returns correct schema shape.
@@ -3563,7 +3565,7 @@ class WSLATests
             expectPorts(details.Ports, {});
             expectMounts(details.Mounts, {});
 
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
     }
 
@@ -3729,7 +3731,7 @@ class WSLATests
 
         // Destroy the container (Stop + Delete + release COM reference).
         VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-        VERIFY_SUCCEEDED(container.Get().Delete());
+        VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         container.Reset();
 
         // The exec process exit event must be signaled within a reasonable timeout.
@@ -3810,10 +3812,9 @@ class WSLATests
 
             auto container = launcher.Launch(session);
             auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
 
             // Wait for the container bind() to be completed.
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
             expectBoundPorts(container, {"8000/tcp"});
 
@@ -3829,7 +3830,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             container.Reset(); // TODO: Re-think container lifetime management.
 
@@ -3842,16 +3843,15 @@ class WSLATests
 
                 auto container = launcher.Launch(session);
                 auto initProcess = container.GetInitProcess();
-                auto stdoutHandle = initProcess.GetStdHandle(1);
 
                 // Wait for the container bind() to be completed.
-                WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+                WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
                 expectBoundPorts(container, {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
                 VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-                VERIFY_SUCCEEDED(container.Get().Delete());
+                VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
                 container.Reset(); // TODO: Re-think container lifetime management.
             }
         }
@@ -4028,7 +4028,7 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "OK\n"}});
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Validate that the volumes are not mounted after container exits.
@@ -4336,7 +4336,7 @@ class WSLATests
 
             auto container = OpenContainer(session.get(), containerName);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLAContainer> notFound;
@@ -4402,14 +4402,13 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach, nullptr));
 
             auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
             // A 200 response also indicates the test file is available so volume was mounted correctly.
             ExpectHttpResponse(L"http://127.0.0.1:1250/test.txt", 200);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Delete the host folder to simulate volume folder being missing on recovery
@@ -4856,7 +4855,7 @@ class WSLATests
                 HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Validate that attaching to a deleted container fails.
-            VERIFY_SUCCEEDED(container->Get().Delete());
+            VERIFY_SUCCEEDED(container->Get().Delete(WSLADeleteFlagsNone));
             VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr), RPC_E_DISCONNECTED);
 
             container->SetDeleteOnClose(false);
@@ -5020,7 +5019,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -5039,7 +5038,7 @@ class WSLATests
             VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGKILL));
             process.Wait();
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -5054,7 +5053,7 @@ class WSLATests
             auto process = container.GetInitProcess();
             process.Wait();
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -5079,7 +5078,7 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
             // verifyContainerDeleted("test-auto-remove");
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
