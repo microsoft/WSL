@@ -36,7 +36,7 @@ void AttachToSession(CLIExecutionContext& context)
     }
     else
     {
-        sessionId = models::s_DefaultSessionName;
+        sessionId = SessionOptions::c_defaultDisplayName;
     }
 
     context.ExitCode = SessionService::Attach(sessionId);
