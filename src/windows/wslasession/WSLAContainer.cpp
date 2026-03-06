@@ -997,14 +997,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLAContainerFlagsInit);
 
-    // Build volume list from container options.
-    std::vector<WSLAVolumeMount> volumes;
-    volumes.reserve(containerOptions.VolumesCount);
-
     if (containerOptions.VolumesCount > 0)
     {
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
     }
+
+    // Build volume list from container options.
+    std::vector<WSLAVolumeMount> volumes;
+    volumes.reserve(containerOptions.VolumesCount);
+
+    std::vector<std::string> binds;
+    binds.reserve(containerOptions.VolumesCount);
 
     for (ULONG i = 0; i < containerOptions.VolumesCount; i++)
     {
@@ -1018,7 +1021,14 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
+
+        auto options = volume.ReadOnly ? "ro" : "rw";
+        auto bind = std::format("{}:{}:{}", parentVMPath, volume.ContainerPath, options);
+
+        binds.push_back(std::move(bind));
     }
+
+    request.HostConfig.Binds = std::move(binds);
 
     // Process tmpfs mounts from container options.
     if (containerOptions.TmpfsCount > 0)
@@ -1049,6 +1059,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         // TODO: ipv6 support.
         auto portKey = std::format("{}/tcp", e.ContainerPort);
         request.ExposedPorts[portKey] = {};
+
         auto& portEntry = request.HostConfig.PortBindings[portKey];
         portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
     }
