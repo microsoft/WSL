@@ -29,8 +29,17 @@ namespace wsl::windows::wslc::task {
 
 void AttachToSession(CLIExecutionContext& context)
 {
-    WI_ASSERT(context.Args.Contains(ArgType::SessionId));
-    context.ExitCode = SessionService::Attach(context.Args.Get<ArgType::SessionId>());
+    std::wstring sessionId;
+    if (context.Args.Contains(ArgType::SessionId))
+    {
+        sessionId = context.Args.Get<ArgType::SessionId>();
+    }
+    else
+    {
+        sessionId = models::s_DefaultSessionName;
+    }
+
+    context.ExitCode = SessionService::Attach(sessionId);
 }
 
 void CreateSession(CLIExecutionContext& context)
