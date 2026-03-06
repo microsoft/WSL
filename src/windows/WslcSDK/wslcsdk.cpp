@@ -175,7 +175,7 @@ try
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     auto result = std::make_unique<WslcSessionImpl>();
-    WSLA_SESSION_SETTINGS runtimeSettings{};
+    WSLASessionSettings runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
     // TODO: Is this the intended use for vhdRequirements.sizeInBytes?
@@ -377,7 +377,7 @@ try
 
     auto result = std::make_unique<WslcContainerImpl>();
 
-    WSLA_CONTAINER_OPTIONS containerOptions{};
+    WSLAContainerOptions containerOptions{};
     containerOptions.Image = internalContainerSettings->image;
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
