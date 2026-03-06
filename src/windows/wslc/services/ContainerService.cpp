@@ -26,6 +26,7 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
+using namespace std::chrono_literals;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
@@ -102,6 +103,10 @@ static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASign
 
 std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state, ULONGLONG stateChangedAt)
 {
+    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
+    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
+    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+
     std::wstring stateString;
     switch (state)
     {
@@ -134,20 +139,20 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
         elapsed = 0;
     }
 
-    if (elapsed < 60)
+    if (elapsed < SecondsPerMinute)
     {
         return std::format(L"{} {} seconds ago", stateString, elapsed);
     }
-    else if (elapsed < 3600)
+    else if (elapsed < SecondsPerHour)
     {
-        return std::format(L"{} {} minutes ago", stateString, elapsed / 60);
+        return std::format(L"{} {} minutes ago", stateString, elapsed / SecondsPerMinute);
     }
-    else if (elapsed < 86400)
+    else if (elapsed < SecondsPerDay)
     {
-        return std::format(L"{} {} hours ago", stateString, elapsed / 3600);
+        return std::format(L"{} {} hours ago", stateString, elapsed / SecondsPerHour);
     }
 
-    return std::format(L"{} {} days ago", stateString, elapsed / 86400);
+    return std::format(L"{} {} days ago", stateString, elapsed / SecondsPerDay);
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
