@@ -2829,7 +2829,7 @@ class WSLATests
             auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_SUCCEEDED(result);
 
-            VERIFY_ARE_EQUAL(container->Id().length(), WSLAContainerEntry_ID_LENGTH);
+            VERIFY_ARE_EQUAL(container->Id().length(), WSLA_CONTAINER_ID_LENGTH);
 
             VERIFY_ARE_EQUAL(container->Name(), "named-container");
 
@@ -2919,7 +2919,7 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
-                VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLAContainerEntry_ID_LENGTH);
+                VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
             }
         };
 
