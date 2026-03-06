@@ -27,6 +27,8 @@ Abstract:
 #include "wslutil.h"
 #include "WslCoreConfig.h"
 
+using namespace std::chrono_literals;
+
 //
 // N.B. This is also defined in 'lxtcommon.h' & 'lxsetup.ps1'. Update those
 //      files too, if the distro name changes here.
@@ -574,6 +576,12 @@ std::string ReadToString(HANDLE Handle);
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
+void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s);
+
 std::string EscapeString(const std::string& Input);
 
 void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
+
+std::filesystem::path GetTestImagePath(std::string_view imageName);
+
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode);

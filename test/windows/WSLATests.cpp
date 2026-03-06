@@ -42,9 +42,9 @@ class WSLATests
     wil::com_ptr<IWSLASession> m_defaultSession;
     static inline auto c_testSessionName = L"wsla-test";
 
-    void LoadTestImage(PCWSTR imageName)
+    void LoadTestImage(std::string_view imageName)
     {
-        std::filesystem::path imagePath = std::filesystem::path{g_testDataPath} / imageName;
+        std::filesystem::path imagePath = GetTestImagePath(imageName);
         wil::unique_hfile imageFile{
             CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         THROW_LAST_ERROR_IF(!imageFile);
@@ -74,12 +74,12 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            LoadTestImage(L"debian-latest.tar");
+            LoadTestImage("debian:latest");
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            LoadTestImage(L"python-3_12-alpine.tar");
+            LoadTestImage("python:3.12-alpine");
         }
 
         // Hacky way to delete all containers.
@@ -654,7 +654,7 @@ class WSLATests
         LogInfo("Test: Dangling filter");
         {
             // Setup a dangling image
-            LoadTestImage(L"alpine-latest.tar");
+            LoadTestImage("alpine:latest");
             WSLATagImageOptions tagOptions{};
             tagOptions.Image = "debian:latest";
             tagOptions.Repo = "alpine";
@@ -745,7 +745,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+        std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
         wil::unique_handle imageTarFileHandle{
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -805,7 +805,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Prepare alpine image to delete.
-        LoadTestImage(L"alpine-latest.tar");
+        LoadTestImage("alpine:latest");
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
@@ -1475,7 +1475,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
         {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+            std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
             wil::unique_handle imageTarFileHandle{
                 CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -1561,7 +1561,7 @@ class WSLATests
 
             // Load the image from a saved tar and launch a container
             {
-                std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+                std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
                 wil::unique_handle imageTarFileHandle{CreateFileW(
                     imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -1839,35 +1839,6 @@ class WSLATests
         ValidateNetworking(WSLANetworkingModeVirtioProxy);
     }
 
-    void WaitForOutput(HANDLE Handle, const char* Content)
-    {
-        std::string output;
-        DWORD index = 0;
-        while (true) // TODO: timeout
-        {
-            constexpr auto bufferSize = 100;
-            output.resize(output.size() + bufferSize);
-            DWORD bytesRead = 0;
-            if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
-            {
-                LogError("ReadFile failed with %lu", GetLastError());
-                VERIFY_FAIL();
-            }
-            output.resize(index + bytesRead);
-            if (bytesRead == 0)
-            {
-                LogError("Process exited, output: %hs", output.c_str());
-                VERIFY_FAIL();
-            }
-
-            index += bytesRead;
-            if (output.find(Content) != std::string::npos)
-            {
-                break;
-            }
-        }
-    }
-
     void ValidatePortMapping(WSLANetworkingMode networkingMode)
     {
         WSL2_TEST_ONLY();
@@ -1888,7 +1859,7 @@ class WSLATests
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
             auto process = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", cmd}).Launch(*session);
-            WaitForOutput(process.GetStdHandle(2).get(), "listening on");
+            WaitForOutput(process.GetStdHandle(2), "listening on");
 
             return process;
         };
@@ -1968,7 +1939,7 @@ class WSLATests
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
                 .Launch(*session);
 
-        WaitForOutput(process.GetStdHandle(2).get(), "listening on");
+        WaitForOutput(process.GetStdHandle(2), "listening on");
 
         for (auto i = 0; i < 100; i++)
         {
@@ -3627,10 +3598,9 @@ class WSLATests
 
             auto container = launcher.Launch(session);
             auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
 
             // Wait for the container bind() to be completed.
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
             expectBoundPorts(container, {"8000/tcp"});
 
@@ -3659,10 +3629,9 @@ class WSLATests
 
                 auto container = launcher.Launch(session);
                 auto initProcess = container.GetInitProcess();
-                auto stdoutHandle = initProcess.GetStdHandle(1);
 
                 // Wait for the container bind() to be completed.
-                WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+                WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
                 expectBoundPorts(container, {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
@@ -4219,8 +4188,7 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach, nullptr));
 
             auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
             // A 200 response also indicates the test file is available so volume was mounted correctly.
             ExpectHttpResponse(L"http://127.0.0.1:1250/test.txt", 200);

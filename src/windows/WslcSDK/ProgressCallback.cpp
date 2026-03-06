@@ -60,15 +60,3 @@ HRESULT STDMETHODCALLTYPE ProgressCallback::OnProgress(LPCSTR Status, LPCSTR Id,
 
     return S_OK;
 }
-
-winrt::com_ptr<ProgressCallback> ProgressCallback::CreateIf(const WslcPullImageOptions* options)
-{
-    if (options->progressCallback)
-    {
-        return winrt::make_self<ProgressCallback>(options->progressCallback, options->progressCallbackContext);
-    }
-    else
-    {
-        return nullptr;
-    }
-}
