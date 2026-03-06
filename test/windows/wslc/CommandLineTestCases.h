@@ -32,6 +32,7 @@ COMMAND_LINE_TEST_CASE(L"session list --verbose --help", L"list", true)
 COMMAND_LINE_TEST_CASE(L"session list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"session list extraarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"session shell session1", L"shell", true)
+COMMAND_LINE_TEST_CASE(L"session shell", L"shell", true)
 
 // Container command tests
 COMMAND_LINE_TEST_CASE(L"container list", L"list", true)
