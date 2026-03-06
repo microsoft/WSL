@@ -18,7 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 struct ContainerService
 {
-    static std::wstring ContainerStateToString(WSLA_CONTAINER_STATE state);
+    static std::wstring ContainerStateToString(WSLAContainerState state);
     static int Run(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static void Start(models::Session& session, const std::string& id);
