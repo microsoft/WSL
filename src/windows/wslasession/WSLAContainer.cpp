@@ -149,6 +149,18 @@ auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, std::set<uint16_t>& al
     return errorCleanup;
 }
 
+auto AllocateVmPorts(std::set<uint16_t> vmPorts, WSLAVirtualMachine& vm)
+{
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&vmPorts, &vm]() { ReleaseVmPorts(vmPorts, vm); });
+
+    for (auto port : vmPorts)
+    {
+        THROW_WIN32_IF_MSG(ERROR_BUSY, !vm.TryAllocatePort(port), "Port %hu is in use.", port);
+    }
+
+    return errorCleanup;
+}
+
 // Builds port mapping list from container options and returns the network mode string.
 std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options)
 {
@@ -1147,34 +1159,24 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     labels.erase(metadataIt);
 
-    // Re-register recovered VM ports in the allocation pool to prevent conflicts.
-    // Only needed for containers that haven't stopped yet — stopped containers release their
-    // VM port allocations, so those ports are available for reuse.
-    std::set<uint16_t> allocatedVmPorts;
-    auto vmPortCleanup = wil::scope_exit_log(
-        WI_DIAGNOSTICS_INFO, [&allocatedVmPorts, &virtualMachine]() { ReleaseVmPorts(allocatedVmPorts, virtualMachine); });
+    auto networkMode = DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode);
 
-    if (dockerContainer.State == ContainerState::Created)
+
+
+    // Re-register recovered VM ports in the allocation pool to prevent conflicts.
+    // Only required for Bridge mode. In network mode the container's ports aren't allocated from the pool.
+    std::set<uint16_t> vmPorts;
+    if (networkMode == WSLA_CONTAINER_NETWORK_BRIDGE)
     {
         for (const auto& port : metadata.Ports)
         {
-            if (port.VmPort != 0)
-            {
-                if (virtualMachine.TryAllocatePort(port.VmPort))
-                {
-                    allocatedVmPorts.insert(port.VmPort);
-                }
-                else
-                {
-                    THROW_WIN32_MSG(ERROR_BUSY, "VM port %hu for container '%hs' is already in use", port.VmPort, name.c_str());
-                }
-            }
+            vmPorts.insert(port.VmPort);
         }
     }
 
-    WI_ASSERT(dockerContainer.State != ContainerState::Running);
+    auto errorCleanup = AllocateVmPorts(vmPorts, virtualMachine);
 
-    auto networkMode = DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode);
+    WI_ASSERT(dockerContainer.State != ContainerState::Running);
 
     auto container = std::make_unique<WSLAContainerImpl>(
         wslaSession,
@@ -1185,7 +1187,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         networkMode,
         std::move(metadata.Volumes),
         std::move(metadata.Ports),
-        std::move(allocatedVmPorts),
+        std::move(vmPorts),
         std::move(labels),
         std::move(OnDeleted),
         EventTracker,
@@ -1195,7 +1197,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
-    vmPortCleanup.release();
+    errorCleanup.release();
     return container;
 }
 
