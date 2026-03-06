@@ -171,6 +171,13 @@ struct WSLA_PROCESS_OPTIONS
     ULONG TtyColumns;
 };
 
+struct WSLA_NAMED_VOLUME
+{
+    LPCSTR Name;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+};
+
 struct WSLA_VOLUME
 {
     LPCWSTR HostPath;
@@ -235,22 +242,6 @@ typedef enum _WSLAContainerStartFlags
 } WSLAContainerStartFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerStartFlags);")
-
-// Options for creating a named volume.
-struct WSLA_VOLUME_OPTIONS
-{
-    LPCSTR Name;
-    LPCSTR Type;
-    [unique] LPCSTR Options;
-};
-
-// Named volume mount — name refers to a volume by name.
-struct WSLA_NAMED_VOLUME
-{
-    LPCSTR Name;
-    LPCSTR ContainerPath;
-    BOOL ReadOnly;
-};
 
 struct WSLA_CONTAINER_OPTIONS
 {
@@ -482,6 +473,13 @@ struct WSLA_TAG_IMAGE_OPTIONS
     LPCSTR Image; // Source image name or ID.
     LPCSTR Repo;  // Target repository name.
     LPCSTR Tag;   // Target tag name.
+};
+
+struct WSLA_VOLUME_OPTIONS
+{
+    LPCSTR Name;
+    LPCSTR Type;
+    [unique] LPCSTR Options;
 };
 
 typedef enum _WSLASessionState
