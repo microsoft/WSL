@@ -94,6 +94,17 @@ void PullImage(CLIExecutionContext& context)
     services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
 }
 
+void DeleteImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+
+    PullImageCallback callback;
+    services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
+}
+
 void LoadImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));

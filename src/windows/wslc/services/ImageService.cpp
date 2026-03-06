@@ -53,6 +53,10 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
+void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::wstring& image, bool force)
+{
+}
+
 void ImageService::Push()
 {
 }

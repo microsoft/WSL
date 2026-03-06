@@ -23,6 +23,7 @@ public:
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
+    static void Delete(wsl::windows::wslc::models::Session& session, const std::wstring& image, bool force);
     void Push();
     void Save();
     void Tag();
