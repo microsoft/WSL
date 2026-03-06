@@ -32,6 +32,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Build Command
+struct ImageBuildCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"build";
+    ImageBuildCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // List Command
 struct ImageListCommand final : public Command
 {
@@ -51,21 +66,6 @@ struct ImageListCommand final : public Command
     // it is parented directly to the root.
     // The bool parameter is used as a tag to select the root-specific name.
     ImageListCommand(const std::wstring& parent, bool /*rootScoped*/) : Command(RootCommandName, {}, parent)
-    {
-    }
-    std::vector<Argument> GetArguments() const override;
-    std::wstring ShortDescription() const override;
-    std::wstring LongDescription() const override;
-
-protected:
-    void ExecuteInternal(CLIExecutionContext& context) const override;
-};
-
-// Pull Command
-struct ImagePullCommand final : public Command
-{
-    constexpr static std::wstring_view CommandName = L"pull";
-    ImagePullCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -96,6 +96,21 @@ struct ImageDeleteCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"delete";
     ImageDeleteCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Pull Command
+struct ImagePullCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"pull";
+    ImagePullCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

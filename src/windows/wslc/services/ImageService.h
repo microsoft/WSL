@@ -20,10 +20,16 @@ namespace wsl::windows::wslc::services {
 class ImageService
 {
 public:
+    static void Build(
+        wsl::windows::wslc::models::Session& session,
+        const std::wstring& contextPath,
+        const std::wstring& tag,
+        const std::wstring& dockerfilePath,
+        IProgressCallback* callback);
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
-    static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
-    static void Delete(wsl::windows::wslc::models::Session& session, const std::wstring& image, bool force);
+    static void Delete(wsl::windows::wslc::models::Session& session, const std::wstring& image, bool force, bool noPrune);
+    static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     void Push();
     void Save();
     void Tag();

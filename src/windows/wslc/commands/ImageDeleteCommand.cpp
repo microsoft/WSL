@@ -26,7 +26,11 @@ namespace wsl::windows::wslc {
 // Image Delete Command
 std::vector<Argument> ImageDeleteCommand::GetArguments() const
 {
-    return {Argument::Create(ArgType::Format), Argument::Create(ArgType::Quiet), Argument::Create(ArgType::Session), Argument::Create(ArgType::Verbose)};
+    return {
+        Argument::Create(ArgType::ImageId, true),
+        Argument::Create(ArgType::Force),
+        Argument::Create(ArgType::NoPrune),
+    };
 }
 
 std::wstring ImageDeleteCommand::ShortDescription() const
@@ -43,7 +47,6 @@ void ImageDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context              //
         << CreateSession //
-        << GetImages     //
-        << DeleteImages;
+        << DeleteImage;
 }
 } // namespace wsl::windows::wslc

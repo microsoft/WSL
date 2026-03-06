@@ -17,8 +17,10 @@ Abstract:
 using wsl::windows::wslc::execution::CLIExecutionContext;
 
 namespace wsl::windows::wslc::task {
+void BuildImage(CLIExecutionContext& context);
 void GetImages(CLIExecutionContext& context);
 void ListImages(CLIExecutionContext& context);
-void PullImage(CLIExecutionContext& context);
 void LoadImage(CLIExecutionContext& context);
+void PullImage(CLIExecutionContext& context);
+void DeleteImage(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task
