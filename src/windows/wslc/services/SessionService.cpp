@@ -99,10 +99,9 @@ int SessionService::Attach(const std::wstring& sessionName)
     return static_cast<int>(exitCode);
 }
 
-Session SessionService::CreateSession(const std::optional<SessionOptions>& options)
+Session SessionService::CreateSession(const SessionOptions& options)
 {
-    SessionOptions sessionOptions = options.has_value() ? options.value() : SessionOptions::Default();
-    const WSLA_SESSION_SETTINGS* settings = sessionOptions.Get();
+    const WSLA_SESSION_SETTINGS* settings = options.Get();
     wil::com_ptr<IWSLASessionManager> sessionManager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());

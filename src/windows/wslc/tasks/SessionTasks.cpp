@@ -36,7 +36,7 @@ void AttachToSession(CLIExecutionContext& context)
     }
     else
     {
-        sessionId = models::s_DefaultSessionName;
+        sessionId = SessionOptions::c_defaultDisplayName;
     }
 
     context.ExitCode = SessionService::Attach(sessionId);
@@ -44,7 +44,12 @@ void AttachToSession(CLIExecutionContext& context)
 
 void CreateSession(CLIExecutionContext& context)
 {
-    std::optional<SessionOptions> options = std::nullopt;
+    SessionOptions options = SessionOptions::Default();
+    if (context.Args.Contains(ArgType::Session))
+    {
+        options.SetDisplayName(context.Args.Get<ArgType::Session>());
+    }
+
     context.Data.Add<Data::Session>(SessionService::CreateSession(options));
 }
 

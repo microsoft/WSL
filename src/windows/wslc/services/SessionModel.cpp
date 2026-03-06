@@ -16,25 +16,41 @@ Abstract:
 #include "SessionModel.h"
 
 namespace wsl::windows::wslc::models {
+
+namespace {
+    std::wstring GetStoragePath(const std::wstring& displayName)
+    {
+        // To avoid collisions with other sessions, storage path uses display name as part of its path.
+        const std::filesystem::path storagePath =
+            wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::c_storagePathPrefix / displayName;
+        return storagePath.wstring();
+    }
+} // namespace
+
+SessionOptions::SessionOptions(std::wstring displayName, uint32_t cpuCount, uint32_t memoryMb, uint32_t bootTimeoutMs, uint64_t maximumStorageSizeMb, WSLANetworkingMode networkingMode) :
+    m_displayName(std::move(displayName)), m_storagePath(GetStoragePath(m_displayName))
+{
+    m_sessionSettings.DisplayName = m_displayName.c_str();
+    m_sessionSettings.StoragePath = m_storagePath.c_str();
+    m_sessionSettings.CpuCount = cpuCount;
+    m_sessionSettings.MemoryMb = memoryMb;
+    m_sessionSettings.BootTimeoutMs = bootTimeoutMs;
+    m_sessionSettings.MaximumStorageSizeMb = maximumStorageSizeMb;
+    m_sessionSettings.NetworkingMode = networkingMode;
+}
+
 SessionOptions SessionOptions::Default()
 {
-    // Use a function-local static to defer path initialization until first use.
-    static const std::filesystem::path defaultPath = {wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / "wsla"};
-
-    // TODO: Have a configuration file for those.
-    SessionOptions options{};
-    options.m_sessionSettings.DisplayName = s_DefaultSessionName;
-    options.m_sessionSettings.CpuCount = 4;
-    options.m_sessionSettings.MemoryMb = 2048;
-    options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
-    options.m_sessionSettings.StoragePath = defaultPath.c_str();
-    options.m_sessionSettings.MaximumStorageSizeMb = 10000; // 10GB.
-    options.m_sessionSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
-    return options;
+    return SessionOptions();
 }
 
-const WSLA_SESSION_SETTINGS* SessionOptions::Get() const
+void SessionOptions::SetDisplayName(const std::wstring& displayName)
 {
-    return &m_sessionSettings;
+    // Setting the display name also affects the storage path.
+    m_displayName = displayName;
+    m_storagePath = GetStoragePath(m_displayName);
+    m_sessionSettings.DisplayName = m_displayName.c_str();
+    m_sessionSettings.StoragePath = m_storagePath.c_str();
 }
+
 } // namespace wsl::windows::wslc::models
