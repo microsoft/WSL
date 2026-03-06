@@ -383,7 +383,7 @@ const std::string& WSLAContainerImpl::Name() const noexcept
 void WSLAContainerImpl::GetStateChangedAt(ULONGLONG* Result)
 {
     auto lock = m_lock.lock_shared();
-    *Result = std::chrono::system_clock::to_time_t(m_stateChangedAt);
+    *Result = m_stateChangedAt;
 }
 
 void WSLAContainerImpl::CopyTo(IWSLAContainer** Container) const
@@ -1291,7 +1291,7 @@ __requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLA_CONTAINER_S
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
-    m_stateChangedAt = std::chrono::system_clock::now();
+    m_stateChangedAt = static_cast<std::uint64_t>(std::time(nullptr));
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :

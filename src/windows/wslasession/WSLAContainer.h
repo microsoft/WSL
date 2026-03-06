@@ -133,7 +133,7 @@ private:
     wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
-    std::chrono::system_clock::time_point m_stateChangedAt{std::chrono::system_clock::now()};
+    std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;
     std::vector<WSLAPortMapping> m_mappedPorts;
