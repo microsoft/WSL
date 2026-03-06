@@ -27,7 +27,7 @@ cpp_quote("#endif")
 
 cpp_quote("#define WSLA_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLA_MAX_IMAGE_NAME_LENGTH 255")
-cpp_quote("#define WSLAContainerEntry_ID_LENGTH 64")
+cpp_quote("#define WSLA_CONTAINER_ID_LENGTH 64")
 
 typedef
 struct _WSLAVersion {
@@ -396,6 +396,14 @@ typedef enum _WSLALogsFlags
     WSLALogsFlagsTimestamps = 2,
 } WSLALogsFlags;
 
+typedef enum _WSLADeleteFlags
+{
+    WSLADeleteFlagsNone = 0,
+    WSLADeleteFlagsForce = 1,
+    WSLADeleteFlagsValid = WSLADeleteFlagsForce
+    // TODO: Flags to remove anonymous volumes, bridge links, etc.
+} WSLADeleteFlags;
+
 
 [
     uuid(7577FE8D-DE85-471E-B870-11669986F332),
@@ -407,7 +415,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
     HRESULT Stop([in] WSLASignal Signal, [in] LONG TimeoutSeconds);
     HRESULT Start([in] WSLAContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
-    HRESULT Delete();
+    HRESULT Delete([in] WSLADeleteFlags Flags);
     HRESULT Export([in] ULONG TarHandle);
     HRESULT GetState([out] WSLAContainerState* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);

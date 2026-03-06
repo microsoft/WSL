@@ -179,12 +179,7 @@ void ContainerService::Delete(Session& session, const std::string& id, bool forc
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    if (force)
-    {
-        StopInternal(*container, WSLASignalSIGKILL);
-    }
-
-    THROW_IF_FAILED(container->Delete());
+    THROW_IF_FAILED(container->Delete(force ? WSLADeleteFlagsForce : WSLADeleteFlagsNone));
 }
 
 std::vector<ContainerInformation> ContainerService::List(Session& session)

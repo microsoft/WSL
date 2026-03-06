@@ -62,6 +62,14 @@ struct FlagsTraits<WslcContainerStartFlags>
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
 };
 
+template <>
+struct FlagsTraits<WslcDeleteContainerFlags>
+{
+    using WslaType = WSLADeleteFlags;
+    constexpr static WslcDeleteContainerFlags Mask = WSLC_DELETE_CONTAINER_FLAG_FORCE;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLADeleteFlagsForce);
+};
+
 template <typename Flags>
 typename FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
 {
@@ -659,10 +667,7 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: Flags?
-    UNREFERENCED_PARAMETER(flags);
-
-    RETURN_HR(internalType->container->Delete());
+    RETURN_HR(internalType->container->Delete(ConvertFlags(flags)));
 }
 CATCH_RETURN();
 

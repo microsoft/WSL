@@ -57,7 +57,7 @@ public:
     void Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys);
     void Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
     void Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds);
-    void Delete();
+    void Delete(WSLADeleteFlags Flags);
     void Export(ULONG TarHandle) const;
     void GetState(_Out_ WSLAContainerState* State);
     void GetInitProcess(_Out_ IWSLAProcess** process) const;
@@ -109,7 +109,7 @@ public:
         IORelay& Relay);
 
 private:
-    __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld();
+    __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld(WSLADeleteFlags Flags);
 
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
@@ -153,7 +153,7 @@ public:
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds) override;
-    IFACEMETHOD(Delete)() override;
+    IFACEMETHOD(Delete)(WSLADeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLAContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
