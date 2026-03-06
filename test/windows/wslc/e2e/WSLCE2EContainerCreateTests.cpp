@@ -80,6 +80,20 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsListed(containerId, L"created");
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_Valid_Session)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        // Create the container with a valid image in the "foo" session.
+        auto result = RunWslc(std::format(L"container create --session foo --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        std::wstring containerId = result.GetStdoutOneLine();
+
+        // Verify the container is listed with the correct status
+        VerifyContainerIsListed(containerId, L"created");
+    }
+
     TEST_METHOD(WSLCE2E_Container_Create_DuplicateContainerName)
     {
         WSL2_TEST_ONLY();
