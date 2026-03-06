@@ -1831,6 +1831,7 @@ class WSLATests
 
     TEST_METHOD(NATNetworkingWithDnsTunneling)
     {
+        WINDOWS_11_TEST_ONLY();
         ValidateNetworking(WSLANetworkingModeNAT, true);
     }
 
