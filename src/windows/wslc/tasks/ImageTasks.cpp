@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "ArgumentValidation.h"
+#include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
 #include "ImageModel.h"
 #include "ImageService.h"
@@ -29,6 +30,31 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+void BuildImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::Path));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& contextPath = context.Args.Get<ArgType::Path>();
+
+    std::wstring tag;
+    if (context.Args.Contains(ArgType::Tag))
+    {
+        tag = context.Args.Get<ArgType::Tag>();
+    }
+
+    std::wstring dockerfilePath;
+    if (context.Args.Contains(ArgType::File))
+    {
+        dockerfilePath = context.Args.Get<ArgType::File>();
+    }
+
+    PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
+
+    BuildImageCallback callback;
+    services::ImageService::Build(session, contextPath, tag, dockerfilePath, &callback);
+}
+
 void GetImages(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
