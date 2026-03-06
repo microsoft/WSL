@@ -54,14 +54,14 @@ public:
 
     ~WSLAContainerImpl();
 
-    void Start(WSLAContainerStartFlags Flags);
-    void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
+    void Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys);
+    void Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
     void Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds);
     void Delete();
     void Export(ULONG TarHandle) const;
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process) const;
-    void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process);
+    void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachKeys, _Out_ IWSLAProcess** Process);
     void Inspect(LPSTR* Output) const;
     void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
     void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count) const;
@@ -151,14 +151,14 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
-    IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
+    IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
-    IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process) override;
-    IFACEMETHOD(Start)(WSLAContainerStartFlags Flags) override;
+    IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _In_opt_ LPCSTR DetachKeys, _Out_ IWSLAProcess** Process) override;
+    IFACEMETHOD(Start)(WSLAContainerStartFlags Flags, _In_opt_ LPCSTR DetachKeys) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLAContainerId Id) override;
