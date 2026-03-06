@@ -2738,3 +2738,128 @@ try
     }
 }
 CATCH_LOG();
+
+class ReadHandleWithTargetValue : public wsl::windows::common::relay::ReadHandle
+{
+public:
+    NON_COPYABLE(ReadHandleWithTargetValue);
+    NON_MOVABLE(ReadHandleWithTargetValue);
+
+    ReadHandleWithTargetValue(wsl::windows::common::relay::HandleWrapper&& MovedHandle, std::string_view targetValue) :
+        ReadHandle(std::move(MovedHandle), [&](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
+        m_targetValue(targetValue)
+    {
+    }
+
+    void Schedule() override
+    {
+        ReadHandle::Schedule();
+        CheckIfTargetFound();
+    }
+
+    void Collect() override
+    {
+        ReadHandle::Collect();
+        CheckIfTargetFound();
+    }
+
+private:
+    void CheckIfTargetFound()
+    {
+        using namespace wsl::windows::common::relay;
+
+        if (State == IOHandleStatus::Standby || State == IOHandleStatus::Completed)
+        {
+            bool targetFound = (m_readBuffer.find(m_targetValue) != std::string::npos);
+
+            if (State == IOHandleStatus::Standby)
+            {
+                if (targetFound)
+                {
+                    State = IOHandleStatus::Completed;
+                }
+            }
+            else
+            {
+                THROW_WIN32_IF(ERROR_NOT_FOUND, !targetFound);
+            }
+        }
+    }
+
+    std::string m_readBuffer;
+    std::string m_targetValue;
+};
+
+void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout)
+{
+    wsl::windows::common::relay::MultiHandleWait io;
+    io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));
+    io.Run(timeout);
+}
+
+std::filesystem::path GetTestImagePath(std::string_view imageName)
+{
+    std::filesystem::path result = std::filesystem::path{g_testDataPath};
+
+    if (imageName == "debian:latest")
+    {
+        result /= L"debian-latest.tar";
+    }
+    else if (imageName == "python:3.12-alpine")
+    {
+        result /= L"python-3_12-alpine.tar";
+    }
+    else if (imageName == "alpine:latest")
+    {
+        result /= L"alpine-latest.tar";
+    }
+    else if (imageName == "hello-world:latest")
+    {
+        result /= L"HelloWorldSaved.tar";
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unknown test image: %hs", imageName.data());
+    }
+
+    return result;
+}
+
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
+{
+    const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
+    filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
+
+    const winrt::Windows::Web::Http::HttpClient client(filter);
+
+    try
+    {
+        auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
+        auto content = response.Content().ReadAsStringAsync().get();
+
+        if (expectedCode.has_value())
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
+        }
+        else
+        {
+            LogError("Unexpected reply for: %ls", Url);
+            VERIFY_FAIL();
+        }
+    }
+    catch (...)
+    {
+        auto result = wil::ResultFromCaughtException();
+
+        if (!expectedCode.has_value())
+        {
+            // We currently reset the connection if connect() fails inside the VM. Consider failing the Windows connect() instead.
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
+        }
+        else
+        {
+            LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
+            VERIFY_FAIL();
+        }
+    }
+}

@@ -62,6 +62,14 @@ struct FlagsTraits<WslcContainerStartFlags>
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
 };
 
+template <>
+struct FlagsTraits<WslcDeleteContainerFlags>
+{
+    using WslaType = WSLADeleteFlags;
+    constexpr static WslcDeleteContainerFlags Mask = WSLC_DELETE_CONTAINER_FLAG_FORCE;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLADeleteFlagsForce);
+};
+
 template <typename Flags>
 typename FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
 {
@@ -86,7 +94,20 @@ WSLASignal ConvertSignal(WslcSignal signal)
     case WSLC_SIGNAL_SIGTERM:
         return WSLASignal::WSLASignalSIGTERM;
     default:
-        THROW_HR(E_INVALIDARG);
+        THROW_HR_MSG(E_INVALIDARG, "Invalid WslcSignal: %i", signal);
+    }
+}
+
+WSLA_CONTAINER_NETWORK_TYPE Convert(WslcContainerNetworkingMode mode)
+{
+    switch (mode)
+    {
+    case WSLC_CONTAINER_NETWORKING_MODE_NONE:
+        return WSLA_CONTAINER_NETWORK_NONE;
+    case WSLC_CONTAINER_NETWORKING_MODE_BRIDGED:
+        return WSLA_CONTAINER_NETWORK_BRIDGE;
+    default:
+        THROW_HR_MSG(E_INVALIDARG, "Invalid WslcContainerNetworkingMode: %i", mode);
     }
 }
 
@@ -100,6 +121,24 @@ void GetErrorInfoFromCOM(PWSTR* errorMessage)
         {
             *errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorInfo->Message.get()).release();
         }
+    }
+}
+
+void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
+{
+    THROW_HR_IF(E_INVALIDARG, path.empty());
+
+    if (containerPath)
+    {
+        auto pathString = path.native();
+        // Not allowed to mount to root
+        THROW_HR_IF(E_INVALIDARG, pathString.length() < 2);
+        // Must be absolute
+        THROW_HR_IF(E_INVALIDARG, pathString[0] != L'/');
+    }
+    else
+    {
+        THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
 }
 } // namespace
@@ -217,15 +256,6 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
 
     RETURN_HR(internalType->session->Terminate());
-}
-CATCH_RETURN();
-
-STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerNetworkingMode networkingMode)
-try
-{
-    UNREFERENCED_PARAMETER(networkingMode);
-    UNREFERENCED_PARAMETER(containerSettings);
-    return E_NOTIMPL;
 }
 CATCH_RETURN();
 
@@ -360,6 +390,8 @@ try
     *internalType = {};
 
     internalType->image = imageName;
+    // Default network configuration to WSLC SDK `0`, which is NONE.
+    internalType->networking = WSLA_CONTAINER_NETWORK_NONE;
 
     return S_OK;
 }
@@ -400,12 +432,45 @@ try
         // containerOptions.InitProcessOptions.User;
     }
 
-    // TODO: Implement
-    // containerOptions.Volumes;
-    // containerOptions.VolumesCount;
-    // containerOptions.Ports;
-    // containerOptions.PortsCount;
-    // containerOptions.ContainerNetwork;
+    std::unique_ptr<WSLA_VOLUME[]> convertedVolumes;
+    if (internalContainerSettings->volumes && internalContainerSettings->volumesCount)
+    {
+        convertedVolumes = std::make_unique<WSLA_VOLUME[]>(internalContainerSettings->volumesCount);
+        for (uint32_t i = 0; i < internalContainerSettings->volumesCount; ++i)
+        {
+            const WslcContainerVolume& internalVolume = internalContainerSettings->volumes[i];
+            WSLA_VOLUME& convertedVolume = convertedVolumes[i];
+
+            convertedVolume.HostPath = internalVolume.windowsPath;
+            convertedVolume.ContainerPath = internalVolume.containerPath;
+            convertedVolume.ReadOnly = internalVolume.readOnly;
+        }
+        containerOptions.Volumes = convertedVolumes.get();
+        containerOptions.VolumesCount = static_cast<ULONG>(internalContainerSettings->volumesCount);
+    }
+
+    std::unique_ptr<WSLA_PORT_MAPPING[]> convertedPorts;
+    if (internalContainerSettings->ports && internalContainerSettings->portsCount)
+    {
+        convertedPorts = std::make_unique<WSLA_PORT_MAPPING[]>(internalContainerSettings->portsCount);
+        for (uint32_t i = 0; i < internalContainerSettings->portsCount; ++i)
+        {
+            const WslcContainerPortMapping& internalPort = internalContainerSettings->ports[i];
+            WSLA_PORT_MAPPING& convertedPort = convertedPorts[i];
+
+            convertedPort.HostPort = internalPort.windowsPort;
+            convertedPort.ContainerPort = internalPort.containerPort;
+            // TODO: Only other supported value right now is AF_INET6; no user access.
+            convertedPort.Family = AF_INET;
+
+            // TODO: Unused protocol?
+            // TODO: Unused windowsAddress?
+        }
+        containerOptions.Ports = convertedPorts.get();
+        containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
+    }
+
+    containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
 
     // TODO: No user access
     // containerOptions.Entrypoint;
@@ -473,24 +538,56 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerNetworkingMode networkingMode)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+
+    internalType->networking = Convert(networkingMode);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 STDAPI WslcContainerSettingsSetPortMapping(
     _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount)
 try
 {
-    UNREFERENCED_PARAMETER(portMappings);
-    UNREFERENCED_PARAMETER(containerSettings);
-    UNREFERENCED_PARAMETER(portMappingCount);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(E_INVALIDARG, (portMappings == nullptr && portMappingCount != 0) || (portMappings != nullptr && portMappingCount == 0));
+
+    for (uint32_t i = 0; i < portMappingCount; ++i)
+    {
+        RETURN_HR_IF(E_NOTIMPL, portMappings[i].windowsAddress != nullptr);
+        RETURN_HR_IF(E_NOTIMPL, portMappings[i].protocol != 0);
+    }
+
+    internalType->ports = portMappings;
+    internalType->portsCount = portMappingCount;
+
+    return S_OK;
 }
 CATCH_RETURN();
 
-STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount)
+STDAPI WslcContainerSettingsSetVolumes(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount)
 try
 {
-    UNREFERENCED_PARAMETER(volumes);
-    UNREFERENCED_PARAMETER(volumeCount);
-    UNREFERENCED_PARAMETER(containerSettings);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(E_INVALIDARG, (volumes == nullptr && volumeCount != 0) || (volumes != nullptr && volumeCount == 0));
+
+    for (uint32_t i = 0; i < volumeCount; ++i)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, volumes[i].windowsPath);
+        EnsureAbsolutePath(volumes[i].windowsPath, false);
+        RETURN_HR_IF_NULL(E_INVALIDARG, volumes[i].containerPath);
+        EnsureAbsolutePath(volumes[i].containerPath, true);
+    }
+
+    internalType->volumes = volumes;
+    internalType->volumesCount = volumeCount;
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -570,10 +667,7 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: Flags?
-    UNREFERENCED_PARAMETER(flags);
-
-    RETURN_HR(internalType->container->Delete());
+    RETURN_HR(internalType->container->Delete(ConvertFlags(flags)));
 }
 CATCH_RETURN();
 
@@ -608,10 +702,10 @@ try
     RETURN_HR_IF(
         E_INVALIDARG,
         (argv == nullptr && argc != 0) || (argv != nullptr && argc == 0) ||
-            (argc > static_cast<size_t>(std::numeric_limits<UINT32>::max())));
+            (argc > static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
 
     internalType->commandLine = argv;
-    internalType->commandLineCount = static_cast<UINT32>(argc);
+    internalType->commandLineCount = static_cast<uint32_t>(argc);
 
     return S_OK;
 }
@@ -620,10 +714,16 @@ CATCH_RETURN();
 STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* key_value, size_t argc)
 try
 {
-    UNREFERENCED_PARAMETER(key_value);
-    UNREFERENCED_PARAMETER(argc);
-    UNREFERENCED_PARAMETER(processSettings);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(processSettings);
+    RETURN_HR_IF(
+        E_INVALIDARG,
+        (key_value == nullptr && argc != 0) || (key_value != nullptr && argc == 0) ||
+            (argc > static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+
+    internalType->environment = key_value;
+    internalType->environmentCount = static_cast<uint32_t>(argc);
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -748,9 +848,23 @@ CATCH_RETURN();
 STDAPI WslcSessionImageLoad(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options)
 try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+    RETURN_HR_IF(E_INVALIDARG, options->ImageHandle == nullptr || options->ImageHandle == INVALID_HANDLE_VALUE);
+    RETURN_HR_IF(E_INVALIDARG, options->ContentLength == 0);
+
+    auto progressCallback = ProgressCallback::CreateIf(options);
+
+    HRESULT hr = internalType->session->LoadImage(HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength);
+
+    if (FAILED_LOG(hr))
+    {
+        // TODO: Expected error message changes
+        // GetErrorInfoFromCOM(errorMessage);
+    }
+
+    return hr;
 }
 CATCH_RETURN();
 

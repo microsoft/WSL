@@ -287,9 +287,16 @@ void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::DeleteContainer(const std::string& Id)
+void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force)
 {
-    Transaction(verb::delete_, URL::Create("/containers/{}", Id));
+    auto url = URL::Create("/containers/{}", Id);
+
+    if (Force)
+    {
+        url.SetParameter("force", true);
+    }
+
+    Transaction(verb::delete_, url);
 }
 
 docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)

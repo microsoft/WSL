@@ -593,7 +593,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             Transition(WslaContainerStateExited);
             if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
             {
-                DeleteExclusiveLockHeld();
+                DeleteExclusiveLockHeld(WSLADeleteFlagsNone);
             }
         }
     }
@@ -653,7 +653,7 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
 
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
-        DeleteExclusiveLockHeld();
+        DeleteExclusiveLockHeld(WSLADeleteFlagsForce);
     }
     else
     {
@@ -668,27 +668,29 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
     }
 }
 
-void WSLAContainerImpl::Delete()
+void WSLAContainerImpl::Delete(WSLADeleteFlags Flags)
 {
     // Acquire an exclusive lock since this method modifies m_state.
     auto lock = m_lock.lock_exclusive();
 
-    DeleteExclusiveLockHeld();
+    DeleteExclusiveLockHeld(Flags);
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLockHeld()
+__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLockHeld(WSLADeleteFlags Flags)
 {
     // Validate that the container is not running or already deleted.
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslaContainerStateCreated && m_state != WslaContainerStateExited,
+        (m_state == WslaContainerStateRunning && WI_IsFlagClear(Flags, WSLADeleteFlagsForce)) || m_state == WslaContainerStateDeleted,
         "Cannot delete container '%hs', state: %i",
         m_name.c_str(),
         m_state);
 
+    WI_ASSERT(m_state != WslaContainerStateInvalid);
+
     try
     {
-        m_dockerClient.DeleteContainer(m_id);
+        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLADeleteImageFlagsForce));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
@@ -1432,15 +1434,17 @@ HRESULT WSLAContainer::Inspect(LPSTR* Output)
     return CallImpl(&WSLAContainerImpl::Inspect, Output);
 }
 
-HRESULT WSLAContainer::Delete()
+HRESULT WSLAContainer::Delete(WSLADeleteFlags Flags)
 try
 {
     COMServiceExecutionContext context;
 
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLADeleteFlagsValid), "Invalid flags: %i", Flags);
+
     // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
     auto [lock, impl] = LockImpl();
 
-    impl->Delete();
+    impl->Delete(Flags);
     m_onDeleted(impl);
 
     return S_OK;
