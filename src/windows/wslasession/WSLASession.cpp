@@ -41,7 +41,7 @@ std::pair<std::string, std::optional<std::string>> ParseImage(const std::string&
     return {Input.substr(0, separator), Input.substr(separator + 1)};
 }
 
-void ValidateContainerName(LPCSTR Name)
+void ValidateName(LPCSTR Name)
 {
     const auto& locale = std::locale::classic();
     size_t i = 0;
@@ -1009,7 +1009,7 @@ try
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr)
     {
-        ValidateContainerName(containerOptions->Name);
+        ValidateName(containerOptions->Name);
     }
 
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
@@ -1053,7 +1053,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    ValidateContainerName(Id);
+    ValidateName(Id);
 
     // Look for an exact ID match first.
     auto lock = m_lock.lock_shared();
@@ -1181,6 +1181,8 @@ try
 
     std::string name = Options->Name;
     std::string type = Options->Type;
+
+    ValidateName(name.c_str());
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);

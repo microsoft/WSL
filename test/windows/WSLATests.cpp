@@ -3095,21 +3095,21 @@ class WSLATests
         // Test error paths
         {
             expectOpen("", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: ''");
+            ValidateCOMErrorMessage(L"Invalid name: ''");
 
             expectOpen("non-existing-container", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             expectOpen("/", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: '/'");
+            ValidateCOMErrorMessage(L"Invalid name: '/'");
 
             expectOpen("?foo=bar", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: '?foo=bar'");
+            ValidateCOMErrorMessage(L"Invalid name: '?foo=bar'");
 
             expectOpen("\n", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: '\n'");
+            ValidateCOMErrorMessage(L"Invalid name: '\n'");
 
             expectOpen(" ", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: ' '");
+            ValidateCOMErrorMessage(L"Invalid name: ' '");
         }
     }
 
@@ -4957,7 +4957,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &container), E_INVALIDARG);
             VERIFY_IS_NULL(container.get());
 
-            ValidateCOMErrorMessage(std::format(L"Invalid container name: '{}'", name));
+            ValidateCOMErrorMessage(std::format(L"Invalid name: '{}'", name));
         };
 
         expectInvalidArg("container with spaces");
