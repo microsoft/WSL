@@ -24,6 +24,8 @@ internal static class SettingsApplyHelper
 
         var contentText = string.Join(Environment.NewLine, changeLines);
 
+        var runningDistros = WslCoreConfigInterface.GetRunningDistributionNames();
+
         var contentPanel = new StackPanel { Spacing = 8 };
         contentPanel.Children.Add(new TextBlock
         {
@@ -36,6 +38,38 @@ internal static class SettingsApplyHelper
             TextWrapping = TextWrapping.Wrap,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
         });
+
+        if (runningDistros.Count > 0)
+        {
+            contentPanel.Children.Add(new TextBlock
+            {
+                Text = "Settings_ApplyChangesDialogRunningDistros".GetLocalized(),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0),
+            });
+            contentPanel.Children.Add(new TextBlock
+            {
+                Text = string.Join(", ", runningDistros),
+                TextWrapping = TextWrapping.Wrap,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            });
+            contentPanel.Children.Add(new TextBlock
+            {
+                Text = "Settings_ApplyChangesDialogWillRestart".GetLocalized(),
+                TextWrapping = TextWrapping.Wrap,
+                FontStyle = Windows.UI.Text.FontStyle.Italic,
+                Margin = new Thickness(0, 4, 0, 0),
+            });
+        }
+        else
+        {
+            contentPanel.Children.Add(new TextBlock
+            {
+                Text = "Settings_ApplyChangesDialogNoRunningDistros".GetLocalized(),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0),
+            });
+        }
 
         var dialog = new ContentDialog
         {
@@ -72,6 +106,24 @@ internal static class SettingsApplyHelper
             });
 
             wslConfigService.ClearPendingChanges();
+
+            // Relaunch previously-running distributions
+            foreach (var name in runningDistros)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = wslPath,
+                        Arguments = $"-d {name}",
+                        UseShellExecute = true,
+                    });
+                }
+                catch
+                {
+                    // Best-effort — don't fail the whole operation if one distro can't relaunch
+                }
+            }
         }
         catch (Exception ex)
         {

@@ -15,6 +15,7 @@ Abstract:
 #include <WslCoreConfigInterface.h>
 #include "WslCoreConfig.h"
 #include <helpers.hpp>
+#include "svccomm.hpp"
 
 using namespace wsl::shared::string;
 using namespace wsl::core;
@@ -562,5 +563,64 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
     }
     default:
         FAIL_FAST();
+    }
+}
+
+unsigned long GetRunningDistributions(unsigned long* count, WslRunningDistribution** distributions)
+{
+    if (count == nullptr || distributions == nullptr)
+    {
+        return ERROR_INVALID_PARAMETER;
+    }
+
+    *count = 0;
+    *distributions = nullptr;
+
+    try
+    {
+        wsl::windows::common::SvcComm service;
+        auto allDistros = service.EnumerateDistributions();
+
+        std::vector<LXSS_ENUMERATE_INFO> running;
+        for (const auto& distro : allDistros)
+        {
+            if (distro.State == LxssDistributionStateRunning && distro.DistroGuid != WSL2_SYSTEM_DISTRO_GUID)
+            {
+                running.push_back(distro);
+            }
+        }
+
+        if (running.empty())
+        {
+            return 0;
+        }
+
+        auto* result = static_cast<WslRunningDistribution*>(
+            CoTaskMemAlloc(running.size() * sizeof(WslRunningDistribution)));
+        if (result == nullptr)
+        {
+            return ERROR_OUTOFMEMORY;
+        }
+
+        for (size_t i = 0; i < running.size(); i++)
+        {
+            wcsncpy_s(result[i].Name, running[i].DistroName, _TRUNCATE);
+        }
+
+        *count = static_cast<unsigned long>(running.size());
+        *distributions = result;
+        return 0;
+    }
+    catch (...)
+    {
+        return wil::ResultFromCaughtException();
+    }
+}
+
+void FreeRunningDistributions(WslRunningDistribution* distributions)
+{
+    if (distributions != nullptr)
+    {
+        CoTaskMemFree(distributions);
     }
 }

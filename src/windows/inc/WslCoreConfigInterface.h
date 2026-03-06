@@ -95,3 +95,14 @@ GetWslConfigSetting(WslConfig_t wslConfig, enum WslConfigEntry ConfigEntry);
 
 STDAPI_(unsigned long)
 SetWslConfigSetting(WslConfig_t wslConfig, struct WslConfigSetting setting);
+
+struct WslRunningDistribution
+{
+    wchar_t Name[257];
+};
+
+STDAPI_(unsigned long)
+GetRunningDistributions(unsigned long* count, struct WslRunningDistribution** distributions);
+
+STDAPI_(void)
+FreeRunningDistributions(struct WslRunningDistribution* distributions);

@@ -15,6 +15,13 @@ using __IntPtr = global::System.IntPtr;
 
 namespace LibWsl
 {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct WslRunningDistribution
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 257)]
+        public string Name;
+    }
+
     public enum WslConfigEntry
     {
         NoEntry = 0,
@@ -356,6 +363,12 @@ namespace LibWsl
 
             [SuppressUnmanagedCodeSecurity, DllImport(@"..\libwsl.dll", EntryPoint = "SetWslConfigSetting", CallingConvention = __CallingConvention.StdCall)]
             internal static extern uint SetWslConfigSetting(__IntPtr wslConfig, global::LibWsl.WslConfigSetting.__Internal setting);
+
+            [SuppressUnmanagedCodeSecurity, DllImport(@"..\libwsl.dll", EntryPoint = "GetRunningDistributions", CallingConvention = __CallingConvention.StdCall)]
+            internal static extern uint GetRunningDistributions(out uint count, out __IntPtr distributions);
+
+            [SuppressUnmanagedCodeSecurity, DllImport(@"..\libwsl.dll", EntryPoint = "FreeRunningDistributions", CallingConvention = __CallingConvention.StdCall)]
+            internal static extern void FreeRunningDistributions(__IntPtr distributions);
         }
 
         public static string GetWslConfigFilePath()
@@ -394,6 +407,34 @@ namespace LibWsl
             var __arg1 = setting.__Instance;
             var ___ret = __Internal.SetWslConfigSetting(__arg0, *(global::LibWsl.WslConfigSetting.__Internal*) __arg1);
             return ___ret;
+        }
+
+        public static List<string> GetRunningDistributionNames()
+        {
+            var result = __Internal.GetRunningDistributions(out var count, out var ptr);
+            if (result != 0 || count == 0 || ptr == __IntPtr.Zero)
+            {
+                return new List<string>();
+            }
+
+            try
+            {
+                var names = new List<string>();
+                var structSize = Marshal.SizeOf<WslRunningDistribution>();
+                for (uint i = 0; i < count; i++)
+                {
+                    var distro = Marshal.PtrToStructure<WslRunningDistribution>(ptr + (int)(i * structSize));
+                    if (!string.IsNullOrEmpty(distro.Name))
+                    {
+                        names.Add(distro.Name);
+                    }
+                }
+                return names;
+            }
+            finally
+            {
+                __Internal.FreeRunningDistributions(ptr);
+            }
         }
     }
 }

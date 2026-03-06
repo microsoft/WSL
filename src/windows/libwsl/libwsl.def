@@ -6,3 +6,5 @@ EXPORTS
     FreeWslConfig
     GetWslConfigSetting
     SetWslConfigSetting
+    GetRunningDistributions
+    FreeRunningDistributions

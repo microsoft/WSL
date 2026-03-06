@@ -1904,4 +1904,13 @@ Changes to apply:</value>
     <value>Settings were saved, but shutting down WSL failed: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
+  <data name="Settings_ApplyChangesDialogRunningDistros" xml:space="preserve">
+    <value>The following distributions are currently running and will be shut down:</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogWillRestart" xml:space="preserve">
+    <value>They will be relaunched automatically after shutdown.</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogNoRunningDistros" xml:space="preserve">
+    <value>No distributions are currently running.</value>
+  </data>
 </root>
