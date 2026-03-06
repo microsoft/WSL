@@ -91,17 +91,12 @@ WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --verbose --verbose cont1)") \
 /* Flag parse tests */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -v cont1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -vi cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -rm cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -virm cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -vrmi cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -rmiv cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -rmiv- cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -rmivp- cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -prmiv cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -prmiv=80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -prmiv 80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -rmivp 80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -rmivp=80:80 cont1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -ivp- cont1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -piv cont1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -piv=80:80 cont1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -piv 80:80 cont1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -ivp 80:80 cont1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -ivp=80:80 cont1)") \
 \
 /* Validation tests */ \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO cont1)") \
