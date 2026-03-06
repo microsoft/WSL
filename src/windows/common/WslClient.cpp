@@ -1521,7 +1521,7 @@ DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 // Temporary debugging tool for WSLA
 int WslaShell(_In_ std::wstring_view commandLine)
 {
-    WSLA_SESSION_SETTINGS sessionSettings{};
+    WSLASessionSettings sessionSettings{};
     sessionSettings.DisplayName = L"WSLAShell";
     sessionSettings.CpuCount = 4;
     sessionSettings.MemoryMb = 4096;

@@ -75,7 +75,7 @@ auto ValidatePortMappings(const WSLA_CONTAINER_OPTIONS& options)
 {
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        options.PortsCount > 0 && options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_NONE,
+        options.PortsCount > 0 && options.ContainerNetwork.ContainerNetworkType == WSLAContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
     // Validate that port mappings are valid.
@@ -164,21 +164,22 @@ auto AllocateVmPorts(std::set<uint16_t>& vmPorts, WSLAVirtualMachine& vm)
 }
 
 // Builds port mapping list from container options and returns the network mode string.
-std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options)
+// Note: For bridge mode, VM ports are set to 0 and will be allocated later by MapPorts().
+std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLAContainerOptions& options)
 {
-    WSLA_CONTAINER_NETWORK_TYPE networkType = options.ContainerNetwork.ContainerNetworkType;
+    WSLAContainerNetworkType networkType = options.ContainerNetwork.ContainerNetworkType;
 
     // Determine network mode string.
     std::string networkMode;
-    if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+    if (networkType == WSLAContainerNetworkTypeBridged)
     {
         networkMode = "bridge";
     }
-    else if (networkType == WSLA_CONTAINER_NETWORK_HOST)
+    else if (networkType == WSLAContainerNetworkTypeHost)
     {
         networkMode = "host";
     }
-    else if (networkType == WSLA_CONTAINER_NETWORK_NONE)
+    else if (networkType == WSLAContainerNetworkTypeNone)
     {
         networkMode = "none";
     }
@@ -190,7 +191,7 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const W
     // Validate port mappings.
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        options.PortsCount > 0 && networkType == WSLA_CONTAINER_NETWORK_NONE,
+        options.PortsCount > 0 && networkType == WSLAContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
     std::vector<WSLAPortMapping> ports;
@@ -201,13 +202,13 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const W
         const auto& port = options.Ports[i];
         THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
 
-        if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+        if (networkType == WSLAContainerNetworkTypeBridged)
         {
             // Note: For bridge mode, VM ports are initially set to 0 and later allocated from the VM port pool
             // at time via AllocateVmPorts().
             ports.push_back({port.HostPort, 0, port.ContainerPort, port.Family});
         }
-        else if (networkType == WSLA_CONTAINER_NETWORK_HOST)
+        else if (networkType == WSLAContainerNetworkTypeHost)
         {
             // In host mode, the container port is the same as the VM port.
             ports.push_back({port.HostPort, port.ContainerPort, port.ContainerPort, port.Family});
@@ -243,22 +244,22 @@ auto MountVolumes(std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& par
     return std::move(errorCleanup);
 }
 
-WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
+WSLAContainerState DockerStateToWSLAState(ContainerState state)
 {
     // TODO: Handle other states like Paused, Restarting, etc.
     switch (state)
     {
     case ContainerState::Created:
-        return WSLA_CONTAINER_STATE::WslaContainerStateCreated;
+        return WSLAContainerState::WslaContainerStateCreated;
     case ContainerState::Running:
-        return WSLA_CONTAINER_STATE::WslaContainerStateRunning;
+        return WSLAContainerState::WslaContainerStateRunning;
     case ContainerState::Exited:
     case ContainerState::Dead:
-        return WSLA_CONTAINER_STATE::WslaContainerStateExited;
+        return WSLAContainerState::WslaContainerStateExited;
     case ContainerState::Removing:
-        return WSLA_CONTAINER_STATE::WslaContainerStateDeleted;
+        return WSLAContainerState::WslaContainerStateDeleted;
     default:
-        return WSLA_CONTAINER_STATE::WslaContainerStateInvalid;
+        return WSLAContainerState::WslaContainerStateInvalid;
     }
 }
 
@@ -334,7 +335,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     IORelay& Relay,
-    WSLA_CONTAINER_STATE InitialState,
+    WSLAContainerState InitialState,
     WSLAProcessFlags InitProcessFlags,
     WSLAContainerFlags ContainerFlags) :
     m_wslaSession(wslaSession),
@@ -737,7 +738,7 @@ void WSLAContainerImpl::Export(ULONG OutHandle) const
     }
 }
 
-void WSLAContainerImpl::GetState(WSLA_CONTAINER_STATE* Result)
+void WSLAContainerImpl::GetState(WSLAContainerState* Result)
 {
     auto lock = m_lock.lock_shared();
     *Result = m_state;
@@ -752,7 +753,7 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process) const
     THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
 }
 
-void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachKeys, IWSLAProcess** Process)
+void WSLAContainerImpl::Exec(const WSLAProcessOptions* Options, LPCSTR DetachKeys, IWSLAProcess** Process)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
 
@@ -925,7 +926,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
 }
 
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
-    const WSLA_CONTAINER_OPTIONS& containerOptions,
+    const WSLAContainerOptions& containerOptions,
     WSLASession& wslaSession,
     WSLAVirtualMachine& virtualMachine,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
@@ -1335,7 +1336,7 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DisconnectComWrap
     }
 }
 
-__requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLA_CONTAINER_STATE State) noexcept
+__requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerState State) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslaContainerStateDeleted);
@@ -1365,7 +1366,7 @@ HRESULT WSLAContainer::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, UL
     return CallImpl(&WSLAContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
 }
 
-HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
+HRESULT WSLAContainer::GetState(WSLAContainerState* Result)
 {
     COMServiceExecutionContext context;
 
@@ -1381,7 +1382,7 @@ HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
     return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
 }
 
-HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, LPCSTR DetachKeys, IWSLAProcess** Process)
+HRESULT WSLAContainer::Exec(const WSLAProcessOptions* Options, LPCSTR DetachKeys, IWSLAProcess** Process)
 {
     COMServiceExecutionContext context;
 
@@ -1474,7 +1475,7 @@ try
 }
 CATCH_RETURN();
 
-void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count) const
+void WSLAContainerImpl::GetLabels(WSLALabelInformation** Labels, ULONG* Count) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -1498,7 +1499,7 @@ void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
     }
 
     // All strings built successfully — allocate output array and transfer ownership.
-    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(localLabels.size());
+    auto labelsArray = wil::make_unique_cotaskmem<WSLALabelInformation[]>(localLabels.size());
     for (size_t i = 0; i < localLabels.size(); ++i)
     {
         labelsArray[i].Key = localLabels[i].first.release();
@@ -1509,7 +1510,7 @@ void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
     *Labels = labelsArray.release();
 }
 
-HRESULT WSLAContainer::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+HRESULT WSLAContainer::GetLabels(WSLALabelInformation** Labels, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;

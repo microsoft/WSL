@@ -44,33 +44,30 @@ public:
 
     // IWSLASession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
-    IFACEMETHOD(Initialize)(_In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm) override;
+    IFACEMETHOD(Initialize)(_In_ const WSLASessionInitSettings* Settings, _In_ IWSLAVirtualMachine* Vm) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetState)(_Out_ WSLASessionState* State) override;
 
     // Image management.
-    IFACEMETHOD(PullImage)(
-        _In_ LPCSTR ImageUri,
-        _In_opt_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
-        _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(PullImage)(_In_ LPCSTR ImageUri, _In_opt_ const WslaRegistryAuthInformation* RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(BuildImage)(_In_ LPCWSTR ContextPath, _In_ ULONG DockerfileHandle, _In_opt_ LPCSTR ImageTag, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(ListImages)(_In_opt_ const WSLA_LIST_IMAGES_OPTIONS* Options, _Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
-    IFACEMETHOD(DeleteImage)(_In_ const WSLA_DELETE_IMAGE_OPTIONS* Options, _Out_ WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, _Out_ ULONG* Count) override;
-    IFACEMETHOD(TagImage)(_In_ const WSLA_TAG_IMAGE_OPTIONS* Options) override;
+    IFACEMETHOD(ListImages)(_In_opt_ const WSLAListImageOptions* Options, _Out_ WSLAImageInformation** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(DeleteImage)(_In_ const WSLADeleteImageOptions* Options, _Out_ WSLADeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
+    IFACEMETHOD(TagImage)(_In_ const WSLATagImageOptions* Options) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
 
     // Container management.
-    IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
+    IFACEMETHOD(CreateContainer)(_In_ const WSLAContainerOptions* Options, _Out_ IWSLAContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLAContainer** Container) override;
-    IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(ListContainers)(_Out_ WSLAContainerEntry** Images, _Out_ ULONG* Count) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
-        _In_ LPCSTR Executable, _In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** VirtualMachine, _Out_ int* Errno) override;
+        _In_ LPCSTR Executable, _In_ const WSLAProcessOptions* Options, _Out_ IWSLAProcess** VirtualMachine, _Out_ int* Errno) override;
 
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
@@ -91,7 +88,7 @@ public:
 private:
     ULONG m_id = 0;
 
-    void ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid);
+    void ConfigureStorage(const WSLASessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);

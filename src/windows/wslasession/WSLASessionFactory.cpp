@@ -30,7 +30,7 @@ void wsla::WSLASessionFactory::SetDestructionCallback(std::function<void()>&& ca
 }
 
 HRESULT wsla::WSLASessionFactory::CreateSession(
-    _In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm, _Out_ IWSLASession** Session, _Out_ IWSLASessionReference** ServiceRef)
+    _In_ const WSLASessionInitSettings* Settings, _In_ IWSLAVirtualMachine* Vm, _Out_ IWSLASession** Session, _Out_ IWSLASessionReference** ServiceRef)
 try
 {
     *Session = nullptr;
