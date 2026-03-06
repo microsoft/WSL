@@ -292,7 +292,7 @@ After parsing, each known key is validated against its expected type and allowed
 
 ### Settings Loading
 
-Settings are loaded once at startup in `CoreMain`, before command dispatch, and stored in `CLIExecutionContext`. Settings will be implemented as a singleton and globally accessible.
+Settings are loaded once at startup in `CoreMain`, before command dispatch, and stored in `CLIExecutionContext`. Settings will be implemented as a singleton and globally read accessible.
 
 ### Settings File Write (for `--reset`)
 
@@ -305,6 +305,10 @@ This will reset all settings to defaults. Continue? [y/N]
 ### No Live Reload
 
 Settings are read once per invocation. There is no file-watcher or live-reload mechanism. This is intentional: CLI tools should be predictable — the settings active when a command starts are the settings used for that command's lifetime.
+
+### Libyaml
+
+If in the end yaml is the chosen format, [Libyaml](https://github.com/yaml/libyaml) will be added as a dependency of this project. WinGet already has a YamlWrapper implementation on top of that.
 
 ---
 
