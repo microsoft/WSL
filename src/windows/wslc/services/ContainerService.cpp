@@ -30,7 +30,7 @@ using namespace std::chrono_literals;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
-static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
+static void SetContainerTTYOptions(WSLAProcessOptions& options)
 {
     if (!WI_IsFlagSet(options.Flags, WSLAProcessFlagsTty))
     {
@@ -69,7 +69,7 @@ static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
     THROW_HR(E_FAIL);
 }
 
-static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, std::vector<const char*>& argsStorage)
+static void SetContainerArguments(WSLAProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
@@ -81,7 +81,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, {}, WSLA_CONTAINER_NETWORK_HOST, processFlags);
+        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
@@ -110,6 +110,7 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
     std::wstring stateString;
     switch (state)
     {
+
     case WSLA_CONTAINER_STATE::WslaContainerStateCreated:
         stateString = L"created";
         break;
@@ -123,6 +124,7 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
         stateString = L"exited";
         break;
     case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
+
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
@@ -215,18 +217,13 @@ void ContainerService::Delete(Session& session, const std::string& id, bool forc
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    if (force)
-    {
-        StopInternal(*container, WSLASignalSIGKILL);
-    }
-
-    THROW_IF_FAILED(container->Delete());
+    THROW_IF_FAILED(container->Delete(force ? WSLADeleteFlagsForce : WSLADeleteFlagsNone));
 }
 
 std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
-    wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+    wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
     THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
     for (const auto& current : containers)
     {

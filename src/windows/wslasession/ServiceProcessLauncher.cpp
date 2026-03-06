@@ -46,7 +46,7 @@ WSLAProcess& ServiceRunningProcess::Get()
     return *m_process.Get();
 }
 
-void ServiceRunningProcess::GetState(WSLA_PROCESS_STATE* State, int* Code)
+void ServiceRunningProcess::GetState(WSLAProcessState* State, int* Code)
 {
     THROW_IF_FAILED(m_process->GetState(State, Code));
 }

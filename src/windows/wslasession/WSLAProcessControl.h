@@ -31,7 +31,7 @@ public:
     virtual void Signal(int Signal) = 0;
     virtual void ResizeTty(ULONG Rows, ULONG Columns) = 0;
     virtual int GetPid() const = 0;
-    std::pair<WSLA_PROCESS_STATE, int> GetState() const;
+    std::pair<WSLAProcessState, int> GetState() const;
     const wil::unique_event& GetExitEvent() const;
 
 protected:

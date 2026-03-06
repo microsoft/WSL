@@ -110,7 +110,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::Initialize(_In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm)
+HRESULT WSLASession::Initialize(_In_ const WSLASessionInitSettings* Settings, _In_ IWSLAVirtualMachine* Vm)
 try
 {
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
@@ -180,7 +180,7 @@ void WSLASession::SetDestructionCallback(std::function<void()>&& callback)
     m_destructionCallback = std::move(callback);
 }
 
-void WSLASession::ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid)
+void WSLASession::ConfigureStorage(const WSLASessionInitSettings& Settings, PSID UserSid)
 {
     if (Settings.StoragePath == nullptr)
     {
@@ -304,7 +304,7 @@ void WSLASession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
 
-HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WslaRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
@@ -678,7 +678,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLAListImagesFlags);
 
-HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+HRESULT WSLASession::ListImages(const WSLAListImageOptions* Options, WSLAImageInformation** Images, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -767,7 +767,7 @@ try
         return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
     });
 
-    auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(entries);
+    auto output = wil::make_unique_cotaskmem<WSLAImageInformation[]>(entries);
 
     size_t index = 0;
     for (const auto& e : images)
@@ -844,7 +844,7 @@ CATCH_RETURN();
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLADeleteImageFlags);
 
-HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count)
+HRESULT WSLASession::DeleteImage(const WSLADeleteImageOptions* Options, WSLADeletedImageInformation** DeletedImages, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -883,7 +883,7 @@ try
 
     THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Options->Image);
 
-    auto output = wil::make_unique_cotaskmem<WSLA_DELETED_IMAGE_INFORMATION[]>(deletedImages.size());
+    auto output = wil::make_unique_cotaskmem<WSLADeletedImageInformation[]>(deletedImages.size());
 
     size_t index = 0;
     for (const auto& image : deletedImages)
@@ -911,7 +911,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::TagImage(const WSLA_TAG_IMAGE_OPTIONS* Options)
+HRESULT WSLASession::TagImage(const WSLATagImageOptions* Options)
 try
 {
     COMServiceExecutionContext context;
@@ -992,7 +992,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container)
+HRESULT WSLASession::CreateContainer(const WSLAContainerOptions* containerOptions, IWSLAContainer** Container)
 try
 {
     COMServiceExecutionContext context;
@@ -1094,7 +1094,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Containers, ULONG* Count)
+HRESULT WSLASession::ListContainers(WSLAContainerEntry** Containers, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -1108,7 +1108,7 @@ try
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
 
-    auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
+    auto output = wil::make_unique_cotaskmem<WSLAContainerEntry[]>(m_containers.size());
 
     size_t index = 0;
     for (const auto& e : m_containers)
@@ -1127,7 +1127,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
+HRESULT WSLASession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLAProcessOptions* Options, IWSLAProcess** Process, int* Errno)
 try
 {
     COMServiceExecutionContext context;
@@ -1179,7 +1179,7 @@ try
 }
 CATCH_RETURN();
 
-WSLA_CONTAINER_STATE WSLAContainerImpl::State() const noexcept
+WSLAContainerState WSLAContainerImpl::State() const noexcept
 {
     auto lock = m_lock.lock_shared();
     return m_state;

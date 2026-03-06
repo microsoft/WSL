@@ -112,7 +112,7 @@ void ListContainers(CLIExecutionContext& context)
     if (!context.Args.Contains(ArgType::All))
     {
         auto shouldRemove = [](const ContainerInformation& container) {
-            return container.State != WSLA_CONTAINER_STATE::WslaContainerStateRunning;
+            return container.State != WSLAContainerState::WslaContainerStateRunning;
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
     }
