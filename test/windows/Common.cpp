@@ -835,7 +835,6 @@ void CreateWerReports()
         L"vmwp.exe",
         L"wslasession.exe",
         L"wslaservice.exe",
-        L"wsladiag.exe", // TODO: Remove once wsladiag.exe is fully merged into wslc.exe
         L"wslc.exe"};
 
     auto PrivilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
