@@ -249,6 +249,31 @@ WSLAContainerState DockerStateToWSLAState(ContainerState state)
     }
 }
 
+std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
+{
+    // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
+    // Strip fractional seconds and trailing 'Z' since we only need second precision.
+    std::string input(timestamp);
+
+    auto dot = input.find('.');
+    if (dot != std::string::npos)
+    {
+        input = input.substr(0, dot);
+    }
+
+    if (!input.empty() && input.back() == 'Z')
+    {
+        input.pop_back();
+    }
+
+    std::chrono::sys_seconds utcSeconds;
+    std::istringstream stream(input);
+    stream >> std::chrono::parse("%FT%T", utcSeconds);
+    THROW_HR_IF(E_INVALIDARG, stream.fail());
+
+    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
+}
+
 std::string CleanContainerName(const std::string& name)
 {
     // Docker container names have a leading '/', strip it.
@@ -1053,6 +1078,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
     metadata.Ports = ports;
+    metadata.StateChangedAt = static_cast<std::uint64_t>(std::time(nullptr));
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
     request.Labels.insert(labels.begin(), labels.end());
@@ -1136,6 +1162,30 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         DockerStateToWSLAState(dockerContainer.State),
         metadata.InitProcessFlags,
         metadata.Flags);
+
+    // Restore the state change timestamp from Docker inspect data, falling back to the metadata value.
+    std::uint64_t restoredTimestamp = metadata.StateChangedAt;
+    try
+    {
+        auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
+        auto state = DockerStateToWSLAState(dockerContainer.State);
+        const auto& timestamp = (state == WslaContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
+
+        if (!timestamp.empty())
+        {
+            auto parsed = ParseDockerTimestamp(timestamp);
+            if (parsed > 0)
+            {
+                restoredTimestamp = parsed;
+            }
+        }
+    }
+    CATCH_LOG();
+
+    if (restoredTimestamp > 0)
+    {
+        container->m_stateChangedAt = restoredTimestamp;
+    }
 
     errorCleanup.release();
     volumeErrorCleanup.release();

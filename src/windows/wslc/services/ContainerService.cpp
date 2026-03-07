@@ -101,7 +101,7 @@ static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASign
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state, ULONGLONG stateChangedAt)
+std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt)
 {
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
@@ -110,21 +110,19 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
     std::wstring stateString;
     switch (state)
     {
-
-    case WSLA_CONTAINER_STATE::WslaContainerStateCreated:
+    case WSLAContainerState::WslaContainerStateCreated:
         stateString = L"created";
         break;
-    case WSLA_CONTAINER_STATE::WslaContainerStateRunning:
+    case WSLAContainerState::WslaContainerStateRunning:
         stateString = L"running";
         break;
-    case WSLA_CONTAINER_STATE::WslaContainerStateDeleted:
+    case WSLAContainerState::WslaContainerStateDeleted:
         stateString = L"stopped";
         break;
-    case WSLA_CONTAINER_STATE::WslaContainerStateExited:
+    case WSLAContainerState::WslaContainerStateExited:
         stateString = L"exited";
         break;
-    case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
-
+    case WSLAContainerState::WslaContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);

@@ -52,8 +52,9 @@ struct WSLAContainerMetadataV1
     WSLAProcessFlags InitProcessFlags{WSLAProcessFlagsNone};
     std::vector<WSLAPortMapping> Ports;
     std::vector<WSLAVolumeMount> Volumes;
+    std::uint64_t StateChangedAt{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes, StateChangedAt);
 };
 
 struct WSLAContainerMetadata
