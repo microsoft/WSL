@@ -101,6 +101,46 @@ static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASign
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
+int ContainerService::Attach(Session& session, const std::string& id)
+{
+    wil::com_ptr<IWSLAContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    wil::com_ptr<IWSLAProcess> process;
+    THROW_IF_FAILED(container->GetInitProcess(&process));
+
+    wsl::windows::common::ClientRunningWSLAProcess runningProcess(std::move(process), {});
+
+    ULONG stdinLogsHandle = 0;
+    ULONG stdoutLogsHandle = 0;
+    ULONG stderrLogsHandle = 0;
+    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogsHandle, &stdoutLogsHandle, &stderrLogsHandle));
+
+    wil::unique_handle stdinLogs(ULongToHandle(stdinLogsHandle));
+    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
+    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
+
+    if (stdoutLogs)
+    {
+        // Non-TTY process - relay separate stdout/stderr streams
+        WI_ASSERT(!!stderrLogs);
+        ConsoleService::RelayNonTtyProcess(std::move(stdinLogs), std::move(stdoutLogs), std::move(stderrLogs));
+    }
+    else
+    {
+        // TTY process - relay using interactive TTY handling
+        WI_ASSERT(!stderrLogs);
+        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.get(), true))
+        {
+            wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
+            return 0; // Exit early if user detached
+        }
+    }
+
+    // Wait for the container process to exit
+    return runningProcess.Wait();
+}
+
 std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt)
 {
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
