@@ -1736,7 +1736,7 @@ struct WSLA_MAP_PORT
     uint32_t AddressFamily{};
     bool Stop{};
 
-    PRETTY_PRINT(FIELD(Header), FIELD(WindowsPort), FIELD(LinuxPort), FIELD(AddressFamily), FIELD(Stop));
+    PRETTY_PRINT(FIELD(Header));
 };
 
 struct WSLA_CONNECT_RELAY
