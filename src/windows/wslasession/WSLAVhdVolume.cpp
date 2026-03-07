@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "DockerHTTPClient.h"
 #include "WSLAVhdVolume.h"
 #include "WSLAVirtualMachine.h"
 #include "WslCoreFilesystem.h"
@@ -81,14 +82,22 @@ namespace {
 } // namespace
 
 WSLAVhdVolumeImpl::WSLAVhdVolumeImpl(
-    std::string&& Name, std::string&& Type, std::filesystem::path&& HostPath, ULONGLONG SizeBytes, ULONG Lun, std::string&& VirtualMachinePath, WSLAVirtualMachine* VirtualMachine) :
+    std::string&& Name,
+    std::string&& Type,
+    std::filesystem::path&& HostPath,
+    ULONGLONG SizeBytes,
+    ULONG Lun,
+    std::string&& VirtualMachinePath,
+    WSLAVirtualMachine& VirtualMachine,
+    DockerHTTPClient& DockerClient) :
     m_name(std::move(Name)),
     m_type(std::move(Type)),
     m_hostPath(std::move(HostPath)),
     m_virtualMachinePath(std::move(VirtualMachinePath)),
     m_sizeBytes(SizeBytes),
     m_lun(Lun),
-    m_virtualMachine(VirtualMachine)
+    m_virtualMachine(VirtualMachine),
+    m_dockerClient(DockerClient)
 {
 }
 
@@ -101,7 +110,8 @@ WSLAVhdVolumeImpl::~WSLAVhdVolumeImpl()
     CATCH_LOG();
 }
 
-std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(const WSLAVolumeOptions& Options, const std::filesystem::path& StoragePath, WSLAVirtualMachine& VirtualMachine)
+std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
+    const WSLAVolumeOptions& Options, const std::filesystem::path& StoragePath, WSLAVirtualMachine& VirtualMachine, DockerHTTPClient& DockerClient)
 {
     THROW_HR_IF_NULL(E_POINTER, Options.Name);
     THROW_HR_IF_NULL(E_POINTER, Options.Type);
@@ -131,8 +141,21 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(const WSLAVolumeOpt
 
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
 
+    try
+    {
+        DockerClient.CreateVolume(name, virtualMachinePath);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create docker volume for '%hs'", name.c_str());
+
     auto volume = std::make_unique<WSLAVhdVolumeImpl>(
-        std::move(name), std::move(type), std::filesystem::path(hostPath), sizeBytes, lun, std::move(virtualMachinePath), &VirtualMachine);
+        std::move(name),
+        std::move(type),
+        std::filesystem::path(hostPath),
+        sizeBytes,
+        lun,
+        std::move(virtualMachinePath),
+        VirtualMachine,
+        DockerClient);
 
     mountCleanup.release();
     attachCleanup.release();
@@ -154,16 +177,34 @@ void WSLAVhdVolumeImpl::Delete()
 
 void WSLAVhdVolumeImpl::Detach()
 {
-    if (m_virtualMachine != nullptr)
+    if (m_attached)
     {
+        try
+        {
+            m_dockerClient.RemoveVolume(m_name);
+        }
+        catch (const DockerHTTPException& e)
+        {
+            if (e.StatusCode() == 409)
+            {
+                THROW_HR(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION));
+            }
+
+            // Allow cleanup to continue if docker volume is already gone.
+            if (e.StatusCode() != 404)
+            {
+                THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete docker volume for '%hs'", m_name.c_str());
+            }
+        }
+
         if (!m_virtualMachinePath.empty())
         {
-            m_virtualMachine->Unmount(m_virtualMachinePath.c_str());
+            m_virtualMachine.Unmount(m_virtualMachinePath.c_str());
             m_virtualMachinePath.clear();
         }
 
-        m_virtualMachine->DetachDisk(m_lun);
-        m_virtualMachine = nullptr;
+        m_virtualMachine.DetachDisk(m_lun);
+        m_attached = false;
     }
 }
 

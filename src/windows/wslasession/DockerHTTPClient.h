@@ -135,6 +135,10 @@ public:
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
 
+    // Volume management.
+    void CreateVolume(const std::string& Name, const std::string& DevicePath);
+    void RemoveVolume(const std::string& Name);
+
     // Image management.
     struct ListImagesFilters
     {

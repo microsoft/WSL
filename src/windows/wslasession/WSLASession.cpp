@@ -1185,21 +1185,21 @@ try
     ValidateName(name.c_str());
 
     auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
     THROW_HR_IF_MSG(E_INVALIDARG, type != "vhd", "Unsupported volume type: %hs", type.c_str());
 
-    auto volume = WSLAVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), *m_virtualMachine);
-    WI_VERIFY(m_volumes.insert({name, std::move(volume)}).second);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
-    const auto inserted = m_volumes.find(name);
-    WI_ASSERT(inserted != m_volumes.end());
+    auto volume = WSLAVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), m_virtualMachine.value(), m_dockerClient.value());
+    auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
+    WI_VERIFY(inserted);
 
     WSL_LOG(
         "VolumeCreated",
         TraceLoggingValue(name.c_str(), "VolumeName"),
-        TraceLoggingValue(inserted->second->VirtualMachinePath().c_str(), "VirtualMachinePath"));
+        TraceLoggingValue(it->second->VirtualMachinePath().c_str(), "VirtualMachinePath"));
 
     return S_OK;
 }
@@ -1214,16 +1214,10 @@ try
     std::string name = Name;
 
     auto lock = m_lock.lock_exclusive();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     auto it = m_volumes.find(name);
     THROW_HR_IF(WSLA_E_VOLUME_NOT_FOUND, it == m_volumes.end());
-
-    // Check if the volume is in use by any container.
-    std::lock_guard containersLock{m_containersLock};
-    for (const auto& container : m_containers)
-    {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), container->NamedVolumes().contains(name));
-    }
 
     it->second->Delete();
     m_volumes.erase(it);

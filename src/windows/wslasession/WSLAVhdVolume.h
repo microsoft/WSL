@@ -22,6 +22,7 @@ Abstract:
 namespace wsl::windows::service::wsla {
 
 class WSLAVirtualMachine;
+class DockerHTTPClient;
 
 class WSLAVhdVolumeImpl
 {
@@ -29,12 +30,23 @@ public:
     NON_COPYABLE(WSLAVhdVolumeImpl);
     NON_MOVABLE(WSLAVhdVolumeImpl);
 
-    WSLAVhdVolumeImpl(std::string&& Name, std::string&& Type, std::filesystem::path&& HostPath, ULONGLONG SizeBytes, ULONG Lun, std::string&& VirtualMachinePath, WSLAVirtualMachine* VirtualMachine);
+    WSLAVhdVolumeImpl(
+        std::string&& Name,
+        std::string&& Type,
+        std::filesystem::path&& HostPath,
+        ULONGLONG SizeBytes,
+        ULONG Lun,
+        std::string&& VirtualMachinePath,
+        WSLAVirtualMachine& VirtualMachine,
+        DockerHTTPClient& DockerClient);
 
     ~WSLAVhdVolumeImpl();
 
     static std::unique_ptr<WSLAVhdVolumeImpl> Create(
-        _In_ const WSLAVolumeOptions& Options, _In_ const std::filesystem::path& StoragePath, _In_ WSLAVirtualMachine& VirtualMachine);
+        _In_ const WSLAVolumeOptions& Options,
+        _In_ const std::filesystem::path& StoragePath,
+        _In_ WSLAVirtualMachine& VirtualMachine,
+        _In_ DockerHTTPClient& DockerClient);
 
     void Delete();
 
@@ -56,7 +68,9 @@ private:
     std::string m_virtualMachinePath;
     ULONGLONG m_sizeBytes{};
     ULONG m_lun{};
-    WSLAVirtualMachine* m_virtualMachine{};
+    WSLAVirtualMachine& m_virtualMachine;
+    DockerHTTPClient& m_dockerClient;
+    bool m_attached{true};
 };
 
 } // namespace wsl::windows::service::wsla

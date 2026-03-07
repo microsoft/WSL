@@ -40,6 +40,17 @@ struct EmptyRequest
     using TResponse = void;
 };
 
+struct CreateVolume
+{
+    using TResponse = void;
+
+    std::string Name;
+    std::string Driver;
+    std::map<std::string, std::string> DriverOpts;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(CreateVolume, Name, Driver, DriverOpts);
+};
+
 struct EmptyObject
 {
 };

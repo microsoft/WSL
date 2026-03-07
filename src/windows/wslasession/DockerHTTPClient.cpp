@@ -342,6 +342,25 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
+void DockerHTTPClient::CreateVolume(const std::string& Name, const std::string& DevicePath)
+{
+    docker_schema::CreateVolume request{};
+    request.Name = Name;
+    request.Driver = "local";
+    request.DriverOpts = {
+        {"type", "none"},
+        {"o", "bind"},
+        {"device", DevicePath},
+    };
+
+    Transaction(verb::post, URL::Create("/volumes/create"), request);
+}
+
+void DockerHTTPClient::RemoveVolume(const std::string& Name)
+{
+    Transaction(verb::delete_, URL::Create("/volumes/{}", Name));
+}
+
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
