@@ -13,10 +13,23 @@ Abstract:
 --*/
 #pragma once
 #include "CLIExecutionContext.h"
+#include "Task.h"
 
 using wsl::windows::wslc::execution::CLIExecutionContext;
 
 namespace wsl::windows::wslc::task {
+
+struct AttachContainer : public Task
+{
+    AttachContainer(const std::wstring& containerId) : m_containerId(containerId)
+    {
+    }
+    void operator()(CLIExecutionContext& context) const override;
+
+private:
+    std::wstring m_containerId;
+};
+
 void CreateContainer(CLIExecutionContext& context);
 void DeleteContainers(CLIExecutionContext& context);
 void ExecContainer(CLIExecutionContext& context);
