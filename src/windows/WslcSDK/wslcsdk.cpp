@@ -69,7 +69,7 @@ typename FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
     return static_cast<typename traits::WslaType>(flags & traits::Mask);
 }
 
-WSLASignal ConvertSignal(WslcSignal signal)
+WSLASignal Convert(WslcSignal signal)
 {
     switch (signal)
     {
@@ -101,6 +101,15 @@ WSLA_CONTAINER_NETWORK_TYPE Convert(WslcContainerNetworkingMode mode)
     default:
         THROW_HR_MSG(E_INVALIDARG, "Invalid WslcContainerNetworkingMode: %i", mode);
     }
+}
+
+void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
+{
+    static constexpr size_t s_sha256ByteCount = 32;
+
+    auto hashBytes = wsl::windows::common::string::HexToBytes(hashString);
+    THROW_HR_IF_MSG(E_INVALIDARG, hashBytes.size() != s_sha256ByteCount, "SHA256 hash was not 32 bytes: %zu", hashBytes.size());
+    memcpy(sha256, &hashBytes[0], s_sha256ByteCount);
 }
 
 void GetErrorInfoFromCOM(PWSTR* errorMessage)
@@ -293,24 +302,6 @@ try
     }
 
     return S_OK;
-}
-CATCH_RETURN();
-
-STDAPI WslcContainerSettingsSetHostName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR hostName)
-try
-{
-    UNREFERENCED_PARAMETER(hostName);
-    UNREFERENCED_PARAMETER(containerSettings);
-    return E_NOTIMPL;
-}
-CATCH_RETURN();
-
-STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR domainName)
-try
-{
-    UNREFERENCED_PARAMETER(domainName);
-    UNREFERENCED_PARAMETER(containerSettings);
-    return E_NOTIMPL;
 }
 CATCH_RETURN();
 
@@ -519,6 +510,28 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcContainerSettingsSetHostName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR hostName)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+
+    internalType->HostName = hostName;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR domainName)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+
+    internalType->DomainName = domainName;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* containerSettings, _In_ WslcProcessSettings* initProcess)
 try
 {
@@ -600,9 +613,10 @@ try
 {
     static_assert(WSLC_CONTAINER_ID_LENGTH == sizeof(WSLAContainerId), "Container ID lengths differ.");
 
-    UNREFERENCED_PARAMETER(container);
-    UNREFERENCED_PARAMETER(containerId);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+
+    return internalType->container->GetId(containerId);
 }
 CATCH_RETURN();
 
@@ -637,9 +651,25 @@ CATCH_RETURN();
 STDAPI WslcContainerGetState(_In_ WslcContainer container, _Out_ WslcContainerState* state)
 try
 {
-    UNREFERENCED_PARAMETER(container);
-    UNREFERENCED_PARAMETER(state);
-    return E_NOTIMPL;
+    static_assert(
+        WSLC_CONTAINER_STATE_INVALID == WslaContainerStateInvalid &&
+        WSLC_CONTAINER_STATE_CREATED == WslaContainerStateCreated &&
+        WSLC_CONTAINER_STATE_RUNNING == WslaContainerStateRunning &&
+        WSLC_CONTAINER_STATE_EXITED == WslaContainerStateExited &&
+        WSLC_CONTAINER_STATE_DELETED == WslaContainerStateDeleted,
+        "Container state enum values mismatch.");
+
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    RETURN_HR_IF_NULL(E_POINTER, state);
+
+    *state = WSLC_CONTAINER_STATE_INVALID;
+
+    WSLA_CONTAINER_STATE runtimeState{};
+    RETURN_IF_FAILED(internalType->container->GetState(&runtimeState));
+
+    *state = static_cast<WslcContainerState>(runtimeState);
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -649,7 +679,7 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    RETURN_HR(internalType->container->Stop(ConvertSignal(signal), timeoutSeconds));
+    RETURN_HR(internalType->container->Stop(Convert(signal), timeoutSeconds));
 }
 CATCH_RETURN();
 
@@ -682,9 +712,11 @@ CATCH_RETURN();
 STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory)
 try
 {
-    UNREFERENCED_PARAMETER(currentDirectory);
-    UNREFERENCED_PARAMETER(processSettings);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(processSettings);
+
+    internalType->currentDirectory = currentDirectory;
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -727,9 +759,17 @@ CATCH_RETURN();
 STDAPI WslcProcessGetPid(_In_ WslcProcess process, _Out_ uint32_t* pid)
 try
 {
-    UNREFERENCED_PARAMETER(process);
-    UNREFERENCED_PARAMETER(pid);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(process);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
+    RETURN_HR_IF_NULL(E_POINTER, pid);
+
+    *pid = 0;
+
+    int runtimePid{};
+    RETURN_IF_FAILED(internalType->process->GetPid(&runtimePid));
+
+    *pid = static_cast<uint32_t>(runtimePid);
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -749,27 +789,47 @@ CATCH_RETURN();
 STDAPI WslcProcessGetState(_In_ WslcProcess process, _Out_ WslcProcessState* state)
 try
 {
-    UNREFERENCED_PARAMETER(process);
-    UNREFERENCED_PARAMETER(state);
-    return E_NOTIMPL;
+    static_assert(
+        WSLC_PROCESS_STATE_UNKNOWN == WslaProcessStateUnknown && WSLC_PROCESS_STATE_RUNNING == WslaProcessStateRunning &&
+            WSLC_PROCESS_STATE_EXITED == WslaProcessStateExited && WSLC_PROCESS_STATE_SIGNALLED == WslaProcessStateSignalled,
+        "Process state enum values mismatch.");
+
+    auto internalType = CheckAndGetInternalType(process);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
+    RETURN_HR_IF_NULL(E_POINTER, state);
+
+    *state = WSLC_PROCESS_STATE_UNKNOWN;
+
+    WSLA_PROCESS_STATE runtimeState{};
+    int exitCode{};
+    RETURN_IF_FAILED(internalType->process->GetState(&runtimeState, &exitCode));
+
+    *state = static_cast<WslcProcessState>(runtimeState);
+    return S_OK;
 }
 CATCH_RETURN();
 
 STDAPI WslcProcessGetExitCode(_In_ WslcProcess process, _Out_ PINT32 exitCode)
 try
 {
-    UNREFERENCED_PARAMETER(process);
-    UNREFERENCED_PARAMETER(exitCode);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(process);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
+    RETURN_HR_IF_NULL(E_POINTER, exitCode);
+
+    *exitCode = -1;
+
+    WSLA_PROCESS_STATE runtimeState{};
+    RETURN_HR(internalType->process->GetState(&runtimeState, exitCode));
 }
 CATCH_RETURN();
 
 STDAPI WslcProcessSignal(_In_ WslcProcess process, _In_ WslcSignal signal)
 try
 {
-    UNREFERENCED_PARAMETER(process);
-    UNREFERENCED_PARAMETER(signal);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(process);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
+
+    RETURN_HR(internalType->process->Signal(Convert(signal)));
 }
 CATCH_RETURN();
 
@@ -866,19 +926,64 @@ CATCH_RETURN();
 STDAPI WslcSessionImageDelete(_In_ WslcSession session, _In_z_ PCSTR NameOrId)
 try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(NameOrId);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, NameOrId);
+
+    WSLA_DELETE_IMAGE_OPTIONS options{};
+    options.Image = NameOrId;
+    // TODO: Flags? (Force and NoPrune)
+
+    wil::unique_cotaskmem_ptr<WSLA_DELETED_IMAGE_INFORMATION*> deletedImageInformation;
+    ULONG deletedImageCount{};
+
+    RETURN_HR(internalType->session->DeleteImage(&options, deletedImageInformation.get(), &deletedImageCount));
 }
 CATCH_RETURN();
 
 STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ uint32_t* count)
 try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(images);
-    UNREFERENCED_PARAMETER(count);
-    return E_NOTIMPL;
+    static_assert(sizeof(decltype(WslcImageInfo::name)) == sizeof(decltype(WSLA_IMAGE_INFORMATION::Image)), "Image name size mismatch.");
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, images);
+    RETURN_HR_IF_NULL(E_POINTER, count);
+
+    *images = nullptr;
+    *count = 0;
+
+    // TODO: Many filtering options are available via WSLA_LIST_IMAGES_OPTIONS
+
+    wil::unique_cotaskmem_ptr<WSLA_IMAGE_INFORMATION*> imageInformation;
+    ULONG imageCount{};
+
+    RETURN_IF_FAILED(internalType->session->ListImages(nullptr, imageInformation.get(), &imageCount));
+
+    if (imageCount)
+    {
+        auto result = wil::make_unique_cotaskmem<WslcImageInfo[]>(imageCount);
+
+        for (ULONG i = 0; i < imageCount; ++i)
+        {
+            WslcImageInfo& currentResult = result[i];
+            WSLA_IMAGE_INFORMATION& currentImage = *(imageInformation.get()[i]);
+
+            THROW_HR_IF(
+                E_UNEXPECTED,
+                memcpy_s(currentResult.name, sizeof(decltype(WslcImageInfo::name)), currentImage.Image, sizeof(decltype(WSLA_IMAGE_INFORMATION::Image))) !=
+                    0);
+            ConvertSHA256Hash(currentImage.Hash, currentResult.sha256);
+            currentResult.sizeBytes = currentImage.Size;
+            currentResult.createdTimestamp = currentImage.Created;
+        }
+
+        *images = result.release();
+        *count = static_cast<uint32_t>(imageCount);
+    }
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -898,8 +1003,18 @@ CATCH_RETURN();
 STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version)
 try
 {
-    UNREFERENCED_PARAMETER(version);
-    return E_NOTIMPL;
+    RETURN_HR_IF_NULL(E_POINTER, version);
+
+    static_assert(std::is_trivial_v<WslcVersion>, "WslcVersion must be trivial");
+    *version = {};
+
+    // TODO: Returning the WSLC SDK API version, but do callers actually need the WSL runtime
+    //       version instead as they will have built and shipped with the SDK?
+    version->major = wsl::shared::VersionMajor;
+    version->minor = wsl::shared::VersionMinor;
+    version->revision = wsl::shared::VersionRevision;
+
+    return S_OK;
 }
 CATCH_RETURN();
 
