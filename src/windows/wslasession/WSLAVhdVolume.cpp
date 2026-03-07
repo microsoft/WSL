@@ -101,8 +101,7 @@ WSLAVhdVolumeImpl::~WSLAVhdVolumeImpl()
     CATCH_LOG();
 }
 
-std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
-    const WSLAVolumeOptions& Options, const std::filesystem::path& StoragePath, WSLAVirtualMachine& VirtualMachine)
+std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(const WSLAVolumeOptions& Options, const std::filesystem::path& StoragePath, WSLAVirtualMachine& VirtualMachine)
 {
     THROW_HR_IF_NULL(E_POINTER, Options.Name);
     THROW_HR_IF_NULL(E_POINTER, Options.Type);
