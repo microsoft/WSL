@@ -1014,6 +1014,23 @@ try
 
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
+    // Validate that each requested named volume exists in the session before passing the request to container creation. 
+    // This prevents adding volumes to the container that the session does not know about or have been removed from the WSLASession.
+    // In the case of VHD backed name volumes, the assumption is that if the volume exists in our map, the VHD is already mounted 
+    // on the VM.
+    RETURN_HR_IF(E_INVALIDARG, containerOptions->NamedVolumesCount > 0 && containerOptions->NamedVolumes == nullptr);
+
+    for (ULONG i = 0; i < containerOptions->NamedVolumesCount; i++)
+    {
+        const auto& namedVolume = containerOptions->NamedVolumes[i];
+        RETURN_HR_IF(E_INVALIDARG, namedVolume.Name == nullptr);
+
+        auto volume = m_volumes.find(namedVolume.Name);
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLA_E_VOLUME_NOT_FOUND, Localization::MessageWslaVolumeNotFound(namedVolume.Name), volume == m_volumes.end());
+    }
+
     // TODO: Log entrance into the function.
 
     try
@@ -1199,7 +1216,7 @@ try
     WSL_LOG(
         "VolumeCreated",
         TraceLoggingValue(name.c_str(), "VolumeName"),
-        TraceLoggingValue(it->second->VirtualMachinePath().c_str(), "VirtualMachinePath"));
+        TraceLoggingValue(std::format("/mnt/wsla-volumes/{}", name).c_str(), "VirtualMachinePath"));
 
     return S_OK;
 }
