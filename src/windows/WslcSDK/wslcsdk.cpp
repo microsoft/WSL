@@ -652,11 +652,9 @@ STDAPI WslcContainerGetState(_In_ WslcContainer container, _Out_ WslcContainerSt
 try
 {
     static_assert(
-        WSLC_CONTAINER_STATE_INVALID == WslaContainerStateInvalid &&
-        WSLC_CONTAINER_STATE_CREATED == WslaContainerStateCreated &&
-        WSLC_CONTAINER_STATE_RUNNING == WslaContainerStateRunning &&
-        WSLC_CONTAINER_STATE_EXITED == WslaContainerStateExited &&
-        WSLC_CONTAINER_STATE_DELETED == WslaContainerStateDeleted,
+        WSLC_CONTAINER_STATE_INVALID == WslaContainerStateInvalid && WSLC_CONTAINER_STATE_CREATED == WslaContainerStateCreated &&
+            WSLC_CONTAINER_STATE_RUNNING == WslaContainerStateRunning &&
+            WSLC_CONTAINER_STATE_EXITED == WslaContainerStateExited && WSLC_CONTAINER_STATE_DELETED == WslaContainerStateDeleted,
         "Container state enum values mismatch.");
 
     auto internalType = CheckAndGetInternalType(container);
@@ -944,7 +942,8 @@ CATCH_RETURN();
 STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ uint32_t* count)
 try
 {
-    static_assert(sizeof(decltype(WslcImageInfo::name)) == sizeof(decltype(WSLA_IMAGE_INFORMATION::Image)), "Image name size mismatch.");
+    static_assert(
+        sizeof(decltype(WslcImageInfo::name)) == sizeof(decltype(WSLA_IMAGE_INFORMATION::Image)), "Image name size mismatch.");
 
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);

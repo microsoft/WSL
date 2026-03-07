@@ -210,7 +210,7 @@ BYTE ConvertHexByte(const wchar_t* hex, wchar_t** endPtr)
     return static_cast<BYTE>(wcstoul(hex, endPtr, 16));
 }
 
-template<typename T>
+template <typename T>
 std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
 {
     if (input.length() % 2 != 0)
