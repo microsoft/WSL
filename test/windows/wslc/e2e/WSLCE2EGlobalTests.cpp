@@ -74,6 +74,7 @@ private:
                  << L"  container  Container command\r\n"
                  << L"  image      Image command\r\n"
                  << L"  session    Session command\r\n"
+                 << L"  attach     Attach to a container.\r\n"
                  << L"  build      Build an image from a Dockerfile.\r\n"
                  << L"  create     Create a container.\r\n"
                  << L"  delete     Delete containers\r\n"
