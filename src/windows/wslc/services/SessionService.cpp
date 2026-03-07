@@ -102,7 +102,7 @@ int SessionService::Attach(const std::wstring& sessionName)
 Session SessionService::CreateSession(const std::optional<SessionOptions>& options)
 {
     SessionOptions sessionOptions = options.has_value() ? options.value() : SessionOptions::Default();
-    const WSLA_SESSION_SETTINGS* settings = sessionOptions.Get();
+    const WSLASessionSettings* settings = sessionOptions.Get();
     wil::com_ptr<IWSLASessionManager> sessionManager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
@@ -120,7 +120,7 @@ std::vector<SessionInformation> SessionService::List()
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+    wil::unique_cotaskmem_array_ptr<WSLASessionInformation> sessions;
     THROW_IF_FAILED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
     for (size_t i = 0; i < sessions.size(); ++i)
     {

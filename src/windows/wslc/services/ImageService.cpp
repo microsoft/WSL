@@ -49,14 +49,14 @@ void ImageService::Build(
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
 {
-    wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+    wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
     ULONG count = 0;
     THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, &count));
 
     std::vector<ImageInformation> result;
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
     {
-        const WSLA_IMAGE_INFORMATION& image = *ptr;
+        const WSLAImageInformation& image = *ptr;
         ImageInformation info{};
         info.Name = image.Image;
         info.Size = image.Size;

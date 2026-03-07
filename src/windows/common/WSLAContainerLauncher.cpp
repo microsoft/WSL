@@ -37,16 +37,15 @@ void RunningWSLAContainer::Reset()
     if (m_container && m_deleteOnClose)
     {
         // Attempt to stop and delete the container.
-        LOG_IF_FAILED(m_container->Stop(WSLASignalSIGKILL, 0));
-        LOG_IF_FAILED(m_container->Delete());
+        LOG_IF_FAILED(m_container->Delete(WSLADeleteFlagsForce));
     }
 
     m_container.reset();
 }
 
-WSLA_CONTAINER_STATE RunningWSLAContainer::State()
+WSLAContainerState RunningWSLAContainer::State()
 {
-    WSLA_CONTAINER_STATE state{};
+    WSLAContainerState state{};
     THROW_IF_FAILED(m_container->GetState(&state));
     return state;
 }
@@ -85,7 +84,7 @@ WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& Name,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
-    WSLA_CONTAINER_NETWORK_TYPE containerNetworkType,
+    WSLAContainerNetworkType containerNetworkType,
     WSLAProcessFlags Flags) :
     WSLAProcessLauncher({}, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
 {
@@ -93,7 +92,7 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 
 void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family)
 {
-    m_ports.emplace_back(WSLA_PORT_MAPPING{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
+    m_ports.emplace_back(WSLAPortMapping{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
 }
 
 void WSLAContainerLauncher::SetName(std::string&& Name)
@@ -143,11 +142,11 @@ void WSLAContainerLauncher::SetDnsOptions(std::vector<std::string>&& DnsOptions)
 
 void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
-    // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
+    // Store a copy of the path strings to the launcher to ensure the pointers in WSLAVolume remain valid.
     const auto& hostPath = m_hostPaths.emplace_back(HostPath);
     const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
 
-    WSLA_VOLUME vol{};
+    WSLAVolume vol{};
     vol.HostPath = hostPath.c_str();
     vol.ContainerPath = containerPath.c_str();
     vol.ReadOnly = ReadOnly ? TRUE : FALSE;
@@ -157,11 +156,11 @@ void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& 
 
 void wsl::windows::common::WSLAContainerLauncher::AddLabel(const std::string& Key, const std::string& Value)
 {
-    // Store a copy of the key/value strings to the launcher to ensure the pointers in WSLA_LABEL remain valid.
+    // Store a copy of the key/value strings to the launcher to ensure the pointers in WSLALabel remain valid.
     const auto& key = m_labelKeys.emplace_back(Key);
     const auto& value = m_labelValues.emplace_back(Value);
 
-    WSLA_LABEL label{};
+    WSLALabel label{};
     label.Key = key.c_str();
     label.Value = value.c_str();
 
@@ -170,11 +169,11 @@ void wsl::windows::common::WSLAContainerLauncher::AddLabel(const std::string& Ke
 
 void wsl::windows::common::WSLAContainerLauncher::AddTmpfs(const std::string& ContainerPath, const std::string& Options)
 {
-    // Store a copy of the path/options strings to the launcher to ensure the pointers in WSLA_TMPFS_MOUNT remain valid.
+    // Store a copy of the path/options strings to the launcher to ensure the pointers in WSLATmpfsMount remain valid.
     const auto& containerPath = m_tmpfsContainerPaths.emplace_back(ContainerPath);
     const auto& options = m_tmpfsOptions.emplace_back(Options);
 
-    WSLA_TMPFS_MOUNT tmpfs{};
+    WSLATmpfsMount tmpfs{};
     tmpfs.Destination = containerPath.c_str();
     tmpfs.Options = options.c_str();
 
@@ -196,7 +195,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
 
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::CreateNoThrow(IWSLASession& Session)
 {
-    WSLA_CONTAINER_OPTIONS options{};
+    WSLAContainerOptions options{};
     options.Image = m_image.c_str();
 
     if (!m_name.empty())
@@ -318,7 +317,7 @@ wsl::windows::common::wsla_schema::InspectContainer RunningWSLAContainer::Inspec
 
 std::map<std::string, std::string> RunningWSLAContainer::Labels()
 {
-    wil::unique_cotaskmem_array_ptr<WSLA_LABEL_INFORMATION> labels;
+    wil::unique_cotaskmem_array_ptr<WSLALabelInformation> labels;
     THROW_IF_FAILED(m_container->GetLabels(&labels, labels.size_address<ULONG>()));
 
     std::map<std::string, std::string> result;

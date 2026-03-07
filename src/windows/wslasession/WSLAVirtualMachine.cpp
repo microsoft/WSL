@@ -32,7 +32,7 @@ constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
-WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLA_SESSION_INIT_SETTINGS* Settings) :
+WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLAFeatureFlags>(Settings->FeatureFlags)),
     m_networkingMode(Settings->NetworkingMode),
@@ -85,7 +85,7 @@ void WSLAVirtualMachine::Initialize()
         auto cmdStr = std::format("echo {} > /sys/module/page_reporting/parameters/page_reporting_order", pageReportingOrder);
         std::vector<const char*> args{"/bin/sh", "-c", cmdStr.c_str()};
 
-        WSLA_PROCESS_OPTIONS options{};
+        WSLAProcessOptions options{};
         options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
         CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
     }
@@ -188,7 +188,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     int gnsChannelFd = -1;
     int dnsChannelFd = -1;
 
-    WSLA_PROCESS_OPTIONS options{};
+    WSLAProcessOptions options{};
     auto prepareCommandLine = [&](const auto& sockets) {
         gnsChannelFd = sockets[0].Fd;
         gnsSocketFdArg = std::to_string(gnsChannelFd);
@@ -405,7 +405,7 @@ std::string WSLAVirtualMachine::GetVhdDevicePath(ULONG Lun)
 }
 
 Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
-    _In_ LPCSTR Executable, _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    _In_ LPCSTR Executable, _In_ const WSLAProcessOptions& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // Check if this is a tty or not
     std::vector<WSLAProcessFd> fds;
@@ -429,7 +429,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
 }
 
 Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
-    LPCSTR Executable, const WSLA_PROCESS_OPTIONS& Options, const std::vector<WSLAProcessFd>& Fds, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    LPCSTR Executable, const WSLAProcessOptions& Options, const std::vector<WSLAProcessFd>& Fds, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // N.B This check is there to prevent processes from being started before the VM is done initializing.
     // to avoid potential deadlocks, since the processExitThread is required to signal the process exit events.

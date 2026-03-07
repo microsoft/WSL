@@ -192,7 +192,7 @@ static int RunListCommand(std::wstring_view commandLine)
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
-    wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+    wil::unique_cotaskmem_array_ptr<WSLASessionInformation> sessions;
     THROW_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
     if (verbose)
@@ -278,7 +278,7 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
     auto dataFolder = std::filesystem::path(wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr)) / "wsla";
 
     // TODO: Have a configuration file for those.
-    WSLA_SESSION_SETTINGS settings{};
+    WSLASessionSettings settings{};
     settings.DisplayName = L"wsla-cli";
     settings.CpuCount = 4;
     settings.MemoryMb = 2024;
@@ -620,7 +620,7 @@ static int Run(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, true);
 
-    WSLA_CONTAINER_OPTIONS options{};
+    WSLAContainerOptions options{};
 
     WSLAContainerStartFlags startFlags = WSLAContainerStartFlagsAttach;
     std::string image;

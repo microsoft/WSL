@@ -33,7 +33,7 @@ SessionOptions SessionOptions::Default()
     return options;
 }
 
-const WSLA_SESSION_SETTINGS* SessionOptions::Get() const
+const WSLASessionSettings* SessionOptions::Get() const
 {
     return &m_sessionSettings;
 }
