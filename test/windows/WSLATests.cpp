@@ -2543,7 +2543,7 @@ class WSLATests
             VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
         };
 
-        validateInvalidOptionsFailure("not-json", E_INVALIDARG, L"Invalid volume options: not-json");
+        validateInvalidOptionsFailure("not-json", E_INVALIDARG, L"Invalid volume options: 'not-json'");
         validateInvalidOptionsFailure("{\"SizeBytes\":\"abc\"}", E_INVALIDARG, L"Invalid size: abc");
         validateInvalidOptionsFailure("{\"SizeBytes\":\"-1\"}", E_INVALIDARG, L"Invalid size: -1");
         validateInvalidOptionsFailure("{\"SizeBytes\":\"+-1\"}", E_INVALIDARG, L"Invalid size: +-1");
