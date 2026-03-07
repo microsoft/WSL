@@ -21,7 +21,7 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 
-static bool RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh = false)
+bool ConsoleService::RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh)
 {
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
@@ -68,7 +68,7 @@ static bool RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
     return completed;
 }
 
-static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
+void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
 {
     wsl::windows::common::relay::MultiHandleWait io;
 

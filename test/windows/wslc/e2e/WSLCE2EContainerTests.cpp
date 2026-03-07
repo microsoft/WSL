@@ -70,6 +70,7 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following sub-commands are available:\r\n"
+                 << L"  attach   Attach to a container.\r\n"
                  << L"  create   Create a container.\r\n"
                  << L"  delete   Delete containers\r\n"
                  << L"  exec     Execute a command in a running container.\r\n"
