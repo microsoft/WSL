@@ -1136,55 +1136,41 @@ class UnitTests
 
         //
         // Test importing a distribution with custom filesystem mount options.
+        // Covers ext4, btrfs (with subvol), and xfs filesystem types.
         //
 
-        constexpr auto distroName = L"fsmount-test";
+        auto importAndValidate = [&](LPCWSTR testName, const std::wstring& extraArgs, const std::vector<std::wstring>& expectedStrings) {
+            const auto distroName = std::format(L"fsmount-test-{}", testName);
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
-            std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
-        });
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+            });
 
-        // Import with custom mount options
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
-            std::format(L"--import {} {} \"{}\" --version 2 --fs-mount-options discard,noatime", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath),
-            0);
-        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"--import {} {} \"{}\" --version 2 {}", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath, extraArgs),
+                0);
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
 
-        // Verify the mount options are applied
-        auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
-        VERIFY_IS_TRUE(mountOut.find(L"noatime") != std::wstring::npos);
+            auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+            for (const auto& expected : expectedStrings)
+            {
+                VERIFY_IS_TRUE(mountOut.find(expected) != std::wstring::npos);
+            }
 
-        WslShutdown();
-    }
+            WslShutdown();
+        };
 
-    TEST_METHOD(ImportDistroWithBtrfsSubvol)
-    {
-        WSL2_TEST_ONLY();
+        // Test ext4 with kernel mount options
+        importAndValidate(L"ext4", L"--fs-mount-options discard,data=writeback", {L"ext4", L"data=writeback"});
 
-        //
-        // Test importing a distribution with btrfs and subvol mount option.
-        //
+        // Test btrfs with compress, subvol, and ssd options
+        importAndValidate(L"btrfs", L"--fs-type btrfs --fs-mount-options compress=zstd,subvol=@,ssd",
+            {L"btrfs", L"compress=zstd", L"subvol=/@", L"ssd"});
 
-        constexpr auto distroName = L"btrfs-subvol-test";
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
-            std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
-        });
-
-        // Import with btrfs and subvol mount option
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
-            std::format(L"--import {} {} \"{}\" --version 2 --fs-type btrfs --fs-mount-options subvol=@", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath),
-            0);
-        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
-
-        // Verify the subvolume is used
-        auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
-        VERIFY_IS_TRUE(mountOut.find(L"btrfs") != std::wstring::npos);
-        VERIFY_IS_TRUE(mountOut.find(L"subvol=/@") != std::wstring::npos);
-
-        WslShutdown();
+        // Test xfs with quota options (uquota/gquota are displayed as usrquota/grpquota by mount)
+        importAndValidate(L"xfs", L"--fs-type xfs --fs-mount-options uquota,gquota",
+            {L"xfs", L"usrquota", L"grpquota"});
     }
 
     TEST_METHOD(ManageSetFsMountOptions)
@@ -1192,34 +1178,49 @@ class UnitTests
         WSL2_TEST_ONLY();
 
         //
-        // Test the --manage --set-fs-mount-options command.
+        // Test the --manage --set-fs-mount-options command across different filesystem types.
         //
 
-        constexpr auto distroName = L"manage-fsmount-test";
+        auto testManageMountOptions = [&](LPCWSTR testName, const std::wstring& importExtraArgs,
+            const std::wstring& mountOptions, const std::vector<std::wstring>& expectedStrings) {
+            const auto distroName = std::format(L"manage-fsmount-{}", testName);
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
-            std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
-        });
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+            });
 
-        // Import a distribution first
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
-            std::format(L"--import {} {} \"{}\" --version 2", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath),
-            0);
-        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+            // Import a distribution
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"--import {} {} \"{}\" --version 2 {}", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath, importExtraArgs),
+                0);
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
 
-        // Set the mount options using --manage
-        WslShutdown();
-        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
-            std::format(L"--manage {} --set-fs-mount-options discard,noatime", distroName),
-            0);
-        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+            // Set the mount options using --manage
+            WslShutdown();
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"--manage {} --set-fs-mount-options {}", distroName, mountOptions),
+                0);
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
 
-        // Verify the mount options are applied after restart
-        auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
-        VERIFY_IS_TRUE(mountOut.find(L"noatime") != std::wstring::npos);
+            // Verify the mount options are applied after restart
+            auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+            for (const auto& expected : expectedStrings)
+            {
+                VERIFY_IS_TRUE(mountOut.find(expected) != std::wstring::npos);
+            }
 
-        WslShutdown();
+            WslShutdown();
+        };
+
+        // Test changing data options on ext4
+        testManageMountOptions(L"ext4", L"--fs-type ext4", L"data=journal", {L"ext4", L"data=journal"});
+
+        // Test changing compress option on btrfs
+        testManageMountOptions(L"btrfs", L"--fs-type btrfs", L"compress=lzo", {L"btrfs", L"compress=lzo"});
+
+        // Test enabling quotas on xfs
+        testManageMountOptions(L"xfs", L"--fs-type xfs", L"uquota,gquota", {L"xfs", L"usrquota", L"grpquota"});
     }
 
 
