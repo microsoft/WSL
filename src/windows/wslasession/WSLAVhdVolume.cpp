@@ -18,6 +18,9 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "WslCoreFilesystem.h"
 
+using namespace wsl::windows::common;
+using wsl::shared::Localization;
+
 namespace wsl::windows::service::wsla {
 
 static constexpr ULONGLONG c_defaultVolumeSizeBytes = 10ULL * 1024 * 1024 * 1024;
@@ -38,7 +41,7 @@ namespace {
         }
         catch (...)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslaInvalidVolumeOptions(options.Options));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslaInvalidVolumeOptions(options.Options));
         }
 
         const auto it = parsedOptions.find("SizeBytes");
@@ -53,8 +56,7 @@ namespace {
             return c_defaultVolumeSizeBytes;
         }
 
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()), sizeBytesString[0] == '-');
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(sizeBytesString.c_str()), sizeBytesString[0] == '-');
 
         ULONGLONG sizeBytes = 0;
         size_t parsedCount = 0;
@@ -65,11 +67,11 @@ namespace {
         }
         catch (...)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageInvalidSize(sizeBytesString.c_str()));
         }
 
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(sizeBytesString.c_str()), parsedCount != sizeBytesString.size());
+            E_INVALIDARG, Localization::MessageInvalidSize(sizeBytesString.c_str()), parsedCount != sizeBytesString.size());
 
         if (sizeBytes == 0)
         {
@@ -148,14 +150,7 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create docker volume for '%hs'", name.c_str());
 
     auto volume = std::make_unique<WSLAVhdVolumeImpl>(
-        std::move(name),
-        std::move(type),
-        std::filesystem::path(hostPath),
-        sizeBytes,
-        lun,
-        std::move(virtualMachinePath),
-        VirtualMachine,
-        DockerClient);
+        std::move(name), std::move(type), std::filesystem::path(hostPath), sizeBytes, lun, std::move(virtualMachinePath), VirtualMachine, DockerClient);
 
     mountCleanup.release();
     attachCleanup.release();
@@ -169,6 +164,7 @@ void WSLAVhdVolumeImpl::Delete()
     Detach();
 
     auto hostPath = std::exchange(m_hostPath, std::filesystem::path{});
+
     if (!hostPath.empty())
     {
         LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str()));
@@ -185,16 +181,9 @@ void WSLAVhdVolumeImpl::Detach()
         }
         catch (const DockerHTTPException& e)
         {
-            if (e.StatusCode() == 409)
-            {
-                THROW_HR(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION));
-            }
-
-            // Allow cleanup to continue if docker volume is already gone.
-            if (e.StatusCode() != 404)
-            {
-                THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete docker volume for '%hs'", m_name.c_str());
-            }
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslaVolumeInUse(m_name.c_str()), e.StatusCode() == HTTP_STATUS_CONFLICT);
+            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to remove volume '%hs'", m_name.c_str());
         }
 
         if (!m_virtualMachinePath.empty())
