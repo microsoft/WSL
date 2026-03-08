@@ -2505,7 +2505,6 @@ std::vector<wsl::windows::common::filesystem::unique_lxss_addmount> LxssUserSess
     return mounts;
 }
 
-// TODO
 _Requires_lock_not_held_(m_instanceLock)
 std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_opt_ LPCGUID DistroGuid, _In_ ULONG Flags)
 {

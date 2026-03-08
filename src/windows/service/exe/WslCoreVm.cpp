@@ -1199,7 +1199,6 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
     message->DeviceId = lun;
     message->Flags = flags;
-    // TODO: add configuration for fsType and mountOptions
     message.WriteString(message->FsTypeOffset, Configuration.FsType);
     message.WriteString(message->MountOptionsOffset, Configuration.FsMountOptions);
     message.WriteString(message->VmIdOffset, m_machineId);
