@@ -981,7 +981,7 @@ class UnitTests
     {
         const auto tarFileName = LXSST_IMPORT_DISTRO_TEST_DIR L"test.tar";
         const auto rootfsDirectoryName = LXSST_IMPORT_DISTRO_TEST_DIR L"rootfs";
-        const auto vhdFileName = LXSST_IMPORT_DISTRO_TEST_DIR L"ext4.vhdx";
+        const auto vhdFileName = LXSST_IMPORT_DISTRO_TEST_DIR L"distro.vhdx";
         auto cleanup = wil::scope_exit([&] {
             try
             {
@@ -1242,7 +1242,7 @@ class UnitTests
         wsl::windows::common::registry::WriteDword(key.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
 
         // Create a dummy vhd
-        const auto vhdPath = vhdDir.string() + "\\ext4.vhdx";
+        const auto vhdPath = vhdDir.string() + "\\distro.vhdx";
 
         wil::unique_handle vhdHandle(CreateFileA(vhdPath.c_str(), GENERIC_READ, 0, nullptr, CREATE_ALWAYS, 0, nullptr));
         VERIFY_IS_TRUE(vhdHandle.is_valid());
@@ -1424,7 +1424,7 @@ class UnitTests
 
                 ValidateErrorMessage(
                     L"-d DummyBrokenDistro",
-                    L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
+                    L"Failed to attach disk 'C:\\DoesNotExit\\distro.vhdx' to WSL2: The system cannot find the path "
                     L"specified. ",
                     L"Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND");
 
@@ -1685,6 +1685,13 @@ Arguments for managing Windows Subsystem for Linux:
             --from-file <Path>
                 Install a distribution from a local file.
 
+            --fs-type <FsType>
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options <Options>
+                Specify additional mount options for the filesystem.
+
             --legacy
                 Use the legacy distribution manifest.
 
@@ -1724,6 +1731,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --set-fs-mount-options <Options>
+                Set the filesystem mount options for the distribution root.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -1799,6 +1809,13 @@ Arguments for managing distributions in Windows Subsystem for Linux:
             --vhd
                 Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
                 This operation makes a copy of the VHD file at the specified install location.
+
+            --fs-type <FsType>
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options <Options>
+                Specify additional mount options for the filesystem.
 
     --import-in-place <Distro> <FileName>
         Imports the specified VHD file as a new distribution.
@@ -2973,7 +2990,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // Validate that the distribution still starts
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", testFolder)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", testFolder)));
         }
 
         auto absolutePath = std::filesystem::weakly_canonical(".").wstring();
@@ -2985,7 +3002,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // Validate that the distribution still starts
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", absolutePath)));
         }
 
         // Try to move the distribution to a folder that's already in use
@@ -3003,7 +3020,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"Wsl/Service/MoveDistro/ERROR_FILE_EXISTS\r\n");
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", absolutePath)));
         }
 
         // Try to move the distribution to an invalid path
@@ -3018,7 +3035,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"Wsl/Service/MoveDistro/ERROR_INVALID_NAME\r\n");
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", absolutePath)));
         }
     }
 
@@ -3173,8 +3190,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // std::pair[0] = Written value, std::pair[1] = Actual/Expected value
             static const std::vector<std::pair<PCWSTR, PCWSTR>> filePathsToTest{
-                {L"C:\\DoesNotExit\\ext4.vhdx", L"C:\\DoesNotExit\\ext4.vhdx"},
-                {L"\\DoesNotExit\\ext4.vhdx", L"\\DoesNotExit\\ext4.vhdx"},
+                {L"C:\\DoesNotExit\\distro.vhdx", L"C:\\DoesNotExit\\distro.vhdx"},
+                {L"\\DoesNotExit\\distro.vhdx", L"\\DoesNotExit\\distro.vhdx"},
                 {L"", L""},
             };
 
@@ -3195,7 +3212,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                         {L"", L""},
                         {L"notaport", L""},
                         {L"-5555", L""},
-                        {L"C:\\DoesNotExit\\ext4.vhdx", L""},
+                        {L"C:\\DoesNotExit\\distro.vhdx", L""},
                     },
                 },
                 {
