@@ -63,6 +63,6 @@ struct ContainerInformation
     WSLAContainerState State;
     ULONGLONG StateChangedAt{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt);
 };
 } // namespace wsl::windows::wslc::models
