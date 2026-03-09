@@ -909,10 +909,12 @@ int FormatDevice(unsigned int Lun, const char* FsType)
 Routine Description:
 
     This routine formats the specified SCSI device with the <FsType> file system.
+
     N.B. The ext4 group size was chosen based on the best practices for Linux VHDs:
          https://docs.microsoft.com/en-us/windows-server/virtualization/hyper-v/best-practices-for-running-linux-on-hyper-v
 
     N.B. The xfs data section options (-d) is also determined based on the VHD sector size of 1MB, as suggested in the link above.
+
 Arguments:
 
     Lun - Supplies the LUN number of the SCSI device.
@@ -965,11 +967,19 @@ CATCH_RETURN_ERRNO()
 
 int CreateBtrfsSubvolumeOnDevice(unsigned int Lun, const char* MountOptions)
 /*++
-Routine Description:
+    This routine creates a btrfs subvolume on the specified SCSI device.
+    It is a no-op if there is no subvolume name in the mount options or
+    the subvolume already exists.
 
-    This routine creates a btrfs subvolume on the specified SCSI device. No-op if there is no subvolume name in the mount options
-or the subvolume already exists. Arguments: Lun - Supplies the LUN number of the SCSI device. MountOptions - The mount options to
-use when mounting the device. Subvolume name is extracted from it. Return Value: 0 on success, < 0 on failure.
+Arguments:
+
+    Lun - Supplies the LUN number of the SCSI device.
+    MountOptions - The mount options to use when mounting the device.
+        The subvolume name is extracted from these options.
+
+Return Value:
+
+    0 on success, < 0 on failure.
 --*/
 try
 {
