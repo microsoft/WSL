@@ -142,6 +142,30 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
         THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
 }
+
+bool CopyProcessSettingsToRuntime(WSLA_PROCESS_OPTIONS& runtimeOptions, const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions)
+{
+    if (initProcessOptions)
+    {
+        runtimeOptions.CurrentDirectory = initProcessOptions->currentDirectory;
+        runtimeOptions.CommandLine.Values = initProcessOptions->commandLine;
+        runtimeOptions.CommandLine.Count = initProcessOptions->commandLineCount;
+        runtimeOptions.Environment.Values = initProcessOptions->environment;
+        runtimeOptions.Environment.Count = initProcessOptions->environmentCount;
+
+        // TODO: No user access
+        // containerOptions.InitProcessOptions.Flags;
+        // containerOptions.InitProcessOptions.TtyRows;
+        // containerOptions.InitProcessOptions.TtyColumns;
+        // containerOptions.InitProcessOptions.User;
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 } // namespace
 
 // SESSION DEFINITIONS
@@ -399,21 +423,7 @@ try
     containerOptions.DomainName = internalContainerSettings->DomainName;
     containerOptions.Flags = ConvertFlags(internalContainerSettings->containerFlags);
 
-    const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions = internalContainerSettings->initProcessOptions;
-    if (initProcessOptions)
-    {
-        containerOptions.InitProcessOptions.CurrentDirectory = initProcessOptions->currentDirectory;
-        containerOptions.InitProcessOptions.CommandLine.Values = initProcessOptions->commandLine;
-        containerOptions.InitProcessOptions.CommandLine.Count = initProcessOptions->commandLineCount;
-        containerOptions.InitProcessOptions.Environment.Values = initProcessOptions->environment;
-        containerOptions.InitProcessOptions.Environment.Count = initProcessOptions->environmentCount;
-
-        // TODO: No user access
-        // containerOptions.InitProcessOptions.Flags;
-        // containerOptions.InitProcessOptions.TtyRows;
-        // containerOptions.InitProcessOptions.TtyColumns;
-        // containerOptions.InitProcessOptions.User;
-    }
+    CopyProcessSettingsToRuntime(containerOptions.InitProcessOptions, internalContainerSettings->initProcessOptions);
 
     std::unique_ptr<WSLA_VOLUME[]> convertedVolumes;
     if (internalContainerSettings->volumes && internalContainerSettings->volumesCount)
@@ -599,10 +609,30 @@ CATCH_RETURN();
 STDAPI WslcContainerExec(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess)
 try
 {
-    UNREFERENCED_PARAMETER(container);
-    UNREFERENCED_PARAMETER(newProcessSettings);
-    UNREFERENCED_PARAMETER(newProcess);
-    return E_NOTIMPL;
+    auto internalContainer = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalContainer->container);
+    auto internalProcessSettings = CheckAndGetInternalType(newProcessSettings);
+    RETURN_HR_IF(E_INVALIDARG, internalProcessSettings->commandLine == nullptr || internalProcessSettings->commandLineCount == 0);
+    RETURN_HR_IF_NULL(E_POINTER, newProcess);
+
+    WSLA_PROCESS_OPTIONS runtimeOptions{};
+    CopyProcessSettingsToRuntime(runtimeOptions, internalProcessSettings);
+
+    auto result = std::make_unique<WslcProcessImpl>();
+    HRESULT hr = internalContainer->container->Exec(&runtimeOptions, nullptr, &result->process);
+
+    if (FAILED_LOG(hr))
+    {
+        // TODO: Expected error message changes
+        // GetErrorInfoFromCOM(errorMessage);
+    }
+    else
+    {
+        wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+        *newProcess = reinterpret_cast<WslcProcess>(result.release());
+    }
+
+    return hr;
 }
 CATCH_RETURN();
 
@@ -640,9 +670,20 @@ try
 
     auto result = std::make_unique<WslcProcessImpl>();
 
-    RETURN_IF_FAILED(internalType->container->GetInitProcess(&result->process));
+    HRESULT hr = internalType->container->GetInitProcess(&result->process);
 
-    *initProcess = reinterpret_cast<WslcProcess>(result.release());
+    if (FAILED_LOG(hr))
+    {
+        // TODO: Expected error message changes
+        // GetErrorInfoFromCOM(errorMessage);
+    }
+    else
+    {
+        wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+        *initProcess = reinterpret_cast<WslcProcess>(result.release());
+    }
+
+    return hr;
 
     return S_OK;
 }

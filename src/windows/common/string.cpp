@@ -190,6 +190,7 @@ std::wstring wsl::windows::common::string::BytesToHex(const std::vector<BYTE>& b
     return str.str();
 }
 
+namespace {
 bool IsHexSpecifier(char first, char second)
 {
     return first == '0' && tolower(second) == 'x';
@@ -244,13 +245,14 @@ std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
 
     return result;
 }
+} // namespace
 
-std::vector<BYTE> HexToBytes(std::string_view input)
+std::vector<BYTE> wsl::windows::common::string::HexToBytes(std::string_view input)
 {
     return HexToBytesT(input);
 }
 
-std::vector<BYTE> HexToBytes(std::wstring_view input)
+std::vector<BYTE> wsl::windows::common::string::HexToBytes(std::wstring_view input)
 {
     return HexToBytesT(input);
 }
