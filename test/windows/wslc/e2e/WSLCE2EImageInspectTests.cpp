@@ -1,0 +1,106 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCE2EImageInspectTests.cpp
+
+Abstract:
+
+    This file contains end-to-end tests for WSLC.
+--*/
+
+#include "precomp.h"
+#include "windows/Common.h"
+#include "WSLCExecutor.h"
+#include "WSLCE2EHelpers.h"
+
+namespace WSLCE2ETests {
+
+class WSLCE2EImageInspectTests
+{
+    WSL_TEST_CLASS(WSLCE2EImageInspectTests)
+
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        EnsureImageIsLoaded(DebianImage);
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(ClassCleanup)
+    {
+        EnsureImageIsDeleted(DebianImage);
+        return true;
+    }
+
+    TEST_METHOD(WSLCE2E_Image_Inspect_HelpCommand)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(L"image inspect --help");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+    }
+
+    TEST_METHOD(WSLCE2E_Image_Inspect_MissingImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(L"image inspect");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(L"image inspect image-not-found");
+        auto errorMessage = std::format(L"No such image: image-not-found:latest\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n");
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
+private:
+    const std::wstring WslcContainerName = L"wslc-test-container";
+    const TestImage& DebianImage = DebianTestImage();
+
+    std::wstring GetHelpMessage() const
+    {
+        std::wstringstream output;
+        output << GetWslcHeader()        //
+               << GetDescription()       //
+               << GetUsage()             //
+               << GetAvailableCommands() //
+               << GetAvailableOptions();
+        return output.str();
+    }
+
+    std::wstring GetDescription() const
+    {
+        return L"Inspect images.\r\n\r\n";
+    }
+
+    std::wstring GetUsage() const
+    {
+        return L"Usage: wslc image inspect [<options>] <image>\r\n\r\n";
+    }
+
+    std::wstring GetAvailableCommands() const
+    {
+        std::wstringstream commands;
+        commands << L"The following arguments are available:\r\n" //
+                 << L"  image      Image name\r\n" //
+                 << L"\r\n";
+        return commands.str();
+    }
+
+    std::wstring GetAvailableOptions() const
+    {
+        std::wstringstream options;
+        options << L"The following options are available:\r\n" //
+                << L"  --session  Specify the session to use\r\n" //
+                << L"  -h,--help  Shows help about the selected command\r\n" //
+                << L"\r\n";
+        return options.str();
+    }
+};
+} // namespace WSLCE2ETests

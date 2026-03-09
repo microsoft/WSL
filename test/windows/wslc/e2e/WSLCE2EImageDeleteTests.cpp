@@ -110,6 +110,14 @@ class WSLCE2EImageDeleteTests
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
     }
 
+    TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)
+    {
+        WSL2_TEST_ONLY();
+
+        // TODO: Implement once 'image tag' is implemented
+        SKIP_TEST_NOT_IMPL();
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
