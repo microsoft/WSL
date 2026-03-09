@@ -24,41 +24,41 @@ using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
 namespace {
-// Internal helper function for reading from pipes
-std::string ReadFromPipe(HANDLE pipe, DWORD timeoutMs)
-{
-    std::string result;
-    char buffer[4096];
-
-    auto startTime = GetTickCount64();
-    while (GetTickCount64() - startTime < timeoutMs)
+    // Internal helper function for reading from pipes
+    std::string ReadFromPipe(HANDLE pipe, DWORD timeoutMs)
     {
-        DWORD available = 0;
-        if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &available, nullptr))
+        std::string result;
+        char buffer[4096];
+
+        auto startTime = GetTickCount64();
+        while (GetTickCount64() - startTime < timeoutMs)
         {
-            break; // Pipe broken
+            DWORD available = 0;
+            if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &available, nullptr))
+            {
+                break; // Pipe broken
+            }
+
+            if (available > 0)
+            {
+                DWORD toRead = (std::min)(available, static_cast<DWORD>(sizeof(buffer)));
+                DWORD read = 0;
+                if (ReadFile(pipe, buffer, toRead, &read, nullptr) && read > 0)
+                {
+                    result.append(buffer, read);
+                    startTime = GetTickCount64(); // Reset timeout after successful read
+                }
+                else
+                {
+                    break; // Read failed
+                }
+            }
+
+            Sleep(10);
         }
 
-        if (available > 0)
-        {
-            DWORD toRead = (std::min)(available, static_cast<DWORD>(sizeof(buffer)));
-            DWORD read = 0;
-            if (ReadFile(pipe, buffer, toRead, &read, nullptr) && read > 0)
-            {
-                result.append(buffer, read);
-                startTime = GetTickCount64(); // Reset timeout after successful read
-            }
-            else
-            {
-                break; // Read failed
-            }
-        }
-
-        Sleep(10);
+        return result;
     }
-
-    return result;
-}
 } // anonymous namespace
 
 void WSLCExecutionResult::Dump() const
@@ -170,12 +170,7 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
         THROW_HR_MSG(E_FAIL, "Process exited immediately with code %d. Stderr: %hs", exitCode, errorOutput.c_str());
     }
 
-    return WSLCInteractiveSession(
-        commandLine,
-        std::move(stdinWrite),
-        std::move(stdoutRead),
-        std::move(stderrRead),
-        std::move(processHandle));
+    return WSLCInteractiveSession(commandLine, std::move(stdinWrite), std::move(stdoutRead), std::move(stderrRead), std::move(processHandle));
 }
 
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)
@@ -204,11 +199,7 @@ void WriteAndVerifyOutput(WSLCInteractiveSession& session, const std::string& co
 // WSLCInteractiveSession implementation
 
 WSLCInteractiveSession::WSLCInteractiveSession(
-    std::wstring commandLine,
-    wil::unique_handle stdinWrite,
-    wil::unique_handle stdoutRead,
-    wil::unique_handle stderrRead,
-    wil::unique_handle processHandle) :
+    std::wstring commandLine, wil::unique_handle stdinWrite, wil::unique_handle stdoutRead, wil::unique_handle stderrRead, wil::unique_handle processHandle) :
     CommandLine(std::move(commandLine)),
     m_stdinWrite(std::move(stdinWrite)),
     m_stdoutRead(std::move(stdoutRead)),
@@ -355,8 +346,13 @@ std::string WSLCInteractiveSession::ReadUntil(const std::string& marker, DWORD t
         Sleep(10);
     }
 
-    THROW_HR_MSG(E_FAIL, "Timeout waiting for marker '%hs' after %dms. Got %zu bytes: %hs",
-        marker.c_str(), timeoutMs, accumulated.size(), accumulated.c_str());
+    THROW_HR_MSG(
+        E_FAIL,
+        "Timeout waiting for marker '%hs' after %dms. Got %zu bytes: %hs",
+        marker.c_str(),
+        timeoutMs,
+        accumulated.size(),
+        accumulated.c_str());
 }
 
 void WSLCInteractiveSession::Write(const std::string& data)
@@ -405,9 +401,7 @@ std::optional<int> WSLCInteractiveSession::GetExitCode() const
 
 void WSLCInteractiveSession::WaitForExit(DWORD timeoutMs)
 {
-    auto ensureCleanup = wil::scope_exit([this] {
-        StopDraining();
-    });
+    auto ensureCleanup = wil::scope_exit([this] { StopDraining(); });
 
     auto result = WaitForSingleObject(m_processHandle.get(), timeoutMs);
     if (result == WAIT_TIMEOUT)
@@ -421,7 +415,9 @@ void WSLCInteractiveSession::WaitForExit(DWORD timeoutMs)
             remainingStdout = ReadStdout(500);
             remainingStderr = ReadStderr(500);
         }
-        catch (...) {}
+        catch (...)
+        {
+        }
 
         Log::Warning(std::format(L"Process (PID: {}) did not exit within timeout of {}ms", processId, timeoutMs).c_str());
         if (!remainingStdout.empty())
@@ -463,8 +459,7 @@ void WSLCInteractiveSession::VerifyNoErrors()
 {
     auto errors = ReadStderr(500);
     VERIFY_IS_TRUE(
-        errors.empty(),
-        std::format(L"Expected no errors on stderr, but got: {}", wsl::shared::string::MultiByteToWide(errors)).c_str());
+        errors.empty(), std::format(L"Expected no errors on stderr, but got: {}", wsl::shared::string::MultiByteToWide(errors)).c_str());
 }
 
 int WSLCInteractiveSession::Exit(DWORD timeoutMs)

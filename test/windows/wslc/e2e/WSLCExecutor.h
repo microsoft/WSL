@@ -43,12 +43,7 @@ struct WSLCExecutionResult
 // - Full diagnostic output on failures
 struct WSLCInteractiveSession
 {
-    WSLCInteractiveSession(
-        std::wstring commandLine,
-        wil::unique_handle stdinWrite,
-        wil::unique_handle stdoutRead,
-        wil::unique_handle stderrRead,
-        wil::unique_handle processHandle);
+    WSLCInteractiveSession(std::wstring commandLine, wil::unique_handle stdinWrite, wil::unique_handle stdoutRead, wil::unique_handle stderrRead, wil::unique_handle processHandle);
 
     void StopDraining();
 
