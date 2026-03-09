@@ -154,7 +154,7 @@ if (${TARGET_PLATFORM} STREQUAL "arm64")
     set(DCAT_PRODUCT_NAME WSL.arm64)
 endif()
 
-set(DCAT_REGISTRATION_KEY SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\DynamicInstalled\\${DCAT_PRODUCT_NAME})
+set(DCAT_REGISTRATION_KEY "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\DynamicInstalled\\${DCAT_PRODUCT_NAME}")
 
 # Configure output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
