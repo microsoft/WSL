@@ -30,9 +30,15 @@ struct TestImage
 
 const TestImage& DebianTestImage();
 const TestImage& InvalidTestImage();
+
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId);
+void VerifyImageIsUsed(const TestImage& image);
+void VerifyImageIsNotUsed(const TestImage& image);
+
+std::map<std::string, nlohmann::json> GetContainerDetails(const std::wstring& containerName);
+
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image);
-
+void EnsureImageIsDeleted(const TestImage& image);
 } // namespace WSLCE2ETests

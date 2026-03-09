@@ -72,6 +72,48 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     VERIFY_FAIL(message.c_str());
 }
 
+void VerifyImageIsUsed(const TestImage& image)
+{
+    auto result = RunWslc(L"container list -a");
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    auto outputLines = result.GetStdoutLines();
+    for (const auto& line : outputLines)
+    {
+        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Image '{}' not found in container list output", image.NameAndTag()).c_str());
+}
+
+void VerifyImageIsNotUsed(const TestImage& image)
+{
+    auto result = RunWslc(L"container list -a");
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    auto outputLines = result.GetStdoutLines();
+    for (const auto& line : outputLines)
+    {
+        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        {
+            VERIFY_FAIL(std::format(L"Image '{}' found in container list output", image.NameAndTag()).c_str());
+        }
+    }
+}
+
+std::map<std::string, nlohmann::json> GetContainerDetails(const std::wstring& containerName)
+{
+    auto result = RunWslc(std::format(L"container inspect {}", containerName));
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    auto jsonOutput = result.GetStdoutOneLine();
+    auto jsonArray = nlohmann::json::parse(jsonOutput);
+    VERIFY_IS_TRUE(jsonArray.is_array());
+    VERIFY_ARE_EQUAL(1U, jsonArray.size());
+    VERIFY_IS_TRUE(jsonArray[0].is_object());
+    return jsonArray[0].get<std::map<std::string, nlohmann::json>>();
+}
+
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     auto listResult = RunWslc(L"container list --all");
@@ -84,6 +126,23 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
         {
             auto result = RunWslc(std::format(L"container delete {}", containerName));
             result.Verify({.Stderr = L"", .ExitCode = S_OK});
+            break;
+        }
+    }
+}
+
+void EnsureImageIsDeleted(const TestImage& image)
+{
+    auto result = RunWslc(L"image list");
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+    auto outputLines = result.GetStdoutLines();
+    for (const auto& line : outputLines)
+    {
+        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        {
+            auto deleteResult = RunWslc(std::format(L"image delete {}", image.NameAndTag()));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = S_OK});
             break;
         }
     }
