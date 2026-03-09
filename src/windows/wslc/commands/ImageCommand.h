@@ -106,6 +106,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Inspect Command
+struct ImageInspectCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"inspect";
+    ImageInspectCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Pull Command
 struct ImagePullCommand final : public Command
 {

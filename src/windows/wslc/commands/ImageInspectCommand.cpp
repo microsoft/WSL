@@ -23,30 +23,29 @@ using namespace wsl::windows::wslc::task;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
-// Image Delete Command
-std::vector<Argument> ImageDeleteCommand::GetArguments() const
+// Image Inspect Command
+std::vector<Argument> ImageInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ImageId, true),
-        Argument::Create(ArgType::Force),
-        Argument::Create(ArgType::NoPrune),
+        Argument::Create(ArgType::ImageId, true, NO_LIMIT),
+        Argument::Create(ArgType::Session),
     };
 }
 
-std::wstring ImageDeleteCommand::ShortDescription() const
+std::wstring ImageInspectCommand::ShortDescription() const
 {
-    return {L"Delete images."};
+    return {L"Inspect images."};
 }
 
-std::wstring ImageDeleteCommand::LongDescription() const
+std::wstring ImageInspectCommand::LongDescription() const
 {
-    return {L"Deletes images."};
+    return {L"Inspect images."};
 }
 
-void ImageDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ImageInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context              //
         << CreateSession //
-        << DeleteImage;
+        << InspectImages;
 }
 } // namespace wsl::windows::wslc

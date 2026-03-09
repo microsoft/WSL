@@ -18,6 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
+using wsl::windows::common::docker_schema::InspectImage;
 
 void ImageService::Build(
     wsl::windows::wslc::models::Session& session, const std::wstring& contextPath, const std::wstring& tag, const std::wstring& dockerfilePath, IProgressCallback* callback)
@@ -102,6 +103,13 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
+InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
+{
+    LPSTR inspectData = nullptr;
+    THROW_IF_FAILED(session.Get()->InspectImage(image.c_str(), &inspectData));
+    return wsl::shared::FromJson<InspectImage>(inspectData);
+}
+
 void ImageService::Push()
 {
 }
@@ -117,9 +125,4 @@ void ImageService::Tag()
 void ImageService::Prune()
 {
 }
-
-void ImageService::Inspect()
-{
-}
-
 } // namespace wsl::windows::wslc::services

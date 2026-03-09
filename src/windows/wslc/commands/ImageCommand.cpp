@@ -23,6 +23,7 @@ std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ImageDeleteCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageInspectCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName()));
     commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));

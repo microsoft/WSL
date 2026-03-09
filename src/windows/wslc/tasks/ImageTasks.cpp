@@ -147,4 +147,22 @@ void LoadImage(CLIExecutionContext& context)
     // TODO Read from stdin if no input argument is provided.
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Requested load but no input provided.");
 }
+
+void InspectImages(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto imageIds = context.Args.GetAll<ArgType::ImageId>();
+
+    std::vector<wsl::windows::common::docker_schema::InspectImage> result;
+    for (const auto& id : imageIds)
+    {
+        auto inspectData = ImageService::Inspect(session, WideToMultiByte(id));
+        result.push_back(inspectData);
+    }
+
+    auto json = ToJson(result);
+    PrintMessage(MultiByteToWide(json));
+}
 } // namespace wsl::windows::wslc::task
