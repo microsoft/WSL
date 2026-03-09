@@ -90,7 +90,12 @@ class WSLCE2EImageDeleteTests
         auto imageId = GetId(inspectImage.Id);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
-        auto errorMessage = std::format(L"conflict: unable to remove repository reference \"{}\" (must force) - container {} is using its referenced image {}\r\nError code: ERROR_SHARING_VIOLATION\r\n", DebianImage.Name, containerId, imageId);
+        auto errorMessage = std::format(
+            L"conflict: unable to remove repository reference \"{}\" (must force) - container {} is using its referenced image "
+            L"{}\r\nError code: ERROR_SHARING_VIOLATION\r\n",
+            DebianImage.Name,
+            containerId,
+            imageId);
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -148,7 +153,7 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following arguments are available:\r\n" //
-                 << L"  image       Image name\r\n" //
+                 << L"  image       Image name\r\n"               //
                  << L"\r\n";
         return commands.str();
     }
@@ -156,10 +161,10 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n" //
+        options << L"The following options are available:\r\n"                     //
                 << L"  -f,--force  Delete containers even if they are running\r\n" //
-                << L"  --no-prune  Do not delete untagged parents\r\n" //
-                << L"  -h,--help   Shows help about the selected command\r\n" //
+                << L"  --no-prune  Do not delete untagged parents\r\n"             //
+                << L"  -h,--help   Shows help about the selected command\r\n"      //
                 << L"\r\n";
         return options.str();
     }

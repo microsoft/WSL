@@ -88,7 +88,7 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following arguments are available:\r\n" //
-                 << L"  image      Image name\r\n" //
+                 << L"  image      Image name\r\n"                //
                  << L"\r\n";
         return commands.str();
     }
@@ -96,8 +96,8 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n" //
-                << L"  --session  Specify the session to use\r\n" //
+        options << L"The following options are available:\r\n"               //
+                << L"  --session  Specify the session to use\r\n"            //
                 << L"  -h,--help  Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
