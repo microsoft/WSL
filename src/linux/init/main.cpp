@@ -847,6 +847,8 @@ try
         return 0;
     }
 
+    THROW_LAST_ERROR_IF(errno != ENOENT);
+
     std::string CommandLine = std::format("/usr/sbin/btrfs subvolume create '{}'", SubvolPath);
     THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0);
 
@@ -2584,7 +2586,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
             if (FsType != nullptr && strcmp(FsType, "btrfs") == 0)
             {
                 // create the subvolume if specified in mount options
-                CreateBtrfsSubvolumeOnDevice(Message->DeviceId, MountOptions);
+                THROW_LAST_ERROR_IF(CreateBtrfsSubvolumeOnDevice(Message->DeviceId, MountOptions) < 0);
             }
 
             THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
