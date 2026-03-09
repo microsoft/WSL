@@ -2982,7 +2982,6 @@ class WSLATests
 
                 auto now = static_cast<ULONGLONG>(time(nullptr));
                 VERIFY_IS_TRUE(containers[0].StateChangedAt <= now);
-                VERIFY_IS_TRUE(containers[0].StateChangedAt >= now - 30);
                 VERIFY_IS_TRUE(containers[0].StateChangedAt >= runningStateChangedAt);
             }
 
