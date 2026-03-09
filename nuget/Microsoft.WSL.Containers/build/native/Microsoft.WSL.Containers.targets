@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <ItemDefinitionGroup>
-        <PropertyGroup Condition="'$(WSLForApps-Platform)' == ''">
-            <WSLForApps-Platform>$(Platform)</WSLForApps-Platform>
+        <PropertyGroup Condition="'$(WSLCSDK-Platform)' == ''">
+            <WSLCSDK-Platform>$(Platform)</WSLCSDK-Platform>
         </PropertyGroup>
         <ClCompile>
             <AdditionalIncludeDirectories>
@@ -12,7 +12,7 @@
         </ClCompile>
         <Link>
             <AdditionalDependencies>
-                wslaclient.lib;
+                wslcsdk.lib;
                 %(AdditionalDependencies)
             </AdditionalDependencies>
             <AdditionalLibraryDirectories>
