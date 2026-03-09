@@ -47,7 +47,7 @@ set(HEADERS
 
 set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil")
 set(INIT_LIBRARIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)
-add_linux_executable(init "${SOURCES}" "${HEADERS}" "${INIT_LIBRARIES}")
+add_linux_executable(init "${SOURCES}" "${HEADERS};${COMMON_LINUX_HEADERS}" "${INIT_LIBRARIES}")
 add_dependencies(init localization)
 
 set_target_properties(init PROPERTIES FOLDER linux)
