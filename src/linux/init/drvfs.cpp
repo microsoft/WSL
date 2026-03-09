@@ -739,18 +739,17 @@ try
     //
 
     auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
-    struct stat st;
-    if (lstat(LinkPath.c_str(), &st) < 0)
-    {
-        LOG_WARNING("Failed to stat virtiofs tag symlink {}: {}", LinkPath, errno);
-        return {};
-    }
-
-    std::string Result(st.st_size, '\0');
+    std::string Result(PATH_MAX, '\0');
     auto Length = readlink(LinkPath.c_str(), Result.data(), Result.size());
     if (Length < 0)
     {
         LOG_WARNING("Failed to read virtiofs tag symlink {}: {}", LinkPath, errno);
+        return {};
+    }
+
+    if (static_cast<size_t>(Length) == Result.size())
+    {
+        LOG_WARNING("Virtiofs tag symlink {} target may be truncated", LinkPath);
         return {};
     }
 
