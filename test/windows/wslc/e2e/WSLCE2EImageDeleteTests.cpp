@@ -24,13 +24,14 @@ class WSLCE2EImageDeleteTests
 
     TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsDeleted(DebianImage);
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
+        EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -48,7 +49,7 @@ class WSLCE2EImageDeleteTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.Name);
+        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -57,7 +58,7 @@ class WSLCE2EImageDeleteTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(L"image delete");
-        result.Verify({.Stdout = L"", .Stderr = L"Required argument not provided: 'image'", .ExitCode = 1});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Image_Delete_UnusedImage_Success)
@@ -82,12 +83,31 @@ class WSLCE2EImageDeleteTests
         createResult.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         VerifyImageIsUsed(DebianImage);
-        auto containerDetails = GetContainerDetails(WslcContainerName);
-        VERIFY_ARE_EQUAL(DebianImage.NameAndTag(), containerDetails["Image"].get<std::string>());
-        auto containerId = containerDetails["Id"].get<std::string>();
+
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto containerId = GetId(inspectContainer.Id);
+        auto inspectImage = InspectImage(DebianImage.NameAndTag());
+        auto imageId = GetId(inspectImage.Id);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 1});
+        auto errorMessage = std::format(L"conflict: unable to remove repository reference \"{}\" (must force) - container {} is using its referenced image {}\r\nError code: ERROR_SHARING_VIOLATION\r\n", DebianImage.Name, containerId, imageId);
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Image_DeleteForce_UsedImage_Success)
+    {
+        WSL2_TEST_ONLY();
+
+        EnsureImageIsLoaded(DebianImage);
+        VerifyImageIsNotUsed(DebianImage);
+
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.Name));
+        createResult.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        VerifyImageIsUsed(DebianImage);
+
+        auto result = RunWslc(std::format(L"image delete --force {}", DebianImage.Name));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
     }
 
 private:
@@ -129,9 +149,9 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  -f,--force         Delete containers even if they are running\r\n" //
-                << L"  --no-prune         Do not delete untagged parents\r\n" //
-                << L"  -h,--help          Shows help about the selected command\r\n" //
+                << L"  -f,--force  Delete containers even if they are running\r\n" //
+                << L"  --no-prune  Do not delete untagged parents\r\n" //
+                << L"  -h,--help   Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
     }

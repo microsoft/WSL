@@ -12,15 +12,17 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "windows/Common.h"
+#include "Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include <JsonUtils.h>
 
 extern std::wstring g_testDataPath;
 
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
+using namespace wsl::windows::common;
 
 const TestImage& DebianTestImage()
 {
@@ -74,7 +76,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
 
 void VerifyImageIsUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"container list -a");
+    auto result = RunWslc(L"image list");
     result.Verify({.Stderr = L"", .ExitCode = S_OK});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -102,16 +104,43 @@ void VerifyImageIsNotUsed(const TestImage& image)
     }
 }
 
-std::map<std::string, nlohmann::json> GetContainerDetails(const std::wstring& containerName)
+std::string GetId(const std::string& id, bool fullId)
+{
+    const int shortIdLength = 12;
+    VERIFY_IS_GREATER_THAN_OR_EQUAL(id.length(), shortIdLength);
+    if (fullId)
+    {
+        return id;
+    }
+
+    // Remove the "sha256:" prefix if it exists and return the first 12 characters
+    const std::string prefix = "sha256:";
+    if (id.rfind(prefix, 0) == 0)
+    {
+        return id.substr(prefix.length(), shortIdLength);
+    }
+
+    return id.substr(0, shortIdLength);
+}
+
+docker_schema::InspectContainer InspectContainer(const std::wstring& containerName)
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
     result.Verify({.Stderr = L"", .ExitCode = S_OK});
     auto jsonOutput = result.GetStdoutOneLine();
-    auto jsonArray = nlohmann::json::parse(jsonOutput);
-    VERIFY_IS_TRUE(jsonArray.is_array());
-    VERIFY_ARE_EQUAL(1U, jsonArray.size());
-    VERIFY_IS_TRUE(jsonArray[0].is_object());
-    return jsonArray[0].get<std::map<std::string, nlohmann::json>>();
+    auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectContainer>>(jsonOutput.c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
+}
+
+docker_schema::InspectImage InspectImage(const std::wstring& imageName)
+{
+    auto result = RunWslc(std::format(L"image inspect {}", imageName));
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    auto jsonOutput = result.GetStdoutOneLine();
+    auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectImage>>(jsonOutput.c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
 }
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
