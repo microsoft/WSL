@@ -194,11 +194,12 @@ CreateContainerResult ContainerService::Create(Session& session, const std::stri
     return {.Id = id};
 }
 
-void ContainerService::Start(Session& session, const std::string& id)
+void ContainerService::Start(Session& session, const std::string& id, bool withAttach)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Start(WSLAContainerStartFlags::WSLAContainerStartFlagsNone, nullptr)); // TODO: Error message, detach keys
+    WSLAContainerStartFlags flags = withAttach ? WSLAContainerStartFlagsAttach : WSLAContainerStartFlagsNone;
+    THROW_IF_FAILED(container->Start(flags, nullptr));
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
