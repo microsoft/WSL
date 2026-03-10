@@ -1131,8 +1131,6 @@ try
 {
     COMServiceExecutionContext context;
 
-
-
     std::optional<docker_schema::PruneContainerLabelFilter> filters;
 
     if (Until > 0 || FiltersCount > 0)

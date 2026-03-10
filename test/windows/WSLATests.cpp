@@ -4254,7 +4254,8 @@ class WSLATests
         {
             // Create a docker container that has no metadata.
             auto result = RunCommand(
-                m_defaultSession.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+                m_defaultSession.get(),
+                {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
         }
 
