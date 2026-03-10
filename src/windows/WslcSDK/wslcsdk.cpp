@@ -253,7 +253,7 @@ try
         *session = reinterpret_cast<WslcSession>(result.release());
     }
 
-    return S_OK;
+    return hr;
 }
 CATCH_RETURN();
 
