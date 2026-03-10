@@ -23,44 +23,6 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
-namespace {
-    // Internal helper function for reading from pipes
-    std::string ReadFromPipe(HANDLE pipe, DWORD timeoutMs)
-    {
-        std::string result;
-        char buffer[4096];
-
-        auto startTime = GetTickCount64();
-        while (GetTickCount64() - startTime < timeoutMs)
-        {
-            DWORD available = 0;
-            if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &available, nullptr))
-            {
-                break; // Pipe broken
-            }
-
-            if (available > 0)
-            {
-                DWORD toRead = (std::min)(available, static_cast<DWORD>(sizeof(buffer)));
-                DWORD read = 0;
-                if (ReadFile(pipe, buffer, toRead, &read, nullptr) && read > 0)
-                {
-                    result.append(buffer, read);
-                    startTime = GetTickCount64(); // Reset timeout after successful read
-                }
-                else
-                {
-                    break; // Read failed
-                }
-            }
-
-            Sleep(10);
-        }
-
-        return result;
-    }
-} // anonymous namespace
-
 void WSLCExecutionResult::Dump() const
 {
     Log::Comment((L"Command Line: \"" + CommandLine + L"\"").c_str());
@@ -167,7 +129,20 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
     DWORD exitCode = 0;
     if (GetExitCodeProcess(processHandle.get(), &exitCode) && exitCode != STILL_ACTIVE)
     {
-        std::string errorOutput = ReadFromPipe(stderrRead.get(), 1000);
+        // Process exited immediately - read any error output
+        std::string errorOutput;
+        char buffer[4096];
+        DWORD available = 0;
+        if (PeekNamedPipe(stderrRead.get(), nullptr, 0, nullptr, &available, nullptr) && available > 0)
+        {
+            DWORD toRead = (std::min)(available, static_cast<DWORD>(sizeof(buffer)));
+            DWORD read = 0;
+            if (ReadFile(stderrRead.get(), buffer, toRead, &read, nullptr) && read > 0)
+            {
+                errorOutput.assign(buffer, read);
+            }
+        }
+
         THROW_HR_MSG(E_FAIL, "Process exited immediately with code %d. Stderr: %hs", exitCode, errorOutput.c_str());
     }
 
