@@ -51,11 +51,10 @@ void ImageService::Build(
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
 {
     wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
-    ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, &count));
+    THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, images.size_address<ULONG>()));
 
     std::vector<ImageInformation> result;
-    for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
+    for (auto ptr = images.get(), end = images.get() + images.size(); ptr != end; ++ptr)
     {
         const WSLAImageInformation& image = *ptr;
         ImageInformation info{};
@@ -77,7 +76,7 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
-void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
+std::vector<WSLADeletedImageInformation> ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
     WSLADeleteImageOptions options{};
     options.Image = image.c_str();
@@ -94,6 +93,15 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
     wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+
+    std::vector<WSLADeletedImageInformation> result;
+    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    {
+        const WSLADeletedImageInformation& deletedImage = *ptr;
+        result.push_back(deletedImage);
+    }
+
+    return result;
 }
 
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)

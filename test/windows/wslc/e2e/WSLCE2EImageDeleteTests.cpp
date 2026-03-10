@@ -53,6 +53,15 @@ class WSLCE2EImageDeleteTests
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
+        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
     TEST_METHOD(WSLCE2E_Image_Delete_MissingImageName)
     {
         WSL2_TEST_ONLY();

@@ -29,7 +29,7 @@ public:
         IProgressCallback* callback);
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
-    static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
+    static std::vector<WSLADeletedImageInformation> Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
     static wsl::windows::common::docker_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     void Push();
