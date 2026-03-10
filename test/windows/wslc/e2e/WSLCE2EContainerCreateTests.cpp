@@ -108,8 +108,7 @@ class WSLCE2EContainerCreateTests
         WriteAndVerifyOutput(session, "echo hello", "hello");
         WriteAndVerifyOutput(session, "whoami", "root");
 
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
+        auto exitCode = session.ExitAndVerifyNoErrors();
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
@@ -126,7 +125,7 @@ class WSLCE2EContainerCreateTests
         session.WriteLine("test line 2");
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY proccess.
+        // limitation where we are not getting stdout data correctly from non-TTY process.
         // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
         // fails due to not receiving any output in the pipe.
 
@@ -154,8 +153,7 @@ class WSLCE2EContainerCreateTests
         WriteAndVerifyOutput(session, "echo hello", "hello");
         WriteAndVerifyOutput(session, "whoami", "root");
 
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
+        auto exitCode = session.ExitAndVerifyNoErrors();
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
@@ -177,7 +175,7 @@ class WSLCE2EContainerCreateTests
         session.WriteLine("test line 2");
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY proccess.
+        // limitation where we are not getting stdout data correctly from non-TTY process.
         // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
         // fails due to not receiving any output in the pipe.
 
@@ -204,8 +202,7 @@ class WSLCE2EContainerCreateTests
         WriteAndVerifyOutput(session, "echo hello", "hello");
         WriteAndVerifyOutput(session, "whoami", "root");
 
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
+        auto exitCode = session.ExitAndVerifyNoErrors();
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
@@ -226,7 +223,7 @@ class WSLCE2EContainerCreateTests
         session.WriteLine("test line 2");
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY proccess.
+        // limitation where we are not getting stdout data correctly from non-TTY process.
         // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
         // fails due to not receiving any output in the pipe.
 
@@ -254,8 +251,7 @@ class WSLCE2EContainerCreateTests
         WriteAndVerifyOutput(session, "echo hello", "hello");
         WriteAndVerifyOutput(session, "whoami", "root");
 
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
+        auto exitCode = session.ExitAndVerifyNoErrors();
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
@@ -278,7 +274,7 @@ class WSLCE2EContainerCreateTests
         session.WriteLine("test line 2");
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY proccess.
+        // limitation where we are not getting stdout data correctly from non-TTY process.
         // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
         // fails due to not receiving any output in the pipe.
 
@@ -301,8 +297,7 @@ class WSLCE2EContainerCreateTests
             WriteAndVerifyOutput(session, "echo hello", "hello");
             WriteAndVerifyOutput(session, "whoami", "root");
 
-            session.ExitAndVerifyNoErrors();
-            auto exitCode = session.Wait();
+            auto exitCode = session.ExitAndVerifyNoErrors();
             VERIFY_ARE_EQUAL(0, exitCode);
         }
         {
@@ -313,9 +308,8 @@ class WSLCE2EContainerCreateTests
             WriteAndVerifyOutput(session, "echo hello", "hello");
             WriteAndVerifyOutput(session, "whoami", "root");
 
-            session.ExitAndVerifyNoErrors();
-            auto exitCode = session.Wait();
-            VERIFY_ARE_EQUAL(0, exitCode);
+            auto exitCode2 = session.ExitAndVerifyNoErrors();
+            VERIFY_ARE_EQUAL(0, exitCode2);
         }
     }
 
