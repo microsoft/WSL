@@ -136,6 +136,7 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
 {
     auto wslcPath = std::filesystem::path(wslutil::GetMsiPackagePath().value()) / L"wslc.exe";
     auto cmd = L"\"" + wslcPath.wstring() + L"\" " + commandLine;
+    Log::Comment(std::format(L"Starting interactive session: {}", cmd).c_str());
 
     // Create pipes with larger buffer to reduce blocking
     constexpr DWORD PIPE_BUFFER_SIZE = 65536; // 64KB

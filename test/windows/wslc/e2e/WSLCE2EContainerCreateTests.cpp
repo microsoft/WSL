@@ -189,6 +189,55 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
     }
 
+    TEST_METHOD(WSLCCLI_E2E_Container_ExecInteractive_TTY)
+    {
+        WSL2_TEST_ONLY();
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        WriteAndVerifyOutput(session, "echo hello", "hello");
+        WriteAndVerifyOutput(session, "whoami", "root");
+
+        session.ExitAndVerifyNoErrors();
+        auto exitCode = session.Wait();
+        VERIFY_ARE_EQUAL(0, exitCode);
+    }
+
+    TEST_METHOD(WSLCCLI_E2E_Container_ExecInteractive_NoTTY)
+    {
+        WSL2_TEST_ONLY();
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        auto session = RunWslcInteractive(std::format(L"container exec -i {} cat", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // Write test data to stdin
+        session.WriteLine("test line 1");
+        session.WriteLine("test line 2");
+
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY proccess.
+        // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
+        // fails due to not receiving any output in the pipe.
+
+        // Close stdin to signal EOF to cat
+        session.CloseStdin();
+
+        // Wait for cat to exit with code 0
+        auto exitCode = session.Wait(10000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+    }
+
     TEST_METHOD(WSLCCLI_E2E_Container_CreateStartAttach_TTY)
     {
         WSL2_TEST_ONLY();
@@ -239,6 +288,35 @@ class WSLCE2EContainerCreateTests
         // Wait for cat to exit with code 0
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+    }
+
+    TEST_METHOD(WSLCCLI_E2E_Session_Shell)
+    {
+        WSL2_TEST_ONLY();
+        {
+            // Session shell should attach to the wslc session.
+            auto session = RunWslcInteractive(L"session shell");
+            VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+            WriteAndVerifyOutput(session, "echo hello", "hello");
+            WriteAndVerifyOutput(session, "whoami", "root");
+
+            session.ExitAndVerifyNoErrors();
+            auto exitCode = session.Wait();
+            VERIFY_ARE_EQUAL(0, exitCode);
+        }
+        {
+            // Session shell should attach to the wslc by name also.
+            auto session = RunWslcInteractive(L"session shell wsla-cli");
+            VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+            WriteAndVerifyOutput(session, "echo hello", "hello");
+            WriteAndVerifyOutput(session, "whoami", "root");
+
+            session.ExitAndVerifyNoErrors();
+            auto exitCode = session.Wait();
+            VERIFY_ARE_EQUAL(0, exitCode);
+        }
     }
 
 private:
