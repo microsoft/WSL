@@ -193,7 +193,7 @@ std::wstring wsl::windows::common::string::BytesToHex(const std::vector<BYTE>& b
 namespace {
 bool IsHexSpecifier(char first, char second)
 {
-    return first == '0' && tolower(second) == 'x';
+    return first == '0' && tolower(static_cast<unsigned char>(second)) == 'x';
 }
 
 bool IsHexSpecifier(wchar_t first, wchar_t second)
@@ -216,7 +216,7 @@ std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
 {
     if (input.length() % 2 != 0)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(input.data()));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(std::basic_string<T>{input}));
     }
 
     std::vector<BYTE> result;
@@ -237,7 +237,7 @@ std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
         const auto byte = ConvertHexByte(currentHex, &endPtr);
         if (endPtr != currentHex + 2)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(input.data()));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(std::basic_string<T>{input}));
         }
 
         result.push_back(byte);

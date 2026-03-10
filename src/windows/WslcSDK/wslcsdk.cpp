@@ -118,6 +118,8 @@ void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
     static constexpr std::string_view s_sha256Prefix = "sha256:"sv;
     static constexpr size_t s_sha256ByteCount = 32;
 
+    THROW_HR_IF_NULL(E_POINTER, sha256);
+
     if (!hashString)
     {
         return;
@@ -708,8 +710,6 @@ try
     }
 
     return hr;
-
-    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1028,6 +1028,9 @@ try
         {
             WslcImageInfo& currentResult = result[i];
             WSLAImageInformation& currentImage = imageInformation[i];
+
+            static_assert(std::is_trivial_v<WslcImageInfo>, "WslcImageInfo must be trivial.");
+            currentResult = {};
 
             THROW_HR_IF(
                 E_UNEXPECTED,
