@@ -123,11 +123,12 @@ void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
         return;
     }
 
-    std::string_view hashStringView{ hashString };
+    std::string_view hashStringView{hashString};
     THROW_HR_IF_MSG(
         E_UNEXPECTED,
         hashStringView.length() < s_sha256Prefix.length() || hashStringView.substr(0, s_sha256Prefix.length()) != s_sha256Prefix,
-        "Unexpected hash specifier: %hs", hashString);
+        "Unexpected hash specifier: %hs",
+        hashString);
 
     auto hashBytes = wsl::windows::common::string::HexToBytes(hashStringView.substr(s_sha256Prefix.length()));
     THROW_HR_IF_MSG(E_INVALIDARG, hashBytes.size() != s_sha256ByteCount, "SHA256 hash was not 32 bytes: %zu", hashBytes.size());
