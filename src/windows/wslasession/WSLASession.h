@@ -67,7 +67,7 @@ public:
     IFACEMETHOD(PruneContainers)(
         _In_opt_ WSLAContainerPruneFilter* Filters,
         _In_ DWORD FiltersCount,
-        _In_ ULONGLONG CratedBeforeTimestamp,
+        _In_ ULONGLONG Until,
         _Out_ WSLAPruneContainersResults* Result) override;
 
     // VM management.

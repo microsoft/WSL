@@ -1129,6 +1129,10 @@ CATCH_RETURN();
 HRESULT WSLASession::PruneContainers(_In_opt_ WSLAContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLAPruneContainersResults* Result)
 try
 {
+    COMServiceExecutionContext context;
+
+
+
     std::optional<docker_schema::PruneContainerLabelFilter> filters;
 
     if (Until > 0 || FiltersCount > 0)
@@ -1163,6 +1167,8 @@ try
     }
 
     auto lock = m_lock.lock_shared();
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
     std::lock_guard containersLock{m_containersLock};
 
     auto result = m_dockerClient->PruneContainers(filters);
@@ -1184,7 +1190,6 @@ try
             result.ContainersDeleted->size(),
             erased);
 
-        wil::unique_cotaskmem_array_ptr<WSLAContainerId> ids;
         auto containers = wil::make_unique_cotaskmem<WSLAContainerId[]>(result.ContainersDeleted->size());
 
         for (size_t i = 0; i < result.ContainersDeleted->size(); ++i)

@@ -519,7 +519,7 @@ interface IWSLASession : IUnknown
     HRESULT CreateContainer([in] const WSLAContainerOptions* Options, [out] IWSLAContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] WSLAContainerEntry** Images, [out] ULONG* Count);
-    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLAContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG CratedBeforeTimestamp, [out] WSLAPruneContainersResults* Result);
+    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLAContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLAPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLAProcessOptions* Options, [out] IWSLAProcess** Process, [out] int* Errno);

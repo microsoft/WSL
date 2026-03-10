@@ -4247,23 +4247,22 @@ class WSLATests
 
     TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
     {
-        auto restore = ResetTestSession();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "container", "rm", "-f", "test-invalid-metadata"});
+        });
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
             // Create a docker container that has no metadata.
             auto result = RunCommand(
-                session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+                m_defaultSession.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
         }
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
+            ResetTestSession();
             // Try to open the container - this should fail due to missing metadata.
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->OpenContainer("test-invalid-metadata", &container);
+            auto hr = m_defaultSession->OpenContainer("test-invalid-metadata", &container);
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
     }
@@ -5300,7 +5299,7 @@ class WSLATests
             // Expect testPrune1 to be selected via key=value.
             expectPrune({testPrune1.Id()}, {{"key", {"value", true}}});
 
-            // Expect testPrune3 to be selected via key being present.
+            // Expect testPrune2 to be selected via key being present.
             expectPrune({testPrune2.Id()}, {{"key", {nullptr, true}}});
 
             // Prune by absence of 'anotherKey' label.

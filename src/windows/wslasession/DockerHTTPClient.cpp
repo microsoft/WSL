@@ -379,7 +379,6 @@ docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const std:
     auto url = URL::Create("/containers/prune");
     if (Filter.has_value())
     {
-        nlohmann::json filtersJson;
         url.SetParameter("filters", shared::ToJson(Filter.value()));
     }
 

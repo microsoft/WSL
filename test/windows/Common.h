@@ -616,7 +616,7 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
     {
         if (expectedCounts.find(value) == expectedCounts.end())
         {
-            error += std::format(L"Unexpected value found: '{}' value", value);
+            error += std::format(L"Unexpected value found: '{}'", value);
         }
     }
 
