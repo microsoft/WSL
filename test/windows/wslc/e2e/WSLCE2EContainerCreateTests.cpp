@@ -110,7 +110,7 @@ class WSLCE2EContainerCreateTests
         result = RunWslc(std::format(L"container start {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        // Wait to allow it to delete to happen.
+        // Wait to allow the delete to happen.
         Sleep(1000);
         VerifyContainerIsNotListed(WslcContainerName);
     }
