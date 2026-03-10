@@ -39,6 +39,7 @@ _(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       L
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L"The command to run") \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Force,          "force",               L"f",              Kind::Flag,        L"Delete containers even if they are running") \
+_(ImageForce,     "force",               L"f",              Kind::Flag,        L"Delete images even if they are being used") \
 _(Detach,         "detach",              L"d",              Kind::Flag,        L"Run container in detached mode") \
 _(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       L"IP address of the DNS nameserver in resolv.conf") \
 _(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       L"Set the default DNS Domain") \

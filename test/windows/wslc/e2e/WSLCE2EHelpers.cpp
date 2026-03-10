@@ -12,7 +12,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "Common.h"
+#include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include <JsonUtils.h>

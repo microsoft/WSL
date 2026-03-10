@@ -127,7 +127,7 @@ void DeleteImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
-    bool force = context.Args.Contains(ArgType::Force);
+    bool force = context.Args.Contains(ArgType::ImageForce);
     bool noPrune = context.Args.Contains(ArgType::NoPrune);
     services::ImageService::Delete(session, WideToMultiByte(imageId), force, noPrune);
 }

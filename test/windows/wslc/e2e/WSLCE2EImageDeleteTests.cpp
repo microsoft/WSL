@@ -162,7 +162,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"                     //
-                << L"  -f,--force  Delete containers even if they are running\r\n" //
+                << L"  -f,--force  Delete images even if they are being used\r\n" //
                 << L"  --no-prune  Do not delete untagged parents\r\n"             //
                 << L"  --session   Specify the session to use\r\n"                 //
                 << L"  -h,--help   Shows help about the selected command\r\n"      //

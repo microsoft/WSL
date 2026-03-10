@@ -92,9 +92,8 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
         options.Flags |= WSLADeleteImageFlagsNoPrune;
     }
 
-    WSLADeletedImageInformation* deletedImages = nullptr;
-    ULONG deletedCount = 0;
-    THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, &deletedCount));
+    wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+    THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 }
 
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
@@ -104,9 +103,9 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
 
 InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
 {
-    LPSTR inspectData = nullptr;
+    wil::unique_cotaskmem_ansistring inspectData;
     THROW_IF_FAILED(session.Get()->InspectImage(image.c_str(), &inspectData));
-    return wsl::shared::FromJson<InspectImage>(inspectData);
+    return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
 void ImageService::Push()

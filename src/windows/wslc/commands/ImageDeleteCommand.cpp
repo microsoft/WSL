@@ -28,7 +28,7 @@ std::vector<Argument> ImageDeleteCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        Argument::Create(ArgType::Force),
+        Argument::Create(ArgType::ImageForce),
         Argument::Create(ArgType::NoPrune),
         Argument::Create(ArgType::Session),
     };
