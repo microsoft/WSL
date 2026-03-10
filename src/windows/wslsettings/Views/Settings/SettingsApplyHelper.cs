@@ -48,34 +48,36 @@ internal static class SettingsApplyHelper
         };
 
         var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Primary)
+        if (result == ContentDialogResult.Primary)
         {
-            return;
-        }
-
-        var commitResult = wslConfigService.CommitPendingChanges();
-        if (commitResult != 0)
-        {
-            await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogCommitFailed".GetLocalized(), commitResult));
-            return;
-        }
-
-        try
-        {
-            var wslPath = Path.Combine(AppContext.BaseDirectory, "..", "wsl.exe");
-            Process.Start(new ProcessStartInfo
+            // "Shutdown WSL now" — commit to disk and shutdown
+            var commitResult = wslConfigService.CommitPendingChanges();
+            if (commitResult != 0)
             {
-                FileName = wslPath,
-                Arguments = "--shutdown",
-                CreateNoWindow = true,
-                UseShellExecute = false,
-            });
+                await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogCommitFailed".GetLocalized(), commitResult));
+                return;
+            }
 
-            wslConfigService.ClearPendingChanges();
+            try
+            {
+                var wslPath = Path.Combine(AppContext.BaseDirectory, "..", "wsl.exe");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = wslPath,
+                    Arguments = "--shutdown",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                });
+            }
+            catch (Exception ex)
+            {
+                await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogRestartFailed".GetLocalized(), ex.Message));
+            }
         }
-        catch (Exception ex)
+        else
         {
-            await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogRestartFailed".GetLocalized(), ex.Message));
+            // "Later" — commit to disk but don't shutdown; settings apply on next WSL restart
+            wslConfigService.CommitPendingChanges();
         }
     }
 

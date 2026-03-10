@@ -1880,15 +1880,13 @@ You can also access more VS Code Remote options through the command palette with
     <value>WSL Shutdown Required</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
-    <value>Applying these settings requires shutting down Windows Subsystem for Linux. All running distributions and shells will be stopped. You will need to relaunch them manually.
-
-Changes to apply:</value>
+    <value>Changed WSL settings require a WSL shutdown and restart to finalize. Shutting down will cause any active WSL sessions to terminate.</value>
   </data>
   <data name="Settings_ApplyChangesDialogRestartButton" xml:space="preserve">
-    <value>Shut down WSL</value>
+    <value>Shutdown WSL now</value>
   </data>
   <data name="Settings_ApplyChangesDialogCancelButton" xml:space="preserve">
-    <value>Cancel</value>
+    <value>Later</value>
   </data>
   <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
     <value>Unable to apply changes</value>
