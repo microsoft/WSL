@@ -24,15 +24,28 @@ using namespace wsl::windows::common;
 
 void WSLCExecutionResult::Dump() const
 {
+    static auto DumpHex = [](const std::wstring& s) {
+        std::wstringstream ss;
+        ss << L"len=" << s.size() << L" [";
+        for (size_t i = 0; i < s.size(); ++i)
+        {
+            ss << L"0x" << std::hex << std::setw(4) << std::setfill(L'0') << static_cast<unsigned int>(static_cast<wchar_t>(s[i])) << L' ';
+        }
+        ss << L"]";
+        return ss.str();
+    };
+
     Log::Comment((L"Command Line: \"" + CommandLine + L"\"").c_str());
     if (Stdout)
     {
         Log::Comment((L"Stdout: \"" + *Stdout + L"\"").c_str());
+        Log::Comment((L"Stdout (hex): " + DumpHex(*Stdout)).c_str());
     }
 
     if (Stderr)
     {
         Log::Comment((L"Stderr: \"" + *Stderr + L"\"").c_str());
+        Log::Comment((L"Stderr (hex): " + DumpHex(*Stderr)).c_str());
     }
 
     if (ExitCode)
