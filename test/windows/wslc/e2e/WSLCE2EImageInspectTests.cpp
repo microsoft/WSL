@@ -43,7 +43,7 @@ class WSLCE2EImageInspectTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_MissingImage)
+    TEST_METHOD(WSLCE2E_Image_Inspect_MissingImageName)
     {
         WSL2_TEST_ONLY();
 
@@ -55,8 +55,8 @@ class WSLCE2EImageInspectTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(L"image inspect image-not-found");
-        auto errorMessage = std::format(L"No such image: image-not-found:latest\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n");
+        auto result = RunWslc(std::format(L"image inspect {}", InvalidImage.NameAndTag()));
+        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -77,6 +77,7 @@ class WSLCE2EImageInspectTests
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& InvalidImage = InvalidTestImage();
 
     std::wstring GetHelpMessage() const
     {

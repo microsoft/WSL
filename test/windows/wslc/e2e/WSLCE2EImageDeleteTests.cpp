@@ -44,7 +44,7 @@ class WSLCE2EImageDeleteTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Delete_NonExistentImage)
+    TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
     {
         WSL2_TEST_ONLY();
 
