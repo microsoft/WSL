@@ -398,7 +398,7 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        // Positive: session has debian:latest pre-loaded — list must return at least one entry.
+        // Positive: session has images pre-loaded — list must return at least one entry.
         {
             WslcImageInfo* images = nullptr;
             uint32_t count = 0;
@@ -514,14 +514,7 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        // Setup: load hello-world:latest so we have something to delete.
-        LoadTestImage("hello-world:latest");
-
-        // Positive: delete an existing image.
-        VERIFY_SUCCEEDED(WslcSessionImageDelete(m_defaultSession, "hello-world:latest"));
-
-        // Verify the image is no longer present in the list.
-        {
+        auto checkForImage = [this](std::string_view image) -> bool {
             WslcImageInfo* images = nullptr;
             uint32_t count = 0;
             VERIFY_SUCCEEDED(WslcSessionImageList(m_defaultSession, &images, &count));
@@ -529,14 +522,25 @@ class WslcSdkTests
             bool found = false;
             for (uint32_t i = 0; i < count; ++i)
             {
-                if (strstr(images[i].name, "hello-world") != nullptr)
+                if (images[i].name == image)
                 {
                     found = true;
                     break;
                 }
             }
-            VERIFY_IS_FALSE(found);
-        }
+            return found;
+        };
+
+        // Setup: load hello-world:latest so we have something to delete.
+        LoadTestImage("hello-world:latest");
+
+        VERIFY_IS_TRUE(checkForImage("hello-world:latest"));
+
+        // Positive: delete an existing image.
+        VERIFY_SUCCEEDED(WslcSessionImageDelete(m_defaultSession, "hello-world:latest"));
+
+        // Verify the image is no longer present in the list.
+        VERIFY_IS_FALSE(checkForImage("hello-world:latest"));
 
         // Negative: null name must fail.
         VERIFY_ARE_EQUAL(WslcSessionImageDelete(m_defaultSession, nullptr), E_POINTER);
@@ -1090,7 +1094,7 @@ class WslcSdkTests
         {
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcProcessInitSettings(&procSettings));
-            const char* argv[] = {"/bin/sh", "-c", "hostname -d || cat /etc/hostname"};
+            const char* argv[] = {"/bin/sh", "-c", "echo $(domainname)"};
             VERIFY_SUCCEEDED(WslcProcessSettingsSetCmdLineArgs(&procSettings, argv, ARRAYSIZE(argv)));
 
             WslcContainerSettings containerSettings;

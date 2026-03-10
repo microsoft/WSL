@@ -19,6 +19,8 @@ Abstract:
 #include "TerminationCallback.h"
 #include "wslutil.h"
 
+using namespace std::string_view_literals;
+
 namespace {
 constexpr uint32_t s_DefaultCPUCount = 2;
 constexpr uint32_t s_DefaultMemoryMB = 2000;
@@ -113,9 +115,21 @@ WSLAContainerNetworkType Convert(WslcContainerNetworkingMode mode)
 
 void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
 {
+    static constexpr std::string_view s_sha256Prefix = "sha256:"sv;
     static constexpr size_t s_sha256ByteCount = 32;
 
-    auto hashBytes = wsl::windows::common::string::HexToBytes(hashString);
+    if (!hashString)
+    {
+        return;
+    }
+
+    std::string_view hashStringView{ hashString };
+    THROW_HR_IF_MSG(
+        E_UNEXPECTED,
+        hashStringView.length() < s_sha256Prefix.length() || hashStringView.substr(0, s_sha256Prefix.length()) != s_sha256Prefix,
+        "Unexpected hash specifier: %hs", hashString);
+
+    auto hashBytes = wsl::windows::common::string::HexToBytes(hashStringView.substr(s_sha256Prefix.length()));
     THROW_HR_IF_MSG(E_INVALIDARG, hashBytes.size() != s_sha256ByteCount, "SHA256 hash was not 32 bytes: %zu", hashBytes.size());
     memcpy(sha256, &hashBytes[0], s_sha256ByteCount);
 }
@@ -151,7 +165,7 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
     }
 }
 
-bool CopyProcessSettingsToRuntime(WSLA_PROCESS_OPTIONS& runtimeOptions, const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions)
+bool CopyProcessSettingsToRuntime(WSLAProcessOptions& runtimeOptions, const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions)
 {
     if (initProcessOptions)
     {
@@ -623,7 +637,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, internalProcessSettings->commandLine == nullptr || internalProcessSettings->commandLineCount == 0);
     RETURN_HR_IF_NULL(E_POINTER, newProcess);
 
-    WSLA_PROCESS_OPTIONS runtimeOptions{};
+    WSLAProcessOptions runtimeOptions{};
     CopyProcessSettingsToRuntime(runtimeOptions, internalProcessSettings);
 
     auto result = std::make_unique<WslcProcessImpl>();
@@ -713,7 +727,7 @@ try
 
     *state = WSLC_CONTAINER_STATE_INVALID;
 
-    WSLA_CONTAINER_STATE runtimeState{};
+    WSLAContainerState runtimeState{};
     RETURN_IF_FAILED(internalType->container->GetState(&runtimeState));
 
     *state = static_cast<WslcContainerState>(runtimeState);
@@ -845,7 +859,7 @@ try
 
     *state = WSLC_PROCESS_STATE_UNKNOWN;
 
-    WSLA_PROCESS_STATE runtimeState{};
+    WSLAProcessState runtimeState{};
     int exitCode{};
     RETURN_IF_FAILED(internalType->process->GetState(&runtimeState, &exitCode));
 
@@ -863,7 +877,7 @@ try
 
     *exitCode = -1;
 
-    WSLA_PROCESS_STATE runtimeState{};
+    WSLAProcessState runtimeState{};
     RETURN_HR(internalType->process->GetState(&runtimeState, exitCode));
 }
 CATCH_RETURN();
@@ -975,14 +989,13 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, NameOrId);
 
-    WSLA_DELETE_IMAGE_OPTIONS options{};
+    WSLADeleteImageOptions options{};
     options.Image = NameOrId;
     // TODO: Flags? (Force and NoPrune)
 
-    wil::unique_cotaskmem_ptr<WSLA_DELETED_IMAGE_INFORMATION*> deletedImageInformation;
-    ULONG deletedImageCount{};
+    wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImageInformation;
 
-    RETURN_HR(internalType->session->DeleteImage(&options, deletedImageInformation.get(), &deletedImageCount));
+    RETURN_HR(internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
 }
 CATCH_RETURN();
 
@@ -990,7 +1003,7 @@ STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*co
 try
 {
     static_assert(
-        sizeof(decltype(WslcImageInfo::name)) == sizeof(decltype(WSLA_IMAGE_INFORMATION::Image)), "Image name size mismatch.");
+        sizeof(decltype(WslcImageInfo::name)) == sizeof(decltype(WSLAImageInformation::Image)), "Image name size mismatch.");
 
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
@@ -1002,23 +1015,22 @@ try
 
     // TODO: Many filtering options are available via WSLA_LIST_IMAGES_OPTIONS
 
-    wil::unique_cotaskmem_ptr<WSLA_IMAGE_INFORMATION*> imageInformation;
-    ULONG imageCount{};
+    wil::unique_cotaskmem_array_ptr<WSLAImageInformation> imageInformation;
 
-    RETURN_IF_FAILED(internalType->session->ListImages(nullptr, imageInformation.get(), &imageCount));
+    RETURN_IF_FAILED(internalType->session->ListImages(nullptr, &imageInformation, imageInformation.size_address<ULONG>()));
 
-    if (imageCount)
+    if (imageInformation.size())
     {
-        auto result = wil::make_unique_cotaskmem<WslcImageInfo[]>(imageCount);
+        auto result = wil::make_unique_cotaskmem<WslcImageInfo[]>(imageInformation.size());
 
-        for (ULONG i = 0; i < imageCount; ++i)
+        for (size_t i = 0; i < imageInformation.size(); ++i)
         {
             WslcImageInfo& currentResult = result[i];
-            WSLA_IMAGE_INFORMATION& currentImage = *(imageInformation.get()[i]);
+            WSLAImageInformation& currentImage = imageInformation[i];
 
             THROW_HR_IF(
                 E_UNEXPECTED,
-                memcpy_s(currentResult.name, sizeof(decltype(WslcImageInfo::name)), currentImage.Image, sizeof(decltype(WSLA_IMAGE_INFORMATION::Image))) !=
+                memcpy_s(currentResult.name, sizeof(decltype(WslcImageInfo::name)), currentImage.Image, sizeof(decltype(WSLAImageInformation::Image))) !=
                     0);
             ConvertSHA256Hash(currentImage.Hash, currentResult.sha256);
             currentResult.sizeBytes = currentImage.Size;
@@ -1026,7 +1038,7 @@ try
         }
 
         *images = result.release();
-        *count = static_cast<uint32_t>(imageCount);
+        *count = static_cast<uint32_t>(imageInformation.size());
     }
 
     return S_OK;
