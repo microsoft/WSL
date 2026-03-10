@@ -252,24 +252,10 @@ WSLAContainerState DockerStateToWSLAState(ContainerState state)
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
 {
     // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
-    // Strip fractional seconds and trailing 'Z' since we only need second precision.
-    std::string input(timestamp);
-
-    auto dot = input.find('.');
-    if (dot != std::string::npos)
-    {
-        input = input.substr(0, dot);
-    }
-
-    if (!input.empty() && input.back() == 'Z')
-    {
-        input.pop_back();
-    }
-
     std::chrono::sys_seconds utcSeconds;
-    std::istringstream stream(input);
-    stream >> std::chrono::parse("%FT%T", utcSeconds);
-    THROW_HR_IF(E_INVALIDARG, stream.fail());
+    std::istringstream stream(timestamp);
+    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
+    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
 
     return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
 }
@@ -1078,7 +1064,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
     metadata.Ports = ports;
-    metadata.StateChangedAt = static_cast<std::uint64_t>(std::time(nullptr));
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
     request.Labels.insert(labels.begin(), labels.end());
@@ -1163,8 +1148,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
-    // Restore the state change timestamp from Docker inspect data, falling back to the metadata value.
-    std::uint64_t restoredTimestamp = metadata.StateChangedAt;
+    // Restore the state change timestamp from Docker inspect data.
     try
     {
         auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
@@ -1173,19 +1157,10 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 
         if (!timestamp.empty())
         {
-            auto parsed = ParseDockerTimestamp(timestamp);
-            if (parsed > 0)
-            {
-                restoredTimestamp = parsed;
-            }
+            container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
         }
     }
     CATCH_LOG();
-
-    if (restoredTimestamp > 0)
-    {
-        container->m_stateChangedAt = restoredTimestamp;
-    }
 
     errorCleanup.release();
     volumeErrorCleanup.release();
