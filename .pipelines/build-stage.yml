@@ -266,6 +266,14 @@ stages:
                       New-Item -ItemType Directory -Path "$(ob_outputDirectory)\bundle" -Force
                       $arch = '${{ platform }}'
                       Copy-Item -Path "bin\$arch\release\wsl.msi" -Destination "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).$arch.msi"
+              
+              - task: PowerShell@2
+                displayName: "Create CAB from ${{ platform }} installer msi"
+                inputs:
+                  targetType: inline
+                  script: |
+                      $arch = '${{ platform }}'
+                      MakeCab "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).$arch.msi" "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).$arch.cab"
 
           - ${{ if eq(parameters.isRelease, 'true') }}:
               - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
