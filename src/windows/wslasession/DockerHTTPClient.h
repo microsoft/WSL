@@ -134,6 +134,7 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
+    common::docker_schema::PruneContainerResult PruneContainers(const std::optional<common::docker_schema::PruneContainerLabelFilter>& Filter);
 
     // Image management.
     struct ListImagesFilters

@@ -536,6 +536,14 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             }
         }
     }
+    else if (event == ContainerEvent::Destroy)
+    {
+        auto lock = m_lock.lock_exclusive();
+        if (m_state != WslaContainerStateDeleted)
+        {
+            Transition(WslaContainerStateDeleted);
+        }
+    }
 
     WSL_LOG(
         "ContainerEvent",

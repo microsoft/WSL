@@ -72,6 +72,37 @@ struct COMErrorInfo
     wil::unique_bstr Source;
 };
 
+struct PruneResult
+{
+    NON_COPYABLE(PruneResult);
+    WSLAPruneContainersResults result{};
+
+    PruneResult() = default;
+
+    PruneResult(PruneResult&& other)
+    {
+        *this = std::move(other);
+    }
+
+    PruneResult& operator=(PruneResult&& other)
+    {
+        result.Containers = other.result.Containers;
+        result.ContainersCount = other.result.ContainersCount;
+        result.SpaceReclaimed = other.result.SpaceReclaimed;
+
+        other.result.Containers = nullptr;
+        other.result.ContainersCount = 0;
+        other.result.SpaceReclaimed = 0;
+
+        return *this;
+    }
+
+    ~PruneResult()
+    {
+        CoTaskMemFree(result.Containers);
+    }
+};
+
 template <typename T>
 void AssertValidPrintfArg()
 {
