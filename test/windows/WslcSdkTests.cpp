@@ -111,9 +111,7 @@ ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::millisecond
 // Runs a container with the given argv, waits up to timeoutMs for it to exit,
 // and returns the captured stdout / stderr output.
 //
-ProcessOutput RunContainerAndCapture(
-    WslcSession session, const WslcContainerSettings& containerSettings,
-    std::chrono::milliseconds timeout = 60s)
+ProcessOutput RunContainerAndCapture(WslcSession session, const WslcContainerSettings& containerSettings, std::chrono::milliseconds timeout = 60s)
 {
     // Create and start the container.
     UniqueContainer container;
@@ -412,7 +410,8 @@ class WslcSdkTests
             bool foundNonEmpty = false;
             for (uint32_t i = 0; i < count; ++i)
             {
-                if (images[i].name[0] != '\0' && (images[i].sha256[0] != 0 || images[i].sha256[31] != 0) && images[i].sizeBytes != 0 && images[i].createdTimestamp != 0)
+                if (images[i].name[0] != '\0' && (images[i].sha256[0] != 0 || images[i].sha256[31] != 0) &&
+                    images[i].sizeBytes != 0 && images[i].createdTimestamp != 0)
                 {
                     foundNonEmpty = true;
                     break;
