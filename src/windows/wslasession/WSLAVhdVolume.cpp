@@ -145,7 +145,16 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
 
     try
     {
-        DockerClient.CreateVolume(name, virtualMachinePath);
+        docker_schema::CreateVolume request{};
+        request.Name = name;
+        request.Driver = "local";
+        request.DriverOpts = {
+            {"type", "none"},
+            {"o", "bind"},
+            {"device", virtualMachinePath},
+        };
+
+        DockerClient.CreateVolume(request);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create docker volume for '%hs'", name.c_str());
 
