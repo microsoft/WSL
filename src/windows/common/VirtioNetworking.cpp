@@ -183,13 +183,14 @@ try
 
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
-    appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress());
+    appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress(AF_INET));
 
     std::wstring default_route_v6{};
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {
-        default_route_v6 = networkSettings->GetBestGatewayV6AddressString();
+        default_route_v6 = networkSettings->GetBestGatewayAddressString(AF_INET6);
         appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
+        appendOption(L"gateway_mac_ipv6", networkSettings->GetBestGatewayMacAddress(AF_INET6));
     }
 
     networking::DnsInfo currentDns{};
