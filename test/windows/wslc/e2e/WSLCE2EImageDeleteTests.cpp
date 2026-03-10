@@ -79,7 +79,7 @@ class WSLCE2EImageDeleteTests
         EnsureImageIsLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
-        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.Name));
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyImageIsUsed(DebianImage);
@@ -106,7 +106,7 @@ class WSLCE2EImageDeleteTests
         EnsureImageIsLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
-        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.Name));
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyImageIsUsed(DebianImage);
