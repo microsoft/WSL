@@ -39,7 +39,7 @@ const TestImage& InvalidTestImage()
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
     auto result = RunWslc(L"container list --all");
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -56,7 +56,7 @@ void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
     auto result = RunWslc(L"container list --all");
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -76,8 +76,8 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
 
 void VerifyImageIsUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"image list");
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    auto result = RunWslc(L"container list -a");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
     {
@@ -93,7 +93,7 @@ void VerifyImageIsUsed(const TestImage& image)
 void VerifyImageIsNotUsed(const TestImage& image)
 {
     auto result = RunWslc(L"container list -a");
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
     {
@@ -104,7 +104,7 @@ void VerifyImageIsNotUsed(const TestImage& image)
     }
 }
 
-std::string GetId(const std::string& id, bool fullId)
+std::string GetHashId(const std::string& id, bool fullId)
 {
     const int shortIdLength = 12;
     VERIFY_IS_GREATER_THAN_OR_EQUAL(id.length(), shortIdLength);
@@ -126,7 +126,7 @@ std::string GetId(const std::string& id, bool fullId)
 docker_schema::InspectContainer InspectContainer(const std::wstring& containerName)
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
     auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectContainer>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
@@ -136,7 +136,7 @@ docker_schema::InspectContainer InspectContainer(const std::wstring& containerNa
 docker_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
     auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectImage>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
@@ -146,7 +146,7 @@ docker_schema::InspectImage InspectImage(const std::wstring& imageName)
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     auto listResult = RunWslc(L"container list --all");
-    listResult.Verify({.Stderr = L"", .ExitCode = S_OK});
+    listResult.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto stdoutLines = listResult.GetStdoutLines();
     for (const auto& line : stdoutLines)
@@ -154,7 +154,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
         if (line.find(containerName) != std::wstring::npos)
         {
             auto result = RunWslc(std::format(L"container delete {}", containerName));
-            result.Verify({.Stderr = L"", .ExitCode = S_OK});
+            result.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
     }
@@ -163,7 +163,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
 void EnsureImageIsDeleted(const TestImage& image)
 {
     auto result = RunWslc(L"image list");
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -171,7 +171,7 @@ void EnsureImageIsDeleted(const TestImage& image)
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
             auto deleteResult = RunWslc(std::format(L"image delete {}", image.NameAndTag()));
-            deleteResult.Verify({.Stderr = L"", .ExitCode = S_OK});
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
     }
@@ -180,7 +180,7 @@ void EnsureImageIsDeleted(const TestImage& image)
 void EnsureImageIsLoaded(const TestImage& image)
 {
     auto result = RunWslc(L"image list");
-    result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -193,6 +193,6 @@ void EnsureImageIsLoaded(const TestImage& image)
 
     // Image not found, load it
     auto loadResult = RunWslc(std::format(L"image load --input {}", image.Path.wstring()));
-    loadResult.Verify({.Stderr = L"", .ExitCode = S_OK});
+    loadResult.Verify({.Stderr = L"", .ExitCode = 0});
 }
 } // namespace WSLCE2ETests

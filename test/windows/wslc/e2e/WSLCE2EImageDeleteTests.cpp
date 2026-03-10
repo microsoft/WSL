@@ -41,7 +41,7 @@ class WSLCE2EImageDeleteTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(L"image delete --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Image_Delete_NonExistentImage)
@@ -69,7 +69,7 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsNotUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Image_Delete_UsedImage_Failure)
@@ -80,14 +80,14 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsNotUsed(DebianImage);
 
         auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.Name));
-        createResult.Verify({.Stderr = L"", .ExitCode = S_OK});
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyImageIsUsed(DebianImage);
 
         auto inspectContainer = InspectContainer(WslcContainerName);
-        auto containerId = GetId(inspectContainer.Id);
+        auto containerId = GetHashId(inspectContainer.Id);
         auto inspectImage = InspectImage(DebianImage.NameAndTag());
-        auto imageId = GetId(inspectImage.Id);
+        auto imageId = GetHashId(inspectImage.Id);
 
         auto result = RunWslc(std::format(L"image delete {}", DebianImage.Name));
         auto errorMessage = std::format(
@@ -107,12 +107,12 @@ class WSLCE2EImageDeleteTests
         VerifyImageIsNotUsed(DebianImage);
 
         auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.Name));
-        createResult.Verify({.Stderr = L"", .ExitCode = S_OK});
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyImageIsUsed(DebianImage);
 
         auto result = RunWslc(std::format(L"image delete --force {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)

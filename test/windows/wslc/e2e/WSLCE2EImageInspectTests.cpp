@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include <docker_schema.h>
 
 namespace WSLCE2ETests {
 
@@ -39,7 +40,7 @@ class WSLCE2EImageInspectTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(L"image inspect --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Image_Inspect_MissingImage)
@@ -57,6 +58,20 @@ class WSLCE2EImageInspectTests
         auto result = RunWslc(L"image inspect image-not-found");
         auto errorMessage = std::format(L"No such image: image-not-found:latest\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n");
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Image_Inspect_Success)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto jsonOutput = result.GetStdoutOneLine();
+        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::docker_schema::InspectImage>>(jsonOutput.c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+        VERIFY_IS_TRUE(inspectData[0].RepoTags.has_value());
+        VERIFY_ARE_EQUAL(1u, inspectData[0].RepoTags.value().size());
+        VERIFY_ARE_EQUAL(DebianImage.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData[0].RepoTags.value()[0]));
     }
 
 private:

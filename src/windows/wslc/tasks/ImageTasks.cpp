@@ -129,7 +129,7 @@ void DeleteImage(CLIExecutionContext& context)
 
     bool force = context.Args.Contains(ArgType::Force);
     bool noPrune = context.Args.Contains(ArgType::NoPrune);
-    services::ImageService::Delete(session, imageId, force, noPrune);
+    services::ImageService::Delete(session, WideToMultiByte(imageId), force, noPrune);
 }
 
 void LoadImage(CLIExecutionContext& context)

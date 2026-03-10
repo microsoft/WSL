@@ -37,7 +37,7 @@ void VerifyContainerIsNotListed(const std::wstring& containerNameOrId);
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 
-std::string GetId(const std::string& id, bool fullId = false);
+std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::docker_schema::InspectContainer InspectContainer(const std::wstring& containerName);
 wsl::windows::common::docker_schema::InspectImage InspectImage(const std::wstring& imageName);
 

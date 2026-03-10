@@ -77,11 +77,10 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
-void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::wstring& image, bool force, bool noPrune)
+void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
     WSLADeleteImageOptions options{};
-    auto imageStr = wsl::windows::common::string::WideToMultiByte(image);
-    options.Image = imageStr.c_str();
+    options.Image = image.c_str();
 
     if (force)
     {
