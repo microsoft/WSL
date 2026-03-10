@@ -94,6 +94,7 @@ static_assert(
 static_assert(std::is_trivial_v<WSLC_CONTAINER_OPTIONS_INTERNAL>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
 
 WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings);
+const WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(const WslcContainerSettings* settings);
 
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl

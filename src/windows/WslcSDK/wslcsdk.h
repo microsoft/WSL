@@ -96,7 +96,7 @@ STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings,
 STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb);
 STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS);
 
-STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
+STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ CONST WslcVhdRequirements* vhdRequirements);
 
 STDAPI WslcSessionSettingsSetFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
@@ -155,7 +155,7 @@ DEFINE_ENUM_FLAG_OPERATORS(WslcContainerStartFlags);
 
 STDAPI WslcContainerInitSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
-STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ CONST WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 STDAPI WslcContainerStart(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags);
 
@@ -173,11 +173,11 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
 
 STDAPI WslcContainerSettingsSetPortMapping(
-    _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount);
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) CONST WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount);
 
 // Add the container volumes to the volumes array
 STDAPI WslcContainerSettingsSetVolumes(
-    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) CONST WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
 
 STDAPI WslcContainerExec(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess);
 
@@ -254,9 +254,9 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings);
 
 STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory);
 
-STDAPI WslcProcessSettingsSetCmdLineArgs(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc);
+STDAPI WslcProcessSettingsSetCmdLineArgs(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR CONST* argv, size_t argc);
 
-STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* key_value, size_t argc);
+STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR CONST* key_value, size_t argc);
 
 // Callback invoked when stdout or stderr data is available from a running
 // WSLC process.
@@ -283,7 +283,7 @@ STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSetti
 //     WSLC's internal I/O processing.
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
-typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) CONST BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
 typedef enum WslcProcessIoHandle
 {
     WSLC_PROCESS_IO_HANDLE_STDIN = 0,
@@ -352,7 +352,7 @@ typedef struct WslcRegistryAuthenticationInformation
 } WslcRegistryAuthenticationInformation;
 
 // pointer-to-function typedef (unambiguous)
-typedef HRESULT(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
+typedef HRESULT(CALLBACK* WslcContainerImageProgressCallback)(CONST WslcImageProgressMessage* progress, PVOID context);
 
 // options struct typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
@@ -360,10 +360,10 @@ typedef struct WslcPullImageOptions
     _In_z_ PCSTR uri;
     WslcContainerImageProgressCallback progressCallback;
     PVOID progressCallbackContext;
-    _In_opt_ const WslcRegistryAuthenticationInformation* authInfo;
+    _In_opt_ CONST WslcRegistryAuthenticationInformation* authInfo;
 } WslcPullImageOptions;
 
-STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ CONST WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcImportImageOptions
 {
@@ -372,7 +372,7 @@ typedef struct WslcImportImageOptions
     _In_opt_ PVOID progressCallbackContext;
 } WslcImportImageOptions;
 
-STDAPI WslcSessionImageImport(_In_ WslcSession session, _In_ const WslcImportImageOptions* options);
+STDAPI WslcSessionImageImport(_In_ WslcSession session, _In_ CONST WslcImportImageOptions* options);
 
 typedef struct WslcLoadImageOptions
 {
@@ -382,7 +382,7 @@ typedef struct WslcLoadImageOptions
     PVOID progressCallbackContext;
 } WslcLoadImageOptions;
 
-STDAPI WslcSessionImageLoad(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options);
+STDAPI WslcSessionImageLoad(_In_ WslcSession session, _In_ CONST WslcLoadImageOptions* options);
 
 #define WSLC_IMAGE_NAME_LENGTH 256 // 255 chars + null
 
@@ -426,7 +426,7 @@ STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*co
 
 // STORAGE
 
-STDAPI WslcSessionCreateVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options);
+STDAPI WslcSessionCreateVhd(_In_ WslcSession session, _In_ CONST WslcVhdRequirements* options);
 
 // INSTALL
 

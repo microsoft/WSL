@@ -30,6 +30,11 @@ WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings
     return reinterpret_cast<WSLC_CONTAINER_OPTIONS_INTERNAL*>(settings);
 }
 
+const WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(const WslcContainerSettings* settings)
+{
+    return reinterpret_cast<const WSLC_CONTAINER_OPTIONS_INTERNAL*>(settings);
+}
+
 WslcSessionImpl* GetInternalType(WslcSession handle)
 {
     return reinterpret_cast<WslcSessionImpl*>(handle);

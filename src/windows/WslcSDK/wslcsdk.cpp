@@ -404,7 +404,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, container);
@@ -645,6 +645,7 @@ try
 
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    RETURN_HR_IF_NULL(E_POINTER, containerId);
 
     return internalType->container->GetId(containerId);
 }
