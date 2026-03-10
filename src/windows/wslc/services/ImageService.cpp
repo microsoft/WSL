@@ -79,7 +79,7 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::wstring& image, bool force, bool noPrune)
 {
-    WSLA_DELETE_IMAGE_OPTIONS options{};
+    WSLADeleteImageOptions options{};
     auto imageStr = wsl::windows::common::string::WideToMultiByte(image);
     options.Image = imageStr.c_str();
 
@@ -93,7 +93,7 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
         options.Flags |= WSLADeleteImageFlagsNoPrune;
     }
 
-    WSLA_DELETED_IMAGE_INFORMATION* deletedImages = nullptr;
+    WSLADeletedImageInformation* deletedImages = nullptr;
     ULONG deletedCount = 0;
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, &deletedCount));
 }
