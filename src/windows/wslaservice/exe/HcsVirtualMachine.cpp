@@ -384,7 +384,7 @@ try
 
     // Duplicate the socket handles - COM manages the lifetime of the marshalled handles,
     // so we need our own copies to take ownership.
-    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(helpers::DuplicateHandle(GnsSocket))};
+    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
     wil::unique_socket dnsSocketHandle;
     if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
     {
@@ -393,7 +393,7 @@ try
             E_NOTIMPL, m_networkingMode == WSLANetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
 
         THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
-        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(helpers::DuplicateHandle(*DnsSocket)));
+        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
     }
     else
     {

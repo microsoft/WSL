@@ -1,5 +1,6 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -32,7 +33,7 @@ public sealed partial class OptionalFeaturesPage : Page
 
     private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        RuntimeHelper.SetupExpanderFocusManagementByName(this, "SystemdSettingsExpander", "InitTextBox");
+        OptionalFeaturesPageRoot.Focus(FocusState.Programmatic);
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "VMIdleTimeoutExpander", "VMIdleTimeoutTextBox");
     }
 
