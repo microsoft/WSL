@@ -1067,11 +1067,16 @@ try
     static_assert(std::is_trivial_v<WslcVersion>, "WslcVersion must be trivial");
     *version = {};
 
-    // TODO: Returning the WSLC SDK API version, but do callers actually need the WSL runtime
-    //       version instead as they will have built and shipped with the SDK?
-    version->major = wsl::shared::VersionMajor;
-    version->minor = wsl::shared::VersionMinor;
-    version->revision = wsl::shared::VersionRevision;
+    wil::com_ptr<IWSLASessionManager> sessionManager;
+    RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    WSLAVersion runtimeVersion{};
+    RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));
+
+    version->major = runtimeVersion.Major;
+    version->minor = runtimeVersion.Minor;
+    version->revision = runtimeVersion.Revision;
 
     return S_OK;
 }
