@@ -30,7 +30,7 @@ constexpr auto MAX_VM_CRASH_FILES = 3;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
-HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLA_SESSION_SETTINGS* Settings)
+HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
 {
     THROW_HR_IF(E_POINTER, Settings == nullptr);
 
