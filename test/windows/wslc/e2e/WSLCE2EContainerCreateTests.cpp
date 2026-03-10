@@ -97,10 +97,10 @@ class WSLCE2EContainerCreateTests
              .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_RunInteractive_TTY)
+    TEST_METHOD(WSLCE2E_Container_RunInteractive_TTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         auto session = RunWslcInteractive(std::format(L"container run -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
@@ -108,15 +108,14 @@ class WSLCE2EContainerCreateTests
         WriteAndVerifyOutput(session, "echo hello", "hello");
         WriteAndVerifyOutput(session, "whoami", "root");
 
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
+        auto exitCode = session.ExitAndVerifyNoErrors();
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_RunInteractive_NoTTY)
+    TEST_METHOD(WSLCE2E_Container_RunInteractive_NoTTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         auto session = RunWslcInteractive(std::format(L"container run -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
@@ -138,10 +137,10 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_RunAttach_TTY)
+    TEST_METHOD(WSLCE2E_Container_RunAttach_TTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -159,10 +158,10 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_RunAttach_NoTTY)
+    TEST_METHOD(WSLCE2E_Container_RunAttach_NoTTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
@@ -189,10 +188,10 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_ExecInteractive_TTY)
+    TEST_METHOD(WSLCE2E_Container_ExecInteractive_TTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
@@ -209,10 +208,10 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_ExecInteractive_NoTTY)
+    TEST_METHOD(WSLCE2E_Container_ExecInteractive_NoTTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
@@ -238,10 +237,10 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_CreateStartAttach_TTY)
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_TTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -259,10 +258,10 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Container_CreateStartAttach_NoTTY)
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_NoTTY)
     {
         WSL2_TEST_ONLY();
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with cat (no TTY)
         auto result = RunWslc(std::format(L"container create -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
@@ -290,7 +289,7 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
     }
 
-    TEST_METHOD(WSLCCLI_E2E_Session_Shell)
+    TEST_METHOD(WSLCE2E_Session_Shell)
     {
         WSL2_TEST_ONLY();
         {

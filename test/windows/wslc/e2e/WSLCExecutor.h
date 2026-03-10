@@ -25,6 +25,11 @@ constexpr DWORD DefaultReadTimeoutMs = 5000;    // 5 seconds
 constexpr DWORD DefaultWaitTimeoutMs = 30000;   // 30 seconds
 constexpr DWORD DefaultMarkerTimeoutMs = 10000; // 10 seconds
 
+inline std::wstring GetWslcPath()
+{
+    return (std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslc.exe").wstring();
+}
+
 struct WSLCExecutionResult
 {
     std::wstring CommandLine{};
@@ -43,7 +48,7 @@ struct WSLCExecutionResult
 // - Full diagnostic output on failures
 struct WSLCInteractiveSession
 {
-    WSLCInteractiveSession(std::wstring commandLine, wil::unique_handle stdinWrite, wil::unique_handle stdoutRead, wil::unique_handle stderrRead, wil::unique_handle processHandle);
+    WSLCInteractiveSession(std::wstring commandLine, wil::unique_hfile stdinWrite, wil::unique_hfile stdoutRead, wil::unique_hfile stderrRead, wil::unique_handle processHandle);
 
     void StopDraining();
 
@@ -77,11 +82,11 @@ struct WSLCInteractiveSession
     int ExitAndVerifyNoErrors(DWORD timeoutMs = DefaultWaitTimeoutMs);
 
 private:
-    void DrainPipes();
+    void DrainPipes(std::promise<void> ready);
 
-    wil::unique_handle m_stdinWrite;
-    wil::unique_handle m_stdoutRead;
-    wil::unique_handle m_stderrRead;
+    wil::unique_hfile m_stdinWrite;
+    wil::unique_hfile m_stdoutRead;
+    wil::unique_hfile m_stderrRead;
     wil::unique_handle m_processHandle;
 
     // Background draining for deadlock prevention

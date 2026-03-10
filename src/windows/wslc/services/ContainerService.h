@@ -22,7 +22,7 @@ struct ContainerService
     static std::wstring ContainerStateToString(WSLAContainerState state);
     static int Run(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
-    static void Start(models::Session& session, const std::string& id, bool withAttach = false);
+    static void Start(models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLASignal signal = WSLASignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force);

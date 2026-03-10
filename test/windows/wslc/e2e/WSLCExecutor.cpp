@@ -87,8 +87,7 @@ std::wstring WSLCExecutionResult::GetStdoutOneLine() const
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine)
 {
-    auto wslcPath = std::filesystem::path(wslutil::GetMsiPackagePath().value()) / L"wslc.exe";
-    auto cmd = L"\"" + wslcPath.wstring() + L"\" " + commandLine;
+    auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
     const auto output = process.RunAndCaptureOutput();
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = output.ExitCode};
@@ -96,57 +95,26 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine)
 
 WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
 {
-    auto wslcPath = std::filesystem::path(wslutil::GetMsiPackagePath().value()) / L"wslc.exe";
-    auto cmd = L"\"" + wslcPath.wstring() + L"\" " + commandLine;
-    Log::Comment(std::format(L"Starting interactive session: {}", cmd).c_str());
+    auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
 
-    // Create pipes with larger buffer to reduce blocking
-    constexpr DWORD PIPE_BUFFER_SIZE = 65536; // 64KB
-    SECURITY_ATTRIBUTES sa{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+    auto [childStdinRead, parentStdinWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, false, true);
+    auto [parentStdoutRead, childStdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
+    auto [parentStderrRead, childStderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
 
-    wil::unique_handle stdinRead, stdinWrite;
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&stdinRead, &stdinWrite, &sa, PIPE_BUFFER_SIZE));
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdinWrite.get(), HANDLE_FLAG_INHERIT, 0));
-
-    wil::unique_handle stdoutRead, stdoutWrite;
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&stdoutRead, &stdoutWrite, &sa, PIPE_BUFFER_SIZE));
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdoutRead.get(), HANDLE_FLAG_INHERIT, 0));
-
-    wil::unique_handle stderrRead, stderrWrite;
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&stderrRead, &stderrWrite, &sa, PIPE_BUFFER_SIZE));
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stderrRead.get(), HANDLE_FLAG_INHERIT, 0));
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdinRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
     auto process = std::make_unique<wsl::windows::common::SubProcess>(nullptr, cmd.c_str());
-    process->SetStdHandles(stdinRead.get(), stdoutWrite.get(), stderrWrite.get());
+    process->SetStdHandles(childStdinRead.get(), childStdoutWrite.get(), childStderrWrite.get());
     wil::unique_handle processHandle = process->Start();
 
-    // Close child's ends immediately to prevent deadlocks
-    stdinRead.reset();
-    stdoutWrite.reset();
-    stderrWrite.reset();
+    childStdinRead.reset();
+    childStdoutWrite.reset();
+    childStderrWrite.reset();
 
-    // Verify process started
-    DWORD exitCode = 0;
-    if (GetExitCodeProcess(processHandle.get(), &exitCode) && exitCode != STILL_ACTIVE)
-    {
-        // Process exited immediately - read any error output
-        std::string errorOutput;
-        char buffer[4096];
-        DWORD available = 0;
-        if (PeekNamedPipe(stderrRead.get(), nullptr, 0, nullptr, &available, nullptr) && available > 0)
-        {
-            DWORD toRead = (std::min)(available, static_cast<DWORD>(sizeof(buffer)));
-            DWORD read = 0;
-            if (ReadFile(stderrRead.get(), buffer, toRead, &read, nullptr) && read > 0)
-            {
-                errorOutput.assign(buffer, read);
-            }
-        }
-
-        THROW_HR_MSG(E_FAIL, "Process exited immediately with code %d. Stderr: %hs", exitCode, errorOutput.c_str());
-    }
-
-    return WSLCInteractiveSession(commandLine, std::move(stdinWrite), std::move(stdoutRead), std::move(stderrRead), std::move(processHandle));
+    return WSLCInteractiveSession(
+        commandLine, std::move(parentStdinWrite), std::move(parentStdoutRead), std::move(parentStderrRead), std::move(processHandle));
 }
 
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)
@@ -175,15 +143,63 @@ void WriteAndVerifyOutput(WSLCInteractiveSession& session, const std::string& co
 // WSLCInteractiveSession implementation
 
 WSLCInteractiveSession::WSLCInteractiveSession(
-    std::wstring commandLine, wil::unique_handle stdinWrite, wil::unique_handle stdoutRead, wil::unique_handle stderrRead, wil::unique_handle processHandle) :
+    std::wstring commandLine, wil::unique_hfile stdinWrite, wil::unique_hfile stdoutRead, wil::unique_hfile stderrRead, wil::unique_handle processHandle) :
     CommandLine(std::move(commandLine)),
     m_stdinWrite(std::move(stdinWrite)),
     m_stdoutRead(std::move(stdoutRead)),
     m_stderrRead(std::move(stderrRead)),
     m_processHandle(std::move(processHandle))
 {
-    // Start background thread to drain pipes and prevent deadlocks
-    m_drainThread = std::thread([this]() { DrainPipes(); });
+    std::promise<void> drainThreadReady;
+    auto drainThreadReadyFuture = drainThreadReady.get_future();
+
+    m_drainThread = std::thread([this, ready = std::move(drainThreadReady)]() mutable { DrainPipes(std::move(ready)); });
+
+    // Wait for drain thread to be fully initialized
+    drainThreadReadyFuture.wait();
+}
+
+void WSLCInteractiveSession::DrainPipes(std::promise<void> ready)
+{
+    using namespace wsl::windows::common::relay;
+
+    MultiHandleWait io;
+
+    auto stdoutCallback = [this](const gsl::span<char>& data) {
+        std::lock_guard<std::mutex> lock(m_stdoutMutex);
+        m_stdoutBuffer.append(data.data(), data.size());
+    };
+
+    io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(m_stdoutRead)}, std::move(stdoutCallback)));
+
+    auto stderrCallback = [this](const gsl::span<char>& data) {
+        std::lock_guard<std::mutex> lock(m_stderrMutex);
+        m_stderrBuffer.append(data.data(), data.size());
+    };
+
+    io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(m_stderrRead)}, std::move(stderrCallback)));
+
+    ready.set_value();
+
+    while (!m_stopDraining)
+    {
+        try
+        {
+            io.Run(std::chrono::milliseconds(100));
+        }
+        catch (const wil::ResultException& ex)
+        {
+            // ERROR_TIMEOUT is expected when there's no data - continue
+            if (ex.GetErrorCode() != HRESULT_FROM_WIN32(ERROR_TIMEOUT))
+            {
+                break; // Exit on unexpected errors
+            }
+        }
+        catch (...)
+        {
+            break; // Exit on unknown errors
+        }
+    }
 }
 
 void WSLCInteractiveSession::StopDraining()
@@ -196,8 +212,6 @@ void WSLCInteractiveSession::StopDraining()
     }
 
     m_stopDraining = true;
-    m_stdoutRead.reset();
-    m_stderrRead.reset();
 }
 
 WSLCInteractiveSession::~WSLCInteractiveSession()
@@ -206,49 +220,6 @@ WSLCInteractiveSession::~WSLCInteractiveSession()
     if (m_drainThread.joinable())
     {
         m_drainThread.join();
-    }
-}
-
-void WSLCInteractiveSession::DrainPipes()
-{
-    char buffer[4096];
-    while (!m_stopDraining)
-    {
-        // Note: There's a TOCTOU race between PeekNamedPipe and ReadFile where the pipe state can change
-        // between calls. However, this thread is the only consumer of these pipes. The Windows kernel
-        // guarantees that data in pipe buffers persists until read or the pipe closes. Since we're the
-        // sole reader, data cannot disappear between Peek and Read due to context switches. If the pipe
-        // closes between calls, ReadFile returns FALSE immediately (doesn't block). The append operation
-        // is protected by a mutex while ReadFile executes outside the lock to avoid blocking. Deadlocks
-        // are not possible with a single consumer and this locking strategy.
-
-        // Drain stdout
-        DWORD availableStdout = 0;
-        if (PeekNamedPipe(m_stdoutRead.get(), nullptr, 0, nullptr, &availableStdout, nullptr) && availableStdout > 0)
-        {
-            DWORD read = 0;
-            DWORD toRead = (std::min)(availableStdout, static_cast<DWORD>(sizeof(buffer)));
-            if (ReadFile(m_stdoutRead.get(), buffer, toRead, &read, nullptr) && read > 0)
-            {
-                std::lock_guard<std::mutex> lock(m_stdoutMutex);
-                m_stdoutBuffer.append(buffer, read);
-            }
-        }
-
-        // Drain stderr
-        DWORD availableStderr = 0;
-        if (PeekNamedPipe(m_stderrRead.get(), nullptr, 0, nullptr, &availableStderr, nullptr) && availableStderr > 0)
-        {
-            DWORD read = 0;
-            DWORD toRead = (std::min)(availableStderr, static_cast<DWORD>(sizeof(buffer)));
-            if (ReadFile(m_stderrRead.get(), buffer, toRead, &read, nullptr) && read > 0)
-            {
-                std::lock_guard<std::mutex> lock(m_stderrMutex);
-                m_stderrBuffer.append(buffer, read);
-            }
-        }
-
-        Sleep(10);
     }
 }
 
@@ -333,8 +304,25 @@ std::string WSLCInteractiveSession::ReadUntil(const std::string& marker, DWORD t
 
 void WSLCInteractiveSession::Write(const std::string& data)
 {
+    OVERLAPPED overlapped{};
+    wil::unique_event event(wil::EventOptions::ManualReset);
+    overlapped.hEvent = event.get();
+
     DWORD written = 0;
-    THROW_IF_WIN32_BOOL_FALSE(WriteFile(m_stdinWrite.get(), data.c_str(), static_cast<DWORD>(data.size()), &written, nullptr));
+    if (!WriteFile(m_stdinWrite.get(), data.c_str(), static_cast<DWORD>(data.size()), &written, &overlapped))
+    {
+        DWORD error = GetLastError();
+        if (error == ERROR_IO_PENDING)
+        {
+            THROW_LAST_ERROR_IF(WaitForSingleObject(event.get(), 5000) != WAIT_OBJECT_0);
+            THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(m_stdinWrite.get(), &overlapped, &written, FALSE));
+        }
+        else
+        {
+            THROW_WIN32(error);
+        }
+    }
+
     THROW_IF_WIN32_BOOL_FALSE(FlushFileBuffers(m_stdinWrite.get()));
 }
 
