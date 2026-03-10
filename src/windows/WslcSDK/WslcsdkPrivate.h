@@ -80,7 +80,7 @@ typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
     const WslcContainerVolume* volumes;
     uint32_t volumesCount;
     const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions;
-    WSLA_CONTAINER_NETWORK_TYPE networking;
+    WSLAContainerNetworkType networking;
     WslcContainerFlags containerFlags;
 
 } WSLC_CONTAINER_OPTIONS_INTERNAL;

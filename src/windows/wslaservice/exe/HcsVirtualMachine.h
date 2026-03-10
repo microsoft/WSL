@@ -31,7 +31,7 @@ class HcsVirtualMachine
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLAVirtualMachine, IFastRundown>
 {
 public:
-    HcsVirtualMachine(_In_ const WSLA_SESSION_SETTINGS* Settings);
+    HcsVirtualMachine(_In_ const WSLASessionSettings* Settings);
     ~HcsVirtualMachine();
 
     // IWSLAVirtualMachine implementation

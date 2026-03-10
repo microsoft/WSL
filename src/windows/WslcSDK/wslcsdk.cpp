@@ -62,6 +62,14 @@ struct FlagsTraits<WslcContainerStartFlags>
     WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
 };
 
+template <>
+struct FlagsTraits<WslcDeleteContainerFlags>
+{
+    using WslaType = WSLADeleteFlags;
+    constexpr static WslcDeleteContainerFlags Mask = WSLC_DELETE_CONTAINER_FLAG_FORCE;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLADeleteFlagsForce);
+};
+
 template <typename Flags>
 typename FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
 {
@@ -90,14 +98,14 @@ WSLASignal Convert(WslcSignal signal)
     }
 }
 
-WSLA_CONTAINER_NETWORK_TYPE Convert(WslcContainerNetworkingMode mode)
+WSLAContainerNetworkType Convert(WslcContainerNetworkingMode mode)
 {
     switch (mode)
     {
     case WSLC_CONTAINER_NETWORKING_MODE_NONE:
-        return WSLA_CONTAINER_NETWORK_NONE;
+        return WSLAContainerNetworkTypeNone;
     case WSLC_CONTAINER_NETWORKING_MODE_BRIDGED:
-        return WSLA_CONTAINER_NETWORK_BRIDGE;
+        return WSLAContainerNetworkTypeBridged;
     default:
         THROW_HR_MSG(E_INVALIDARG, "Invalid WslcContainerNetworkingMode: %i", mode);
     }
@@ -239,7 +247,7 @@ try
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     auto result = std::make_unique<WslcSessionImpl>();
-    WSLA_SESSION_SETTINGS runtimeSettings{};
+    WSLASessionSettings runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
     // TODO: Is this the intended use for vhdRequirements.sizeInBytes?
@@ -398,7 +406,7 @@ try
 
     internalType->image = imageName;
     // Default network configuration to WSLC SDK `0`, which is NONE.
-    internalType->networking = WSLA_CONTAINER_NETWORK_NONE;
+    internalType->networking = WSLAContainerNetworkTypeNone;
 
     return S_OK;
 }
@@ -416,7 +424,7 @@ try
 
     auto result = std::make_unique<WslcContainerImpl>();
 
-    WSLA_CONTAINER_OPTIONS containerOptions{};
+    WSLAContainerOptions containerOptions{};
     containerOptions.Image = internalContainerSettings->image;
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
@@ -425,14 +433,14 @@ try
 
     CopyProcessSettingsToRuntime(containerOptions.InitProcessOptions, internalContainerSettings->initProcessOptions);
 
-    std::unique_ptr<WSLA_VOLUME[]> convertedVolumes;
+    std::unique_ptr<WSLAVolume[]> convertedVolumes;
     if (internalContainerSettings->volumes && internalContainerSettings->volumesCount)
     {
-        convertedVolumes = std::make_unique<WSLA_VOLUME[]>(internalContainerSettings->volumesCount);
+        convertedVolumes = std::make_unique<WSLAVolume[]>(internalContainerSettings->volumesCount);
         for (uint32_t i = 0; i < internalContainerSettings->volumesCount; ++i)
         {
             const WslcContainerVolume& internalVolume = internalContainerSettings->volumes[i];
-            WSLA_VOLUME& convertedVolume = convertedVolumes[i];
+            WSLAVolume& convertedVolume = convertedVolumes[i];
 
             convertedVolume.HostPath = internalVolume.windowsPath;
             convertedVolume.ContainerPath = internalVolume.containerPath;
@@ -442,14 +450,14 @@ try
         containerOptions.VolumesCount = static_cast<ULONG>(internalContainerSettings->volumesCount);
     }
 
-    std::unique_ptr<WSLA_PORT_MAPPING[]> convertedPorts;
+    std::unique_ptr<WSLAPortMapping[]> convertedPorts;
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
-        convertedPorts = std::make_unique<WSLA_PORT_MAPPING[]>(internalContainerSettings->portsCount);
+        convertedPorts = std::make_unique<WSLAPortMapping[]>(internalContainerSettings->portsCount);
         for (uint32_t i = 0; i < internalContainerSettings->portsCount; ++i)
         {
             const WslcContainerPortMapping& internalPort = internalContainerSettings->ports[i];
-            WSLA_PORT_MAPPING& convertedPort = convertedPorts[i];
+            WSLAPortMapping& convertedPort = convertedPorts[i];
 
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
@@ -729,10 +737,7 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: Flags?
-    UNREFERENCED_PARAMETER(flags);
-
-    RETURN_HR(internalType->container->Delete());
+    RETURN_HR(internalType->container->Delete(ConvertFlags(flags)));
 }
 CATCH_RETURN();
 

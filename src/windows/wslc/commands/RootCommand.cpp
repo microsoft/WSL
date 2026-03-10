@@ -27,6 +27,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerDeleteCommand>(FullName()));

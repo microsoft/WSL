@@ -56,7 +56,7 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLA_SESSION_INIT_SETTINGS* Settings);
+    WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings);
     ~WSLAVirtualMachine();
 
     void Initialize();
@@ -77,7 +77,7 @@ public:
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
-        _In_ const WSLA_PROCESS_OPTIONS& Options,
+        _In_ const WSLAProcessOptions& Options,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -112,7 +112,7 @@ private:
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ LPCSTR Executable,
-        _In_ const WSLA_PROCESS_OPTIONS& Options,
+        _In_ const WSLAProcessOptions& Options,
         _In_ const std::vector<WSLAProcessFd>& Fds = {},
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});

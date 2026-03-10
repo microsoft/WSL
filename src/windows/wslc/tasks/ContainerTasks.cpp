@@ -31,6 +31,12 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+void AttachContainer::operator()(CLIExecutionContext& context) const
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    context.ExitCode = ContainerService::Attach(context.Data.Get<Data::Session>(), WideToMultiByte(m_containerId));
+}
+
 void CreateContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -112,7 +118,7 @@ void ListContainers(CLIExecutionContext& context)
     if (!context.Args.Contains(ArgType::All))
     {
         auto shouldRemove = [](const ContainerInformation& container) {
-            return container.State != WSLA_CONTAINER_STATE::WslaContainerStateRunning;
+            return container.State != WSLAContainerState::WslaContainerStateRunning;
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
     }
