@@ -395,6 +395,9 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->ContextPath);
+    RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
+    RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
     wil::unique_handle dockerfileFileHandle;
     if (Options->DockerfileHandle != 0 && Options->DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
@@ -416,12 +419,14 @@ try
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->Tags.Values[i]);
         RETURN_HR_IF(E_INVALIDARG, strlen(Options->Tags.Values[i]) > WSLA_MAX_IMAGE_NAME_LENGTH);
         buildArgs.push_back("-t");
         buildArgs.push_back(Options->Tags.Values[i]);
     }
     for (ULONG i = 0; i < Options->BuildArgs.Count; i++)
     {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->BuildArgs.Values[i]);
         buildArgs.push_back("--build-arg");
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
