@@ -2510,7 +2510,7 @@ class WSLATests
         cleanup.release();
     }
 
-    TEST_METHOD(NamedVolumeSessionRecovery)
+    TEST_METHOD(NamedVolumesSessionRecovery)
     {
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
@@ -2580,7 +2580,7 @@ class WSLATests
 
             std::error_code error;
             VERIFY_IS_TRUE(std::filesystem::remove(volumeVhdPath, error));
-            VERIFY_ARE_EQUAL(removeError, std::error_code{});
+            VERIFY_ARE_EQUAL(error, std::error_code{});
         }
 
         wil::com_ptr<IWSLAContainer> notFound;

@@ -320,6 +320,22 @@ void ProcessNamedVolumes(
     }
 }
 
+void ValidateNamedVolumes(
+    const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes)
+{
+    for (const auto& mount : mounts)
+    {
+        if (mount.Type == "volume")
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                WSLA_E_VOLUME_NOT_FOUND,
+                wsl::shared::Localization::MessageWslaVolumeNotFound(mount.Name),
+                sessionVolumes.find(mount.Name) == sessionVolumes.end());
+        }
+    }
+}
+
 } // namespace
 
 WSLAContainerImpl::WSLAContainerImpl(
@@ -1139,6 +1155,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLASession& wslaSession,
     WSLAVirtualMachine& virtualMachine,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1146,6 +1163,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 {
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
+    
+    ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes);
 
     auto labels(dockerContainer.Labels);
     auto metadataIt = labels.find(WSLAContainerMetadataLabel);

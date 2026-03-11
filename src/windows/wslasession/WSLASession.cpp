@@ -1410,37 +1410,11 @@ void WSLASession::RecoverExistingContainers()
     {
         try
         {
-            // Skip container recovery if any named volume mount is missing from recovered session volumes.
-            // TODO: Consider recovering containers with missing volumes and failing them when Start() is called instead. 
-            bool missingNamedVolume = false;
-
-            for (const auto& mount : dockerContainer.Mounts)
-            {
-                if (mount.Type == "volume")
-                {
-                    if (m_volumes.find(mount.Name) == m_volumes.end())
-                    {
-                        missingNamedVolume = true;
-
-                        WSL_LOG(
-                            "ContainerRecoverySkippedMissingVolume",
-                            TraceLoggingValue(dockerContainer.Id.c_str(), "ContainerId"),
-                            TraceLoggingValue(dockerContainer.Names.empty() ? "" : dockerContainer.Names[0].c_str(), "ContainerName"),
-                            TraceLoggingValue(mount.Source.c_str(), "MissingVolume"));
-                        break;
-                    }
-                }
-            }
-
-            if (missingNamedVolume)
-            {
-                continue;
-            }
-
             auto container = WSLAContainerImpl::Open(
                 dockerContainer,
                 *this,
                 m_virtualMachine.value(),
+                m_volumes,
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
@@ -1486,7 +1460,10 @@ void WSLASession::RecoverExistingVolumes()
         CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());
     }
 
-    WSL_LOG("VolumesRecovered", TraceLoggingValue(m_displayName.c_str(), "SessionName"), TraceLoggingValue(m_volumes.size(), "VolumeCount"));
+    WSL_LOG(
+        "VolumesRecovered",
+        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+        TraceLoggingValue(m_volumes.size(), "VolumeCount"));
 }
 
 } // namespace wsl::windows::service::wsla
