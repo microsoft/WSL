@@ -52,7 +52,14 @@ public partial class MemAndProcViewModel : WslConfigSettingViewModel
         {
             if (ValidateInput(value, Constants.IntegerRegex))
             {
-                Set(ref _procCount!, Convert.ToInt32(value));
+                if (Int32.TryParse(value, out int parsedValue))
+                {
+                    Set(ref _procCount!, parsedValue);
+                }
+                else
+                {
+                    OnPropertyChanged();
+                }
             }
         }
     }
@@ -92,7 +99,14 @@ public partial class MemAndProcViewModel : WslConfigSettingViewModel
         {
             if (ValidateInput(value, Constants.WholeNumberRegex))
             {
-                Set(ref _memorySize!, Convert.ToUInt64(value));
+                if (UInt64.TryParse(value, out ulong parsedValue))
+                {
+                    Set(ref _memorySize!, parsedValue);
+                }
+                else
+                {
+                    OnPropertyChanged();
+                }
             }
         }
     }
@@ -132,7 +146,14 @@ public partial class MemAndProcViewModel : WslConfigSettingViewModel
         {
             if (ValidateInput(value, Constants.WholeNumberRegex))
             {
-                Set(ref _swapSize!, Convert.ToUInt64(value));
+                if (UInt64.TryParse(value, out ulong parsedValue))
+                {
+                    Set(ref _swapSize!, parsedValue);
+                }
+                else
+                {
+                    OnPropertyChanged();
+                }
             }
         }
     }

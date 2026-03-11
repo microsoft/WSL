@@ -53,11 +53,13 @@ _(Format,         "format",              NO_ALIAS,          Kind::Value,       L
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L"Arguments to pass to container's init process") \
 _(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       L"Group Id for the process") \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
+_(ImageForce,     "force",               L"f",              Kind::Flag,        L"Delete images even if they are being used") \
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  L"Image name") \
 _(Input,          "input",               L"i",              Kind::Value,       L"Provides path to the tar archive file containing the image") \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       L"Name of the container") \
 _(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container") \
+_(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        L"Do not delete untagged parents") \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  L"Path to the build context directory") \
 _(Progress,       "progress",            NO_ALIAS,          Kind::Value,       L"Progress type (format: none|ansi) (default: ansi)") \
 _(Publish,        "publish",             L"p",              Kind::Value,       L"Publish a port from a container to host") \

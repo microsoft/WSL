@@ -51,9 +51,9 @@ wil::unique_fd CreateUnixServerSocket(const char* path)
         }
     });
 
-    // Check if the path will fit in a sockaddr_un.
+    // Check if the path will fit in a sockaddr_un (with room for null terminator).
     std::string_view pathView{path};
-    if (pathView.length() > sizeof(sockaddr_un::sun_path))
+    if (pathView.length() >= sizeof(sockaddr_un::sun_path))
     {
         // It won't, so split the parent path and child name.
         auto index = pathView.find_last_of('/');
@@ -63,6 +63,9 @@ wil::unique_fd CreateUnixServerSocket(const char* path)
 
         const std::string parent{pathView.substr(0, index)};
         pathView = pathView.substr(index + 1);
+
+        // Ensure the child name fits in sun_path (with null terminator).
+        THROW_ERRNO_IF(ENAMETOOLONG, pathView.length() >= sizeof(sockaddr_un::sun_path));
 
         // Get the current working directory to restore it later, and change to the socket's parent
         // path.

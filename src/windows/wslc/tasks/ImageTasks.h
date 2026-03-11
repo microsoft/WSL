@@ -22,4 +22,6 @@ void GetImages(CLIExecutionContext& context);
 void ListImages(CLIExecutionContext& context);
 void LoadImage(CLIExecutionContext& context);
 void PullImage(CLIExecutionContext& context);
+void DeleteImage(CLIExecutionContext& context);
+void InspectImages(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task
