@@ -2128,7 +2128,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
+std::pair<std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
     WI_ASSERT(m_vmConfig.EnableVirtioFs);
 
@@ -2190,7 +2190,7 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
         TraceLoggingValue(created, "created"),
         TraceLoggingValue(m_virtioFsShares.size(), "shareCount"));
 
-    return tag;
+    return {tag, sharePath};
 }
 
 void WslCoreVm::OnCrash(_In_ LPCWSTR Details)
@@ -2607,8 +2607,7 @@ try
 
                         // Acquire the lock and attempt to add the device.
                         auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-                        tag = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
-                        source = pathWide;
+                        std::tie(tag, source) = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
                     });
 
                     respondWithTag(tag, source, result);
@@ -2627,8 +2626,10 @@ try
                         const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
                         THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
 
-                        source = foundShare->Path;
-                        newTag = AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
+                        std::tie(newTag, source) =
+                            AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
+
+                        WI_ASSERT(source == foundShare->Path);
                     });
 
                     respondWithTag(newTag, source, result);
