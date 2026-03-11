@@ -103,25 +103,11 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
 {
-    std::string repo;
-    std::string tag;
-
-    // Split target image into repo and tag if it contains a ':'
-    auto separatorPos = targetImage.find(':');
-    if (separatorPos != std::string::npos)
-    {
-        repo = targetImage.substr(0, separatorPos);
-        tag = targetImage.substr(separatorPos + 1);
-    }
-    else
-    {
-        repo = targetImage.c_str();
-    }
-
+    auto repoTag = RepoTag::Parse(targetImage);
     WSLATagImageOptions options{};
     options.Image = sourceImage.c_str();
-    options.Repo = repo.c_str();
-    options.Tag = tag.c_str();
+    options.Repo = repoTag.Repo.c_str();
+    options.Tag = repoTag.Tag.c_str();
     THROW_IF_FAILED(session.Get()->TagImage(&options));
 }
 
