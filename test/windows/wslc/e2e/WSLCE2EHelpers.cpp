@@ -175,7 +175,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
-            auto result = RunWslc(std::format(L"container delete --force {}", containerName));
+            auto result = RunWslc(std::format(L"container delete {}", containerName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
@@ -192,7 +192,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     {
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
-            auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
+            auto deleteResult = RunWslc(std::format(L"image delete {}", image.NameAndTag()));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
