@@ -280,7 +280,9 @@ typedef struct _WSLAContainerEntry
     char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     WSLAContainerId Id;
+    ULONGLONG StateChangedAt;
     WSLAContainerState State;
+
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
 } WSLAContainerEntry;

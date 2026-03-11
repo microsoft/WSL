@@ -2921,6 +2921,7 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
+                VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
             }
         };
 
@@ -2947,6 +2948,16 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
 
+            // Capture StateChangedAt while the container is running.
+            ULONGLONG runningStateChangedAt{};
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                VERIFY_ARE_EQUAL(containers.size(), 1);
+                runningStateChangedAt = containers[0].StateChangedAt;
+                VERIFY_IS_TRUE(runningStateChangedAt > 0);
+            }
+
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
             VERIFY_SUCCEEDED(initProcess.Get().Signal(WSLASignalSIGKILL));
@@ -2962,6 +2973,17 @@ class WSLATests
             // Expect the container to be in exited state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
             expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that StateChangedAt was updated after the state transition.
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                VERIFY_ARE_EQUAL(containers.size(), 1);
+
+                auto now = static_cast<ULONGLONG>(time(nullptr));
+                VERIFY_IS_TRUE(containers[0].StateChangedAt <= now);
+                VERIFY_IS_TRUE(containers[0].StateChangedAt >= runningStateChangedAt);
+            }
 
             // Open a new reference to the same container.
             wil::com_ptr<IWSLAContainer> sameContainer;
@@ -3158,6 +3180,8 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
+                VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
+                VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
             }
         };
 
@@ -4130,6 +4154,7 @@ class WSLATests
         auto restore = ResetTestSession(); // Required to access the storage folder.
 
         std::string containerName = "test-container";
+        ULONGLONG originalStateChangedAt{};
 
         // Phase 1: Create session and container, then stop the container
         {
@@ -4146,6 +4171,13 @@ class WSLATests
             // Stop the container so it can be recovered and deleted later
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Capture StateChangedAt before the session is destroyed.
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            originalStateChangedAt = containers[0].StateChangedAt;
+            VERIFY_IS_TRUE(originalStateChangedAt > 0);
         }
 
         // Phase 2: Create new session from same storage, recover and delete container
@@ -4154,6 +4186,13 @@ class WSLATests
 
             auto container = OpenContainer(session.get(), containerName);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that StateChangedAt was correctly restored from the Docker timestamp.
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
+
             VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Verify container is no longer accessible
