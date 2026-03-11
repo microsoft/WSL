@@ -48,18 +48,6 @@ void CreateContainer(CLIExecutionContext& context)
     PrintMessage(MultiByteToWide(result.Id));
 }
 
-void DeleteContainers(CLIExecutionContext& context)
-{
-    WI_ASSERT(context.Data.Contains(Data::Session));
-    auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    bool force = context.Args.Contains(ArgType::Force);
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Delete(session, WideToMultiByte(id), force);
-    }
-}
-
 void ExecContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -166,6 +154,18 @@ void ListContainers(CLIExecutionContext& context)
     }
     default:
         THROW_HR(E_UNEXPECTED);
+    }
+}
+
+void RemoveContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
+    bool force = context.Args.Contains(ArgType::Force);
+    for (const auto& id : containerIds)
+    {
+        ContainerService::Delete(session, WideToMultiByte(id), force);
     }
 }
 
