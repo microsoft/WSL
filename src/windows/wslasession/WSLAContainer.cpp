@@ -345,7 +345,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     WSLAContainerNetworkType NetworkMode,
     std::vector<WSLAVolumeMount>&& volumes,
     std::vector<WSLAPortMapping>&& ports,
-    std::set<uint16_t>&& allocatedVmPorts,
+    std::shared_ptr<std::set<uint16_t>> allocatedVmPorts,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
@@ -1154,7 +1154,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         containerOptions.ContainerNetwork.ContainerNetworkType,
         std::move(volumes),
         std::move(ports),
-        std::move(*allocatedVmPorts),
+        std::move(allocatedVmPorts),
         std::move(labels),
         std::move(OnDeleted),
         EventTracker,
@@ -1219,7 +1219,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         networkMode,
         std::move(metadata.Volumes),
         std::move(metadata.Ports),
-        std::move(*vmPorts),
+        std::move(vmPorts),
         std::move(labels),
         std::move(OnDeleted),
         EventTracker,
@@ -1363,7 +1363,7 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseResources(
     ReleaseRuntimeResources();
 
     // Release VM port allocations back to the pool.
-    ReleaseVmPorts(m_allocatedVmPorts, m_virtualMachine);
+    ReleaseVmPorts(*m_allocatedVmPorts, m_virtualMachine);
 
     // Disconnect the COM wrapper so no new RPC calls can reach this container.
     DisconnectComWrapper();

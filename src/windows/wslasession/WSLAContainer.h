@@ -44,7 +44,7 @@ public:
         WSLAContainerNetworkType NetworkMode,
         std::vector<WSLAVolumeMount>&& volumes,
         std::vector<WSLAPortMapping>&& ports,
-        std::set<uint16_t>&& allocatedVmPorts,
+        std::shared_ptr<std::set<uint16_t>> allocatedVmPorts,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
@@ -137,7 +137,7 @@ private:
     WSLAVirtualMachine& m_virtualMachine;
     WSLAContainerNetworkType m_networkMode;
     std::vector<WSLAPortMapping> m_mappedPorts;
-    std::set<uint16_t> m_allocatedVmPorts;
+    std::shared_ptr<std::set<uint16_t>> m_allocatedVmPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
