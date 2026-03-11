@@ -16,38 +16,11 @@ Abstract:
 
 #include "SubProcess.h"
 
+using namespace wsl::windows::common::relay;
 using wsl::windows::common::SubProcess;
 
-namespace {
-wil::unique_file FileFromHandle(wil::unique_hfile& Handle, const char* Mode)
-{
-    using UniqueFd = wil::unique_any<int, decltype(_close), _close, wil::details::pointer_access_all, int, int, -1>;
-
-    UniqueFd Fd(_open_osfhandle(reinterpret_cast<intptr_t>(Handle.get()), 0));
-    THROW_LAST_ERROR_IF(Fd.get() < 0);
-
-    Handle.release();
-
-    wil::unique_file File(_fdopen(Fd.get(), Mode));
-    THROW_LAST_ERROR_IF(!File);
-    Fd.release();
-
-    return File;
-}
-
-std::wstring ReadFileContent(wil::unique_hfile& Handle)
-{
-    THROW_LAST_ERROR_IF(SetFilePointer(Handle.get(), 0, 0, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
-
-    const auto File = FileFromHandle(Handle, "r");
-
-    std::ifstream Stdout(File.get());
-    return wsl::shared::string::MultiByteToWide(std::string(std::istreambuf_iterator<char>(Stdout), {}));
-}
-} // namespace
-
-SubProcess::SubProcess(LPCWSTR ApplicationName, LPCWSTR CommandLine, DWORD Flags) :
-    m_applicationName(ApplicationName), m_commandLine(CommandLine), m_flags(Flags)
+SubProcess::SubProcess(LPCWSTR ApplicationName, LPCWSTR CommandLine, DWORD Flags, DWORD StartupFlags) :
+    m_applicationName(ApplicationName), m_commandLine(CommandLine), m_flags(Flags), m_startupFlags(StartupFlags)
 {
 }
 
@@ -159,7 +132,7 @@ wil::unique_handle SubProcess::Start()
 
     STARTUPINFOEX StartupInfo{};
     StartupInfo.StartupInfo.cb = sizeof(StartupInfo);
-    StartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    StartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES | m_startupFlags;
 
     // N.B. Passing a pseudoconsole requires all standard handles to be null
     if (m_pseudoConsole == nullptr)
@@ -240,29 +213,50 @@ DWORD SubProcess::Run(DWORD Timeout)
 
 SubProcess::ProcessOutput SubProcess::RunAndCaptureOutput(DWORD Timeout, HANDLE StdErr)
 {
-    //
-    // Using pipes could cause a deadlock if the process writes more bytes
-    // than the size of the pipe buffer. Using two files to prevent that.
-    //
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        // Clear out references to stdout and stderr pipes.
+        m_stdOut = nullptr;
+        m_stdErr = nullptr;
+    });
 
-    using wsl::windows::common::filesystem::TempFile;
-    const auto flags = filesystem::TempFileFlags::DeleteOnClose | filesystem::TempFileFlags::InheritHandle;
-    auto stdoutFile = filesystem::TempFile(GENERIC_ALL, 0, OPEN_EXISTING, flags);
-    m_stdOut = stdoutFile.Handle.get();
+    auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
-    std::optional<filesystem::TempFile> stderrFile;
+    m_stdOut = stdoutWrite.get();
+
+    relay::MultiHandleWait io;
+    std::string stdoutNative;
+    std::string stderrNative;
+
+    io.AddHandle(std::make_unique<relay::ReadHandle>(
+        std::move(stdoutRead), [&](const gsl::span<char>& buffer) { stdoutNative.append(buffer.data(), buffer.size()); }));
+
+    wil::unique_hfile stderrWrite;
     if (StdErr == nullptr)
     {
-        stderrFile = filesystem::TempFile(GENERIC_ALL, 0, OPEN_EXISTING, flags);
+        wil::unique_hfile stderrRead;
+        std::tie(stderrRead, stderrWrite) = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+        m_stdErr = stderrWrite.get();
+
+        io.AddHandle(std::make_unique<relay::ReadHandle>(
+            std::move(stderrRead), [&](const gsl::span<char>& buffer) { stderrNative.append(buffer.data(), buffer.size()); }));
+    }
+    else
+    {
+        m_stdErr = StdErr;
     }
 
-    m_stdErr = stderrFile ? stderrFile->Handle.get() : StdErr;
+    auto process = Start();
+    stdoutWrite.reset();
+    stderrWrite.reset();
 
-    const DWORD ExitCode = GetExitCode(Start().get(), Timeout);
-    ProcessOutput output{ExitCode, ReadFileContent(stdoutFile.Handle), stderrFile ? ReadFileContent(stderrFile->Handle) : L""};
+    io.Run(std::chrono::milliseconds{Timeout});
 
-    // Clear out references to stdout and stderr temp files.
-    m_stdOut = nullptr;
-    m_stdErr = nullptr;
+    // Reusing the same timeout since the std handles have been fully read at that point.
+    const DWORD ExitCode = GetExitCode(process.get(), Timeout);
+    ProcessOutput output{ExitCode, shared::string::MultiByteToWide(stdoutNative), shared::string::MultiByteToWide(stderrNative)};
+
     return output;
 }

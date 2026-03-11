@@ -98,6 +98,8 @@ public partial class App : Application
             services.AddTransient<NetworkingIntegrationPage>();
             services.AddTransient<VSCodeIntegrationViewModel>();
             services.AddTransient<VSCodeIntegrationPage>();
+            services.AddTransient<VSIntegrationViewModel>();
+            services.AddTransient<VSIntegrationPage>();
             services.AddTransient<WorkingAcrossFileSystemsViewModel>();
             services.AddTransient<WorkingAcrossFileSystemsPage>();
             services.AddTransient<Views.OOBE.ShellPage>();

@@ -72,6 +72,38 @@ struct COMErrorInfo
     wil::unique_bstr Source;
 };
 
+struct PruneResult
+{
+    NON_COPYABLE(PruneResult);
+    WSLAPruneContainersResults result{};
+
+    PruneResult() = default;
+
+    PruneResult(PruneResult&& other)
+    {
+        *this = std::move(other);
+    }
+
+    PruneResult& operator=(PruneResult&& other)
+    {
+        CoTaskMemFree(result.Containers);
+        result.Containers = other.result.Containers;
+        result.ContainersCount = other.result.ContainersCount;
+        result.SpaceReclaimed = other.result.SpaceReclaimed;
+
+        other.result.Containers = nullptr;
+        other.result.ContainersCount = 0;
+        other.result.SpaceReclaimed = 0;
+
+        return *this;
+    }
+
+    ~PruneResult()
+    {
+        CoTaskMemFree(result.Containers);
+    }
+};
+
 template <typename T>
 void AssertValidPrintfArg()
 {
@@ -111,9 +143,11 @@ std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
 
 std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
 
-[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE handleInTarget);
+[[nodiscard]] HANDLE DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = std::nullopt, _In_ BOOL InheritHandle = FALSE);
 
-[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> Permissions = {});
+[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE Handle);
+
+[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = {});
 
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
 

@@ -189,43 +189,22 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
 
     // Setup boot VHDs
     hcs::Scsi scsiController{};
-    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
-    {
-        auto attachScsiDisk = [&](PCWSTR path) {
-            const ULONG lun = AllocateLun();
-            hcs::Attachment disk{};
-            disk.Type = hcs::AttachmentType::VirtualDisk;
-            disk.Path = path;
-            disk.ReadOnly = true;
-            disk.SupportCompressedVolumes = true;
-            disk.AlwaysAllowSparseFiles = true;
-            disk.SupportEncryptedFiles = true;
-            scsiController.Attachments[std::to_string(lun)] = std::move(disk);
-            DiskInfo diskInfo{path};
-            m_attachedDisks.emplace(lun, std::move(diskInfo));
-        };
+    auto attachScsiDisk = [&](PCWSTR path) {
+        const ULONG lun = AllocateLun();
+        hcs::Attachment disk{};
+        disk.Type = hcs::AttachmentType::VirtualDisk;
+        disk.Path = path;
+        disk.ReadOnly = true;
+        disk.SupportCompressedVolumes = true;
+        disk.AlwaysAllowSparseFiles = true;
+        disk.SupportEncryptedFiles = true;
+        scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+        DiskInfo diskInfo{path};
+        m_attachedDisks.emplace(lun, std::move(diskInfo));
+    };
 
-        attachScsiDisk(rootVhdPath.c_str());
-        attachScsiDisk(kernelModulesPath.c_str());
-    }
-    else
-    {
-        hcs::VirtualPMemController pmemController{};
-        pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
-        ULONG nextDeviceId = 0;
-        auto attachPmemDisk = [&](PCWSTR path) {
-            auto deviceId = nextDeviceId++;
-            hcs::VirtualPMemDevice vhd{};
-            vhd.HostPath = path;
-            vhd.ReadOnly = true;
-            vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
-            pmemController.Devices[std::to_string(deviceId)] = std::move(vhd);
-        };
-
-        attachPmemDisk(rootVhdPath.c_str());
-        attachPmemDisk(kernelModulesPath.c_str());
-        vmSettings.Devices.VirtualPMem = std::move(pmemController);
-    }
+    attachScsiDisk(rootVhdPath.c_str());
+    attachScsiDisk(kernelModulesPath.c_str());
 
     vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 
@@ -384,7 +363,7 @@ try
 
     // Duplicate the socket handles - COM manages the lifetime of the marshalled handles,
     // so we need our own copies to take ownership.
-    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(helpers::DuplicateHandle(GnsSocket))};
+    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
     wil::unique_socket dnsSocketHandle;
     if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
     {
@@ -393,7 +372,7 @@ try
             E_NOTIMPL, m_networkingMode == WSLANetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
 
         THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
-        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(helpers::DuplicateHandle(*DnsSocket)));
+        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
     }
     else
     {
