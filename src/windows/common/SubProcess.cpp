@@ -19,8 +19,8 @@ Abstract:
 using namespace wsl::windows::common::relay;
 using wsl::windows::common::SubProcess;
 
-SubProcess::SubProcess(LPCWSTR ApplicationName, LPCWSTR CommandLine, DWORD Flags) :
-    m_applicationName(ApplicationName), m_commandLine(CommandLine), m_flags(Flags)
+SubProcess::SubProcess(LPCWSTR ApplicationName, LPCWSTR CommandLine, DWORD Flags, DWORD StartupFlags) :
+    m_applicationName(ApplicationName), m_commandLine(CommandLine), m_flags(Flags), m_startupFlags(StartupFlags)
 {
 }
 
