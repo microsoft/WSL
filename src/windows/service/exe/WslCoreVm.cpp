@@ -2581,12 +2581,13 @@ try
                     return;
                 }
 
-                auto respondWithTag = [&](const std::wstring& tag, HRESULT result) {
+                auto respondWithTag = [&](const std::wstring& tag, const std::wstring& source, HRESULT result) {
                     // Respond to the guest with the tag that should be used to mount the device.
 
                     wsl::shared::MessageWriter<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE> response(LxInitMessageAddVirtioFsDeviceResponse);
                     response->Result = SUCCEEDED(result) ? 0 : EINVAL; // TODO: Improved HRESULT -> errno mapping.
                     response.WriteString(response->TagOffset, tag);
+                    response.WriteString(response->SourceOffset, source);
 
                     channel.SendMessage<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE>(response.Span());
                 };
@@ -2594,7 +2595,8 @@ try
                 if (message->MessageType == LxInitMessageAddVirtioFsDevice)
                 {
                     std::wstring tag;
-                    const auto result = wil::ResultFromException([this, span, &tag]() {
+                    std::wstring source;
+                    const auto result = wil::ResultFromException([this, span, &tag, &source]() {
                         const auto* addShare = gslhelpers::try_get_struct<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(span);
                         THROW_HR_IF(E_UNEXPECTED, !addShare);
 
@@ -2606,14 +2608,16 @@ try
                         // Acquire the lock and attempt to add the device.
                         auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
                         tag = AddVirtioFsShare(addShare->Admin, pathWide.c_str(), optionsWide.c_str());
+                        source = pathWide;
                     });
 
-                    respondWithTag(tag, result);
+                    respondWithTag(tag, source, result);
                 }
                 else if (message->MessageType == LxInitMessageRemountVirtioFsDevice)
                 {
                     std::wstring newTag;
-                    const auto result = wil::ResultFromException([this, span, &newTag]() {
+                    std::wstring source;
+                    const auto result = wil::ResultFromException([this, span, &newTag, &source]() {
                         const auto* remountShare = gslhelpers::try_get_struct<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE>(span);
                         THROW_HR_IF(E_UNEXPECTED, !remountShare);
 
@@ -2623,10 +2627,11 @@ try
                         const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
                         THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
 
+                        source = foundShare->Path;
                         newTag = AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
                     });
 
-                    respondWithTag(newTag, result);
+                    respondWithTag(newTag, source, result);
                 }
                 else
                 {

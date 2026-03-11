@@ -624,9 +624,16 @@ try
     //
 
     auto* Tag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
+    auto* ResponseSource = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
     THROW_LAST_ERROR_IF(MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode) < 0);
 
-    SaveVirtiofsTagMapping(Tag, Source);
+    //
+    // Save the tag mapping.
+    //
+    // N.B. Use the source path from the response since the service canonicalizes it.
+    //
+
+    SaveVirtiofsTagMapping(Tag, ResponseSource);
 
     return 0;
 }
@@ -684,16 +691,10 @@ try
     }
 
     auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
+    auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
     THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
 
-    auto Source = QueryVirtiofsMountSource(Tag);
-    if (Source.empty())
-    {
-        LOG_ERROR("Failed to query source for virtiofs tag {}", Tag);
-        return -1;
-    }
-
-    SaveVirtiofsTagMapping(NewTag, Source.c_str());
+    SaveVirtiofsTagMapping(NewTag, Source);
 
     return 0;
 }
