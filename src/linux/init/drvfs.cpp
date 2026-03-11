@@ -21,6 +21,7 @@ Abstract:
 #include "config.h"
 #include "message.h"
 #include <cassert>
+#include <filesystem>
 #include <optional>
 
 using namespace std::chrono_literals;
@@ -739,22 +740,7 @@ try
     //
 
     auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
-    std::string Result(PATH_MAX, '\0');
-    auto Length = readlink(LinkPath.c_str(), Result.data(), Result.size());
-    if (Length < 0)
-    {
-        LOG_WARNING("Failed to read virtiofs tag symlink {}: {}", LinkPath, errno);
-        return {};
-    }
-
-    if (static_cast<size_t>(Length) == Result.size())
-    {
-        LOG_WARNING("Virtiofs tag symlink {} target may be truncated", LinkPath);
-        return {};
-    }
-
-    Result.resize(Length);
-    return Result;
+    return std::filesystem::read_symlink(LinkPath).string();
 }
 catch (...)
 {
