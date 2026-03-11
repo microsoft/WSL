@@ -273,8 +273,24 @@ stages:
                   targetType: inline
                   script: |
                       $arch = '${{ platform }}'
-                      MakeCab "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).$arch.msi" "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).$arch.cab"
+                      $bundleDir = "$(ob_outputDirectory)\bundle"
+                      $msiPath = Join-Path $bundleDir "wsl.$(version.WSL_PACKAGE_VERSION).$arch.msi"
+                      $cabPath = Join-Path $bundleDir "wsl.$(version.WSL_PACKAGE_VERSION).$arch.cab"
 
+                      if (-not (Test-Path -Path $msiPath)) {
+                          throw "Input MSI not found for architecture '$arch': $msiPath"
+                      }
+
+                      Write-Host "Creating CAB from MSI: $msiPath -> $cabPath"
+                      & makecab.exe $msiPath $cabPath
+
+                      if ($LASTEXITCODE -ne 0) {
+                          throw "makecab.exe failed with exit code $LASTEXITCODE for architecture '$arch'."
+                      }
+
+                      if (-not (Test-Path -Path $cabPath)) {
+                          throw "CAB file was not created at expected path: $cabPath"
+                      }
           - ${{ if eq(parameters.isRelease, 'true') }}:
               - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
                 displayName: "Sign CAB (${{ platform }})"
