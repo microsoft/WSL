@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "SessionModel.h"
 #include "ContainerModel.h"
+#include <wsla_schema.h>
 
 namespace wsl::windows::wslc::services {
 struct ContainerService
@@ -28,7 +29,7 @@ struct ContainerService
     static void Delete(models::Session& session, const std::string& id, bool force);
     static std::vector<models::ContainerInformation> List(models::Session& session);
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
-    static wsl::windows::common::docker_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
+    static wsl::windows::common::wsla_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
     static void Logs(models::Session& session, const std::string& id, bool follow);
 };
 } // namespace wsl::windows::wslc::services

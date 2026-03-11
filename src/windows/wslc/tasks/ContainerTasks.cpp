@@ -22,6 +22,7 @@ Abstract:
 #include "SessionService.h"
 #include "TablePrinter.h"
 #include <wil/result_macros.h>
+#include <wsla_schema.h>
 
 using namespace wsl::shared;
 using namespace wsl::shared::string;
@@ -81,7 +82,7 @@ void InspectContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    std::vector<wsl::windows::common::docker_schema::InspectContainer> result;
+    std::vector<wsl::windows::common::wsla_schema::InspectContainer> result;
     for (const auto& id : containerIds)
     {
         auto inspectData = ContainerService::Inspect(session, WideToMultiByte(id));
