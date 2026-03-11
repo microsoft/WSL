@@ -1135,6 +1135,8 @@ try
 
     if (Until > 0 || FiltersCount > 0)
     {
+        THROW_HR_IF(FiltersCount > 0 && Filters == nullptr, E_POINTER);
+
         filters.emplace();
 
         for (DWORD i = 0; i < FiltersCount; ++i)

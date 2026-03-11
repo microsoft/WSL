@@ -86,6 +86,7 @@ struct PruneResult
 
     PruneResult& operator=(PruneResult&& other)
     {
+        CoTaskMemFree(result.Containers);
         result.Containers = other.result.Containers;
         result.ContainersCount = other.result.ContainersCount;
         result.SpaceReclaimed = other.result.SpaceReclaimed;
