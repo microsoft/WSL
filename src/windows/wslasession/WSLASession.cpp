@@ -1135,7 +1135,7 @@ try
 
     if (Until > 0 || FiltersCount > 0)
     {
-        THROW_HR_IF(FiltersCount > 0 && Filters == nullptr, E_POINTER);
+        THROW_HR_IF(E_POINTER, FiltersCount > 0 && Filters == nullptr);
 
         filters.emplace();
 

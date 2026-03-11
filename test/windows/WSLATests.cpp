@@ -5328,7 +5328,7 @@ class WSLATests
             PruneResult result;
 
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
-            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
     }
 };
