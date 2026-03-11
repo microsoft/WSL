@@ -2510,6 +2510,86 @@ class WSLATests
         cleanup.release();
     }
 
+    TEST_METHOD(NamedVolumeSessionRecovery)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        const std::string volumeName = "wsla-test-named-volume";
+        const std::string containerName = "wsla-test-container";
+        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
+
+        // Best-effort cleanup in case prior failed runs left artifacts behind.
+        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        {
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        }
+
+        auto cleanup = wil::scope_exit([&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        });
+
+        WSLAVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Type = "vhd";
+        volumeOptions.Options = nullptr;
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+
+        // Create a container that uses the named volume and writes a marker.
+        {
+            WSLAContainerLauncher writer(
+                "debian:latest", containerName, {"/bin/sh", "-c", "echo named-volume-recovery >/data/marker.txt"});
+            writer.AddNamedVolume(volumeName, "/data", false);
+
+            auto writerContainer = writer.Launch(*m_defaultSession);
+            writerContainer.SetDeleteOnClose(false);
+
+            auto writerProcess = writerContainer.GetInitProcess();
+            ValidateProcessOutput(writerProcess, {});
+        }
+
+        // Restart the session and verify the container is recovered.
+        ResetTestSession();
+        
+        auto recoveredContainer = OpenContainer(m_defaultSession.get(), containerName);
+        recoveredContainer.SetDeleteOnClose(false);
+
+        // Verify the named volume still contains the marker after restart.
+        {
+            WSLAContainerLauncher reader("debian:latest", "wsla-test-container-reader", {"/bin/sh", "-c", "cat /data/marker.txt"});
+            reader.AddNamedVolume(volumeName, "/data", true);
+
+            auto readerContainer = reader.Launch(*m_defaultSession);
+            auto readerProcess = readerContainer.GetInitProcess();
+            ValidateProcessOutput(readerProcess, {{1, "named-volume-recovery\n"}});
+        }
+
+        // Stop the session, delete the backing VHD, and restart.
+        {
+            auto restartSession = ResetTestSession();
+
+            VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+
+            std::error_code error;
+            VERIFY_IS_TRUE(std::filesystem::remove(volumeVhdPath, error));
+            VERIFY_ARE_EQUAL(removeError, std::error_code{});
+        }
+
+        wil::com_ptr<IWSLAContainer> notFound;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerName.c_str(), &notFound), E_UNEXPECTED);
+
+        // Deleting the named volume should fail after failed volume recovery.
+        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLA_E_VOLUME_NOT_FOUND);
+    }
+
     TEST_METHOD(NamedVolumeOptionsParseTest)
     {
         WSL2_TEST_ONLY();

@@ -14,10 +14,15 @@ Abstract:
 
 #pragma once
 
+#include "WSLAVolumeMetadata.h"
 #include "wslaservice.h"
 #include <filesystem>
 #include <memory>
 #include <string>
+
+namespace wsl::windows::common::docker_schema {
+struct Volume;
+}
 
 namespace wsl::windows::service::wsla {
 
@@ -45,6 +50,11 @@ public:
     static std::unique_ptr<WSLAVhdVolumeImpl> Create(
         _In_ const WSLAVolumeOptions& Options,
         _In_ const std::filesystem::path& StoragePath,
+        _In_ WSLAVirtualMachine& VirtualMachine,
+        _In_ DockerHTTPClient& DockerClient);
+
+    static std::unique_ptr<WSLAVhdVolumeImpl> Open(
+        _In_ const wsl::windows::common::docker_schema::Volume& Volume,
         _In_ WSLAVirtualMachine& VirtualMachine,
         _In_ DockerHTTPClient& DockerClient);
 

@@ -136,8 +136,9 @@ public:
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
 
     // Volume management.
-    void CreateVolume(const std::string& Name, const std::string& DevicePath);
+    void CreateVolume(const common::docker_schema::CreateVolume& Request);
     void RemoveVolume(const std::string& Name);
+    std::vector<common::docker_schema::Volume> ListVolumes();
 
     // Image management.
     struct ListImagesFilters

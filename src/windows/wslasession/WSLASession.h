@@ -18,6 +18,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "WSLAContainer.h"
 #include "WSLAVhdVolume.h"
+#include "WSLAVolumeMetadata.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
@@ -102,6 +103,7 @@ private:
     void StartDockerd();
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
     void RecoverExistingContainers();
+    void RecoverExistingVolumes();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle);
 

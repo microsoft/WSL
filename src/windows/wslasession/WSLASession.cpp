@@ -156,6 +156,7 @@ try
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
     // Recover any existing containers from storage.
+    RecoverExistingVolumes();
     RecoverExistingContainers();
 
     errorCleanup.release();
@@ -1409,6 +1410,33 @@ void WSLASession::RecoverExistingContainers()
     {
         try
         {
+            // Skip container recovery if any named volume mount is missing from recovered session volumes.
+            // TODO: Consider recovering containers with missing volumes and failing them when Start() is called instead. 
+            bool missingNamedVolume = false;
+
+            for (const auto& mount : dockerContainer.Mounts)
+            {
+                if (mount.Type == "volume")
+                {
+                    if (m_volumes.find(mount.Name) == m_volumes.end())
+                    {
+                        missingNamedVolume = true;
+
+                        WSL_LOG(
+                            "ContainerRecoverySkippedMissingVolume",
+                            TraceLoggingValue(dockerContainer.Id.c_str(), "ContainerId"),
+                            TraceLoggingValue(dockerContainer.Names.empty() ? "" : dockerContainer.Names[0].c_str(), "ContainerName"),
+                            TraceLoggingValue(mount.Source.c_str(), "MissingVolume"));
+                        break;
+                    }
+                }
+            }
+
+            if (missingNamedVolume)
+            {
+                continue;
+            }
+
             auto container = WSLAContainerImpl::Open(
                 dockerContainer,
                 *this,
@@ -1431,6 +1459,34 @@ void WSLASession::RecoverExistingContainers()
         "ContainersRecovered",
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_containers.size(), "ContainerCount"));
+}
+
+void WSLASession::RecoverExistingVolumes()
+{
+    WI_ASSERT(m_dockerClient.has_value());
+    WI_ASSERT(m_virtualMachine.has_value());
+
+    std::vector<docker_schema::Volume> volumes;
+    try
+    {
+        volumes = m_dockerClient->ListVolumes();
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to enumerate docker volumes");
+
+    for (const auto& volume : volumes)
+    {
+        try
+        {
+            WI_ASSERT(!m_volumes.contains(volume.Name));
+
+            auto vhdVolume = WSLAVhdVolumeImpl::Open(volume, m_virtualMachine.value(), m_dockerClient.value());
+            auto [_, inserted] = m_volumes.insert({volume.Name, std::move(vhdVolume)});
+            WI_VERIFY(inserted);
+        }
+        CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());
+    }
+
+    WSL_LOG("VolumesRecovered", TraceLoggingValue(m_displayName.c_str(), "SessionName"), TraceLoggingValue(m_volumes.size(), "VolumeCount"));
 }
 
 } // namespace wsl::windows::service::wsla

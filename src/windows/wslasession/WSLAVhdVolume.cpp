@@ -16,6 +16,7 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "WSLAVhdVolume.h"
 #include "WSLAVirtualMachine.h"
+#include "WSLAVolumeMetadata.h"
 #include "WslCoreFilesystem.h"
 
 using namespace wsl::windows::common;
@@ -79,6 +80,18 @@ namespace {
         }
 
         return sizeBytes;
+    }
+
+    std::string SerializeVhdVolumeMetadata(const std::filesystem::path& HostPath, ULONGLONG SizeBytes)
+    {
+        WSLAVolumeMetadata metadata{};
+        metadata.Type = "vhd";
+
+        WSLAVhdVolumeMetadata vhdMetadata{};
+        vhdMetadata.V1 = WSLAVhdVolumeMetadataV1{HostPath.wstring(), SizeBytes};
+        metadata.VhdVolumeMetadata = std::move(vhdMetadata);
+
+        return wsl::shared::ToJson(metadata);
     }
 
 } // namespace
@@ -145,7 +158,17 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
 
     try
     {
-        DockerClient.CreateVolume(name, virtualMachinePath);
+        docker_schema::CreateVolume request{};
+        request.Name = name;
+        request.Driver = "local";
+        request.DriverOpts = {
+            {"type", "none"},
+            {"o", "bind"},
+            {"device", virtualMachinePath},
+        };
+        request.Labels = {{WSLAVolumeMetadataLabel, SerializeVhdVolumeMetadata(hostPath, sizeBytes)}};
+
+        DockerClient.CreateVolume(request);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create docker volume for '%hs'", name.c_str());
 
@@ -159,19 +182,54 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
     return volume;
 }
 
-void WSLAVhdVolumeImpl::Delete()
+std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Open(
+    const wsl::windows::common::docker_schema::Volume& Volume,
+    WSLAVirtualMachine& VirtualMachine,
+    DockerHTTPClient& DockerClient)
 {
-    Detach();
+    auto metadataIt = Volume.Labels.find(WSLAVolumeMetadataLabel);
+    THROW_HR_IF(E_INVALIDARG, metadataIt == Volume.Labels.end());
 
-    auto hostPath = std::exchange(m_hostPath, std::filesystem::path{});
+    auto metadata = wsl::shared::FromJson<WSLAVolumeMetadata>(metadataIt->second.c_str());
+    THROW_HR_IF(E_INVALIDARG, metadata.Type != "vhd");
+    THROW_HR_IF(E_INVALIDARG, !metadata.VhdVolumeMetadata.has_value() || !metadata.VhdVolumeMetadata->V1.has_value());
 
-    if (!hostPath.empty())
+    const auto& vhdMetadata = metadata.VhdVolumeMetadata->V1.value();
+
+    std::string virtualMachinePath;
+    if (auto device = Volume.Options.find("device"); device != Volume.Options.end())
     {
-        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str()));
+        virtualMachinePath = device->second;
     }
+
+    if (virtualMachinePath.empty())
+    {
+        virtualMachinePath = Volume.Mountpoint;
+    }
+
+    THROW_HR_IF(E_INVALIDARG, virtualMachinePath.empty());
+
+    THROW_HR_IF(E_INVALIDARG, vhdMetadata.HostPath.empty());
+    THROW_HR_IF(E_INVALIDARG, vhdMetadata.SizeBytes == 0);
+
+    std::filesystem::path hostPath = vhdMetadata.HostPath;
+
+    auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
+    auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });
+
+    VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
+    auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
+
+    auto volume = std::make_unique<WSLAVhdVolumeImpl>(
+        std::string{Volume.Name}, "vhd", std::move(hostPath), vhdMetadata.SizeBytes, lun, std::move(virtualMachinePath), VirtualMachine, DockerClient);
+
+    mountCleanup.release();
+    attachCleanup.release();
+
+    return volume;
 }
 
-void WSLAVhdVolumeImpl::Detach()
+void WSLAVhdVolumeImpl::Delete()
 {
     if (m_attached)
     {
@@ -186,15 +244,26 @@ void WSLAVhdVolumeImpl::Detach()
             THROW_DOCKER_USER_ERROR_MSG(e, "Failed to remove volume '%hs'", m_name.c_str());
         }
 
-        if (!m_virtualMachinePath.empty())
-        {
-            m_virtualMachine.Unmount(m_virtualMachinePath.c_str());
-            m_virtualMachinePath.clear();
-        }
-
-        m_virtualMachine.DetachDisk(m_lun);
-        m_attached = false;
+        Detach();
     }
+
+    if (!m_hostPath.empty())
+    {
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_hostPath.c_str()));
+        m_hostPath.clear();
+    }
+}
+
+void WSLAVhdVolumeImpl::Detach()
+{
+    if (!m_virtualMachinePath.empty())
+    {
+        m_virtualMachine.Unmount(m_virtualMachinePath.c_str());
+        m_virtualMachinePath.clear();
+    }
+
+    m_virtualMachine.DetachDisk(m_lun);
+    m_attached = false;
 }
 
 } // namespace wsl::windows::service::wsla
