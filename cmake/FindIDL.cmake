@@ -24,7 +24,7 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
         set(IDL_I ${OUTPUT_DIR}/${IDL_NAME}_i_${TARGET_PLATFORM}.c)
         set(IDL_P ${OUTPUT_DIR}/${IDL_NAME}_p_${TARGET_PLATFORM}.c)
         set(IDL_DLLDATA ${OUTPUT_DIR}/dlldata_${TARGET_PLATFORM}.c)
-        set(MIDL_OUTPUT ${IDL_HEADER} ${IDL_I} ${IDL_C} ${IDL_DLLDATA})
+        set(MIDL_OUTPUT ${IDL_HEADER} ${IDL_I} ${IDL_P} ${IDL_DLLDATA})
 
         add_custom_command(
             OUTPUT ${MIDL_OUTPUT} ${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}

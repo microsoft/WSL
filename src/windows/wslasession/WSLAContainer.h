@@ -59,6 +59,7 @@ public:
     void Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLADeleteFlags Flags);
     void Export(ULONG TarHandle) const;
+    void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
     void GetState(_Out_ WSLAContainerState* State);
     void GetInitProcess(_Out_ IWSLAProcess** process) const;
     void Exec(_In_ const WSLAProcessOptions* Options, LPCSTR DetachKeys, _Out_ IWSLAProcess** Process);
@@ -131,6 +132,7 @@ private:
 
     wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
     DockerHTTPClient& m_dockerClient;
+    std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     WSLAContainerState m_state = WslaContainerStateInvalid;
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;

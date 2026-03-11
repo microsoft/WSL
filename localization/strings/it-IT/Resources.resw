@@ -728,7 +728,7 @@ Potrebbe essere necessario riavviare il sistema per rendere effettive le modific
     <value>La rete bridged richiede l'impostazione di wsl2.vmSwitch.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Non è possibile recuperare la distribuzione degli elenchi da '{}'. {}</value>
+    <value>Recupero dell'elenco di distribuzione da '{}'. {} non riuscito</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1061,7 +1061,7 @@ Fallback alla rete NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Non è stato possibile leggere la proprietà '{}' dalla distribuzione {} </value>
+    <value>Non è stato possibile leggere la proprietà '{}' dalla distribuzione {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1879,191 +1879,209 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Numero di millisecondi di inattività di una macchina virtuale prima dell'arresto.</value>
   </data>
-  <data name="MessageWsladiagUsage" xml:space="preserve">
-    <value>wsladiag - WSLA diagnostics tool
-Usage:
-  wsladiag list [--verbose|-v]
-  wsladiag shell &lt;SessionName&gt; [--verbose|-v]
-  wsladiag pull &lt;Image&gt;
-  wsladiag build [--tag|-t &lt;Tag&gt;] [--file|-f &lt;Dockerfile&gt;] &lt;Directory&gt;
-  wsladiag run [--interactive|-i] [--tty|-t] [--detach|-d] [--name &lt;Name&gt;] &lt;Image&gt; [Command...]
-  wsladiag logs [--follow|-f] &lt;ContainerId&gt;
-  wsladiag attach &lt;ContainerId&gt;
-  wsladiag --help</value>
-    <comment>{Locked="--verbose|"}{Locked="--verbose|"}{Locked="--tag|"}{Locked="--file|"}{Locked="--interactive|"}{Locked="--tty|"}{Locked="--detach|"}{Locked="--name "}{Locked="--follow|"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>Compila, esegui, esegui il debug e profila le app in esecuzione in WSL da Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Esegui ed esegui il debug delle app in WSL da Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>Altre informazioni su WSL in Visual Studio per sviluppatori .NET</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>Altre informazioni su Visual Studio e WSL per sviluppatori C++</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>Puoi eseguire ed eseguire il debug delle app .NET Core e C++ multipiattaforma in Linux con facilità senza uscire Visual Studio usando il sottosistema Windows per Linux (WSL). Gli sviluppatori multipiattaforma possono usare questo metodo come approccio semplice per testare più ambienti di destinazione.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Integrazione di Visual Studio</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Integrazione di Visual Studio</value>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
-    <value>wslc - WSL Container CLI
-Usage:
+    <value>wslc - CLI contenitore WSL
+Utilizzo:
   wslc --help</value>
     <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaSessionNotFound" xml:space="preserve">
-    <value>Session not found: '{}'</value>
+    <value>Sessione non trovata: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
-    <value>OpenSessionByName('{}') failed</value>
+    <value>OpenSessionByName('{}') non riuscito</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>No WSLA sessions found.</value>
+    <value>Nessuna sessione WSLA trovata.</value>
   </data>
   <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>Found {} WSLA session{}:</value>
+    <value>Trovata {} sessione WSLA {}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaShellExited" xml:space="preserve">
-    <value>{} exited with: {}</value>
+    <value>{} terminato con: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaHeaderId" xml:space="preserve">
     <value>ID</value>
   </data>
   <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
-    <value>Creator PID</value>
+    <value>PID creatore</value>
   </data>
   <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
-    <value>Display Name</value>
+    <value>Nome visualizzato</value>
   </data>
   <data name="MessageWslaUnknownCommand" xml:space="preserve">
-    <value>Unknown command: '{}'</value>
+    <value>Comando sconosciuto: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
-    <value>Unrecognized command: '{}'</value>
+    <value>Comando non riconosciuto: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
-    <value>Required argument not provided: '{}'</value>
+    <value>Argomento obbligatorio non specificato: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argument provided more times than allowed: '{}'</value>
+    <value>Argomento specificato più volte di quanto consentito: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
-    <value>Shows help about the selected command</value>
-  </data>
-  <data name="WSLCCLI_InfoArgDescription" xml:space="preserve">
-    <value>Shows information about this tool and its environment</value>
+    <value>Mostra la guida per il comando selezionato</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Multiple mutually exclusive arguments provided: '{}'</value>
+    <value>Sono stati specificati più argomenti che si escludono a vicenda: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
-    <value>Argument {} can only be used with {}</value>
+    <value>L'argomento {} può essere usato solo con {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage: {} {}</value>
+    <value>Utilizzo: {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
-    <value>command</value>
+    <value>comando</value>
   </data>
   <data name="WSLCCLI_Options" xml:space="preserve">
-    <value>options</value>
+    <value>Opzioni</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
-    <value>The following command aliases are available:</value>
+    <value>Sono disponibili gli alias di comando seguenti:</value>
   </data>
   <data name="WSLCCLI_AvailableCommands" xml:space="preserve">
-    <value>The following commands are available:</value>
+    <value>Sono disponibili i seguenti comandi:</value>
   </data>
   <data name="WSLCCLI_AvailableSubcommands" xml:space="preserve">
-    <value>The following sub-commands are available:</value>
+    <value>Sono disponibili i seguenti comandi secondari:</value>
   </data>
   <data name="WSLCCLI_AvailableOptions" xml:space="preserve">
-    <value>The following options are available:</value>
+    <value>Sono disponibili le seguenti opzioni:</value>
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
-    <value>The following arguments are available:</value>
+    <value>Sono disponibili i seguenti argomenti:</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>For more details on a specific command, pass it the help argument.</value>
+    <value>Per altre informazioni su un comando specifico, passa alla Guida degli argomenti.</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Argument name was not recognized for the current command: '{}'</value>
+    <value>Il nome dell'argomento non è stato riconosciuto per il comando corrente: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
-    <value>This command requires administrator privileges to execute.</value>
+    <value>Questo comando richiede i privilegi di amministratore per l'esecuzione.</value>
   </data>
   <data name="WSLCCLI_SessionIdArgDescription" xml:space="preserve">
-    <value>Specify the session to use</value>
+    <value>Specifica la sessione da usare</value>
   </data>
   <data name="WSLCCLI_AttachArgDescription" xml:space="preserve">
-    <value>Attach to stdout/stderr of the container</value>
+    <value>Collega a stdout/stderr del contenitore</value>
   </data>
   <data name="WSLCCLI_InteractiveArgDescription" xml:space="preserve">
-    <value>Attach to stdin and keep it open</value>
+    <value>Collega a stdin e tienilo aperto</value>
   </data>
   <data name="WSLCCLI_PortArgDescription" xml:space="preserve">
-    <value>Specify the port to use</value>
+    <value>Specifica la porta da usare</value>
   </data>
   <data name="WSLCCLI_ContainerIdArgDescription" xml:space="preserve">
-    <value>Container ID</value>
+    <value>ID contenitore</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Missing argument value: '{}'</value>
+    <value>Valore argomento mancante: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Argument alias was not recognized for the current command: '{}'</value>
+    <value>Alias di argomento non riconosciuto per il comando corrente: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Invalid argument specifier: '{}'</value>
+     <value>Identificatore argomento non valido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Adjoined flag alias not found: '{}'</value>
+     <value>Alias flag contiguo non trovato: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Adjoined alias is not a flag: '{}'</value>
+     <value>L'alias contiguo non è un flag: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Invalid argument specifier: '{}'</value>
+     <value>Identificatore argomento non valido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Flag argument cannot contain adjoined value: '{}'</value>
+     <value>L'argomento flag non può contenere un valore contiguo: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
-     <value>Found a positional argument when none was expected: '{}'</value>
+     <value>È stato trovato un argomento posizionale nonostante non ne fosse previsto alcuno: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Missing argument name at: '{}'</value>
+     <value>Nome dell'argomento mancante in: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
-     <value>Failed to resolve forwarded arguments starting at argument: '{}'</value>
+     <value>Non è stato possibile risolvere gli argomenti inoltrati a partire dall'argomento: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
-     <value>Invalid extra argument encountered: '{}'</value>
+     <value>È stato rilevato un argomento aggiuntivo non valido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Alias arguments with a value must be last in the alias chain: '{}'</value>
+     <value>Gli argomenti alias con un valore devono essere gli ultimi nella catena di alias: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
+     <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.</value>
+     <comment>Copyright notice and privacy link</comment>
+  </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
-    <value>Invalid image: '{}'</value>
+    <value>Immagine non valida: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaInvalidContainerName" xml:space="preserve">
-    <value>Invalid container name: '{}'</value>
+    <value>Nome contenitore non valido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
-    <value>Path is not absolute: '{}'</value>
+    <value>Il percorso non è assoluto: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

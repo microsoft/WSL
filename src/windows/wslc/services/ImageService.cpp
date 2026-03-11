@@ -18,6 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
+using wsl::windows::common::docker_schema::InspectImage;
 
 void ImageService::Build(
     wsl::windows::wslc::models::Session& session, const std::wstring& contextPath, const std::wstring& tag, const std::wstring& dockerfilePath, IProgressCallback* callback)
@@ -76,9 +77,35 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
+void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
+{
+    WSLADeleteImageOptions options{};
+    options.Image = image.c_str();
+
+    if (force)
+    {
+        options.Flags |= WSLADeleteImageFlagsForce;
+    }
+
+    if (noPrune)
+    {
+        options.Flags |= WSLADeleteImageFlagsNoPrune;
+    }
+
+    wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+    THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+}
+
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
+}
+
+InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
+{
+    wil::unique_cotaskmem_ansistring inspectData;
+    THROW_IF_FAILED(session.Get()->InspectImage(image.c_str(), &inspectData));
+    return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
 void ImageService::Push()
@@ -96,9 +123,4 @@ void ImageService::Tag()
 void ImageService::Prune()
 {
 }
-
-void ImageService::Inspect()
-{
-}
-
 } // namespace wsl::windows::wslc::services
