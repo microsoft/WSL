@@ -15,6 +15,8 @@
     Command to run post-installation and set-up of the WSL distro used for testing, if specified.
 .PARAMETER AllowUnsigned
     Imports .\private-wsl.cert to the LocalMachine\Root store.
+.PARAMETER AllowMissingProduct
+    Ignores the error if attempting to uninstall the MSI reports that the MSI is not installed.
 #>
 
 [CmdletBinding()]
@@ -25,7 +27,8 @@ Param (
     $Package = $null,
     $UnitTestsPath = $null,
     $PostInstallCommand = $null,
-    [switch]$AllowUnsigned)
+    [switch]$AllowUnsigned,
+    [switch]$AllowMissingProduct)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -60,7 +63,15 @@ if ($Package) {
 
         $exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
         # 1605 means that ProductCode was not present on the system
-        if ($exitCode -Ne 0 -and $exitCode -Ne 1605)
+        if ($exitCode -Eq 1605)
+        {
+            Write-Host "MSI product $($installedMsi.ProductCode) was not found, registry HKLM:Software\Microsoft\Windows\CurrentVersion\Lxss\MSI appears to have been leaked. Provide -AllowMissingProduct to bypass."
+            if (-not $AllowMissingProduct)
+            {
+                exit 1
+            }
+        }
+        elseif ($exitCode -Ne 0)
         {
             Write-Host "Failed to remove package: $exitCode"
             exit 1

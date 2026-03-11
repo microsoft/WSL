@@ -43,7 +43,7 @@ void CloseContainer(WslcContainer container)
 {
     if (container)
     {
-        WslcContainerStop(container, WSLC_SIGNAL_SIGKILL, 30);
+        WslcContainerStop(container, WSLC_SIGNAL_SIGKILL, 0);
         WslcContainerDelete(container, WSLC_DELETE_CONTAINER_FLAG_NONE);
         WslcContainerRelease(container);
     }
@@ -652,7 +652,7 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_RUNNING);
         }
 
-        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 10));
+        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 0));
 
         // State after stop: EXITED.
         {
@@ -693,7 +693,7 @@ class WslcSdkTests
         }
 
         // Stop the container gracefully (after the timeout).
-        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 10));
+        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 0));
 
         // Delete the stopped container.
         VERIFY_SUCCEEDED(WslcContainerDelete(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
