@@ -34,10 +34,10 @@ namespace {
             return c_defaultVolumeSizeBytes;
         }
 
-        std::unordered_map<std::string, std::string> parsedOptions;
+        std::map<std::string, std::string> parsedOptions;
         try
         {
-            parsedOptions = wsl::shared::FromJson<std::unordered_map<std::string, std::string>>(options.Options);
+            parsedOptions = wsl::shared::FromJson<std::map<std::string, std::string>>(options.Options);
         }
         catch (...)
         {

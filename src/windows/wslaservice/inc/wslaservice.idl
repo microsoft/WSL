@@ -16,18 +16,21 @@ Abstract:
 import "unknwn.idl";
 import "wtypes.idl";
 
-cpp_quote("#ifdef __cplusplus") cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLASessionManager;")
-    cpp_quote("class DECLSPEC_UUID(\"9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3\") WSLASessionFactory;") cpp_quote("#endif")
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLASessionManager;")
+cpp_quote("class DECLSPEC_UUID(\"9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3\") WSLASessionFactory;")
+cpp_quote("#endif")
 
 #define WSLA_MAX_CONTAINER_NAME_LENGTH 255
 #define WSLA_MAX_IMAGE_NAME_LENGTH 255
 #define WSLA_CONTAINER_ID_LENGTH 64
 
-        cpp_quote("#define WSLA_MAX_CONTAINER_NAME_LENGTH 255") cpp_quote("#define WSLA_MAX_IMAGE_NAME_LENGTH 255")
-            cpp_quote("#define WSLA_CONTAINER_ID_LENGTH 64")
+cpp_quote("#define WSLA_MAX_CONTAINER_NAME_LENGTH 255")
+cpp_quote("#define WSLA_MAX_IMAGE_NAME_LENGTH 255")
+cpp_quote("#define WSLA_CONTAINER_ID_LENGTH 64")
 
-                typedef struct _WSLAVersion
-{
+typedef
+struct _WSLAVersion {
     ULONG Major;
     ULONG Minor;
     ULONG Revision;
@@ -86,12 +89,22 @@ typedef enum _WSLASignal
     WSLASignalSIGSYS = 31
 } WSLASignal;
 
-[ uuid(7BC4E198 - 6531 - 4FA6 - ADE2 - 5EF3D2A04DFE), pointer_default(unique), object ] interface ITerminationCallback : IUnknown
+[
+    uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
+    pointer_default(unique),
+    object
+]
+interface ITerminationCallback : IUnknown
 {
     HRESULT OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details);
 };
 
-[ uuid(5038842F - 53DB - 4F30 - A6D0 - A41B02C94AC1), pointer_default(unique), object ] interface IProgressCallback : IUnknown
+[
+    uuid(5038842F-53DB-4F30-A6D0-A41B02C94AC1),
+    pointer_default(unique),
+    object
+]
+interface IProgressCallback : IUnknown
 {
     HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
@@ -136,11 +149,11 @@ typedef struct _WSLALabel
 
 typedef struct _WSLAListImageOptions
 {
-    DWORD Flags;               // WSLAListImagesFlags (can combine with bitwise OR)
+    DWORD Flags; // WSLAListImagesFlags (can combine with bitwise OR)
     [unique] LPCSTR Reference; // Filter by reference (name[:tag])
-    [unique] LPCSTR Before;    // Filter: show images created before this image
-    [unique] LPCSTR Since;     // Filter: show images created since this image
-    [ unique, size_is(LabelsCount) ] const WSLALabel* Labels;
+    [unique] LPCSTR Before; // Filter: show images created before this image
+    [unique] LPCSTR Since; // Filter: show images created since this image
+    [unique, size_is(LabelsCount)] const WSLALabel* Labels;
     ULONG LabelsCount;
 } WSLAListImageOptions;
 
@@ -153,9 +166,9 @@ typedef enum _WSLAProcessFlags
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAProcessFlags);")
 
-    typedef struct _WSLAStringArray
+typedef struct _WSLAStringArray
 {
-    [ unique, size_is(Count) ] LPCSTR const* Values;
+    [unique, size_is(Count)] LPCSTR const* Values;
     ULONG Count;
 } WSLAStringArray;
 
@@ -214,31 +227,33 @@ typedef struct _WSLAContainerNetwork
 typedef enum _WSLAContainerFlags
 {
     WSLAContainerFlagsNone = 0,
-    WSLAContainerFlagsRm = 1,   // Delete the container when it exits. TODO: Implement.
-    WSLAContainerFlagsGpu = 2,  // Enable GPU access. TODO: implement.
+    WSLAContainerFlagsRm = 1, // Delete the container when it exits. TODO: Implement.
+    WSLAContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
     WSLAContainerFlagsInit = 4, // Run the container under an init process.
 } WSLAContainerFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerFlags);")
 
-    typedef enum _WSLAContainerStartFlags {
-        WSLAContainerStartFlagsNone = 0,
-        WSLAContainerStartFlagsAttach = 1, // Attach stdio handles on start.
-    } WSLAContainerStartFlags;
+
+typedef enum _WSLAContainerStartFlags
+{
+    WSLAContainerStartFlagsNone = 0,
+    WSLAContainerStartFlagsAttach = 1, // Attach stdio handles on start.
+} WSLAContainerStartFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerStartFlags);")
 
-    typedef struct _WSLAContainerOptions
+typedef struct _WSLAContainerOptions
 {
     LPCSTR Image;
     [unique] LPCSTR Name;
     WSLAStringArray Entrypoint;
     WSLAProcessOptions InitProcessOptions;
-    [ unique, size_is(VolumesCount) ] WSLAVolume* Volumes;
+    [unique, size_is(VolumesCount)] WSLAVolume* Volumes;
     ULONG VolumesCount;
-    [ unique, size_is(PortsCount) ] WSLAPortMapping* Ports;
+    [unique, size_is(PortsCount)] WSLAPortMapping* Ports;
     ULONG PortsCount;
-    [ unique, size_is(LabelsCount) ] const WSLALabel* Labels;
+    [unique, size_is(LabelsCount)] const WSLALabel* Labels;
     ULONG LabelsCount;
     WSLAContainerFlags Flags;
     WSLASignal StopSignal;
@@ -252,10 +267,10 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerStartFlags);")
 
     ULONGLONG ShmSize;
     WSLAContainerNetwork ContainerNetwork;
-    [ unique, size_is(TmpfsCount) ] const WSLATmpfsMount* Tmpfs;
+    [unique, size_is(TmpfsCount)] const WSLATmpfsMount* Tmpfs;
     ULONG TmpfsCount;
 
-    [ unique, size_is(NamedVolumesCount) ] WSLANamedVolume* NamedVolumes;
+    [unique, size_is(NamedVolumesCount)] WSLANamedVolume* NamedVolumes;
     ULONG NamedVolumesCount;
 } WSLAContainerOptions;
 
@@ -268,7 +283,7 @@ typedef enum _WSLAContainerState
     WslaContainerStateDeleted = 4,
 } WSLAContainerState;
 
-typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1];
+typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
 
 typedef struct _WSLAContainerEntry
 {
@@ -277,6 +292,7 @@ typedef struct _WSLAContainerEntry
     WSLAContainerId Id;
     ULONGLONG StateChangedAt;
     WSLAContainerState State;
+
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
 } WSLAContainerEntry;
@@ -289,13 +305,18 @@ typedef enum _WSLAProcessState
     WslaProcessStateSignalled = 3
 } WSLAProcessState;
 
-[ uuid(1AD163CD - 393D - 4B33 - 83A2 - 8A3F3F23E608), pointer_default(unique), object ] interface IWSLAProcess : IUnknown
+[
+    uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
+    pointer_default(unique),
+    object
+]
+interface IWSLAProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
-    HRESULT GetExitEvent([ out, system_handle(sh_event) ] HANDLE * EventHandle);
-    HRESULT GetStdHandle([in] ULONG Index, [out] ULONG * Handle);
+    HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
+    HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
     HRESULT GetPid([out] int* Pid);
-    HRESULT GetState([out] WSLAProcessState * State, [out] int* Code);
+    HRESULT GetState([out] WSLAProcessState* State, [out] int* Code);
     HRESULT ResizeTty([in] ULONG Rows, [in] ULONG Columns);
 
     // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
@@ -320,44 +341,49 @@ typedef enum _WSLAFeatureFlags
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
 
-    //
-    // IWSLAVirtualMachine - Interface representing a single VM instance.
-    // Operations are scoped to this VM. The VM ID is stored internally,
-    // so only the holder of this interface can operate on the VM.
-    //
-    [uuid(B5E2D8F1 - 9A3C - 4E6B - 8D1F - 7C4A2E9B6D3A), pointer_default(unique), object] interface IWSLAVirtualMachine : IUnknown
+//
+// IWSLAVirtualMachine - Interface representing a single VM instance.
+// Operations are scoped to this VM. The VM ID is stored internally,
+// so only the holder of this interface can operate on the VM.
+//
+[
+    uuid(B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A),
+    pointer_default(unique),
+    object
+]
+interface IWSLAVirtualMachine : IUnknown
 {
     // Gets the VM ID.
-    HRESULT GetId([ out, retval ] GUID * VmId);
+    HRESULT GetId([out, retval] GUID* VmId);
 
     // Accepts a connect from mini_init in the VM.
-    HRESULT AcceptConnection([ out, system_handle(sh_socket) ] HANDLE * Socket);
+    HRESULT AcceptConnection([out, system_handle(sh_socket)] HANDLE* Socket);
 
     // Configures networking engine with sockets from the user process.
     // GnsSocket is required; DnsSocket is optional (NULL if DNS tunneling is disabled).
     // The service duplicates the socket handles.
     HRESULT ConfigureNetworking(
-        [ in, system_handle(sh_socket) ] HANDLE GnsSocket, [ in, system_handle(sh_socket), unique ] HANDLE * DnsSocket);
+        [in, system_handle(sh_socket)] HANDLE GnsSocket,
+        [in, system_handle(sh_socket), unique] HANDLE* DnsSocket);
 
     // Attaches a VHD or VHDX disk to the VM.
     // GrantVmAccess is called by the service before attaching.
     // Returns the SCSI LUN assigned to the disk.
-    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [ out, retval ] ULONG * Lun);
+    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out, retval] ULONG* Lun);
 
     // Detaches a previously attached disk from the VM.
     HRESULT DetachDisk([in] ULONG Lun);
 
     // Adds a filesystem share (Plan9 or VirtioFS) accessible to the VM.
     // Returns an instance GUID that can be used to remove the share.
-    HRESULT AddShare([in] LPCWSTR WindowsPath, [in] BOOL ReadOnly, [ out, retval ] GUID * ShareId);
+    HRESULT AddShare([in] LPCWSTR WindowsPath, [in] BOOL ReadOnly, [out, retval] GUID* ShareId);
 
     // Removes a previously added filesystem share.
     HRESULT RemoveShare([in] REFGUID ShareId);
 }
 
 // Settings for IWSLASessionManager::CreateSession - full session configuration
-typedef struct _WSLASessionSettings
-{
+typedef struct _WSLASessionSettings {
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
     ULONGLONG MaximumStorageSizeMb;
@@ -389,21 +415,27 @@ typedef enum _WSLADeleteFlags
     // TODO: Flags to remove anonymous volumes, bridge links, etc.
 } WSLADeleteFlags;
 
-[ uuid(7577FE8D - DE85 - 471E-B870 - 11669986F332), pointer_default(unique), object ] interface IWSLAContainer : IUnknown
+
+[
+    uuid(7577FE8D-DE85-471E-B870-11669986F332),
+    pointer_default(unique),
+    object
+]
+interface IWSLAContainer : IUnknown
 {
-    HRESULT Attach([ in, unique ] LPCSTR DetachKeys, [out] ULONG * StdIn, [out] ULONG * StdOut, [out] ULONG * StdErr);
+    HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
     HRESULT Stop([in] WSLASignal Signal, [in] LONG TimeoutSeconds);
-    HRESULT Start([in] WSLAContainerStartFlags Flags, [ in, unique ] LPCSTR DetachKeys);
+    HRESULT Start([in] WSLAContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
     HRESULT Delete([in] WSLADeleteFlags Flags);
     HRESULT Export([in] ULONG TarHandle);
-    HRESULT GetState([out] WSLAContainerState * State);
-    HRESULT GetInitProcess([out] IWSLAProcess * *Process);
-    HRESULT Exec([ in, ref ] const WSLAProcessOptions* Options, [ in, unique ] LPCSTR DetachKeys, [out] IWSLAProcess** Process);
-    HRESULT Inspect([out] LPSTR * Output);
-    HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG * Stdout, [out] ULONG * Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
-    HRESULT GetId([ out, string ] WSLAContainerId Id);
-    HRESULT GetName([ out, string ] LPSTR * Name);
-    HRESULT GetLabels([ out, size_is(, *Count) ] WSLALabelInformation * *Labels, [out] ULONG * Count);
+    HRESULT GetState([out] WSLAContainerState* State);
+    HRESULT GetInitProcess([out] IWSLAProcess** Process);
+    HRESULT Exec([in, ref] const WSLAProcessOptions* Options, [in, unique] LPCSTR DetachKeys, [out] IWSLAProcess** Process);
+    HRESULT Inspect([out] LPSTR* Output);
+    HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT GetId([out, string] WSLAContainerId Id);
+    HRESULT GetName([out, string] LPSTR* Name);
+    HRESULT GetLabels([out, size_is(, *Count)] WSLALabelInformation** Labels, [out] ULONG* Count);
 }
 
 typedef enum _WSLADeletedImageType
@@ -428,7 +460,7 @@ typedef enum _WSLADeleteImageFlags
 typedef struct _WSLADeleteImageOptions
 {
     LPCSTR Image; // Image can be ID or Repo:Tag.
-    DWORD Flags;  // WSLADeleteImageFlags
+    DWORD Flags; // WSLADeleteImageFlags
     // TODO: Platforms: a json array of OCI platform strings.
 } WSLADeleteImageOptions;
 
@@ -455,7 +487,7 @@ typedef struct _WSLAContainerPruneFilter
 
 typedef struct _WSLAPruneContainersResults
 {
-    [ unique, size_is(ContainersCount) ] WSLAContainerId* Containers;
+    [unique, size_is(ContainersCount)] WSLAContainerId* Containers;
     ULONG ContainersCount;
     ULONGLONG SpaceReclaimed;
 } WSLAPruneContainersResults;
@@ -480,60 +512,58 @@ typedef struct _WSLASessionInitSettings
     [unique] LPCSTR RootVhdTypeOverride;
 } WSLASessionInitSettings;
 
-[ uuid(EF0661E4 - 6364 - 40EA - B433 - E2FDF11F3519), pointer_default(unique), object ] interface IWSLASession : IUnknown
+[
+    uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
+    pointer_default(unique),
+    object
+]
+interface IWSLASession : IUnknown
 {
-    HRESULT GetId([out] ULONG * Id);
-    HRESULT GetState([out] WSLASessionState * State);
+    HRESULT GetId([out] ULONG* Id);
+    HRESULT GetState([out] WSLASessionState* State);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR ImageUri, [ in, unique ] const WslaRegistryAuthInformation* RegistryAuthenticationInformation, [
-        in,
-        unique
-    ] IProgressCallback* ProgressCallback);
-    HRESULT BuildImage([in] LPCWSTR ContextPath, [in] ULONG DockerfileHandle, [ in, unique ] LPCSTR ImageTag, [
-        in,
-        unique
-    ] IProgressCallback * ProgressCallback);
-    HRESULT LoadImage([in] ULONG ImageHandle, [ in, unique ] IProgressCallback * ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [ in, unique ] IProgressCallback * ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [ in, unique ] IProgressCallback * ProgressCallback);
-    HRESULT ListImages(
-        [ in, unique ] const WSLAListImageOptions* Options, [ out, size_is(, *Count) ] WSLAImageInformation** Images, [out] ULONG* Count);
-    HRESULT DeleteImage([in] const WSLADeleteImageOptions* Options, [ out, size_is(, *Count) ] WSLADeletedImageInformation** DeletedImages, [out] ULONG* Count);
+    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const  WslaRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT BuildImage([in] LPCWSTR ContextPath, [in] ULONG DockerfileHandle, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
+    HRESULT ListImages([in, unique] const WSLAListImageOptions* Options, [out, size_is(, *Count)] WSLAImageInformation** Images, [out] ULONG* Count);
+    HRESULT DeleteImage([in] const WSLADeleteImageOptions* Options, [out, size_is(, *Count)] WSLADeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLATagImageOptions* Options);
-    HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR * Output);
+    HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
 
     // Container management.
     HRESULT CreateContainer([in] const WSLAContainerOptions* Options, [out] IWSLAContainer** Container);
-    HRESULT OpenContainer([ in, ref ] LPCSTR Id, [out] IWSLAContainer * *Container);
-    HRESULT ListContainers([ out, size_is(, *Count) ] WSLAContainerEntry * *Images, [out] ULONG * Count);
-    HRESULT PruneContainers(
-        [ in, unique, size_is(FiltersCount) ] WSLAContainerPruneFilter * Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLAPruneContainersResults * Result);
+    HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLAContainer** Container);
+    HRESULT ListContainers([out, size_is(, *Count)] WSLAContainerEntry** Images, [out] ULONG* Count);
+    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLAContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLAPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess(
-        [ in, ref ] LPCSTR Executable, [ in, ref ] const WSLAProcessOptions* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLAProcessOptions* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
     // Disk management.
-    HRESULT FormatVirtualDisk([ in, ref ] LPCWSTR Path);
+    HRESULT FormatVirtualDisk([in, ref] LPCWSTR Path);
 
     // Terminate the VM and containers.
     HRESULT Terminate();
 
     // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
-    HRESULT MountWindowsFolder([ in, ref ] LPCWSTR WindowsPath, [ in, ref ] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([ in, ref ] LPCSTR LinuxPath);
+    HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly);
+    HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath);
     HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
 
     // Session initialization - called by SYSTEM service after launching per-user process.
     // Returns a handle to this COM server process (used to add to job object).
-    HRESULT GetProcessHandle([ out, system_handle(sh_process) ] HANDLE * ProcessHandle);
+    HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
     // Initializes the session with a pre-created VM.
-    HRESULT Initialize([in] const WSLASessionInitSettings* Settings, [in] IWSLAVirtualMachine* Vm);
+    HRESULT Initialize(
+        [in] const WSLASessionInitSettings* Settings,
+        [in] IWSLAVirtualMachine* Vm);
 
     // Volume management.
     HRESULT CreateVolume([in] const WSLAVolumeOptions* Options);
@@ -545,11 +575,16 @@ typedef struct _WSLASessionInitSettings
 // Stored in per-user process, allows service to check liveness and terminate sessions.
 // Session metadata (ID, name, etc.) is stored service-side in SessionEntry.
 //
-[ uuid(B3A72F48 - 9D15 - 4E8A - A621 - 7C3E84F09B52), pointer_default(unique), object ] interface IWSLASessionReference : IUnknown
+[
+    uuid(B3A72F48-9D15-4E8A-A621-7C3E84F09B52),
+    pointer_default(unique),
+    object
+]
+interface IWSLASessionReference : IUnknown
 {
     // Try to open the session. Fails if session was released or terminated.
     // Returns S_OK and a valid session if still alive.
-    HRESULT OpenSession([out] IWSLASession * *Session);
+    HRESULT OpenSession([out] IWSLASession** Session);
 
     // Terminate the session if still alive.
     HRESULT Terminate();
@@ -559,13 +594,22 @@ typedef struct _WSLASessionInitSettings
 // IWSLASessionFactory - Creates sessions in the per-user COM server process.
 // Called by the SYSTEM service via CoCreateInstanceAsUser.
 //
-[ uuid(C4E8F291 - 3B5D - 4A7C - 9E12 - 8F6A4D2B7C91), pointer_default(unique), object ] interface IWSLASessionFactory : IUnknown
+[
+    uuid(C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91),
+    pointer_default(unique),
+    object
+]
+interface IWSLASessionFactory : IUnknown
 {
     // Creates a new session and returns both the session interface and a service reference.
-    HRESULT CreateSession([in] const WSLASessionInitSettings* Settings, [in] IWSLAVirtualMachine* Vm, [out] IWSLASession** Session, [out] IWSLASessionReference** ServiceRef);
+    HRESULT CreateSession(
+        [in] const WSLASessionInitSettings* Settings,
+        [in] IWSLAVirtualMachine* Vm,
+        [out] IWSLASession** Session,
+        [out] IWSLASessionReference** ServiceRef);
 
     // Gets the process handle for adding to job object.
-    HRESULT GetProcessHandle([ out, system_handle(sh_process) ] HANDLE * ProcessHandle);
+    HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 }
 
 typedef struct _WSLASessionInformation
@@ -579,25 +623,28 @@ typedef struct _WSLASessionInformation
 typedef enum _WSLASessionFlags
 {
     WSLASessionFlagsNone = 0,
-    WSLASessionFlagsPersistent = 1,   // Session remains active after its COM reference is released.
+    WSLASessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
     WSLASessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
 } WSLASessionFlags;
 
-[ uuid(82A7ABC8 - 6B50 - 43FC - AB96 - 15FBBE7E8760), pointer_default(unique), object ] interface IWSLASessionManager : IUnknown
+[
+    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
+    pointer_default(unique),
+    object
+]
+interface IWSLASessionManager : IUnknown
 {
-    HRESULT GetVersion([out] WSLAVersion * Version);
+    HRESULT GetVersion([out] WSLAVersion* Version);
 
     // Session management.
-    HRESULT CreateSession([ in, ref ] const WSLASessionSettings* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
-    HRESULT ListSessions([ out, size_is(, *SessionsCount) ] WSLASessionInformation * *Sessions, [out] ULONG * SessionsCount);
-    HRESULT OpenSession([in] ULONG Id, [out] IWSLASession * *Session);
-    HRESULT OpenSessionByName([ in, ref ] LPCWSTR DisplayName, [out] IWSLASession * *Session);
+    HRESULT CreateSession([in, ref] const WSLASessionSettings* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
+    HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLASessionInformation** Sessions, [out] ULONG* SessionsCount);
+    HRESULT OpenSession([in] ULONG Id, [out] IWSLASession** Session);
+    HRESULT OpenSessionByName([in, ref] LPCWSTR DisplayName, [out] IWSLASession** Session);
 }
 
 cpp_quote("#define WSLA_E_BASE (0x0600)")
-    cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */") cpp_quote(
-        "#define WSLA_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 2) /* 0x80040602 */")
-        cpp_quote(
-            "#define WSLA_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 3) /* 0x80040603 */")
-            cpp_quote(
-                "#define WSLA_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 4) /* 0x80040604 */")
+cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")
+cpp_quote("#define WSLA_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 2) /* 0x80040602 */")
+cpp_quote("#define WSLA_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 3) /* 0x80040603 */")
+cpp_quote("#define WSLA_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 4) /* 0x80040604 */")
