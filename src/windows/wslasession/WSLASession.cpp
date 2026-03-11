@@ -1293,7 +1293,7 @@ try
     auto lock = m_lock.lock_exclusive();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
-    THROW_HR_IF_MSG(E_INVALIDARG, type != "vhd", "Unsupported volume type: %hs", type.c_str());
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidVolumeType(type), type != "vhd");
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
