@@ -326,8 +326,7 @@ typedef enum _WSLAFeatureFlags
     WslaFeatureFlagsEarlyBootDmesg = 2,
     WslaFeatureFlagsGPU = 4,
     WslaFeatureFlagsVirtioFs = 8,
-    WslaFeatureFlagsPmemVhds = 16,
-    WslaFeatureFlagsDebug = 32,
+    WslaFeatureFlagsDebug = 16,
 } WSLAFeatureFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
