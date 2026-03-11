@@ -107,12 +107,11 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         // Start the container.
-        result = RunWslc(std::format(L"container start {}", WslcContainerName, DebianImage.NameAndTag()));
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        // Wait to allow the delete to happen.
-        Sleep(1000);
-        VerifyContainerIsNotListed(WslcContainerName);
+        // Verify with retry timeout of 1 minute.
+        VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_Remove)
@@ -124,9 +123,8 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(std::format(L"container run --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        // Wait to allow the delete to happen.
-        Sleep(1000);
-        VerifyContainerIsNotListed(WslcContainerName);
+        // Verify with retry timeout of 1 minute.
+        VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
     }
 
 private:

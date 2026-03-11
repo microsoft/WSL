@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include <JsonUtils.h>
+#include <retryshared.h>
 
 extern std::wstring g_testDataPath;
 
@@ -36,22 +37,43 @@ const TestImage& InvalidTestImage()
     return image;
 }
 
-void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
+// Default timeout of 0 will execute once.
+template <typename TInterval, typename TTimeout>
+void VerifyContainerIsNotListed(const std::wstring& containerNameOrId, TInterval retryInterval, TTimeout timeout)
 {
-    auto result = RunWslc(L"container list --all");
-    result.Verify({.Stderr = L"", .ExitCode = 0});
-
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    try
     {
-        if (line.find(containerNameOrId) != std::wstring::npos)
-        {
-            const std::wstring message =
-                L"Container '" + containerNameOrId + L"' found in container list output but it should not be listed";
-            VERIFY_FAIL(message.c_str());
-        }
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&containerNameOrId]() {
+                auto result = RunWslc(L"container list --all");
+                result.Verify({.Stderr = L"", .ExitCode = 0});
+
+                auto outputLines = result.GetStdoutLines();
+                for (const auto& line : outputLines)
+                {
+                    if (line.find(containerNameOrId) != std::wstring::npos)
+                    {
+                        THROW_HR(E_FAIL);
+                    }
+                }
+            },
+            retryInterval,
+            timeout);
+    }
+    catch (...)
+    {
+        const std::wstring message =
+            L"Container '" + containerNameOrId + L"' found in container list output" +
+            (std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count() > 0 ? L" after timeout" : L" but it should not be listed");
+        VERIFY_FAIL(message.c_str());
     }
 }
+
+// Explicit template instantiations for common duration types
+template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::milliseconds, std::chrono::milliseconds);
+template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::seconds, std::chrono::seconds);
+template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::seconds, std::chrono::minutes);
+template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::milliseconds, std::chrono::minutes);
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
@@ -153,7 +175,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
-            auto result = RunWslc(std::format(L"container delete {}", containerName));
+            auto result = RunWslc(std::format(L"container delete --force {}", containerName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
@@ -170,7 +192,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     {
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
-            auto deleteResult = RunWslc(std::format(L"image delete {}", image.NameAndTag()));
+            auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }

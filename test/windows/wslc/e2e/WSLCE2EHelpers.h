@@ -15,6 +15,7 @@ Abstract:
 
 #include "WSLCExecutor.h"
 #include <docker_schema.h>
+#include <chrono>
 
 namespace WSLCE2ETests {
 
@@ -33,7 +34,10 @@ const TestImage& DebianTestImage();
 const TestImage& InvalidTestImage();
 
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
-void VerifyContainerIsNotListed(const std::wstring& containerNameOrId);
+
+template <typename TInterval = std::chrono::milliseconds, typename TTimeout = std::chrono::milliseconds>
+void VerifyContainerIsNotListed(const std::wstring& containerNameOrId, TInterval retryInterval = TInterval(0), TTimeout timeout = TTimeout(0));
+
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 
