@@ -32,7 +32,7 @@ Thank you in advance for your contribution! We appreciate your help in making WS
 ## Notes for collecting WSL logs
 
 ### Important: Reporting BSODs and Security issues
-**Do not open GitHub issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
+**Do not open GitHub issues for Windows crashes (BSODs) or security issues.** Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
 See the `10) Reporting a Windows crash (BSOD)` section below for detailed instructions.
 
 ### Reporting issues in Windows Console or WSL text rendering/user experience

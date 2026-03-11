@@ -144,7 +144,7 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
 } // namespace
 
 // SESSION DEFINITIONS
-STDAPI WslcSessionInitSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
+STDAPI WslcInitSessionSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, name);
@@ -165,7 +165,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t cpuCount)
+STDAPI WslcSetSessionSettingsCpuCount(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t cpuCount)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
@@ -183,7 +183,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb)
+STDAPI WslcSetSessionSettingsMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
@@ -201,7 +201,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session)
+STDAPI WslcCreateSession(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, session);
@@ -241,15 +241,23 @@ try
     //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
     // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
-    RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
+    HRESULT hr = sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session);
 
-    *session = reinterpret_cast<WslcSession>(result.release());
-    return S_OK;
+    if (FAILED_LOG(hr))
+    {
+        GetErrorInfoFromCOM(errorMessage);
+    }
+    else
+    {
+        wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
+        *session = reinterpret_cast<WslcSession>(result.release());
+    }
+
+    return hr;
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionTerminate(_In_ WslcSession session)
+STDAPI WslcTerminateSession(_In_ WslcSession session)
 try
 {
     auto internalType = CheckAndGetInternalType(session);
@@ -259,7 +267,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS)
+STDAPI WslcSetSessionSettingsTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
@@ -286,7 +294,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
+STDAPI WslcSetSessionSettingsVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
@@ -322,7 +330,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionSettingsSetFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags)
+STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
@@ -333,7 +341,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionSettingsSetTerminateCallback(
+STDAPI WslcSetSessionSettingsTerminationCallback(
     _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext)
 try
 {
@@ -347,7 +355,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionRelease(_In_ WslcSession session)
+STDAPI WslcReleaseSession(_In_ WslcSession session)
 try
 {
     auto internalType = CheckAndGetInternalTypeUniquePointer(session);

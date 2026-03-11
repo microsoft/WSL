@@ -585,3 +585,59 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
 void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode);
+
+template <typename T>
+void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
+{
+    std::map<T, size_t> expectedCounts;
+    std::map<T, size_t> actualCounts;
+
+    for (const auto& e : expected)
+    {
+        expectedCounts[e]++;
+    }
+
+    for (const auto& e : actual)
+    {
+        actualCounts[e]++;
+    }
+
+    std::wstring error;
+
+    for (const auto& [value, count] : expectedCounts)
+    {
+        if (actualCounts[value] != count)
+        {
+            error += std::format(L"Value '{}' expected {} times but was found {} times.\n", value, count, actualCounts[value]);
+        }
+    }
+
+    for (const auto& [value, count] : actualCounts)
+    {
+        if (expectedCounts.find(value) == expectedCounts.end())
+        {
+            error += std::format(L"Unexpected value found: '{}'", value);
+        }
+    }
+
+    if (!error.empty())
+    {
+        error += std::format(L"Expected ({} elements):\n", expected.size());
+        for (const auto& e : expected)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Actual ({} elements):\n", actual.size());
+
+        for (const auto& e : actual)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Called from: {}", source);
+
+        LogError("VerifyAreEqualUnordered failed: %ls", error.c_str());
+        VERIFY_FAIL();
+    }
+}

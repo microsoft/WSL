@@ -26,6 +26,7 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
+using namespace std::chrono_literals;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
@@ -146,23 +147,58 @@ int ContainerService::Attach(Session& session, const std::string& id)
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLAContainerState state)
+std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt)
 {
+    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
+    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
+    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+
+    std::wstring stateString;
     switch (state)
     {
     case WSLAContainerState::WslaContainerStateCreated:
-        return L"created";
+        stateString = L"created";
+        break;
     case WSLAContainerState::WslaContainerStateRunning:
-        return L"running";
+        stateString = L"running";
+        break;
     case WSLAContainerState::WslaContainerStateDeleted:
-        return L"stopped";
+        stateString = L"stopped";
+        break;
     case WSLAContainerState::WslaContainerStateExited:
-        return L"exited";
+        stateString = L"exited";
+        break;
     case WSLAContainerState::WslaContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
+
+    if (stateChangedAt == 0)
+    {
+        return stateString;
+    }
+
+    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(stateChangedAt);
+    if (elapsed < 0)
+    {
+        elapsed = 0;
+    }
+
+    if (elapsed < SecondsPerMinute)
+    {
+        return std::format(L"{} {} seconds ago", stateString, elapsed);
+    }
+    else if (elapsed < SecondsPerHour)
+    {
+        return std::format(L"{} {} minutes ago", stateString, elapsed / SecondsPerMinute);
+    }
+    else if (elapsed < SecondsPerDay)
+    {
+        return std::format(L"{} {} hours ago", stateString, elapsed / SecondsPerHour);
+    }
+
+    return std::format(L"{} {} days ago", stateString, elapsed / SecondsPerDay);
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
@@ -240,6 +276,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Image = current.Image;
         entry.State = current.State;
         entry.Id = current.Id;
+        entry.StateChangedAt = current.StateChangedAt;
         result.emplace_back(std::move(entry));
     }
 

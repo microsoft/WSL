@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 
 #include "WSLCExecutor.h"
+#include <docker_schema.h>
 
 namespace WSLCE2ETests {
 
@@ -30,9 +31,17 @@ struct TestImage
 
 const TestImage& DebianTestImage();
 const TestImage& InvalidTestImage();
+
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId);
+void VerifyImageIsUsed(const TestImage& image);
+void VerifyImageIsNotUsed(const TestImage& image);
+
+std::string GetHashId(const std::string& id, bool fullId = false);
+wsl::windows::common::docker_schema::InspectContainer InspectContainer(const std::wstring& containerName);
+wsl::windows::common::docker_schema::InspectImage InspectImage(const std::wstring& imageName);
+
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image);
-
+void EnsureImageIsDeleted(const TestImage& image);
 } // namespace WSLCE2ETests
