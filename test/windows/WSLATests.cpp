@@ -27,6 +27,7 @@ using wsl::windows::common::WSLAContainerLauncher;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
+using wsl::windows::common::wslutil::PruneResult;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -82,9 +83,12 @@ class WSLATests
             LoadTestImage("python:3.12-alpine");
         }
 
-        // Hacky way to delete all containers.
-        // TODO: Replace with the --rm flag once available.
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "container", "prune", "-f"}, 0);
+        PruneResult result;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        if (result.result.ContainersCount > 0)
+        {
+            LogInfo("Pruned %lu containers", result.result.ContainersCount);
+        }
 
         return true;
     }
@@ -4282,23 +4286,23 @@ class WSLATests
 
     TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
     {
-        auto restore = ResetTestSession();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "container", "rm", "-f", "test-invalid-metadata"});
+        });
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
             // Create a docker container that has no metadata.
             auto result = RunCommand(
-                session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+                m_defaultSession.get(),
+                {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
         }
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
+            ResetTestSession();
             // Try to open the container - this should fail due to missing metadata.
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->OpenContainer("test-invalid-metadata", &container);
+            auto hr = m_defaultSession->OpenContainer("test-invalid-metadata", &container);
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
     }
@@ -5248,6 +5252,122 @@ class WSLATests
             VERIFY_ARE_EQUAL(result, E_FAIL);
 
             ValidateCOMErrorMessage(L"Invalid escape keys (invalid) provided");
+        }
+    }
+
+    TEST_METHOD(ContainerPrune)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectPrune = [this](
+                               const std::vector<std::string>& expectedIds = {},
+                               const std::map<std::string, std::pair<const char*, bool>>& labels = {},
+                               uint64_t until = 0,
+                               const std::source_location& source = std::source_location::current()) {
+            PruneResult result;
+
+            std::vector<WSLAContainerPruneFilter> labelsFilter;
+            for (const auto& e : labels)
+            {
+                labelsFilter.push_back({e.first.c_str(), e.second.first, e.second.second});
+            }
+
+            VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(
+                labels.empty() ? nullptr : labelsFilter.data(), static_cast<DWORD>(labelsFilter.size()), until, &result.result));
+
+            std::vector<std::string> prunedContainers;
+            for (size_t i = 0; i < result.result.ContainersCount; i++)
+            {
+                prunedContainers.push_back(result.result.Containers[i]);
+            }
+
+            VerifyAreEqualUnordered(expectedIds, prunedContainers, source);
+        };
+
+        auto RunAndWait = [&](auto& launcher) {
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+
+            return container;
+        };
+
+        // Validate that a prune without any container returns nothing.
+        {
+            expectPrune({});
+        }
+
+        {
+            // Validate that prune doesn't remove running containers.
+            WSLAContainerLauncher launcher("debian:latest", "test-prune", {"sleep", "9999999"}, {}, {});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            expectPrune({});
+
+            // Validate that prune removes stopped containers.
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            auto containerId = container.Id();
+            expectPrune({containerId});
+
+            // Validate that the container can't be opened anymore.
+            wil::com_ptr<IWSLAContainer> dummy;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerId.c_str(), &dummy), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
+        }
+
+        // Validate that label filters work.
+        {
+            WSLAContainerLauncher testPrune1Launcher("debian:latest", "test-prune-1", {"echo", "OK"}, {}, {});
+            testPrune1Launcher.AddLabel("key", "value");
+
+            auto testPrune1 = RunAndWait(testPrune1Launcher);
+
+            WSLAContainerLauncher testPrune2Launcher("debian:latest", "test-prune-2", {"echo", "OK"}, {}, {});
+            testPrune2Launcher.AddLabel("key", "anotherValue");
+
+            auto testPrune2 = RunAndWait(testPrune2Launcher);
+
+            WSLAContainerLauncher testPrune3Launcher("debian:latest", "test-prune-3", {"echo", "OK"}, {}, {});
+            testPrune3Launcher.AddLabel("anotherKey", "value");
+            auto testPrune3 = RunAndWait(testPrune3Launcher);
+
+            WSLAContainerLauncher testPrune4Launcher("debian:latest", "test-prune-4", {"echo", "OK"}, {}, {});
+            auto testPrune4 = RunAndWait(testPrune4Launcher);
+
+            // Expect testPrune1 to be selected via key=value.
+            expectPrune({testPrune1.Id()}, {{"key", {"value", true}}});
+
+            // Expect testPrune2 to be selected via key being present.
+            expectPrune({testPrune2.Id()}, {{"key", {nullptr, true}}});
+
+            // Prune by absence of 'anotherKey' label.
+            expectPrune({testPrune4.Id()}, {{"anotherKey", {nullptr, false}}});
+
+            // Prune by label inequality.
+            expectPrune({testPrune3.Id()}, {{"anotherKey", {"someValue", false}}});
+        }
+
+        // Validate that the 'until' filter works.
+        {
+            WSLAContainerLauncher lancher("debian:latest", "test-prune-until", {"echo", "OK"}, {}, {});
+
+            auto container = RunAndWait(lancher);
+
+            auto now = time(nullptr);
+
+            expectPrune({}, {}, now - 3600);
+            expectPrune({container.Id()}, {}, now + 3600);
+        }
+
+        // Validate error paths.
+        {
+            WSLAContainerPruneFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
+            PruneResult result;
+
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
     }
 };
