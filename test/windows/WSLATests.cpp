@@ -2884,6 +2884,7 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
                 VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
+                VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
             }
         };
 
@@ -2910,14 +2911,17 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
 
-            // Capture StateChangedAt while the container is running.
+            // Capture StateChangedAt and CreatedAt while the container is running.
             ULONGLONG runningStateChangedAt{};
+            ULONGLONG runningCreatedAt{};
             {
                 wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
                 VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
                 VERIFY_ARE_EQUAL(containers.size(), 1);
                 runningStateChangedAt = containers[0].StateChangedAt;
+                runningCreatedAt = containers[0].CreatedAt;
                 VERIFY_IS_TRUE(runningStateChangedAt > 0);
+                VERIFY_IS_TRUE(runningCreatedAt > 0);
             }
 
             // Kill the container init process and expect it to be in exited state.
@@ -2945,6 +2949,9 @@ class WSLATests
                 auto now = static_cast<ULONGLONG>(time(nullptr));
                 VERIFY_IS_TRUE(containers[0].StateChangedAt <= now);
                 VERIFY_IS_TRUE(containers[0].StateChangedAt >= runningStateChangedAt);
+
+                // CreatedAt must not change after state transitions.
+                VERIFY_ARE_EQUAL(containers[0].CreatedAt, runningCreatedAt);
             }
 
             // Open a new reference to the same container.
@@ -3144,6 +3151,7 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
                 VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
+                VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
             }
         };
 
@@ -4117,6 +4125,7 @@ class WSLATests
 
         std::string containerName = "test-container";
         ULONGLONG originalStateChangedAt{};
+        ULONGLONG originalCreatedAt{};
 
         // Phase 1: Create session and container, then stop the container
         {
@@ -4134,12 +4143,14 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
-            // Capture StateChangedAt before the session is destroyed.
+            // Capture StateChangedAt and CreatedAt before the session is destroyed.
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
             VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
             originalStateChangedAt = containers[0].StateChangedAt;
+            originalCreatedAt = containers[0].CreatedAt;
             VERIFY_IS_TRUE(originalStateChangedAt > 0);
+            VERIFY_IS_TRUE(originalCreatedAt > 0);
         }
 
         // Phase 2: Create new session from same storage, recover and delete container
@@ -4154,6 +4165,7 @@ class WSLATests
             VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
             VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
+            VERIFY_ARE_EQUAL(containers[0].CreatedAt, originalCreatedAt);
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 

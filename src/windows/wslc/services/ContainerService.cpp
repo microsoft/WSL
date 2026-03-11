@@ -101,6 +101,34 @@ static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASign
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
+static std::wstring FormatRelativeTime(ULONGLONG timestamp)
+{
+    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
+    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
+    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+
+    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
+    if (elapsed < 0)
+    {
+        elapsed = 0;
+    }
+
+    if (elapsed < SecondsPerMinute)
+    {
+        return std::format(L"{} seconds ago", elapsed);
+    }
+    else if (elapsed < SecondsPerHour)
+    {
+        return std::format(L"{} minutes ago", elapsed / SecondsPerMinute);
+    }
+    else if (elapsed < SecondsPerDay)
+    {
+        return std::format(L"{} hours ago", elapsed / SecondsPerHour);
+    }
+
+    return std::format(L"{} days ago", elapsed / SecondsPerDay);
+}
+
 int ContainerService::Attach(Session& session, const std::string& id)
 {
     wil::com_ptr<IWSLAContainer> container;
@@ -143,10 +171,6 @@ int ContainerService::Attach(Session& session, const std::string& id)
 
 std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt)
 {
-    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
-    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
-    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
-
     std::wstring stateString;
     switch (state)
     {
@@ -173,26 +197,12 @@ std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, 
         return stateString;
     }
 
-    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(stateChangedAt);
-    if (elapsed < 0)
-    {
-        elapsed = 0;
-    }
+    return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
+}
 
-    if (elapsed < SecondsPerMinute)
-    {
-        return std::format(L"{} {} seconds ago", stateString, elapsed);
-    }
-    else if (elapsed < SecondsPerHour)
-    {
-        return std::format(L"{} {} minutes ago", stateString, elapsed / SecondsPerMinute);
-    }
-    else if (elapsed < SecondsPerDay)
-    {
-        return std::format(L"{} {} hours ago", stateString, elapsed / SecondsPerHour);
-    }
-
-    return std::format(L"{} {} days ago", stateString, elapsed / SecondsPerDay);
+std::wstring ContainerService::ContainerCreatedAtToString(ULONGLONG createdAt)
+{
+    return FormatRelativeTime(createdAt);
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
@@ -271,6 +281,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.State = current.State;
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
+        entry.CreatedAt = current.CreatedAt;
         result.emplace_back(std::move(entry));
     }
 
