@@ -511,7 +511,7 @@ interface IWSLASession : IUnknown
     HRESULT BuildImage([in] LPCWSTR ContextPath, [in] ULONG DockerfileHandle, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
+    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLAListImageOptions* Options, [out, size_is(, *Count)] WSLAImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLADeleteImageOptions* Options, [out, size_is(, *Count)] WSLADeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLATagImageOptions* Options);
