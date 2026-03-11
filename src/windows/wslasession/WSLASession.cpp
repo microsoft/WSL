@@ -1135,11 +1135,100 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
         e->GetState(&output[index].State);
+        e->GetStateChangedAt(&output[index].StateChangedAt);
         index++;
     }
 
     *Count = static_cast<ULONG>(m_containers.size());
     *Containers = output.release();
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::PruneContainers(_In_opt_ WSLAContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLAPruneContainersResults* Result)
+try
+{
+    COMServiceExecutionContext context;
+
+    std::optional<docker_schema::PruneContainerLabelFilter> filters;
+
+    if (Until > 0 || FiltersCount > 0)
+    {
+        THROW_HR_IF(E_POINTER, FiltersCount > 0 && Filters == nullptr);
+
+        filters.emplace();
+
+        for (DWORD i = 0; i < FiltersCount; ++i)
+        {
+            THROW_HR_IF_MSG(E_POINTER, Filters[i].Key == nullptr, "Filter key cannot be null (index %lu)", i);
+            std::string labelFilter = Filters[i].Key;
+
+            if (Filters[i].Value != nullptr)
+            {
+                labelFilter += '=';
+                labelFilter += Filters[i].Value;
+            }
+
+            if (Filters[i].Present)
+            {
+                filters->presentLabels.emplace(std::move(labelFilter), true);
+            }
+            else
+            {
+                filters->absentLabels.emplace(std::move(labelFilter), true);
+            }
+        }
+
+        if (Until > 0)
+        {
+            filters->until = Until;
+        }
+    }
+
+    auto lock = m_lock.lock_shared();
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    std::lock_guard containersLock{m_containersLock};
+
+    auto result = m_dockerClient->PruneContainers(filters);
+
+    Result->SpaceReclaimed = result.SpaceReclaimed;
+
+    if (result.ContainersDeleted.has_value() && result.ContainersDeleted->size() > 0)
+    {
+        // Remove deleted containers from m_containers.
+        auto pred = [&](const auto& e) {
+            return std::ranges::find(result.ContainersDeleted.value(), e->ID()) != result.ContainersDeleted->end();
+        };
+
+        auto erased = std::erase_if(m_containers, pred);
+        LOG_HR_IF_MSG(
+            E_UNEXPECTED,
+            erased != result.ContainersDeleted->size(),
+            "Expected to erase %zu containers, but erased %zu",
+            result.ContainersDeleted->size(),
+            erased);
+
+        auto containers = wil::make_unique_cotaskmem<WSLAContainerId[]>(result.ContainersDeleted->size());
+
+        for (size_t i = 0; i < result.ContainersDeleted->size(); ++i)
+        {
+            THROW_HR_IF_MSG(
+                E_UNEXPECTED,
+                strcpy_s(containers[i], result.ContainersDeleted.value()[i].c_str()) != 0,
+                "Unexpected container name: %hs",
+                result.ContainersDeleted.value()[i].c_str());
+        }
+
+        Result->Containers = containers.release();
+        Result->ContainersCount = static_cast<DWORD>(result.ContainersDeleted->size());
+    }
+    else
+    {
+        Result->Containers = nullptr;
+        Result->ContainersCount = 0;
+    }
+
     return S_OK;
 }
 CATCH_RETURN();

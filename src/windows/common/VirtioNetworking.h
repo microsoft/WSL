@@ -43,6 +43,10 @@ private:
     int ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET& addr, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection() noexcept;
     void SetupLoopbackDevice();
+    void UpdateDefaultRoute(const std::wstring& gateway, ADDRESS_FAMILY family);
+    void UpdateDnsSettings(const networking::DnsInfo& dns);
+    void UpdateIpAddress(const networking::EndpointIpAddress& ipAddress);
+    void UpdateMtu(ULONG mtu);
 
     mutable wil::srwlock m_lock;
 
@@ -58,7 +62,8 @@ private:
 
     ULONG m_networkMtu = 0;
     std::wstring m_trackedDeviceOptions;
-    networking::DnsInfo m_trackedDnsSettings;
+    std::wstring m_trackedDefaultRoute;
+    networking::DnsInfo m_trackedDnsSettings{};
 
     // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.
     networking::unique_notify_handle m_networkNotifyHandle;

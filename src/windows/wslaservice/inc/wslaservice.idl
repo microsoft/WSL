@@ -289,7 +289,9 @@ typedef struct _WSLAContainerEntry
     char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     WSLAContainerId Id;
+    ULONGLONG StateChangedAt;
     WSLAContainerState State;
+
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
 } WSLAContainerEntry;
@@ -333,8 +335,7 @@ typedef enum _WSLAFeatureFlags
     WslaFeatureFlagsEarlyBootDmesg = 2,
     WslaFeatureFlagsGPU = 4,
     WslaFeatureFlagsVirtioFs = 8,
-    WslaFeatureFlagsPmemVhds = 16,
-    WslaFeatureFlagsDebug = 32,
+    WslaFeatureFlagsDebug = 16,
 } WSLAFeatureFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
@@ -476,6 +477,20 @@ typedef struct _WSLAVolumeOptions
     [unique] LPCSTR Options;
 } WSLAVolumeOptions;
 
+typedef struct _WSLAContainerPruneFilter
+{
+    LPCSTR Key;
+    [unique] LPCSTR Value;
+    BOOL Present;
+} WSLAContainerPruneFilter;
+
+typedef struct _WSLAPruneContainersResults
+{
+    [unique, size_is(ContainersCount)] WSLAContainerId* Containers;
+    ULONG ContainersCount;
+    ULONGLONG SpaceReclaimed;
+} WSLAPruneContainersResults;
+
 typedef enum _WSLASessionState
 {
     WSLASessionStateRunning = 0,
@@ -521,6 +536,7 @@ interface IWSLASession : IUnknown
     HRESULT CreateContainer([in] const WSLAContainerOptions* Options, [out] IWSLAContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] WSLAContainerEntry** Images, [out] ULONG* Count);
+    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLAContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLAPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLAProcessOptions* Options, [out] IWSLAProcess** Process, [out] int* Errno);

@@ -2,25 +2,25 @@ LIBRARY wslcsdk
 
 EXPORTS
 
-WslcSessionInitSettings
+WslcInitSessionSettings
 WslcContainerInitSettings
 WslcProcessInitSettings
 
-WslcSessionCreate
+WslcCreateSession
 WslcContainerCreate
 
-WslcSessionRelease
+WslcReleaseSession
 WslcContainerRelease
 WslcProcessRelease
 
-WslcSessionSettingsSetFeatureFlags
-WslcSessionSettingsSetTerminateCallback
-WslcSessionSettingsSetCpuCount
-WslcSessionSettingsSetMemory
-WslcSessionSettingsSetTimeout
-WslcSessionSettingsSetVHD
+WslcSetSessionSettingsFeatureFlags
+WslcSetSessionSettingsTerminationCallback
+WslcSetSessionSettingsCpuCount
+WslcSetSessionSettingsMemory
+WslcSetSessionSettingsTimeout
+WslcSetSessionSettingsVHD
  
-WslcSessionTerminate
+WslcTerminateSession
 WslcSessionImagePull
 WslcSessionImageImport
 WslcSessionImageLoad

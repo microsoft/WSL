@@ -121,31 +121,11 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
 
 void WSLAVirtualMachine::ConfigureInitialMounts()
 {
-    // Get paths for root and modules VHDs
-    auto basePath = wslutil::GetBasePath();
+    // Determine device paths from guest
+    const auto rootDevice = GetVhdDevicePath(0);
+    const auto modulesDevice = GetVhdDevicePath(1);
 
-#ifdef WSL_KERNEL_MODULES_PATH
-    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
-#else
-    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
-#endif
-
-    // Determine device paths based on whether pmem VHDs are used
-    std::string rootDevice;
-    std::string modulesDevice;
-
-    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
-    {
-        // SCSI attached disks - query device paths from guest
-        rootDevice = GetVhdDevicePath(0);
-        modulesDevice = GetVhdDevicePath(1);
-    }
-    else
-    {
-        // PMEM devices - use known device paths
-        rootDevice = "/dev/pmem0";
-        modulesDevice = "/dev/pmem1";
-    }
+    WI_ASSERT(rootDevice == "/dev/sda" && modulesDevice == "/dev/sdb");
 
     // Mount root filesystem with overlay
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);

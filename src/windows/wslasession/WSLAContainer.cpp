@@ -250,6 +250,17 @@ WSLAContainerState DockerStateToWSLAState(ContainerState state)
     }
 }
 
+std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
+{
+    // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
+    std::chrono::sys_seconds utcSeconds;
+    std::istringstream stream(timestamp);
+    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
+    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
+
+    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
+}
+
 std::string CleanContainerName(const std::string& name)
 {
     // Docker container names have a leading '/', strip it.
@@ -414,6 +425,12 @@ const std::string& WSLAContainerImpl::Name() const noexcept
     return m_name;
 }
 
+void WSLAContainerImpl::GetStateChangedAt(ULONGLONG* Result)
+{
+    auto lock = m_lock.lock_shared();
+    *Result = m_stateChangedAt;
+}
+
 void WSLAContainerImpl::CopyTo(IWSLAContainer** Container) const
 {
     auto lock = m_lock.lock_shared();
@@ -568,6 +585,14 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             {
                 DeleteExclusiveLockHeld(WSLADeleteFlagsNone);
             }
+        }
+    }
+    else if (event == ContainerEvent::Destroy)
+    {
+        auto lock = m_lock.lock_exclusive();
+        if (m_state != WslaContainerStateDeleted)
+        {
+            Transition(WslaContainerStateDeleted);
         }
     }
 
@@ -1181,6 +1206,20 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
+    // Restore the state change timestamp from Docker inspect data.
+    try
+    {
+        auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
+        auto state = DockerStateToWSLAState(dockerContainer.State);
+        const auto& timestamp = (state == WslaContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
+
+        if (!timestamp.empty())
+        {
+            container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
+        }
+    }
+    CATCH_LOG();
+
     errorCleanup.release();
     volumeErrorCleanup.release();
 
@@ -1337,6 +1376,7 @@ __requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerSta
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
+    m_stateChangedAt = static_cast<std::uint64_t>(std::time(nullptr));
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
