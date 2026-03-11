@@ -722,7 +722,7 @@ The system may need to be restarted so the changes can take effect.</value>
     <value>Bridged networking requires wsl2.vmSwitch to be set.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Failed to fetch the list distribution from '{}'. {}</value>
+    <value>Failed to fetch the distribution list from '{}'. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1055,7 +1055,7 @@ Falling back to NAT networking.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Failed to read property '{}' from distribution {} </value>
+    <value>Failed to read property '{}' from distribution {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1873,18 +1873,34 @@ You can also access more VS Code Remote options through the command palette with
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>The number of milliseconds that a VM is idle, before it is shut down.</value>
   </data>
-  <data name="MessageWsladiagUsage" xml:space="preserve">
-    <value>wsladiag - WSLA diagnostics tool
-Usage:
-  wsladiag list [--verbose|-v]
-  wsladiag shell &lt;SessionName&gt; [--verbose|-v]
-  wsladiag pull &lt;Image&gt;
-  wsladiag build [--tag|-t &lt;Tag&gt;] [--file|-f &lt;Dockerfile&gt;] &lt;Directory&gt;
-  wsladiag run [--interactive|-i] [--tty|-t] [--detach|-d] [--name &lt;Name&gt;] &lt;Image&gt; [Command...]
-  wsladiag logs [--follow|-f] &lt;ContainerId&gt;
-  wsladiag attach &lt;ContainerId&gt;
-  wsladiag --help</value>
-    <comment>{Locked="--verbose|"}{Locked="--verbose|"}{Locked="--tag|"}{Locked="--file|"}{Locked="--interactive|"}{Locked="--tty|"}{Locked="--detach|"}{Locked="--name "}{Locked="--follow|"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>Build, run, debug, and profile your apps running on WSL from Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Run and debug your apps on WSL from Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>Learn more about WSL in Visual Studio for .NET developers</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>Learn more about Visual Studio and WSL for C++ developers</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>You can easily run and debug your .NET Core and cross platform C++ apps in Linux without leaving Visual Studio using Windows Subsystem for Linux (WSL). If you are a cross-platform developer, you can use this method as a simple way to test more of your target environments.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Visual Studio Integration</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Visual Studio Integration</value>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
     <value>wslc - WSL Container CLI
@@ -1938,9 +1954,6 @@ Usage:
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Shows help about the selected command</value>
-  </data>
-  <data name="WSLCCLI_InfoArgDescription" xml:space="preserve">
-    <value>Shows information about this tool and its environment</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
     <value>Multiple mutually exclusive arguments provided: '{}'</value>
@@ -2047,6 +2060,11 @@ Usage:
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
      <value>Alias arguments with a value must be last in the alias chain: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
+     <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.</value>
+     <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
     <value>Invalid image: '{}'</value>

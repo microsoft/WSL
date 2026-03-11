@@ -722,7 +722,7 @@ Lehet, hogy újra kell indítani a rendszert, hogy a módosítások érvénybe l
     <value>A hálózati hídhoz be kell állítani a wsl2.vmSwitch kapcsolót.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Nem sikerült beolvasni a listaterjesztést a következőből: {}. {}</value>
+    <value>Nem sikerült beolvasni a terjesztési listát innen: {}. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1055,7 +1055,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Nem sikerült beolvasni a(z) {} tulajdonságot a(z) {} disztribúcióból </value>
+    <value>Nem sikerült beolvasni a(z) {} tulajdonságot a(z) {} disztribúcióból</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1873,18 +1873,34 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>A virtuális gép üresjárati ideje ezredmásodpercben a leállítás előtt.</value>
   </data>
-  <data name="MessageWsladiagUsage" xml:space="preserve">
-    <value>wsladiag - WSLA diagnostics tool
-Usage:
-  wsladiag list [--verbose|-v]
-  wsladiag shell &lt;SessionName&gt; [--verbose|-v]
-  wsladiag pull &lt;Image&gt;
-  wsladiag build [--tag|-t &lt;Tag&gt;] [--file|-f &lt;Dockerfile&gt;] &lt;Directory&gt;
-  wsladiag run [--interactive|-i] [--tty|-t] [--detach|-d] [--name &lt;Name&gt;] &lt;Image&gt; [Command...]
-  wsladiag logs [--follow|-f] &lt;ContainerId&gt;
-  wsladiag attach &lt;ContainerId&gt;
-  wsladiag --help</value>
-    <comment>{Locked="--verbose|"}{Locked="--verbose|"}{Locked="--tag|"}{Locked="--file|"}{Locked="--interactive|"}{Locked="--tty|"}{Locked="--detach|"}{Locked="--name "}{Locked="--follow|"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>WSL-en futó alkalmazásokat készíthet, futtathat, profilozhat és végezhet rajtuk hibakeresést a Visual Studio segítségével</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Alkalmazások futtatása és hibakeresés végzése a WSL-ben a Visual Studio segítségével</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>További információ a WSL-ről a .NET-fejlesztőknek készült Visual Studióban</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>További információ a Visual Studióról és a WSL-ről C++ fejlesztők számára</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer (WSL) használatával könnyedén futtathatja és hibakeresést végezhet a .NET Core és platformfüggetlen C++ alkalmazásain Linuxon, anélkül, hogy elhagyná a Visual Studiót. Ha Ön platformfüggetlen fejlesztő, ez a módszer egyszerű módot kínál arra, hogy több célkörnyezetet is teszteljen.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Visual Studio-integráció</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Visual Studio-integráció</value>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
     <value>wslc - WSL Container CLI
@@ -1938,9 +1954,6 @@ Usage:
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Shows help about the selected command</value>
-  </data>
-  <data name="WSLCCLI_InfoArgDescription" xml:space="preserve">
-    <value>Shows information about this tool and its environment</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
     <value>Multiple mutually exclusive arguments provided: '{}'</value>
@@ -2047,6 +2060,11 @@ Usage:
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
      <value>Alias arguments with a value must be last in the alias chain: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
+     <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.</value>
+     <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
     <value>Invalid image: '{}'</value>

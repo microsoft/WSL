@@ -728,7 +728,7 @@ Windows: {}</value>
     <value>桥接网络需要设置 wsl2.vmSwitch。</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>无法从“{}”提取列表分发。{}</value>
+    <value>无法从 '{}' 提取通讯组列表。{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1061,7 +1061,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>无法从分发 {} 读取属性“{}”</value>
+    <value>未能从分发内容 {} 读取属性“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1879,18 +1879,34 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
   </data>
-  <data name="MessageWsladiagUsage" xml:space="preserve">
-    <value>wsladiag - WSLA diagnostics tool
-Usage:
-  wsladiag list [--verbose|-v]
-  wsladiag shell &lt;SessionName&gt; [--verbose|-v]
-  wsladiag pull &lt;Image&gt;
-  wsladiag build [--tag|-t &lt;Tag&gt;] [--file|-f &lt;Dockerfile&gt;] &lt;Directory&gt;
-  wsladiag run [--interactive|-i] [--tty|-t] [--detach|-d] [--name &lt;Name&gt;] &lt;Image&gt; [Command...]
-  wsladiag logs [--follow|-f] &lt;ContainerId&gt;
-  wsladiag attach &lt;ContainerId&gt;
-  wsladiag --help</value>
-    <comment>{Locked="--verbose|"}{Locked="--verbose|"}{Locked="--tag|"}{Locked="--file|"}{Locked="--interactive|"}{Locked="--tty|"}{Locked="--detach|"}{Locked="--name "}{Locked="--follow|"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>通过 Visual Studio 构建、运行、调试和分析运行于 WSL 上的应用</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>通过 Visual Studio 运行和调试 WSL 上的应用</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>详细了解面向 .NET 开发人员的 Visual Studio 中的 WSL</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>详细了解面向 C++ 开发人员的 Visual Studio 和 WSL</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>你可以使用适用于 Linux 的 Windows 子系统(WSL)在不离开 Visual Studio 的情况下，在 Linux 中轻松运行和调试 .NET Core 和跨平台 C++ 应用。如果你是跨平台开发人员，可以通过这种方法简单地测试更多目标环境。</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Visual Studio 集成</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Visual Studio 集成</value>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
     <value>wslc - WSL Container CLI
@@ -1944,9 +1960,6 @@ Usage:
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Shows help about the selected command</value>
-  </data>
-  <data name="WSLCCLI_InfoArgDescription" xml:space="preserve">
-    <value>Shows information about this tool and its environment</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
     <value>Multiple mutually exclusive arguments provided: '{}'</value>
@@ -2053,6 +2066,11 @@ Usage:
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
      <value>Alias arguments with a value must be last in the alias chain: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
+     <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.</value>
+     <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
     <value>Invalid image: '{}'</value>
