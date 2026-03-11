@@ -1384,7 +1384,11 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
             // Advance beyond the LF
             advance(end - buffer.begin() + 1);
 
-            THROW_HR_IF_MSG(E_INVALIDARG, PendingBuffer.size() < 2 || PendingBuffer.back() != '\r', "Malformed chunk header: %hs", PendingBuffer.c_str());
+            THROW_HR_IF_MSG(
+                E_INVALIDARG,
+                PendingBuffer.size() < 2 || PendingBuffer.back() != '\r',
+                "Malformed chunk header: %hs",
+                PendingBuffer.c_str());
             PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CR.
 
 #ifdef WSLA_HTTP_DEBUG
