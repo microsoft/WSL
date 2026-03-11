@@ -1323,7 +1323,7 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     auto it = m_volumes.find(name);
-    THROW_HR_IF(WSLA_E_VOLUME_NOT_FOUND, it == m_volumes.end());
+    THROW_HR_WITH_USER_ERROR_IF(WSLA_E_VOLUME_NOT_FOUND, Localization::MessageWslaVolumeNotFound(name), it == m_volumes.end());
 
     it->second->Delete();
     m_volumes.erase(it);
