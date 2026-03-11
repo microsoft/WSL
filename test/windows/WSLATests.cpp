@@ -4967,6 +4967,13 @@ class WSLATests
                 std::filesystem::remove_all(hostFolder, ec);
             });
 
+            auto getMountCount = [&]() {
+                auto result = RunCommand(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep -c '^/mnt/'"});
+                return std::stoi(result.Output[1]);
+            };
+
+            auto baselineMountCount = getMountCount();
+
             WSLAContainerLauncher launcher("debian:latest", "deferred-volume", {"sleep", "99999"}, {}, WSLAContainerNetworkTypeHost);
             launcher.AddVolume(hostFolder.wstring(), "/deferred-volume", false);
 
@@ -4974,16 +4981,16 @@ class WSLATests
             auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_SUCCEEDED(result);
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
-            ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 1);
+            VERIFY_ARE_EQUAL(getMountCount(), baselineMountCount);
 
             // Start the container — volume should now be mounted.
             VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
-            ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 0);
+            VERIFY_ARE_EQUAL(getMountCount(), baselineMountCount + 1);
 
             // Verify the volume is unmounted after container is stopped.
             VERIFY_SUCCEEDED(container->Get().Stop(WSLASignalSIGKILL, 0));
-            ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 1);
+            VERIFY_ARE_EQUAL(getMountCount(), baselineMountCount);
         }
     }
 
