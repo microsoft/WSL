@@ -29,6 +29,7 @@ struct TestImage
     }
 };
 
+const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
 const TestImage& InvalidTestImage();
 
@@ -36,6 +37,8 @@ void VerifyContainerIsListed(const std::wstring& containerName, const std::wstri
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId);
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
+void VerifyImageIsListed(const TestImage& image);
+void VerifyImageIsNotListed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::docker_schema::InspectContainer InspectContainer(const std::wstring& containerName);

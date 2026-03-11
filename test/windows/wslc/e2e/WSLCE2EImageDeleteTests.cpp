@@ -26,6 +26,7 @@ class WSLCE2EImageDeleteTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 
@@ -33,6 +34,7 @@ class WSLCE2EImageDeleteTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 
@@ -42,15 +44,6 @@ class WSLCE2EImageDeleteTests
 
         auto result = RunWslc(L"image delete --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
-    TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
-        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
@@ -132,9 +125,39 @@ class WSLCE2EImageDeleteTests
         SKIP_TEST_NOT_IMPL();
     }
 
+    TEST_METHOD(WSLCE2E_Image_Delete_MultipleImages_Success)
+    {
+        WSL2_TEST_ONLY();
+
+        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
+
+        auto result = RunWslc(std::format(L"image delete {} {}", DebianImage.NameAndTag(), AlpineImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyImageIsNotListed(DebianImage);
+        VerifyImageIsNotListed(AlpineImage);
+    }
+
+    TEST_METHOD(WSLCE2E_Image_Delete_MultipleImagesWithInvalid_SuccessAndFailure)
+    {
+        WSL2_TEST_ONLY();
+
+        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
+
+        auto result = RunWslc(std::format(L"image delete {} {} {}", DebianImage.NameAndTag(), AlpineImage.NameAndTag(), InvalidImage.NameAndTag()));
+        auto errorMessage = std::format(L"No such image: {}\r\n", InvalidImage.NameAndTag());
+        result.Verify({.Stderr = errorMessage, .ExitCode = 1});
+
+        VerifyImageIsNotListed(DebianImage);
+        VerifyImageIsNotListed(AlpineImage);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
     std::wstring GetHelpMessage() const
