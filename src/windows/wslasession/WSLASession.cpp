@@ -1395,7 +1395,6 @@ HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
 }
 
-// TODO consider allowing callers to pass cancellation handles.
 MultiHandleWait WSLASession::CreateIOContext(HANDLE CancellationHandle)
 {
     relay::MultiHandleWait io;

@@ -1652,11 +1652,8 @@ class WSLATests
                 },
                 E_ABORT);
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
-
             cancelEvent.SetEvent();
-
-            // operation's destructor validates that the operation was cancelled.
+            operation.Complete();
         }
     }
     TEST_METHOD(ExportContainer)
