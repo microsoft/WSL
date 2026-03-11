@@ -132,7 +132,7 @@ wil::unique_handle SubProcess::Start()
 
     STARTUPINFOEX StartupInfo{};
     StartupInfo.StartupInfo.cb = sizeof(StartupInfo);
-    StartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    StartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES | m_startupFlags;
 
     // N.B. Passing a pseudoconsole requires all standard handles to be null
     if (m_pseudoConsole == nullptr)
