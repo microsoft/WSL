@@ -283,8 +283,6 @@ typedef struct _WSLAContainerEntry
     ULONGLONG StateChangedAt;
     ULONGLONG CreatedAt;
     WSLAContainerState State;
-
-    // TODO: Add creation timestamp and other fields that the command line tool might want to display.
 } WSLAContainerEntry;
 
 typedef enum _WSLAProcessState
