@@ -44,6 +44,7 @@ public sealed partial class ShellPage : Page
         App.MainWindow.SetTitleBar(AppTitleBar);
         App.MainWindow.Activated += MainWindow_Activated;
         AppTitleBarText.Text = "Settings_AppDisplayName".GetLocalized();
+        NavigationFrame.LostFocus += NavigationFrame_LostFocus;
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -128,5 +129,24 @@ public sealed partial class ShellPage : Page
         var result = navigationService.GoBack();
 
         args.Handled = result;
+    }
+
+    private void NavigationFrame_LostFocus(object sender, RoutedEventArgs e)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            var focused = FocusManager.GetFocusedElement(NavigationViewControl.XamlRoot);
+
+            // If focus is transferred to the selected page itself, do nothing
+            if (focused is not NavigationViewItem && focused is not NavigationView)
+            {
+                return;
+            }
+
+            // Restore focus to the selected navigation item
+            var selected = NavigationViewControl.SelectedItem;
+            var container = NavigationViewControl.ContainerFromMenuItem(selected) as Control;
+            container?.Focus(FocusState.Keyboard);
+        });
     }
 }

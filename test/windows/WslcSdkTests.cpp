@@ -32,8 +32,8 @@ void CloseSession(WslcSession session)
 {
     if (session)
     {
-        WslcSessionTerminate(session);
-        WslcSessionRelease(session);
+        WslcTerminateSession(session);
+        WslcReleaseSession(session);
     }
 }
 
@@ -197,17 +197,17 @@ class WslcSdkTests
 
         // Build session settings using the WSLC SDK.
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(c_testSessionName, m_storagePath.c_str(), &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetCpuCount(&sessionSettings, 4));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetMemory(&sessionSettings, 2048));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(c_testSessionName, m_storagePath.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsCpuCount(&sessionSettings, 4));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsMemory(&sessionSettings, 2048));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
 
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 4096ull * 1024 * 1024; // 4 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
 
-        VERIFY_SUCCEEDED(WslcSessionCreate(&sessionSettings, &m_defaultSession));
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &m_defaultSession, nullptr));
 
         // Pull images required by the tests (no-op if already present).
         for (const char* image : {"debian:latest", "python:3.12-alpine"})
@@ -222,8 +222,8 @@ class WslcSdkTests
     {
         if (m_defaultSession)
         {
-            WslcSessionTerminate(m_defaultSession);
-            WslcSessionRelease(m_defaultSession);
+            WslcTerminateSession(m_defaultSession);
+            WslcReleaseSession(m_defaultSession);
             m_defaultSession = nullptr;
         }
 
@@ -252,26 +252,26 @@ class WslcSdkTests
         std::filesystem::path extraStorage = m_storagePath / "wslc-extra-session-storage";
 
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(L"wslc-extra-session", extraStorage.c_str(), &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetCpuCount(&sessionSettings, 2));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetMemory(&sessionSettings, 1024));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-extra-session", extraStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsCpuCount(&sessionSettings, 2));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsMemory(&sessionSettings, 1024));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
 
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 1024ull * 1024 * 1024; // 1 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
 
         UniqueSession session;
-        VERIFY_SUCCEEDED(WslcSessionCreate(&sessionSettings, &session));
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
         VERIFY_IS_NOT_NULL(session.get());
 
         // Null output pointer must fail.
-        VERIFY_ARE_EQUAL(WslcSessionCreate(&sessionSettings, nullptr), E_POINTER);
+        VERIFY_ARE_EQUAL(WslcCreateSession(&sessionSettings, nullptr, nullptr), E_POINTER);
 
         // Null settings pointer must fail.
         UniqueSession session2;
-        VERIFY_ARE_EQUAL(WslcSessionCreate(nullptr, &session2), E_POINTER);
+        VERIFY_ARE_EQUAL(WslcCreateSession(nullptr, &session2, nullptr), E_POINTER);
     }
 
     TEST_METHOD(TerminationCallbackViaTerminate)
@@ -288,15 +288,15 @@ class WslcSdkTests
         std::filesystem::path extraStorage = m_storagePath / "wslc-termcb-term-storage";
 
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(L"wslc-termcb-term-test", extraStorage.c_str(), &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetTerminateCallback(&sessionSettings, callback, &promise));
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-termcb-term-test", extraStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTerminationCallback(&sessionSettings, callback, &promise));
 
         UniqueSession session;
-        VERIFY_SUCCEEDED(WslcSessionCreate(&sessionSettings, &session));
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
 
         // Terminating the session should trigger a graceful shutdown and fire the callback.
-        VERIFY_SUCCEEDED(WslcSessionTerminate(session.get()));
+        VERIFY_SUCCEEDED(WslcTerminateSession(session.get()));
 
         auto future = promise.get_future();
         VERIFY_ARE_EQUAL(future.wait_for(std::chrono::seconds(30)), std::future_status::ready);
@@ -317,15 +317,15 @@ class WslcSdkTests
         std::filesystem::path extraStorage = m_storagePath / "wslc-termcb-release-storage";
 
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(L"wslc-termcb-release-test", extraStorage.c_str(), &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetTerminateCallback(&sessionSettings, callback, &promise));
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-termcb-release-test", extraStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsTerminationCallback(&sessionSettings, callback, &promise));
 
         UniqueSession session;
-        VERIFY_SUCCEEDED(WslcSessionCreate(&sessionSettings, &session));
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
 
         // Releasing the session should trigger a graceful shutdown and fire the callback.
-        VERIFY_SUCCEEDED(WslcSessionRelease(session.get()));
+        VERIFY_SUCCEEDED(WslcReleaseSession(session.get()));
         // Calling WslcSessionRelease will destroy the session
         session.release();
 
