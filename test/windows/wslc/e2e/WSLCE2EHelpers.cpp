@@ -24,6 +24,12 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
+const TestImage& AlpineTestImage()
+{
+    static const TestImage image{L"alpine", L"latest", std::filesystem::path{g_testDataPath} / L"alpine-latest.tar"};
+    return image;
+}
+
 const TestImage& DebianTestImage()
 {
     static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / L"debian-latest.tar"};
@@ -100,6 +106,35 @@ void VerifyImageIsNotUsed(const TestImage& image)
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
             VERIFY_FAIL(std::format(L"Image '{}' found in container list output", image.NameAndTag()).c_str());
+        }
+    }
+}
+
+void VerifyImageIsListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto outputLines = result.GetStdoutLines();
+    for (const auto& line : outputLines)
+    {
+        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        {
+            return;
+        }
+    }
+    VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
+}
+
+void VerifyImageIsNotListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto outputLines = result.GetStdoutLines();
+    for (const auto& line : outputLines)
+    {
+        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        {
+            VERIFY_FAIL(std::format(L"Image '{}' found in image list output", image.NameAndTag()).c_str());
         }
     }
 }

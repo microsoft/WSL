@@ -120,16 +120,43 @@ void PullImage(CLIExecutionContext& context)
     services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
 }
 
-void DeleteImage(CLIExecutionContext& context)
+void DeleteImages(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     auto& session = context.Data.Get<Data::Session>();
-    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    const auto& imageIds = context.Args.GetAll<ArgType::ImageId>();
 
     bool force = context.Args.Contains(ArgType::ImageForce);
     bool noPrune = context.Args.Contains(ArgType::NoPrune);
-    services::ImageService::Delete(session, WideToMultiByte(imageId), force, noPrune);
+    for (const auto& imageId : imageIds)
+    {
+        try
+        {
+            auto deletedImages = services::ImageService::Delete(session, WideToMultiByte(imageId), force, noPrune);
+            for (const auto& deletedImage : deletedImages)
+            {
+                std::wstring typeString = deletedImage.Type == WSLADeletedImageTypeUntagged ? L"Untagged" : L"Deleted";
+                PrintMessage(std::format(L"{}: {}", typeString, MultiByteToWide(deletedImage.Image)));
+            }
+        }
+        catch (const wil::ResultException& ex)
+        {
+            context.ExitCode = 1;
+            std::wstring errorMessage;
+            switch (ex.GetErrorCode())
+            {
+            case WSLA_E_IMAGE_NOT_FOUND:
+                errorMessage = std::format(L"No such image: {}", imageId);
+                break;
+            default:
+                errorMessage = std::format(L"Error deleting image {}. Error code: {}", imageId, ex.GetErrorCode());
+                break;
+            }
+
+            PrintMessage(errorMessage, stderr);
+        }
+    }
 }
 
 void LoadImage(CLIExecutionContext& context)
