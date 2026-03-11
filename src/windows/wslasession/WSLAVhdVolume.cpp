@@ -107,7 +107,7 @@ WSLAVhdVolumeImpl::~WSLAVhdVolumeImpl()
 {
     try
     {
-        Detach();
+        Delete();
     }
     CATCH_LOG();
 }
@@ -170,13 +170,23 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
 
 void WSLAVhdVolumeImpl::Delete()
 {
+    try
+    {
+        m_dockerClient.RemoveVolume(m_name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslaVolumeInUse(m_name.c_str()), e.StatusCode() == HTTP_STATUS_CONFLICT);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to remove volume '%hs'", m_name.c_str());
+    }
+
     Detach();
 
-    auto hostPath = std::exchange(m_hostPath, std::filesystem::path{});
-
-    if (!hostPath.empty())
+    if (!m_hostPath.empty())
     {
-        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str()));
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_hostPath.c_str()));
+        m_hostPath.clear();
     }
 }
 
@@ -184,24 +194,13 @@ void WSLAVhdVolumeImpl::Detach()
 {
     if (m_attached)
     {
-        try
-        {
-            m_dockerClient.RemoveVolume(m_name);
-        }
-        catch (const DockerHTTPException& e)
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslaVolumeInUse(m_name.c_str()), e.StatusCode() == HTTP_STATUS_CONFLICT);
-            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to remove volume '%hs'", m_name.c_str());
-        }
-
         if (!m_virtualMachinePath.empty())
         {
-            m_virtualMachine.Unmount(m_virtualMachinePath.c_str());
+            LOG_IF_FAILED(wil::ResultFromException([&]() { m_virtualMachine.Unmount(m_virtualMachinePath.c_str()); }));
             m_virtualMachinePath.clear();
         }
 
-        m_virtualMachine.DetachDisk(m_lun);
+        LOG_IF_FAILED(wil::ResultFromException([&]() { m_virtualMachine.DetachDisk(m_lun); }));
         m_attached = false;
     }
 }
