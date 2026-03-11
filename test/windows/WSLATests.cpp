@@ -5351,9 +5351,9 @@ class WSLATests
 
         // Validate that the 'until' filter works.
         {
-            WSLAContainerLauncher lancher("debian:latest", "test-prune-until", {"echo", "OK"}, {}, {});
+            WSLAContainerLauncher launcher("debian:latest", "test-prune-until", {"echo", "OK"}, {}, {});
 
-            auto container = RunAndWait(lancher);
+            auto container = RunAndWait(launcher);
 
             auto now = time(nullptr);
 
