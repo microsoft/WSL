@@ -4052,6 +4052,7 @@ class WSLATests
         };
 
         runTest("3\r\nfoo\r\n3\r\nbar", {"foo", "bar"});
+        runTest("3\r\nfoo\r\n3\r\nbar\r\n0\r\n\r\n", {"foo", "bar"});
         runTest("1\r\na\r\n\r\n", {"a"});
 
         runTest("c\r\nlf\nin\r\nchunk\r\n3\r\nEOF", {"lf\nin\r\nchunk", "EOF"});
@@ -4065,6 +4066,73 @@ class WSLATests
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4invalid\nnocr", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid\n", {}); }), E_INVALIDARG);
+    }
+
+    TEST_METHOD(HTTPChunkReaderSplitReads)
+    {
+        auto runTest = [](const std::vector<std::string>& Data, const std::vector<std::string>& ExpectedChunk) {
+            std::vector<std::string> chunks;
+            auto onData = [&](const gsl::span<char>& data) { chunks.emplace_back(data.data(), data.size()); };
+
+            auto reader = std::make_unique<wsl::windows::common::relay::HTTPChunkBasedReadHandle>(
+                wsl::windows::common::relay::HandleWrapper{nullptr}, std::move(onData));
+
+            std::string allData;
+            for (const auto& datum : Data)
+            {
+                size_t currentSize = allData.size();
+                allData.append(datum);
+                reader->OnRead(gsl::span<char>{&allData[currentSize], datum.size()});
+            }
+
+            // Final 0 byte read
+            reader->OnRead(gsl::span<char>{nullptr, static_cast<size_t>(0)});
+
+            for (size_t i = 0; i < ExpectedChunk.size(); i++)
+            {
+                if (i >= chunks.size())
+                {
+                    LogError(
+                        "Input: '%hs': Chunk %zu is missing. Expected: '%hs'",
+                        EscapeString(allData).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str());
+                    VERIFY_FAIL();
+                }
+                else if (ExpectedChunk[i] != chunks[i])
+                {
+                    LogError(
+
+                        "Input: '%hs': Chunk %zu does not match expected value. Expected: '%hs', Actual: '%hs'",
+                        EscapeString(allData).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str(),
+                        EscapeString(chunks[i]).c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            if (ExpectedChunk.size() != chunks.size())
+            {
+                LogError(
+                    "Input: '%hs', Number of chunks do not match. Expected: %zu, Actual: %zu",
+                    EscapeString(allData).c_str(),
+                    ExpectedChunk.size(),
+                    chunks.size());
+                VERIFY_FAIL();
+            }
+
+            WEX::Logging::Log::Comment(EscapeString(allData).c_str(), "HTTPChunkReaderSplitReads success");
+        };
+
+        runTest({"3\r\nfo", "o\r\n3\r\nbar"}, {"foo", "bar"});
+        runTest({"1\r\n", "a\r\n\r\n"}, {"a"});
+
+        runTest({"c\r\nlf\n", "in\r\nchunk\r\n3\r\nEOF"}, {"lf\nin\r\nchunk", "EOF"});
+        runTest({"15\r\n\r\nchunkstartingwithlf\r\n", "3\r\nEOF"}, {"\r\nchunkstartingwithlf", "EOF"});
+
+        runTest({"3", "\r\nfoo\r\n3\r\nbar"}, {"foo", "bar"});
+        runTest({"3\r\nfoo\r\n3\r\nbar\r\n0", "\r\n\r\n"}, {"foo", "bar"});
     }
 
     TEST_METHOD(DockerIORelay)
