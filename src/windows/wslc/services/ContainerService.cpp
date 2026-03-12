@@ -101,7 +101,7 @@ static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASign
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
-static std::wstring FormatRelativeTime(ULONGLONG timestamp)
+std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
@@ -198,11 +198,6 @@ std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, 
     }
 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
-}
-
-std::wstring ContainerService::ContainerCreatedAtToString(ULONGLONG createdAt)
-{
-    return FormatRelativeTime(createdAt);
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)

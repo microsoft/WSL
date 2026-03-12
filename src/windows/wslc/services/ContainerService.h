@@ -19,7 +19,7 @@ namespace wsl::windows::wslc::services {
 struct ContainerService
 {
     static std::wstring ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt = 0);
-    static std::wstring ContainerCreatedAtToString(ULONGLONG createdAt);
+    static std::wstring FormatRelativeTime(ULONGLONG timestamp);
     static int Attach(models::Session& session, const std::string& id);
     static int Run(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
