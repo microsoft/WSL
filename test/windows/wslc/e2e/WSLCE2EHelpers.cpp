@@ -153,7 +153,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
-            auto result = RunWslc(std::format(L"container delete {}", containerName));
+            auto result = RunWslc(std::format(L"container remove {}", containerName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
