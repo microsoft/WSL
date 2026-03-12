@@ -139,7 +139,7 @@ auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm
 
     if (portsToAllocate > 0)
     {
-        *allocatedPorts = vm.AllocatePorts(portsToAllocate);
+        *allocatedPorts = vm.AllocatePorts(static_cast<uint16_t>(portsToAllocate));
 
         auto it = allocatedPorts->begin();
         for (auto& port : ports)
