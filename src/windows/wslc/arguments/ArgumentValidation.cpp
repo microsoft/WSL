@@ -108,8 +108,8 @@ WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring
     // failure since we also know it failed to be found in the map.
     catch (ArgumentException)
     {
-        throw ArgumentException(
-            std::format(L"Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).", argName, input));
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).", argName, input));
     }
 
     if (signalValue < MIN_SIGNAL || signalValue > MAX_SIGNAL)
@@ -140,8 +140,8 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
     else
     {
-        throw ArgumentException(
-            std::format(L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
     }
 }
 
