@@ -37,7 +37,6 @@ public:
 
     WSLAVhdVolumeImpl(
         std::string&& Name,
-        std::string&& Type,
         std::filesystem::path&& HostPath,
         ULONGLONG SizeBytes,
         ULONG Lun,
@@ -73,7 +72,6 @@ private:
     void Detach();
 
     std::string m_name;
-    std::string m_type;
     std::filesystem::path m_hostPath;
     std::string m_virtualMachinePath;
     ULONGLONG m_sizeBytes{};

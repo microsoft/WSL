@@ -97,7 +97,6 @@ private:
     ULONG m_id = 0;
 
     void ConfigureStorage(const WSLASessionInitSettings& Settings, PSID UserSid);
-    void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();

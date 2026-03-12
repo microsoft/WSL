@@ -1021,23 +1021,13 @@ try
     // already mounted on the VM.
     RETURN_HR_IF(E_INVALIDARG, containerOptions->NamedVolumesCount > 0 && containerOptions->NamedVolumes == nullptr);
 
-    std::lock_guard volumesLock(m_volumesLock);
-    for (ULONG i = 0; i < containerOptions->NamedVolumesCount; i++)
-    {
-        const auto& namedVolume = containerOptions->NamedVolumes[i];
-        RETURN_HR_IF(E_INVALIDARG, namedVolume.Name == nullptr);
-
-        auto volume = m_volumes.find(namedVolume.Name);
-
-        THROW_HR_WITH_USER_ERROR_IF(
-            WSLA_E_VOLUME_NOT_FOUND, Localization::MessageWslaVolumeNotFound(namedVolume.Name), volume == m_volumes.end());
-    }
-
     // TODO: Log entrance into the function.
 
     try
     {
         std::lock_guard containersLock{m_containersLock};
+        std::lock_guard volumesLock(m_volumesLock);
+
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
             *this,
@@ -1327,7 +1317,8 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
-
+    ValidateName(name.c_str());
+    
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);

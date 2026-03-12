@@ -41,7 +41,6 @@ namespace {
 
 WSLAVhdVolumeImpl::WSLAVhdVolumeImpl(
     std::string&& Name,
-    std::string&& Type,
     std::filesystem::path&& HostPath,
     ULONGLONG SizeBytes,
     ULONG Lun,
@@ -49,7 +48,6 @@ WSLAVhdVolumeImpl::WSLAVhdVolumeImpl(
     WSLAVirtualMachine& VirtualMachine,
     DockerHTTPClient& DockerClient) :
     m_name(std::move(Name)),
-    m_type(std::move(Type)),
     m_hostPath(std::move(HostPath)),
     m_virtualMachinePath(std::move(VirtualMachinePath)),
     m_sizeBytes(SizeBytes),
@@ -72,7 +70,6 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
     THROW_HR_IF_NULL(E_POINTER, Options.Options);
 
     std::string name = Options.Name;
-    std::string type = Options.Type;
 
     auto options = wsl::shared::FromJson<std::map<std::string, std::string>>(Options.Options);
 
@@ -82,7 +79,7 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
     auto sizeBytes = wsl::shared::FromJson<ULONGLONG>(it->second.c_str());
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(it->second.c_str()), sizeBytes == 0);
 
-    const auto hostPath = StoragePath / "volumes" / (name + ".vhdx");
+    auto hostPath = StoragePath / "volumes" / (name + ".vhdx");
 
     auto createVhdCleanup =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str())); });
@@ -112,10 +109,14 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
     };
     request.Labels = {{WSLAVolumeMetadataLabel, SerializeVhdVolumeMetadata(hostPath, sizeBytes)}};
 
-    DockerClient.CreateVolume(request);
+    try
+    {
+        DockerClient.CreateVolume(request);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create volume '%hs'", name.c_str());
 
     auto volume = std::make_unique<WSLAVhdVolumeImpl>(
-        std::move(name), std::move(type), std::filesystem::path(hostPath), sizeBytes, lun, std::move(virtualMachinePath), VirtualMachine, DockerClient);
+        std::move(name), std::move(hostPath), sizeBytes, lun, std::move(virtualMachinePath), VirtualMachine, DockerClient);
 
     mountCleanup.release();
     attachCleanup.release();
@@ -154,7 +155,7 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Open(
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
 
     auto volume = std::make_unique<WSLAVhdVolumeImpl>(
-        std::string{Volume.Name}, "vhd", std::move(hostPath), vhdMetadata.SizeBytes, lun, std::move(virtualMachinePath), VirtualMachine, DockerClient);
+        std::string{Volume.Name}, std::move(hostPath), vhdMetadata.SizeBytes, lun, std::move(virtualMachinePath), VirtualMachine, DockerClient);
 
     mountCleanup.release();
     attachCleanup.release();
@@ -170,15 +171,9 @@ void WSLAVhdVolumeImpl::Delete()
     }
     catch (const DockerHTTPException& e)
     {
-        std::string errorMessage;
-        if (e.StatusCode() >= 400 && e.StatusCode() < 500)
-        {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
-        }
-
-        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_VOLUME_NOT_FOUND, errorMessage, e.StatusCode() == 404);
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), errorMessage, e.StatusCode() == 409);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslaVolumeInUse(m_name.c_str()), e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_VOLUME_NOT_FOUND, Localization::MessageWslaVolumeNotFound(m_name.c_str()), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete volume '%hs'", m_name.c_str());
     }
 
     Detach();
