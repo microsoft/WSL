@@ -3317,8 +3317,7 @@ class NetworkTests
             return false;
         }
 
-        for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter != nullptr;
-             adapter = adapter->Next)
+        for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter != nullptr; adapter = adapter->Next)
         {
             if (adapter->IfIndex != bestIndex)
             {
