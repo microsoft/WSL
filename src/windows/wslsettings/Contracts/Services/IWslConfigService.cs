@@ -19,8 +19,8 @@ public interface IWslConfigService
 public sealed class WslConfigPendingChange
 {
     public WslConfigEntry ConfigEntry { get; init; }
-    public object CurrentValue { get; init; } = string.Empty;
-    public object PendingValue { get; init; } = string.Empty;
+    public required IWslConfigSetting CurrentSetting { get; init; }
+    public required IWslConfigSetting PendingSetting { get; init; }
 }
 
 public interface IWslConfigSetting

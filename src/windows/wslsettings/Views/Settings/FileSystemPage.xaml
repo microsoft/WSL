@@ -35,7 +35,7 @@
                 </ctControls:SettingsExpander>
             </StackPanel>
         </ScrollViewer>
-        <Button x:Uid="Settings_ApplyChangesButton" Grid.Row="3" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right" Margin="0,12,0,0"
+        <Button x:Uid="Settings_ApplyChangesButton" Grid.Row="3" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right" Margin="{StaticResource SmallTopMargin}"
             Visibility="{x:Bind ViewModel.HasPendingChanges, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
             Click="ApplyChanges_Click"/>
     </Grid>

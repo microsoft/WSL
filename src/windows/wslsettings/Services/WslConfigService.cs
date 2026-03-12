@@ -43,7 +43,7 @@ public class WslConfigService : IWslConfigService
         {
             if (!defaultSetting && _pendingSettings.TryGetValue(wslConfigEntry, out var pendingSettingState))
             {
-                wslConfigSetting = pendingSettingState.Pending.Clone();
+                wslConfigSetting = pendingSettingState.PendingValue.Clone();
             }
             else
             {
@@ -66,10 +66,9 @@ public class WslConfigService : IWslConfigService
         lock (_wslCoreConfigInterfaceLockObj!)
         {
             var currentPersisted = GetPersistedWslConfigSetting(settingManaged.ConfigEntry, false);
-            var pendingValue = settingManaged.GetValueObject();
 
             var hadPendingBefore = _pendingSettings.Count > 0;
-            if (currentPersisted.Equals(pendingValue))
+            if (currentPersisted.Equals(settingManaged))
             {
                 _pendingSettings.Remove(settingManaged.ConfigEntry);
             }
@@ -77,14 +76,14 @@ public class WslConfigService : IWslConfigService
             {
                 if (_pendingSettings.TryGetValue(settingManaged.ConfigEntry, out var pendingSettingState))
                 {
-                    pendingSettingState.Pending = settingManaged.Clone();
+                    pendingSettingState.PendingValue = settingManaged.Clone();
                 }
                 else
                 {
                     _pendingSettings[settingManaged.ConfigEntry] = new PendingSettingState
                     {
-                        Current = currentPersisted,
-                        Pending = settingManaged.Clone(),
+                        CurrentValue = currentPersisted,
+                        PendingValue = settingManaged.Clone(),
                     };
                 }
             }
@@ -111,35 +110,43 @@ public class WslConfigService : IWslConfigService
     {
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            return _pendingSettings.Values.Select(pendingSettingState => new WslConfigPendingChange
+            var changes = new List<WslConfigPendingChange>(_pendingSettings.Count);
+            foreach (var pendingSettingState in _pendingSettings.Values)
             {
-                ConfigEntry = pendingSettingState.Pending.ConfigEntry,
-                CurrentValue = pendingSettingState.Current.GetValueObject(),
-                PendingValue = pendingSettingState.Pending.GetValueObject()
-            }).ToList();
+                changes.Add(new WslConfigPendingChange
+                {
+                    ConfigEntry = pendingSettingState.PendingValue.ConfigEntry,
+                    CurrentSetting = pendingSettingState.CurrentValue,
+                    PendingSetting = pendingSettingState.PendingValue,
+                });
+            }
+
+            return changes;
         }
     }
 
     public uint CommitPendingChanges()
     {
-        List<PendingSettingState> pendingSettings;
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            pendingSettings = _pendingSettings.Values.ToList();
-        }
-
-        foreach (var pendingSetting in pendingSettings)
-        {
-            var result = PersistWslConfigSetting(pendingSetting.Pending);
-            if (result != 0)
+            _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
+            try
             {
-                return result;
-            }
-        }
+                foreach (var entry in _pendingSettings)
+                {
+                    var result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, entry.Value.PendingValue.ConfigSetting);
+                    if (result != 0)
+                    {
+                        return result;
+                    }
+                }
 
-        lock (_wslCoreConfigInterfaceLockObj!)
-        {
-            _pendingSettings.Clear();
+                _pendingSettings.Clear();
+            }
+            finally
+            {
+                _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            }
         }
 
         _onPendingChangesChangedHandler?.Invoke();
@@ -198,19 +205,6 @@ public class WslConfigService : IWslConfigService
         _onWslConfigChangedHandler?.Invoke();
     }
 
-    private uint PersistWslConfigSetting(WslConfigSettingManaged wslConfigSettingsManaged)
-    {
-        uint result;
-        lock (_wslCoreConfigInterfaceLockObj!)
-        {
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
-            result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, wslConfigSettingsManaged.ConfigSetting);
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
-        }
-
-        return result;
-    }
-
     private WslConfigSettingManaged GetPersistedWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting)
     {
         return new WslConfigSettingManaged(WslCoreConfigInterface.GetWslConfigSetting(defaultSetting ? _wslConfigDefaults : _wslConfig, wslConfigEntry));
@@ -226,8 +220,8 @@ public class WslConfigService : IWslConfigService
 
     private sealed class PendingSettingState
     {
-        public required WslConfigSettingManaged Current { get; init; }
-        public required WslConfigSettingManaged Pending { get; set; }
+        public required WslConfigSettingManaged CurrentValue { get; init; }
+        public required WslConfigSettingManaged PendingValue { get; set; }
     }
 }
 
@@ -291,7 +285,7 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
         return new WslConfigSettingManaged(WslConfigSetting.__CreateInstance(nativeInternal));
     }
 
-    public object GetValueObject()
+    private object GetValueObject()
     {
         switch (ConfigSetting.ConfigEntry)
         {
@@ -316,6 +310,11 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
         default:
             return ConfigSetting.BoolValue;
         }
+    }
+
+    public bool Equals(WslConfigSettingManaged other)
+    {
+        return Equals(other.GetValueObject());
     }
 
 #nullable enable

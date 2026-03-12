@@ -2,6 +2,7 @@
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.ComponentModel;
 using System.Diagnostics;
 using WslSettings.Contracts.Services;
 
@@ -18,9 +19,11 @@ internal static class SettingsApplyHelper
             return;
         }
 
-        var changeLines = pendingChanges
-            .Select(change => $"- {GetSettingName(change.ConfigEntry)}: {FormatSettingValue(change.ConfigEntry, change.PendingValue)}")
-            .ToList();
+        var changeLines = new List<string>(pendingChanges.Count);
+        foreach (var change in pendingChanges)
+        {
+            changeLines.Add($"- {GetSettingName(change.ConfigEntry)}: {FormatSettingValue(change.PendingSetting)}");
+        }
 
         var contentText = string.Join(Environment.NewLine, changeLines);
 
@@ -42,8 +45,8 @@ internal static class SettingsApplyHelper
             XamlRoot = xamlRoot,
             Title = "Settings_ApplyChangesDialogTitle".GetLocalized(),
             Content = contentPanel,
-            PrimaryButtonText = "Settings_ApplyChangesDialogRestartButton".GetLocalized(),
-            CloseButtonText = "Settings_ApplyChangesDialogCancelButton".GetLocalized(),
+            PrimaryButtonText = "Settings_ApplyChangesDialogShutdownButton".GetLocalized(),
+            SecondaryButtonText = "Settings_ApplyChangesDialogLaterButton".GetLocalized(),
             DefaultButton = ContentDialogButton.Primary,
         };
 
@@ -67,18 +70,27 @@ internal static class SettingsApplyHelper
                     Arguments = "--shutdown",
                     CreateNoWindow = true,
                     UseShellExecute = false,
-                });
+                })?.Dispose();
             }
-            catch (Exception ex)
+            catch (Win32Exception ex)
             {
-                await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogRestartFailed".GetLocalized(), ex.Message));
+                await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogShutdownFailed".GetLocalized(), ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogShutdownFailed".GetLocalized(), ex.Message));
             }
         }
-        else
+        else if (result == ContentDialogResult.Secondary)
         {
             // "Later" — commit to disk but don't shutdown; settings apply on next WSL restart
-            wslConfigService.CommitPendingChanges();
+            var commitResult = wslConfigService.CommitPendingChanges();
+            if (commitResult != 0)
+            {
+                await ShowFailureDialogAsync(xamlRoot, string.Format("Settings_ApplyChangesDialogCommitFailed".GetLocalized(), commitResult));
+            }
         }
+        // Esc / close — do nothing, leave changes pending
     }
 
     private static async Task ShowFailureDialogAsync(XamlRoot? xamlRoot, string message)
@@ -134,33 +146,31 @@ internal static class SettingsApplyHelper
         };
     }
 
-    private static string FormatSettingValue(WslConfigEntry entry, object value)
+    private static string FormatSettingValue(IWslConfigSetting setting)
     {
-        if (value is ulong ulongValue)
+        switch (setting.ConfigEntry)
         {
-            if (entry == WslConfigEntry.MemorySizeBytes || entry == WslConfigEntry.SwapSizeBytes || entry == WslConfigEntry.VhdSizeBytes)
-            {
-                return $"{ulongValue / Constants.MB} MB";
-            }
-
-            return ulongValue.ToString();
+            case WslConfigEntry.MemorySizeBytes:
+            case WslConfigEntry.SwapSizeBytes:
+            case WslConfigEntry.VhdSizeBytes:
+                return $"{setting.UInt64Value / Constants.MB} MB";
+            case WslConfigEntry.ProcessorCount:
+                return setting.Int32Value.ToString();
+            case WslConfigEntry.InitialAutoProxyTimeout:
+            case WslConfigEntry.VMIdleTimeout:
+                return $"{setting.Int32Value} ms";
+            case WslConfigEntry.SwapFilePath:
+            case WslConfigEntry.IgnoredPorts:
+            case WslConfigEntry.KernelPath:
+            case WslConfigEntry.SystemDistroPath:
+            case WslConfigEntry.KernelModulesPath:
+                return setting.StringValue;
+            case WslConfigEntry.NetworkingMode:
+                return setting.NetworkingConfigurationValue.ToString();
+            case WslConfigEntry.AutoMemoryReclaim:
+                return setting.MemoryReclaimModeValue.ToString();
+            default:
+                return setting.BoolValue ? "true" : "false";
         }
-
-        if (value is bool boolValue)
-        {
-            return boolValue ? "true" : "false";
-        }
-
-        if (value is int intValue)
-        {
-            if (entry == WslConfigEntry.InitialAutoProxyTimeout || entry == WslConfigEntry.VMIdleTimeout)
-            {
-                return $"{intValue} ms";
-            }
-
-            return intValue.ToString();
-        }
-
-        return value?.ToString() ?? string.Empty;
     }
 }
