@@ -12,14 +12,15 @@ Abstract:
 
 --*/
 
+#include "precomp.h"
 #include "ImageModel.h"
 
 namespace wsl::windows::wslc::models
 {
 RepoTag RepoTag::Parse(const std::string& repoTag)
 {
-    size_t lastSlashPos = repoTag.rfind('/');
-    size_t lastColonPos = repoTag.rfind(':');
+    auto lastSlashPos = repoTag.rfind('/');
+    auto lastColonPos = repoTag.rfind(':');
 
     if (lastSlashPos == std::string::npos)
     {
@@ -42,6 +43,6 @@ RepoTag RepoTag::Parse(const std::string& repoTag)
 
     // Has slash but no colon or colon before the last slash
     // (e.g. "myrepo/debian" or "myrepo:5000/debian")
-    return {repoTag, ""};
+    return { repoTag, "" };
 }
 } // namespace wsl::windows::wslc::models

@@ -18,20 +18,17 @@ Abstract:
 
 namespace WSLCE2ETests {
 
+using namespace wsl::shared::string;
+
 class WSLCE2EImageTagTests
 {
     WSL_TEST_CLASS(WSLCE2EImageTagTests)
 
-    TEST_CLASS_SETUP(ClassSetup)
-    {
-        EnsureImageIsDeleted(DebianTaggedImage);
-        EnsureImageIsLoaded(DebianImage);
-        return true;
-    }
-
     TEST_METHOD_SETUP(MethodSetup)
     {
         EnsureImageIsDeleted(DebianTaggedImage);
+        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
         return true;
     }
 
@@ -39,6 +36,7 @@ class WSLCE2EImageTagTests
     {
         EnsureImageIsDeleted(DebianTaggedImage);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 
@@ -96,9 +94,59 @@ class WSLCE2EImageTagTests
         VERIFY_ARE_EQUAL(sourceInspect, targetInspect);
     }
 
+    TEST_METHOD(WSLCE2E_Image_Tag_SourceAndTargetAreTheSame_Noop)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        VerifyImageIsListed(DebianImage);
+
+        auto imageInspect = InspectImage(DebianImage.NameAndTag());
+        VERIFY_ARE_EQUAL(1u, imageInspect.RepoTags->size());
+        VERIFY_ARE_EQUAL(imageInspect.RepoTags->at(0), WideToMultiByte(DebianImage.NameAndTag()));
+    }
+
+    TEST_METHOD(WSLCE2E_Image_Tag_TargetAlreadyExists_OverwritesTarget)
+    {
+        WSL2_TEST_ONLY();
+
+        {
+            auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+            auto resultSourceInspect = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
+            resultSourceInspect.Verify({.Stderr = L"", .ExitCode = 0});
+            auto sourceInspect = resultSourceInspect.GetStdoutOneLine();
+
+            auto resultTargetInspect = RunWslc(std::format(L"image inspect {}", DebianTaggedImage.NameAndTag()));
+            resultTargetInspect.Verify({.Stderr = L"", .ExitCode = 0});
+            auto targetInspect = resultTargetInspect.GetStdoutOneLine();
+
+            VERIFY_ARE_EQUAL(sourceInspect, targetInspect);
+        }
+
+        {
+            auto result = RunWslc(std::format(L"image tag {} {}", AlpineImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+            auto resultSourceInspect = RunWslc(std::format(L"image inspect {}", AlpineImage.NameAndTag()));
+            resultSourceInspect.Verify({.Stderr = L"", .ExitCode = 0});
+            auto sourceInspect = resultSourceInspect.GetStdoutOneLine();
+
+            auto resultTargetInspect = RunWslc(std::format(L"image inspect {}", DebianTaggedImage.NameAndTag()));
+            resultTargetInspect.Verify({.Stderr = L"", .ExitCode = 0});
+            auto targetInspect = resultTargetInspect.GetStdoutOneLine();
+
+            VERIFY_ARE_EQUAL(sourceInspect, targetInspect);
+        }
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
     const TestImage& DebianTaggedImage = TestImage{L"debian", L"e2e-new-tag"};
 
