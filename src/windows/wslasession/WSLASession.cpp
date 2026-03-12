@@ -619,7 +619,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     }
 }
 
-HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -633,18 +633,18 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto retVal = m_dockerClient->SaveImage(ImageNameOrID);
-    SaveImageImpl(retVal, OutHandle);
+    SaveImageImpl(retVal, OutHandle, CancelEvent);
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle)
+void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, HANDLE CancelEvent)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto io = CreateIOContext();
+    auto io = CreateIOContext(CancelEvent);
 
     std::string errorJson;
 
@@ -1459,8 +1459,7 @@ HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
 }
 
-// TODO consider allowing callers to pass cancellation handles.
-MultiHandleWait WSLASession::CreateIOContext()
+MultiHandleWait WSLASession::CreateIOContext(HANDLE CancelHandle)
 {
     relay::MultiHandleWait io;
 
@@ -1471,6 +1470,12 @@ MultiHandleWait WSLASession::CreateIOContext()
     // Cancel with E_ABORT if the client process exits.
     io.AddHandle(std::make_unique<relay::EventHandle>(
         wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
+
+    if (CancelHandle != nullptr)
+    {
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
+    }
 
     return io;
 }
