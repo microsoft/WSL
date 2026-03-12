@@ -334,8 +334,9 @@ interface ILxssUserSession : IUnknown
         [in] BOOL Force);
 
     HRESULT ImportDistributionInplace(
-        [in] LPCWSTR DistributionName,
+        [in, unique] LPCWSTR DistributionName,
         [in] LPCWSTR VhdPath,
+        [in] BOOL EnableOobe,
         [in, out] LXSS_ERROR_INFO* Error,
         [out, retval] GUID* pDistroGuid);
 
