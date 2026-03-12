@@ -1395,7 +1395,7 @@ HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
 }
 
-MultiHandleWait WSLASession::CreateIOContext(HANDLE CancellationHandle)
+MultiHandleWait WSLASession::CreateIOContext(HANDLE CancelHandle)
 {
     relay::MultiHandleWait io;
 
@@ -1407,10 +1407,10 @@ MultiHandleWait WSLASession::CreateIOContext(HANDLE CancellationHandle)
     io.AddHandle(std::make_unique<relay::EventHandle>(
         wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
 
-    if (CancellationHandle != nullptr)
+    if (CancelHandle != nullptr)
     {
-        io.AddHandle(std::make_unique<relay::EventHandle>(
-            CancellationHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
     }
 
     return io;
