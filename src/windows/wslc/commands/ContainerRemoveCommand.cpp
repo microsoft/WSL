@@ -34,7 +34,7 @@ std::vector<Argument> ContainerRemoveCommand::GetArguments() const
 
 std::wstring ContainerRemoveCommand::ShortDescription() const
 {
-    return {L"Remove containers"};
+    return {L"Remove containers."};
 }
 
 std::wstring ContainerRemoveCommand::LongDescription() const

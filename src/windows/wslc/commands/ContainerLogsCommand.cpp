@@ -34,7 +34,7 @@ std::vector<Argument> ContainerLogsCommand::GetArguments() const
 
 std::wstring ContainerLogsCommand::ShortDescription() const
 {
-    return {L"View container logs"};
+    return {L"View container logs."};
 }
 
 std::wstring ContainerLogsCommand::LongDescription() const

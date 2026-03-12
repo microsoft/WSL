@@ -18,7 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
-using wsl::windows::common::docker_schema::InspectImage;
+using wsl::windows::common::wsla_schema::InspectImage;
 
 void ImageService::Build(
     wsl::windows::wslc::models::Session& session,

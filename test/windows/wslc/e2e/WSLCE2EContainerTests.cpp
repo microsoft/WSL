@@ -74,13 +74,13 @@ private:
                  << L"  create   Create a container.\r\n"
                  << L"  exec     Execute a command in a running container.\r\n"
                  << L"  inspect  Inspect a container.\r\n"
-                 << L"  kill     Kill containers\r\n"
-                 << L"  logs     View container logs\r\n"
+                 << L"  kill     Kill containers.\r\n"
+                 << L"  logs     View container logs.\r\n"
                  << L"  list     List containers.\r\n"
-                 << L"  remove   Remove containers\r\n"
+                 << L"  remove   Remove containers.\r\n"
                  << L"  run      Run a container.\r\n"
                  << L"  start    Start a container.\r\n"
-                 << L"  stop     Stop containers\r\n"
+                 << L"  stop     Stop containers.\r\n"
                  << L"\r\n"
                  << L"For more details on a specific command, pass it the help argument. [-h]\r\n\r\n";
         return commands.str();
