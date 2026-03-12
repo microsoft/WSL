@@ -1475,6 +1475,98 @@ class WSLATests
         }
     }
 
+    struct BlockingOperation
+    {
+        NON_COPYABLE(BlockingOperation);
+        NON_MOVABLE(BlockingOperation);
+
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK) :
+            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult)
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+
+            m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
+            m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
+
+            // Wait for the operation to be running before continuing.
+            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
+        }
+
+        ~BlockingOperation()
+        {
+            if (m_operationThread.joinable())
+            {
+                m_operationThread.join();
+            }
+
+            if (m_ioThread.joinable())
+            {
+                m_ioThread.join();
+            }
+        }
+
+        void RunOperation(wil::unique_handle Handle)
+        {
+            m_result.set_value(m_operation(Handle.get()));
+
+            // Fail if the operation completed before the test signaled completion.
+            // Don't use VERIFY macros since this is running in a separate thread.
+            WI_ASSERT(m_testCompleteEvent.is_signaled());
+        }
+
+        void RunIO(wil::unique_handle Handle)
+        {
+            std::vector<char> buffer(1024 * 1024);
+            while (true)
+            {
+                DWORD bytesRead{};
+                if (!ReadFile(Handle.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+                {
+                    if (GetLastError() != ERROR_BROKEN_PIPE)
+                    {
+                        LogError("Unexpected ReadFile() error: %u", GetLastError());
+                    }
+
+                    break;
+                }
+
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                if (!m_startedEvent.is_signaled())
+                {
+                    m_startedEvent.SetEvent();
+                }
+
+                // Block until the test completes.
+                if (!m_testCompleteEvent.wait(60 * 1000))
+                {
+                    LogError("Timed out waiting for test completion");
+                    break;
+                }
+            }
+        }
+
+        void Complete()
+        {
+            m_testCompleteEvent.SetEvent();
+
+            VERIFY_ARE_EQUAL(m_expectedResult, m_result.get_future().get());
+        }
+
+        std::function<HRESULT(HANDLE)> m_operation;
+        wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
+        wil::unique_event m_testCompleteEvent{wil::EventOptions::ManualReset};
+        std::thread m_operationThread;
+        std::thread m_ioThread;
+        std::promise<HRESULT> m_result;
+        HRESULT m_expectedResult{};
+    };
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
@@ -1508,7 +1600,7 @@ class WSLATests
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, nullptr));
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
             }
@@ -1543,11 +1635,25 @@ class WSLATests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr));
+            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, nullptr));
             ValidateCOMErrorMessage(L"reference does not exist");
 
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+        }
+
+        // Validate that cancellation works.
+        {
+            wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+
+            BlockingOperation operation(
+                [&](HANDLE handle) {
+                    return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, cancelEvent.get());
+                },
+                E_ABORT);
+
+            cancelEvent.SetEvent();
+            operation.Complete();
         }
     }
     TEST_METHOD(ExportContainer)
@@ -5011,96 +5117,6 @@ class WSLATests
         }
     }
 
-    struct BlockingOperation
-    {
-        NON_COPYABLE(BlockingOperation);
-        NON_MOVABLE(BlockingOperation);
-
-        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation) : m_operation(std::move(Operation))
-        {
-            wil::unique_handle pipeRead;
-            wil::unique_handle pipeWrite;
-            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
-
-            m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
-            m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
-
-            // Wait for the operation to be running before continuing.
-            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
-        }
-
-        ~BlockingOperation()
-        {
-            if (m_operationThread.joinable())
-            {
-                m_operationThread.join();
-            }
-
-            if (m_ioThread.joinable())
-            {
-                m_ioThread.join();
-            }
-        }
-
-        void RunOperation(wil::unique_handle Handle)
-        {
-            m_result.set_value(m_operation(Handle.get()));
-
-            // Fail if the operation completed before the test signaled completion.
-            // Don't use VERIFY macros since this is running in a separate thread.
-            WI_ASSERT(m_testCompleteEvent.is_signaled());
-        }
-
-        void RunIO(wil::unique_handle Handle)
-        {
-            std::vector<char> buffer(1024 * 1024);
-            while (true)
-            {
-                DWORD bytesRead{};
-                if (!ReadFile(Handle.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
-                {
-                    if (GetLastError() != ERROR_BROKEN_PIPE)
-                    {
-                        LogError("Unexpected ReadFile() error: %u", GetLastError());
-                    }
-
-                    break;
-                }
-
-                if (bytesRead == 0)
-                {
-                    break;
-                }
-
-                if (!m_startedEvent.is_signaled())
-                {
-                    m_startedEvent.SetEvent();
-                }
-
-                // Block until the test completes.
-                if (!m_testCompleteEvent.wait(60 * 1000))
-                {
-                    LogError("Timed out waiting for test completion");
-                    break;
-                }
-            }
-        }
-
-        void Complete()
-        {
-            m_testCompleteEvent.SetEvent();
-
-            VERIFY_SUCCEEDED(m_result.get_future().get());
-        }
-
-        std::function<HRESULT(HANDLE)> m_operation;
-        wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
-        wil::unique_event m_testCompleteEvent{wil::EventOptions::ManualReset};
-        std::thread m_operationThread;
-        std::thread m_ioThread;
-        std::promise<HRESULT> m_result;
-    };
-
     // This test case validates that multiple operations can happen in parallel in the same session.
     TEST_METHOD(ParallelSessionOperations)
     {
@@ -5108,7 +5124,7 @@ class WSLATests
 
         // Start a blocking export
         BlockingOperation operation(
-            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr); });
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); });
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
 
