@@ -352,6 +352,12 @@ void DockerHTTPClient::RemoveVolume(const std::string& Name)
     Transaction(verb::delete_, URL::Create("/volumes/{}", Name));
 }
 
+std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
+{
+    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, URL::Create("/volumes"));
+    return response.Volumes;
+}
+
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);

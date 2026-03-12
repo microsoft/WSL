@@ -139,6 +139,7 @@ public:
     // Volume management.
     void CreateVolume(const common::docker_schema::CreateVolume& Request);
     void RemoveVolume(const std::string& Name);
+    std::vector<common::docker_schema::Volume> ListVolumes();
 
     // Image management.
     struct ListImagesFilters

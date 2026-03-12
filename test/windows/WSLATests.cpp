@@ -2359,7 +2359,7 @@ class WSLATests
         WSLAVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
         volumeOptions.Type = "vhd";
-        volumeOptions.Options = nullptr;
+        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
 
         // Create volume and validate duplicate volume name handling.
         VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
@@ -2461,7 +2461,7 @@ class WSLATests
         holderContainer.SetDeleteOnClose(false);
 
         VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION));
-
+        
         // Verify that after deleting the container, the volume can be deleted.
         VERIFY_SUCCEEDED(holderContainer.Get().Delete(WSLADeleteFlagsNone));
         VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
@@ -2472,6 +2472,86 @@ class WSLATests
         cleanup.release();
     }
 
+    TEST_METHOD(NamedVolumesSessionRecovery)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        const std::string volumeName = "wsla-test-named-volume";
+        const std::string containerName = "wsla-test-container";
+        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
+
+        // Best-effort cleanup in case prior failed runs left artifacts behind.
+        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        {
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        }
+
+        auto cleanup = wil::scope_exit([&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        });
+
+        WSLAVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Type = "vhd";
+        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+
+        // Create a container that uses the named volume and writes a marker.
+        {
+            WSLAContainerLauncher writer(
+                "debian:latest", containerName, {"/bin/sh", "-c", "echo named-volume-recovery >/data/marker.txt"});
+            writer.AddNamedVolume(volumeName, "/data", false);
+
+            auto writerContainer = writer.Launch(*m_defaultSession);
+            writerContainer.SetDeleteOnClose(false);
+
+            auto writerProcess = writerContainer.GetInitProcess();
+            ValidateProcessOutput(writerProcess, {});
+        }
+
+        // Restart the session and verify the container is recovered.
+        ResetTestSession();
+        
+        auto recoveredContainer = OpenContainer(m_defaultSession.get(), containerName);
+        recoveredContainer.SetDeleteOnClose(false);
+
+        // Verify the named volume still contains the marker after restart.
+        {
+            WSLAContainerLauncher reader("debian:latest", "wsla-test-container-reader", {"/bin/sh", "-c", "cat /data/marker.txt"});
+            reader.AddNamedVolume(volumeName, "/data", true);
+
+            auto readerContainer = reader.Launch(*m_defaultSession);
+            auto readerProcess = readerContainer.GetInitProcess();
+            ValidateProcessOutput(readerProcess, {{1, "named-volume-recovery\n"}});
+        }
+
+        // Stop the session, delete the backing VHD, and restart.
+        {
+            auto restartSession = ResetTestSession();
+
+            VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+
+            std::error_code error;
+            VERIFY_IS_TRUE(std::filesystem::remove(volumeVhdPath, error));
+            VERIFY_ARE_EQUAL(error, std::error_code{});
+        }
+
+        wil::com_ptr<IWSLAContainer> notFound;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerName.c_str(), &notFound), E_UNEXPECTED);
+
+        // Deleting the named volume should fail since the volume was not recovered.
+        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLA_E_VOLUME_NOT_FOUND);
+    }
+
     TEST_METHOD(NamedVolumeOptionsParseTest)
     {
         WSL2_TEST_ONLY();
@@ -2479,7 +2559,7 @@ class WSLATests
 
         const std::string volumeName = "wsla-volume-name";
 
-        auto validateInvalidOptionsFailure = [&](const std::string& options, HRESULT expectedResult, const std::wstring& expectedMessage) {
+        auto validateInvalidOptionsFailure = [&](const std::string& options, HRESULT expectedResult, const std::optional<std::wstring>& expectedMessage = std::nullopt) {
             LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
             auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
@@ -2489,36 +2569,30 @@ class WSLATests
             volumeOptions.Type = "vhd";
             volumeOptions.Options = options.c_str();
 
-            VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), expectedResult);
-            ValidateCOMErrorMessage(expectedMessage);
+            const auto result = m_defaultSession->CreateVolume(&volumeOptions);
+
+            if (result != expectedResult)
+            {
+                LogInfo("CreateVolume mismatch options='%hs' result=0x%08x expected=0x%08x", options.c_str(), static_cast<unsigned int>(result), static_cast<unsigned int>(expectedResult));
+            }
+
+            VERIFY_ARE_EQUAL(result, expectedResult);
+            if (expectedMessage.has_value())
+            {
+                ValidateCOMErrorMessage(expectedMessage);
+            }
         };
 
-        auto validateValidOptionsSuccess = [&](const std::string& options) {
-            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        validateInvalidOptionsFailure("not-json", WSL_E_INVALID_JSON);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"abc"})", WSL_E_INVALID_JSON);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"+-1"})", WSL_E_INVALID_JSON);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"123abc"})", WSL_E_INVALID_JSON);
 
-            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
-
-            WSLAVolumeOptions volumeOptions{};
-            volumeOptions.Name = volumeName.c_str();
-            volumeOptions.Type = "vhd";
-            volumeOptions.Options = options.c_str();
-
-            VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
-        };
-
-        validateInvalidOptionsFailure("not-json", E_INVALIDARG, L"Invalid volume options: 'not-json'");
-        validateInvalidOptionsFailure("{\"SizeBytes\":\"abc\"}", E_INVALIDARG, L"Invalid size: abc");
-        validateInvalidOptionsFailure("{\"SizeBytes\":\"-1\"}", E_INVALIDARG, L"Invalid size: -1");
-        validateInvalidOptionsFailure("{\"SizeBytes\":\"+-1\"}", E_INVALIDARG, L"Invalid size: +-1");
-        validateInvalidOptionsFailure("{\"SizeBytes\":\"123abc\"}", E_INVALIDARG, L"Invalid size: 123abc");
-        validateInvalidOptionsFailure(
-            "{\"SizeBytes\":\"18446744073709551616\"}", E_INVALIDARG, L"Invalid size: 18446744073709551616");
-
-        validateValidOptionsSuccess("{\"SizeBytes\":\"1073741824\"}");
-        validateValidOptionsSuccess("{\"SizeBytes\":\"0\"}");
-        validateValidOptionsSuccess("{\"SizeBytes\":\"\"}");
-        validateValidOptionsSuccess("{}");
-        validateValidOptionsSuccess("");
+        validateInvalidOptionsFailure(R"({"SizeBytes":"18446744073709551616"})", E_INVALIDARG);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"-1"})", E_INVALIDARG);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"0"})", E_INVALIDARG, L"Invalid size: 0");
+        validateInvalidOptionsFailure("{}", E_INVALIDARG, L"Invalid volume options: '{}'");
+        validateInvalidOptionsFailure("", WSL_E_INVALID_JSON);
     }
 
     TEST_METHOD(CreateContainer)
