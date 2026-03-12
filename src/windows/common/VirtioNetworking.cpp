@@ -230,13 +230,12 @@ try
     }
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
-    UpdateDefaultRoute(default_route, AF_INET);
-
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {
         UpdateIpv6Address(networkSettings->PreferredIpv6Address);
-        UpdateDefaultRoute(default_route_v6, AF_INET6);
     }
+
+    UpdateDefaultRoute(default_route);
 
     UpdateDnsSettings(currentDns);
     UpdateMtu(minMtu);
@@ -275,10 +274,8 @@ void VirtioNetworking::SetupLoopbackDevice()
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }
 
-void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, ADDRESS_FAMILY family, hns::ModifyRequestType requestType)
+void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, hns::ModifyRequestType requestType)
 {
-    WI_ASSERT(family == AF_INET || WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
-
     if (gateway.empty())
     {
         return;
@@ -286,8 +283,8 @@ void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, ADDRESS_FAM
 
     wsl::shared::hns::Route route;
     route.NextHop = gateway;
-    route.DestinationPrefix = (family == AF_INET) ? LX_INIT_DEFAULT_ROUTE_PREFIX : LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
-    route.Family = family;
+    route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+    route.Family = AF_INET;
 
     hns::ModifyGuestEndpointSettingRequest<hns::Route> request;
     request.RequestType = requestType;
@@ -296,19 +293,16 @@ void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, ADDRESS_FAM
     m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
 }
 
-void VirtioNetworking::UpdateDefaultRoute(const std::wstring& gateway, ADDRESS_FAMILY family)
+void VirtioNetworking::UpdateDefaultRoute(const std::wstring& gateway)
 {
-    WI_ASSERT(family == AF_INET || WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
-
-    auto& trackedRoute = (family == AF_INET) ? m_trackedDefaultRoute : m_trackedDefaultRouteV6;
-    if (gateway == trackedRoute)
+    if (gateway == m_trackedDefaultRoute)
     {
         return;
     }
 
-    SendDefaultRoute(trackedRoute, family, hns::ModifyRequestType::Remove);
-    trackedRoute = gateway;
-    SendDefaultRoute(gateway, family, hns::ModifyRequestType::Add);
+    SendDefaultRoute(m_trackedDefaultRoute, hns::ModifyRequestType::Remove);
+    m_trackedDefaultRoute = gateway;
+    SendDefaultRoute(gateway, hns::ModifyRequestType::Add);
 }
 
 void VirtioNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
@@ -366,6 +360,7 @@ void VirtioNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAd
     request.Settings.Address = ipAddress.AddressString;
     request.Settings.Family = ipAddress.Address.si_family;
     request.Settings.OnLinkPrefixLength = ipAddress.PrefixLength;
+    request.Settings.PreferredLifetime = ULONG_MAX;
     m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
 }
 

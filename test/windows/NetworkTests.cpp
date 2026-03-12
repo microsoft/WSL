@@ -2249,8 +2249,10 @@ class NetworkTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Verify we have connectivity from the networking namespace when using ephemeral port selection.
@@ -2729,14 +2731,17 @@ class NetworkTests
         {
             if (std::regex_search(line, match, defaultRoutePattern) && match.size() >= 3)
             {
-                VERIFY_IS_FALSE(state.DefaultRoute.has_value());
+                if (state.DefaultRoute.has_value())
+                {
+                    continue;
+                }
 
                 state.DefaultRoute = {{match.str(1), match.str(2), {}, match.size() > 4 && match[4].matched ? std::stoi(match.str(4)) : 0}};
             }
             else if (std::regex_search(line, match, routePattern) && match.size() >= 4)
             {
-                state.Routes.emplace_back(Route{
-                    match.str(2), match.str(3), {match.str(1)}, match.size() > 5 && match[5].matched ? std::stoi(match.str(5)) : 0});
+                state.Routes.emplace_back(
+                    Route{match.str(2), match.str(3), {match.str(1)}, match.size() > 5 && match[5].matched ? std::stoi(match.str(5)) : 0});
             }
         }
 
@@ -2752,6 +2757,24 @@ class NetworkTests
         std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
 
         return GetRoutingTableState(out, defaultRoutePattern, routePattern);
+    }
+
+    static void WaitForIpv6DefaultRoute()
+    {
+        const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        while (std::chrono::steady_clock::now() < timeout)
+        {
+            auto state = GetIpv6RoutingTableState();
+            if (state.DefaultRoute.has_value())
+            {
+                return;
+            }
+
+            LogInfo("Waiting for IPv6 default route...");
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+
+        VERIFY_FAIL(L"Timed out waiting for IPv6 default route");
     }
 
     static RoutingTableState GetIpv6RoutingTableState()
@@ -3258,6 +3281,52 @@ class NetworkTests
             for (const IP_ADAPTER_ADDRESSES* adapter = adapterAddresses.get(); adapter != nullptr; adapter = adapter->Next)
             {
                 if (interfaceLuid.Value == adapter->Luid.Value && adapter->FirstUnicastAddress != nullptr && adapter->FirstGatewayAddress != nullptr)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    static bool HostHasIpv6DnsServers()
+    {
+        ULONG bufferSize = 0;
+        constexpr ULONG flags = GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_INCLUDE_GATEWAYS;
+        std::unique_ptr<IP_ADAPTER_ADDRESSES> buffer;
+        ULONG result;
+
+        while ((result = GetAdaptersAddresses(AF_INET6, flags, nullptr, buffer.get(), &bufferSize)) == ERROR_BUFFER_OVERFLOW)
+        {
+            buffer.reset(static_cast<IP_ADAPTER_ADDRESSES*>(malloc(bufferSize)));
+        }
+
+        if (result != NO_ERROR)
+        {
+            return false;
+        }
+
+        DWORD bestIndex = 0;
+        SOCKADDR_IN6 dest{};
+        dest.sin6_family = AF_INET6;
+        InetPtonW(AF_INET6, L"2001:4860:4860::8888", &dest.sin6_addr);
+
+        if (GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex) != NO_ERROR)
+        {
+            return false;
+        }
+
+        for (const IP_ADAPTER_ADDRESSES* adapter = buffer.get(); adapter != nullptr; adapter = adapter->Next)
+        {
+            if (adapter->IfIndex != bestIndex)
+            {
+                continue;
+            }
+
+            for (auto* dns = adapter->FirstDnsServerAddress; dns != nullptr; dns = dns->Next)
+            {
+                if (dns->Address.lpSockaddr->sa_family == AF_INET6)
                 {
                     return true;
                 }
@@ -3967,12 +4036,15 @@ class MirroredTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Add rule for port forwarding traffic with destination port 8080 to port 80 in the new namespace
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat PREROUTING { type nat hook prerouting priority dstnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat PREROUTING { type nat hook prerouting priority dstnat; }\""), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat PREROUTING tcp dport 8080 dnat to 192.168.15.2:80"), 0);
 
         // Start listeners in root namespace on port 8080 and new namespace on port 80
@@ -4046,8 +4118,10 @@ class MirroredTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Create a listener on the Windows host on port 1234
@@ -4566,6 +4640,8 @@ class VirtioProxyTests
             return;
         }
 
+        NetworkTests::WaitForIpv6DefaultRoute();
+
         NetworkTests::GuestClient(L"tcp6-connect:bing.com:80");
     }
 
@@ -4584,8 +4660,14 @@ class VirtioProxyTests
 
         VERIFY_IS_TRUE(std::regex_match(out, pattern));
 
-        // Verify that /etc/resolv.conf contains a 'search' line with DNS suffixes
-        VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
+        // Verify that /etc/resolv.conf contains a 'search' line if the host has DNS suffixes
+        auto [suffixOut, suffixErr] = LxsstuLaunchPowershellAndCaptureOutput(
+            L"@((Get-DnsClientGlobalSetting).SuffixSearchList) + @((Get-DnsClient).ConnectionSpecificSuffix) | Where-Object {$_} "
+            L"| Select-Object -First 1");
+        if (suffixOut.find_first_not_of(L" \t\r\n") != std::wstring::npos)
+        {
+            VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
+        }
     }
 
     TEST_METHOD(GuestPortIsReleased)
@@ -4698,6 +4780,10 @@ class VirtioProxyTests
             return;
         }
 
+        // Wait for the device host to send an IPv6 Router Advertisement
+        // before querying the interface state.
+        NetworkTests::WaitForIpv6DefaultRoute();
+
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
 
         // Verify that the guest has a global IPv6 address assigned
@@ -4737,7 +4823,18 @@ class VirtioProxyTests
                     SOCKADDR_INET hostAddr{};
                     hostAddr.Ipv6 = sin6;
                     const auto hostAddrString = wsl::windows::common::string::SockAddrInetToWstring(hostAddr);
-                    VERIFY_ARE_EQUAL(hostAddrString, state.V6Addresses[0].Address);
+
+                    // The host address may not be at index 0 due to SLAAC addresses from RA
+                    bool addressFound = false;
+                    for (const auto& v6Addr : state.V6Addresses)
+                    {
+                        if (v6Addr.Address == hostAddrString)
+                        {
+                            addressFound = true;
+                            break;
+                        }
+                    }
+                    VERIFY_IS_TRUE(addressFound);
                     break;
                 }
 
@@ -4800,6 +4897,12 @@ class VirtioProxyTests
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
             LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        if (!NetworkTests::HostHasIpv6DnsServers())
+        {
+            LogSkipped("Host does not have IPv6 DNS servers configured. Skipping...");
             return;
         }
 
