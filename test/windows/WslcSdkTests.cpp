@@ -1154,4 +1154,3 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcInstallWithDependencies(nullptr, nullptr), E_NOTIMPL);
     }
 };
-
