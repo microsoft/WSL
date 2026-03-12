@@ -57,7 +57,7 @@ set(INIT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/init)
 add_custom_command(
     OUTPUT ${INITRAMFS} "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
     DEPENDS init ${INIT}
-    COMMAND tar.exe -cf "${INITRAMFS}" --format=newc -C "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}" init
+    COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive -File "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1" "${INIT}" "${INITRAMFS}"
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
     VERBATIM)
 add_custom_target(initramfs DEPENDS ${INITRAMFS})
