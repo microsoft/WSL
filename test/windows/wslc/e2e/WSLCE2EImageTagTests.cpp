@@ -195,9 +195,9 @@ private:
     std::wstring GetAvailableCommands() const
     {
         std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
+        commands << L"The following arguments are available:\r\n"                                          //
                  << L"  source     Current or existing image reference in the image-name[:tag] format\r\n" //
-                 << L"  target     New image reference in the image-name[:tag] format\r\n" //
+                 << L"  target     New image reference in the image-name[:tag] format\r\n"                 //
                  << L"\r\n";
         return commands.str();
     }
@@ -205,7 +205,7 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                //
+        options << L"The following options are available:\r\n"               //
                 << L"  -h,--help  Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();

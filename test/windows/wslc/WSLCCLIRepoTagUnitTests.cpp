@@ -27,12 +27,12 @@ class WSLCCLIRepoTagUnitTests
     TEST_METHOD(RepoTag_Parse_ValidInput_ReturnsExpectedRepoAndTag)
     {
         std::vector<std::tuple<std::string, std::string, std::string>> testCases = {
-            { "debian", "debian", "" },
-            { "debian:latest", "debian", "latest" },
-            { "myrepo/debian", "myrepo/debian", "" },
-            { "myrepo/debian:latest", "myrepo/debian", "latest" },
-            { "myrepo:5000/debian", "myrepo:5000/debian", "" },
-            { "myrepo:5000/debian:latest", "myrepo:5000/debian", "latest" }};
+            {"debian", "debian", ""},
+            {"debian:latest", "debian", "latest"},
+            {"myrepo/debian", "myrepo/debian", ""},
+            {"myrepo/debian:latest", "myrepo/debian", "latest"},
+            {"myrepo:5000/debian", "myrepo:5000/debian", ""},
+            {"myrepo:5000/debian:latest", "myrepo:5000/debian", "latest"}};
 
         for (const auto& [input, expectedRepo, expectedTag] : testCases)
         {
@@ -45,13 +45,13 @@ class WSLCCLIRepoTagUnitTests
     TEST_METHOD(RepoTag_Parse_EdgeCases_ReturnExpectedRepoAndTag)
     {
         std::vector<std::tuple<std::string, std::string, std::string>> testCases = {
-            { "", "", "" },
-            { "repo:", "repo", "" },
-            { ":latest", "", "latest" },
-            { "org/team/image", "org/team/image", "" },
-            { "registry.example.com:5000/org/team/image", "registry.example.com:5000/org/team/image", "" },
-            { "registry.example.com:5000/org/team/image:v1", "registry.example.com:5000/org/team/image", "v1" },
-            { "org/team/image:", "org/team/image", "" },
+            {"", "", ""},
+            {"repo:", "repo", ""},
+            {":latest", "", "latest"},
+            {"org/team/image", "org/team/image", ""},
+            {"registry.example.com:5000/org/team/image", "registry.example.com:5000/org/team/image", ""},
+            {"registry.example.com:5000/org/team/image:v1", "registry.example.com:5000/org/team/image", "v1"},
+            {"org/team/image:", "org/team/image", ""},
         };
 
         for (const auto& [input, expectedRepo, expectedTag] : testCases)
