@@ -51,3 +51,13 @@ add_linux_executable(init "${SOURCES}" "${HEADERS};${COMMON_LINUX_HEADERS}" "${I
 add_dependencies(init localization)
 
 set_target_properties(init PROPERTIES FOLDER linux)
+
+set(INITRAMFS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/initrd.img)
+set(INIT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/init)
+add_custom_command(
+    OUTPUT ${INITRAMFS} "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
+    DEPENDS init ${INIT}
+    COMMAND tar.exe -cf ${INITRAMFS} --format=newc -C "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}" init
+    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
+    VERBATIM)
+add_custom_target(initramfs DEPENDS ${INITRAMFS})

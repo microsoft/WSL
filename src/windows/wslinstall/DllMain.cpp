@@ -872,46 +872,6 @@ extern "C" UINT __stdcall UnregisterLspCategories(MSIHANDLE install)
     return NOERROR;
 }
 
-extern "C" UINT __stdcall CreateInitrd(MSIHANDLE install)
-try
-{
-    WSL_INSTALL_LOG("CreateInitrd");
-
-    const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
-    THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
-
-    const auto toolsPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY;
-    const auto initPath = toolsPath / L"init";
-    const auto initrdPath = toolsPath / LXSS_VM_MODE_INITRD_NAME;
-    wsl::windows::common::filesystem::CreateCpioInitrd(initPath, initrdPath);
-
-    return NOERROR;
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
-
-    return ERROR_INSTALL_FAILURE;
-}
-
-extern "C" UINT __stdcall RemoveInitrd(MSIHANDLE install)
-{
-    try
-    {
-        WSL_INSTALL_LOG("RemoveInitrd");
-
-        const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
-        THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
-
-        const auto initrdPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
-        THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(initrdPath.c_str()));
-    }
-    CATCH_LOG()
-
-    // Failures in this method aren't fatal.
-    return NOERROR;
-}
-
 std::wstring GetWslSettingsInstalledExePath(MSIHANDLE install)
 {
     const auto wslSettingsInstallFolder = GetMsiProperty(install, c_wslSettingsInstalledDirectoryPropertyName);
