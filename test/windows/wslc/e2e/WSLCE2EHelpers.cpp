@@ -104,6 +104,22 @@ void VerifyImageIsNotUsed(const TestImage& image)
     }
 }
 
+void VerifyImageIsListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto outputLines = result.GetStdoutLines();
+    for (const auto& line : outputLines)
+    {
+        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     const int shortIdLength = 12;
