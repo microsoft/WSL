@@ -23,7 +23,7 @@ function Write-Pad([System.IO.Stream]$Stream, [int]$Position)
     }
 }
 
-function Write-CpioEntry([System.IO.Stream]$Stream, [byte[]]$NameBytes, [byte[]]$FileData, [int]$Mode)
+function Write-CpioEntry([System.IO.Stream]$Stream, [byte[]]$NameBytes, [byte[]]$FileData, [int]$Mode, [uint32]$Mtime)
 {
     $header = "070701" +                        # header magic
               "00000001" +                      # inode
@@ -31,7 +31,7 @@ function Write-CpioEntry([System.IO.Stream]$Stream, [byte[]]$NameBytes, [byte[]]
               "00000000" +                      # uid
               "00000000" +                      # gid
               "00000001" +                      # nlink
-              ("{0:X8}" -f $mtime) +            # mtime
+              ("{0:X8}" -f $Mtime) +            # mtime
               ("{0:X8}" -f $FileData.Length) +  # filesize
               "00000000" +                      # devmajor
               "00000000" +                      # devminor
@@ -52,14 +52,14 @@ function Write-CpioEntry([System.IO.Stream]$Stream, [byte[]]$NameBytes, [byte[]]
 
 $data = [System.IO.File]::ReadAllBytes($InputFile)
 $name = [System.Text.Encoding]::ASCII.GetBytes("init`0")
-$mtime = [int][System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+$mtime = [uint32][System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
 $out = [System.IO.File]::Create($OutputFile)
 try
 {
-    Write-CpioEntry $out $name $data 0x81ED  # S_IFREG | 0755
+    Write-CpioEntry $out $name $data 0x81ED $mtime  # S_IFREG | 0755
     $trailer = [System.Text.Encoding]::ASCII.GetBytes("TRAILER!!!`0")
-    Write-CpioEntry $out $trailer ([byte[]]::new(0)) 0
+    Write-CpioEntry $out $trailer ([byte[]]::new(0)) 0 0
 }
 finally
 {
