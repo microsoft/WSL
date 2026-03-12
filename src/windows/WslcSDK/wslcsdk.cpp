@@ -111,18 +111,48 @@ WSLAContainerNetworkType Convert(WslcContainerNetworkingMode mode)
     }
 }
 
-void GetErrorInfoFromCOM(PWSTR* errorMessage)
+struct ErrorInfoWrapper
 {
-    if (errorMessage)
+    ErrorInfoWrapper(PWSTR* errorMessage) : m_errorMessage(errorMessage)
     {
-        *errorMessage = nullptr;
-        auto errorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
-        if (errorInfo)
+        if (m_errorMessage)
         {
-            *errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorInfo->Message.get()).release();
+            *m_errorMessage = nullptr;
         }
     }
-}
+
+    void GetErrorInfoFromCOM()
+    {
+        if (m_errorMessage)
+        {
+            auto errorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            if (errorInfo)
+            {
+                *m_errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorInfo->Message.get()).release();
+            }
+        }
+    }
+
+    // Returns true if successful.
+    HRESULT CaptureResult(HRESULT hr)
+    {
+        m_hr = hr;
+        if (FAILED_LOG(m_hr))
+        {
+            GetErrorInfoFromCOM();
+        }
+        return m_hr;
+    }
+
+    operator HRESULT() const
+    {
+        return m_hr;
+    }
+
+private:
+    PWSTR* m_errorMessage = nullptr;
+    HRESULT m_hr = S_OK;
+};
 
 void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
 {
@@ -204,10 +234,10 @@ CATCH_RETURN();
 STDAPI WslcCreateSession(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
+    auto internalType = CheckAndGetInternalType(sessionSettings);
     RETURN_HR_IF_NULL(E_POINTER, session);
     *session = nullptr;
-
-    auto internalType = CheckAndGetInternalType(sessionSettings);
+    ErrorInfoWrapper errorInfoWrapper{ errorMessage };
 
     wil::com_ptr<IWSLASessionManager> sessionManager;
     RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
@@ -241,19 +271,15 @@ try
     //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
     // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
-    HRESULT hr = sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session);
-
-    if (FAILED_LOG(hr))
+    if (FAILED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session))))
     {
-        GetErrorInfoFromCOM(errorMessage);
-    }
-    else
-    {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
-        *session = reinterpret_cast<WslcSession>(result.release());
+        return errorInfoWrapper;
     }
 
-    return hr;
+    wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
+    *session = reinterpret_cast<WslcSession>(result.release());
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -285,11 +311,12 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options)
+STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     UNREFERENCED_PARAMETER(session);
     UNREFERENCED_PARAMETER(options);
+    UNREFERENCED_PARAMETER(errorMessage);
     return E_NOTIMPL;
 }
 CATCH_RETURN();
@@ -408,12 +435,12 @@ CATCH_RETURN();
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    RETURN_HR_IF_NULL(E_POINTER, container);
-    *container = nullptr;
-
     auto internalSession = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
     auto internalContainerSettings = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF_NULL(E_POINTER, container);
+    *container = nullptr;
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto result = std::make_unique<WslcContainerImpl>();
 
@@ -487,23 +514,19 @@ try
     // containerOptions.StopSignal;
     // containerOptions.ShmSize;
 
-    HRESULT hr = internalSession->session->CreateContainer(&containerOptions, &result->container);
-
-    if (FAILED_LOG(hr))
+    if (FAILED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, &result->container))))
     {
-        GetErrorInfoFromCOM(errorMessage);
-    }
-    else
-    {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
-        *container = reinterpret_cast<WslcContainer>(result.release());
+        return errorInfoWrapper;
     }
 
-    return hr;
+    wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
+    *container = reinterpret_cast<WslcContainer>(result.release());
+
+    return S_OK;
 }
 CATCH_RETURN();
 
-STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags)
+STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     auto internalType = CheckAndGetInternalType(container);
@@ -599,12 +622,14 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcCreateContainerProcess(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess)
+STDAPI WslcCreateContainerProcess(
+    _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     UNREFERENCED_PARAMETER(container);
     UNREFERENCED_PARAMETER(newProcessSettings);
     UNREFERENCED_PARAMETER(newProcess);
+    UNREFERENCED_PARAMETER(errorMessage);
     return E_NOTIMPL;
 }
 CATCH_RETURN();
@@ -659,23 +684,25 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcStopContainer(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds)
+STDAPI WslcStopContainer(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
-    RETURN_HR(internalType->container->Stop(ConvertSignal(signal), timeoutSeconds));
+    return errorInfoWrapper.CaptureResult(internalType->container->Stop(ConvertSignal(signal), timeoutSeconds));
 }
 CATCH_RETURN();
 
-STDAPI WslcDeleteContainer(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags)
+STDAPI WslcDeleteContainer(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
-    RETURN_HR(internalType->container->Delete(ConvertFlags(flags)));
+    return errorInfoWrapper.CaptureResult(internalType->container->Delete(ConvertFlags(flags)));
 }
 CATCH_RETURN();
 
@@ -829,31 +856,26 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, options);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->uri);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     // TODO: Auth
-    HRESULT hr = internalType->session->PullImage(options->uri, nullptr, progressCallback.get());
-
-    if (FAILED_LOG(hr))
-    {
-        GetErrorInfoFromCOM(errorMessage);
-    }
-
-    return hr;
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, nullptr, progressCallback.get()));
 }
 CATCH_RETURN();
 
-STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options)
+STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     UNREFERENCED_PARAMETER(session);
     UNREFERENCED_PARAMETER(options);
+    UNREFERENCED_PARAMETER(errorMessage);
     return E_NOTIMPL;
 }
 CATCH_RETURN();
 
-STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options)
+STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     auto internalType = CheckAndGetInternalType(session);
@@ -861,26 +883,22 @@ try
     RETURN_HR_IF_NULL(E_POINTER, options);
     RETURN_HR_IF(E_INVALIDARG, options->ImageHandle == nullptr || options->ImageHandle == INVALID_HANDLE_VALUE);
     RETURN_HR_IF(E_INVALIDARG, options->ContentLength == 0);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    HRESULT hr = internalType->session->LoadImage(HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength);
-
-    if (FAILED_LOG(hr))
-    {
-        // TODO: Expected error message changes
-        // GetErrorInfoFromCOM(errorMessage);
-    }
-
-    return hr;
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->LoadImage(
+        HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength));
 }
 CATCH_RETURN();
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId)
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     UNREFERENCED_PARAMETER(session);
     UNREFERENCED_PARAMETER(NameOrId);
+    UNREFERENCED_PARAMETER(errorMessage);
     return E_NOTIMPL;
 }
 CATCH_RETURN();

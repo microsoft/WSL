@@ -157,7 +157,7 @@ STDAPI WslcInitContainerSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettin
 
 STDAPI WslcCreateContainer(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags);
+STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // OPTIONAL CONTAINER SETTINGS
 STDAPI WslcSetContainerSettingsName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR name);
@@ -179,7 +179,8 @@ STDAPI WslcSetContainerSettingsPortMappings(
 STDAPI WslcSetContainerSettingsVolumes(
     _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
 
-STDAPI WslcCreateContainerProcess(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess);
+STDAPI WslcCreateContainerProcess(
+    _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 STDAPI WslcReleaseContainer(_In_ WslcContainer container);
 
@@ -235,7 +236,7 @@ typedef enum WslcSignal
     WSLC_SIGNAL_SIGTERM = 15, // SIGTERM: graceful shutdown
 } WslcSignal;
 
-STDAPI WslcStopContainer(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds);
+STDAPI WslcStopContainer(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef enum WslcDeleteContainerFlags
 {
@@ -245,7 +246,7 @@ typedef enum WslcDeleteContainerFlags
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcDeleteContainerFlags);
 
-STDAPI WslcDeleteContainer(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags);
+STDAPI WslcDeleteContainer(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // PROCESS DEFINITIONS
 STDAPI WslcInitProcessSettings(_Out_ WslcProcessSettings* processSettings);
@@ -372,7 +373,7 @@ typedef struct WslcImportImageOptions
     _In_opt_ PVOID progressCallbackContext;
 } WslcImportImageOptions;
 
-STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options);
+STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcLoadImageOptions
 {
@@ -382,7 +383,7 @@ typedef struct WslcLoadImageOptions
     PVOID progressCallbackContext;
 } WslcLoadImageOptions;
 
-STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options);
+STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcImageInfo
 {
@@ -394,7 +395,7 @@ typedef struct WslcImageInfo
     uint64_t createdTimestamp;
 } WslcImageInfo;
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId);
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Retrieves the list of container images
 // Parameters:
@@ -425,7 +426,7 @@ STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*c
 
 // STORAGE
 
-STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options);
+STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // INSTALL
 

@@ -43,8 +43,8 @@ void CloseContainer(WslcContainer container)
 {
     if (container)
     {
-        WslcStopContainer(container, WSLC_SIGNAL_SIGKILL, 30);
-        WslcDeleteContainer(container, WSLC_DELETE_CONTAINER_FLAG_NONE);
+        WslcStopContainer(container, WSLC_SIGNAL_SIGKILL, 30, nullptr);
+        WslcDeleteContainer(container, WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr);
         WslcReleaseContainer(container);
     }
 }
@@ -105,7 +105,7 @@ ContainerOutput RunContainerAndCapture(
     // Create and start the container.
     UniqueContainer container;
     THROW_IF_FAILED(WslcCreateContainer(session, &containerSettings, &container, nullptr));
-    THROW_IF_FAILED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH));
+    THROW_IF_FAILED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
     // Acquire the init process handle.
     UniqueProcess process;
@@ -175,7 +175,7 @@ class WslcSdkTests
         options.ImageHandle = imageFile.get();
         options.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
 
-        THROW_IF_FAILED(WslcLoadSessionImage(m_defaultSession, &options));
+        THROW_IF_FAILED(WslcLoadSessionImage(m_defaultSession, &options, nullptr));
     }
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -413,9 +413,8 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcInitContainerSettings("invalid-image:notfound", &containerSettings));
 
             WslcContainer container = nullptr;
-            PWSTR rawMsg = nullptr;
-            VERIFY_FAILED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, &rawMsg));
-            wil::unique_cotaskmem_string errorMsg{rawMsg};
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_FAILED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, &errorMsg));
             VERIFY_IS_NULL(container);
         }
 
@@ -455,7 +454,7 @@ class WslcSdkTests
 
         UniqueContainer container;
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
 
         // Acquire and release the init process handle — we won't read its I/O.
         {
@@ -464,10 +463,10 @@ class WslcSdkTests
         }
 
         // Stop the container gracefully (after the timeout).
-        VERIFY_SUCCEEDED(WslcStopContainer(container.get(), WSLC_SIGNAL_SIGKILL, 10));
+        VERIFY_SUCCEEDED(WslcStopContainer(container.get(), WSLC_SIGNAL_SIGKILL, 10, nullptr));
 
         // Delete the stopped container.
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
+        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
     TEST_METHOD(ProcessIOHandles)
@@ -487,7 +486,7 @@ class WslcSdkTests
 
         UniqueContainer container;
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
         UniqueProcess process;
         VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
@@ -531,7 +530,7 @@ class WslcSdkTests
             WslcLoadImageOptions opts{};
             opts.ImageHandle = imageTarFileHandle.get();
             opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
-            VERIFY_SUCCEEDED(WslcLoadSessionImage(m_defaultSession, &opts));
+            VERIFY_SUCCEEDED(WslcLoadSessionImage(m_defaultSession, &opts, nullptr));
 
             // Verify the loaded image is usable.
             auto output = RunContainerAndCapture(m_defaultSession, "hello-world:latest", {});
@@ -539,13 +538,13 @@ class WslcSdkTests
         }
 
         // Negative: null options pointer must fail.
-        VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, nullptr), E_POINTER);
+        VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, nullptr, nullptr), E_POINTER);
 
         // Negative: null ImageHandle must fail.
         {
             WslcLoadImageOptions opts{};
             opts.ContentLength = 1;
-            VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
 
         // Negative: INVALID_HANDLE_VALUE must fail.
@@ -553,7 +552,7 @@ class WslcSdkTests
             WslcLoadImageOptions opts{};
             opts.ImageHandle = INVALID_HANDLE_VALUE;
             opts.ContentLength = 1;
-            VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
 
         // Negative: zero ContentLength must fail.
@@ -561,7 +560,7 @@ class WslcSdkTests
             WslcLoadImageOptions opts{};
             opts.ImageHandle = GetCurrentProcess();
             opts.ContentLength = 0;
-            VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
     }
 
@@ -584,7 +583,9 @@ class WslcSdkTests
             WslcLoadImageOptions opts{};
             opts.ImageHandle = selfFileHandle.get();
             opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
-            VERIFY_FAILED(WslcLoadSessionImage(m_defaultSession, &opts));
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_FAILED(WslcLoadSessionImage(m_defaultSession, &opts, &errorMsg));
+            VERIFY_IS_NOT_NULL(errorMsg);
         }
     }
 
@@ -692,7 +693,7 @@ class WslcSdkTests
 
             UniqueContainer container;
             VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
             UniqueProcess process;
             VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
@@ -832,7 +833,7 @@ class WslcSdkTests
 
             UniqueContainer container;
             VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
             UniqueProcess process;
             VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
@@ -912,7 +913,7 @@ class WslcSdkTests
 
             UniqueContainer container;
             VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
             UniqueProcess process;
             VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
@@ -975,7 +976,7 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        VERIFY_ARE_EQUAL(WslcDeleteSessionImage(m_defaultSession, "debian:latest"), E_NOTIMPL);
+        VERIFY_ARE_EQUAL(WslcDeleteSessionImage(m_defaultSession, "debian:latest", nullptr), E_NOTIMPL);
     }
 
     TEST_METHOD(ImageImportNotImplemented)
@@ -984,7 +985,7 @@ class WslcSdkTests
 
         WslcImportImageOptions opts{};
         opts.imagePath = L"dummy.tar";
-        VERIFY_ARE_EQUAL(WslcImportSessionImage(m_defaultSession, &opts), E_NOTIMPL);
+        VERIFY_ARE_EQUAL(WslcImportSessionImage(m_defaultSession, &opts, nullptr), E_NOTIMPL);
     }
 
     TEST_METHOD(ContainerGetIDNotImplemented)
@@ -1000,7 +1001,7 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcGetContainerID(container.get(), id), E_NOTIMPL);
 
         // Clean up the created container.
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
+        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
     TEST_METHOD(ContainerGetStateNotImplemented)
@@ -1015,7 +1016,7 @@ class WslcSdkTests
         WslcContainerState state{};
         VERIFY_ARE_EQUAL(WslcGetContainerState(container.get(), &state), E_NOTIMPL);
 
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
+        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
     TEST_METHOD(ContainerInspectNotImplemented)
@@ -1030,7 +1031,7 @@ class WslcSdkTests
         PCSTR inspectData = nullptr;
         VERIFY_ARE_EQUAL(WslcInspectContainer(container.get(), &inspectData), E_NOTIMPL);
 
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
+        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
     TEST_METHOD(ContainerExecNotImplemented)
@@ -1046,9 +1047,9 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
 
         WslcProcess newProcess = nullptr;
-        VERIFY_ARE_EQUAL(WslcCreateContainerProcess(container.get(), &procSettings, &newProcess), E_NOTIMPL);
+        VERIFY_ARE_EQUAL(WslcCreateContainerProcess(container.get(), &procSettings, &newProcess, nullptr), E_NOTIMPL);
 
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
+        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
     TEST_METHOD(ContainerHostNameNotImplemented)
@@ -1084,7 +1085,7 @@ class WslcSdkTests
 
         UniqueContainer container;
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
 
         UniqueProcess process;
         VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
@@ -1144,7 +1145,7 @@ class WslcSdkTests
         WslcVhdRequirements vhd{};
         vhd.sizeInBytes = 1024ull * 1024 * 1024;
         vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_ARE_EQUAL(WslcCreateSessionVhd(m_defaultSession, &vhd), E_NOTIMPL);
+        VERIFY_ARE_EQUAL(WslcCreateSessionVhd(m_defaultSession, &vhd, nullptr), E_NOTIMPL);
     }
 
     TEST_METHOD(InstallWithDependenciesNotImplemented)
