@@ -359,9 +359,10 @@ struct ContainerInfo
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
     ContainerState State{ContainerState::Unknown};
+    int64_t Created{};
     HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State, HostConfig);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State, Created, HostConfig);
 };
 
 struct BuildKitVertex

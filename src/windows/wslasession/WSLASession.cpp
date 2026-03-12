@@ -1118,6 +1118,7 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
+        e->GetCreatedAt(&output[index].CreatedAt);
         index++;
     }
 
