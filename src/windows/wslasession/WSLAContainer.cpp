@@ -1194,7 +1194,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 {
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
-    
+
     ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes);
 
     auto labels(dockerContainer.Labels);

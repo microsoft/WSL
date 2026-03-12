@@ -53,9 +53,7 @@ public:
         _In_ DockerHTTPClient& DockerClient);
 
     static std::unique_ptr<WSLAVhdVolumeImpl> Open(
-        _In_ const wsl::windows::common::docker_schema::Volume& Volume,
-        _In_ WSLAVirtualMachine& VirtualMachine,
-        _In_ DockerHTTPClient& DockerClient);
+        _In_ const wsl::windows::common::docker_schema::Volume& Volume, _In_ WSLAVirtualMachine& VirtualMachine, _In_ DockerHTTPClient& DockerClient);
 
     void Delete();
 

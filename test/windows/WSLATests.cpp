@@ -2461,7 +2461,7 @@ class WSLATests
         holderContainer.SetDeleteOnClose(false);
 
         VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION));
-        
+
         // Verify that after deleting the container, the volume can be deleted.
         VERIFY_SUCCEEDED(holderContainer.Get().Delete(WSLADeleteFlagsNone));
         VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
@@ -2520,7 +2520,7 @@ class WSLATests
 
         // Restart the session and verify the container is recovered.
         ResetTestSession();
-        
+
         auto recoveredContainer = OpenContainer(m_defaultSession.get(), containerName);
         recoveredContainer.SetDeleteOnClose(false);
 
@@ -2559,29 +2559,34 @@ class WSLATests
 
         const std::string volumeName = "wsla-volume-name";
 
-        auto validateInvalidOptionsFailure = [&](const std::string& options, HRESULT expectedResult, const std::optional<std::wstring>& expectedMessage = std::nullopt) {
-            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        auto validateInvalidOptionsFailure =
+            [&](const std::string& options, HRESULT expectedResult, const std::optional<std::wstring>& expectedMessage = std::nullopt) {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
-            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+                auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
-            WSLAVolumeOptions volumeOptions{};
-            volumeOptions.Name = volumeName.c_str();
-            volumeOptions.Type = "vhd";
-            volumeOptions.Options = options.c_str();
+                WSLAVolumeOptions volumeOptions{};
+                volumeOptions.Name = volumeName.c_str();
+                volumeOptions.Type = "vhd";
+                volumeOptions.Options = options.c_str();
 
-            const auto result = m_defaultSession->CreateVolume(&volumeOptions);
+                const auto result = m_defaultSession->CreateVolume(&volumeOptions);
 
-            if (result != expectedResult)
-            {
-                LogInfo("CreateVolume mismatch options='%hs' result=0x%08x expected=0x%08x", options.c_str(), static_cast<unsigned int>(result), static_cast<unsigned int>(expectedResult));
-            }
+                if (result != expectedResult)
+                {
+                    LogInfo(
+                        "CreateVolume mismatch options='%hs' result=0x%08x expected=0x%08x",
+                        options.c_str(),
+                        static_cast<unsigned int>(result),
+                        static_cast<unsigned int>(expectedResult));
+                }
 
-            VERIFY_ARE_EQUAL(result, expectedResult);
-            if (expectedMessage.has_value())
-            {
-                ValidateCOMErrorMessage(expectedMessage);
-            }
-        };
+                VERIFY_ARE_EQUAL(result, expectedResult);
+                if (expectedMessage.has_value())
+                {
+                    ValidateCOMErrorMessage(expectedMessage);
+                }
+            };
 
         validateInvalidOptionsFailure("not-json", WSL_E_INVALID_JSON);
         validateInvalidOptionsFailure(R"({"SizeBytes":"abc"})", WSL_E_INVALID_JSON);

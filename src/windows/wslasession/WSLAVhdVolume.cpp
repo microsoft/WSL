@@ -126,9 +126,7 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Create(
 }
 
 std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Open(
-    const wsl::windows::common::docker_schema::Volume& Volume,
-    WSLAVirtualMachine& VirtualMachine,
-    DockerHTTPClient& DockerClient)
+    const wsl::windows::common::docker_schema::Volume& Volume, WSLAVirtualMachine& VirtualMachine, DockerHTTPClient& DockerClient)
 {
     auto metadataIt = Volume.Labels.find(WSLAVolumeMetadataLabel);
     THROW_HR_IF(E_INVALIDARG, metadataIt == Volume.Labels.end());
@@ -171,7 +169,8 @@ void WSLAVhdVolumeImpl::Delete()
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslaVolumeInUse(m_name.c_str()), e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslaVolumeInUse(m_name.c_str()), e.StatusCode() == 409);
         THROW_HR_WITH_USER_ERROR_IF(WSLA_E_VOLUME_NOT_FOUND, Localization::MessageWslaVolumeNotFound(m_name.c_str()), e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete volume '%hs'", m_name.c_str());
     }

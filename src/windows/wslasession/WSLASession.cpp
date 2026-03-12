@@ -1318,7 +1318,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
     ValidateName(name.c_str());
-    
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
