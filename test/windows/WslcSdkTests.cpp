@@ -1221,7 +1221,7 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        auto RunAndGetExitCode = [&](int exitCodeArg) -> INT32 {
+        auto RunAndGetProcess = [&](int exitCodeArg) -> UniqueProcess {
             std::string script = "exit " + std::to_string(exitCodeArg);
             const char* argv[] = {"/bin/sh", "-c", script.c_str()};
 
@@ -1244,6 +1244,12 @@ class WslcSdkTests
             THROW_IF_FAILED(WslcProcessGetExitEvent(process.get(), &exitEvent));
             THROW_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), WaitForSingleObject(exitEvent, 30 * 1000) != WAIT_OBJECT_0);
 
+            return process;
+        };
+
+        auto RunAndGetExitCode = [&](int exitCodeArg) -> INT32 {
+            UniqueProcess process = RunAndGetProcess(exitCodeArg);
+
             INT32 code = -1;
             THROW_IF_FAILED(WslcProcessGetExitCode(process.get(), &code));
             return code;
@@ -1255,8 +1261,8 @@ class WslcSdkTests
 
         // Negative: null exit code pointer must fail.
         {
-            auto output = RunContainerAndCapture(m_defaultSession, "debian:latest", {"/bin/true"});
-            (void)output; // just run to get a container that already exited
+            auto process = RunAndGetProcess(0);
+            VERIFY_FAILED(WslcProcessGetExitCode(process.get(), nullptr));
         }
 
         // Negative: null process handle must return an error.

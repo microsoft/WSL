@@ -647,6 +647,7 @@ try
     auto internalProcessSettings = CheckAndGetInternalType(newProcessSettings);
     RETURN_HR_IF(E_INVALIDARG, internalProcessSettings->commandLine == nullptr || internalProcessSettings->commandLineCount == 0);
     RETURN_HR_IF_NULL(E_POINTER, newProcess);
+    *newProcess = nullptr;
 
     WSLAProcessOptions runtimeOptions{};
     CopyProcessSettingsToRuntime(runtimeOptions, internalProcessSettings);
