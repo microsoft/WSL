@@ -7,6 +7,7 @@
 #include <winrt/Windows.Media.Core.h>
 #include <winrt/Windows.Storage.Pickers.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
+#include <winrt/Windows.UI.h>
 #include <chrono>
 
 using namespace winrt;
@@ -17,6 +18,8 @@ using namespace Windows::Media::Playback;
 using namespace Windows::Media::Core;
 using namespace Windows::Storage;
 using namespace Windows::Storage::Pickers;
+using namespace Microsoft::UI::Xaml::Shapes;
+using namespace Microsoft::UI::Xaml::Media;
 
 namespace winrt::WSLAMoviePlayer::implementation
 {
@@ -146,6 +149,30 @@ namespace winrt::WSLAMoviePlayer::implementation
             m_dispatcherQueue.TryEnqueue([this]()
             {
                 OnSubtitlesUpdated();
+            });
+        };
+        
+        m_subtitler->OnConnectionEstablished = [this]()
+        {
+            m_dispatcherQueue.TryEnqueue([this]()
+            {
+                OnConnectionEstablished();
+            });
+        };
+        
+        m_subtitler->OnConnectionLost = [this]()
+        {
+            m_dispatcherQueue.TryEnqueue([this]()
+            {
+                OnConnectionLost();
+            });
+        };
+        
+        m_subtitler->OnConnectionError = [this](const hstring& error)
+        {
+            m_dispatcherQueue.TryEnqueue([this, error]()
+            {
+                OnConnectionError(error);
             });
         };
     }
@@ -318,13 +345,16 @@ namespace winrt::WSLAMoviePlayer::implementation
         switch (m_playbackState)
         {
             case PlaybackState::Playing:
-                PlayPauseButton().Content(box_value(L"⏸ Pause"));
+                PlayPauseIcon().Symbol(Symbol::Pause);
+                PlayPauseLabel().Text(L"Pause");
                 break;
             case PlaybackState::Buffering:
-                PlayPauseButton().Content(box_value(L"⏳ Buffering..."));
+                PlayPauseIcon().Symbol(Symbol::Clock);
+                PlayPauseLabel().Text(L"Buffering...");
                 break;
             default:
-                PlayPauseButton().Content(box_value(L"▶ Play"));
+                PlayPauseIcon().Symbol(Symbol::Play);
+                PlayPauseLabel().Text(L"Play");
                 break;
         }
     }
@@ -362,19 +392,78 @@ namespace winrt::WSLAMoviePlayer::implementation
     void MainWindow::OnProcessingStarted(double seekTime)
     {
         OutputDebugStringW((L"MainWindow: Processing started at " + to_hstring(seekTime) + L" seconds\n").c_str());
-        LoadingIndicator().Visibility(Visibility::Visible);
+        ProcessingIndicator().Visibility(Visibility::Visible);
     }
 
     void MainWindow::OnProcessingFinished()
     {
         OutputDebugStringW(L"MainWindow: Processing finished\n");
-        LoadingIndicator().Visibility(Visibility::Collapsed);
+        ProcessingIndicator().Visibility(Visibility::Collapsed);
     }
 
     void MainWindow::OnSubtitlesUpdated()
     {
-        // Could update buffer progress visualization here
-        // For now just log
         OutputDebugStringW(L"MainWindow: Subtitles updated\n");
+        UpdateCoverageOverlay();
+    }
+
+    void MainWindow::UpdateCoverageOverlay()
+    {
+        if (!m_subtitler || m_duration <= 0)
+            return;
+
+        auto canvas = CoverageCanvas();
+        canvas.Children().Clear();
+
+        double canvasWidth = canvas.ActualWidth();
+        if (canvasWidth <= 0)
+        {
+            // Canvas not laid out yet; use the slider width as fallback
+            canvasWidth = ProgressSlider().ActualWidth();
+            if (canvasWidth <= 0)
+                return;
+        }
+
+        auto greenBrush = SolidColorBrush(Windows::UI::ColorHelper::FromArgb(180, 0, 180, 0));
+
+        for (const auto& range : m_subtitler->GetCoverageRanges())
+        {
+            double startFrac = static_cast<double>(range.start) / m_duration;
+            double endFrac = static_cast<double>(range.end) / m_duration;
+
+            double x = startFrac * canvasWidth;
+            double width = (endFrac - startFrac) * canvasWidth;
+            if (width < 1.0) width = 1.0;
+
+            Microsoft::UI::Xaml::Shapes::Rectangle rect;
+            rect.Fill(greenBrush);
+            rect.Width(width);
+            rect.Height(4);
+            rect.RadiusX(2);
+            rect.RadiusY(2);
+            Canvas::SetLeft(rect, x);
+            canvas.Children().Append(rect);
+        }
+    }
+
+    void MainWindow::OnConnectionEstablished()
+    {
+        OutputDebugStringW(L"MainWindow: Connection established\n");
+        ConnectionDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 0, 200, 0)));
+        ConnectionStatusText().Text(L"Connected");
+    }
+
+    void MainWindow::OnConnectionLost()
+    {
+        OutputDebugStringW(L"MainWindow: Connection lost\n");
+        ConnectionDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 255, 0, 0)));
+        ConnectionStatusText().Text(L"Disconnected");
+    }
+
+    void MainWindow::OnConnectionError(const hstring& error)
+    {
+        OutputDebugStringW((L"MainWindow: Connection error - " + error + L"\n").c_str());
+        ConnectionDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 255, 0, 0)));
+        ConnectionStatusText().Text(L"Error");
     }
 }

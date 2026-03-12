@@ -272,16 +272,28 @@ namespace winrt::WSLAMoviePlayer::implementation
     void Subtitler::OnSocketConnected()
     {
         OutputDebugStringW(L"Subtitler: Socket connected\n");
+        if (OnConnectionEstablished)
+        {
+            OnConnectionEstablished();
+        }
     }
 
     void Subtitler::OnSocketDisconnected()
     {
         OutputDebugStringW(L"Subtitler: Socket disconnected\n");
+        if (OnConnectionLost)
+        {
+            OnConnectionLost();
+        }
     }
 
     void Subtitler::OnSocketError(const hstring& errorString)
     {
         OutputDebugStringW((L"Subtitler: Socket error - " + errorString + L"\n").c_str());
+        if (OnConnectionError)
+        {
+            OnConnectionError(errorString);
+        }
     }
 
     void Subtitler::OnSocketProcessingStarted(const ProcessingStartedEvent& event)

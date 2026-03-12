@@ -60,6 +60,7 @@ namespace winrt::WSLAMoviePlayer::implementation
         void UpdateDuration(Windows::Foundation::TimeSpan duration);
         void Seek(int64_t positionMs);
         void UpdatePlayPauseButton();
+        void UpdateCoverageOverlay();
         winrt::hstring FormatTime(int64_t milliseconds);
         
         // Subtitler callbacks
@@ -68,6 +69,9 @@ namespace winrt::WSLAMoviePlayer::implementation
         void OnProcessingStarted(double seekTime);
         void OnProcessingFinished();
         void OnSubtitlesUpdated();
+        void OnConnectionEstablished();
+        void OnConnectionLost();
+        void OnConnectionError(const winrt::hstring& error);
         
         // Dispatcher for UI thread
         Microsoft::UI::Dispatching::DispatcherQueue m_dispatcherQueue{ nullptr };

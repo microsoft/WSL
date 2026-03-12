@@ -50,6 +50,9 @@ namespace winrt::WSLAMoviePlayer::implementation
         std::function<void(double)> OnProcessingStarted;
         std::function<void()> OnProcessingFinished;
         std::function<void()> OnSubtitlesUpdated;
+        std::function<void()> OnConnectionEstablished;
+        std::function<void()> OnConnectionLost;
+        std::function<void(const winrt::hstring&)> OnConnectionError;
 
         // Initialize the socket connection
         winrt::Windows::Foundation::IAsyncAction InitializeAsync();

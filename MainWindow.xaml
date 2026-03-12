@@ -17,84 +17,66 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Video Player -->
-        <MediaPlayerElement x:Name="MediaPlayerElement" 
-                           Grid.Row="0" 
-                           AreTransportControlsEnabled="False"
-                           Stretch="Uniform"
-                           MinHeight="400"/>
+        <Grid Grid.Row="0" MinHeight="400">
+            <MediaPlayerElement x:Name="MediaPlayerElement" 
+                                AreTransportControlsEnabled="False"
+                                Stretch="Uniform"/>
 
-        <!-- Native Subtitle Label -->
-        <Border Grid.Row="1" 
-                Background="#B3000000" 
-                Padding="10,5"
-                HorizontalAlignment="Center"
-                Margin="0,5">
-            <TextBlock x:Name="NativeSubtitleText"
-                       Text=""
-                       Foreground="White"
-                       FontSize="18"
-                       FontWeight="Bold"
-                       TextAlignment="Center"
-                       TextWrapping="Wrap"
-                       MaxWidth="800"/>
-        </Border>
+            <!-- Subtitles overlaid on video -->
+            <StackPanel VerticalAlignment="Bottom" 
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,20">
+                <!-- Native Subtitle -->
+                <Border Background="#99000000" 
+                        CornerRadius="6"
+                        Padding="16,6"
+                        HorizontalAlignment="Center"
+                        Margin="0,2">
+                    <TextBlock x:Name="NativeSubtitleText"
+                               Text=""
+                               Foreground="White"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               MaxWidth="800"/>
+                </Border>
 
-        <!-- Translated Subtitle Label -->
-        <Border Grid.Row="2" 
-                Background="#B3000000" 
-                Padding="10,5"
-                HorizontalAlignment="Center"
-                Margin="0,5">
-            <TextBlock x:Name="TranslatedSubtitleText"
-                       Text=""
-                       Foreground="Yellow"
-                       FontSize="16"
-                       FontStyle="Italic"
-                       TextAlignment="Center"
-                       TextWrapping="Wrap"
-                       MaxWidth="800"/>
-        </Border>
-
-        <!-- Loading Indicator -->
-        <Border x:Name="LoadingIndicator"
-                Grid.Row="3" 
-                Background="#CC000000" 
-                Padding="15,8"
-                HorizontalAlignment="Center"
-                Visibility="Collapsed"
-                Margin="0,5">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <ProgressRing IsActive="True" Width="20" Height="20"/>
-                <TextBlock x:Name="LoadingText"
-                           Text="Processing subtitles..."
-                           Foreground="Orange"
-                           FontSize="16"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center"/>
+                <!-- Translated Subtitle -->
+                <Border Background="#99000000" 
+                        CornerRadius="6"
+                        Padding="16,4"
+                        HorizontalAlignment="Center"
+                        Margin="0,2">
+                    <TextBlock x:Name="TranslatedSubtitleText"
+                               Text=""
+                               Foreground="#FFD700"
+                               FontSize="16"
+                               FontStyle="Italic"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               MaxWidth="800"/>
+                </Border>
             </StackPanel>
-        </Border>
+        </Grid>
 
         <!-- Time Label -->
         <TextBlock x:Name="TimeLabel"
-                   Grid.Row="4"
+                   Grid.Row="1"
                    Text="00:00 / 00:00"
                    HorizontalAlignment="Center"
                    Margin="0,5"
                    FontSize="14"/>
 
-        <!-- Progress Slider with Buffer Visualization -->
-        <Grid Grid.Row="5" Margin="10,5">
-            <!-- Buffer indicator (shows processed areas) -->
-            <ProgressBar x:Name="BufferProgress"
-                         Value="0"
-                         Maximum="100"
-                         Height="8"
-                         VerticalAlignment="Center"
-                         Foreground="#4000FF00"/>
+        <!-- Progress Slider with Coverage Visualization -->
+        <Grid Grid.Row="2" Margin="10,5">
+            <!-- Green coverage overlay behind slider -->
+            <Canvas x:Name="CoverageCanvas"
+                    Height="4"
+                    VerticalAlignment="Center"/>
             
             <!-- Main slider -->
             <Slider x:Name="ProgressSlider"
@@ -108,7 +90,7 @@
         </Grid>
 
         <!-- Control Buttons -->
-        <Grid Grid.Row="6" Margin="10">
+        <Grid Grid.Row="3" Margin="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -121,34 +103,91 @@
             <!-- Open File Button -->
             <Button x:Name="OpenFileButton"
                     Grid.Column="0"
-                    Content="📂 Open File"
                     Click="OpenFileButton_Click"
-                    Padding="15,8"/>
+                    Padding="15,8">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Folder"/>
+                    <TextBlock Text="Open File" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
 
             <!-- Skip Back Button -->
             <Button x:Name="SkipBackButton"
                     Grid.Column="2"
-                    Content="⏪ -15s"
                     Click="SkipBackButton_Click"
                     Padding="15,8"
-                    Margin="5,0"/>
+                    Margin="5,0">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Previous"/>
+                    <TextBlock Text="-15s" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
 
             <!-- Play/Pause Button -->
             <Button x:Name="PlayPauseButton"
                     Grid.Column="3"
-                    Content="▶ Play"
                     Click="PlayPauseButton_Click"
                     IsEnabled="False"
                     Padding="20,8"
-                    Margin="5,0"/>
+                    Margin="5,0">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon x:Name="PlayPauseIcon" Symbol="Play"/>
+                    <TextBlock x:Name="PlayPauseLabel" Text="Play" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
 
             <!-- Skip Forward Button -->
             <Button x:Name="SkipForwardButton"
                     Grid.Column="4"
-                    Content="+15s ⏩"
                     Click="SkipForwardButton_Click"
                     Padding="15,8"
-                    Margin="5,0"/>
+                    Margin="5,0">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="+15s" VerticalAlignment="Center"/>
+                    <SymbolIcon Symbol="Next"/>
+                </StackPanel>
+            </Button>
         </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="4"
+                Background="{ThemeResource SystemControlBackgroundChromeMediumBrush}" 
+                Padding="8,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Processing indicator (left side) -->
+                <StackPanel x:Name="ProcessingIndicator"
+                            Grid.Column="0"
+                            Orientation="Horizontal" 
+                            Spacing="6"
+                            Visibility="Collapsed">
+                    <ProgressRing IsActive="True" Width="16" Height="16"/>
+                    <TextBlock x:Name="ProcessingText"
+                               Text="Processing subtitles..."
+                               Foreground="Orange"
+                               FontSize="12"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Connection status (right side) -->
+                <StackPanel Grid.Column="1" 
+                            Orientation="Horizontal" 
+                            Spacing="6">
+                    <Ellipse x:Name="ConnectionDot" 
+                             Width="10" Height="10" 
+                             Fill="Red"
+                             VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ConnectionStatusText"
+                               Text="Disconnected"
+                               FontSize="12"
+                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>
