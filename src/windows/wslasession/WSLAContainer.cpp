@@ -135,7 +135,7 @@ auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [allocatedPorts, &vm]() { ReleaseVmPorts(*allocatedPorts, vm); });
 
     // Count ports that need VM port allocation (bridge mode ports have VmPort == 0).
-    auto portsToAllocate = static_cast<uint16_t>(std::ranges::count_if(ports, [](const auto& p) { return p.VmPort == 0; }));
+    size_t portsToAllocate = std::count_if(ports.begin(), ports.end(), [](const auto& p) { return p.VmPort == 0; });
 
     if (portsToAllocate > 0)
     {
@@ -342,7 +342,6 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Id,
     std::string&& Name,
     std::string&& Image,
-    WSLAContainerNetworkType NetworkMode,
     std::vector<WSLAVolumeMount>&& volumes,
     std::vector<WSLAPortMapping>&& ports,
     std::shared_ptr<std::set<uint16_t>> allocatedVmPorts,
@@ -359,7 +358,6 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_name(std::move(Name)),
     m_image(std::move(Image)),
     m_id(std::move(Id)),
-    m_networkMode(NetworkMode),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
     m_allocatedVmPorts(std::move(allocatedVmPorts)),
@@ -1151,7 +1149,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(result.Id),
         std::move(containerOptions.Name == nullptr ? CleanContainerName(inspectData.Name) : std::string(containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
-        containerOptions.ContainerNetwork.ContainerNetworkType,
         std::move(volumes),
         std::move(ports),
         std::move(allocatedVmPorts),
@@ -1216,7 +1213,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::string(dockerContainer.Id),
         std::move(name),
         std::string(dockerContainer.Image),
-        networkMode,
         std::move(metadata.Volumes),
         std::move(metadata.Ports),
         std::move(vmPorts),

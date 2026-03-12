@@ -41,7 +41,6 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
-        WSLAContainerNetworkType NetworkMode,
         std::vector<WSLAVolumeMount>&& volumes,
         std::vector<WSLAPortMapping>&& ports,
         std::shared_ptr<std::set<uint16_t>> allocatedVmPorts,
@@ -135,7 +134,6 @@ private:
     WSLAContainerState m_state = WslaContainerStateInvalid;
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;
-    WSLAContainerNetworkType m_networkMode;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::shared_ptr<std::set<uint16_t>> m_allocatedVmPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
