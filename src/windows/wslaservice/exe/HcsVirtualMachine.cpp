@@ -34,6 +34,14 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
 {
     THROW_HR_IF(E_POINTER, Settings == nullptr);
 
+    auto s = wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Settings->DmesgOutput));
+
+    sockaddr_in bound{};
+    int len = sizeof(bound);
+    THROW_LAST_ERROR_IF(getsockname((SOCKET)s, reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR);
+
+    WSL_LOG("BoundPortService", TraceLoggingValue(ntohs(bound.sin_port), "Port"));
+
     // Store the user token.
     m_userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
     m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;

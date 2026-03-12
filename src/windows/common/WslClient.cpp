@@ -1529,6 +1529,23 @@ int WslaShell(_In_ std::wstring_view commandLine)
     sessionSettings.BootTimeoutMs = 30 * 1000;
     sessionSettings.MaximumStorageSizeMb = 4096;
 
+    SOCKET s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(0);
+
+    THROW_LAST_ERROR_IF(bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+
+    sockaddr_in bound{};
+    int len = sizeof(bound);
+    THROW_LAST_ERROR_IF(getsockname(s, reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR);
+
+    WSL_LOG("BoundPort", TraceLoggingValue(ntohs(bound.sin_port), "Port"));
+
+    sessionSettings.DmesgOutput = (ULONG)s;
+
     std::string shell = "/bin/bash";
     std::string cmd;
 
