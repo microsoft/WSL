@@ -172,32 +172,20 @@ try
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
 
-    // TODO: Determine gateway MAC address
     std::wstring device_options;
-    auto client_ip = networkSettings->PreferredIpAddress.AddressString;
-    if (!client_ip.empty())
-    {
-        device_options += L"client_ip=" + client_ip;
-    }
-
-    if (!networkSettings->MacAddress.empty())
-    {
-        if (!device_options.empty())
+    auto appendOption = [&device_options](std::wstring_view key, std::wstring_view value) {
+        if (!value.empty())
         {
-            device_options += L';';
+            std::format_to(std::back_inserter(device_options), L"{}{}={}", device_options.empty() ? L"" : L";", key, value);
         }
-        device_options += L"client_mac=" + networkSettings->MacAddress;
-    }
+    };
+
+    appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
+    appendOption(L"client_mac", networkSettings->MacAddress);
 
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
-    if (!default_route.empty())
-    {
-        if (!device_options.empty())
-        {
-            device_options += L';';
-        }
-        device_options += L"gateway_ip=" + default_route;
-    }
+    appendOption(L"gateway_ip", default_route);
+    appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress());
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))

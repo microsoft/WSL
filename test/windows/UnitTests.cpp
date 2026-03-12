@@ -217,6 +217,12 @@ class UnitTests
             LxsstuLaunchWslAndCaptureOutput(L"systemctl status systemd-networkd-wait-online.service  | grep -iF Loaded:");
 
         VERIFY_ARE_EQUAL(out, L"     Loaded: masked (Reason: Unit systemd-networkd-wait-online.service is masked.)\n");
+
+        // Validate that NetworkManager-wait-online.service is masked.
+        auto [outNm, __] =
+            LxsstuLaunchWslAndCaptureOutput(L"systemctl status NetworkManager-wait-online.service  | grep -iF Loaded:");
+
+        VERIFY_ARE_EQUAL(outNm, L"     Loaded: masked (Reason: Unit NetworkManager-wait-online.service is masked.)\n");
     }
 
     TEST_METHOD(SystemdUser)
@@ -265,6 +271,7 @@ class UnitTests
         };
 
         // Validate user sessions state with gui apps disabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = false}));
         {
             validateUserSession();
 
@@ -278,7 +285,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps enabled.
         {
-            WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+            config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
             validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
@@ -1401,13 +1408,13 @@ class UnitTests
 
             ValidateErrorMessage(
                 L"--install -d ubuntu",
-                L"Failed to fetch the list distribution from 'http://127.0.0.1:6666'. " +
+                L"Failed to fetch the distribution list from 'http://127.0.0.1:6666'. " +
                     GetSystemErrorString(HRESULT_FROM_WIN32(WININET_E_CANNOT_CONNECT)),
                 L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT");
 
             ValidateErrorMessage(
                 L"--list --online",
-                L"Failed to fetch the list distribution from 'http://127.0.0.1:6666'. " +
+                L"Failed to fetch the distribution list from 'http://127.0.0.1:6666'. " +
                     GetSystemErrorString(HRESULT_FROM_WIN32(WININET_E_CANNOT_CONNECT)),
                 L"Wsl/WININET_E_CANNOT_CONNECT");
         }

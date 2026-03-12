@@ -7,13 +7,16 @@
     xmlns:controls="using:WslSettings.Controls"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
-    <Grid Margin="{ThemeResource ContentPageMargin}">
+    <Grid Margin="{ThemeResource ContentPageMargin}"
+          IsTabStop="True"
+		  AutomationProperties.LandmarkType="Main"
+		  x:Name="DeveloperPageRoot">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <TextBlock x:Uid="Settings_DeveloperPageTitle" Style="{ThemeResource PageHeaderTextBlockStyle}" Margin="{StaticResource MediumSmallBottomMargin}" HorizontalAlignment="Left"/>
+        <TextBlock x:Uid="Settings_DeveloperPageTitle" Style="{ThemeResource PageHeaderTextBlockStyle}" Margin="{StaticResource MediumSmallBottomMargin}" HorizontalAlignment="Left" AutomationProperties.HeadingLevel="Level1"/>
         <TextBlock x:Uid="Settings_ErrorTryAgainLater" x:Name="Settings_ErrorTryAgainLater" Grid.Row="1" HorizontalAlignment="Left" AutomationProperties.LiveSetting="Assertive"
             Visibility="{x:Bind ViewModel.ErrorVisibility, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
