@@ -3276,7 +3276,8 @@ class NetworkTests
             NET_LUID interfaceLuid{};
             CONTINUE_IF_FAILED_WIN32(ConvertInterfaceGuidToLuid(&interfaceGuid, &interfaceLuid));
 
-            for (const IP_ADAPTER_ADDRESSES* adapter = adapterAddresses.get(); adapter != nullptr; adapter = adapter->Next)
+            for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(adapterAddresses.data()); adapter != nullptr;
+                 adapter = adapter->Next)
             {
                 if (interfaceLuid.Value == adapter->Luid.Value && adapter->FirstUnicastAddress != nullptr && adapter->FirstGatewayAddress != nullptr)
                 {
@@ -3292,12 +3293,13 @@ class NetworkTests
     {
         ULONG bufferSize = 0;
         constexpr ULONG flags = GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_INCLUDE_GATEWAYS;
-        std::unique_ptr<IP_ADAPTER_ADDRESSES> buffer;
+        std::vector<BYTE> buffer;
         ULONG result;
 
-        while ((result = GetAdaptersAddresses(AF_INET6, flags, nullptr, buffer.get(), &bufferSize)) == ERROR_BUFFER_OVERFLOW)
+        while ((result = GetAdaptersAddresses(AF_INET6, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize)) ==
+               ERROR_BUFFER_OVERFLOW)
         {
-            buffer.reset(static_cast<IP_ADAPTER_ADDRESSES*>(malloc(bufferSize)));
+            buffer.resize(bufferSize);
         }
 
         if (result != NO_ERROR)
@@ -3315,7 +3317,8 @@ class NetworkTests
             return false;
         }
 
-        for (const IP_ADAPTER_ADDRESSES* adapter = buffer.get(); adapter != nullptr; adapter = adapter->Next)
+        for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter != nullptr;
+             adapter = adapter->Next)
         {
             if (adapter->IfIndex != bestIndex)
             {
@@ -3334,18 +3337,18 @@ class NetworkTests
         return false;
     }
 
-    static std::unique_ptr<IP_ADAPTER_ADDRESSES> GetAdapterAddresses(ADDRESS_FAMILY family)
+    static std::vector<BYTE> GetAdapterAddresses(ADDRESS_FAMILY family)
     {
         ULONG result;
         constexpr ULONG flags =
             (GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS);
         ULONG bufferSize = 0;
-        std::unique_ptr<IP_ADAPTER_ADDRESSES> buffer;
+        std::vector<BYTE> buffer;
 
-        while ((result = GetAdaptersAddresses(family, flags, nullptr, buffer.get(), &bufferSize)) == ERROR_BUFFER_OVERFLOW)
+        while ((result = GetAdaptersAddresses(family, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize)) ==
+               ERROR_BUFFER_OVERFLOW)
         {
-            buffer.reset(static_cast<IP_ADAPTER_ADDRESSES*>(malloc(bufferSize)));
-            VERIFY_IS_NOT_NULL(buffer.get());
+            buffer.resize(bufferSize);
         }
 
         VERIFY_WIN32_SUCCEEDED(result);
@@ -4793,7 +4796,8 @@ class VirtioProxyTests
         InetPtonW(AF_INET6, L"2001:4860:4860::8888", &dest.sin6_addr);
         if (GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex) == NO_ERROR)
         {
-            for (const IP_ADAPTER_ADDRESSES* adapter = adapterAddresses.get(); adapter != nullptr; adapter = adapter->Next)
+            for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(adapterAddresses.data()); adapter != nullptr;
+                 adapter = adapter->Next)
             {
                 if (adapter->IfIndex != bestIndex)
                 {
