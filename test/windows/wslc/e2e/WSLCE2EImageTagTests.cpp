@@ -143,6 +143,28 @@ class WSLCE2EImageTagTests
         }
     }
 
+    TEST_METHOD(WSLCE2E_Image_Tag_DeleteSourceImage_TargetRemains)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        EnsureImageIsDeleted(DebianImage);
+        VerifyImageIsListed(DebianTaggedImage);
+    }
+
+    TEST_METHOD(WSLCE2E_Image_Tag_DeleteTargetImage_SourceRemains)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        EnsureImageIsDeleted(DebianTaggedImage);
+        VerifyImageIsListed(DebianImage);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
