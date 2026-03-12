@@ -34,7 +34,7 @@ struct ContainerOptions
     bool Interactive = false;
     std::string Name;
     bool TTY = false;
-    std::vector<std::string> Volumes;
+    std::vector<std::wstring> Volumes;
 };
 
 struct CreateContainerResult
@@ -69,27 +69,35 @@ struct ContainerInformation
 
 struct VolumeMount
 {
-    std::string HostPath() const
+    std::wstring HostPath() const
     {
         return m_hostPath;
     }
+
     std::string ContainerPath() const
     {
         return m_containerPath;
     }
-    std::string Mode() const
+
+    bool IsReadOnly() const
     {
-        return m_mode;
+        return m_isReadOnlyMode;
     }
-    constexpr bool IsReadOnly() const
-    {
-        return m_mode == "ro";
-    }
-    static VolumeMount Parse(const std::string& value);
+    static VolumeMount Parse(const std::wstring& value);
 
 private:
-    std::string m_hostPath;
+    std::wstring m_hostPath;
     std::string m_containerPath;
-    std::string m_mode;
+    bool m_isReadOnlyMode;
+
+    static bool IsReadOnlyMode(const std::wstring& mode)
+    {
+        return mode == L"ro" || mode == L"readonly";
+    }
+
+    static bool IsValidMode(const std::wstring& mode)
+    {
+        return IsReadOnlyMode(mode) || mode == L"rw";
+    }
 };
 } // namespace wsl::windows::wslc::models

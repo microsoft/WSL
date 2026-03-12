@@ -86,7 +86,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     for (const auto& volumeSpec : options.Volumes)
     {
         auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = wsl::shared::string::MultiByteToWide(volume.HostPath());
+        auto host = volume.HostPath();
         auto container = volume.ContainerPath();
         containerLauncher.AddVolume(host, container, volume.IsReadOnly());
     }

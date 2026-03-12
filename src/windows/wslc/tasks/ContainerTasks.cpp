@@ -211,7 +211,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Volumes.reserve(options.Volumes.size() + volumes.size());
         for (const auto& volume : volumes)
         {
-            options.Volumes.emplace_back(WideToMultiByte(volume));
+            options.Volumes.emplace_back(volume);
         }
     }
 

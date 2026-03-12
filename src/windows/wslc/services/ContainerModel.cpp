@@ -16,66 +16,45 @@ Abstract:
 #include "ContainerModel.h"
 
 namespace wsl::windows::wslc::models {
-static bool IsWindowsDriveColon(const std::string& s, size_t index, size_t tokenStart)
+
+using namespace wsl::shared::string;
+
+VolumeMount VolumeMount::Parse(const std::wstring& value)
 {
-    if (s[index] != ':' || index != tokenStart + 1 || !std::isalpha((unsigned char)s[tokenStart]) || index + 1 >= s.size())
-    {
-        return false;
-    }
-
-    return s[index + 1] == '\\' || s[index + 1] == '/';
-}
-
-static std::vector<std::string> SplitVolumeValue(const std::string& value)
-{
-    std::vector<std::string> parts;
-    std::string current;
-    size_t tokenStart = 0;
-
-    for (size_t i = 0; i < value.size(); ++i)
-    {
-        char c = value[i];
-        if (c == ':')
-        {
-            if (IsWindowsDriveColon(value, i, tokenStart))
-            {
-                current.push_back(c);
-            }
-            else
-            {
-                parts.push_back(current);
-                current.clear();
-                tokenStart = i + 1;
-            }
-        }
-        else
-        {
-            current.push_back(c);
-        }
-    }
-
-    parts.push_back(current);
-    return parts;
-}
-
-VolumeMount VolumeMount::Parse(const std::string& value)
-{
-    auto parts = SplitVolumeValue(value);
-    if (parts.size() < 2 || parts.size() > 3)
+    auto lastColon = value.rfind(':');
+    if (lastColon == std::wstring::npos)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Volume mount value must be in the format <host path>:<container path>[:mode]");
     }
 
     VolumeMount vm;
-    vm.m_hostPath = parts[0];
-    vm.m_containerPath = parts[1];
-    if (parts.size() == 3)
+    auto splitColon = lastColon;
+    const auto lastToken = value.substr(lastColon + 1);
+    if (IsValidMode(lastToken))
     {
-        vm.m_mode = parts[2];
-        if (vm.m_mode != "ro" && vm.m_mode != "rw")
+        vm.m_isReadOnlyMode = IsReadOnlyMode(lastToken);
+        if (lastColon == 0)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Volume mount mode must be either 'ro' or 'rw'");
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Volume mount value must be in the format <host path>:<container path>[:mode]");
         }
+
+        splitColon = value.rfind(':', lastColon - 1);
+        if (splitColon == std::string::npos)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Volume mount value must be in the format <host path>:<container path>[:mode]");
+        }
+
+        vm.m_containerPath = WideToMultiByte(value.substr(splitColon + 1, lastColon - splitColon - 1));
+    }
+    else
+    {
+        vm.m_containerPath = WideToMultiByte(lastToken);
+    }
+
+    vm.m_hostPath = value.substr(0, splitColon);
+    if (vm.m_hostPath.empty() || vm.m_containerPath.empty())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Volume mount value must be in the format <host path>:<container path>[:mode]");
     }
 
     return vm;
