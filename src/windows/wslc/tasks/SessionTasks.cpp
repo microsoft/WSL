@@ -13,20 +13,44 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "CLIExecutionContext.h"
-#include "Task.h"
-#include "TablePrinter.h"
+#include "SessionModel.h"
+#include "SessionService.h"
 #include "SessionTasks.h"
-#include "ShellService.h"
+#include "TablePrinter.h"
+#include "Task.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::services;
+using wsl::windows::wslc::models::SessionOptions;
 
 namespace wsl::windows::wslc::task {
+
+void AttachToSession(CLIExecutionContext& context)
+{
+    std::wstring sessionId;
+    if (context.Args.Contains(ArgType::SessionId))
+    {
+        sessionId = context.Args.Get<ArgType::SessionId>();
+    }
+    else
+    {
+        sessionId = models::s_DefaultSessionName;
+    }
+
+    context.ExitCode = SessionService::Attach(sessionId);
+}
+
+void CreateSession(CLIExecutionContext& context)
+{
+    std::optional<SessionOptions> options = std::nullopt;
+    context.Data.Add<Data::Session>(SessionService::CreateSession(options));
+}
+
 void ListSessions(CLIExecutionContext& context)
 {
-    auto sessions = ShellService::List();
+    auto sessions = SessionService::List();
     if (context.Args.Contains(ArgType::Verbose))
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
@@ -44,11 +68,5 @@ void ListSessions(CLIExecutionContext& context)
         });
     }
     tablePrinter.Print();
-}
-
-void AttachToSession(CLIExecutionContext& context)
-{
-    WI_ASSERT(context.Args.Contains(ArgType::SessionId));
-    ShellService::Attach(context.Args.Get<ArgType::SessionId>());
 }
 } // namespace wsl::windows::wslc::task

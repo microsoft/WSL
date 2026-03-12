@@ -16,7 +16,6 @@ Abstract:
 
 #include <wslservice.h>
 #include <wslaservice.h>
-#include <docker_schema.h>
 #include <string>
 
 namespace wsl::windows::wslc::models {
@@ -45,10 +44,10 @@ struct CreateContainerResult
 
 struct StopContainerOptions
 {
-    static constexpr LONGLONG DefaultTimeout = -1;
+    static constexpr LONG DefaultTimeout = -1;
 
     WSLASignal Signal = WSLASignalSIGTERM;
-    LONGLONG Timeout = DefaultTimeout;
+    LONG Timeout = DefaultTimeout;
 };
 
 struct KillContainerOptions
@@ -61,9 +60,11 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
-    WSLA_CONTAINER_STATE State;
+    WSLAContainerState State;
+    ULONGLONG StateChangedAt{};
+    ULONGLONG CreatedAt{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
 };
 
 struct VolumeMount

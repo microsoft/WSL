@@ -19,6 +19,8 @@ Abstract:
 #include "wslaservice.h"
 #include "hcs.hpp"
 #include "WSLAProcess.h"
+#include <thread>
+#include <filesystem>
 
 namespace wsl::windows::service::wsla {
 
@@ -54,7 +56,7 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLA_SESSION_INIT_SETTINGS* Settings);
+    WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings);
     ~WSLAVirtualMachine();
 
     void Initialize();
@@ -75,7 +77,7 @@ public:
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
-        _In_ const WSLA_PROCESS_OPTIONS& Options,
+        _In_ const WSLAProcessOptions& Options,
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -110,7 +112,7 @@ private:
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ LPCSTR Executable,
-        _In_ const WSLA_PROCESS_OPTIONS& Options,
+        _In_ const WSLAProcessOptions& Options,
         _In_ const std::vector<WSLAProcessFd>& Fds = {},
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
@@ -123,12 +125,13 @@ private:
 
     ConnectedSocket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
     std::string GetVhdDevicePath(ULONG Lun);
-    static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
 
     HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ WSLAMountFlags Flags = WSLAMountFlagsNone);
 
     void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
+
+    void CollectCrashDumps(wil::unique_socket&& listenSocket);
 
     struct AttachedDisk
     {
@@ -146,6 +149,7 @@ private:
     std::string m_rootVhdType;
 
     std::thread m_processExitThread;
+    std::thread m_crashDumpThread;
 
     std::set<uint16_t> m_allocatedPorts;
 

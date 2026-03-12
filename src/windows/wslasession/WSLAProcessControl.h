@@ -31,7 +31,7 @@ public:
     virtual void Signal(int Signal) = 0;
     virtual void ResizeTty(ULONG Rows, ULONG Columns) = 0;
     virtual int GetPid() const = 0;
-    std::pair<WSLA_PROCESS_STATE, int> GetState() const;
+    std::pair<WSLAProcessState, int> GetState() const;
     const wil::unique_event& GetExitEvent() const;
 
 protected:
@@ -47,7 +47,7 @@ public:
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
-    void OnContainerReleased();
+    void OnContainerReleased() noexcept;
 
 private:
     void OnEvent(ContainerEvent Event, std::optional<int> ExitCode);
@@ -66,7 +66,7 @@ public:
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
-    void OnContainerReleased();
+    void OnContainerReleased() noexcept;
 
     void SetPid(int Pid);
     void SetExitCode(int ExitCode);

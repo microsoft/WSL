@@ -23,7 +23,7 @@ DmesgCollector::DmesgCollector(
     m_telemetry(EnableTelemetry),
     m_outputHandle(std::move(OutputHandle))
 {
-    m_exitEvent.reset(wsl::windows::common::helpers::DuplicateHandle(ExitEvent.get()));
+    m_exitEvent.reset(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
     m_overlappedEvent.create(wil::EventOptions::ManualReset);
     m_overlapped.hEvent = m_overlappedEvent.get();
     m_threadExit.create(wil::EventOptions::ManualReset);
@@ -72,13 +72,13 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
 
     THROW_LAST_ERROR_IF(!pipe);
 
-    auto workerThread = std::thread([this, Source, Pipe = std::move(pipe)]() {
+    auto workerThread = std::thread([Self = shared_from_this(), Source, Pipe = std::move(pipe)]() {
         try
         {
             wsl::windows::common::wslutil::SetThreadDescription(L"Dmesg");
 
             // When the pipe connects, start reading data.
-            wsl::windows::common::helpers::ConnectPipe(Pipe.get(), INFINITE, m_exitEvents);
+            wsl::windows::common::helpers::ConnectPipe(Pipe.get(), INFINITE, Self->m_exitEvents);
 
             std::vector<char> buffer(LX_RELAY_BUFFER_SIZE);
             const auto allBuffer = gsl::make_span(buffer);
@@ -89,7 +89,7 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
             {
                 overlappedEvent.ResetEvent();
                 const auto bytesRead = wsl::windows::common::relay::InterruptableRead(
-                    Pipe.get(), gslhelpers::convert_span<gsl::byte>(allBuffer), m_exitEvents, &overlapped);
+                    Pipe.get(), gslhelpers::convert_span<gsl::byte>(allBuffer), Self->m_exitEvents, &overlapped);
 
                 if (bytesRead == 0)
                 {
@@ -97,7 +97,7 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
                 }
 
                 auto validBuffer = allBuffer.subspan(0, bytesRead);
-                ProcessInput(Source, validBuffer);
+                Self->ProcessInput(Source, validBuffer);
             }
         }
         catch (...)

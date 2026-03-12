@@ -30,7 +30,6 @@ int CoreMain(int argc, wchar_t const** argv)
 try
 {
     EnableContextualizedErrors(false, true);
-    CLIExecutionContext context;
     HRESULT result = S_OK;
 
     // Initialize runtime and COM.
@@ -43,6 +42,10 @@ try
     wslutil::SetCrtEncoding(_O_U8TEXT);
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wslutil::CoInitializeSecurity();
+
+    // The execution context must be declared after COM is initialized because it stores internal
+    // COM references.
+    CLIExecutionContext context;
 
     WSADATA data{};
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
@@ -76,7 +79,7 @@ try
         // A command exception means there was an input failure. Display the help
         // along with the error message to help the user correct their input.
         command->OutputHelp(&ce);
-        return E_INVALIDARG;
+        return 1;
     }
     // Any other type of error unrelated to the command parsing.
     catch (...)
@@ -102,11 +105,16 @@ try
         }
     }
 
-    return result;
+    if (context.ExitCode.has_value())
+    {
+        return context.ExitCode.value();
+    }
+
+    return FAILED(result) ? 1 : 0;
 }
 catch (...)
 {
-    return E_UNEXPECTED;
+    return 1;
 }
 } // namespace wsl::windows::wslc
 

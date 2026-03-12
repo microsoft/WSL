@@ -395,7 +395,6 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLAMapPort,
     LxMessageWSLAConnectRelay,
     LxMessageWSLAPortRelay,
-    LxMessageWSLAOpen,
     LxMessageWSLAUnmount,
     LxMessageWSLADetach,
     LxMessageWSLATerminalChanged,
@@ -506,7 +505,6 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLAMapPort)
         X(LxMessageWSLAConnectRelay)
         X(LxMessageWSLAPortRelay)
-        X(LxMessageWSLAOpen)
         X(LxMessageWSLAUnmount)
         X(LxMessageWSLADetach)
         X(LxMessageWSLATerminalChanged)
@@ -1710,37 +1708,6 @@ struct WSLA_CONNECT
     MESSAGE_HEADER Header;
     uint32_t HostPort{};
     PRETTY_PRINT(FIELD(Header), FIELD(HostPort));
-};
-
-enum WslaOpenFlags // Must match FileDescriptorType.
-{
-    WslaOpenFlagsNone = 0,
-    WslaOpenFlagsRead = 4,
-    WslaOpenFlagsWrite = 8,
-    WslaOpenFlagsAppend = 16,
-    WslaOpenFlagsCreate = 32
-};
-
-struct WSLA_OPEN
-{
-    static inline auto Type = LxMessageWSLAOpen;
-    using TResponse = RESULT_MESSAGE<int32_t>;
-    DECLARE_MESSAGE_CTOR(WSLA_OPEN);
-
-    MESSAGE_HEADER Header;
-    uint32_t Flags{};
-    int32_t Fd{};
-    char Buffer[];
-
-    PRETTY_PRINT(FIELD(Header), FIELD(Flags), FIELD(Fd), FIELD(Buffer));
-};
-
-enum WSLAOpenFlags
-{
-    WSLAOpenFlagsUnknown,
-    WSLAOpenFlagsRunning,
-    WSLAOpenFlagsExited,
-    WSLAOpenFlagsSignaled
 };
 
 struct WSLA_SIGNAL

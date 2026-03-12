@@ -88,6 +88,9 @@ public class ProtocolActivationHandler : ActivationHandler<LaunchActivatedEventA
                     case "vscodeint":
                         pageKey = typeof(VSCodeIntegrationViewModel).FullName!;
                         break;
+                    case "vsint":
+                        pageKey = typeof(VSIntegrationViewModel).FullName!;
+                        break;
                     case "gpuaccel":
                         pageKey = typeof(GPUAccelerationViewModel).FullName!;
                         break;

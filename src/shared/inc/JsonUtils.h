@@ -62,8 +62,8 @@ T FromJson(const char* Value)
 
 #ifdef WIN32
 
-        WSL_LOG("InvalidJson", TraceLoggingValue(Value, "JsonValue"), TraceLoggingValue(e.what(), "Error"));
-        THROW_HR_WITH_USER_ERROR(WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()));
+        THROW_HR_WITH_USER_ERROR_MSG(
+            WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()), "Invalid JSON: %hs", Value);
 
 #else
         LOG_ERROR("Failed to deserialize json: '{}'. Error: {}", Value, e.what());

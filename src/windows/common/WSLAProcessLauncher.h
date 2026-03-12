@@ -40,12 +40,12 @@ public:
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
     int GetExitCode();
-    WSLA_PROCESS_STATE State();
+    WSLAProcessState State();
 
     WSLAProcessFlags Flags() const;
 
 protected:
-    virtual void GetState(WSLA_PROCESS_STATE* State, int* Code) = 0;
+    virtual void GetState(WSLAProcessState* State, int* Code) = 0;
 
     WSLAProcessFlags m_flags{};
 };
@@ -62,7 +62,7 @@ public:
     IWSLAProcess& Get();
 
 protected:
-    void GetState(WSLA_PROCESS_STATE* State, int* Code) override;
+    void GetState(WSLAProcessState* State, int* Code) override;
 
 private:
     wil::com_ptr<IWSLAProcess> m_process;
@@ -82,6 +82,7 @@ public:
     void SetTtySize(ULONG Rows, ULONG Columns);
     void SetWorkingDirectory(std::string&& WorkingDirectory);
     void SetUser(std::string&& User);
+    void SetDetachKeys(std::string&& DetachKeys);
 
     std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>, int> LaunchNoThrow(IWSLASession& Session);
     std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
@@ -99,12 +100,13 @@ public:
     std::string FormatResult(const int code);
 
 protected:
-    std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();
+    std::tuple<WSLAProcessOptions, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();
 
     WSLAProcessFlags m_flags{};
     std::string m_executable;
     std::string m_workingDirectory;
     std::string m_user;
+    std::optional<std::string> m_detachKeys;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
     DWORD m_rows = 0;
