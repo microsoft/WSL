@@ -9,6 +9,6 @@
         <WSLCSDK-Platform Condition="'$(Platform)' != 'AnyCPU'">$(Platform)</WSLCSDK-Platform>
     </PropertyGroup>
 
-    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.API.common.targets" />
+    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
 
 </Project>
