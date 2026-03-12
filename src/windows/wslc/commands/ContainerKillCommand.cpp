@@ -34,7 +34,7 @@ std::vector<Argument> ContainerKillCommand::GetArguments() const
 
 std::wstring ContainerKillCommand::ShortDescription() const
 {
-    return {L"Kill containers"};
+    return {L"Kill containers."};
 }
 
 std::wstring ContainerKillCommand::LongDescription() const

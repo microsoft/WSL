@@ -16,7 +16,6 @@ Abstract:
 
 #include <wslservice.h>
 #include <wslaservice.h>
-#include <docker_schema.h>
 #include <string>
 
 namespace wsl::windows::wslc::models {

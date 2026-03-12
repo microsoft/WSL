@@ -16,14 +16,13 @@ Abstract:
 #include "ImageService.h"
 #include <wslutil.h>
 #include <WSLAProcessLauncher.h>
-#include <docker_schema.h>
 #include <CommandLine.h>
 #include <unordered_map>
 #include <wslaservice.h>
 
 namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
-using wsl::windows::common::docker_schema::InspectContainer;
+using wsl::windows::common::wsla_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
