@@ -237,7 +237,7 @@ try
     auto internalType = CheckAndGetInternalType(sessionSettings);
     RETURN_HR_IF_NULL(E_POINTER, session);
     *session = nullptr;
-    ErrorInfoWrapper errorInfoWrapper{ errorMessage };
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     wil::com_ptr<IWSLASessionManager> sessionManager;
     RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
@@ -888,8 +888,7 @@ try
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalType->session->LoadImage(
-        HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength));
+        internalType->session->LoadImage(HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength));
 }
 CATCH_RETURN();
 
