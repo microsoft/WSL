@@ -115,9 +115,12 @@ private:
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
 
-    // N.B. m_lock must be acquired before acquiring m_containersLock
-    // This lock is used to protect m_containers. Doing this instead of acquiring m_lock exlusively allows for containers to be created/destroyed while operations that hold a shared m_lock are running.
+    // N.B. m_lock must be acquired before acquiring m_volumesLock or m_containersLock.
+    // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.
+    // This allows independent operations (e.g. SaveImage) to proceed while volume/container
+    // bookkeeping remains synchronized.
     std::mutex m_containersLock;
+    std::mutex m_volumesLock;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
     std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>> m_volumes;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};

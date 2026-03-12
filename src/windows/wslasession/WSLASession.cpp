@@ -1021,6 +1021,7 @@ try
     // already mounted on the VM.
     RETURN_HR_IF(E_INVALIDARG, containerOptions->NamedVolumesCount > 0 && containerOptions->NamedVolumes == nullptr);
 
+    std::lock_guard volumesLock(m_volumesLock);
     for (ULONG i = 0; i < containerOptions->NamedVolumesCount; i++)
     {
         const auto& namedVolume = containerOptions->NamedVolumes[i];
@@ -1291,13 +1292,13 @@ try
 
     ValidateName(name.c_str());
 
-    auto lock = m_lock.lock_exclusive();
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
+    std::lock_guard volumesLock(m_volumesLock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidVolumeType(type), type != "vhd");
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     auto volume = WSLAVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), m_virtualMachine.value(), m_dockerClient.value());
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
@@ -1320,8 +1321,11 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
 
-    auto lock = m_lock.lock_exclusive();
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard volumesLock(m_volumesLock);
 
     auto it = m_volumes.find(name);
     THROW_HR_WITH_USER_ERROR_IF(WSLA_E_VOLUME_NOT_FOUND, Localization::MessageWslaVolumeNotFound(name), it == m_volumes.end());
@@ -1344,9 +1348,9 @@ try
     // Acquire an exclusive lock to ensure that no operation is running.
     auto lock = m_lock.lock_exclusive();
     std::lock_guard containersLock(m_containersLock);
+    std::lock_guard volumesLock(m_volumesLock);
 
     m_containers.clear();
-
     m_volumes.clear();
 
     // Stop the IO relay.
