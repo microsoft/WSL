@@ -13,9 +13,9 @@ param (
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-function Write-Pad([System.IO.Stream]$Stream, [int]$Position)
+function Write-Pad([System.IO.Stream]$Stream)
 {
-    $remainder = $Position % 4
+    $remainder = $Stream.Position % 4
     if ($remainder -ne 0)
     {
         $pad = [byte[]]::new(4 - $remainder)
@@ -42,11 +42,11 @@ function Write-CpioEntry([System.IO.Stream]$Stream, [byte[]]$NameBytes, [byte[]]
     $headerBytes = [System.Text.Encoding]::ASCII.GetBytes($header)
     $Stream.Write($headerBytes, 0, $headerBytes.Length)
     $Stream.Write($NameBytes, 0, $NameBytes.Length)
-    Write-Pad $Stream ($headerBytes.Length + $NameBytes.Length)
+    Write-Pad $Stream
     if ($FileData.Length -gt 0)
     {
         $Stream.Write($FileData, 0, $FileData.Length)
-        Write-Pad $Stream $FileData.Length
+        Write-Pad $Stream
     }
 }
 
