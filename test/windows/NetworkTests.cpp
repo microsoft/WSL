@@ -2249,10 +2249,8 @@ class NetworkTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Verify we have connectivity from the networking namespace when using ephemeral port selection.
@@ -2740,8 +2738,8 @@ class NetworkTests
             }
             else if (std::regex_search(line, match, routePattern) && match.size() >= 4)
             {
-                state.Routes.emplace_back(
-                    Route{match.str(2), match.str(3), {match.str(1)}, match.size() > 5 && match[5].matched ? std::stoi(match.str(5)) : 0});
+                state.Routes.emplace_back(Route{
+                    match.str(2), match.str(3), {match.str(1)}, match.size() > 5 && match[5].matched ? std::stoi(match.str(5)) : 0});
             }
         }
 
@@ -4036,15 +4034,12 @@ class MirroredTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Add rule for port forwarding traffic with destination port 8080 to port 80 in the new namespace
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat PREROUTING { type nat hook prerouting priority dstnat; }\""), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat PREROUTING { type nat hook prerouting priority dstnat; }\""), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat PREROUTING tcp dport 8080 dnat to 192.168.15.2:80"), 0);
 
         // Start listeners in root namespace on port 8080 and new namespace on port 80
@@ -4118,10 +4113,8 @@ class MirroredTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Create a listener on the Windows host on port 1234
