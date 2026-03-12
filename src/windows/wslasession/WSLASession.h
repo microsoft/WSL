@@ -117,8 +117,7 @@ private:
 
     // N.B. m_lock must be acquired before acquiring m_volumesLock or m_containersLock.
     // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.
-    // This allows independent operations (e.g. SaveImage) to proceed while volume/container
-    // bookkeeping remains synchronized.
+    // This allows independent operations to proceed while volume/container bookkeeping remains synchronized.
     std::mutex m_containersLock;
     std::mutex m_volumesLock;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
