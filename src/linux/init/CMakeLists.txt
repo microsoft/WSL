@@ -61,3 +61,4 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
     VERBATIM)
 add_custom_target(initramfs DEPENDS ${INITRAMFS})
+set_target_properties(initramfs PROPERTIES FOLDER linux)
