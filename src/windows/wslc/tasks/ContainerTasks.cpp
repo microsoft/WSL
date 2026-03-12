@@ -139,13 +139,14 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATUS"});
+        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
         for (const auto& container : containers)
         {
             tablePrinter.AddRow({
                 MultiByteToWide(container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
+                ContainerService::FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
             });
         }
