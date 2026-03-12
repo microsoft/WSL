@@ -26,7 +26,7 @@ RepoTag RepoTag::Parse(const std::string& repoTag)
     {
         if (lastColonPos == std::string::npos)
         {
-            // Not slash and no colon (e.g. "debian")
+            // No slash and no colon (e.g. "debian")
             return { repoTag, "" };
         }
 

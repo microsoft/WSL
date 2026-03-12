@@ -62,4 +62,4 @@ class WSLCCLIRepoTagUnitTests
         }
     }
 };
-} // namespace WSLCCLIParserUnitTests
+} // namespace WSLCCLIRepoTagUnitTests

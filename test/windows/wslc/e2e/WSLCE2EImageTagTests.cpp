@@ -166,11 +166,10 @@ class WSLCE2EImageTagTests
     }
 
 private:
-    const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
-    const TestImage& DebianTaggedImage = TestImage{L"debian", L"e2e-new-tag"};
+    const TestImage DebianTaggedImage{L"debian", L"e2e-new-tag"};
 
     std::wstring GetHelpMessage() const
     {
