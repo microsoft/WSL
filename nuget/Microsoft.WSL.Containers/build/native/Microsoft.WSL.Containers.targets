@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup Condition="'$(WSLCSDK_Platform)' == ''">
+        <WSLCSDK_Platform>$(Platform)</WSLCSDK_Platform>
+    </PropertyGroup>
     <ItemDefinitionGroup>
-        <PropertyGroup Condition="'$(WSLCSDK-Platform)' == ''">
-            <WSLCSDK-Platform>$(Platform)</WSLCSDK-Platform>
-        </PropertyGroup>
         <ClCompile>
             <AdditionalIncludeDirectories>
                 $(MSBuildThisFileDirectory)..\..\include;
@@ -21,4 +21,6 @@
             </AdditionalLibraryDirectories>
         </Link>
     </ItemDefinitionGroup>
+
+    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
 </Project>
