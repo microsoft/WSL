@@ -35,7 +35,7 @@ std::vector<Argument> SessionCommand::GetArguments() const
 
 std::wstring SessionCommand::ShortDescription() const
 {
-    return {L"Session command"};
+    return {L"Session command."};
 }
 
 std::wstring SessionCommand::LongDescription() const

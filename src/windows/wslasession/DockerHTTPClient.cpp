@@ -559,7 +559,18 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             auto contentLength = response.find(http::field::content_length);
             if (contentLength != response.end())
             {
-                RemainingContentLength = std::stoul(contentLength->value());
+                try
+                {
+                    RemainingContentLength = std::stoul(contentLength->value());
+                }
+                catch (const std::exception&)
+                {
+                    THROW_HR_MSG(
+                        E_UNEXPECTED,
+                        "Invalid Content-Length header: %.*hs",
+                        static_cast<int>(contentLength->value().size()),
+                        contentLength->value().data());
+                }
             }
         }
 

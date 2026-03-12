@@ -390,8 +390,9 @@ struct ContainerInfo
     std::vector<Port> Ports;
     std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
+    int64_t Created{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created);
 };
 
 struct BuildKitVertex
