@@ -1521,6 +1521,8 @@ int RunDebugShell()
 
 int WslMain(_In_ std::wstring_view commandLine)
 {
+    __fastfail(1);
+
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
