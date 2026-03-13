@@ -305,7 +305,7 @@ void ProcessNamedVolumes(
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
     THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
-    
+
     for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
     {
         const auto& nv = containerOptions.NamedVolumes[i];
