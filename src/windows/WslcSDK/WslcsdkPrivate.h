@@ -21,7 +21,7 @@ Abstract:
 // #include <wil/result.h>   // error handling
 
 // SESSION DEFINITIONS
-typedef struct WSLC_SESSION_OPTIONS_INTERNAL
+typedef struct WslcSessionOptionsInternal
 {
     PCWSTR displayName;
     PCWSTR storagePath;
@@ -34,42 +34,41 @@ typedef struct WSLC_SESSION_OPTIONS_INTERNAL
     WslcSessionFeatureFlags featureFlags;
     WslcSessionTerminationCallback terminationCallback;
     PVOID terminationCallbackContext;
-} WSLC_SESSION_OPTIONS_INTERNAL;
+} WslcSessionOptionsInternal;
 
-static_assert(sizeof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
+static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
 
 static_assert(
-    __alignof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_ALIGNMENT,
+    __alignof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_ALIGNMENT,
     "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
 
-static_assert(std::is_trivial_v<WSLC_SESSION_OPTIONS_INTERNAL>, "WSLC_SESSION_OPTIONS_INTERNAL must be trivial");
+static_assert(std::is_trivial_v<WslcSessionOptionsInternal>, "WSLC_SESSION_OPTIONS_INTERNAL must be trivial");
 
-WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings);
+WslcSessionOptionsInternal* GetInternalType(WslcSessionSettings* settings);
 
 // PROCESS DEFINITIONS
-typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
+typedef struct WslcContainerProcessOptionsInternal
 {
     PCSTR const* commandLine;
     uint32_t commandLineCount;
     PCSTR const* environment;
     uint32_t environmentCount;
     PCSTR currentDirectory;
-} WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL;
+} WslcContainerProcessOptionsInternal;
 
 static_assert(
-    sizeof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
+    sizeof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
     "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 48 bytes");
 static_assert(
-    __alignof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
+    __alignof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
 
-static_assert(
-    std::is_trivial_v<WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
+static_assert(std::is_trivial_v<WslcContainerProcessOptionsInternal>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
 
-WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* GetInternalType(WslcProcessSettings* settings);
+WslcContainerProcessOptionsInternal* GetInternalType(WslcProcessSettings* settings);
 
 // CONTAINER DEFINITIONS
-typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
+typedef struct WslcContainerOptionsInternal
 {
     PCSTR image;       // Image name (repository:tag)
     PCSTR runtimeName; // Container runtime name (expected to allow DNS resolution between containers)
@@ -79,22 +78,22 @@ typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
     uint32_t portsCount;
     const WslcContainerVolume* volumes;
     uint32_t volumesCount;
-    const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions;
+    const WslcContainerProcessOptionsInternal* initProcessOptions;
     WSLAContainerNetworkType networking;
     WslcContainerFlags containerFlags;
 
-} WSLC_CONTAINER_OPTIONS_INTERNAL;
+} WslcContainerOptionsInternal;
 
 static_assert(
-    sizeof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL must be 80 bytes");
+    sizeof(WslcContainerOptionsInternal) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL must be 80 bytes");
 static_assert(
-    __alignof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
+    __alignof(WslcContainerOptionsInternal) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_OPTIONS_INTERNAL must be 8-byte aligned");
 
-static_assert(std::is_trivial_v<WSLC_CONTAINER_OPTIONS_INTERNAL>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
+static_assert(std::is_trivial_v<WslcContainerOptionsInternal>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
 
-WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings);
-const WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(const WslcContainerSettings* settings);
+WslcContainerOptionsInternal* GetInternalType(WslcContainerSettings* settings);
+const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings* settings);
 
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl

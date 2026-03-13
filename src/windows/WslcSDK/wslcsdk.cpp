@@ -168,7 +168,7 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
     }
 }
 
-bool CopyProcessSettingsToRuntime(WSLAProcessOptions& runtimeOptions, const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions)
+bool CopyProcessSettingsToRuntime(WSLAProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
 {
     if (initProcessOptions)
     {
@@ -888,7 +888,9 @@ try
     *exitCode = -1;
 
     WSLAProcessState runtimeState{};
-    RETURN_HR(internalType->process->GetState(&runtimeState, exitCode));
+    RETURN_IF_FAILED(internalType->process->GetState(&runtimeState, exitCode));
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), runtimeState != WslaProcessStateExited);
+    return S_OK;
 }
 CATCH_RETURN();
 

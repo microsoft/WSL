@@ -67,7 +67,7 @@ struct ProcessOutput
     std::string stderrOutput;
 };
 
-ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::milliseconds timeout = 60s)
+ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::milliseconds timeout = 2min)
 {
     // Borrow the exit-event handle (lifetime tied to the process object; do NOT close it).
     HANDLE exitEvent = nullptr;
@@ -111,7 +111,7 @@ ProcessOutput WaitForProcessOutput(WslcProcess process, std::chrono::millisecond
 // Runs a container with the given argv, waits up to timeoutMs for it to exit,
 // and returns the captured stdout / stderr output.
 //
-ProcessOutput RunContainerAndCapture(WslcSession session, const WslcContainerSettings& containerSettings, std::chrono::milliseconds timeout = 60s)
+ProcessOutput RunContainerAndCapture(WslcSession session, const WslcContainerSettings& containerSettings, std::chrono::milliseconds timeout = 2min)
 {
     // Create and start the container.
     UniqueContainer container;
@@ -131,7 +131,7 @@ ProcessOutput RunContainerAndCapture(
     const std::vector<const char*>& argv,
     WslcContainerFlags flags = WSLC_CONTAINER_FLAG_NONE,
     const char* name = nullptr,
-    std::chrono::milliseconds timeout = 60s,
+    std::chrono::milliseconds timeout = 2min,
     std::optional<WslcContainerNetworkingMode> networkingMode = std::nullopt)
 {
     // Build process settings.
@@ -374,7 +374,7 @@ class WslcSdkTests
             WslcPullImageOptions opts{};
             opts.uri = "does-not:exist";
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_FAILED(WslcSessionImagePull(m_defaultSession, &opts, &errorMsg));
+            VERIFY_ARE_EQUAL(WslcSessionImagePull(m_defaultSession, &opts, &errorMsg), WSLA_E_IMAGE_NOT_FOUND);
 
             // An error message should be present.
             VERIFY_IS_NOT_NULL(errorMsg.get());
@@ -506,7 +506,7 @@ class WslcSdkTests
             WslcLoadImageOptions opts{};
             opts.ImageHandle = selfFileHandle.get();
             opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
-            VERIFY_FAILED(WslcSessionImageLoad(m_defaultSession, &opts));
+            VERIFY_ARE_EQUAL(WslcSessionImageLoad(m_defaultSession, &opts), E_FAIL);
         }
     }
 
@@ -576,7 +576,7 @@ class WslcSdkTests
 
             WslcContainer container = nullptr;
             PWSTR rawMsg = nullptr;
-            VERIFY_FAILED(WslcContainerCreate(m_defaultSession, &containerSettings, &container, &rawMsg));
+            VERIFY_ARE_EQUAL(WslcContainerCreate(m_defaultSession, &containerSettings, &container, &rawMsg), WSLA_E_IMAGE_NOT_FOUND);
             wil::unique_cotaskmem_string errorMsg{rawMsg};
             VERIFY_IS_NULL(container);
         }
@@ -755,7 +755,7 @@ class WslcSdkTests
                 nullptr,
                 60s,
                 WSLC_CONTAINER_NETWORKING_MODE_BRIDGED);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("HAS_ETH0") != std::string::npos);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "HAS_ETH0\n");
         }
 
         // NONE: container should not have an eth0 interface.
@@ -768,7 +768,7 @@ class WslcSdkTests
                 nullptr,
                 60s,
                 WSLC_CONTAINER_NETWORKING_MODE_NONE);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("NO_ETH0") != std::string::npos);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "NO_ETH0\n");
         }
 
         // Invalid networking mode must fail.
@@ -818,7 +818,7 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcContainerSettingsSetPortMapping(&containerSettings, &mapping, 1));
 
             WslcContainer rawContainer = nullptr;
-            VERIFY_FAILED(WslcContainerCreate(m_defaultSession, &containerSettings, &rawContainer, nullptr));
+            VERIFY_ARE_EQUAL(WslcContainerCreate(m_defaultSession, &containerSettings, &rawContainer, nullptr), E_INVALIDARG);
             VERIFY_IS_NULL(rawContainer);
         }
 
@@ -996,7 +996,7 @@ class WslcSdkTests
             std::ifstream written(hostRwDir / "written.txt");
             VERIFY_IS_TRUE(written.is_open());
             std::string writtenContent((std::istreambuf_iterator<char>(written)), std::istreambuf_iterator<char>());
-            VERIFY_IS_TRUE(writtenContent.find("container-write") != std::string::npos);
+            VERIFY_ARE_EQUAL(writtenContent, "container-write\n");
         }
     }
 
@@ -1028,8 +1028,8 @@ class WslcSdkTests
             UniqueProcess execProcess;
             VERIFY_SUCCEEDED(WslcContainerExec(container.get(), &execProcSettings, &execProcess));
 
-            auto output = WaitForProcessOutput(execProcess.get(), 30s);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("exec-hello") != std::string::npos);
+            auto output = WaitForProcessOutput(execProcess.get());
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "exec-hello\n");
         }
 
         // Negative: process settings with no command line must fail.
@@ -1074,8 +1074,8 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcContainerSettingsSetInitProcess(&containerSettings, &procSettings));
             VERIFY_SUCCEEDED(WslcContainerSettingsSetHostName(&containerSettings, "my-test-host"));
 
-            auto output = RunContainerAndCapture(m_defaultSession, containerSettings, 30s);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("my-test-host") != std::string::npos);
+            auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "my-test-host\n");
         }
     }
 
@@ -1102,8 +1102,8 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcContainerSettingsSetInitProcess(&containerSettings, &procSettings));
             VERIFY_SUCCEEDED(WslcContainerSettingsSetDomainName(&containerSettings, "test.local"));
 
-            auto output = RunContainerAndCapture(m_defaultSession, containerSettings, 30s);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("test.local") != std::string::npos);
+            auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "test.local\n");
         }
     }
 
@@ -1146,8 +1146,8 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
             VERIFY_SUCCEEDED(WslcContainerSettingsSetInitProcess(&containerSettings, &procSettings));
 
-            auto output = RunContainerAndCapture(m_defaultSession, containerSettings, 10s);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("hello-from-test") != std::string::npos);
+            auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "hello-from-test\n");
         }
     }
 
@@ -1181,7 +1181,7 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WaitForSingleObject(exitEvent, 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
 
         // Negative: null process handle must return an error.
-        VERIFY_FAILED(WslcProcessSignal(nullptr, WSLC_SIGNAL_SIGKILL));
+        VERIFY_ARE_EQUAL(WslcProcessSignal(nullptr, WSLC_SIGNAL_SIGKILL), E_POINTER);
     }
 
     TEST_METHOD(ProcessGetPid)
@@ -1214,7 +1214,7 @@ class WslcSdkTests
 
         // Negative: null process handle must return an error.
         WslcProcess nullProcess = nullptr;
-        VERIFY_FAILED(WslcProcessGetPid(nullProcess, &pid));
+        VERIFY_ARE_EQUAL(WslcProcessGetPid(nullProcess, &pid), E_POINTER);
     }
 
     TEST_METHOD(ProcessGetExitCode)
@@ -1262,14 +1262,14 @@ class WslcSdkTests
         // Negative: null exit code pointer must fail.
         {
             auto process = RunAndGetProcess(0);
-            VERIFY_FAILED(WslcProcessGetExitCode(process.get(), nullptr));
+            VERIFY_ARE_EQUAL(WslcProcessGetExitCode(process.get(), nullptr), E_POINTER);
         }
 
         // Negative: null process handle must return an error.
         {
             WslcProcess nullProcess = nullptr;
             INT32 code = 0;
-            VERIFY_FAILED(WslcProcessGetExitCode(nullProcess, &code));
+            VERIFY_ARE_EQUAL(WslcProcessGetExitCode(nullProcess, &code), E_POINTER);
         }
     }
 
@@ -1303,6 +1303,13 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(state, WSLC_PROCESS_STATE_RUNNING);
         }
 
+        // Bonus test for exit code while running
+        {
+            INT32 exitCode{};
+            VERIFY_ARE_EQUAL(WslcProcessGetExitCode(process.get(), &exitCode), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(exitCode, -1);
+        }
+
         // Kill the process and wait for the exit event.
         VERIFY_SUCCEEDED(WslcProcessSignal(process.get(), WSLC_SIGNAL_SIGKILL));
         VERIFY_ARE_EQUAL(WaitForSingleObject(exitEvent, 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
@@ -1321,7 +1328,7 @@ class WslcSdkTests
         {
             WslcProcess nullProcess = nullptr;
             WslcProcessState state{};
-            VERIFY_FAILED(WslcProcessGetState(nullProcess, &state));
+            VERIFY_ARE_EQUAL(WslcProcessGetState(nullProcess, &state), E_POINTER);
         }
     }
 
@@ -1358,8 +1365,8 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcContainerInitSettings("debian:latest", &containerSettings));
             VERIFY_SUCCEEDED(WslcContainerSettingsSetInitProcess(&containerSettings, &procSettings));
 
-            auto output = RunContainerAndCapture(m_defaultSession, containerSettings, 30s);
-            VERIFY_IS_TRUE(output.stdoutOutput.find("/tmp") != std::string::npos);
+            auto output = RunContainerAndCapture(m_defaultSession, containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "/tmp\n");
         }
     }
 
