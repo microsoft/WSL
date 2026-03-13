@@ -110,6 +110,11 @@ try
     {
         const auto distributions = wsl::windows::common::distribution::GetAvailable();
 
+        if (distributions.PolicyOverridden)
+        {
+            EMIT_USER_WARNING(Localization::MessageDistributionListOverriddenByPolicy());
+        }
+
         if (distributionName.has_value())
         {
             installResult.Distribution = LookupByName(distributions, distributionName->c_str(), legacy);
