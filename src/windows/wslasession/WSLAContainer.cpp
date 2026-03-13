@@ -304,6 +304,8 @@ void ProcessNamedVolumes(
     std::unordered_set<std::string>& containerMountTargets,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
+    THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
+    
     for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
     {
         const auto& nv = containerOptions.NamedVolumes[i];
@@ -337,7 +339,7 @@ void ValidateNamedVolumes(
 {
     for (const auto& mount : mounts)
     {
-        if (mount.Type == "volume")
+        if (mount.Type == "volume" && !mount.Name.empty())
         {
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLA_E_VOLUME_NOT_FOUND,

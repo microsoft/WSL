@@ -1015,12 +1015,6 @@ try
 
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
-    // Validate that each requested named volume exists in the session before passing the request to container creation.
-    // This prevents adding volumes to the container that the session does not know about or have been removed from the
-    // WSLASession. In the case of VHD backed name volumes, the assumption is that if the volume exists in our map, the VHD is
-    // already mounted on the VM.
-    RETURN_HR_IF(E_INVALIDARG, containerOptions->NamedVolumesCount > 0 && containerOptions->NamedVolumes == nullptr);
-
     // TODO: Log entrance into the function.
 
     try
