@@ -222,7 +222,7 @@ std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
     std::vector<BYTE> result;
     result.reserve(input.length() / 2);
     T currentHex[3]{};
-    for (auto i = 0; i < input.size(); i += 2)
+    for (size_t i = 0; i < input.size(); i += 2)
     {
         // Skip '0x', if any
         if (i == 0 && IsHexSpecifier(input[0], input[1]))
