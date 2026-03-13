@@ -205,6 +205,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Interactive = true;
     }
 
+    if (context.Args.Contains(ArgType::Remove))
+    {
+        options.Remove = true;
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
