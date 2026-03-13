@@ -59,8 +59,8 @@ public class WslConfigService : IWslConfigService
 
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            var working = GetSnapshotValueOrThrow(_workingSnapshot, wslConfigEntry, nameof(_workingSnapshot));
-            return working.Clone();
+            var workingSettingValue = GetConfigSettingValueFromSnapshot(_workingSnapshot, wslConfigEntry, nameof(_workingSnapshot));
+            return workingSettingValue.Clone();
         }
     }
 
@@ -80,9 +80,9 @@ public class WslConfigService : IWslConfigService
 
             // Replace the old value in the working snapshot with the new one.
             // We clone to avoid sharing the same native object with the caller.
-            if (_workingSnapshot.TryGetValue(settingManaged.ConfigEntry, out var existing))
+            if (_workingSnapshot.TryGetValue(settingManaged.ConfigEntry, out var existingSettingValue))
             {
-                existing.ConfigSetting.Dispose();
+                existingSettingValue.ConfigSetting.Dispose();
             }
             _workingSnapshot[settingManaged.ConfigEntry] = settingManaged.Clone();
 
@@ -119,14 +119,13 @@ public class WslConfigService : IWslConfigService
 
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            // Track whether pending state toggles so we can show/hide the Apply button
-            var hadPendingBefore = HasPendingChanges_NoLock();
             var pendingChanges = EnumeratePendingChanges_NoLock().ToList();
             if (pendingChanges.Count == 0)
             {
                 return 0;
             }
 
+            var hadPendingBefore = HasPendingChanges_NoLock();
             _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
             try
             {
@@ -144,6 +143,7 @@ public class WslConfigService : IWslConfigService
                 RefreshSnapshots_NoLock();
 
                 var hasPendingAfter = HasPendingChanges_NoLock();
+                // This controls whether the Apply button appears or disappears in the UI
                 pendingStateChanged = hadPendingBefore != hasPendingAfter;
             }
             finally
@@ -242,7 +242,7 @@ public class WslConfigService : IWslConfigService
 
     // Look up an entry in a snapshot. Both snapshots are populated with every entry at startup,
     // so a missing key means something went wrong during initialization.
-    private static WslConfigSettingManaged GetSnapshotValueOrThrow(IDictionary<WslConfigEntry, WslConfigSettingManaged> snapshot, WslConfigEntry entry, string snapshotName)
+    private static WslConfigSettingManaged GetConfigSettingValueFromSnapshot(IDictionary<WslConfigEntry, WslConfigSettingManaged> snapshot, WslConfigEntry entry, string snapshotName)
     {
         if (!snapshot.TryGetValue(entry, out var setting) || setting is null)
         {
@@ -270,8 +270,8 @@ public class WslConfigService : IWslConfigService
     {
         foreach (var entry in AllConfigEntries)
         {
-            var baseline = GetSnapshotValueOrThrow(_baselineSnapshot, entry, nameof(_baselineSnapshot));
-            var working = GetSnapshotValueOrThrow(_workingSnapshot, entry, nameof(_workingSnapshot));
+            var baseline = GetConfigSettingValueFromSnapshot(_baselineSnapshot, entry, nameof(_baselineSnapshot));
+            var working = GetConfigSettingValueFromSnapshot(_workingSnapshot, entry, nameof(_workingSnapshot));
 
             if (!baseline.Equals(working))
             {
@@ -288,8 +288,8 @@ public class WslConfigService : IWslConfigService
     {
         foreach (var entry in AllConfigEntries)
         {
-            var baseline = GetSnapshotValueOrThrow(_baselineSnapshot, entry, nameof(_baselineSnapshot));
-            var working = GetSnapshotValueOrThrow(_workingSnapshot, entry, nameof(_workingSnapshot));
+            var baseline = GetConfigSettingValueFromSnapshot(_baselineSnapshot, entry, nameof(_baselineSnapshot));
+            var working = GetConfigSettingValueFromSnapshot(_workingSnapshot, entry, nameof(_workingSnapshot));
 
             if (!baseline.Equals(working))
             {
