@@ -1056,8 +1056,8 @@ Falling back to NAT networking.</value>
     <value>The distribution failed to start. Error code: {}, failure step: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDiskCorrupted" xml:space="preserve">
-    <value>The distribution failed to start because its virtual disk is corrupted.</value>
+  <data name="MessageMountFailed" xml:space="preserve">
+    <value>The distribution failed to start because its virtual disk is corrupted, of non-expected filesystem, or invalid mount options.</value>
   </data>
   <data name="MessageConfigKeyDuplicated" xml:space="preserve">
     <value>Duplicated config key '{}' in {}:{} (Conflicting key: '{}' in {}:{})</value>

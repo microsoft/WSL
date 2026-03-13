@@ -2586,14 +2586,14 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             // Validate that starting the distribution fails with the correct error code.
             validateOutput(
                 L"-d BrokenDistro echo ok",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED\r\n");
+                L"The distribution failed to start because its virtual disk is corrupted, of non-expected filesystem, or invalid mount options.\r\n"
+                L"Error code: Wsl/Service/CreateInstance/WSL_E_MOUNT_FAILED\r\n");
 
             // Validate that trying to export the distribution fails with the correct error code.
             validateOutput(
                 L"--export BrokenDistro dummy.tar",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/WSL_E_DISK_CORRUPTED\r\n");
+                L"The distribution failed to start because its virtual disk is corrupted, of non-expected filesystem, or invalid mount options.\r\n"
+                L"Error code: Wsl/Service/WSL_E_MOUNT_FAILED\r\n");
 
             // Shutdown WSL to force the disk to detach.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0L);
@@ -2602,8 +2602,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Import a corrupted vhd.
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
-            L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-            L"Error code: Wsl/Service/RegisterDistro/WSL_E_DISK_CORRUPTED\r\n");
+            L"The distribution failed to start because its virtual disk is corrupted, of non-expected filesystem, or invalid mount options.\r\n"
+            L"Error code: Wsl/Service/RegisterDistro/WSL_E_MOUNT_FAILED\r\n");
 
         // Ensure the VHD can be deleted to make sure it was properly ejected from the VM.
         VERIFY_ARE_EQUAL(DeleteFileW(vhdPath.c_str()), TRUE);
