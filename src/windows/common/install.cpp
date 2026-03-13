@@ -42,8 +42,24 @@ bool PromptForKeyPress()
 
 bool PromptForKeyPressWithTimeout()
 {
+    // Run PromptForKeyPress on a separate thread so we can apply a timeout.
+    // If PromptForKeyPress fails, fulfill the promise with false so the caller doesn't hang.
     std::promise<bool> pressedKey;
-    auto thread = std::thread([&pressedKey]() { pressedKey.set_value(PromptForKeyPress()); });
+    auto thread = std::thread([&pressedKey]() {
+        try
+        {
+            pressedKey.set_value(PromptForKeyPress());
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            try
+            {
+                pressedKey.set_value(false);
+            }
+            CATCH_LOG()
+        }
+    });
 
     auto cancelRead = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&thread]() {
         if (thread.joinable())
@@ -135,10 +151,10 @@ void WaitForMsiInstall()
     auto finishLine = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { fputws(L"\n", stderr); });
 
     UINT exitCode = -1;
-    wil::unique_cotaskmem_string message = nullptr;
+    wil::unique_cotaskmem_string message{};
     THROW_IF_FAILED(installer->Install(&exitCode, &message));
 
-    if (*message.get() != UNICODE_NULL)
+    if (message && *message.get() != UNICODE_NULL)
     {
         finishLine.release();
         wprintf(L"\n%ls\n", message.get());
@@ -179,7 +195,7 @@ int WINAPI InstallRecordHandler(void* context, UINT messageType, LPCWSTR message
             WriteInstallLog(std::format("MSI message: {}", message));
         }
 
-        auto* callback = reinterpret_cast<const std::function<void(UINT, LPCWSTR)>*>(context);
+        auto* callback = reinterpret_cast<const std::function<void(INSTALLMESSAGE, LPCWSTR)>*>(context);
         if (callback != nullptr)
         {
             (*callback)(type, message);
