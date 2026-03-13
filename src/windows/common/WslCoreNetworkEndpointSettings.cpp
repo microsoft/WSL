@@ -139,16 +139,7 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
 
 std::wstring wsl::core::networking::NetworkSettings::GetBestGatewayMacAddress(ADDRESS_FAMILY addressFamily) const
 {
-    SOCKADDR_INET gatewayAddress{};
-    if (addressFamily == AF_INET)
-    {
-        gatewayAddress = GetBestGatewayAddress();
-    }
-    else if (addressFamily == AF_INET6)
-    {
-        gatewayAddress = GetBestGatewayAddress(AF_INET6);
-    }
-
+    auto gatewayAddress = GetBestGatewayAddress(addressFamily);
     if (gatewayAddress.si_family != addressFamily)
     {
         return {};

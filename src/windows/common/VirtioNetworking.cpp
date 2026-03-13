@@ -274,7 +274,7 @@ void VirtioNetworking::SetupLoopbackDevice()
 
 void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, hns::ModifyRequestType requestType)
 {
-    if (gateway.empty())
+    if (gateway.empty() || !m_adapterId.has_value())
     {
         return;
     }
@@ -293,7 +293,7 @@ void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, hns::Modify
 
 void VirtioNetworking::UpdateDefaultRoute(const std::wstring& gateway)
 {
-    if (gateway == m_trackedDefaultRoute)
+    if (gateway == m_trackedDefaultRoute || !m_adapterId.has_value())
     {
         return;
     }
@@ -305,7 +305,7 @@ void VirtioNetworking::UpdateDefaultRoute(const std::wstring& gateway)
 
 void VirtioNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
 {
-    if (dns == m_trackedDnsSettings)
+    if (dns == m_trackedDnsSettings || !m_adapterId.has_value())
     {
         return;
     }
@@ -321,17 +321,12 @@ void VirtioNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
 
 void VirtioNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress)
 {
-    if (ipAddress == m_trackedIpv4Address)
+    if (ipAddress == m_trackedIpv4Address || ipAddress.AddressString.empty() || !m_adapterId.has_value())
     {
         return;
     }
 
     m_trackedIpv4Address = ipAddress;
-
-    if (ipAddress.AddressString.empty())
-    {
-        return;
-    }
 
     // N.B. SendEndpointState triggers SetAdapterConfiguration on the Linux side
     // which brings the interface UP and configures the full adapter state.
@@ -346,7 +341,7 @@ void VirtioNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAd
 {
     WI_ASSERT(WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
 
-    if (ipAddress.AddressString.empty())
+    if (ipAddress.AddressString.empty() || !m_adapterId.has_value())
     {
         return;
     }
@@ -366,7 +361,7 @@ void VirtioNetworking::UpdateIpv6Address(const networking::EndpointIpAddress& ip
 {
     WI_ASSERT(WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
 
-    if (ipAddress == m_trackedIpv6Address)
+    if (ipAddress == m_trackedIpv6Address || !m_adapterId.has_value())
     {
         return;
     }
@@ -378,7 +373,7 @@ void VirtioNetworking::UpdateIpv6Address(const networking::EndpointIpAddress& ip
 
 void VirtioNetworking::UpdateMtu(std::optional<ULONG> mtu)
 {
-    if (!mtu || mtu.value() == m_networkMtu)
+    if (!mtu || mtu.value() == m_networkMtu || !m_adapterId.has_value())
     {
         return;
     }

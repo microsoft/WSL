@@ -4657,9 +4657,9 @@ class VirtioProxyTests
 
         // Verify that /etc/resolv.conf contains a 'search' line if the host has DNS suffixes
         auto [suffixOut, suffixErr] = LxsstuLaunchPowershellAndCaptureOutput(
-            L"@((Get-DnsClientGlobalSetting).SuffixSearchList) + @((Get-DnsClient).ConnectionSpecificSuffix) | Where-Object {$_} "
-            L"| Select-Object -First 1");
-        if (suffixOut.find_first_not_of(L" \t\r\n") != std::wstring::npos)
+            L"(@((Get-DnsClientGlobalSetting).SuffixSearchList) + @((Get-DnsClient).ConnectionSpecificSuffix) | Where-Object "
+            L"{$_}).Count");
+        if (_wtoi(suffixOut.c_str()) > 0)
         {
             VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
         }
@@ -4793,49 +4793,48 @@ class VirtioProxyTests
         SOCKADDR_IN6 dest{};
         dest.sin6_family = AF_INET6;
         InetPtonW(AF_INET6, L"2001:4860:4860::8888", &dest.sin6_addr);
-        if (GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex) == NO_ERROR)
+        VERIFY_ARE_EQUAL(NO_ERROR, GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex));
+
+        for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(adapterAddresses.data()); adapter != nullptr;
+             adapter = adapter->Next)
         {
-            for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(adapterAddresses.data()); adapter != nullptr;
-                 adapter = adapter->Next)
+            if (adapter->IfIndex != bestIndex)
             {
-                if (adapter->IfIndex != bestIndex)
+                continue;
+            }
+
+            for (auto* unicast = adapter->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next)
+            {
+                if (unicast->Address.lpSockaddr->sa_family != AF_INET6)
                 {
                     continue;
                 }
 
-                for (auto* unicast = adapter->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next)
+                const auto& sin6 = *reinterpret_cast<SOCKADDR_IN6*>(unicast->Address.lpSockaddr);
+                if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) || IN6_IS_ADDR_LOOPBACK(&sin6.sin6_addr))
                 {
-                    if (unicast->Address.lpSockaddr->sa_family != AF_INET6)
-                    {
-                        continue;
-                    }
-
-                    const auto& sin6 = *reinterpret_cast<SOCKADDR_IN6*>(unicast->Address.lpSockaddr);
-                    if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) || IN6_IS_ADDR_LOOPBACK(&sin6.sin6_addr))
-                    {
-                        continue;
-                    }
-
-                    SOCKADDR_INET hostAddr{};
-                    hostAddr.Ipv6 = sin6;
-                    const auto hostAddrString = wsl::windows::common::string::SockAddrInetToWstring(hostAddr);
-
-                    // The host address may not be at index 0 due to SLAAC addresses from RA
-                    bool addressFound = false;
-                    for (const auto& v6Addr : state.V6Addresses)
-                    {
-                        if (v6Addr.Address == hostAddrString)
-                        {
-                            addressFound = true;
-                            break;
-                        }
-                    }
-                    VERIFY_IS_TRUE(addressFound);
-                    break;
+                    continue;
                 }
 
+                SOCKADDR_INET hostAddr{};
+                hostAddr.Ipv6 = sin6;
+                const auto hostAddrString = wsl::windows::common::string::SockAddrInetToWstring(hostAddr);
+
+                // The host address may not be at index 0 due to SLAAC addresses from RA
+                bool addressFound = false;
+                for (const auto& v6Addr : state.V6Addresses)
+                {
+                    if (v6Addr.Address == hostAddrString)
+                    {
+                        addressFound = true;
+                        break;
+                    }
+                }
+                VERIFY_IS_TRUE(addressFound);
                 break;
             }
+
+            break;
         }
     }
 
