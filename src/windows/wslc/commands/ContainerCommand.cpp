@@ -42,7 +42,7 @@ std::vector<Argument> ContainerCommand::GetArguments() const
 
 std::wstring ContainerCommand::ShortDescription() const
 {
-    return {L"Container command"};
+    return {L"Container command."};
 }
 
 std::wstring ContainerCommand::LongDescription() const
