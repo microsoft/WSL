@@ -1012,7 +1012,8 @@ try
 
     wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImageInformation;
 
-    return errorInfoWrapper.CaptureResult(internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
 }
 CATCH_RETURN();
 
