@@ -39,8 +39,7 @@ typedef struct WslcSessionOptionsInternal
 static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
 
 static_assert(
-    __alignof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_ALIGNMENT,
-    "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
+    __alignof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_ALIGNMENT, "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
 
 static_assert(std::is_trivial_v<WslcSessionOptionsInternal>, "WSLC_SESSION_OPTIONS_INTERNAL must be trivial");
 
