@@ -671,10 +671,6 @@ int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPC
             {
                 wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageFsUpgradeNeeded(), stderr);
             }
-            else if (result == E_UNEXPECTED)
-            {
-                THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageUnexpectedError());
-            }
             else
             {
                 THROW_HR(result);

@@ -302,9 +302,9 @@ For information please visit https://aka.ms/enablevirtualization</value>
     <value>Too many virtual hard disks or physical disks are attached.</value>
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
-    <value>The virtual disk is already attached.
+    <value>The virtual disk '{}' is already attached.
 Unmount it with 'wsl.exe --unmount &lt;DiskPath&gt;' before attaching again.</value>
-    <comment>{Locked="--unmount "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}{Locked="--unmount "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>WSL1 is not supported with your current machine configuration.
@@ -1012,16 +1012,11 @@ Falling back to NAT networking.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>WSL cannot run under the LocalSystem account.
-Use a standard user account instead, or launch PowerShell as administrator.</value>
-  </data>
-  <data name="MessageUnexpectedError" xml:space="preserve">
-    <value>An unexpected error occurred.
-Restart WSL with 'wsl.exe --shutdown' or update it with 'wsl.exe --update', then try again.</value>
-    <comment>{Locked="--shutdown'"}{Locked="--update'"}Command line arguments, file names and string inserts should not be translated</comment>
+Use a standard user account instead.</value>
   </data>
   <data name="MessageDetachDiskNotFound" xml:space="preserve">
-    <value>WSL could not find the specified disk to detach.
-Check that the file path is correct and that the virtual disk exists.</value>
+    <value>Disk not found: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePerformanceTip" xml:space="preserve">
     <value>Performance Tip:</value>

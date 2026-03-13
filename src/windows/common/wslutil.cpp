@@ -768,7 +768,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
         return Localization::MessageTooManyDisks();
 
     case WSL_E_USER_VHD_ALREADY_ATTACHED:
-        return Localization::MessageUserVhdAlreadyAttached();
+        return Localization::MessageUserVhdAlreadyAttached(L"");
 
     case WSL_E_VM_MODE_NOT_SUPPORTED:
         return Localization::MessageVmModeNotSupported();
