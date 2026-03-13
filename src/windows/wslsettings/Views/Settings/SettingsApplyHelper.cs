@@ -1,9 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using WslSettings.Contracts.Services;
 
 namespace WslSettings.Views.Settings;
@@ -22,7 +23,7 @@ internal static class SettingsApplyHelper
         var changeLines = new List<string>(pendingChanges.Count);
         foreach (var change in pendingChanges)
         {
-            changeLines.Add($"- {GetSettingName(change.ConfigEntry)}: {FormatSettingValue(change.PendingSetting)}");
+            changeLines.Add($"- {GetSettingDisplayName(change.ConfigEntry)}: {FormatSettingValue(change.PendingSetting)}");
         }
 
         var contentText = string.Join(Environment.NewLine, changeLines);
@@ -47,6 +48,7 @@ internal static class SettingsApplyHelper
             Content = contentPanel,
             PrimaryButtonText = "Settings_ApplyChangesDialogShutdownButton".GetLocalized(),
             SecondaryButtonText = "Settings_ApplyChangesDialogLaterButton".GetLocalized(),
+            CloseButtonText = "Settings_ApplyChangesDialogCloseButton".GetLocalized(),
             DefaultButton = ContentDialogButton.Primary,
         };
 
@@ -112,39 +114,53 @@ internal static class SettingsApplyHelper
         await dialog.ShowAsync();
     }
 
-    private static string GetSettingName(WslConfigEntry entry)
+    private static string GetSettingDisplayName(WslConfigEntry entry)
     {
-        return entry switch
+        // Use existing Settings page resource keys so dialog matches page terminology
+        if (SettingDisplayNameResources.TryGetValue(entry, out var resourceKey))
         {
-            WslConfigEntry.ProcessorCount => "processors",
-            WslConfigEntry.MemorySizeBytes => "memory",
-            WslConfigEntry.SwapSizeBytes => "swap",
-            WslConfigEntry.SwapFilePath => "swapFile",
-            WslConfigEntry.VhdSizeBytes => "defaultVhdSize",
-            WslConfigEntry.NetworkingMode => "networkingMode",
-            WslConfigEntry.FirewallEnabled => "firewall",
-            WslConfigEntry.IgnoredPorts => "ignoredPorts",
-            WslConfigEntry.LocalhostForwardingEnabled => "localhostForwarding",
-            WslConfigEntry.HostAddressLoopbackEnabled => "hostAddressLoopback",
-            WslConfigEntry.AutoProxyEnabled => "autoProxy",
-            WslConfigEntry.InitialAutoProxyTimeout => "initialAutoProxyTimeout",
-            WslConfigEntry.DNSProxyEnabled => "dnsProxy",
-            WslConfigEntry.DNSTunnelingEnabled => "dnsTunneling",
-            WslConfigEntry.BestEffortDNSParsingEnabled => "bestEffortDnsParsing",
-            WslConfigEntry.AutoMemoryReclaim => "autoMemoryReclaim",
-            WslConfigEntry.GUIApplicationsEnabled => "guiApplications",
-            WslConfigEntry.NestedVirtualizationEnabled => "nestedVirtualization",
-            WslConfigEntry.SafeModeEnabled => "safeMode",
-            WslConfigEntry.SparseVHDEnabled => "sparseVhd",
-            WslConfigEntry.VMIdleTimeout => "vmIdleTimeout",
-            WslConfigEntry.DebugConsoleEnabled => "debugConsole",
-            WslConfigEntry.HardwarePerformanceCountersEnabled => "hardwarePerformanceCounters",
-            WslConfigEntry.KernelPath => "kernel",
-            WslConfigEntry.SystemDistroPath => "systemDistro",
-            WslConfigEntry.KernelModulesPath => "kernelModules",
-            _ => entry.ToString(),
-        };
+            var localized = resourceKey.GetLocalized();
+            if (!string.IsNullOrEmpty(localized) && localized != resourceKey)
+            {
+                return localized;
+            }
+        }
+
+        // Fallback: type name (keeps something useful even if resx missing)
+        return entry.ToString();
     }
+
+    private static readonly IReadOnlyDictionary<WslConfigEntry, string> SettingDisplayNameResources =
+        new Dictionary<WslConfigEntry, string>
+        {
+            // ResourceLoader.GetString() requires '/' (not '.') as the separator for x:Uid property resources
+            { WslConfigEntry.ProcessorCount, "Settings_ProcCount/Header" },
+            { WslConfigEntry.MemorySizeBytes, "Settings_MemorySize/Header" },
+            { WslConfigEntry.SwapSizeBytes, "Settings_SwapSize/Header" },
+            { WslConfigEntry.SwapFilePath, "Settings_SwapFilePath/Header" },
+            { WslConfigEntry.VhdSizeBytes, "Settings_DefaultVHDSize/Header" },
+            { WslConfigEntry.NetworkingMode, "Settings_NetworkingMode/Header" },
+            { WslConfigEntry.FirewallEnabled, "Settings_HyperVFirewall/Header" },
+            { WslConfigEntry.IgnoredPorts, "Settings_IgnoredPorts/Header" },
+            { WslConfigEntry.LocalhostForwardingEnabled, "Settings_LocalhostForwarding/Header" },
+            { WslConfigEntry.HostAddressLoopbackEnabled, "Settings_HostAddressLoopback/Header" },
+            { WslConfigEntry.AutoProxyEnabled, "Settings_AutoProxy/Header" },
+            { WslConfigEntry.InitialAutoProxyTimeout, "Settings_InitialAutoProxyTimeout/Header" },
+            { WslConfigEntry.DNSProxyEnabled, "Settings_DNSProxy/Header" },
+            { WslConfigEntry.DNSTunnelingEnabled, "Settings_DNSTunneling/Header" },
+            { WslConfigEntry.BestEffortDNSParsingEnabled, "Settings_BestEffortDNS/Header" },
+            { WslConfigEntry.AutoMemoryReclaim, "Settings_AutoMemoryReclaim/Header" },
+            { WslConfigEntry.GUIApplicationsEnabled, "Settings_GUIApplications/Header" },
+            { WslConfigEntry.NestedVirtualizationEnabled, "Settings_NestedVirtualization/Header" },
+            { WslConfigEntry.SafeModeEnabled, "Settings_SafeMode/Header" },
+            { WslConfigEntry.SparseVHDEnabled, "Settings_SparseVHD/Header" },
+            { WslConfigEntry.VMIdleTimeout, "Settings_VMIdleTimeout/Header" },
+            { WslConfigEntry.DebugConsoleEnabled, "Settings_DebugConsole/Header" },
+            { WslConfigEntry.HardwarePerformanceCountersEnabled, "Settings_HWPerfCounters/Header" },
+            { WslConfigEntry.KernelPath, "Settings_CustomKernelPath/Header" },
+            { WslConfigEntry.SystemDistroPath, "Settings_CustomSystemDistroPath/Header" },
+            { WslConfigEntry.KernelModulesPath, "Settings_CustomKernelModulesPath/Header" },
+        };
 
     private static string FormatSettingValue(IWslConfigSetting setting)
     {
@@ -153,12 +169,12 @@ internal static class SettingsApplyHelper
             case WslConfigEntry.MemorySizeBytes:
             case WslConfigEntry.SwapSizeBytes:
             case WslConfigEntry.VhdSizeBytes:
-                return $"{setting.UInt64Value / Constants.MB} MB";
+                return string.Format("Settings_MegabyteStringFormat".GetLocalized(), setting.UInt64Value / Constants.MB);
             case WslConfigEntry.ProcessorCount:
                 return setting.Int32Value.ToString();
             case WslConfigEntry.InitialAutoProxyTimeout:
             case WslConfigEntry.VMIdleTimeout:
-                return $"{setting.Int32Value} ms";
+                return string.Format("Settings_MillisecondsStringFormat".GetLocalized(), setting.Int32Value);
             case WslConfigEntry.SwapFilePath:
             case WslConfigEntry.IgnoredPorts:
             case WslConfigEntry.KernelPath:
@@ -166,11 +182,33 @@ internal static class SettingsApplyHelper
             case WslConfigEntry.KernelModulesPath:
                 return setting.StringValue;
             case WslConfigEntry.NetworkingMode:
-                return setting.NetworkingConfigurationValue.ToString();
+                return FormatEnum(setting.NetworkingConfigurationValue);
             case WslConfigEntry.AutoMemoryReclaim:
-                return setting.MemoryReclaimModeValue.ToString();
+                return FormatEnum(setting.MemoryReclaimModeValue);
             default:
-                return setting.BoolValue ? "true" : "false";
+                return FormatBool(setting.BoolValue);
         }
+    }
+
+    private static string FormatBool(bool value)
+    {
+        var localized = value
+            ? "Settings_BooleanTrueText".GetLocalized()
+            : "Settings_BooleanFalseText".GetLocalized();
+        return string.IsNullOrEmpty(localized)
+            ? (value ? bool.TrueString : bool.FalseString)
+            : localized;
+    }
+
+    private static string FormatEnum<TEnum>(TEnum value) where TEnum : struct, Enum
+    {
+        // Try resource lookup first (e.g., Settings_NetworkingMode_Bridge)
+        var resourceKey = $"Settings_{typeof(TEnum).Name}_{value}";
+        var localized = resourceKey.GetLocalized();
+        if (!string.IsNullOrEmpty(localized) && localized != resourceKey)
+        {
+            return localized;
+        }
+        return value.ToString();
     }
 }

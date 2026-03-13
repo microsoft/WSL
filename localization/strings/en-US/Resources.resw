@@ -1902,4 +1902,10 @@ You can also access more VS Code Remote options through the command palette with
     <value>Settings were saved, but shutting down WSL failed: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
+  <data name="Settings_BooleanTrueText" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="Settings_BooleanFalseText" xml:space="preserve">
+    <value>Off</value>
+  </data>
 </root>

@@ -5,11 +5,24 @@ namespace WslSettings.Contracts.Services;
 public interface IWslConfigService
 {
     IWslConfigSetting GetWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting = false);
+
+    /// <summary>
+    /// Sets a WSL config value in the in-memory working snapshot. Pending state is computed by diffing that working snapshot
+    /// against a baseline captured at startup/last commit; values are only written to disk on <see cref="CommitPendingChanges"/>.
+    /// </summary>
     uint SetWslConfigSetting(IWslConfigSetting setting);
+
+    /// <summary>
+    /// Indicates whether the working snapshot differs from the baseline snapshot (i.e., whether there are pending changes).
+    /// </summary>
     bool HasPendingChanges { get; }
+
+    /// <summary>
+    /// Returns the diff (baseline vs working) for all entries that differ.
+    /// Throws if snapshots are not fully hydrated (fail-fast rather than silently skipping).
+    /// </summary>
     IReadOnlyList<WslConfigPendingChange> GetPendingChanges();
     uint CommitPendingChanges();
-    void ClearPendingChanges();
     public delegate void WslConfigChangedEventHandler();
     event WslConfigChangedEventHandler WslConfigChanged;
     public delegate void PendingChangesChangedEventHandler();
