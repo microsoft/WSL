@@ -1074,15 +1074,12 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
         auto volume = containerOptions.Volumes[i];
-        THROW_HR_IF_MSG(E_INVALIDARG, volume.ContainerPath == nullptr, "Volume at index %lu has null ContainerPath", i);
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-            !containerMountTargets.insert(volume.ContainerPath).second,
-            "Duplicate container mount path '%hs'",
-            volume.ContainerPath);
 
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.HostPath, "Volumes[%lu].HostPath is null", i);
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
+
+        const auto [_, inserted] = containerMountTargets.insert(volume.ContainerPath);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), !inserted, "Duplicate container mount path '%hs'", volume.ContainerPath);
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 
