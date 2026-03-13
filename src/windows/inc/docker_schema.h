@@ -40,6 +40,36 @@ struct EmptyRequest
     using TResponse = void;
 };
 
+struct CreateVolume
+{
+    using TResponse = void;
+
+    std::string Name;
+    std::string Driver;
+    std::map<std::string, std::string> DriverOpts;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateVolume, Name, Driver, DriverOpts, Labels);
+};
+
+struct Volume
+{
+    std::string Name;
+    std::string Driver;
+    std::string Mountpoint;
+    std::map<std::string, std::string> Options;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
+};
+
+struct ListVolumesResponse
+{
+    std::vector<Volume> Volumes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ListVolumesResponse, Volumes);
+};
+
 struct EmptyObject
 {
 };
@@ -59,12 +89,13 @@ inline void from_json(const nlohmann::json& j, EmptyObject& obj)
 
 struct Mount
 {
+    std::string Name;
     std::string Source;
     std::string Target;
     std::string Type;
     bool ReadOnly{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Target, Source, Type, ReadOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly);
 };
 
 struct PortMapping
@@ -357,10 +388,11 @@ struct ContainerInfo
     std::string Image;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
+    std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
     int64_t Created{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State, Created);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created);
 };
 
 struct BuildKitVertex

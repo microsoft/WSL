@@ -23,6 +23,8 @@ Abstract:
 #include "COMImplClass.h"
 #include "wsla_schema.h"
 #include "WSLAContainerMetadata.h"
+#include "WSLAVhdVolume.h"
+#include <unordered_map>
 
 namespace wsl::windows::service::wsla {
 
@@ -96,6 +98,7 @@ public:
         const WSLAContainerOptions& Options,
         WSLASession& wslaSession,
         WSLAVirtualMachine& virtualMachine,
+        const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& SessionVolumes,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -105,6 +108,7 @@ public:
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLASession& wslaSession,
         WSLAVirtualMachine& virtualMachine,
+        const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& SessionVolumes,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,

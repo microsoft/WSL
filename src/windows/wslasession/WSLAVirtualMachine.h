@@ -83,6 +83,7 @@ public:
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
     void DetachDisk(_In_ ULONG Lun);
+    void Ext4Format(_In_ const std::string& Device);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);

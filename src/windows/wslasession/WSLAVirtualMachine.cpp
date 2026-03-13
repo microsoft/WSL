@@ -284,6 +284,15 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     return {Lun, Device};
 }
 
+void WSLAVirtualMachine::Ext4Format(const std::string& Device)
+{
+    constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
+    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+}
+
 void WSLAVirtualMachine::Unmount(_In_ const char* Path)
 {
     auto [pid, _, subChannel] = Fork(WSLA_FORK::Thread);

@@ -17,9 +17,12 @@ Abstract:
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
 #include "WSLAContainer.h"
+#include "WSLAVhdVolume.h"
+#include "WSLAVolumeMetadata.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
+#include <unordered_map>
 
 namespace wsl::windows::service::wsla {
 
@@ -73,6 +76,10 @@ public:
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
+    // Volume management.
+    IFACEMETHOD(CreateVolume)(_In_ const WSLAVolumeOptions* Options) override;
+    IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
+
     IFACEMETHOD(Terminate()) override;
 
     // ISupportErrorInfo
@@ -90,13 +97,13 @@ private:
     ULONG m_id = 0;
 
     void ConfigureStorage(const WSLASessionInitSettings& Settings, PSID UserSid);
-    void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();
     void StartDockerd();
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
     void RecoverExistingContainers();
+    void RecoverExistingVolumes();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle, HANDLE CancelEvent);
 
@@ -107,10 +114,13 @@ private:
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
 
-    // N.B. m_lock must be acquired before acquiring m_containersLock
-    // This lock is used to protect m_containers. Doing this instead of acquiring m_lock exlusively allows for containers to be created/destroyed while operations that hold a shared m_lock are running.
+    // N.B. m_lock must be acquired before acquiring m_volumesLock or m_containersLock.
+    // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.
+    // This allows independent operations to proceed while volume/container bookkeeping remains synchronized.
     std::mutex m_containersLock;
+    std::mutex m_volumesLock;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
+    std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>> m_volumes;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;

@@ -37,6 +37,7 @@ using wsl::windows::service::wsla::WSLAContainerMetadata;
 using wsl::windows::service::wsla::WSLAContainerMetadataV1;
 using wsl::windows::service::wsla::WSLAPortMapping;
 using wsl::windows::service::wsla::WSLASession;
+using wsl::windows::service::wsla::WSLAVhdVolumeImpl;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 using wsl::windows::service::wsla::WSLAVolumeMount;
 
@@ -295,6 +296,57 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
     wrapper.V1 = metadata;
 
     return wsl::shared::ToJson(wrapper);
+}
+
+void ProcessNamedVolumes(
+    const WSLAContainerOptions& containerOptions,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
+    std::unordered_set<std::string>& containerMountTargets,
+    wsl::windows::common::docker_schema::CreateContainer& request)
+{
+    THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
+
+    for (ULONG i = 0; i < containerOptions.NamedVolumesCount; i++)
+    {
+        const auto& nv = containerOptions.NamedVolumes[i];
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, nv.Name, "NamedVolume at index %lu has null Name", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, nv.ContainerPath, "NamedVolume at index %lu has null ContainerPath", i);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+            !containerMountTargets.insert(nv.ContainerPath).second,
+            "Duplicate container mount path '%hs'",
+            nv.ContainerPath);
+
+        std::string volumeName = nv.Name;
+
+        auto volume = sessionVolumes.find(volumeName);
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLA_E_VOLUME_NOT_FOUND, wsl::shared::Localization::MessageWslaVolumeNotFound(nv.Name), volume == sessionVolumes.end());
+
+        wsl::windows::common::docker_schema::Mount mount{};
+        mount.Source = std::move(volumeName);
+        mount.Target = std::string(nv.ContainerPath);
+        mount.Type = "volume";
+        mount.ReadOnly = static_cast<bool>(nv.ReadOnly);
+
+        request.HostConfig.Mounts.emplace_back(mount);
+    }
+}
+
+void ValidateNamedVolumes(
+    const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes)
+{
+    for (const auto& mount : mounts)
+    {
+        if (mount.Type == "volume" && !mount.Name.empty())
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                WSLA_E_VOLUME_NOT_FOUND,
+                wsl::shared::Localization::MessageWslaVolumeNotFound(mount.Name),
+                sessionVolumes.find(mount.Name) == sessionVolumes.end());
+        }
+    }
 }
 
 } // namespace
@@ -728,6 +780,12 @@ void WSLAContainerImpl::GetState(WSLAContainerState* Result)
     *Result = m_state;
 }
 
+WSLAContainerState WSLAContainerImpl::State() const noexcept
+{
+    auto lock = m_lock.lock_shared();
+    return m_state;
+}
+
 void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process) const
 {
     auto lock = m_lock.lock_shared();
@@ -913,6 +971,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLAContainerOptions& containerOptions,
     WSLASession& wslaSession,
     WSLAVirtualMachine& virtualMachine,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1001,6 +1060,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     // Build volume list from container options.
     std::vector<WSLAVolumeMount> volumes;
     volumes.reserve(containerOptions.VolumesCount);
+    std::unordered_set<std::string> containerMountTargets;
 
     if (containerOptions.VolumesCount > 0)
     {
@@ -1017,6 +1077,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.HostPath, "Volumes[%lu].HostPath is null", i);
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
+
+        const auto [_, inserted] = containerMountTargets.insert(volume.ContainerPath);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), !inserted, "Duplicate container mount path '%hs'", volume.ContainerPath);
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 
@@ -1041,6 +1104,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
             request.HostConfig.Tmpfs[tmpfs.Destination] = tmpfs.Options != nullptr ? tmpfs.Options : "";
         }
     }
+
+    ProcessNamedVolumes(containerOptions, sessionVolumes, containerMountTargets, request);
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
@@ -1120,6 +1185,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLASession& wslaSession,
     WSLAVirtualMachine& virtualMachine,
+    const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1127,6 +1193,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 {
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
+
+    ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes);
 
     auto labels(dockerContainer.Labels);
     auto metadataIt = labels.find(WSLAContainerMetadataLabel);
