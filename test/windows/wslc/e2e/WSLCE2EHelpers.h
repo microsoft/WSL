@@ -88,11 +88,4 @@ inline void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
     VerifyContainerIsNotListed(containerNameOrId, std::chrono::milliseconds(0), std::chrono::milliseconds(0));
 }
-
-// Explicit template instantiations for common duration types
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::milliseconds, std::chrono::milliseconds);
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::seconds, std::chrono::seconds);
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::seconds, std::chrono::minutes);
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::milliseconds, std::chrono::minutes);
-
 } // namespace WSLCE2ETests
