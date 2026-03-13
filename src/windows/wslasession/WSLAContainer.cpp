@@ -368,6 +368,13 @@ WSLAContainerImpl::~WSLAContainerImpl()
     m_containerEvents.Reset();
 
     auto lock = m_lock.lock_exclusive();
+
+    if (m_comWrapper)
+    {
+        m_comWrapper->Disconnect();
+        m_comWrapper.Reset();
+    }
+
     ReleaseResources();
 }
 
@@ -648,10 +655,15 @@ void WSLAContainerImpl::Delete(WSLADeleteFlags Flags)
 
 __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLockHeld(WSLADeleteFlags Flags)
 {
+    if (m_state == WslaContainerStateDeleted)
+    {
+        return;
+    }
+
     // Validate that the container is not running or already deleted.
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        (m_state == WslaContainerStateRunning && WI_IsFlagClear(Flags, WSLADeleteFlagsForce)) || m_state == WslaContainerStateDeleted,
+        (m_state == WslaContainerStateRunning && WI_IsFlagClear(Flags, WSLADeleteFlagsForce)),
         "Cannot delete container '%hs', state: %i",
         m_name.c_str(),
         m_state);
@@ -1289,13 +1301,6 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseResources(
 {
     WSL_LOG("ReleaseContainerResources", TraceLoggingValue(m_id.c_str(), "ID"));
 
-    // Disconnect the COM wrapper so no new RPC calls can reach this container.
-    if (m_comWrapper)
-    {
-        m_comWrapper->Disconnect();
-        m_comWrapper.Reset();
-    }
-
     // Unmount volumes.
     UnmountVolumes(m_mountedVolumes, m_virtualMachine);
     m_mountedVolumes.clear();
@@ -1341,6 +1346,20 @@ __requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerSta
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
     COMImplClass<WSLAContainerImpl>(impl), m_onDeleted(std::move(OnDeleted))
 {
+}
+
+WSLAContainer::~WSLAContainer()
+{
+    try
+    {
+        const auto [lock, impl] = LockImpl();
+        m_onDeleted(impl);
+    }
+    catch (const wil::ResultException& e)
+    {
+        // RPC_E_DISCONNECTED is expected if the session has already terminated, so don't log in that case.
+        LOG_HR_IF(e.GetErrorCode(), e.GetErrorCode() != RPC_E_DISCONNECTED);
+    }
 }
 
 HRESULT WSLAContainer::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)

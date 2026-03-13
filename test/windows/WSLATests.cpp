@@ -5025,7 +5025,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateDeleted);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -5044,7 +5044,7 @@ class WSLATests
             VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGKILL));
             process.Wait();
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateDeleted);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -5059,7 +5059,7 @@ class WSLATests
             auto process = container.GetInitProcess();
             process.Wait();
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateDeleted);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -5083,8 +5083,8 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
-            // verifyContainerDeleted("test-auto-remove");
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
+            // Verify the container was deleted.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateDeleted);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -5094,6 +5094,43 @@ class WSLATests
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 0);
         }
+    }
+
+    TEST_METHOD(ContainerAutoRemoveReadStdout)
+    {
+        WSLAContainerLauncher launcher("debian:latest", "test-auto-remove-stdout", {"echo", "Hello World"});
+        launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+        auto container = launcher.Launch(*m_defaultSession);
+
+        // Wait for the container to exit and verify it gets deleted automatically.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_WIN32_IF(ERROR_RETRY, container.State() != WslaContainerStateDeleted); },
+            std::chrono::milliseconds{100},
+            std::chrono::seconds{30});
+
+        VERIFY_ARE_EQUAL(WslaContainerStateDeleted, container.State());
+
+        // Ensure we can still get the init process and read stdout.
+        auto process = container.GetInitProcess();
+        auto result = process.WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL(std::string("Hello World\n"), result.Output[1]);
+
+        // Validate that the container is not found if we try to open it by name or id, or found in the container list.
+        wil::com_ptr<IWSLAContainer> notFound;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+        wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(containers.size(), 0);
+
+        // Verify the com wrapper gets disconnected when Delete is called.
+        VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
+
+        WSLAContainerState state{};
+        VERIFY_ARE_EQUAL(container.Get().GetState(&state), RPC_E_DISCONNECTED);
     }
 
     TEST_METHOD(ContainerNameGeneration)
