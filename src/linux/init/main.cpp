@@ -65,6 +65,9 @@ Abstract:
 #include "SocketChannel.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
+#define BTRFS_CREATE_ARG "create"
+#define BTRFS_PATH "/usr/sbin/btrfs"
+#define BTRFS_SUBVOLUME_ARG "subvolume"
 #define BINFMT_REGISTER_STRING ":" LX_INIT_BINFMT_NAME ":M::MZ::" LX_INIT_PATH ":FP\n"
 #define BINFMT_PATH PROCFS_PATH "/sys/fs/binfmt_misc"
 #define CHRONY_CONF_PATH ETC_PATH "/chrony.conf"
@@ -913,7 +916,7 @@ Routine Description:
     N.B. The ext4 group size was chosen based on the best practices for Linux VHDs:
          https://docs.microsoft.com/en-us/windows-server/virtualization/hyper-v/best-practices-for-running-linux-on-hyper-v
 
-    N.B. The xfs data section options (-d) is also determined based on the VHD sector size of 1MB, as suggested in the link above.
+    N.B. The xfs data section options (-d) are also determined based on the VHD sector size of 1MB, as suggested in the link above.
 
 Arguments:
 
@@ -1036,8 +1039,8 @@ try
 
     THROW_LAST_ERROR_IF(errno != ENOENT);
 
-    std::string CommandLine = std::format("/usr/sbin/btrfs subvolume create '{}'", SubvolPath);
-    THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0);
+    const char* Argv[] = {BTRFS_PATH, BTRFS_SUBVOLUME_ARG, BTRFS_CREATE_ARG, SubvolPath.c_str(), nullptr};
+    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(Argv[0], Argv) < 0);
 
     return 0;
 }
@@ -2850,12 +2853,12 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
             if (Message->Header.MessageType == LxMiniInitMessageImport)
             {
                 THROW_LAST_ERROR_IF(FormatDevice(Message->DeviceId, FsType) < 0);
-            }
 
-            if (FsType != nullptr && strcmp(FsType, "btrfs") == 0)
-            {
-                // create the subvolume if specified in mount options
-                THROW_LAST_ERROR_IF(CreateBtrfsSubvolumeOnDevice(Message->DeviceId, MountOptions) < 0);
+                if (FsType != nullptr && strcmp(FsType, "btrfs") == 0)
+                {
+                    // create the subvolume if specified in mount options
+                    THROW_LAST_ERROR_IF(CreateBtrfsSubvolumeOnDevice(Message->DeviceId, MountOptions) < 0);
+                }
             }
 
             THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
