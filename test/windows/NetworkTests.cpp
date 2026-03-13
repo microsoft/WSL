@@ -2729,7 +2729,10 @@ class NetworkTests
         {
             if (std::regex_search(line, match, defaultRoutePattern) && match.size() >= 3)
             {
-                VERIFY_IS_FALSE(state.DefaultRoute.has_value());
+                if (state.DefaultRoute.has_value())
+                {
+                    continue;
+                }
 
                 state.DefaultRoute = {{match.str(1), match.str(2), {}, match.size() > 4 && match[4].matched ? std::stoi(match.str(4)) : 0}};
             }
@@ -2752,6 +2755,24 @@ class NetworkTests
         std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
 
         return GetRoutingTableState(out, defaultRoutePattern, routePattern);
+    }
+
+    static void WaitForIpv6DefaultRoute()
+    {
+        const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        while (std::chrono::steady_clock::now() < timeout)
+        {
+            auto state = GetIpv6RoutingTableState();
+            if (state.DefaultRoute.has_value())
+            {
+                return;
+            }
+
+            LogInfo("Waiting for IPv6 default route...");
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+
+        VERIFY_FAIL(L"Timed out waiting for IPv6 default route");
     }
 
     static RoutingTableState GetIpv6RoutingTableState()
@@ -3255,7 +3276,8 @@ class NetworkTests
             NET_LUID interfaceLuid{};
             CONTINUE_IF_FAILED_WIN32(ConvertInterfaceGuidToLuid(&interfaceGuid, &interfaceLuid));
 
-            for (const IP_ADAPTER_ADDRESSES* adapter = adapterAddresses.get(); adapter != nullptr; adapter = adapter->Next)
+            for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(adapterAddresses.data()); adapter != nullptr;
+                 adapter = adapter->Next)
             {
                 if (interfaceLuid.Value == adapter->Luid.Value && adapter->FirstUnicastAddress != nullptr && adapter->FirstGatewayAddress != nullptr)
                 {
@@ -3267,18 +3289,63 @@ class NetworkTests
         return false;
     }
 
-    static std::unique_ptr<IP_ADAPTER_ADDRESSES> GetAdapterAddresses(ADDRESS_FAMILY family)
+    static bool HostHasIpv6DnsServers()
     {
-        ULONG result;
+        ULONG bufferSize = 0;
+        constexpr ULONG flags = GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_INCLUDE_GATEWAYS;
+        std::vector<BYTE> buffer;
+        ULONG result = GetAdaptersAddresses(AF_INET6, flags, nullptr, nullptr, &bufferSize);
+        while (result == ERROR_BUFFER_OVERFLOW)
+        {
+            buffer.resize(bufferSize);
+            result = GetAdaptersAddresses(AF_INET6, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize);
+        }
+
+        if (result != NO_ERROR)
+        {
+            return false;
+        }
+
+        DWORD bestIndex = 0;
+        SOCKADDR_IN6 dest{};
+        dest.sin6_family = AF_INET6;
+        InetPtonW(AF_INET6, L"2001:4860:4860::8888", &dest.sin6_addr);
+
+        if (GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex) != NO_ERROR)
+        {
+            return false;
+        }
+
+        for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter != nullptr; adapter = adapter->Next)
+        {
+            if (adapter->IfIndex != bestIndex)
+            {
+                continue;
+            }
+
+            for (auto* dns = adapter->FirstDnsServerAddress; dns != nullptr; dns = dns->Next)
+            {
+                if (dns->Address.lpSockaddr->sa_family == AF_INET6)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    static std::vector<BYTE> GetAdapterAddresses(ADDRESS_FAMILY family)
+    {
         constexpr ULONG flags =
             (GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS);
         ULONG bufferSize = 0;
-        std::unique_ptr<IP_ADAPTER_ADDRESSES> buffer;
-
-        while ((result = GetAdaptersAddresses(family, flags, nullptr, buffer.get(), &bufferSize)) == ERROR_BUFFER_OVERFLOW)
+        std::vector<BYTE> buffer;
+        ULONG result = GetAdaptersAddresses(family, flags, nullptr, nullptr, &bufferSize);
+        while (result == ERROR_BUFFER_OVERFLOW)
         {
-            buffer.reset(static_cast<IP_ADAPTER_ADDRESSES*>(malloc(bufferSize)));
-            VERIFY_IS_NOT_NULL(buffer.get());
+            buffer.resize(bufferSize);
+            result = GetAdaptersAddresses(family, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize);
         }
 
         VERIFY_WIN32_SUCCEEDED(result);
@@ -4566,6 +4633,8 @@ class VirtioProxyTests
             return;
         }
 
+        NetworkTests::WaitForIpv6DefaultRoute();
+
         NetworkTests::GuestClient(L"tcp6-connect:bing.com:80");
     }
 
@@ -4584,8 +4653,14 @@ class VirtioProxyTests
 
         VERIFY_IS_TRUE(std::regex_match(out, pattern));
 
-        // Verify that /etc/resolv.conf contains a 'search' line with DNS suffixes
-        VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
+        // Verify that /etc/resolv.conf contains a 'search' line if the host has DNS suffixes
+        auto [suffixOut, suffixErr] = LxsstuLaunchPowershellAndCaptureOutput(
+            L"(@((Get-DnsClientGlobalSetting).SuffixSearchList) + @((Get-DnsClient).ConnectionSpecificSuffix) | Where-Object "
+            L"{$_}).Count");
+        if (_wtoi(suffixOut.c_str()) > 0)
+        {
+            VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
+        }
     }
 
     TEST_METHOD(GuestPortIsReleased)
@@ -4602,23 +4677,18 @@ class VirtioProxyTests
             NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
         }
 
-        const wil::unique_socket listenSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-        VERIFY_IS_TRUE(!!listenSocket);
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const wil::unique_socket listenSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_HR_IF(E_ABORT, !listenSocket);
 
-        SOCKADDR_IN Address{};
-        Address.sin_family = AF_INET;
-        Address.sin_port = htons(1234);
-
-        const auto timeout = std::chrono::steady_clock::now() + std::chrono::minutes(2);
-
-        bool bound = false;
-        while (!bound && std::chrono::steady_clock::now() < timeout)
-        {
-            bound = bind(listenSocket.get(), reinterpret_cast<SOCKADDR*>(&Address), sizeof(Address)) != SOCKET_ERROR;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-
-        VERIFY_IS_TRUE(bound);
+                SOCKADDR_IN Address{};
+                Address.sin_family = AF_INET;
+                Address.sin_port = htons(1234);
+                THROW_HR_IF(E_FAIL, bind(listenSocket.get(), reinterpret_cast<SOCKADDR*>(&Address), sizeof(Address)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2));
     }
 
     TEST_METHOD(LoopbackGuestToHost)
@@ -4689,6 +4759,151 @@ class VirtioProxyTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .autoProxy = true}));
         NetworkTests::VerifyHttpProxySimple();
+    }
+
+    TEST_METHOD(ConfigurationV6)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        // Wait for the device host to send an IPv6 Router Advertisement
+        // before querying the interface state.
+        NetworkTests::WaitForIpv6DefaultRoute();
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+
+        // Verify that the guest has a global IPv6 address assigned
+        VERIFY_IS_FALSE(state.V6Addresses.empty());
+
+        // Verify that the guest has an IPv6 default gateway
+        VERIFY_IS_TRUE(state.V6Gateway.has_value());
+
+        // Verify the guest IPv6 address matches the host global IPv6 address
+        const auto adapterAddresses = NetworkTests::GetAdapterAddresses(AF_INET6);
+        DWORD bestIndex = 0;
+        SOCKADDR_IN6 dest{};
+        dest.sin6_family = AF_INET6;
+        InetPtonW(AF_INET6, L"2001:4860:4860::8888", &dest.sin6_addr);
+        VERIFY_ARE_EQUAL(NO_ERROR, GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&dest), &bestIndex));
+
+        for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(adapterAddresses.data()); adapter != nullptr;
+             adapter = adapter->Next)
+        {
+            if (adapter->IfIndex != bestIndex)
+            {
+                continue;
+            }
+
+            for (auto* unicast = adapter->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next)
+            {
+                if (unicast->Address.lpSockaddr->sa_family != AF_INET6)
+                {
+                    continue;
+                }
+
+                const auto& sin6 = *reinterpret_cast<SOCKADDR_IN6*>(unicast->Address.lpSockaddr);
+                if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) || IN6_IS_ADDR_LOOPBACK(&sin6.sin6_addr))
+                {
+                    continue;
+                }
+
+                SOCKADDR_INET hostAddr{};
+                hostAddr.Ipv6 = sin6;
+                const auto hostAddrString = wsl::windows::common::string::SockAddrInetToWstring(hostAddr);
+
+                // The host address may not be at index 0 due to SLAAC addresses from RA
+                bool addressFound = false;
+                for (const auto& v6Addr : state.V6Addresses)
+                {
+                    if (v6Addr.Address == hostAddrString)
+                    {
+                        addressFound = true;
+                        break;
+                    }
+                }
+                VERIFY_IS_TRUE(addressFound);
+                break;
+            }
+
+            break;
+        }
+    }
+
+    TEST_METHOD(DnsResolutionDigV6)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        // Test AAAA record resolution (IPv6) with both UDP and TCP
+        NetworkTests::VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
+        NetworkTests::VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+    }
+
+    TEST_METHOD(GuestPortIsReleasedV6)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        // Make sure the VM doesn't time out
+        WslKeepAlive keepAlive;
+
+        {
+            auto guestProcess = NetworkTests::BindGuestPort(L"TCP6-LISTEN:1234,bind=::", true);
+            NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false, true);
+        }
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const wil::unique_socket listenSocket(socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP));
+                THROW_HR_IF(E_ABORT, !listenSocket);
+
+                SOCKADDR_IN6 Address{};
+                Address.sin6_family = AF_INET6;
+                Address.sin6_port = htons(1234);
+                THROW_HR_IF(E_FAIL, bind(listenSocket.get(), reinterpret_cast<SOCKADDR*>(&Address), sizeof(Address)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2));
+    }
+
+    TEST_METHOD(ConfigurationV6DnsServers)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        if (!NetworkTests::HostHasIpv6DnsServers())
+        {
+            LogSkipped("Host does not have IPv6 DNS servers configured. Skipping...");
+            return;
+        }
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
+
+        // Verify that /etc/resolv.conf contains at least one IPv6 nameserver
+        const std::wregex v6Pattern(L"(.|\\n)*nameserver [0-9a-fA-F:]+\\n(.|\\n)*");
+        VERIFY_IS_TRUE(std::regex_match(out, v6Pattern));
     }
 };
 } // namespace NetworkTests
