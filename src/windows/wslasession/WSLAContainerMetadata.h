@@ -43,6 +43,9 @@ struct WSLAVolumeMount
     std::string ContainerPath;
     bool ReadOnly{};
 
+    // Runtime-only field. Not serialized to JSON.
+    bool Mounted{};
+
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly);
 };
 
