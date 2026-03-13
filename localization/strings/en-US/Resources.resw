@@ -248,9 +248,12 @@ Please use '{} --help' to get a list of supported arguments.</value>
     <value>Cannot launch because another instance is running elevated.  Elevated and un-elevated instances are not permitted to run simultaneously.</value>
   </data>
   <data name="MessageNoDefaultDistro" xml:space="preserve">
-    <value>No Linux distribution is installed.
-Run 'wsl.exe --install &lt;Distro&gt;' to install one (for example, 'wsl.exe --install Ubuntu').</value>
-    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Windows Subsystem for Linux has no installed distributions.
+You can resolve this by installing a distribution with the instructions below:
+
+Use 'wsl.exe --list --online' to list available distributions
+and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoRunningDistro" xml:space="preserve">
     <value>There are no running distributions.</value>
