@@ -1058,9 +1058,10 @@ try
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock{m_containersLock};
 
-    // Purge containers that were auto-deleted via OnEvent (--rm).
-    std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
-    auto it = std::ranges::find_if(m_containers, [Id](const auto& e) { return e->ID() == Id; });
+    // Skip deleted containers. They are kept alive until their COM wrapper ref count drops to 0
+    // or the session is terminated.
+    auto it =
+        std::ranges::find_if(m_containers, [Id](const auto& e) { return e->State() != WslaContainerStateDeleted && e->ID() == Id; });
 
     // If no match is found, call Inspect() so that partial IDs and names are matched.
     if (it == m_containers.end())
@@ -1105,14 +1106,21 @@ try
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock{m_containersLock};
 
-    // Purge containers that were auto-deleted via OnEvent (--rm).
-    std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
+    // Count non-deleted containers. Deleted containers are kept alive until their COM wrapper
+    // ref count drops to 0, but should not be visible in list results.
+    size_t count = std::count_if(
+        m_containers.begin(), m_containers.end(), [](const auto& e) { return e->State() != WslaContainerStateDeleted; });
 
-    auto output = wil::make_unique_cotaskmem<WSLAContainerEntry[]>(m_containers.size());
+    auto output = wil::make_unique_cotaskmem<WSLAContainerEntry[]>(count);
 
     size_t index = 0;
     for (const auto& e : m_containers)
     {
+        if (e->State() == WslaContainerStateDeleted)
+        {
+            continue;
+        }
+
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
@@ -1122,7 +1130,7 @@ try
         index++;
     }
 
-    *Count = static_cast<ULONG>(m_containers.size());
+    *Count = static_cast<ULONG>(count);
     *Containers = output.release();
     return S_OK;
 }
