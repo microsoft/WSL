@@ -27,6 +27,7 @@ using wsl::windows::common::WSLAContainerLauncher;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
+using wsl::windows::common::wslutil::PruneResult;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -82,9 +83,12 @@ class WSLATests
             LoadTestImage("python:3.12-alpine");
         }
 
-        // Hacky way to delete all containers.
-        // TODO: Replace with the --rm flag once available.
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "container", "prune", "-f"}, 0);
+        PruneResult result;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        if (result.result.ContainersCount > 0)
+        {
+            LogInfo("Pruned %lu containers", result.result.ContainersCount);
+        }
 
         return true;
     }
@@ -1471,6 +1475,98 @@ class WSLATests
         }
     }
 
+    struct BlockingOperation
+    {
+        NON_COPYABLE(BlockingOperation);
+        NON_MOVABLE(BlockingOperation);
+
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK) :
+            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult)
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+
+            m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
+            m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
+
+            // Wait for the operation to be running before continuing.
+            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
+        }
+
+        ~BlockingOperation()
+        {
+            if (m_operationThread.joinable())
+            {
+                m_operationThread.join();
+            }
+
+            if (m_ioThread.joinable())
+            {
+                m_ioThread.join();
+            }
+        }
+
+        void RunOperation(wil::unique_handle Handle)
+        {
+            m_result.set_value(m_operation(Handle.get()));
+
+            // Fail if the operation completed before the test signaled completion.
+            // Don't use VERIFY macros since this is running in a separate thread.
+            WI_ASSERT(m_testCompleteEvent.is_signaled());
+        }
+
+        void RunIO(wil::unique_handle Handle)
+        {
+            std::vector<char> buffer(1024 * 1024);
+            while (true)
+            {
+                DWORD bytesRead{};
+                if (!ReadFile(Handle.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+                {
+                    if (GetLastError() != ERROR_BROKEN_PIPE)
+                    {
+                        LogError("Unexpected ReadFile() error: %u", GetLastError());
+                    }
+
+                    break;
+                }
+
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                if (!m_startedEvent.is_signaled())
+                {
+                    m_startedEvent.SetEvent();
+                }
+
+                // Block until the test completes.
+                if (!m_testCompleteEvent.wait(60 * 1000))
+                {
+                    LogError("Timed out waiting for test completion");
+                    break;
+                }
+            }
+        }
+
+        void Complete()
+        {
+            m_testCompleteEvent.SetEvent();
+
+            VERIFY_ARE_EQUAL(m_expectedResult, m_result.get_future().get());
+        }
+
+        std::function<HRESULT(HANDLE)> m_operation;
+        wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
+        wil::unique_event m_testCompleteEvent{wil::EventOptions::ManualReset};
+        std::thread m_operationThread;
+        std::thread m_ioThread;
+        std::promise<HRESULT> m_result;
+        HRESULT m_expectedResult{};
+    };
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
@@ -1504,7 +1600,7 @@ class WSLATests
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, nullptr));
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
             }
@@ -1539,11 +1635,25 @@ class WSLATests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr));
+            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, nullptr));
             ValidateCOMErrorMessage(L"reference does not exist");
 
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+        }
+
+        // Validate that cancellation works.
+        {
+            wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+
+            BlockingOperation operation(
+                [&](HANDLE handle) {
+                    return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, cancelEvent.get());
+                },
+                E_ABORT);
+
+            cancelEvent.SetEvent();
+            operation.Complete();
         }
     }
     TEST_METHOD(ExportContainer)
@@ -2126,48 +2236,6 @@ class WSLATests
 
         // Validate that xsk_diag is now loaded.
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
-    }
-
-    TEST_METHOD(PmemVhds)
-    {
-        WSL2_TEST_ONLY();
-
-        // TODO: Remove once test failure is fixed.
-        SKIP_TEST_UNSTABLE();
-
-        // Test with SCSI boot VHDs.
-        {
-            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
-            WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-
-            auto createNewSession = WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
-
-            // Validate that SCSI devices are present and PMEM devices are not.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/sda"}, 0);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/sdb"}, 0);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem0"}, 1);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem1"}, 1);
-
-            // Verify that the SCSI device is readable.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "dd if=/dev/sda of=/dev/null bs=512 count=1 2>&1"}, 0);
-        }
-
-        // Test with PMEM boot VHDs enabled.
-        {
-            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
-            WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-
-            auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
-
-            // Validate that PMEM devices are present.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem0"}, 0);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem1"}, 0);
-
-            // Verify that the PMEM devices can be read from.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "dd if=/dev/pmem0 of=/dev/null bs=512 count=1 2>&1"}, 0);
-        }
     }
 
     TEST_METHOD(CreateRootNamespaceProcess)
@@ -2921,6 +2989,8 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
+                VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
+                VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
             }
         };
 
@@ -2947,6 +3017,19 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
 
+            // Capture StateChangedAt and CreatedAt while the container is running.
+            ULONGLONG runningStateChangedAt{};
+            ULONGLONG runningCreatedAt{};
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                VERIFY_ARE_EQUAL(containers.size(), 1);
+                runningStateChangedAt = containers[0].StateChangedAt;
+                runningCreatedAt = containers[0].CreatedAt;
+                VERIFY_IS_TRUE(runningStateChangedAt > 0);
+                VERIFY_IS_TRUE(runningCreatedAt > 0);
+            }
+
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
             VERIFY_SUCCEEDED(initProcess.Get().Signal(WSLASignalSIGKILL));
@@ -2962,6 +3045,20 @@ class WSLATests
             // Expect the container to be in exited state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
             expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that StateChangedAt was updated after the state transition.
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                VERIFY_ARE_EQUAL(containers.size(), 1);
+
+                auto now = static_cast<ULONGLONG>(time(nullptr));
+                VERIFY_IS_TRUE(containers[0].StateChangedAt <= now);
+                VERIFY_IS_TRUE(containers[0].StateChangedAt >= runningStateChangedAt);
+
+                // CreatedAt must not change after state transitions.
+                VERIFY_ARE_EQUAL(containers[0].CreatedAt, runningCreatedAt);
+            }
 
             // Open a new reference to the same container.
             wil::com_ptr<IWSLAContainer> sameContainer;
@@ -3158,6 +3255,9 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
+                VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
+                VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
+                VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
             }
         };
 
@@ -4028,6 +4128,7 @@ class WSLATests
         };
 
         runTest("3\r\nfoo\r\n3\r\nbar", {"foo", "bar"});
+        runTest("3\r\nfoo\r\n3\r\nbar\r\n0\r\n\r\n", {"foo", "bar"});
         runTest("1\r\na\r\n\r\n", {"a"});
 
         runTest("c\r\nlf\nin\r\nchunk\r\n3\r\nEOF", {"lf\nin\r\nchunk", "EOF"});
@@ -4038,9 +4139,77 @@ class WSLATests
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("Invalid\r\nInvalid", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4nolf", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\nnocr", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("12\nyeseighteenletters", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4invalid\nnocr", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid\n", {}); }), E_INVALIDARG);
+    }
+
+    TEST_METHOD(HTTPChunkReaderSplitReads)
+    {
+        auto runTest = [](const std::vector<std::string>& Data, const std::vector<std::string>& ExpectedChunk) {
+            std::vector<std::string> chunks;
+            auto onData = [&](const gsl::span<char>& data) { chunks.emplace_back(data.data(), data.size()); };
+
+            auto reader = std::make_unique<wsl::windows::common::relay::HTTPChunkBasedReadHandle>(
+                wsl::windows::common::relay::HandleWrapper{nullptr}, std::move(onData));
+
+            std::string allData;
+            for (const auto& datum : Data)
+            {
+                size_t currentSize = allData.size();
+                allData.append(datum);
+                reader->OnRead(gsl::span<char>{&allData[currentSize], datum.size()});
+            }
+
+            // Final 0 byte read
+            reader->OnRead(gsl::span<char>{nullptr, static_cast<size_t>(0)});
+
+            for (size_t i = 0; i < ExpectedChunk.size(); i++)
+            {
+                if (i >= chunks.size())
+                {
+                    LogError(
+                        "Input: '%hs': Chunk %zu is missing. Expected: '%hs'",
+                        EscapeString(allData).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str());
+                    VERIFY_FAIL();
+                }
+                else if (ExpectedChunk[i] != chunks[i])
+                {
+                    LogError(
+
+                        "Input: '%hs': Chunk %zu does not match expected value. Expected: '%hs', Actual: '%hs'",
+                        EscapeString(allData).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str(),
+                        EscapeString(chunks[i]).c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            if (ExpectedChunk.size() != chunks.size())
+            {
+                LogError(
+                    "Input: '%hs', Number of chunks do not match. Expected: %zu, Actual: %zu",
+                    EscapeString(allData).c_str(),
+                    ExpectedChunk.size(),
+                    chunks.size());
+                VERIFY_FAIL();
+            }
+
+            LogInfo("HTTPChunkReaderSplitReads success. Input: %hs", EscapeString(allData).c_str());
+        };
+
+        runTest({"3\r\nfo", "o\r\n3\r\nbar"}, {"foo", "bar"});
+        runTest({"1\r\n", "a\r\n\r\n"}, {"a"});
+
+        runTest({"c\r\nlf\n", "in\r\nchunk\r\n3\r\nEOF"}, {"lf\nin\r\nchunk", "EOF"});
+        runTest({"15\r\n\r\nchunkstartingwithlf\r\n", "3\r\nEOF"}, {"\r\nchunkstartingwithlf", "EOF"});
+
+        runTest({"3", "\r\nfoo\r\n3\r\nbar"}, {"foo", "bar"});
+        runTest({"3\r\nfoo\r\n3\r\nbar\r\n0", "\r\n\r\n"}, {"foo", "bar"});
     }
 
     TEST_METHOD(DockerIORelay)
@@ -4130,6 +4299,8 @@ class WSLATests
         auto restore = ResetTestSession(); // Required to access the storage folder.
 
         std::string containerName = "test-container";
+        ULONGLONG originalStateChangedAt{};
+        ULONGLONG originalCreatedAt{};
 
         // Phase 1: Create session and container, then stop the container
         {
@@ -4146,6 +4317,15 @@ class WSLATests
             // Stop the container so it can be recovered and deleted later
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Capture StateChangedAt and CreatedAt before the session is destroyed.
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            originalStateChangedAt = containers[0].StateChangedAt;
+            originalCreatedAt = containers[0].CreatedAt;
+            VERIFY_IS_TRUE(originalStateChangedAt > 0);
+            VERIFY_IS_TRUE(originalCreatedAt > 0);
         }
 
         // Phase 2: Create new session from same storage, recover and delete container
@@ -4154,6 +4334,14 @@ class WSLATests
 
             auto container = OpenContainer(session.get(), containerName);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that StateChangedAt was correctly restored from the Docker timestamp.
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
+            VERIFY_ARE_EQUAL(containers[0].CreatedAt, originalCreatedAt);
+
             VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Verify container is no longer accessible
@@ -4243,23 +4431,23 @@ class WSLATests
 
     TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
     {
-        auto restore = ResetTestSession();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "container", "rm", "-f", "test-invalid-metadata"});
+        });
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
             // Create a docker container that has no metadata.
             auto result = RunCommand(
-                session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+                m_defaultSession.get(),
+                {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
         }
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
+            ResetTestSession();
             // Try to open the container - this should fail due to missing metadata.
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->OpenContainer("test-invalid-metadata", &container);
+            auto hr = m_defaultSession->OpenContainer("test-invalid-metadata", &container);
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
     }
@@ -4929,96 +5117,6 @@ class WSLATests
         }
     }
 
-    struct BlockingOperation
-    {
-        NON_COPYABLE(BlockingOperation);
-        NON_MOVABLE(BlockingOperation);
-
-        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation) : m_operation(std::move(Operation))
-        {
-            wil::unique_handle pipeRead;
-            wil::unique_handle pipeWrite;
-            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
-
-            m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
-            m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
-
-            // Wait for the operation to be running before continuing.
-            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
-        }
-
-        ~BlockingOperation()
-        {
-            if (m_operationThread.joinable())
-            {
-                m_operationThread.join();
-            }
-
-            if (m_ioThread.joinable())
-            {
-                m_ioThread.join();
-            }
-        }
-
-        void RunOperation(wil::unique_handle Handle)
-        {
-            m_result.set_value(m_operation(Handle.get()));
-
-            // Fail if the operation completed before the test signaled completion.
-            // Don't use VERIFY macros since this is running in a separate thread.
-            WI_ASSERT(m_testCompleteEvent.is_signaled());
-        }
-
-        void RunIO(wil::unique_handle Handle)
-        {
-            std::vector<char> buffer(1024 * 1024);
-            while (true)
-            {
-                DWORD bytesRead{};
-                if (!ReadFile(Handle.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
-                {
-                    if (GetLastError() != ERROR_BROKEN_PIPE)
-                    {
-                        LogError("Unexpected ReadFile() error: %u", GetLastError());
-                    }
-
-                    break;
-                }
-
-                if (bytesRead == 0)
-                {
-                    break;
-                }
-
-                if (!m_startedEvent.is_signaled())
-                {
-                    m_startedEvent.SetEvent();
-                }
-
-                // Block until the test completes.
-                if (!m_testCompleteEvent.wait(60 * 1000))
-                {
-                    LogError("Timed out waiting for test completion");
-                    break;
-                }
-            }
-        }
-
-        void Complete()
-        {
-            m_testCompleteEvent.SetEvent();
-
-            VERIFY_SUCCEEDED(m_result.get_future().get());
-        }
-
-        std::function<HRESULT(HANDLE)> m_operation;
-        wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
-        wil::unique_event m_testCompleteEvent{wil::EventOptions::ManualReset};
-        std::thread m_operationThread;
-        std::thread m_ioThread;
-        std::promise<HRESULT> m_result;
-    };
-
     // This test case validates that multiple operations can happen in parallel in the same session.
     TEST_METHOD(ParallelSessionOperations)
     {
@@ -5026,7 +5124,7 @@ class WSLATests
 
         // Start a blocking export
         BlockingOperation operation(
-            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr); });
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); });
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
 
@@ -5209,6 +5307,122 @@ class WSLATests
             VERIFY_ARE_EQUAL(result, E_FAIL);
 
             ValidateCOMErrorMessage(L"Invalid escape keys (invalid) provided");
+        }
+    }
+
+    TEST_METHOD(ContainerPrune)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectPrune = [this](
+                               const std::vector<std::string>& expectedIds = {},
+                               const std::map<std::string, std::pair<const char*, bool>>& labels = {},
+                               uint64_t until = 0,
+                               const std::source_location& source = std::source_location::current()) {
+            PruneResult result;
+
+            std::vector<WSLAContainerPruneFilter> labelsFilter;
+            for (const auto& e : labels)
+            {
+                labelsFilter.push_back({e.first.c_str(), e.second.first, e.second.second});
+            }
+
+            VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(
+                labels.empty() ? nullptr : labelsFilter.data(), static_cast<DWORD>(labelsFilter.size()), until, &result.result));
+
+            std::vector<std::string> prunedContainers;
+            for (size_t i = 0; i < result.result.ContainersCount; i++)
+            {
+                prunedContainers.push_back(result.result.Containers[i]);
+            }
+
+            VerifyAreEqualUnordered(expectedIds, prunedContainers, source);
+        };
+
+        auto RunAndWait = [&](auto& launcher) {
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+
+            return container;
+        };
+
+        // Validate that a prune without any container returns nothing.
+        {
+            expectPrune({});
+        }
+
+        {
+            // Validate that prune doesn't remove running containers.
+            WSLAContainerLauncher launcher("debian:latest", "test-prune", {"sleep", "9999999"}, {}, {});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            expectPrune({});
+
+            // Validate that prune removes stopped containers.
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            auto containerId = container.Id();
+            expectPrune({containerId});
+
+            // Validate that the container can't be opened anymore.
+            wil::com_ptr<IWSLAContainer> dummy;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerId.c_str(), &dummy), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
+        }
+
+        // Validate that label filters work.
+        {
+            WSLAContainerLauncher testPrune1Launcher("debian:latest", "test-prune-1", {"echo", "OK"}, {}, {});
+            testPrune1Launcher.AddLabel("key", "value");
+
+            auto testPrune1 = RunAndWait(testPrune1Launcher);
+
+            WSLAContainerLauncher testPrune2Launcher("debian:latest", "test-prune-2", {"echo", "OK"}, {}, {});
+            testPrune2Launcher.AddLabel("key", "anotherValue");
+
+            auto testPrune2 = RunAndWait(testPrune2Launcher);
+
+            WSLAContainerLauncher testPrune3Launcher("debian:latest", "test-prune-3", {"echo", "OK"}, {}, {});
+            testPrune3Launcher.AddLabel("anotherKey", "value");
+            auto testPrune3 = RunAndWait(testPrune3Launcher);
+
+            WSLAContainerLauncher testPrune4Launcher("debian:latest", "test-prune-4", {"echo", "OK"}, {}, {});
+            auto testPrune4 = RunAndWait(testPrune4Launcher);
+
+            // Expect testPrune1 to be selected via key=value.
+            expectPrune({testPrune1.Id()}, {{"key", {"value", true}}});
+
+            // Expect testPrune2 to be selected via key being present.
+            expectPrune({testPrune2.Id()}, {{"key", {nullptr, true}}});
+
+            // Prune by absence of 'anotherKey' label.
+            expectPrune({testPrune4.Id()}, {{"anotherKey", {nullptr, false}}});
+
+            // Prune by label inequality.
+            expectPrune({testPrune3.Id()}, {{"anotherKey", {"someValue", false}}});
+        }
+
+        // Validate that the 'until' filter works.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-prune-until", {"echo", "OK"}, {}, {});
+
+            auto container = RunAndWait(launcher);
+
+            auto now = time(nullptr);
+
+            expectPrune({}, {}, now - 3600);
+            expectPrune({container.Id()}, {}, now + 3600);
+        }
+
+        // Validate error paths.
+        {
+            WSLAContainerPruneFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
+            PruneResult result;
+
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
     }
 };

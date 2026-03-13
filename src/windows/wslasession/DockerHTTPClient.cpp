@@ -374,6 +374,17 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALo
     return std::move(socket);
 }
 
+docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const std::optional<docker_schema::PruneContainerLabelFilter>& Filter)
+{
+    auto url = URL::Create("/containers/prune");
+    if (Filter.has_value())
+    {
+        url.SetParameter("filters", shared::ToJson(Filter.value()));
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneContainerResult>(verb::post, url);
+}
+
 docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string& Container, const docker_schema::CreateExec& Request)
 {
     return Transaction<docker_schema::CreateExec>(verb::post, URL::Create("/containers/{}/exec", Container), Request);
@@ -532,7 +543,18 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             auto contentLength = response.find(http::field::content_length);
             if (contentLength != response.end())
             {
-                RemainingContentLength = std::stoul(contentLength->value());
+                try
+                {
+                    RemainingContentLength = std::stoul(contentLength->value());
+                }
+                catch (const std::exception&)
+                {
+                    THROW_HR_MSG(
+                        E_UNEXPECTED,
+                        "Invalid Content-Length header: %.*hs",
+                        static_cast<int>(contentLength->value().size()),
+                        contentLength->value().data());
+                }
             }
         }
 

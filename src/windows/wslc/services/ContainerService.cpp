@@ -16,16 +16,16 @@ Abstract:
 #include "ImageService.h"
 #include <wslutil.h>
 #include <WSLAProcessLauncher.h>
-#include <docker_schema.h>
 #include <CommandLine.h>
 #include <unordered_map>
 #include <wslaservice.h>
 
 namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
-using wsl::windows::common::docker_schema::InspectContainer;
+using wsl::windows::common::wsla_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
+using namespace std::chrono_literals;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
@@ -100,6 +100,34 @@ static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASign
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
+std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
+{
+    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
+    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
+    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+
+    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
+    if (elapsed < 0)
+    {
+        elapsed = 0;
+    }
+
+    if (elapsed < SecondsPerMinute)
+    {
+        return std::format(L"{} seconds ago", elapsed);
+    }
+    else if (elapsed < SecondsPerHour)
+    {
+        return std::format(L"{} minutes ago", elapsed / SecondsPerMinute);
+    }
+    else if (elapsed < SecondsPerDay)
+    {
+        return std::format(L"{} hours ago", elapsed / SecondsPerHour);
+    }
+
+    return std::format(L"{} days ago", elapsed / SecondsPerDay);
+}
+
 int ContainerService::Attach(Session& session, const std::string& id)
 {
     wil::com_ptr<IWSLAContainer> container;
@@ -140,23 +168,35 @@ int ContainerService::Attach(Session& session, const std::string& id)
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLAContainerState state)
+std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt)
 {
+    std::wstring stateString;
     switch (state)
     {
     case WSLAContainerState::WslaContainerStateCreated:
-        return L"created";
+        stateString = L"created";
+        break;
     case WSLAContainerState::WslaContainerStateRunning:
-        return L"running";
+        stateString = L"running";
+        break;
     case WSLAContainerState::WslaContainerStateDeleted:
-        return L"stopped";
+        stateString = L"stopped";
+        break;
     case WSLAContainerState::WslaContainerStateExited:
-        return L"exited";
+        stateString = L"exited";
+        break;
     case WSLAContainerState::WslaContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
+
+    if (stateChangedAt == 0)
+    {
+        return stateString;
+    }
+
+    return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
@@ -235,6 +275,8 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Image = current.Image;
         entry.State = current.State;
         entry.Id = current.Id;
+        entry.StateChangedAt = current.StateChangedAt;
+        entry.CreatedAt = current.CreatedAt;
         result.emplace_back(std::move(entry));
     }
 

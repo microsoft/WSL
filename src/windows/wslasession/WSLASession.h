@@ -54,7 +54,7 @@ public:
     IFACEMETHOD(BuildImage)(_In_ LPCWSTR ContextPath, _In_ ULONG DockerfileHandle, _In_opt_ LPCSTR ImageTag, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLAListImageOptions* Options, _Out_ WSLAImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLADeleteImageOptions* Options, _Out_ WSLADeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLATagImageOptions* Options) override;
@@ -64,6 +64,7 @@ public:
     IFACEMETHOD(CreateContainer)(_In_ const WSLAContainerOptions* Options, _Out_ IWSLAContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLAContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLAContainerEntry** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(PruneContainers)(_In_opt_ WSLAContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLAPruneContainersResults* Result) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
@@ -83,7 +84,7 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
 
-    common::relay::MultiHandleWait CreateIOContext();
+    common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
 private:
     ULONG m_id = 0;
@@ -97,7 +98,7 @@ private:
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
     void RecoverExistingContainers();
 
-    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle);
+    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle, HANDLE CancelEvent);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLAVirtualMachine> m_virtualMachine;

@@ -22,6 +22,7 @@ Abstract:
 #include "SessionService.h"
 #include "TablePrinter.h"
 #include <wil/result_macros.h>
+#include <wsla_schema.h>
 
 using namespace wsl::shared;
 using namespace wsl::shared::string;
@@ -48,18 +49,6 @@ void CreateContainer(CLIExecutionContext& context)
     PrintMessage(MultiByteToWide(result.Id));
 }
 
-void DeleteContainers(CLIExecutionContext& context)
-{
-    WI_ASSERT(context.Data.Contains(Data::Session));
-    auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    bool force = context.Args.Contains(ArgType::Force);
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Delete(session, WideToMultiByte(id), force);
-    }
-}
-
 void ExecContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -81,7 +70,7 @@ void InspectContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    std::vector<wsl::windows::common::docker_schema::InspectContainer> result;
+    std::vector<wsl::windows::common::wsla_schema::InspectContainer> result;
     for (const auto& id : containerIds)
     {
         auto inspectData = ContainerService::Inspect(session, WideToMultiByte(id));
@@ -150,14 +139,15 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
+        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
         for (const auto& container : containers)
         {
             tablePrinter.AddRow({
                 MultiByteToWide(container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
-                ContainerService::ContainerStateToString(container.State),
+                ContainerService::FormatRelativeTime(container.CreatedAt),
+                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
             });
         }
 
@@ -166,6 +156,18 @@ void ListContainers(CLIExecutionContext& context)
     }
     default:
         THROW_HR(E_UNEXPECTED);
+    }
+}
+
+void RemoveContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
+    bool force = context.Args.Contains(ArgType::Force);
+    for (const auto& id : containerIds)
+    {
+        ContainerService::Delete(session, WideToMultiByte(id), force);
     }
 }
 

@@ -5,13 +5,13 @@
   <description>Windows Subsystem for Linux</description>
   <resources>
     <stringTable>
-        <string id="WindowsSubsystemForLinux">Windows Subsystem For Linux</string>
+        <string id="WindowsSubsystemForLinux">Windows Subsystem for Linux</string>
 
-        <string id="AllowWSL">Allow the Windows Subsystem For Linux</string>
-        <string id="AllowWSLExplain">When set to disabled, this policy disables access to the Windows Subsystem For Linux for all users on the machine.</string>
+        <string id="AllowWSL">Allow the Windows Subsystem for Linux</string>
+        <string id="AllowWSLExplain">When set to disabled, this policy disables access to the Windows Subsystem for Linux for all users on the machine.</string>
 
-        <string id="AllowInboxWSL">Allow the Inbox version of the Windows Subsystem For Linux</string>
-        <string id="AllowInboxWSLExplain">When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem For Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+        <string id="AllowInboxWSL">Allow the Inbox version of the Windows Subsystem for Linux</string>
+        <string id="AllowInboxWSLExplain">When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
 
         <string id="AllowWSL1">Allow WSL1</string>
         <string id="AllowWSL1Explain">When set to disabled, this policy disables WSL1. When disabled, only WSL2 distributions can be used.</string>

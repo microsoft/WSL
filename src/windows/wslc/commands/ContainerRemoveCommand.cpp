@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ContainerDeleteCommand.cpp
+    ContainerRemoveCommand.cpp
 
 Abstract:
 
@@ -22,8 +22,8 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc {
-// Container Delete Command
-std::vector<Argument> ContainerDeleteCommand::GetArguments() const
+// Container Remove Command
+std::vector<Argument> ContainerRemoveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
@@ -32,22 +32,20 @@ std::vector<Argument> ContainerDeleteCommand::GetArguments() const
     };
 }
 
-std::wstring ContainerDeleteCommand::ShortDescription() const
+std::wstring ContainerRemoveCommand::ShortDescription() const
 {
-    return {L"Delete containers"};
+    return {L"Remove containers."};
 }
 
-std::wstring ContainerDeleteCommand::LongDescription() const
+std::wstring ContainerRemoveCommand::LongDescription() const
 {
-    return {L"Deletes containers."};
+    return {L"Removes containers."};
 }
 
-// clang-format off
-void ContainerDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ContainerRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context 
-        << CreateSession
-        << DeleteContainers;
+    context              //
+        << CreateSession //
+        << RemoveContainers;
 }
-// clang-format on
 } // namespace wsl::windows::wslc
