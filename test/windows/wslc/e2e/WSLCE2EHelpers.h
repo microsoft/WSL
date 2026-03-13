@@ -47,8 +47,11 @@ void EnsureImageIsLoaded(const TestImage& image);
 void EnsureImageIsDeleted(const TestImage& image);
 
 // Default timeout of 0 will execute once.
-template <typename TInterval, typename TTimeout>
-void VerifyContainerIsNotListed(const std::wstring& containerNameOrId, TInterval retryInterval, TTimeout timeout)
+template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
+void VerifyContainerIsNotListed(
+    const std::wstring& containerNameOrId,
+    std::chrono::duration<IntervalRep, IntervalPeriod> retryInterval,
+    std::chrono::duration<TimeoutRep, TimeoutPeriod> timeout)
 {
     try
     {
