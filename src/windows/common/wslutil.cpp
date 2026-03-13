@@ -745,18 +745,6 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_HIGHER_INTEGRITY:
         return Localization::MessageHigherIntegrity();
 
-    case REGDB_E_CLASSNOTREG:
-        return Localization::MessageClassNotRegistered();
-
-    case E_UNEXPECTED:
-        return Localization::MessageUnexpectedError();
-
-    case HRESULT_FROM_WIN32(WSAETIMEDOUT):
-        return Localization::MessageServiceConnectionFailed();
-
-    case HRESULT_FROM_WIN32(ERROR_SERVICE_DISABLED):
-        return Localization::MessageServiceDisabled();
-
     case WSL_E_DEFAULT_DISTRO_NOT_FOUND:
         return Localization::MessageNoDefaultDistro();
 
