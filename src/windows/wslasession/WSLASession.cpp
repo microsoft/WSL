@@ -1006,6 +1006,8 @@ try
     auto lock = m_lock.lock_shared();
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr)
