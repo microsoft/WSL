@@ -123,8 +123,8 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(std::format(L"container run --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        // Verify with retry timeout of 1 minute.
-        VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
+        // Run should be deleted on return so no retry.
+        VerifyContainerIsNotListed(WslcContainerName);
     }
 
 private:

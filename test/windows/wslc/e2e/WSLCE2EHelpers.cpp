@@ -37,44 +37,6 @@ const TestImage& InvalidTestImage()
     return image;
 }
 
-// Default timeout of 0 will execute once.
-template <typename TInterval, typename TTimeout>
-void VerifyContainerIsNotListed(const std::wstring& containerNameOrId, TInterval retryInterval, TTimeout timeout)
-{
-    try
-    {
-        wsl::shared::retry::RetryWithTimeout<void>(
-            [&containerNameOrId]() {
-                auto result = RunWslc(L"container list --all");
-                result.Verify({.Stderr = L"", .ExitCode = 0});
-
-                auto outputLines = result.GetStdoutLines();
-                for (const auto& line : outputLines)
-                {
-                    if (line.find(containerNameOrId) != std::wstring::npos)
-                    {
-                        THROW_HR(E_FAIL);
-                    }
-                }
-            },
-            retryInterval,
-            timeout);
-    }
-    catch (...)
-    {
-        const std::wstring message =
-            L"Container '" + containerNameOrId + L"' found in container list output" +
-            (std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count() > 0 ? L" after timeout" : L" but it should not be listed");
-        VERIFY_FAIL(message.c_str());
-    }
-}
-
-// Explicit template instantiations for common duration types
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::milliseconds, std::chrono::milliseconds);
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::seconds, std::chrono::seconds);
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::seconds, std::chrono::minutes);
-template void VerifyContainerIsNotListed(const std::wstring&, std::chrono::milliseconds, std::chrono::minutes);
-
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
     auto result = RunWslc(L"container list --all");
