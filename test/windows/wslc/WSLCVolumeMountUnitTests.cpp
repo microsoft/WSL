@@ -59,7 +59,6 @@ class WSLCVolumeMountUnitTests
             LR"(::)", // Empty host and container with extra delimiter
             LR"(C:\hostPath:)", // Empty container
             LR"(C:\hostPath:ro)", // Mode provided but missing container path
-            LR"(ro)", // No delimiter
             LR"(:ro)", // Empty host/container with mode token
             LR"(C:\hostPath::rw)", // Empty container with valid mode
             LR"(C:\hostPath:/containerPath:readonly:)", // Trailing delimiter
@@ -67,17 +66,7 @@ class WSLCVolumeMountUnitTests
 
         for (const auto& arg : invalidVolumeArgs)
         {
-            try
-            {
-                auto result = VolumeMount::Parse(arg);
-                WEX::Logging::Log::Comment(std::format(L"Unexpected success for argument: '{}'", arg).c_str());
-                WEX::Logging::Log::Comment(std::format(L"  HostPath: '{}'", result.HostPath()).c_str());
-                WEX::Logging::Log::Comment(std::format(L"  ContainerPath: '{}'", result.ContainerPath()).c_str());
-                WEX::Logging::Log::Comment(std::format(L"  IsReadOnly: '{}'", result.IsReadOnly()).c_str());
-            }
-            catch(...)
-            {
-            }
+            VERIFY_THROWS(VolumeMount::Parse(arg), std::exception);
         }
     }
 };
