@@ -119,9 +119,16 @@ void GnsPortTracker::Run()
 
             if (bindCall->PortZeroBind.has_value())
             {
-                std::lock_guard lock(m_deferredMutex);
-                m_deferredQueue.push_back(std::move(bindCall->PortZeroBind.value()));
-                m_deferredCv.notify_one();
+                try
+                {
+                    std::lock_guard lock(m_deferredMutex);
+                    m_deferredQueue.push_back(std::move(bindCall->PortZeroBind.value()));
+                    m_deferredCv.notify_one();
+                }
+                catch (const std::exception& e)
+                {
+                    GNS_LOG_ERROR("Failed to queue port-0 bind for deferred resolution, {}", e.what());
+                }
             }
         }
 
@@ -521,10 +528,15 @@ wil::unique_fd GnsPortTracker::DuplicateSocketFd(pid_t Pid, int SocketFd)
 }
 
 void GnsPortTracker::TrackPort(PortAllocation allocation)
+try
 {
     // Use insert_or_assign so the deallocation timeout is refreshed if the same
     // port key is already present (emplace would silently keep the old entry).
     m_allocatedPorts.insert_or_assign(std::move(allocation), std::make_optional(time(nullptr) + c_bind_timeout_seconds));
+}
+catch (const std::exception& e)
+{
+    GNS_LOG_ERROR("Failed to track port allocation, {}", e.what());
 }
 
 void GnsPortTracker::RunDeferredResolve()
