@@ -15,6 +15,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "wslutil.h"
 #include "WslPluginApi.h"
 #include "wslinstallerservice.h"
@@ -29,6 +30,7 @@ using wsl::shared::Localization;
 using wsl::windows::common::Context;
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::common::install;
 
 namespace {
 
@@ -225,7 +227,7 @@ void ConfigureMsiLogging(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void
 
 } // namespace
 
-int wsl::windows::common::wslutil::CallMsiPackage()
+int wsl::windows::common::install::CallMsiPackage()
 {
     wsl::windows::common::ExecutionContext context(wsl::windows::common::CallMsi);
 
@@ -312,7 +314,7 @@ int wsl::windows::common::wslutil::CallMsiPackage()
     return static_cast<int>(SubProcess::GetExitCode(runningProcess.get()));
 }
 
-void wsl::windows::common::wslutil::MsiMessageCallback(INSTALLMESSAGE type, LPCWSTR message)
+void wsl::windows::common::install::MsiMessageCallback(INSTALLMESSAGE type, LPCWSTR message)
 {
     switch (type)
     {
@@ -327,7 +329,7 @@ void wsl::windows::common::wslutil::MsiMessageCallback(INSTALLMESSAGE type, LPCW
     }
 }
 
-int wsl::windows::common::wslutil::UpdatePackage(bool PreRelease, bool Repair)
+int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair)
 {
     // Register a console control handler so "^C" is not printed when the app platform terminates the process.
     THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(
@@ -353,7 +355,7 @@ int wsl::windows::common::wslutil::UpdatePackage(bool PreRelease, bool Repair)
     }
 }
 
-UINT wsl::windows::common::wslutil::UpgradeViaMsi(
+UINT wsl::windows::common::install::UpgradeViaMsi(
     _In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
 {
     WriteInstallLog(std::format("Upgrading via MSI package: {}. Args: {}", PackageLocation, ExtraArgs != nullptr ? ExtraArgs : L""));
@@ -371,7 +373,7 @@ UINT wsl::windows::common::wslutil::UpgradeViaMsi(
     return result;
 }
 
-UINT wsl::windows::common::wslutil::UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
+UINT wsl::windows::common::install::UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
 {
     const auto key = OpenLxssMachineKey(KEY_READ);
     const auto productCode = ReadString(key.get(), L"Msi", L"ProductCode", nullptr);
@@ -388,7 +390,7 @@ UINT wsl::windows::common::wslutil::UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _I
     return result;
 }
 
-wil::unique_hfile wsl::windows::common::wslutil::ValidateFileSignature(LPCWSTR Path)
+wil::unique_hfile wsl::windows::common::install::ValidateFileSignature(LPCWSTR Path)
 {
     wil::unique_hfile fileHandle{CreateFileW(Path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)};
     THROW_LAST_ERROR_IF(!fileHandle);
@@ -415,7 +417,7 @@ wil::unique_hfile wsl::windows::common::wslutil::ValidateFileSignature(LPCWSTR P
     return fileHandle;
 }
 
-void wsl::windows::common::wslutil::WriteInstallLog(const std::string& Content)
+void wsl::windows::common::install::WriteInstallLog(const std::string& Content)
 try
 {
     static std::wstring path = wil::GetWindowsDirectoryW<std::wstring>() + L"\\temp\\wsl-install-log.txt";
