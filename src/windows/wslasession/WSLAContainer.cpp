@@ -397,6 +397,12 @@ void WSLAContainerImpl::GetStateChangedAt(ULONGLONG* Result)
     *Result = m_stateChangedAt;
 }
 
+void WSLAContainerImpl::GetCreatedAt(ULONGLONG* Result)
+{
+    auto lock = m_lock.lock_shared();
+    *Result = m_createdAt;
+}
+
 void WSLAContainerImpl::CopyTo(IWSLAContainer** Container) const
 {
     auto lock = m_lock.lock_shared();
@@ -1155,6 +1161,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         DockerStateToWSLAState(dockerContainer.State),
         metadata.InitProcessFlags,
         metadata.Flags);
+
+    // Restore the creation timestamp from Docker list API data.
+    container->m_createdAt = static_cast<std::uint64_t>(dockerContainer.Created);
 
     // Restore the state change timestamp from Docker inspect data.
     try

@@ -37,12 +37,12 @@ std::vector<Argument> ImageCommand::GetArguments() const
 
 std::wstring ImageCommand::ShortDescription() const
 {
-    return {L"Image command"};
+    return {L"Image command."};
 }
 
 std::wstring ImageCommand::LongDescription() const
 {
-    return {L"Image command"};
+    return {L"Image command."};
 }
 
 void ImageCommand::ExecuteInternal(CLIExecutionContext& context) const

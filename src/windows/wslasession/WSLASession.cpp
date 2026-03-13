@@ -618,7 +618,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     }
 }
 
-HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -632,18 +632,18 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto retVal = m_dockerClient->SaveImage(ImageNameOrID);
-    SaveImageImpl(retVal, OutHandle);
+    SaveImageImpl(retVal, OutHandle, CancelEvent);
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle)
+void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, HANDLE CancelEvent)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto io = CreateIOContext();
+    auto io = CreateIOContext(CancelEvent);
 
     std::string errorJson;
 
@@ -1118,6 +1118,7 @@ try
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
+        e->GetCreatedAt(&output[index].CreatedAt);
         index++;
     }
 
@@ -1172,38 +1173,44 @@ try
 
     std::lock_guard containersLock{m_containersLock};
 
-    auto result = m_dockerClient->PruneContainers(filters);
+    docker_schema::PruneContainerResult pruneResult;
 
-    Result->SpaceReclaimed = result.SpaceReclaimed;
+    try
+    {
+        pruneResult = m_dockerClient->PruneContainers(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune containers");
 
-    if (result.ContainersDeleted.has_value() && result.ContainersDeleted->size() > 0)
+    Result->SpaceReclaimed = pruneResult.SpaceReclaimed;
+
+    if (pruneResult.ContainersDeleted.has_value() && pruneResult.ContainersDeleted->size() > 0)
     {
         // Remove deleted containers from m_containers.
         auto pred = [&](const auto& e) {
-            return std::ranges::find(result.ContainersDeleted.value(), e->ID()) != result.ContainersDeleted->end();
+            return std::ranges::find(pruneResult.ContainersDeleted.value(), e->ID()) != pruneResult.ContainersDeleted->end();
         };
 
         auto erased = std::erase_if(m_containers, pred);
         LOG_HR_IF_MSG(
             E_UNEXPECTED,
-            erased != result.ContainersDeleted->size(),
+            erased != pruneResult.ContainersDeleted->size(),
             "Expected to erase %zu containers, but erased %zu",
-            result.ContainersDeleted->size(),
+            pruneResult.ContainersDeleted->size(),
             erased);
 
-        auto containers = wil::make_unique_cotaskmem<WSLAContainerId[]>(result.ContainersDeleted->size());
+        auto containers = wil::make_unique_cotaskmem<WSLAContainerId[]>(pruneResult.ContainersDeleted->size());
 
-        for (size_t i = 0; i < result.ContainersDeleted->size(); ++i)
+        for (size_t i = 0; i < pruneResult.ContainersDeleted->size(); ++i)
         {
             THROW_HR_IF_MSG(
                 E_UNEXPECTED,
-                strcpy_s(containers[i], result.ContainersDeleted.value()[i].c_str()) != 0,
+                strcpy_s(containers[i], pruneResult.ContainersDeleted.value()[i].c_str()) != 0,
                 "Unexpected container name: %hs",
-                result.ContainersDeleted.value()[i].c_str());
+                pruneResult.ContainersDeleted.value()[i].c_str());
         }
 
         Result->Containers = containers.release();
-        Result->ContainersCount = static_cast<DWORD>(result.ContainersDeleted->size());
+        Result->ContainersCount = static_cast<DWORD>(pruneResult.ContainersDeleted->size());
     }
     else
     {
@@ -1395,8 +1402,7 @@ HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
 }
 
-// TODO consider allowing callers to pass cancellation handles.
-MultiHandleWait WSLASession::CreateIOContext()
+MultiHandleWait WSLASession::CreateIOContext(HANDLE CancelHandle)
 {
     relay::MultiHandleWait io;
 
@@ -1407,6 +1413,12 @@ MultiHandleWait WSLASession::CreateIOContext()
     // Cancel with E_ABORT if the client process exits.
     io.AddHandle(std::make_unique<relay::EventHandle>(
         wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
+
+    if (CancelHandle != nullptr)
+    {
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(CancelHandle, []() { THROW_HR_MSG(E_ABORT, "Cancellation handle was signaled"); }));
+    }
 
     return io;
 }

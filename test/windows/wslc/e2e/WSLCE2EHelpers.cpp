@@ -107,22 +107,22 @@ std::string GetHashId(const std::string& id, bool fullId)
     return id.substr(0, shortIdLength);
 }
 
-docker_schema::InspectContainer InspectContainer(const std::wstring& containerName)
+wsla_schema::InspectContainer InspectContainer(const std::wstring& containerName)
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectContainer>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wsla_schema::InspectContainer>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
 
-docker_schema::InspectImage InspectImage(const std::wstring& imageName)
+wsla_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectImage>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wsla_schema::InspectImage>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -137,7 +137,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
-            auto result = RunWslc(std::format(L"container delete {}", containerName));
+            auto result = RunWslc(std::format(L"container remove {}", containerName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }

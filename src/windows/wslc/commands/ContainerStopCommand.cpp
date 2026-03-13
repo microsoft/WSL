@@ -35,7 +35,7 @@ std::vector<Argument> ContainerStopCommand::GetArguments() const
 
 std::wstring ContainerStopCommand::ShortDescription() const
 {
-    return {L"Stop containers"};
+    return {L"Stop containers."};
 }
 
 std::wstring ContainerStopCommand::LongDescription() const

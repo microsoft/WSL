@@ -1365,9 +1365,9 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
     {
         if (PendingChunkSize == 0)
         {
-            if (buffer.front() == '\r' || buffer.front() == '\n')
+            // Consume CRLF's between chunks.
+            if (PendingBuffer.empty() && (buffer.front() == '\r' || buffer.front() == '\n'))
             {
-                // Consume CRLF's between chunks.
                 advance(1);
                 continue;
             }
@@ -1381,9 +1381,15 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
                 // Incomplete size header, buffer until next read.
                 break;
             }
+            // Advance beyond the LF
+            advance(end - buffer.begin() + 1);
 
-            THROW_HR_IF_MSG(E_INVALIDARG, end - buffer.begin() < 2, "Malformed chunk header: %hs", PendingBuffer.c_str());
-            PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CRLF.
+            THROW_HR_IF_MSG(
+                E_INVALIDARG,
+                PendingBuffer.size() < 2 || PendingBuffer.back() != '\r',
+                "Malformed chunk header: %hs",
+                PendingBuffer.c_str());
+            PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CR.
 
 #ifdef WSLA_HTTP_DEBUG
 
@@ -1403,7 +1409,6 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
             }
 
             ExpectHeader = false;
-            advance(PendingBuffer.size() + 2);
             PendingBuffer.clear();
         }
         else
