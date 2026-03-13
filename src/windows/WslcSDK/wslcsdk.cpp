@@ -549,8 +549,9 @@ try
 {
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
-    RETURN_HR(internalType->container->Start(ConvertFlags(flags), nullptr));
+    return errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr));
 }
 CATCH_RETURN();
 
@@ -672,25 +673,21 @@ try
     RETURN_HR_IF(E_INVALIDARG, internalProcessSettings->commandLine == nullptr || internalProcessSettings->commandLineCount == 0);
     RETURN_HR_IF_NULL(E_POINTER, newProcess);
     *newProcess = nullptr;
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     WSLAProcessOptions runtimeOptions{};
     CopyProcessSettingsToRuntime(runtimeOptions, internalProcessSettings);
 
     auto result = std::make_unique<WslcProcessImpl>();
-    HRESULT hr = internalContainer->container->Exec(&runtimeOptions, nullptr, &result->process);
-
-    if (FAILED_LOG(hr))
+    if (FAILED(errorInfoWrapper.CaptureResult(internalContainer->container->Exec(&runtimeOptions, nullptr, &result->process))))
     {
-        // TODO: Expected error message changes
-        // GetErrorInfoFromCOM(errorMessage);
-    }
-    else
-    {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
-        *newProcess = reinterpret_cast<WslcProcess>(result.release());
+        return errorInfoWrapper;
     }
 
-    return hr;
+    wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+    *newProcess = reinterpret_cast<WslcProcess>(result.release());
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -729,20 +726,12 @@ try
 
     auto result = std::make_unique<WslcProcessImpl>();
 
-    HRESULT hr = internalType->container->GetInitProcess(&result->process);
+    RETURN_IF_FAILED(internalType->container->GetInitProcess(&result->process));
 
-    if (FAILED_LOG(hr))
-    {
-        // TODO: Expected error message changes
-        // GetErrorInfoFromCOM(errorMessage);
-    }
-    else
-    {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
-        *initProcess = reinterpret_cast<WslcProcess>(result.release());
-    }
+    wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+    *initProcess = reinterpret_cast<WslcProcess>(result.release());
 
-    return hr;
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1015,6 +1004,7 @@ try
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, NameOrId);
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     WSLADeleteImageOptions options{};
     options.Image = NameOrId;
@@ -1022,7 +1012,7 @@ try
 
     wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImageInformation;
 
-    RETURN_HR(internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
+    return errorInfoWrapper.CaptureResult(internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
 }
 CATCH_RETURN();
 
