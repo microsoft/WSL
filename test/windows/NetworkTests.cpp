@@ -3294,12 +3294,11 @@ class NetworkTests
         ULONG bufferSize = 0;
         constexpr ULONG flags = GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_INCLUDE_GATEWAYS;
         std::vector<BYTE> buffer;
-        ULONG result;
-
-        while ((result = GetAdaptersAddresses(AF_INET6, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize)) ==
-               ERROR_BUFFER_OVERFLOW)
+        ULONG result = GetAdaptersAddresses(AF_INET6, flags, nullptr, nullptr, &bufferSize);
+        while (result == ERROR_BUFFER_OVERFLOW)
         {
             buffer.resize(bufferSize);
+            result = GetAdaptersAddresses(AF_INET6, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize);
         }
 
         if (result != NO_ERROR)
@@ -3338,16 +3337,15 @@ class NetworkTests
 
     static std::vector<BYTE> GetAdapterAddresses(ADDRESS_FAMILY family)
     {
-        ULONG result;
         constexpr ULONG flags =
             (GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS);
         ULONG bufferSize = 0;
         std::vector<BYTE> buffer;
-
-        while ((result = GetAdaptersAddresses(family, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize)) ==
-               ERROR_BUFFER_OVERFLOW)
+        ULONG result = GetAdaptersAddresses(family, flags, nullptr, nullptr, &bufferSize);
+        while (result == ERROR_BUFFER_OVERFLOW)
         {
             buffer.resize(bufferSize);
+            result = GetAdaptersAddresses(family, flags, nullptr, reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data()), &bufferSize);
         }
 
         VERIFY_WIN32_SUCCEEDED(result);
