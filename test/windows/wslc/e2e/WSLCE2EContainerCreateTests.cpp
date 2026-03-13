@@ -25,18 +25,30 @@ class WSLCE2EContainerCreateTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(AlpineImage);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
     TEST_METHOD_SETUP(TestMethodSetup)
     {
+        VolumeTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
+        VolumeTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
         EnsureContainerDoesNotExist(WslcContainerName);
+        return true;
+    }
+
+    TEST_METHOD_CLEANUP(TestMethodCleanup)
+    {
+        DeleteFileW(VolumeTestFile1.c_str());
+        DeleteFileW(VolumeTestFile2.c_str());
         return true;
     }
 
@@ -97,10 +109,130 @@ class WSLCE2EContainerCreateTests
              .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromHostReadFromContainer)
+    {
+        WSL2_TEST_ONLY();
+
+        // Write to a temp file that we will mount as a volume to the container
+        const std::wstring tempFile = VolumeTestFile1.wstring();
+        std::wofstream out(tempFile);
+        out << L"WSLC Volume Test";
+        out.close();
+
+        auto hostDirectory = VolumeTestFile1.parent_path();
+        auto fileName = VolumeTestFile1.filename().wstring();
+
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume {}:/data:ro {} cat /data/{}",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
+        result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = S_OK});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermissionByDefault)
+    {
+        WSL2_TEST_ONLY();
+
+        auto hostDirectory = VolumeTestFile1.parent_path();
+        auto fileName = VolumeTestFile1.filename().wstring();
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume {}:/data {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+
+        // Read all file content
+        std::wifstream in(VolumeTestFile1);
+        std::wstringstream buffer;
+        buffer << in.rdbuf();
+        VERIFY_ARE_EQUAL(L"WSLC Volume Test", buffer.str());
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermission)
+    {
+        WSL2_TEST_ONLY();
+
+        auto hostDirectory = VolumeTestFile1.parent_path();
+        auto fileName = VolumeTestFile1.filename().wstring();
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume {}:/data:rw {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+
+        // Read all file content
+        std::wifstream in(VolumeTestFile1);
+        std::wstringstream buffer;
+        buffer << in.rdbuf();
+        VERIFY_ARE_EQUAL(L"WSLC Volume Test", buffer.str());
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadOnlyPermission_Fail)
+    {
+        WSL2_TEST_ONLY();
+
+        auto hostDirectory = VolumeTestFile1.parent_path();
+        auto fileName = VolumeTestFile1.filename().wstring();
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume {}:/data:ro {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+                WslcContainerName,
+                hostDirectory.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName));
+        auto errorMessage = std::format(L"sh: can't create /data/{}: Read-only file system\n", fileName);
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_Volume_Multiple_WriteFromContainerReadFromHost_ReadWritePermission)
+    {
+        WSL2_TEST_ONLY();
+
+        // Mount multiple volumes to the container
+        auto hostDirectory1 = VolumeTestFile1.parent_path();
+        auto fileName1 = VolumeTestFile1.filename().wstring();
+        auto hostDirectory2 = VolumeTestFile2.parent_path();
+        auto fileName2 = VolumeTestFile2.filename().wstring();
+        auto result = RunWslc(
+            std::format(
+                L"container run --name {} --volume {}:/data1:rw --volume {}:/data2:rw {} sh -c \"echo -n 'Test1' > /data1/{} && echo -n 'Test2' > /data2/{}\"",
+                WslcContainerName,
+                hostDirectory1.wstring(),
+                hostDirectory2.wstring(),
+                AlpineImage.NameAndTag(),
+                fileName1,
+                fileName2));
+
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+
+        // Read all file content for both files
+        std::wifstream in1(VolumeTestFile1);
+        std::wstringstream buffer1;
+        buffer1 << in1.rdbuf();
+        VERIFY_ARE_EQUAL(L"Test1", buffer1.str());
+
+        std::wifstream in2(VolumeTestFile2);
+        std::wstringstream buffer2;
+        buffer2 << in2.rdbuf();
+        VERIFY_ARE_EQUAL(L"Test2", buffer2.str());
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+    std::filesystem::path VolumeTestFile1;
+    std::filesystem::path VolumeTestFile2;
 
     std::wstring GetHelpMessage() const
     {

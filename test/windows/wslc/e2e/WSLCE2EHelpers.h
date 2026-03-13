@@ -29,6 +29,7 @@ struct TestImage
     }
 };
 
+const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
 const TestImage& InvalidTestImage();
 

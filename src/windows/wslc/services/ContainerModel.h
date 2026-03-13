@@ -88,7 +88,7 @@ struct VolumeMount
 private:
     std::wstring m_hostPath;
     std::string m_containerPath;
-    bool m_isReadOnlyMode;
+    bool m_isReadOnlyMode = false;
 
     static bool IsReadOnlyMode(const std::wstring& mode)
     {
