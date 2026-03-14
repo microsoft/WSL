@@ -80,7 +80,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-    image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
+        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
 
     // Add volumes if specified
     for (const auto& volumeSpec : options.Volumes)
@@ -331,11 +331,11 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
 
     wsl::windows::common::relay::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-        std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
+            std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
     if (stderrLogs) // This handle is only used for non-tty processes.
     {
         io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-            std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+                std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.

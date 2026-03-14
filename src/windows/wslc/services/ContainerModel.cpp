@@ -24,7 +24,8 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     auto lastColon = value.rfind(':');
     if (lastColon == std::wstring::npos)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG, std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
     }
 
     VolumeMount vm;
@@ -35,13 +36,17 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
         vm.m_isReadOnlyMode = IsReadOnlyMode(lastToken);
         if (lastColon == 0)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG,
+                std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
         }
 
         splitColon = value.rfind(':', lastColon - 1);
         if (splitColon == std::string::npos)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG,
+                std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
         }
 
         vm.m_containerPath = WideToMultiByte(value.substr(splitColon + 1, lastColon - splitColon - 1));
