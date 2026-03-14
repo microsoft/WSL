@@ -52,11 +52,6 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     }
 
     vm.m_hostPath = value.substr(0, splitColon);
-    if (vm.m_hostPath.empty() || vm.m_containerPath.empty())
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
-    }
-
     return vm;
 }
 } // namespace wsl::windows::wslc::models

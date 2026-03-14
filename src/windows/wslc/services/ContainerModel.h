@@ -92,7 +92,7 @@ private:
 
     static bool IsReadOnlyMode(const std::wstring& mode)
     {
-        return mode == L"ro" || mode == L"readonly";
+        return mode == L"ro";
     }
 
     static bool IsValidMode(const std::wstring& mode)
