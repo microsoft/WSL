@@ -92,6 +92,19 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     for (const auto& port : options.Ports)
     {
         auto portMapping = PublishPort::Parse(port);
+
+        {
+            // https://github.com/microsoft/WSL/issues/14433
+            // The following scenarios are currently not implemented:
+            // - Ephemeral host port mappings
+            // - Host port mappings with a specific host IP
+            // - Host port mappings with UDP protocol
+            if (portMapping.HostPort().IsEphemeral() || portMapping.HostIP().has_value() || portMapping.PortProtocol() == PublishPort::Protocol::UDP)
+            {
+                THROW_HR_WITH_USER_ERROR(E_NOTIMPL, "Only host port mappings with TCP protocol are currently supported");
+            }
+        }
+
         auto containerPort = portMapping.ContainerPort();
         for (auto i = 0; i < containerPort.Count(); ++i)
         {
