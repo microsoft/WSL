@@ -32,7 +32,7 @@ constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
-WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLA_SESSION_INIT_SETTINGS* Settings) :
+WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLAFeatureFlags>(Settings->FeatureFlags)),
     m_networkingMode(Settings->NetworkingMode),
@@ -45,6 +45,12 @@ WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const 
 void WSLAVirtualMachine::Initialize()
 {
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
+
+    // Start crash dump collection thread.
+    auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
+    THROW_LAST_ERROR_IF(!crashDumpSocket);
+
+    m_crashDumpThread = std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
 
     // Establish a socket channel with mini_init in the VM.
     wil::unique_socket socket;
@@ -79,7 +85,7 @@ void WSLAVirtualMachine::Initialize()
         auto cmdStr = std::format("echo {} > /sys/module/page_reporting/parameters/page_reporting_order", pageReportingOrder);
         std::vector<const char*> args{"/bin/sh", "-c", cmdStr.c_str()};
 
-        WSLA_PROCESS_OPTIONS options{};
+        WSLAProcessOptions options{};
         options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
         CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
     }
@@ -101,6 +107,11 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
         m_processExitThread.join();
     }
 
+    if (m_crashDumpThread.joinable())
+    {
+        m_crashDumpThread.join();
+    }
+
     // Clear the state of all remaining processes now that the VM has exited.
     for (auto& e : m_trackedProcesses)
     {
@@ -110,31 +121,11 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
 
 void WSLAVirtualMachine::ConfigureInitialMounts()
 {
-    // Get paths for root and modules VHDs
-    auto basePath = wslutil::GetBasePath();
+    // Determine device paths from guest
+    const auto rootDevice = GetVhdDevicePath(0);
+    const auto modulesDevice = GetVhdDevicePath(1);
 
-#ifdef WSL_KERNEL_MODULES_PATH
-    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
-#else
-    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
-#endif
-
-    // Determine device paths based on whether pmem VHDs are used
-    std::string rootDevice;
-    std::string modulesDevice;
-
-    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
-    {
-        // SCSI attached disks - query device paths from guest
-        rootDevice = GetVhdDevicePath(0);
-        modulesDevice = GetVhdDevicePath(1);
-    }
-    else
-    {
-        // PMEM devices - use known device paths
-        rootDevice = "/dev/pmem0";
-        modulesDevice = "/dev/pmem1";
-    }
+    WI_ASSERT(rootDevice == "/dev/sda" && modulesDevice == "/dev/sdb");
 
     // Mount root filesystem with overlay
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);
@@ -177,7 +168,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     int gnsChannelFd = -1;
     int dnsChannelFd = -1;
 
-    WSLA_PROCESS_OPTIONS options{};
+    WSLAProcessOptions options{};
     auto prepareCommandLine = [&](const auto& sockets) {
         gnsChannelFd = sockets[0].Fd;
         gnsSocketFdArg = std::to_string(gnsChannelFd);
@@ -394,7 +385,7 @@ std::string WSLAVirtualMachine::GetVhdDevicePath(ULONG Lun)
 }
 
 Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
-    _In_ LPCSTR Executable, _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    _In_ LPCSTR Executable, _In_ const WSLAProcessOptions& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // Check if this is a tty or not
     std::vector<WSLAProcessFd> fds;
@@ -418,7 +409,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
 }
 
 Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
-    LPCSTR Executable, const WSLA_PROCESS_OPTIONS& Options, const std::vector<WSLAProcessFd>& Fds, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+    LPCSTR Executable, const WSLAProcessOptions& Options, const std::vector<WSLAProcessFd>& Fds, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // N.B This check is there to prevent processes from being started before the VM is done initializing.
     // to avoid potential deadlocks, since the processExitThread is required to signal the process exit events.
@@ -893,4 +884,72 @@ wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char* Path)
     THROW_HR_IF_MSG(E_FAIL, result.Result < 0, "Failed to connect to unix socket: '%hs', %i", Path, result.Result);
 
     return channel.Release();
+}
+
+void WSLAVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
+{
+    // No impersonation needed - the session process already runs as the user.
+    wslutil::SetThreadDescription(L"CrashDumpCollection");
+
+    const auto crashDumpFolder = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wsla-crashes";
+
+    while (!m_vmTerminatingEvent.is_signaled())
+    {
+        try
+        {
+            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
+            if (!socket)
+            {
+                // VM is exiting.
+                break;
+            }
+
+            constexpr DWORD timeout = 30 * 1000;
+            THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
+
+            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmTerminatingEvent.get()};
+
+            const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
+            const char* process = reinterpret_cast<const char*>(&message.Buffer);
+
+            constexpr auto dumpExtension = ".dmp";
+            constexpr auto dumpPrefix = "wsl-crash";
+
+            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
+
+            std::replace_if(filename.begin(), filename.end(), [](auto e) { return !std::isalnum(e) && e != '.' && e != '-'; }, '_');
+
+            auto fullPath = crashDumpFolder / filename;
+
+            WSL_LOG(
+                "WSLALinuxCrash",
+                TraceLoggingValue(fullPath.c_str(), "FullPath"),
+                TraceLoggingValue(message.Pid, "Pid"),
+                TraceLoggingValue(message.Signal, "Signal"),
+                TraceLoggingValue(process, "process"));
+
+            filesystem::EnsureDirectory(crashDumpFolder.c_str());
+
+            // Only delete files that:
+            // - have the temporary flag set
+            // - start with 'wsl-crash'
+            // - end in .dmp
+            //
+            // This logic is here to prevent accidental user file deletion
+            auto pred = [&dumpExtension, &dumpPrefix](const auto& e) {
+                return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
+                       e.path().extension() == dumpExtension && e.path().has_filename() &&
+                       e.path().filename().string().find(dumpPrefix) == 0;
+            };
+
+            wslutil::EnforceFileLimit(crashDumpFolder.c_str(), 10, pred);
+
+            wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
+            THROW_LAST_ERROR_IF(!file);
+
+            channel.SendResultMessage<std::int32_t>(0);
+            relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+        }
+        CATCH_LOG()
+    }
 }

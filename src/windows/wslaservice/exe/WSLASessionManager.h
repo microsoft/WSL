@@ -39,6 +39,7 @@ Abstract:
 #include <string>
 #include <vector>
 #include <mutex>
+#include <type_traits>
 
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -70,9 +71,9 @@ public:
     WSLASessionManagerImpl() = default;
     ~WSLASessionManagerImpl();
 
-    void GetVersion(_Out_ WSLA_VERSION* Version);
-    void CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession);
-    void ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount);
+    void GetVersion(_Out_ WSLAVersion* Version);
+    void CreateSession(const WSLASessionSettings* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession);
+    void ListSessions(_Out_ WSLASessionInformation** Sessions, _Out_ ULONG* SessionsCount);
     void OpenSession(_In_ ULONG Id, _Out_ IWSLASession** Session);
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
 
@@ -83,6 +84,13 @@ private:
     inline auto ForEachSession(const auto& Routine)
     {
         std::lock_guard lock(m_wslaSessionsLock);
+
+        // Enforce noexcept: remove_if leaves the container in an unspecified
+        // (partially-moved) state if the predicate throws. Callers must handle
+        // errors via return values, not exceptions.
+        static_assert(
+            std::is_nothrow_invocable_v<decltype(Routine), SessionEntry&, wil::com_ptr<IWSLASession>&>,
+            "ForEachSession routine must be noexcept to preserve container invariants during remove_if");
 
         using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
         TResult result{};
@@ -130,7 +138,7 @@ private:
     }
 
     void AddSessionProcessToJobObject(_In_ IWSLASessionFactory* Factory);
-    WSLA_SESSION_INIT_SETTINGS CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLA_SESSION_SETTINGS* Settings);
+    WSLASessionInitSettings CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLASessionSettings* Settings);
     void EnsureJobObjectCreated();
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
@@ -163,9 +171,9 @@ public:
 
     WSLASessionManager(wsl::windows::service::wsla::WSLASessionManagerImpl* Impl);
 
-    IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
-    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession) override;
-    IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
+    IFACEMETHOD(GetVersion)(_Out_ WSLAVersion* Version) override;
+    IFACEMETHOD(CreateSession)(const WSLASessionSettings* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession) override;
+    IFACEMETHOD(ListSessions)(_Out_ WSLASessionInformation** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session) override;
 };

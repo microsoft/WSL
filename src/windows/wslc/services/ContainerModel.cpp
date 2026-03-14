@@ -19,7 +19,7 @@ namespace wsl::windows::wslc::models {
 
 PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
 {
-    static auto parsePort = [](const std::string& value, const char* errorMessage) -> uint16_t {
+    static auto parsePort = [](const std::string& value, const std::string& errorMessage) -> uint16_t {
         try
         {
             // Ensure the value is not empty and contains only digits before parsing
@@ -49,13 +49,13 @@ PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& 
         // Port range specified
         auto startPortStr = portPart.substr(0, dashPos);
         auto endPortStr = portPart.substr(dashPos + 1);
-        auto startPort = parsePort(startPortStr, "Invalid port range specified in port mapping.");
-        auto endPort = parsePort(endPortStr, "Invalid port range specified in port mapping.");
+        auto startPort = parsePort(startPortStr, std::format("Invalid port range specified in port mapping: '{}'.", portPart));
+        auto endPort = parsePort(endPortStr, std::format("Invalid port range specified in port mapping: '{}'.", portPart));
         return {startPort, endPort};
     }
 
     // Single port specified
-    auto port = parsePort(portPart, "Invalid port specified in port mapping.");
+    auto port = parsePort(portPart, std::format("Invalid port specified in port mapping: '{}'.", portPart));
     return {port, port};
 }
 
@@ -71,7 +71,7 @@ PublishPort::IPAddress PublishPort::IPAddress::ParseHostIP(const std::string& ho
             return PublishPort::IPAddress(v6);
         }
 
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv6 address specified in port mapping.");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format("Invalid IPv6 address specified in port mapping: '{}'.", hostIpPart));
     }
     else
     {
@@ -81,7 +81,7 @@ PublishPort::IPAddress PublishPort::IPAddress::ParseHostIP(const std::string& ho
             return PublishPort::IPAddress(v4);
         }
 
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv4 address specified in port mapping.");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format("Invalid IPv4 address specified in port mapping: '{}'.", hostIpPart));
     }
 }
 

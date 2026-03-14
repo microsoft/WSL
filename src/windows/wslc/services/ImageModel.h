@@ -13,8 +13,6 @@ Abstract:
 --*/
 #pragma once
 
-#include <docker_schema.h>
-
 namespace wsl::windows::wslc::models {
 struct ImageInformation
 {

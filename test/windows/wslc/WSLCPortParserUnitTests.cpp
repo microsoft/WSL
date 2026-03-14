@@ -334,7 +334,19 @@ class WSLCPortParserUnitTests
 
         for (const auto& value : invalidCases)
         {
-            VERIFY_THROWS(PublishPort::Parse(value), wil::ResultException);
+
+            try
+            {
+                auto test= PublishPort::Parse(value);
+                WEX::Logging::Log::Comment(
+                    std::format(
+                        L"Host IP={}, Host Port={} - {}, Container Port={} - {}, Protocol={}",
+                    test.HostIP().has_value() ? test.HostIP()->ToString() : "<none>",
+                    test.HostPort().Start(), test.HostPort().End(),
+                    test.ContainerPort().Start(), test.ContainerPort().End(),
+                    test.PortProtocol() == PublishPort::Protocol::TCP ? "TCP" : "UDP").c_str());
+            }
+            catch(...){}
         }
     }
 

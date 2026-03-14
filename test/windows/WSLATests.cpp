@@ -19,6 +19,7 @@ Abstract:
 #include "WSLAContainerLauncher.h"
 #include "WslCoreFilesystem.h"
 
+using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
 using wsl::windows::common::RunningWSLAContainer;
 using wsl::windows::common::RunningWSLAProcess;
@@ -26,6 +27,7 @@ using wsl::windows::common::WSLAContainerLauncher;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
+using wsl::windows::common::wslutil::PruneResult;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -37,13 +39,13 @@ class WSLATests
     wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
-    WSLA_SESSION_SETTINGS m_defaultSessionSettings{};
+    WSLASessionSettings m_defaultSessionSettings{};
     wil::com_ptr<IWSLASession> m_defaultSession;
     static inline auto c_testSessionName = L"wsla-test";
 
-    void LoadTestImage(PCWSTR imageName)
+    void LoadTestImage(std::string_view imageName)
     {
-        std::filesystem::path imagePath = std::filesystem::path{g_testDataPath} / imageName;
+        std::filesystem::path imagePath = GetTestImagePath(imageName);
         wil::unique_hfile imageFile{
             CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         THROW_LAST_ERROR_IF(!imageFile);
@@ -63,8 +65,8 @@ class WSLATests
         m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeVirtioProxy);
         m_defaultSession = CreateSession(m_defaultSessionSettings);
 
-        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
+        wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+        VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
 
         auto hasImage = [&](const std::string& imageName) {
             return std::ranges::any_of(
@@ -73,17 +75,20 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            LoadTestImage(L"debian-latest.tar");
+            LoadTestImage("debian:latest");
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            LoadTestImage(L"python-3_12-alpine.tar");
+            LoadTestImage("python:3.12-alpine");
         }
 
-        // Hacky way to delete all containers.
-        // TODO: Replace with the --rm flag once available.
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "container", "prune", "-f"}, 0);
+        PruneResult result;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        if (result.result.ContainersCount > 0)
+        {
+            LogInfo("Pruned %lu containers", result.result.ContainersCount);
+        }
 
         return true;
     }
@@ -106,12 +111,12 @@ class WSLATests
         return true;
     }
 
-    WSLA_SESSION_SETTINGS GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
+    WSLASessionSettings GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
     {
-        WSLA_SESSION_SETTINGS settings{};
+        WSLASessionSettings settings{};
         settings.DisplayName = Name;
         settings.CpuCount = 4;
-        settings.MemoryMb = 2024;
+        settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
         settings.MaximumStorageSizeMb = 4096; // 4GB.
@@ -136,7 +141,7 @@ class WSLATests
         return sessionManager;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings, WSLASessionFlags Flags = WSLASessionFlagsNone)
+    wil::com_ptr<IWSLASession> CreateSession(const WSLASessionSettings& sessionSettings, WSLASessionFlags Flags = WSLASessionFlagsNone)
     {
         const auto sessionManager = OpenSessionManager();
 
@@ -167,7 +172,7 @@ class WSLATests
         wil::com_ptr<IWSLASessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
 
-        WSLA_VERSION version{};
+        WSLAVersion version{};
 
         VERIFY_SUCCEEDED(sessionManager->GetVersion(&version));
 
@@ -184,7 +189,7 @@ class WSLATests
     }
 
     static RunningWSLAProcess::ProcessResult ExpectCommandResult(
-        IWSLASession* session, const std::vector<std::string>& command, int expectResult, bool expectSignal = false, int timeout = 600000)
+        IWSLASession* session, const std::vector<std::string>& command, int expectResult, int timeout = 600000)
     {
         auto result = RunCommand(session, command, timeout);
 
@@ -235,6 +240,8 @@ class WSLATests
                     fd,
                     EscapeString(expected).c_str(),
                     EscapeString(it->second).c_str());
+
+                return;
             }
         }
     }
@@ -268,7 +275,7 @@ class WSLATests
 
         // Act: list sessions
         {
-            wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+            wil::unique_cotaskmem_array_ptr<WSLASessionInformation> sessions;
             VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
             // Assert
@@ -283,7 +290,7 @@ class WSLATests
         {
             auto session2 = CreateSession(GetDefaultSessionSettings(L"wsla-test-list-2"));
 
-            wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+            wil::unique_cotaskmem_array_ptr<WSLASessionInformation> sessions;
             VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
             VERIFY_ARE_EQUAL(sessions.size(), 2);
@@ -318,10 +325,40 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
+    TEST_METHOD(CreateSessionValidation)
+    {
+        WSL2_TEST_ONLY();
+
+        auto sessionManager = OpenSessionManager();
+
+        // Reject NULL DisplayName.
+        {
+            auto settings = GetDefaultSessionSettings(nullptr);
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
+        }
+
+        // Reject DisplayName at exact boundary (no room for null terminator).
+        {
+            std::wstring boundaryName(std::size(WSLASessionInformation{}.DisplayName), L'x');
+            auto settings = GetDefaultSessionSettings(boundaryName.c_str());
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
+        }
+
+        // Reject too long DisplayName.
+        {
+            std::wstring longName(std::size(WSLASessionInformation{}.DisplayName) + 1, L'x');
+            auto settings = GetDefaultSessionSettings(longName.c_str());
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
+        }
+    }
+
     void ExpectImagePresent(IWSLASession& Session, const char* Image, bool Present = true)
     {
-        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
+        wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+        THROW_IF_FAILED(Session.ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
         std::vector<std::string> tags;
         for (const auto& e : images)
@@ -388,26 +425,323 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // TODO: Add more test coverage once ListImages() is fully implemented.
-
-        // Validate that images with multiple tags are correctly returned.
+        // Setup: Ensure debian:latest is available
         ExpectImagePresent(*m_defaultSession, "debian:latest");
 
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
+        // Create additional tags for testing
+        WSLATagImageOptions tagOptions{};
+        tagOptions.Image = "debian:latest";
+        tagOptions.Repo = "debian";
+        tagOptions.Tag = "test-tag1";
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+        tagOptions.Tag = "test-tag2";
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
         auto cleanup = wil::scope_exit([&]() {
-            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Force = false, .NoPrune = false};
+            WSLADeleteImageOptions options{.Image = "debian:test-tag1", .Flags = WSLADeleteImageFlagsNone};
+            wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 
-            wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            options.Image = "debian:test-tag2";
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
         });
 
-        ExpectImagePresent(*m_defaultSession, "debian:test-list-images");
-        ExpectImagePresent(*m_defaultSession, "debian:latest");
+        LogInfo("Test: Basic listing with nullptr options");
+        {
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+            VERIFY_IS_TRUE(images.size() > 0);
+
+            // Find debian images and verify they exist
+            bool foundLatest = false, foundTag1 = false, foundTag2 = false;
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName == "debian:latest")
+                {
+                    foundLatest = true;
+                }
+                if (imageName == "debian:test-tag1")
+                {
+                    foundTag1 = true;
+                }
+                if (imageName == "debian:test-tag2")
+                {
+                    foundTag2 = true;
+                }
+            }
+
+            VERIFY_IS_TRUE(foundLatest);
+            VERIFY_IS_TRUE(foundTag1);
+            VERIFY_IS_TRUE(foundTag2);
+        }
+
+        LogInfo("Test: Verify all fields are populated");
+        {
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+            std::string commonHash;
+            int debianTagCount = 0;
+
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName.starts_with("debian:"))
+                {
+                    debianTagCount++;
+
+                    // Verify Hash field
+                    VERIFY_IS_TRUE(strlen(image.Hash) > 0);
+                    VERIFY_IS_TRUE(std::string(image.Hash).starts_with("sha256:"));
+
+                    // All debian tags should have the same hash (same underlying image)
+                    if (commonHash.empty())
+                    {
+                        commonHash = image.Hash;
+                    }
+                    else
+                    {
+                        VERIFY_ARE_EQUAL(commonHash, std::string(image.Hash));
+                    }
+
+                    // Verify Size field
+                    VERIFY_IS_TRUE(image.Size > 0);
+
+                    // Verify Created timestamp
+                    VERIFY_IS_TRUE(image.Created > 0);
+                }
+            }
+
+            VERIFY_IS_TRUE(debianTagCount >= 3); // At least debian:latest, test-tag1, test-tag2
+        }
+
+        LogInfo("Test: Multiple tags for same image return separate entries");
+        {
+            WSLAListImageOptions options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = "debian";
+
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Should find at least our 3 debian tags
+            VERIFY_IS_TRUE(images.size() >= 3);
+
+            // Verify each tag is a separate entry
+            std::set<std::string> imageTags;
+            for (const auto& image : images)
+            {
+                imageTags.insert(image.Image);
+            }
+
+            VERIFY_IS_TRUE(imageTags.contains("debian:latest"));
+            VERIFY_IS_TRUE(imageTags.contains("debian:test-tag1"));
+            VERIFY_IS_TRUE(imageTags.contains("debian:test-tag2"));
+        }
+
+        LogInfo("Test: Filter by specific reference");
+        {
+            WSLAListImageOptions options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = "debian:test-tag1";
+
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // When filtering by exact tag, Docker returns all tags for that image
+            // So we should get debian:latest, debian:test-tag1, debian:test-tag2
+            bool foundTag1 = false;
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName == "debian:test-tag1")
+                {
+                    foundTag1 = true;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag1);
+        }
+
+        LogInfo("Test: Digests flag");
+        {
+            WSLAListImageOptions options{};
+            options.Flags = WSLAListImagesFlagsDigests;
+            options.Reference = "debian:latest";
+
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Check if digests are available (they may not be for all images)
+            bool hasDigest = false;
+            for (const auto& image : images)
+            {
+                if (strlen(image.Digest) > 0)
+                {
+                    hasDigest = true;
+                    // Digest should be in format repo@sha256:...
+                    VERIFY_IS_TRUE(std::string(image.Digest).find("@sha256:") != std::string::npos);
+                }
+            }
+            // Note: Pulled images from registry should have digests, locally built may not
+        }
+
+        LogInfo("Test: Before/Since filters");
+        {
+            // Get all images to find their IDs
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> allImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
+
+            std::string debianId, pythonId;
+            for (const auto& image : allImages)
+            {
+                std::string imageName = image.Image;
+                if (imageName == "debian:latest")
+                {
+                    debianId = image.Hash;
+                }
+                else if (imageName == "python:3.12-alpine")
+                {
+                    pythonId = image.Hash;
+                }
+            }
+
+            VERIFY_IS_FALSE(debianId.empty());
+            VERIFY_IS_FALSE(pythonId.empty());
+
+            // Test 'since' filter - images created after debian
+            {
+                WSLAListImageOptions options{};
+                options.Flags = WSLAListImagesFlagsNone;
+                options.Since = debianId.c_str();
+
+                wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                VERIFY_IS_TRUE(images.size() > 0);
+
+                bool foundPython = false;
+                for (const auto& image : images)
+                {
+                    LogInfo("Image: %hs, Hash: %hs, Created: %lld", image.Image, image.Hash, image.Created);
+                    if (std::string{image.Image} == "python:3.12-alpine")
+                    {
+                        foundPython = true;
+                    }
+                }
+
+                VERIFY_IS_TRUE(foundPython);
+            }
+
+            // Test 'before' filter - images created before python
+            {
+                WSLAListImageOptions options{};
+                options.Flags = WSLAListImagesFlagsNone;
+                options.Before = pythonId.c_str();
+                wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                VERIFY_IS_TRUE(images.size() > 0);
+
+                bool foundDebian = false;
+                for (const auto& image : images)
+                {
+                    if (std::string{image.Image} == "debian:latest")
+                    {
+                        foundDebian = true;
+                    }
+                }
+
+                VERIFY_IS_TRUE(foundDebian);
+            }
+        }
+
+        LogInfo("Test: Dangling filter");
+        {
+            // Setup a dangling image
+            LoadTestImage("alpine:latest");
+            WSLATagImageOptions tagOptions{};
+            tagOptions.Image = "debian:latest";
+            tagOptions.Repo = "alpine";
+            tagOptions.Tag = "latest";
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+
+            auto alpineCleanup = wil::scope_exit([&]() {
+                RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "image", "prune", "-f"});
+                WSLADeleteImageOptions options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsNone};
+                wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            });
+
+            // List only dangling images
+            WSLAListImageOptions options{};
+            options.Flags = WSLAListImagesFlagsDanglingTrue;
+
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> danglingImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, danglingImages.addressof(), danglingImages.size_address<ULONG>()));
+
+            VERIFY_ARE_EQUAL(1, danglingImages.size());
+
+            // All dangling images should have <none>:<none> as the tag
+            for (const auto& image : danglingImages)
+            {
+                std::string imageName = image.Image;
+                VERIFY_ARE_EQUAL(imageName, std::string("<none>:<none>"));
+            }
+
+            // List non-dangling images
+            options.Flags = WSLAListImagesFlagsDanglingFalse;
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> nonDanglingImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, nonDanglingImages.addressof(), nonDanglingImages.size_address<ULONG>()));
+            VERIFY_IS_TRUE(nonDanglingImages.size() > 0);
+
+            // None of these should be <none>:<none>
+            for (const auto& image : nonDanglingImages)
+            {
+                std::string imageName = image.Image;
+                VERIFY_ARE_NOT_EQUAL(imageName, std::string("<none>:<none>"));
+            }
+        }
+
+        LogInfo("Test: Label filter");
+        {
+            // Test with nullptr (no label filter)
+            WSLAListImageOptions options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Labels = nullptr;
+            options.LabelsCount = 0;
+
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Test with single label filter
+            {
+                WSLALabel labels[] = {{.Key = "test.label", .Value = nullptr}};
+                options.Labels = labels;
+                options.LabelsCount = 1;
+
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+            }
+
+            // Test with multiple label filters (labels are AND'ed together)
+            {
+                WSLALabel labels[] = {{.Key = "test.label1", .Value = nullptr}, {.Key = "test.label2", .Value = "value"}};
+                options.Labels = labels;
+                options.LabelsCount = 2;
+
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+            }
+
+            // Note: To fully test label filtering with actual matches, would need to:
+            // 1. Build an image with specific labels using docker build --label
+            // 2. Filter with matching labels
+            // 3. Verify the filtered image appears
+            // This only tests the API usage not fail without requiring image builds
+        }
 
         cleanup.reset();
-        ExpectImagePresent(*m_defaultSession, "debian:test-list-images", false);
-        ExpectImagePresent(*m_defaultSession, "debian:latest");
+        ExpectImagePresent(*m_defaultSession, "debian:test-tag1", false);
+        ExpectImagePresent(*m_defaultSession, "debian:test-tag2", false);
+        ExpectImagePresent(*m_defaultSession, "debian:latest", true);
     }
 
     // TODO: Test that invalid tars are correctly handled.
@@ -415,7 +749,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+        std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
         wil::unique_handle imageTarFileHandle{
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -475,14 +809,14 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Prepare alpine image to delete.
-        LoadTestImage(L"alpine-latest.tar");
+        LoadTestImage("alpine:latest");
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
 
         // Launch a container to ensure that image deletion fails when in use.
         WSLAContainerLauncher launcher(
-            "alpine:latest", "test-delete-container-in-use", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+            "alpine:latest", "test-delete-container-in-use", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
 
         auto container = launcher.Launch(*m_defaultSession);
 
@@ -490,17 +824,17 @@ class WSLATests
         VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
         // Test delete failed if image in use.
-        WSLA_DELETE_IMAGE_OPTIONS options{};
+        WSLADeleteImageOptions options{};
         options.Image = "alpine:latest";
-        options.Force = FALSE;
-        wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+        options.Flags = WSLADeleteImageFlagsNone;
+        wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
 
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
             m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
-        // Force should suuceed.
-        options.Force = TRUE;
+        // Force should succeed.
+        options.Flags = WSLADeleteImageFlagsForce;
         VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
         VERIFY_IS_TRUE(deletedImages.size() > 0);
         VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);
@@ -508,7 +842,7 @@ class WSLATests
         // Verify that the image is no longer in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
 
-        // Test delete failed if image not exists.
+        // Test delete failed if image does not exist.
         VERIFY_ARE_EQUAL(
             WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
     }
@@ -904,7 +1238,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         auto runTagImage = [&](LPCSTR Image, LPCSTR Repo, LPCSTR Tag) {
-            WSLA_TAG_IMAGE_OPTIONS options{};
+            WSLATagImageOptions options{};
             options.Image = Image;
             options.Repo = Repo;
             options.Tag = Tag;
@@ -917,12 +1251,11 @@ class WSLATests
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                WSLADeleteImageOptions deleteOptions{};
                 deleteOptions.Image = "debian:test-tag";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
-                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
                 VERIFY_SUCCEEDED(
                     m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
@@ -937,8 +1270,8 @@ class WSLATests
             ExpectImagePresent(*m_defaultSession, "debian:test-tag");
 
             // Verify they have the same image hash.
-            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             std::string latestHash;
             std::string testTagHash;
@@ -964,12 +1297,11 @@ class WSLATests
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                WSLADeleteImageOptions deleteOptions{};
                 deleteOptions.Image = "myrepo/myimage:v1.0.0";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
-                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
                 VERIFY_SUCCEEDED(
                     m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
@@ -986,20 +1318,19 @@ class WSLATests
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                WSLADeleteImageOptions deleteOptions{};
                 deleteOptions.Image = "debian:test-by-id";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
-                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
                 VERIFY_SUCCEEDED(
                     m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
                 ExpectImagePresent(*m_defaultSession, "debian:test-by-id", false);
             });
 
-            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             std::string imageId;
             for (const auto& image : images)
@@ -1020,12 +1351,11 @@ class WSLATests
         // Positive test: Overwrite existing tag.
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                WSLADeleteImageOptions deleteOptions{};
                 deleteOptions.Image = "test:duplicate-tag";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
-                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
                 VERIFY_SUCCEEDED(
                     m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
@@ -1069,11 +1399,179 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(InspectImage)
+    {
+        WSL2_TEST_ONLY();
+
+        // Test inspect debian:latest
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectImage("debian:latest", &output));
+
+            // Verify output is valid JSON
+            VERIFY_IS_NOT_NULL(output.get());
+            VERIFY_IS_TRUE(std::strlen(output.get()) > 0);
+            LogInfo("Inspect output: %hs", output.get());
+
+            // Parse and validate JSON structure
+            auto inspectResult = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(output.get());
+
+            // Verify all fields exposed in wsla_schema::InspectImage
+            VERIFY_IS_TRUE(inspectResult.Id.find("sha256:") == 0);
+
+            VERIFY_IS_TRUE(inspectResult.RepoTags.has_value());
+            VERIFY_IS_FALSE(inspectResult.RepoTags->empty());
+            bool foundTag = false;
+            for (const auto& tag : inspectResult.RepoTags.value())
+            {
+                if (tag.find("debian:latest") != std::string::npos)
+                {
+                    foundTag = true;
+                    break;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag);
+
+            // skip testing RepoDigests for loaded test image.
+            VERIFY_IS_FALSE(inspectResult.Created.empty());
+            VERIFY_IS_TRUE(inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
+            VERIFY_ARE_EQUAL("linux", inspectResult.Os);
+            VERIFY_IS_TRUE(inspectResult.Size > 0);
+            VERIFY_IS_TRUE(inspectResult.Metadata.has_value());
+            VERIFY_IS_TRUE(inspectResult.Metadata->size() > 0);
+
+            VERIFY_IS_TRUE(inspectResult.Config.has_value());
+            const auto& config = inspectResult.Config.value();
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_IS_TRUE(config.Cmd->size() > 0);
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(0, config.Entrypoint->size());
+            VERIFY_IS_TRUE(config.Env.has_value());
+            VERIFY_IS_TRUE(config.Env->size() > 0);
+            VERIFY_IS_FALSE(config.Labels.has_value());
+        }
+
+        // Negative test: Image not found
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
+            ValidateCOMErrorMessage(L"No such image: nonexistent:image");
+        }
+
+        // Negative test: Bad image name input
+        {
+            wil::unique_cotaskmem_ansistring output;
+
+            std::string longImageName(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a');
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->InspectImage(longImageName.c_str(), &output));
+
+            // Invalid name.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), m_defaultSession->InspectImage("debian latest", &output));
+            ValidateCOMErrorMessage(L"invalid reference format");
+
+            // Attempt to fake to call search endpoint. Our implementation escaped the image name correctly.
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("search/debian:latest", &output));
+            ValidateCOMErrorMessage(L"No such image: search/debian:latest");
+        }
+    }
+
+    struct BlockingOperation
+    {
+        NON_COPYABLE(BlockingOperation);
+        NON_MOVABLE(BlockingOperation);
+
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK) :
+            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult)
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+
+            m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
+            m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
+
+            // Wait for the operation to be running before continuing.
+            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
+        }
+
+        ~BlockingOperation()
+        {
+            if (m_operationThread.joinable())
+            {
+                m_operationThread.join();
+            }
+
+            if (m_ioThread.joinable())
+            {
+                m_ioThread.join();
+            }
+        }
+
+        void RunOperation(wil::unique_handle Handle)
+        {
+            m_result.set_value(m_operation(Handle.get()));
+
+            // Fail if the operation completed before the test signaled completion.
+            // Don't use VERIFY macros since this is running in a separate thread.
+            WI_ASSERT(m_testCompleteEvent.is_signaled());
+        }
+
+        void RunIO(wil::unique_handle Handle)
+        {
+            std::vector<char> buffer(1024 * 1024);
+            while (true)
+            {
+                DWORD bytesRead{};
+                if (!ReadFile(Handle.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+                {
+                    if (GetLastError() != ERROR_BROKEN_PIPE)
+                    {
+                        LogError("Unexpected ReadFile() error: %u", GetLastError());
+                    }
+
+                    break;
+                }
+
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                if (!m_startedEvent.is_signaled())
+                {
+                    m_startedEvent.SetEvent();
+                }
+
+                // Block until the test completes.
+                if (!m_testCompleteEvent.wait(60 * 1000))
+                {
+                    LogError("Timed out waiting for test completion");
+                    break;
+                }
+            }
+        }
+
+        void Complete()
+        {
+            m_testCompleteEvent.SetEvent();
+
+            VERIFY_ARE_EQUAL(m_expectedResult, m_result.get_future().get());
+        }
+
+        std::function<HRESULT(HANDLE)> m_operation;
+        wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
+        wil::unique_event m_testCompleteEvent{wil::EventOptions::ManualReset};
+        std::thread m_operationThread;
+        std::thread m_ioThread;
+        std::promise<HRESULT> m_result;
+        HRESULT m_expectedResult{};
+    };
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
         {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+            std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
             wil::unique_handle imageTarFileHandle{
                 CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -1090,120 +1588,151 @@ class WSLATests
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         }
 
-        // Save the image to a tar file.
         {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{CreateFileW(
-                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
-        }
+            std::filesystem::path imageTar = L"HelloWorldExported.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
+            // Save the image to a tar file.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, nullptr));
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
+            }
 
-        // Load the saved image to verify it's valid.
-        {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{
-                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            // Load the image from a saved tar
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
-            // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
-            auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess().WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(0, result.Code);
-            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            // Load the saved image to verify it's valid.
+            {
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                // Load the image from a saved tar
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                // Verify that the image is in the list of images.
+                ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+                WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+                auto container = launcher.Launch(*m_defaultSession);
+                auto result = container.GetInitProcess().WaitAndCaptureOutput();
+                VERIFY_ARE_EQUAL(0, result.Code);
+                VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            }
         }
 
         // Try to save an invalid image.
         {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldError.tar";
+            std::filesystem::path imageTar = L"HelloWorldError.tar";
+            auto cleanfile =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTar.c_str())); });
             wil::unique_handle imageTarFileHandle{CreateFileW(
                 imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr));
+            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, nullptr));
             ValidateCOMErrorMessage(L"reference does not exist");
 
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
         }
+
+        // Validate that cancellation works.
+        {
+            wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+
+            BlockingOperation operation(
+                [&](HANDLE handle) {
+                    return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, cancelEvent.get());
+                },
+                E_ABORT);
+
+            cancelEvent.SetEvent();
+            operation.Complete();
+        }
     }
     TEST_METHOD(ExportContainer)
     {
         WSL2_TEST_ONLY();
+
         // Load an image and launch a container to verify image is valid.
+        // Then export the container to a tar file.
+        // Load the exported tar file to verify it's a valid image and can be launched.
+        // Finally, stop and delete the container, then try to export again to verify it fails as expected.
         {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
-            wil::unique_handle imageTarFileHandle{
-                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
-            // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
-            auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess().WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(0, result.Code);
-            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            std::filesystem::path containerTar = L"HelloWorldExported.tar";
+            auto cleanup =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(containerTar.c_str())); });
 
-            // Export the container to a tar file.
-            std::filesystem::path containerTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
-            wil::unique_handle containerTarFileHandle{CreateFileW(
-                containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
-            VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(HandleToULong(containerTarFileHandle.get()), container.Id().c_str(), nullptr));
-            VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
-        }
+            // Load the image from a saved tar and launch a container
+            {
+                std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
+                wil::unique_handle imageTarFileHandle{CreateFileW(
+                    imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                // Verify that the image is in the list of images.
+                ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+                WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+                auto container = launcher.Launch(*m_defaultSession);
+                auto result = container.GetInitProcess().WaitAndCaptureOutput();
+                VERIFY_ARE_EQUAL(0, result.Code);
+                VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
 
-        // Load the exported container to verify it's valid.
-        {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{
-                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
-            // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
-            auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess().WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(0, result.Code);
-            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
-        }
+                // Export the container to a tar file.
+                wil::unique_handle containerTarFileHandle{CreateFileW(
+                    containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
+                VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
+                VERIFY_SUCCEEDED(container.Get().Export(HandleToULong(containerTarFileHandle.get())));
+                VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_NOT_EQUAL(fileSize.QuadPart, 0);
+            }
 
-        // Try to export a non-existing container.
-        {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExportError.tar";
-            wil::unique_handle contTarFileHandle{CreateFileW(
-                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == contTarFileHandle.get());
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+            // Load the exported container to verify it's valid.
+            {
+                wil::unique_handle containerTarFileHandle{CreateFileW(
+                    containerTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
+                LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(containerTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                // Verify that the image is in the list of images.
+                ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+                WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+                auto container = launcher.Launch(*m_defaultSession);
+                auto result = container.GetInitProcess().WaitAndCaptureOutput();
+                VERIFY_ARE_EQUAL(0, result.Code);
+                VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
 
-            VERIFY_ARE_EQUAL(m_defaultSession->ExportContainer(HandleToULong(contTarFileHandle.get()), "dummy", nullptr), WSLA_E_CONTAINER_NOT_FOUND);
-            ValidateCOMErrorMessage(L"No such container: dummy");
+                // Stop and delete the above container and try to export.
 
-            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+                std::filesystem::path imageTarFile = L"HelloWorldExportError.tar";
+                auto cleanfile =
+                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTarFile.c_str())); });
+                wil::unique_handle contTarFileHandle{CreateFileW(
+                    imageTarFile.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == contTarFileHandle.get());
+                VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
+
+                ULONG outFile = HandleToULong(contTarFileHandle.get());
+
+                container.Get().Stop(WSLASignalSIGILL, 10);
+                container.Get().Delete(WSLADeleteFlagsNone);
+                VERIFY_ARE_EQUAL(container.Get().Export(outFile), RPC_E_DISCONNECTED);
+
+                VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
+                VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
+            }
         }
     }
 
@@ -1319,7 +1848,7 @@ class WSLATests
             promise.set_value(std::make_pair(reason, details));
         }};
 
-        WSLA_SESSION_SETTINGS sessionSettings = GetDefaultSessionSettings(L"termination-callback-test");
+        WSLASessionSettings sessionSettings = GetDefaultSessionSettings(L"termination-callback-test");
         sessionSettings.TerminationCallback = &callback;
 
         auto session = CreateSession(sessionSettings);
@@ -1412,41 +1941,13 @@ class WSLATests
 
     TEST_METHOD(NATNetworkingWithDnsTunneling)
     {
+        WINDOWS_11_TEST_ONLY();
         ValidateNetworking(WSLANetworkingModeNAT, true);
     }
 
     TEST_METHOD(VirtioProxyNetworking)
     {
         ValidateNetworking(WSLANetworkingModeVirtioProxy);
-    }
-
-    void WaitForOutput(HANDLE Handle, const char* Content)
-    {
-        std::string output;
-        DWORD index = 0;
-        while (true) // TODO: timeout
-        {
-            constexpr auto bufferSize = 100;
-            output.resize(output.size() + bufferSize);
-            DWORD bytesRead = 0;
-            if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
-            {
-                LogError("ReadFile failed with %lu", GetLastError());
-                VERIFY_FAIL();
-            }
-            output.resize(index + bytesRead);
-            if (bytesRead == 0)
-            {
-                LogError("Process exited, output: %hs", output.c_str());
-                VERIFY_FAIL();
-            }
-
-            index += bytesRead;
-            if (output.find(Content) != std::string::npos)
-            {
-                break;
-            }
-        }
     }
 
     void ValidatePortMapping(WSLANetworkingMode networkingMode)
@@ -1469,7 +1970,7 @@ class WSLATests
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
             auto process = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", cmd}).Launch(*session);
-            WaitForOutput(process.GetStdHandle(2).get(), "listening on");
+            WaitForOutput(process.GetStdHandle(2), "listening on");
 
             return process;
         };
@@ -1549,7 +2050,7 @@ class WSLATests
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
                 .Launch(*session);
 
-        WaitForOutput(process.GetStdHandle(2).get(), "listening on");
+        WaitForOutput(process.GetStdHandle(2), "listening on");
 
         for (auto i = 0; i < 100; i++)
         {
@@ -1735,48 +2236,6 @@ class WSLATests
 
         // Validate that xsk_diag is now loaded.
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
-    }
-
-    TEST_METHOD(PmemVhds)
-    {
-        WSL2_TEST_ONLY();
-
-        // TODO: Remove once test failure is fixed.
-        SKIP_TEST_UNSTABLE();
-
-        // Test with SCSI boot VHDs.
-        {
-            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
-            WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-
-            auto createNewSession = WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
-
-            // Validate that SCSI devices are present and PMEM devices are not.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/sda"}, 0);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/sdb"}, 0);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem0"}, 1);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem1"}, 1);
-
-            // Verify that the SCSI device is readable.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "dd if=/dev/sda of=/dev/null bs=512 count=1 2>&1"}, 0);
-        }
-
-        // Test with PMEM boot VHDs enabled.
-        {
-            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
-            WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-
-            auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsPmemVhds);
-            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
-
-            // Validate that PMEM devices are present.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem0"}, 0);
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem1"}, 0);
-
-            // Verify that the PMEM devices can be read from.
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "dd if=/dev/pmem0 of=/dev/null bs=512 count=1 2>&1"}, 0);
-        }
     }
 
     TEST_METHOD(CreateRootNamespaceProcess)
@@ -2024,7 +2483,7 @@ class WSLATests
         // Validate that stdin is correctly wired
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-default-entrypoint", {"/bin/cat"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST, WSLAProcessFlagsStdin);
+                "debian:latest", "test-default-entrypoint", {"/bin/cat"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost, WSLAProcessFlagsStdin);
 
             auto container = launcher.Launch(*m_defaultSession);
 
@@ -2217,7 +2676,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 wil::com_ptr<IWSLAContainer> openedContainer;
                 VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &openedContainer));
-                VERIFY_SUCCEEDED(openedContainer->Delete());
+                VERIFY_SUCCEEDED(openedContainer->Delete(WSLADeleteFlagsNone));
             });
 
             auto process = container.GetInitProcess();
@@ -2227,11 +2686,11 @@ class WSLATests
             // Terminate the session.
             ResetTestSession();
 
-            WSLA_PROCESS_STATE processState{};
+            WSLAProcessState processState{};
             int exitCode{};
             VERIFY_ARE_EQUAL(process.Get().GetState(&processState, &exitCode), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
 
-            WSLA_CONTAINER_STATE state{};
+            WSLAContainerState state{};
             VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
         }
 
@@ -2256,6 +2715,43 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
+        // Validate that tmpfs mounts are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest",
+                "test-tmpfs",
+                {"/bin/sh", "-c", "mount | grep 'tmpfs on /mnt/wsla-tmpfs1' && mount | grep 'tmpfs on /mnt/wsla-tmpfs2'"});
+
+            launcher.AddTmpfs("/mnt/wsla-tmpfs1", "rw,noexec,nosuid,size=65536k");
+            launcher.AddTmpfs("/mnt/wsla-tmpfs2", "");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
+        // Validate that relative tmpfs paths are rejected by Docker.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-relative", {"/bin/cat"});
+            launcher.AddTmpfs("relative-path", "");
+
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+
+            ValidateCOMErrorMessage(L"invalid mount path: 'relative-path' mount path must be absolute");
+        }
+
+        // Validate that invalid tmpfs options are rejected by Docker.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-invalid-opts", {"/bin/cat"});
+            launcher.AddTmpfs("/mnt/wsla-tmpfs", "invalid_option_xyz");
+
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+
+            ValidateCOMErrorMessage(L"invalid tmpfs option [\"invalid_option_xyz\"]");
+        }
+
         // Validate error paths
         {
             WSLAContainerLauncher launcher("debian:latest", std::string(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
@@ -2278,7 +2774,7 @@ class WSLATests
         {
             WSLAContainerLauncher launcher("debian:latest", "dummy", {"/does-not-exist"});
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
 
             ValidateCOMErrorMessage(
                 L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create "
@@ -2288,7 +2784,7 @@ class WSLATests
 
         // Test null image name
         {
-            WSLA_CONTAINER_OPTIONS options{};
+            WSLAContainerOptions options{};
             options.Image = nullptr;
             options.Name = "test-container";
             options.InitProcessOptions.CommandLine = {.Values = nullptr, .Count = 0};
@@ -2300,14 +2796,87 @@ class WSLATests
 
         // Test null container name
         {
-            WSLA_CONTAINER_OPTIONS options{};
+            WSLAContainerOptions options{};
             options.Image = "debian:latest";
             options.Name = nullptr;
             options.InitProcessOptions.CommandLine = {.Values = nullptr, .Count = 0};
 
             wil::com_ptr<IWSLAContainer> container;
             VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, &container));
-            VERIFY_SUCCEEDED(container->Delete());
+            VERIFY_SUCCEEDED(container->Delete(WSLADeleteFlagsNone));
+        }
+    }
+
+    TEST_METHOD(ContainerStartAfterStop)
+    {
+        WSL2_TEST_ONLY();
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            {
+                // Validate that the container can be restarted.
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach, nullptr), S_OK);
+                auto restartedProcess = container.GetInitProcess();
+                ValidateProcessOutput(restartedProcess, {{1, "OK\n"}});
+            }
+
+            {
+                // Validate that the container can be restarted without the attach flag.
+                VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), S_OK);
+                auto restartedProcess = container.GetInitProcess();
+                VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
+
+                wil::unique_handle stdoutLogs;
+                wil::unique_handle stderrLogs;
+                VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+
+                ValidateHandleOutput(stdoutLogs.get(), "OK\nOK\nOK\n");
+                ValidateHandleOutput(stderrLogs.get(), "");
+            }
+        }
+
+        // Validate that containers can be restarted after being explicitly stopped.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start-2", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            auto initProcess = container.GetInitProcess();
+            initProcess.Get().Signal(WSLASignalSIGKILL);
+            VERIFY_ARE_EQUAL(initProcess.Wait(), WSLASignalSIGKILL + 128);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
+
+            // Validate that deleted containers can't be started.
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
+        }
+
+        // Validate restart behavior for a container with the autorm flag set
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-start-3", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            // Validate that deleted containers can't be started.
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
         }
     }
 
@@ -2407,8 +2976,8 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
-            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+        auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
 
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
@@ -2420,6 +2989,8 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
+                VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
+                VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
             }
         };
 
@@ -2446,6 +3017,19 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
 
+            // Capture StateChangedAt and CreatedAt while the container is running.
+            ULONGLONG runningStateChangedAt{};
+            ULONGLONG runningCreatedAt{};
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                VERIFY_ARE_EQUAL(containers.size(), 1);
+                runningStateChangedAt = containers[0].StateChangedAt;
+                runningCreatedAt = containers[0].CreatedAt;
+                VERIFY_IS_TRUE(runningStateChangedAt > 0);
+                VERIFY_IS_TRUE(runningCreatedAt > 0);
+            }
+
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
             VERIFY_SUCCEEDED(initProcess.Get().Signal(WSLASignalSIGKILL));
@@ -2462,27 +3046,45 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
             expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateExited}});
 
+            // Verify that StateChangedAt was updated after the state transition.
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                VERIFY_ARE_EQUAL(containers.size(), 1);
+
+                auto now = static_cast<ULONGLONG>(time(nullptr));
+                VERIFY_IS_TRUE(containers[0].StateChangedAt <= now);
+                VERIFY_IS_TRUE(containers[0].StateChangedAt >= runningStateChangedAt);
+
+                // CreatedAt must not change after state transitions.
+                VERIFY_ARE_EQUAL(containers[0].CreatedAt, runningCreatedAt);
+            }
+
             // Open a new reference to the same container.
             wil::com_ptr<IWSLAContainer> sameContainer;
             VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("test-container-1", &sameContainer));
 
             // Verify that the state matches.
-            WSLA_CONTAINER_STATE state{};
+            WSLAContainerState state{};
             VERIFY_SUCCEEDED(sameContainer->GetState(&state));
             VERIFY_ARE_EQUAL(state, WslaContainerStateExited);
 
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Test StopContainer
         {
             // Create a container
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-2", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+                "debian:latest", "test-container-2", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
 
-            auto container = launcher.Launch(*m_defaultSession);
+            auto container = launcher.Create(*m_defaultSession);
+
+            // Validate that a created container cannot be stopped.
+            VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that the container is in running state.
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
@@ -2495,7 +3097,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
             expectContainerList({});
         }
 
@@ -2508,7 +3110,7 @@ class WSLATests
         // Validate that container names are unique.
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-unique-name", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+                "debian:latest", "test-unique-name", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
 
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -2519,7 +3121,7 @@ class WSLATests
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that running containers can't be deleted.
-            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Kill the container.
             auto initProcess = container.GetInitProcess();
@@ -2540,20 +3142,20 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that stopped containers can be deleted.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Verify that stopping a deleted container returns ERROR_INVALID_STATE.
             VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGTERM, 0), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers can't be deleted again.
-            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers don't show up in the container list.
             expectContainerList({});
 
             // Verify that the same name can be reused now that the container is deleted.
             WSLAContainerLauncher otherLauncher(
-                "debian:latest", "test-unique-name", {"echo", "OK"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+                "debian:latest", "test-unique-name", {"echo", "OK"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
 
             auto result = otherLauncher.Launch(*m_defaultSession).GetInitProcess().WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
@@ -2568,19 +3170,19 @@ class WSLATests
             VERIFY_SUCCEEDED(result);
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
-            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone, nullptr));
 
             // Verify that Start() can't be called again on a running container.
-            VERIFY_ARE_EQUAL(container->Get().Start(WSLAContainerStartFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container->Get().Start(WSLAContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
 
             VERIFY_SUCCEEDED(container->Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
 
-            VERIFY_SUCCEEDED(container->Get().Delete());
+            VERIFY_SUCCEEDED(container->Get().Delete(WSLADeleteFlagsNone));
 
-            WSLA_CONTAINER_STATE state{};
+            WSLAContainerState state{};
             VERIFY_ARE_EQUAL(container->Get().GetState(&state), RPC_E_DISCONNECTED);
         }
 
@@ -2593,15 +3195,46 @@ class WSLATests
 
             // Delete the container to avoid leaving it dangling after test completion.
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Terminate the session
             ResetTestSession();
 
             // Validate that calling into the container returns RPC_S_SERVER_UNAVAILABLE.
-            WSLA_CONTAINER_STATE state = WslaContainerStateRunning;
+            WSLAContainerState state = WslaContainerStateRunning;
             VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
             VERIFY_ARE_EQUAL(state, WslaContainerStateInvalid);
+        }
+    }
+
+    TEST_METHOD(DeleteContainer)
+    {
+        WSL2_TEST_ONLY();
+        WSLAContainerLauncher launcher("debian:latest", "test-container-delete", {"sleep", "99999"});
+
+        {
+            // Verify that a created container can be deleted.
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
+
+            // Verify that a deleted container can't be deleted again.
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+        }
+
+        {
+            // Verify that a running container can't be deleted by default.
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Verify that a running container can be deleted with the force flag.
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsForce));
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsForce), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+
+            // Validate that invalid flags are rejected.
+            VERIFY_ARE_EQUAL(container.Get().Delete(static_cast<WSLADeleteFlags>(0x2)), E_INVALIDARG);
         }
     }
 
@@ -2610,8 +3243,8 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
-            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+        auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
 
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
@@ -2622,6 +3255,9 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
+                VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
+                VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
+                VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
             }
         };
 
@@ -2630,7 +3266,7 @@ class WSLATests
         // TODO: Add port mapping related tests when port mapping is implemented
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-network", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+                "debian:latest", "test-network", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
 
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -2646,14 +3282,14 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             expectContainerList({});
         }
 
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-network", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE);
+                "debian:latest", "test-network", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeNone);
 
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -2668,7 +3304,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             expectContainerList({});
         }
@@ -2679,7 +3315,7 @@ class WSLATests
                 "test-network",
                 {"sleep", "99999"},
                 {},
-                (WSLA_CONTAINER_NETWORK_TYPE)6 // WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE
+                (WSLAContainerNetworkType)6 // WSLAContainerNetworkType::WSLAContainerNetworkTypeNone
             );
 
             auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
@@ -2688,7 +3324,7 @@ class WSLATests
 
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-network", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_BRIDGE);
+                "debian:latest", "test-network", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeBridged);
 
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -2702,7 +3338,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             expectContainerList({});
         }
@@ -2760,9 +3396,12 @@ class WSLATests
                 }
 
                 VERIFY_IS_FALSE(it->Type.empty());
-                VERIFY_IS_FALSE(it->Source.empty());
-
                 VERIFY_ARE_EQUAL(it->Type, expectedType);
+
+                if (expectedType != "tmpfs")
+                {
+                    VERIFY_IS_FALSE(it->Source.empty());
+                }
                 VERIFY_ARE_EQUAL(it->ReadWrite, expectedReadWrite);
             }
         };
@@ -2782,13 +3421,14 @@ class WSLATests
             });
 
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+                "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1235, 8000, AF_INET);
             launcher.AddPort(1236, 8001, AF_INET);
             launcher.AddVolume(testFolder.wstring(), "/test-volume", false);
             launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true);
+            launcher.AddTmpfs("/mnt/wsla-tmpfs-inspect", "");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto details = container.Inspect();
@@ -2808,11 +3448,13 @@ class WSLATests
             // Verify port mappings match what we configured.
             expectPorts(details.Ports, {{"8000/tcp", {"1234", "1235"}}, {"8001/tcp", {"1236"}}});
 
-            // Verify volume mounts match what we configured.
-            expectMounts(details.Mounts, {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}});
+            // Verify mounts match what we configured.
+            expectMounts(
+                details.Mounts,
+                {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}, {"/mnt/wsla-tmpfs-inspect", "tmpfs", true}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Test an exited container still returns correct schema shape.
@@ -2842,7 +3484,7 @@ class WSLATests
             expectPorts(details.Ports, {});
             expectMounts(details.Mounts, {});
 
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
     }
 
@@ -2853,7 +3495,7 @@ class WSLATests
 
         // Create a container.
         WSLAContainerLauncher launcher(
-            "debian:latest", "test-container-exec", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE);
+            "debian:latest", "test-container-exec", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeNone);
 
         auto container = launcher.Launch(*m_defaultSession);
 
@@ -2993,6 +3635,28 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ExecContainerDelete)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        WSLAContainerLauncher launcher("debian:latest", "test-exec-dtor", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeNone);
+
+        auto container = launcher.Launch(*m_defaultSession);
+
+        auto process = WSLAProcessLauncher({}, {"sleep", "99999"}).Launch(container.Get());
+        auto exitEvent = process.GetExitEvent();
+
+        // Destroy the container (Stop + Delete + release COM reference).
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
+        container.Reset();
+
+        // The exec process exit event must be signaled within a reasonable timeout.
+        VERIFY_IS_TRUE(exitEvent.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(process.GetExitCode(), 128 + WSLASignalSIGKILL);
+    }
+
     void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
     {
         const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
@@ -3032,7 +3696,7 @@ class WSLATests
         }
     }
 
-    void RunPortMappingsTest(IWSLASession& session, WSLA_CONTAINER_NETWORK_TYPE containerNetworkType)
+    void RunPortMappingsTest(IWSLASession& session, WSLAContainerNetworkType containerNetworkType)
     {
         LogInfo("Container network type: %d", static_cast<int>(containerNetworkType));
 
@@ -3066,10 +3730,9 @@ class WSLATests
 
             auto container = launcher.Launch(session);
             auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
 
             // Wait for the container bind() to be completed.
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
             expectBoundPorts(container, {"8000/tcp"});
 
@@ -3085,7 +3748,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             container.Reset(); // TODO: Re-think container lifetime management.
 
@@ -3098,16 +3761,15 @@ class WSLATests
 
                 auto container = launcher.Launch(session);
                 auto initProcess = container.GetInitProcess();
-                auto stdoutHandle = initProcess.GetStdHandle(1);
 
                 // Wait for the container bind() to be completed.
-                WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+                WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
                 expectBoundPorts(container, {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
                 VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-                VERIFY_SUCCEEDED(container.Get().Delete());
+                VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
                 container.Reset(); // TODO: Re-think container lifetime management.
             }
         }
@@ -3201,8 +3863,8 @@ class WSLATests
 
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeNAT);
 
-        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_BRIDGE);
-        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_HOST);
+        RunPortMappingsTest(*session, WSLAContainerNetworkTypeBridged);
+        RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
     }
 
     TEST_METHOD(PortMappingsVirtioProxy)
@@ -3211,15 +3873,15 @@ class WSLATests
 
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeVirtioProxy);
 
-        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_BRIDGE);
-        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_HOST);
+        RunPortMappingsTest(*session, WSLAContainerNetworkTypeBridged);
+        RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
     }
 
     TEST_METHOD(PortMappingsNone)
     {
         // Validate that trying to map ports without network fails.
         WSLAContainerLauncher launcher(
-            "python:3.12-alpine", "test-ports-fail", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, WSLA_CONTAINER_NETWORK_NONE);
+            "python:3.12-alpine", "test-ports-fail", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, WSLAContainerNetworkTypeNone);
 
         launcher.AddPort(1234, 8000, AF_INET);
 
@@ -3284,7 +3946,7 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "OK\n"}});
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Validate that the volumes are not mounted after container exits.
@@ -3466,6 +4128,7 @@ class WSLATests
         };
 
         runTest("3\r\nfoo\r\n3\r\nbar", {"foo", "bar"});
+        runTest("3\r\nfoo\r\n3\r\nbar\r\n0\r\n\r\n", {"foo", "bar"});
         runTest("1\r\na\r\n\r\n", {"a"});
 
         runTest("c\r\nlf\nin\r\nchunk\r\n3\r\nEOF", {"lf\nin\r\nchunk", "EOF"});
@@ -3476,9 +4139,77 @@ class WSLATests
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("Invalid\r\nInvalid", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4nolf", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\nnocr", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("12\nyeseighteenletters", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4invalid\nnocr", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid", {}); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid\n", {}); }), E_INVALIDARG);
+    }
+
+    TEST_METHOD(HTTPChunkReaderSplitReads)
+    {
+        auto runTest = [](const std::vector<std::string>& Data, const std::vector<std::string>& ExpectedChunk) {
+            std::vector<std::string> chunks;
+            auto onData = [&](const gsl::span<char>& data) { chunks.emplace_back(data.data(), data.size()); };
+
+            auto reader = std::make_unique<wsl::windows::common::relay::HTTPChunkBasedReadHandle>(
+                wsl::windows::common::relay::HandleWrapper{nullptr}, std::move(onData));
+
+            std::string allData;
+            for (const auto& datum : Data)
+            {
+                size_t currentSize = allData.size();
+                allData.append(datum);
+                reader->OnRead(gsl::span<char>{&allData[currentSize], datum.size()});
+            }
+
+            // Final 0 byte read
+            reader->OnRead(gsl::span<char>{nullptr, static_cast<size_t>(0)});
+
+            for (size_t i = 0; i < ExpectedChunk.size(); i++)
+            {
+                if (i >= chunks.size())
+                {
+                    LogError(
+                        "Input: '%hs': Chunk %zu is missing. Expected: '%hs'",
+                        EscapeString(allData).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str());
+                    VERIFY_FAIL();
+                }
+                else if (ExpectedChunk[i] != chunks[i])
+                {
+                    LogError(
+
+                        "Input: '%hs': Chunk %zu does not match expected value. Expected: '%hs', Actual: '%hs'",
+                        EscapeString(allData).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str(),
+                        EscapeString(chunks[i]).c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            if (ExpectedChunk.size() != chunks.size())
+            {
+                LogError(
+                    "Input: '%hs', Number of chunks do not match. Expected: %zu, Actual: %zu",
+                    EscapeString(allData).c_str(),
+                    ExpectedChunk.size(),
+                    chunks.size());
+                VERIFY_FAIL();
+            }
+
+            LogInfo("HTTPChunkReaderSplitReads success. Input: %hs", EscapeString(allData).c_str());
+        };
+
+        runTest({"3\r\nfo", "o\r\n3\r\nbar"}, {"foo", "bar"});
+        runTest({"1\r\n", "a\r\n\r\n"}, {"a"});
+
+        runTest({"c\r\nlf\n", "in\r\nchunk\r\n3\r\nEOF"}, {"lf\nin\r\nchunk", "EOF"});
+        runTest({"15\r\n\r\nchunkstartingwithlf\r\n", "3\r\nEOF"}, {"\r\nchunkstartingwithlf", "EOF"});
+
+        runTest({"3", "\r\nfoo\r\n3\r\nbar"}, {"foo", "bar"});
+        runTest({"3\r\nfoo\r\n3\r\nbar\r\n0", "\r\n\r\n"}, {"foo", "bar"});
     }
 
     TEST_METHOD(DockerIORelay)
@@ -3545,6 +4276,19 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
         }
+
+        // Validate that behavior is correct if a read spans across multiple streams.
+        {
+            std::vector<char> input;
+
+            std::string largeStdout(LX_RELAY_BUFFER_SIZE + 150, 'a');
+            std::string largeStderr(LX_RELAY_BUFFER_SIZE + 12, 'b');
+            insert(input, 1, largeStdout);
+            insert(input, 2, largeStderr);
+            insert(input, 1, "regularStdout");
+
+            runTest(input, largeStdout + "regularStdout", largeStderr);
+        }
     }
 
     TEST_METHOD(ContainerRecoveryFromStorage)
@@ -3555,6 +4299,8 @@ class WSLATests
         auto restore = ResetTestSession(); // Required to access the storage folder.
 
         std::string containerName = "test-container";
+        ULONGLONG originalStateChangedAt{};
+        ULONGLONG originalCreatedAt{};
 
         // Phase 1: Create session and container, then stop the container
         {
@@ -3571,6 +4317,15 @@ class WSLATests
             // Stop the container so it can be recovered and deleted later
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Capture StateChangedAt and CreatedAt before the session is destroyed.
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            originalStateChangedAt = containers[0].StateChangedAt;
+            originalCreatedAt = containers[0].CreatedAt;
+            VERIFY_IS_TRUE(originalStateChangedAt > 0);
+            VERIFY_IS_TRUE(originalCreatedAt > 0);
         }
 
         // Phase 2: Create new session from same storage, recover and delete container
@@ -3579,7 +4334,15 @@ class WSLATests
 
             auto container = OpenContainer(session.get(), containerName);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
-            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            // Verify that StateChangedAt was correctly restored from the Docker timestamp.
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
+            VERIFY_ARE_EQUAL(containers[0].CreatedAt, originalCreatedAt);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLAContainer> notFound;
@@ -3623,7 +4386,7 @@ class WSLATests
             auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-vp", true, WSLANetworkingModeNAT));
 
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine", containerName, {"python3", "-m", "http.server", "--directory", "/volume"}, {"PYTHONUNBUFFERED=1"}, WSLA_CONTAINER_NETWORK_BRIDGE);
+                "python:3.12-alpine", containerName, {"python3", "-m", "http.server", "--directory", "/volume"}, {"PYTHONUNBUFFERED=1"}, WSLAContainerNetworkTypeBridged);
 
             launcher.AddPort(1250, 8000, AF_INET);
             launcher.AddVolume(hostFolder.wstring(), "/volume", false);
@@ -3642,17 +4405,16 @@ class WSLATests
             container.SetDeleteOnClose(false);
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach, nullptr));
 
             auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
 
             // A 200 response also indicates the test file is available so volume was mounted correctly.
             ExpectHttpResponse(L"http://127.0.0.1:1250/test.txt", 200);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete());
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
         }
 
         // Delete the host folder to simulate volume folder being missing on recovery
@@ -3669,23 +4431,23 @@ class WSLATests
 
     TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
     {
-        auto restore = ResetTestSession();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "container", "rm", "-f", "test-invalid-metadata"});
+        });
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
             // Create a docker container that has no metadata.
             auto result = RunCommand(
-                session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+                m_defaultSession.get(),
+                {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
         }
 
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
-
+            ResetTestSession();
             // Try to open the container - this should fail due to missing metadata.
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->OpenContainer("test-invalid-metadata", &container);
+            auto hr = m_defaultSession->OpenContainer("test-invalid-metadata", &container);
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
     }
@@ -3697,7 +4459,7 @@ class WSLATests
         auto manager = OpenSessionManager();
 
         auto expectSessions = [&](const std::vector<std::wstring>& expectedSessions) {
-            wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+            wil::unique_cotaskmem_array_ptr<WSLASessionInformation> sessions;
             VERIFY_SUCCEEDED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
             std::set<std::wstring> displayNames;
@@ -3883,6 +4645,7 @@ class WSLATests
             WSLAContainerLauncher launcher("debian:latest", "logs-test-4", {"/bin/bash", "-c", "echo -n OK"});
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK"}});
 
             // Testing would with more granularity would be difficult, but these flags are just forwarded to docker,
             // so validate that they're wired correctly.
@@ -3977,9 +4740,9 @@ class WSLATests
 
         // Test nullptr key
         {
-            WSLA_LABEL label{.Key = nullptr, .Value = "value"};
+            WSLALabel label{.Key = nullptr, .Value = "value"};
 
-            WSLA_CONTAINER_OPTIONS options{};
+            WSLAContainerOptions options{};
             options.Image = "debian:latest";
             options.Name = "test-labels-nullptr-key";
             options.Labels = &label;
@@ -3992,9 +4755,9 @@ class WSLATests
 
         // Test nullptr value
         {
-            WSLA_LABEL label{.Key = "key", .Value = nullptr};
+            WSLALabel label{.Key = "key", .Value = nullptr};
 
-            WSLA_CONTAINER_OPTIONS options{};
+            WSLAContainerOptions options{};
             options.Image = "debian:latest";
             options.Name = "test-labels-nullptr-value";
             options.Labels = &label;
@@ -4007,11 +4770,11 @@ class WSLATests
 
         // Test duplicate keys
         {
-            std::vector<WSLA_LABEL> labels(2);
+            std::vector<WSLALabel> labels;
             labels.push_back({.Key = "key", .Value = "value"});
             labels.push_back({.Key = "key", .Value = "value2"});
 
-            WSLA_CONTAINER_OPTIONS options{};
+            WSLAContainerOptions options{};
             options.Image = "debian:latest";
             options.Name = "test-labels-duplicate-keys";
             options.Labels = labels.data();
@@ -4019,7 +4782,7 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> container;
             auto hr = m_defaultSession->CreateContainer(&options, &container);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
         }
 
         // Test wsla metadata key conflict
@@ -4047,11 +4810,11 @@ class WSLATests
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
             VERIFY_ARE_EQUAL(
-                container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
+                container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
                 HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Start the container.
-            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsAttach));
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsAttach, nullptr));
 
             // Get its original std handles.
             auto process = container->GetInitProcess();
@@ -4059,7 +4822,7 @@ class WSLATests
             auto originalStdout = process.GetStdHandle(1);
 
             // Attach to the container with separate handles.
-            VERIFY_SUCCEEDED(container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_SUCCEEDED(container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead originalReader(originalStdout.get());
             PartialHandleRead attachedReader(attachedStdout.get());
@@ -4094,12 +4857,12 @@ class WSLATests
             // Validate that attaching to an exited container fails.
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
             VERIFY_ARE_EQUAL(
-                container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
+                container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
                 HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Validate that attaching to a deleted container fails.
-            VERIFY_SUCCEEDED(container->Get().Delete());
-            VERIFY_ARE_EQUAL(container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr), RPC_E_DISCONNECTED);
+            VERIFY_SUCCEEDED(container->Get().Delete(WSLADeleteFlagsNone));
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr), RPC_E_DISCONNECTED);
 
             container->SetDeleteOnClose(false);
         }
@@ -4116,7 +4879,7 @@ class WSLATests
             wil::unique_handle attachedStdin;
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead originalReader(originalStdout.get());
             PartialHandleRead attachedReader(attachedStdout.get());
@@ -4138,7 +4901,7 @@ class WSLATests
 
             wil::unique_handle attachedTty;
             wil::unique_handle dummy;
-            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedTty, (ULONG*)&dummy, (ULONG*)&dummy));
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedTty, (ULONG*)&dummy, (ULONG*)&dummy));
 
             PartialHandleRead originalReader(originalTty.get());
             PartialHandleRead attachedReader(attachedTty.get());
@@ -4176,7 +4939,7 @@ class WSLATests
             wil::unique_handle attachedStdin;
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead attachedReader(attachedStdout.get());
 
@@ -4262,7 +5025,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -4281,7 +5044,7 @@ class WSLATests
             VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGKILL));
             process.Wait();
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -4296,7 +5059,7 @@ class WSLATests
             auto process = container.GetInitProcess();
             process.Wait();
 
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
@@ -4315,14 +5078,351 @@ class WSLATests
             }
 
             auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            auto id = container.Id();
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
             // verifyContainerDeleted("test-auto-remove");
-            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 0);
+        }
+    }
+
+    TEST_METHOD(ContainerNameGeneration)
+    {
+        WSL2_TEST_ONLY();
+
+        {
+            // Create a container with a specific name
+            auto container = WSLAContainerLauncher("debian:latest", "test-container-name").Create(*m_defaultSession.get());
+
+            // Validate that the container name is correct.
+            VERIFY_ARE_EQUAL(container.Name(), "test-container-name");
+        }
+
+        {
+            // Create a container without name.
+            auto container = WSLAContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+
+            // Validate that the service generates a name for the container.
+            VERIFY_ARE_NOT_EQUAL(container.Name(), "");
+        }
+    }
+
+    // This test case validates that multiple operations can happen in parallel in the same session.
+    TEST_METHOD(ParallelSessionOperations)
+    {
+        WSL2_TEST_ONLY();
+
+        // Start a blocking export
+        BlockingOperation operation(
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); });
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
+
+        // Validate that various operations can be done while the export is in progress.
+
+        {
+            wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+
+            if (containers.size() > 0)
+            {
+                LogError("Unexpected container found: %hs", containers[0].Name);
+                VERIFY_FAIL();
+            }
+        }
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-parallel-operation", {"echo", "OK"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            auto containerRef = OpenContainer(m_defaultSession.get(), "test-parallel-operation");
+        }
+
+        {
+            wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
+        }
+    }
+
+    TEST_METHOD(ParallelContainerOperations)
+    {
+        WSL2_TEST_ONLY();
+
+        WSLAContainerLauncher launcher("debian:latest", "test-parallel-container-operations", {"echo", "OK"});
+
+        auto container = launcher.Launch(*m_defaultSession);
+
+        auto process = container.GetInitProcess();
+        ValidateProcessOutput(process, {{1, "OK\n"}});
+
+        // Start a blocking export
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
+
+        // Validate that various operations can be done while the export is in progress.
+        {
+            VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 0);
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+        }
+
+        {
+            wil::unique_handle stdoutLogs;
+            wil::unique_handle stderrLogs;
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, false));
+
+            ValidateHandleOutput(stdoutLogs.get(), "OK\n");
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.Inspect().State.Status, "exited");
+        }
+
+        {
+            VERIFY_ARE_EQUAL(container.Labels().size(), 0);
+        }
+
+        {
+            // Validate that another export can run.
+            BlockingOperation secondExport([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+            secondExport.Complete();
+        }
+
+        {
+            // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
+            auto [result, _] = WSLAProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+    }
+
+    TEST_METHOD(InteractiveDetach)
+    {
+        WSL2_TEST_ONLY();
+
+        auto validateDetaches = [](HANDLE TtyIn, HANDLE TtyOut, const std::vector<char>& Input) {
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(TtyIn, Input.data(), static_cast<DWORD>(Input.size()), nullptr, nullptr));
+
+            std::string output;
+            auto onRead = [&](const gsl::span<char>& data) { output.append(data.data(), data.size()); };
+
+            wsl::windows::common::relay::MultiHandleWait io;
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(TtyOut, std::move(onRead)));
+
+            io.Run(60s);
+
+            // N.B. In the case of exec, the output can either be 'read escape sequence' or 'exec attach failed [...]' based on timing.
+            std::set<std::string> expectedOutputs{
+                "", "\r\n", "exec attach failed: error on attach stdin: read escape sequence\r\n", "read escape sequence\r\n"};
+
+            if (expectedOutputs.find(output) == expectedOutputs.end())
+            {
+                LogError("Unexpected output: %hs", output.c_str());
+                VERIFY_FAIL();
+            }
+        };
+
+        auto runDetachTest = [&](LPCSTR DetachKeys, const std::vector<char>& DetachSequence) {
+            WSLAContainerLauncher launcher("debian:latest", "test-detach", {"sleep", "9999999"}, {}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach, DetachKeys));
+
+            auto initProcess = container.GetInitProcess();
+
+            // Validate detaching from a started container with the attach flag.
+            {
+                auto tty = initProcess.GetStdHandle(WSLAFDTty);
+                validateDetaches(tty.get(), tty.get(), DetachSequence);
+            }
+
+            // Validate detaching from an attached tty.
+            {
+                wil::unique_handle attachedTty;
+                wil::unique_handle unused;
+                VERIFY_SUCCEEDED(container.Get().Attach(DetachKeys, (ULONG*)&attachedTty, (ULONG*)&unused, (ULONG*)&unused));
+
+                validateDetaches(attachedTty.get(), attachedTty.get(), DetachSequence);
+            }
+
+            // Validate detaching from an exec'd process.
+            {
+                WSLAProcessLauncher processLauncher({}, {"sleep", "9999999"}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+
+                if (DetachKeys != nullptr)
+                {
+                    processLauncher.SetDetachKeys(DetachKeys);
+                }
+
+                auto process = processLauncher.Launch(container.Get());
+                auto tty = process.GetStdHandle(WSLAFDTty);
+
+                validateDetaches(tty.get(), tty.get(), DetachSequence);
+            }
+        };
+
+        {
+            // Validate that by default ttys can be detached via ctrlp-ctrlq.
+            runDetachTest(nullptr, {0x10, 0x11});
+
+            // Validate other detach keys.
+            runDetachTest("ctrl-a", {0x1});
+            runDetachTest("a,b,c,d,ctrl-z", {'a', 'b', 'c', 'd', 0x1a});
+        }
+
+        {
+            // Validate that invalid detach keys fail with the appropriate error.
+            // N.B. Docker doesn't set an error message for this specific case.
+            WSLAContainerLauncher launcher("debian:latest", "test-detach", {"cat"}, {}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+            auto container = launcher.Create(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.Get().Start(WSLAContainerStartFlagsAttach, "invalid"), E_INVALIDARG);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone, nullptr));
+
+            wil::unique_handle unused;
+            VERIFY_ARE_EQUAL(container.Get().Attach("invalid", (ULONG*)&unused, (ULONG*)&unused, (ULONG*)&unused), E_INVALIDARG);
+
+            WSLAProcessLauncher processLauncher({}, {"cat"}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
+            processLauncher.SetDetachKeys("invalid");
+
+            // N.B. Docker returns HTTP 500 if the detach keys are invalid, but unlike other cases there's a proper error message.
+            auto [result, _] = processLauncher.LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+
+            ValidateCOMErrorMessage(L"Invalid escape keys (invalid) provided");
+        }
+    }
+
+    TEST_METHOD(ContainerPrune)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectPrune = [this](
+                               const std::vector<std::string>& expectedIds = {},
+                               const std::map<std::string, std::pair<const char*, bool>>& labels = {},
+                               uint64_t until = 0,
+                               const std::source_location& source = std::source_location::current()) {
+            PruneResult result;
+
+            std::vector<WSLAContainerPruneFilter> labelsFilter;
+            for (const auto& e : labels)
+            {
+                labelsFilter.push_back({e.first.c_str(), e.second.first, e.second.second});
+            }
+
+            VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(
+                labels.empty() ? nullptr : labelsFilter.data(), static_cast<DWORD>(labelsFilter.size()), until, &result.result));
+
+            std::vector<std::string> prunedContainers;
+            for (size_t i = 0; i < result.result.ContainersCount; i++)
+            {
+                prunedContainers.push_back(result.result.Containers[i]);
+            }
+
+            VerifyAreEqualUnordered(expectedIds, prunedContainers, source);
+        };
+
+        auto RunAndWait = [&](auto& launcher) {
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+
+            return container;
+        };
+
+        // Validate that a prune without any container returns nothing.
+        {
+            expectPrune({});
+        }
+
+        {
+            // Validate that prune doesn't remove running containers.
+            WSLAContainerLauncher launcher("debian:latest", "test-prune", {"sleep", "9999999"}, {}, {});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            expectPrune({});
+
+            // Validate that prune removes stopped containers.
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            auto containerId = container.Id();
+            expectPrune({containerId});
+
+            // Validate that the container can't be opened anymore.
+            wil::com_ptr<IWSLAContainer> dummy;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerId.c_str(), &dummy), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
+        }
+
+        // Validate that label filters work.
+        {
+            WSLAContainerLauncher testPrune1Launcher("debian:latest", "test-prune-1", {"echo", "OK"}, {}, {});
+            testPrune1Launcher.AddLabel("key", "value");
+
+            auto testPrune1 = RunAndWait(testPrune1Launcher);
+
+            WSLAContainerLauncher testPrune2Launcher("debian:latest", "test-prune-2", {"echo", "OK"}, {}, {});
+            testPrune2Launcher.AddLabel("key", "anotherValue");
+
+            auto testPrune2 = RunAndWait(testPrune2Launcher);
+
+            WSLAContainerLauncher testPrune3Launcher("debian:latest", "test-prune-3", {"echo", "OK"}, {}, {});
+            testPrune3Launcher.AddLabel("anotherKey", "value");
+            auto testPrune3 = RunAndWait(testPrune3Launcher);
+
+            WSLAContainerLauncher testPrune4Launcher("debian:latest", "test-prune-4", {"echo", "OK"}, {}, {});
+            auto testPrune4 = RunAndWait(testPrune4Launcher);
+
+            // Expect testPrune1 to be selected via key=value.
+            expectPrune({testPrune1.Id()}, {{"key", {"value", true}}});
+
+            // Expect testPrune2 to be selected via key being present.
+            expectPrune({testPrune2.Id()}, {{"key", {nullptr, true}}});
+
+            // Prune by absence of 'anotherKey' label.
+            expectPrune({testPrune4.Id()}, {{"anotherKey", {nullptr, false}}});
+
+            // Prune by label inequality.
+            expectPrune({testPrune3.Id()}, {{"anotherKey", {"someValue", false}}});
+        }
+
+        // Validate that the 'until' filter works.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-prune-until", {"echo", "OK"}, {}, {});
+
+            auto container = RunAndWait(launcher);
+
+            auto now = time(nullptr);
+
+            expectPrune({}, {}, now - 3600);
+            expectPrune({container.Id()}, {}, now + 3600);
+        }
+
+        // Validate error paths.
+        {
+            WSLAContainerPruneFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
+            PruneResult result;
+
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
     }
 };

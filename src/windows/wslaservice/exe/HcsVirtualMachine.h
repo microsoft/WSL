@@ -22,7 +22,6 @@ Abstract:
 #include "INetworkingEngine.h"
 #include <filesystem>
 #include <map>
-#include <thread>
 
 #define MAX_VHD_COUNT 254
 
@@ -32,7 +31,7 @@ class HcsVirtualMachine
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLAVirtualMachine, IFastRundown>
 {
 public:
-    HcsVirtualMachine(_In_ const WSLA_SESSION_SETTINGS* Settings);
+    HcsVirtualMachine(_In_ const WSLASessionSettings* Settings);
     ~HcsVirtualMachine();
 
     // IWSLAVirtualMachine implementation
@@ -60,7 +59,6 @@ private:
     void CreateVmSavedStateFile(HANDLE UserToken);
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
-    void CollectCrashDumps(wil::unique_socket&& listenSocket) const;
 
     ULONG AllocateLun();
     void FreeLun(ULONG Lun);
@@ -91,7 +89,6 @@ private:
     // Shares: key is ShareId, value is nullopt for Plan9 or DeviceInstanceId for VirtioFS
     std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;
 
-    std::thread m_crashDumpThread;
     std::filesystem::path m_vmSavedStateFile;
     std::filesystem::path m_crashDumpFolder;
     bool m_vmSavedStateCaptured = false;

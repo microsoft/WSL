@@ -36,12 +36,17 @@ void WSLAProcessLauncher::SetWorkingDirectory(std::string&& WorkingDirectory)
     m_workingDirectory = std::move(WorkingDirectory);
 }
 
+void WSLAProcessLauncher::SetDetachKeys(std::string&& DetachKeys)
+{
+    m_detachKeys = std::move(DetachKeys);
+}
+
 void WSLAProcessLauncher::SetUser(std::string&& User)
 {
     m_user = std::move(User);
 }
 
-std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> WSLAProcessLauncher::CreateProcessOptions()
+std::tuple<WSLAProcessOptions, std::vector<const char*>, std::vector<const char*>> WSLAProcessLauncher::CreateProcessOptions()
 {
     std::vector<const char*> commandLine;
     std::ranges::transform(m_arguments, std::back_inserter(commandLine), [](const std::string& e) { return e.c_str(); });
@@ -49,7 +54,7 @@ std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const cha
     std::vector<const char*> environment;
     std::ranges::transform(m_environment, std::back_inserter(environment), [](const std::string& e) { return e.c_str(); });
 
-    WSLA_PROCESS_OPTIONS options{};
+    WSLAProcessOptions options{};
     options.CommandLine = {.Values = commandLine.data(), .Count = static_cast<DWORD>(commandLine.size())};
     options.Environment = {.Values = environment.data(), .Count = static_cast<DWORD>(environment.size())};
     options.TtyColumns = m_columns;
@@ -80,7 +85,7 @@ WSLAProcessFlags RunningWSLAProcess::Flags() const
 
 int RunningWSLAProcess::GetExitCode()
 {
-    WSLA_PROCESS_STATE state{};
+    WSLAProcessState state{};
     int code{};
     GetState(&state, &code);
 
@@ -93,9 +98,9 @@ int RunningWSLAProcess::GetExitCode()
     return code;
 }
 
-WSLA_PROCESS_STATE RunningWSLAProcess::State()
+WSLAProcessState RunningWSLAProcess::State()
 {
-    WSLA_PROCESS_STATE state{};
+    WSLAProcessState state{};
     int code{};
     GetState(&state, &code);
 
@@ -193,7 +198,7 @@ std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher
     auto [options, commandLine, env] = CreateProcessOptions();
 
     wil::com_ptr<IWSLAProcess> process;
-    auto result = Container.Exec(&options, &process);
+    auto result = Container.Exec(&options, m_detachKeys.has_value() ? m_detachKeys->c_str() : nullptr, &process);
     if (FAILED(result))
     {
         return std::make_pair(result, std::optional<ClientRunningWSLAProcess>());
@@ -230,7 +235,7 @@ wil::unique_event ClientRunningWSLAProcess::GetExitEvent()
     return event;
 }
 
-void ClientRunningWSLAProcess::GetState(WSLA_PROCESS_STATE* State, int* Code)
+void ClientRunningWSLAProcess::GetState(WSLAProcessState* State, int* Code)
 {
     THROW_IF_FAILED(m_process->GetState(State, Code));
 }

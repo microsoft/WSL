@@ -15,18 +15,26 @@ Abstract:
 
 #include "SessionModel.h"
 #include "ImageModel.h"
+#include <wsla_schema.h>
 
 namespace wsl::windows::wslc::services {
 class ImageService
 {
 public:
-    std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
-    void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    static void Build(
+        wsl::windows::wslc::models::Session& session,
+        const std::wstring& contextPath,
+        const std::wstring& tag,
+        const std::wstring& dockerfilePath,
+        IProgressCallback* callback);
+    static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
+    static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
+    static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
+    static wsl::windows::common::wsla_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
+    static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     void Push();
     void Save();
-    void Load();
     void Tag();
     void Prune();
-    void Inspect();
 };
 } // namespace wsl::windows::wslc::services

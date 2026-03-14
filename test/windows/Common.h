@@ -27,6 +27,8 @@ Abstract:
 #include "wslutil.h"
 #include "WslCoreConfig.h"
 
+using namespace std::chrono_literals;
+
 //
 // N.B. This is also defined in 'lxtcommon.h' & 'lxsetup.ps1'. Update those
 //      files too, if the distro name changes here.
@@ -191,19 +193,31 @@ public:
 
     wil::unique_hkey OpenKey()
     {
-        return;
+        return wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
     }
 
     RegistryKeyChange(const RegistryKeyChange&) = delete;
-    RegistryKeyChange(RegistryKeyChange&& other) = default;
-    const RegistryKeyChange& operator=(RegistryKeyChange&& other)
+    RegistryKeyChange(RegistryKeyChange&& other) noexcept :
+        m_hive(other.m_hive), m_key(other.m_key), m_value(std::move(other.m_value)), m_originalValue(std::move(other.m_originalValue))
     {
-        m_hive = std::move(other.m_hive);
-        m_key = std::move(other.m_key);
-        m_value = std::move(other.m_value);
-
         other.m_hive = nullptr;
         other.m_key = nullptr;
+    }
+
+    RegistryKeyChange& operator=(RegistryKeyChange&& other)
+    {
+        if (this != &other)
+        {
+            m_hive = std::move(other.m_hive);
+            m_key = std::move(other.m_key);
+            m_value = std::move(other.m_value);
+            m_originalValue = std::move(other.m_originalValue);
+
+            other.m_hive = nullptr;
+            other.m_key = nullptr;
+        }
+
+        return *this;
     }
 
     const RegistryKeyChange& operator=(RegistryKeyChange&) = delete;
@@ -562,6 +576,68 @@ std::string ReadToString(HANDLE Handle);
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
+void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s);
+
 std::string EscapeString(const std::string& Input);
 
 void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
+
+std::filesystem::path GetTestImagePath(std::string_view imageName);
+
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode);
+
+template <typename T>
+void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
+{
+    std::map<T, size_t> expectedCounts;
+    std::map<T, size_t> actualCounts;
+
+    for (const auto& e : expected)
+    {
+        expectedCounts[e]++;
+    }
+
+    for (const auto& e : actual)
+    {
+        actualCounts[e]++;
+    }
+
+    std::wstring error;
+
+    for (const auto& [value, count] : expectedCounts)
+    {
+        if (actualCounts[value] != count)
+        {
+            error += std::format(L"Value '{}' expected {} times but was found {} times.\n", value, count, actualCounts[value]);
+        }
+    }
+
+    for (const auto& [value, count] : actualCounts)
+    {
+        if (expectedCounts.find(value) == expectedCounts.end())
+        {
+            error += std::format(L"Unexpected value found: '{}'", value);
+        }
+    }
+
+    if (!error.empty())
+    {
+        error += std::format(L"Expected ({} elements):\n", expected.size());
+        for (const auto& e : expected)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Actual ({} elements):\n", actual.size());
+
+        for (const auto& e : actual)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Called from: {}", source);
+
+        LogError("VerifyAreEqualUnordered failed: %ls", error.c_str());
+        VERIFY_FAIL();
+    }
+}

@@ -42,13 +42,13 @@ public:
         NON_COPYABLE(ContainerTrackingReference);
 
         ContainerTrackingReference() = default;
-        ContainerTrackingReference(ContainerEventTracker* tracker, size_t id);
+        ContainerTrackingReference(ContainerEventTracker* tracker, size_t id) noexcept;
         ContainerTrackingReference(ContainerTrackingReference&& other) noexcept;
-        ~ContainerTrackingReference();
+        ~ContainerTrackingReference() noexcept;
 
-        ContainerTrackingReference& operator=(ContainerTrackingReference&&);
+        ContainerTrackingReference& operator=(ContainerTrackingReference&&) noexcept;
 
-        void Reset();
+        void Reset() noexcept;
 
         size_t m_id;
         ContainerEventTracker* m_tracker = nullptr;
@@ -61,9 +61,9 @@ public:
 
     void Stop();
 
-    ContainerTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback);
-    ContainerTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback);
-    void UnregisterContainerStateUpdates(size_t Id);
+    ContainerTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
+    ContainerTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
+    void UnregisterContainerStateUpdates(size_t Id) noexcept;
 
 private:
     void OnEvent(const std::string_view& event);

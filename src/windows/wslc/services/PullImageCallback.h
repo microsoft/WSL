@@ -24,6 +24,11 @@ public:
     ChangeTerminalMode(HANDLE console, bool cursorVisible);
     ~ChangeTerminalMode();
 
+    bool IsConsole() const
+    {
+        return m_console != nullptr;
+    }
+
 private:
     HANDLE m_console{};
     CONSOLE_CURSOR_INFO m_originalCursorInfo{};

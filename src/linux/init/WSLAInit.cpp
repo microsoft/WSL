@@ -64,15 +64,13 @@ struct WSLAState
 static WSLAState g_state;
 
 int CreateCaptureCrashSymlink()
+try
 {
-    if (symlink("/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0)
-    {
-        LOG_ERROR("symlink({}, {}) failed {}", "/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH, errno);
-        return errno;
-    }
+    THROW_LAST_ERROR_IF(symlink("/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0);
 
     return 0;
 }
+CATCH_RETURN_ERRNO()
 
 void WSLAEnableCrashDumpCollection()
 {
@@ -144,54 +142,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_CONNECT& 
     }
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_OPEN& Message, const gsl::span<gsl::byte>& Buffer)
-{
-    int32_t result = EINVAL;
-
-    auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
-
-    auto path = wsl::shared::string::FromMessageBuffer<WSLA_OPEN>(Buffer);
-    int flags = 0;
-
-    WI_SetFlagIf(flags, O_APPEND, WI_IsFlagSet(Message.Flags, WslaOpenFlagsAppend));
-    WI_SetFlagIf(flags, O_TRUNC, !WI_IsFlagSet(Message.Flags, WslaOpenFlagsAppend) && WI_IsFlagSet(Message.Flags, WslaOpenFlagsWrite));
-    WI_SetFlagIf(flags, O_CREAT, WI_IsFlagSet(Message.Flags, WslaOpenFlagsCreate));
-    if (WI_IsFlagSet(Message.Flags, WslaOpenFlagsRead) && WI_IsFlagSet(Message.Flags, WslaOpenFlagsWrite))
-    {
-        WI_SetFlag(flags, O_RDWR);
-    }
-    else if (WI_IsFlagSet(Message.Flags, WslaOpenFlagsRead))
-    {
-        static_assert(O_RDONLY == 0);
-    }
-    else if (WI_IsFlagSet(Message.Flags, WslaOpenFlagsWrite))
-    {
-        WI_SetFlag(flags, O_WRONLY);
-    }
-    else
-    {
-        LOG_ERROR("Invalid WSLA_OPEN flags: {}", Message.Flags);
-        return; // Return -EINVAL if no opening flags are passed.
-    }
-
-    wil::unique_fd fd = open(path, flags);
-    if (!fd)
-    {
-        result = errno;
-        LOG_ERROR("open({}, {}) failed: {}", path, flags, result);
-        return;
-    }
-
-    if (dup2(fd.get(), Message.Fd) < 0)
-    {
-        result = errno;
-        LOG_ERROR("dup2({}, {}) failed: {}", fd.get(), Message.Fd, result);
-        return;
-    }
-
-    result = 0;
-}
-
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     // Make sure to close the channel since no more messages can be processed after this.
@@ -245,8 +195,15 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
             }
             else if (bytesRead == 0)
             {
-                // Unix socket has been closed.
+                // Unix socket has been closed. Gracefully half-close the
+                // hvsocket so the Windows side receives a clean EOF instead
+                // of ERROR_BROKEN_PIPE.
                 pollDescriptors[0].fd = -1;
+                if (shutdown(Channel.Socket(), SHUT_WR) < 0)
+                {
+                    LOG_ERROR("shutdown({}, SHUT_WR) failed {}", Channel.Socket(), errno);
+                }
+
                 break;
             }
             else if (UtilWriteBuffer(Channel.Socket(), relayBuffer.data(), bytesRead) < 0)
@@ -446,7 +403,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Mes
     std::promise<pid_t> childPid;
 
     {
-        auto childLogic = [ListenSocketFd = ListenSocket.get(), &SocketAddress, &Channel, &Message, &childPid]() mutable {
+        auto childLogic = [ListenSocketFd = ListenSocket.get(), SocketAddress, &Channel, &Message, &childPid]() mutable {
             wil::unique_fd ListenSocket;
 
             // Close parent channel
@@ -503,6 +460,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Mes
             {
                 sigset_t SignalMask;
                 sigemptyset(&SignalMask);
+                THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
+
                 try
                 {
                     childLogic();
@@ -832,7 +791,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT, WSLA_WATCH_PROCESSES, WSLA_UNIX_CONNECT>(
+        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT, WSLA_WATCH_PROCESSES, WSLA_UNIX_CONNECT>(
             Channel, Type, Buffer);
     }
     catch (...)

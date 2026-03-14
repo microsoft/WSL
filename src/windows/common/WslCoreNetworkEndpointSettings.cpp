@@ -94,3 +94,38 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
     return std::make_shared<NetworkSettings>(
         bestInterface->NetworkGuid, address, route, macAddress, bestInterface->IfIndex, bestInterface->IfType);
 }
+
+std::wstring wsl::core::networking::NetworkSettings::GetBestGatewayMacAddress() const
+{
+    auto gatewayAddress = GetBestGatewayAddress();
+    if (gatewayAddress.si_family != AF_INET)
+    {
+        return {};
+    }
+
+    MIB_IPNET_ROW2 ipNetRow{};
+    ipNetRow.Address = gatewayAddress;
+    ipNetRow.InterfaceIndex = InterfaceIndex;
+
+    const auto result = ResolveIpNetEntry2(&ipNetRow, nullptr);
+    if (result != NO_ERROR)
+    {
+        LOG_HR_MSG(HRESULT_FROM_WIN32(result), "Failed to resolve gateway MAC address");
+        return {};
+    }
+
+    if (ipNetRow.PhysicalAddressLength != 6)
+    {
+        return {};
+    }
+
+    return wsl::shared::string::FormatMacAddress(
+        wsl::shared::string::MacAddress{
+            ipNetRow.PhysicalAddress[0],
+            ipNetRow.PhysicalAddress[1],
+            ipNetRow.PhysicalAddress[2],
+            ipNetRow.PhysicalAddress[3],
+            ipNetRow.PhysicalAddress[4],
+            ipNetRow.PhysicalAddress[5]},
+        L'-');
+}

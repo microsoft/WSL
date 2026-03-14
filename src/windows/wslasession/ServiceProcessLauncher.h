@@ -32,7 +32,7 @@ public:
     WSLAProcess& Get();
 
 protected:
-    void GetState(WSLA_PROCESS_STATE* State, int* Code) override;
+    void GetState(WSLAProcessState* State, int* Code) override;
 
 private:
     Microsoft::WRL::ComPtr<WSLAProcess> m_process;

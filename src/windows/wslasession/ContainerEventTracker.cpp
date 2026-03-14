@@ -21,12 +21,13 @@ using wsl::windows::service::wsla::ContainerEventTracker;
 using wsl::windows::service::wsla::DockerHTTPClient;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
-ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(ContainerEventTracker* tracker, size_t id) :
+ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(ContainerEventTracker* tracker, size_t id) noexcept :
     m_tracker(tracker), m_id(id)
 {
 }
 
-ContainerEventTracker::ContainerTrackingReference& ContainerEventTracker::ContainerTrackingReference::operator=(ContainerEventTracker::ContainerTrackingReference&& other)
+ContainerEventTracker::ContainerTrackingReference& ContainerEventTracker::ContainerTrackingReference::operator=(
+    ContainerEventTracker::ContainerTrackingReference&& other) noexcept
 {
     Reset();
     m_id = other.m_id;
@@ -38,7 +39,7 @@ ContainerEventTracker::ContainerTrackingReference& ContainerEventTracker::Contai
     return *this;
 }
 
-void ContainerEventTracker::ContainerTrackingReference::Reset()
+void ContainerEventTracker::ContainerTrackingReference::Reset() noexcept
 {
     if (m_tracker != nullptr)
     {
@@ -55,7 +56,7 @@ ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(Co
     other.m_id = {};
 }
 
-ContainerEventTracker::ContainerTrackingReference::~ContainerTrackingReference()
+ContainerEventTracker::ContainerTrackingReference::~ContainerTrackingReference() noexcept
 {
     Reset();
 }
@@ -96,7 +97,8 @@ void ContainerEventTracker::OnEvent(const std::string_view& event)
 {
     WSL_LOG(
         "DockerEvent",
-        TraceLoggingCountedString(event.data(), static_cast<UINT16>(event.size()), "Data"),
+        TraceLoggingCountedString(
+            event.data(), static_cast<UINT16>(std::min(event.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
         TraceLoggingValue(m_sessionId, "SessionId"));
 
     static std::map<std::string, ContainerEvent> events{
@@ -155,7 +157,7 @@ void ContainerEventTracker::OnEvent(const std::string_view& event)
 }
 
 ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::RegisterContainerStateUpdates(
-    const std::string& ContainerId, ContainerStateChangeCallback&& Callback)
+    const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept
 {
     std::lock_guard lock{m_lock};
 
@@ -166,7 +168,7 @@ ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::Registe
 }
 
 ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::RegisterExecStateUpdates(
-    const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback)
+    const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept
 {
     std::lock_guard lock{m_lock};
 
@@ -176,7 +178,7 @@ ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::Registe
     return ContainerTrackingReference{this, id};
 }
 
-void ContainerEventTracker::UnregisterContainerStateUpdates(size_t Id)
+void ContainerEventTracker::UnregisterContainerStateUpdates(size_t Id) noexcept
 {
     std::lock_guard lock{m_lock};
 
