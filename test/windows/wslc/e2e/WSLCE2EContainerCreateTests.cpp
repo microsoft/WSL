@@ -204,7 +204,8 @@ class WSLCE2EContainerCreateTests
         auto fileName2 = VolumeTestFile2.filename().wstring();
         auto result = RunWslc(
             std::format(
-                L"container run --name {} --volume \"{}:/data1:rw\" --volume \"{}:/data2:rw\" {} sh -c \"echo -n 'Test1' > /data1/{} && "
+                L"container run --name {} --volume \"{}:/data1:rw\" --volume \"{}:/data2:rw\" {} sh -c \"echo -n 'Test1' > "
+                L"/data1/{} && "
                 L"echo -n 'Test2' > /data2/{}\"",
                 WslcContainerName,
                 hostDirectory1.wstring(),
