@@ -33,6 +33,7 @@ struct ContainerOptions
     bool Detach = false;
     bool Interactive = false;
     std::string Name;
+    bool Remove = false;
     bool TTY = false;
     std::vector<std::wstring> Volumes;
 };

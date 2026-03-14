@@ -42,23 +42,6 @@ const TestImage& InvalidTestImage()
     return image;
 }
 
-void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
-{
-    auto result = RunWslc(L"container list --all");
-    result.Verify({.Stderr = L"", .ExitCode = 0});
-
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
-    {
-        if (line.find(containerNameOrId) != std::wstring::npos)
-        {
-            const std::wstring message =
-                L"Container '" + containerNameOrId + L"' found in container list output but it should not be listed";
-            VERIFY_FAIL(message.c_str());
-        }
-    }
-}
-
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
     auto result = RunWslc(L"container list --all");

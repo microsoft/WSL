@@ -155,7 +155,7 @@ DEFINE_ENUM_FLAG_OPERATORS(WslcContainerStartFlags);
 
 STDAPI WslcContainerInitSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
-STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ const WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 STDAPI WslcContainerStart(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags);
 
@@ -219,7 +219,7 @@ typedef enum WslcContainerState
     WSLC_CONTAINER_STATE_CREATED = 1,
     WSLC_CONTAINER_STATE_RUNNING = 2,
     WSLC_CONTAINER_STATE_EXITED = 3,
-    WSLC_CONTAINER_STATE_FAILED = 4,
+    WSLC_CONTAINER_STATE_DELETED = 4,
 } WslcContainerState;
 
 STDAPI WslcContainerGetState(_In_ WslcContainer container, _Out_ WslcContainerState* state);
@@ -304,9 +304,9 @@ STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent
 typedef enum WslcProcessState
 {
     WSLC_PROCESS_STATE_UNKNOWN = 0,
-    WSLC_PROCESS_STATE_CREATED = 1,
-    WSLC_PROCESS_STATE_RUNNING = 2,
-    WSLC_PROCESS_STATE_EXITED = 3
+    WSLC_PROCESS_STATE_RUNNING = 1,
+    WSLC_PROCESS_STATE_EXITED = 2,
+    WSLC_PROCESS_STATE_SIGNALLED = 3
 } WslcProcessState;
 
 STDAPI WslcProcessGetState(_In_ WslcProcess process, _Out_ WslcProcessState* state);
@@ -384,11 +384,12 @@ typedef struct WslcLoadImageOptions
 
 STDAPI WslcSessionImageLoad(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options);
 
+#define WSLC_IMAGE_NAME_LENGTH 256 // 255 chars + null
+
 typedef struct WslcImageInfo
 {
     // we should expose this
-    PCSTR repository;
-    PCSTR tag;
+    CHAR name[WSLC_IMAGE_NAME_LENGTH];
     uint8_t sha256[32];
     uint64_t sizeBytes;
     uint64_t createdTimestamp;

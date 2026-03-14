@@ -79,6 +79,10 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     auto processFlags = WSLAProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
+
+    auto containerFlags = WSLAContainerFlagsNone;
+    WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
+
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
 
@@ -90,6 +94,8 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         auto container = volume.ContainerPath();
         containerLauncher.AddVolume(host, container, volume.IsReadOnly());
     }
+
+    containerLauncher.SetContainerFlags(containerFlags);
 
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
