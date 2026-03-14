@@ -81,7 +81,7 @@ void WSLASessionManagerImpl::CreateSession(const WSLASessionSettings* Settings, 
         return; // Existing session was opened.
     }
 
-    common::wslutil::StopWatch stopWatch;
+    wslutil::StopWatch stopWatch;
 
     HRESULT creationResult = wil::ResultFromException([&]() {
         // Get caller info.
@@ -114,7 +114,6 @@ void WSLASessionManagerImpl::CreateSession(const WSLASessionSettings* Settings, 
         }
 
         *WslaSession = session.detach();
-        result = S_OK;
     });
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
