@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCCLIParserUnitTests.cpp
+    WSLCVolumeMountUnitTests.cpp
 
 Abstract:
 
-    This file contains unit tests for WSLC CLI argument parsing and validation.
+    This file contains unit tests for WSLC volume mount argument parsing and validation.
 
 --*/
 
@@ -26,7 +26,7 @@ class WSLCVolumeMountUnitTests
 
     TEST_METHOD(VolumeMount_Parse_ReturnExpectedResult)
     {
-        // Volume value => host, contianer, reaodnly
+        // Volume value => host, container, readonly
         std::vector<std::tuple<std::wstring, std::wstring, std::string, bool>> validVolumeArgs = {
             {LR"(C:\hostPath:/containerPath)", LR"(C:\hostPath)", R"(/containerPath)", false},
             {LR"(C:\hostPath:/containerPath:ro)", LR"(C:\hostPath)", R"(/containerPath)", true},
@@ -52,9 +52,9 @@ class WSLCVolumeMountUnitTests
         {
             WEX::Logging::Log::Comment(std::format(L"Testing volume argument: '{}'", std::get<0>(arg)).c_str());
             auto result = VolumeMount::Parse(std::get<0>(arg));
-            VERIFY_ARE_EQUAL(result.HostPath(), std::get<1>(arg));
-            VERIFY_ARE_EQUAL(result.ContainerPath(), std::get<2>(arg));
-            VERIFY_ARE_EQUAL(result.IsReadOnly(), std::get<3>(arg));
+            VERIFY_ARE_EQUAL(std::get<1>(arg), result.HostPath());
+            VERIFY_ARE_EQUAL(std::get<2>(arg), result.ContainerPath());
+            VERIFY_ARE_EQUAL(std::get<3>(arg), result.IsReadOnly());
         }
     }
 };
