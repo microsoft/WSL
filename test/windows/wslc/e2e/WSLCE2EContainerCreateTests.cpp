@@ -280,10 +280,43 @@ class WSLCE2EContainerCreateTests
              result.Verify({.Stderr = L"The system cannot find the path specified. \r\nError code: ERROR_PATH_NOT_FOUND\r\n", .ExitCode = 1});
         }
 
-         {
-             auto result = RunWslc(std::format(L"container run --volume C:\\hostPath:/containerPath: {}", AlpineImage.NameAndTag()));
-             result.Verify({.Stderr = L"The system cannot find the path specified. \r\nError code: ERROR_PATH_NOT_FOUND\r\n", .ExitCode = 1});
-         }
+        {
+            auto result = RunWslc(std::format(L"container run --volume C:\\hostPath:/containerPath: {}", AlpineImage.NameAndTag()));
+            result.Verify({.Stderr = L"The system cannot find the path specified. \r\nError code: ERROR_PATH_NOT_FOUND\r\n", .ExitCode = 1});
+        }
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_Volume_NotSupported)
+    {
+        // Commands tested in this method are not currently supported in WSLC,
+        // so we just verify that they fail with the expected error message.
+        // https://github.com/microsoft/WSL/issues/14432
+        WSL2_TEST_ONLY();
+
+        {
+            auto result = RunWslc(std::format(L"container run --volume \"C:\\hostPath\" {}", AlpineImage.NameAndTag()));
+            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        }
+
+        {
+            auto result = RunWslc(std::format(L"container run --volume \"C:/hostPath\" {}", AlpineImage.NameAndTag()));
+            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        }
+
+        {
+            auto result = RunWslc(std::format(L"container run --volume \":\" {}", AlpineImage.NameAndTag()));
+            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        }
+
+        {
+            auto result = RunWslc(std::format(L"container run --volume \"::\" {}", AlpineImage.NameAndTag()));
+            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        }
+
+        {
+            auto result = RunWslc(std::format(L"container run --volume \"e2e_test\" {}", AlpineImage.NameAndTag()));
+             result.Verify({.Stderr = L"Invalid volume specifications: 'e2e_test'. Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        }
     }
 
 private:
