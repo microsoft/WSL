@@ -205,6 +205,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Interactive = true;
     }
 
+    if(context.Args.Contains(ArgType::Publish))
+    {
+        auto ports = context.Args.GetAll<ArgType::Publish>();
+        options.Ports.reserve(options.Ports.size() + ports.size());
+        for (const auto& port : ports)
+        {
+            options.Ports.emplace_back(WideToMultiByte(port));
+        }
+    }
+
     if (context.Args.Contains(ArgType::Remove))
     {
         options.Remove = true;
