@@ -42,7 +42,7 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
         }
 
         splitColon = value.rfind(':', lastColon - 1);
-        if (splitColon == std::string::npos)
+        if (splitColon == std::wstring::npos)
         {
             THROW_HR_WITH_USER_ERROR(
                 E_INVALIDARG,
