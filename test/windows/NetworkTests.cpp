@@ -2023,6 +2023,134 @@ class NetworkTests
         return std::tuple(std::move(process), std::move(read));
     }
 
+    // Bind port 0 in the guest and return the process handle and the kernel-assigned port.
+    // Uses socat's -dd output to extract the actual port from the "listening on" line.
+    static std::tuple<unique_kill_process, uint16_t> BindGuestPortZero(bool Ipv6 = false)
+    {
+        auto [stdErrRead, stdErrWrite] = CreateSubprocessPipe(false, true);
+        const std::wstring protocol = Ipv6 ? L"TCP6-LISTEN:0" : L"TCP4-LISTEN:0";
+        const std::wstring wslCmd = L"socat -dd " + protocol + L" STDOUT";
+        auto cmd = LxssGenerateWslCommandLine(wslCmd.data());
+
+        auto process = LxsstuStartProcess(cmd.data(), nullptr, nullptr, stdErrWrite.get());
+        stdErrWrite.reset();
+
+        // Parse the assigned port from socat's debug output.
+        // socat -dd prints a line like: "... listening on AF=2 0.0.0.0:PORT"
+        std::string output(512, '\0');
+        DWORD writeOffset = 0;
+        uint16_t assignedPort = 0;
+        bool found = false;
+
+        while (!found)
+        {
+            // Grow the buffer if full to avoid zero-byte reads and infinite loops.
+            if (writeOffset == output.size())
+            {
+                output.resize(output.size() * 2);
+            }
+
+            DWORD bytesRead = 0;
+            if (!ReadFile(stdErrRead.get(), output.data() + writeOffset, static_cast<DWORD>(output.size() - writeOffset), &bytesRead, nullptr))
+            {
+                break;
+            }
+
+            if (bytesRead == 0)
+            {
+                break;
+            }
+
+            writeOffset += bytesRead;
+            LogInfo("output %hs", output.c_str());
+            std::string_view outputView(output.data(), writeOffset);
+            auto pos = outputView.find("listening on");
+            if (pos != std::string_view::npos)
+            {
+                // Limit the search to just the "listening on" line to avoid
+                // matching colons in subsequent debug lines socat may emit.
+                auto lineEnd = outputView.find('\n', pos);
+                auto line = outputView.substr(pos, lineEnd != std::string_view::npos ? lineEnd - pos : std::string_view::npos);
+
+                // Find the last ':' before the port digits. For IPv6, socat outputs
+                // "listening on AF=10 :::PORT", so using find() would match the
+                // first colon in the address instead of the port separator.
+                auto colonPos = line.rfind(':');
+                if (colonPos != std::string_view::npos)
+                {
+                    auto portStr = line.substr(colonPos + 1);
+                    auto end = portStr.find_first_not_of("0123456789");
+                    if (end != std::string_view::npos)
+                    {
+                        portStr = portStr.substr(0, end);
+                    }
+
+                    if (portStr.empty())
+                    {
+                        continue;
+                    }
+
+                    assignedPort = static_cast<uint16_t>(std::stoi(std::string(portStr)));
+                    found = true;
+                }
+            }
+        }
+
+        VERIFY_IS_TRUE(found);
+        VERIFY_IS_TRUE(assignedPort > 0);
+        LogInfo("Port-0 bind resolved to port %u", assignedPort);
+
+        return {std::move(process), assignedPort};
+    }
+
+    static void VerifyPortZeroBindIsTracked(bool verifyRelease = true)
+    {
+        // Make sure the VM doesn't time out while we wait for async port resolution
+        WslKeepAlive keepAlive;
+
+        // Bind port 0 in the guest - the kernel assigns an ephemeral port.
+        // The port tracker intercepts the bind() via seccomp and defers lookup
+        // to a background thread that resolves the actual port via getsockname().
+        auto [guestProcess, assignedPort] = BindGuestPortZero();
+
+        // The port-0 resolution is asynchronous (deferred to a background thread).
+        // Retry until the host port tracker registers the port, blocking the host bind.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&assignedPort]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(assignedPort);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
+
+        if (!verifyRelease)
+        {
+            return;
+        }
+
+        // Kill the guest process so the port tracker releases the port.
+        guestProcess.reset();
+
+        // Retry until the host can bind the port again, confirming it was released.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&assignedPort]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(assignedPort);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2)));
+    }
+
     template <typename T>
     static void VerifyNotBound(T& Address, int AddressFamily, int Protocol)
     {
@@ -3920,6 +4048,21 @@ class MirroredTests
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:0", true);
     }
 
+    TEST_METHOD(PortZeroBindIsTracked)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        // Skip port-release verification in mirrored mode. The host reserves a contiguous
+        // ephemeral port range via HcnReserveGuestNetworkServicePortRange that no Windows
+        // process can bind for the lifetime of the VM. Port-0 binds resolve to ports within
+        // this range, so even after the guest releases the port the host still cannot bind
+        // it — the range-level reservation remains, making release unverifiable.
+        NetworkTests::VerifyPortZeroBindIsTracked(false);
+    }
+
     TEST_METHOD(ExplicitEphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4750,6 +4893,15 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         NetworkTests::VerifyDnsResolutionRecordTypes();
+    }
+
+    TEST_METHOD(PortZeroBindIsTracked)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyPortZeroBindIsTracked();
     }
 
     TEST_METHOD(HttpProxySimple)
