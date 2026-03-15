@@ -511,13 +511,14 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
     auto control = std::make_unique<VMProcessControl>(*this, pid, std::move(ttyControlHandle));
+    auto* controlPtr = control.get();
+
+    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
 
     {
         std::lock_guard lock{m_trackedProcessesLock};
-        m_trackedProcesses.emplace_back(control.get());
+        m_trackedProcesses.emplace_back(controlPtr);
     }
-
-    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
 
     setErrno(0);
 
