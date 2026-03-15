@@ -488,11 +488,15 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
             break;
         }
 
+        // Validate result is within expected range (accounts for exit event at index 0)
+        const DWORD portIndex = result - 1;
+        THROW_HR_IF(E_UNEXPECTED, portIndex >= static_cast<DWORD>(ports.size()));
+
         // Otherwise complete the accept and start a relay
         try
         {
-            ports[result - 1]->CompleteAccept();
-            ports[result - 1]->LaunchRelay(VmId);
+            ports[portIndex]->CompleteAccept();
+            ports[portIndex]->LaunchRelay(VmId);
         }
         CATCH_LOG();
     }
