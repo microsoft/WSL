@@ -110,6 +110,8 @@ typedef struct _LXSS_DISTRO_CONFIGURATION
     std::filesystem::path BasePath;
     std::wstring PackageFamilyName;
     std::filesystem::path VhdFilePath;
+    std::wstring FsType;
+    std::wstring FsMountOptions;
     ULONG Flags;
     std::wstring Flavor;
     std::wstring OsVersion;

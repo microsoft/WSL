@@ -65,6 +65,9 @@ Abstract:
 #include "SocketChannel.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
+#define BTRFS_CREATE_ARG "create"
+#define BTRFS_PATH "/usr/sbin/btrfs"
+#define BTRFS_SUBVOLUME_ARG "subvolume"
 #define BINFMT_REGISTER_STRING ":" LX_INIT_BINFMT_NAME ":M::MZ::" LX_INIT_PATH ":FP\n"
 #define BINFMT_PATH PROCFS_PATH "/sys/fs/binfmt_misc"
 #define CHRONY_CONF_PATH ETC_PATH "/chrony.conf"
@@ -136,7 +139,8 @@ int EnableInterface(int Socket, const char* Name);
 
 int ExportToSocket(const char* Source, int Socket, int ErrorSocket, unsigned int flags);
 
-int FormatDevice(unsigned int Lun);
+int FormatDevice(unsigned int Lun, const char* FsType);
+int CreateBtrfsSubvolumeOnDevice(unsigned int Lun, const char* MountOptions);
 
 std::string GetLunDeviceName(unsigned int Lun);
 
@@ -901,19 +905,23 @@ Return Value:
     return Result;
 }
 
-int FormatDevice(unsigned int Lun)
+int FormatDevice(unsigned int Lun, const char* FsType)
 
 /*++
 
 Routine Description:
 
-    This routine formats the specified SCSI device with the ext4 file system.
-    N.B. The group size was chosen based on the best practices for Linux VHDs:
+    This routine formats the specified SCSI device with the <FsType> file system.
+
+    N.B. The ext4 group size was chosen based on the best practices for Linux VHDs:
          https://docs.microsoft.com/en-us/windows-server/virtualization/hyper-v/best-practices-for-running-linux-on-hyper-v
+
+    N.B. The xfs data section options (-d) are also determined based on the VHD sector size of 1MB, as suggested in the link above.
 
 Arguments:
 
     Lun - Supplies the LUN number of the SCSI device.
+    FsType - The filesystem type to format the device with.
 
 Return Value:
 
@@ -927,11 +935,112 @@ try
 
     WaitForBlockDevice(DevicePath.c_str());
 
-    std::string CommandLine = std::format("/usr/sbin/mkfs.ext4 -G 4096 '{}'", DevicePath);
+    if (FsType == nullptr)
+    {
+        FsType = "ext4";
+    }
+
+    std::string CommandLine;
+    if (strcmp(FsType, "ext4") == 0)
+    {
+        CommandLine = std::format("/usr/sbin/mkfs.ext4 -G 4096 '{}'", DevicePath);
+    }
+    else if (strcmp(FsType, "btrfs") == 0)
+    {
+        CommandLine = std::format("/usr/sbin/mkfs.btrfs '{}'", DevicePath);
+    }
+    else if (strcmp(FsType, "xfs") == 0)
+    {
+        CommandLine = std::format("/usr/sbin/mkfs.xfs -s size=4096 -d su=1m,sw=1 '{}'", DevicePath);
+    }
+    else
+    {
+        LOG_ERROR("Unsupported filesystem type: {}", FsType);
+        errno = ENOSYS;
+        return -1;
+    }
     if (UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0)
     {
         return -1;
     }
+
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
+int CreateBtrfsSubvolumeOnDevice(unsigned int Lun, const char* MountOptions)
+/*++
+    This routine creates a btrfs subvolume on the specified SCSI device.
+    It is a no-op if there is no subvolume name in the mount options or
+    the subvolume already exists.
+
+Arguments:
+
+    Lun - Supplies the LUN number of the SCSI device.
+    MountOptions - The mount options to use when mounting the device.
+        The subvolume name is extracted from these options.
+
+Return Value:
+
+    0 on success, < 0 on failure.
+--*/
+try
+{
+    if (MountOptions == nullptr)
+    {
+        return 0;
+    }
+
+    std::string_view options(MountOptions);
+    std::string_view subvolName;
+
+    size_t pos = 0;
+    while (pos < options.size())
+    {
+        size_t end = options.find(',', pos);
+        if (end == std::string_view::npos)
+        {
+            end = options.size();
+        }
+
+        std::string_view option = options.substr(pos, end - pos);
+        if (option.starts_with("subvol="))
+        {
+            subvolName = option.substr(7); // Skip "subvol="
+            break;
+        }
+
+        pos = end + 1;
+    }
+
+    if (subvolName.empty())
+    {
+        return 0;
+    }
+
+    std::string DevicePath = GetLunDevicePath(Lun);
+    std::string TempMountPath;
+    THROW_LAST_ERROR_IF(CreateTempDirectory("/tmp", TempMountPath) < 0);
+
+    auto unmountOnExit = wil::scope_exit([&TempMountPath]() {
+        umount(TempMountPath.c_str());
+        rmdir(TempMountPath.c_str());
+    });
+
+    THROW_LAST_ERROR_IF(UtilMount(DevicePath.c_str(), TempMountPath.c_str(), "btrfs", 0, nullptr, c_defaultRetryTimeout) < 0);
+
+    std::string SubvolPath = std::format("{}/{}", TempMountPath, subvolName);
+
+    struct stat st;
+    if (stat(SubvolPath.c_str(), &st) == 0)
+    {
+        return 0;
+    }
+
+    THROW_LAST_ERROR_IF(errno != ENOENT);
+
+    const char* Argv[] = {BTRFS_PATH, BTRFS_SUBVOLUME_ARG, BTRFS_CREATE_ARG, SubvolPath.c_str(), nullptr};
+    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(Argv[0], Argv) < 0);
 
     return 0;
 }
@@ -2738,13 +2847,20 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
             ListenSocket = UtilListenVsockAnyPort(&ListenAddress, 2, true);
             THROW_LAST_ERROR_IF(!ListenSocket);
 
-            if (Message->Header.MessageType == LxMiniInitMessageImport)
-            {
-                THROW_LAST_ERROR_IF(FormatDevice(Message->DeviceId) < 0);
-            }
-
             auto* FsType = wsl::shared::string::FromSpan(Buffer, Message->FsTypeOffset);
             auto* MountOptions = wsl::shared::string::FromSpan(Buffer, Message->MountOptionsOffset);
+
+            if (Message->Header.MessageType == LxMiniInitMessageImport)
+            {
+                THROW_LAST_ERROR_IF(FormatDevice(Message->DeviceId, FsType) < 0);
+
+                if (FsType != nullptr && strcmp(FsType, "btrfs") == 0)
+                {
+                    // create the subvolume if specified in mount options
+                    THROW_LAST_ERROR_IF(CreateBtrfsSubvolumeOnDevice(Message->DeviceId, MountOptions) < 0);
+                }
+            }
+
             THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
 
             Result = 0;

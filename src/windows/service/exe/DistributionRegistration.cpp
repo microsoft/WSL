@@ -57,7 +57,18 @@ DistributionRegistration DistributionRegistration::Open(HKEY LxssKey, const GUID
 }
 
 DistributionRegistration DistributionRegistration::Create(
-    HKEY LxssKey, const std::optional<GUID>& Id, LPCWSTR Name, ULONG Version, LPCWSTR BasePath, ULONG Flags, ULONG DefaultUID, LPCWSTR PackageFamilyName, LPCWSTR VhdFileName, bool EnableOobe)
+    HKEY LxssKey,
+    const std::optional<GUID>& Id,
+    LPCWSTR Name,
+    ULONG Version,
+    LPCWSTR BasePath,
+    ULONG Flags,
+    ULONG DefaultUID,
+    LPCWSTR PackageFamilyName,
+    LPCWSTR VhdFileName,
+    LPCWSTR FsType,
+    LPCWSTR FsMountOptions,
+    bool EnableOobe)
 {
     std::wstring distroGuidString;
     GUID distroId{};
@@ -110,6 +121,26 @@ DistributionRegistration DistributionRegistration::Create(
     if (ARGUMENT_PRESENT(VhdFileName))
     {
         distribution.Write(Property::VhdFileName, VhdFileName);
+    }
+
+    if (ARGUMENT_PRESENT(FsType))
+    {
+        distribution.Write(Property::FsType, FsType);
+    }
+
+    if (ARGUMENT_PRESENT(FsMountOptions))
+    {
+        distribution.Write(Property::FsMountOptions, FsMountOptions);
+    }
+    else if (ARGUMENT_PRESENT(FsType) && wcscmp(FsType, LXSS_DISTRO_DEFAULT_FS_TYPE) != 0)
+    {
+        // FsType-specific default mount options
+        if (wcscmp(FsType, L"ext4") == 0)
+            distribution.Write(Property::FsMountOptions, LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_EXT4);
+        else if (wcscmp(FsType, L"btrfs") == 0)
+            distribution.Write(Property::FsMountOptions, LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_BTRFS);
+        else if (wcscmp(FsType, L"xfs") == 0)
+            distribution.Write(Property::FsMountOptions, LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_XFS);
     }
 
     // Dismiss the scope exit member so the key is persisted.
