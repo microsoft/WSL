@@ -101,6 +101,16 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
+void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
+{
+    auto repoTag = RepoTag::Parse(targetImage);
+    WSLATagImageOptions options{};
+    options.Image = sourceImage.c_str();
+    options.Repo = repoTag.Repo.c_str();
+    options.Tag = repoTag.Tag.c_str();
+    THROW_IF_FAILED(session.Get()->TagImage(&options));
+}
+
 InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
 {
     wil::unique_cotaskmem_ansistring inspectData;
@@ -113,10 +123,6 @@ void ImageService::Push()
 }
 
 void ImageService::Save()
-{
-}
-
-void ImageService::Tag()
 {
 }
 

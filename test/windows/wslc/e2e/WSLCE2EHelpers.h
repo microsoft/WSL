@@ -31,12 +31,14 @@ struct TestImage
     }
 };
 
+const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
 const TestImage& InvalidTestImage();
 
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
+void VerifyImageIsListed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wsla_schema::InspectContainer InspectContainer(const std::wstring& containerName);

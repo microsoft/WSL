@@ -165,4 +165,14 @@ void InspectImages(CLIExecutionContext& context)
     auto json = ToJson(result);
     PrintMessage(MultiByteToWide(json));
 }
+
+void TagImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& source = context.Args.Get<ArgType::Source>();
+    auto& target = context.Args.Get<ArgType::Target>();
+
+    services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
+}
 } // namespace wsl::windows::wslc::task

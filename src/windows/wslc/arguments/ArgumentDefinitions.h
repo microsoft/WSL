@@ -70,7 +70,9 @@ _(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       L
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  L"Session ID") \
 _(Signal,         "signal",              L"s",              Kind::Value,       L"Signal to send (default: SIGKILL)") \
+_(Source,         "source",              NO_ALIAS,          Kind::Positional,  L"Current or existing image reference in the image-name[:tag] format") \
 _(Tag,            "tag",                 L"t",              Kind::Value,       L"Tag for the built image") \
+_(Target,         "target",              NO_ALIAS,          Kind::Positional,  L"New image reference in the image-name[:tag] format") \
 _(Time,           "time",                L"t",              Kind::Value,       L"Time in seconds to wait before executing (default 5)") \
 _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       L"Mount tmpfs to the container at the given path") \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        L"Open a TTY with the container process.") \
