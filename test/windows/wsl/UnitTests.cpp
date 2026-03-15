@@ -3091,14 +3091,14 @@ Usage:
             validateOutput(
                 L"-d BrokenDistro echo ok",
                 FormatErrorMessage(
-                    L"The distribution failed to start because its virtual disk is corrupted, of non-expected filesystem, or invalid mount options.",
+                    L"The distribution failed to start because its virtual disk is corrupted, has an unexpected filesystem type, or has invalid mount options.",
                     L"Wsl/Service/CreateInstance/WSL_E_MOUNT_FAILED"));
 
             // Validate that trying to export the distribution fails with the correct error code.
             validateOutput(
                 L"--export BrokenDistro dummy.tar",
                 FormatErrorMessage(
-                    L"The distribution failed to start because its virtual disk is corrupted, of non-expected filesystem, or invalid mount options.",
+                    L"The distribution failed to start because its virtual disk is corrupted, has an unexpected filesystem type, or has invalid mount options.",
                     L"Wsl/Service/WSL_E_MOUNT_FAILED"));
 
             // Shutdown WSL to force the disk to detach.
@@ -3109,7 +3109,7 @@ Usage:
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
             FormatErrorMessage(
-                L"The distribution failed to start because its virtual disk is corrupted, of non-expected filesystem, or invalid mount options.",
+                L"The distribution failed to start because its virtual disk is corrupted, has an unexpected filesystem type, or has invalid mount options.",
                 L"Wsl/Service/RegisterDistro/WSL_E_MOUNT_FAILED"));
 
         // Ensure the VHD can be deleted to make sure it was properly ejected from the VM.
