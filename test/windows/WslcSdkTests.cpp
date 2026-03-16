@@ -508,7 +508,7 @@ class WslcSdkTests
             opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
-            VERIFY_IS_NOT_NULL(errorMsg);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
         }
     }
 

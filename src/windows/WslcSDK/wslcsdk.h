@@ -173,11 +173,13 @@ STDAPI WslcSetContainerSettingsDomainName(_In_ WslcContainerSettings* containerS
 STDAPI WslcSetContainerSettingsFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
 
 STDAPI WslcSetContainerSettingsPortMappings(
-    _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount);
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(portMappingCount) const WslcContainerPortMapping* portMappings,
+    _In_ uint32_t portMappingCount);
 
 // Add the container volumes to the volumes array
 STDAPI WslcSetContainerSettingsVolumes(
-    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
 
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);
