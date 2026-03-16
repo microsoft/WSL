@@ -14,14 +14,14 @@ Instructions for creating custom agent files that provide specialized expertise 
 - Location: `.github/agents/` directory
 - Purpose: Define specialized agents with tailored expertise for WSL development
 
-## Required Frontmatter
+## Example Frontmatter
 
 ```yaml
 ---
 description: 'Brief description of the agent purpose and capabilities'
-name: 'Agent Display Name'
-tools: ['read', 'edit', 'search']
-model: 'Claude Sonnet 4.5'
+# name: 'Agent Display Name'      # Optional
+# tools: ['read', 'edit', 'search']  # Optional
+# model: 'Claude Sonnet 4.5'      # Recommended
 ---
 ```
 

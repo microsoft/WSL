@@ -1,6 +1,6 @@
 ---
 description: 'C/C++ coding standards, formatting, and copyright headers for WSL source code'
-applyTo: '**/*.{cpp,h,c}'
+applyTo: '**/*.cpp, **/*.h, **/*.c'
 ---
 
 # C/C++ Development — WSL

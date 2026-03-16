@@ -15,9 +15,9 @@ Provide a single-line, ready-to-paste git commit title (<= 80 characters) that r
   ```
 
 ## How to decide the title
-1. From the diff, find the dominant area (e.g., `src/modules/*`, `doc/devdocs/**`) and the change type (bug fix, docs update, config tweak).
+1. From the diff, find the dominant area (e.g., `src/windows/service/`, `src/windows/wsl/`, `src/linux/init/`, `src/shared/`, `doc/`, or `distributions/`) and the change type (bug fix, docs update, config tweak).
 2. Draft an imperative, plain-ASCII title that:
-   - Mentions the primary component when obvious (e.g., `FancyZones:` or `Docs:`)
+   - Mentions the primary WSL component when obvious (e.g., `service:` or `docs:`)
    - Stays within 80 characters and has no trailing punctuation
 
 ## Final output
@@ -32,18 +32,19 @@ Use Conventional Commits style:
 - feat, fix, docs, refactor, perf, test, build, ci, chore
 
 **Scope rules**
-- Use a short, PowerToys-focused scope (one word preferred). Common scopes:
-  - Core: `runner`, `settings-ui`, `common`, `docs`, `build`, `ci`, `installer`, `gpo`, `dsc`
-  - Modules: `fancyzones`, `powerrename`, `awake`, `colorpicker`, `imageresizer`, `keyboardmanager`, `mouseutils`, `peek`, `hosts`, `file-locksmith`, `screen-ruler`, `text-extractor`, `cropandlock`, `paste`, `powerlauncher`
-- If unclear, pick the closest module or subsystem; omit only if unavoidable
+- Use a short, WSL-focused scope (one word preferred when practical). Common scopes:
+  - `service`, `wsl`, `wslhost`, `wslrelay`, `wslg`, `libwsl`, `wslsettings`
+  - `init`, `gns`, `plan9`, `localhost`, `relay`, `session-leader`, `drvfs`, `binfmt`
+  - `docs`, `distributions`, `pipelines`, `build`, `test`, `config`
+- If unclear, pick the closest component or subsystem; omit only if unavoidable
 
 **Summary rules**
 - Imperative, present tense (“add”, “update”, “remove”, “fix”)
 - Keep it <= 72 characters when possible; be specific, avoid “misc changes”
 
 **Examples**
-- `feat(fancyzones): add canvas template duplication`
-- `fix(mouseutils): guard crosshair toggle when dpi info missing`
-- `docs(runner): document tray icon states`
-- `build(installer): align wix v5 suffix flag`
-- `ci(ci): cache pipeline artifacts for x64`
+- `fix(service): guard VM teardown after launch failure`
+- `feat(init): add validation for systemd boot config`
+- `docs(docs): clarify debug-shell troubleshooting steps`
+- `build(distributions): validate modern distro metadata`
+- `ci(pipelines): cache build artifacts for x64`
