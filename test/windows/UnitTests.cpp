@@ -217,6 +217,12 @@ class UnitTests
             LxsstuLaunchWslAndCaptureOutput(L"systemctl status systemd-networkd-wait-online.service  | grep -iF Loaded:");
 
         VERIFY_ARE_EQUAL(out, L"     Loaded: masked (Reason: Unit systemd-networkd-wait-online.service is masked.)\n");
+
+        // Validate that NetworkManager-wait-online.service is masked.
+        auto [outNm, __] =
+            LxsstuLaunchWslAndCaptureOutput(L"systemctl status NetworkManager-wait-online.service  | grep -iF Loaded:");
+
+        VERIFY_ARE_EQUAL(outNm, L"     Loaded: masked (Reason: Unit NetworkManager-wait-online.service is masked.)\n");
     }
 
     TEST_METHOD(SystemdUser)
@@ -1401,13 +1407,13 @@ class UnitTests
 
             ValidateErrorMessage(
                 L"--install -d ubuntu",
-                L"Failed to fetch the list distribution from 'http://127.0.0.1:6666'. " +
+                L"Failed to fetch the distribution list from 'http://127.0.0.1:6666'. " +
                     GetSystemErrorString(HRESULT_FROM_WIN32(WININET_E_CANNOT_CONNECT)),
                 L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT");
 
             ValidateErrorMessage(
                 L"--list --online",
-                L"Failed to fetch the list distribution from 'http://127.0.0.1:6666'. " +
+                L"Failed to fetch the distribution list from 'http://127.0.0.1:6666'. " +
                     GetSystemErrorString(HRESULT_FROM_WIN32(WININET_E_CANNOT_CONNECT)),
                 L"Wsl/WININET_E_CANNOT_CONNECT");
         }
@@ -6530,6 +6536,75 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
             L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(BytesToHex)
+    {
+        using wsl::windows::common::string::BytesToHex;
+
+        VERIFY_ARE_EQUAL(BytesToHex({}), L"0x");
+        VERIFY_ARE_EQUAL(BytesToHex({0x0F}), L"0x0f");
+        VERIFY_ARE_EQUAL(BytesToHex({0xDE, 0xAD, 0xBE, 0xEF}), L"0xdeadbeef");
+        VERIFY_ARE_EQUAL(BytesToHex({0x00, 0x00}), L"0x0000");
+        VERIFY_ARE_EQUAL(BytesToHex({0xFF, 0xFF}), L"0xffff");
+    }
+
+    TEST_METHOD(HexToBytes)
+    {
+        using wsl::windows::common::string::BytesToHex;
+        using wsl::windows::common::string::HexToBytes;
+        using ByteVec = std::vector<BYTE>;
+
+        // Wide string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes("0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Wide string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes("deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Empty string
+        VERIFY_ARE_EQUAL(HexToBytes(L""), (ByteVec{}));
+
+        // Single byte
+        VERIFY_ARE_EQUAL(HexToBytes(L"0x0f"), (ByteVec{0x0F}));
+
+        // Uppercase hex digits
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xDEADBEEF"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Round-trip: BytesToHex -> HexToBytes
+        const ByteVec original = {0x01, 0x23, 0xAB};
+        VERIFY_ARE_EQUAL(HexToBytes(BytesToHex(original)), original);
+
+        // Odd-length string (after stripping "0x") throws E_INVALIDARG
+        bool threw = false;
+        try
+        {
+            HexToBytes(L"0xabc");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
+
+        // Invalid hex character throws E_INVALIDARG
+        threw = false;
+        try
+        {
+            HexToBytes(L"0xZZ");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
     }
 
 }; // namespace UnitTests

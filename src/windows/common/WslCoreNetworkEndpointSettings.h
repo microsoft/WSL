@@ -318,6 +318,8 @@ struct NetworkSettings
         return {};
     }
 
+    std::wstring GetBestGatewayMacAddress() const;
+
     std::wstring IpAddressesString() const
     {
         return std::accumulate(std::begin(IpAddresses), std::end(IpAddresses), std::wstring{}, [](const std::wstring& prev, const auto& addr) {

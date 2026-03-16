@@ -27,19 +27,21 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
-    commands.push_back(std::make_unique<ContainerDeleteCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
     commands.push_back(std::make_unique<ContainerInspectCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
-    commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
     return commands;
 }
 

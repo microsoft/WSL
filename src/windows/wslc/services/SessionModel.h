@@ -56,7 +56,7 @@ public:
 
     void SetDisplayName(const std::wstring& displayName);
 
-    const WSLA_SESSION_SETTINGS* Get() const
+    const WSLASessionSettings* Get() const
     {
         return &m_sessionSettings;
     }
@@ -64,6 +64,6 @@ public:
 private:
     std::wstring m_displayName;
     std::wstring m_storagePath;
-    WSLA_SESSION_SETTINGS m_sessionSettings{};
+    WSLASessionSettings m_sessionSettings{};
 };
 } // namespace wsl::windows::wslc::models

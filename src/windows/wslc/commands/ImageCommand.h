@@ -32,6 +32,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Build Command
+struct ImageBuildCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"build";
+    ImageBuildCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // List Command
 struct ImageListCommand final : public Command
 {
@@ -61,11 +76,11 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
-// Pull Command
-struct ImagePullCommand final : public Command
+// Load Command
+struct ImageLoadCommand final : public Command
 {
-    constexpr static std::wstring_view CommandName = L"pull";
-    ImagePullCommand(const std::wstring& parent) : Command(CommandName, parent)
+    constexpr static std::wstring_view CommandName = L"load";
+    ImageLoadCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -76,11 +91,41 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
-// Load Command
-struct ImageLoadCommand final : public Command
+// Delete Command
+struct ImageDeleteCommand final : public Command
 {
-    constexpr static std::wstring_view CommandName = L"load";
-    ImageLoadCommand(const std::wstring& parent) : Command(CommandName, parent)
+    constexpr static std::wstring_view CommandName = L"delete";
+    ImageDeleteCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Inspect Command
+struct ImageInspectCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"inspect";
+    ImageInspectCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Pull Command
+struct ImagePullCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"pull";
+    ImagePullCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

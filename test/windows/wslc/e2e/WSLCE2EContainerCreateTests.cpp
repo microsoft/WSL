@@ -111,6 +111,36 @@ class WSLCE2EContainerCreateTests
              .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_Remove)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        // Create the container with a valid image
+        auto result = RunWslc(std::format(L"container create --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Start the container.
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify with retry timeout of 1 minute.
+        VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Remove)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        // Run the container with a valid image
+        auto result = RunWslc(std::format(L"container run --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Run should be deleted on return so no retry.
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
@@ -164,7 +194,7 @@ private:
                 << L"  --name            Name of the container\r\n"
                 << L"  --no-dns          No configuration of DNS in the container\r\n"
                 << L"  --progress        Progress type (format: none|ansi) (default: ansi)\r\n"
-                << L"  -rm,--remove      Remove the container after it stops\r\n"
+                << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --scheme          Use this scheme for registry connection\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"

@@ -21,13 +21,14 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> ContainerCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
+    commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
-    commands.push_back(std::make_unique<ContainerDeleteCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerInspectCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
@@ -41,7 +42,7 @@ std::vector<Argument> ContainerCommand::GetArguments() const
 
 std::wstring ContainerCommand::ShortDescription() const
 {
-    return {L"Container command"};
+    return {L"Container command."};
 }
 
 std::wstring ContainerCommand::LongDescription() const

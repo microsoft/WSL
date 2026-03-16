@@ -14,11 +14,14 @@ Abstract:
 #pragma once
 #include "SessionModel.h"
 #include "ContainerModel.h"
+#include <wsla_schema.h>
 
 namespace wsl::windows::wslc::services {
 struct ContainerService
 {
-    static std::wstring ContainerStateToString(WSLA_CONTAINER_STATE state);
+    static std::wstring ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt = 0);
+    static std::wstring FormatRelativeTime(ULONGLONG timestamp);
+    static int Attach(models::Session& session, const std::string& id);
     static int Run(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static void Start(models::Session& session, const std::string& id);
@@ -27,7 +30,7 @@ struct ContainerService
     static void Delete(models::Session& session, const std::string& id, bool force);
     static std::vector<models::ContainerInformation> List(models::Session& session);
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
-    static wsl::windows::common::docker_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
+    static wsl::windows::common::wsla_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
     static void Logs(models::Session& session, const std::string& id, bool follow);
 };
 } // namespace wsl::windows::wslc::services
