@@ -207,7 +207,7 @@ void PublishPort::Validate() const
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port must be a valid port number (1-65535).");
         }
 
-        if(m_hostPort.Count() != m_containerPort.Count())
+        if (m_hostPort.Count() != m_containerPort.Count())
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port range must match the container port range.");
         }

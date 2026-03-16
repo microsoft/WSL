@@ -205,7 +205,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Interactive = true;
     }
 
-    if(context.Args.Contains(ArgType::Publish))
+    if (context.Args.Contains(ArgType::Publish))
     {
         auto ports = context.Args.GetAll<ArgType::Publish>();
         options.Ports.reserve(options.Ports.size() + ports.size());
