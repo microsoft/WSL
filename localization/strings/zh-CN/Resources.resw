@@ -1876,4 +1876,33 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
   </data>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>通过 Visual Studio 构建、运行、调试和分析运行于 WSL 上的应用</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>通过 Visual Studio 运行和调试 WSL 上的应用</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>详细了解面向 .NET 开发人员的 Visual Studio 中的 WSL</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>详细了解面向 C++ 开发人员的 Visual Studio 和 WSL</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>你可以使用适用于 Linux 的 Windows 子系统(WSL)在不离开 Visual Studio 的情况下，在 Linux 中轻松运行和调试 .NET Core 和跨平台 C++ 应用。如果你是跨平台开发人员，可以通过这种方法简单地测试更多目标环境。</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Visual Studio 集成</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Visual Studio 集成</value>
+  </data>
 </root>

@@ -22,7 +22,7 @@ foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
 endforeach()
 
-set(LINUX_BINARIES init)
+set(LINUX_BINARIES init;initrd.img)
 foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")
 endforeach()
@@ -52,7 +52,7 @@ add_custom_command(
 
 add_custom_target(msipackage DEPENDS ${OUTPUT_PACKAGE})
 set_target_properties(msipackage PROPERTIES EXCLUDE_FROM_ALL FALSE SOURCES ${PACKAGE_WIX_IN})
-add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init wslinstall msixgluepackage)
+add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init initramfs wslinstall msixgluepackage)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_dependencies(msipackage wslsettings libwsl)
@@ -66,5 +66,5 @@ if (DEFINED WSL_POST_BUILD_COMMAND)
         POST_BUILD
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         USES_TERMINAL
-        COMMAND ${WSL_POST_BUILD_COMMAND} -Platform ${TARGET_PLATFORM} -BuildType ${CMAKE_BUILD_TYPE})
+        COMMAND ${WSL_POST_BUILD_COMMAND} -BuildType ${CMAKE_BUILD_TYPE})
 endif()

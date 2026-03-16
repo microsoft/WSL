@@ -728,7 +728,7 @@ Das System muss möglicherweise neu gestartet werden, damit die Änderungen wirk
     <value>Für Bridged Networking muss wsl2.vmSwitch eingestellt sein.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Fehler beim Abrufen der Liste der Distributionen von „{}“. {}</value>
+    <value>Fehler beim Abrufen der Verteilerliste von '{}'. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1061,7 +1061,7 @@ Fallback auf NAT-Netzwerk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Fehler beim Lesen der Eigenschaft "{}" aus der Distribution {} </value>
+    <value>Fehler beim Lesen der Eigenschaft „{}“ aus der Distribution {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1878,5 +1878,34 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Die Anzahl von Millisekunden, die eine VM im Leerlauf ist, bevor sie heruntergefahren wird.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>Erstellen, Ausführen, Debuggen und Profilieren von Apps, die auf WSL laufen, direkt in Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Ausführen und Debuggen Ihrer Apps auf WSL aus Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>Weitere Informationen zu WSL in Visual Studio für .NET-Entwickelnde</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>Weitere Informationen zu Visual Studio und WSL für C++-Entwickelnde</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>Mithilfe des Windows-Subsystems für Linux (WSL) können Sie Ihre .NET Core- und plattformübergreifenden C++-Apps problemlos unter Linux ausführen und debuggen, ohne Visual Studio verlassen zu müssen. Wenn Sie plattformübergreifend entwickeln, ist diese Methode eine einfache Möglichkeit, weitere Ihrer Zielumgebungen zu testen.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Visual Studio-Integration</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Visual Studio-Integration</value>
   </data>
 </root>

@@ -722,7 +722,7 @@ Może być konieczne ponowne uruchomienie systemu, aby zmiany zostały wprowadzo
     <value>Sieć pomostowa wymaga ustawienia przełącznika wsl2.vmSwitch.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Nie można pobrać dystrybucji listy z „{}”. {}</value>
+    <value>Nie można pobrać listy dystrybucyjnej z „{}”. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1055,7 +1055,7 @@ Powrót do sieci NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Nie można odczytać właściwości „{}” z dystrybucji {} </value>
+    <value>Nie można odczytać właściwości „{}” z dystrybucji {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1872,5 +1872,34 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Liczba milisekund bezczynności maszyny wirtualnej przed jej zamknięciem.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>Kompiluj, uruchamiaj, debuguj i profiluj aplikacje działające w systemie WSL z poziomu programu Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Uruchamiaj i debuguj aplikacje w systemie WSL z poziomu programu Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>Dowiedz się więcej o systemie WSL w programie Visual Studio dla deweloperów .NET</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>Dowiedz się więcej o programie Visual Studio i systemie WSL dla deweloperów C++</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>Możesz łatwo uruchamiać i debugować aplikacje .NET Core oraz wieloplatformowe aplikacje C++ w systemie Linux bez opuszczania programu Visual Studio, korzystając z Podsystemu Windows dla systemu Linux (WSL). Jeśli jesteś deweloperem międzyplatformowym, możesz użyć tej metody jako prostego sposobu na przetestowanie większej liczby środowisk docelowych.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Integracja z programem Visual Studio</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Integracja z programem Visual Studio</value>
   </data>
 </root>
