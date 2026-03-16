@@ -44,7 +44,7 @@ struct WSLCExecutionResult
 
 // Interactive session for testing wslc commands that require stdin/stdout interaction.
 // - Background thread drains pipes to prevent deadlocks
-// - Direct read fallback ensures tests succeed even if draining thread has issues
+// - Reads are served from background-drained buffers (no direct read fallback)
 // - Full diagnostic output on failures
 struct WSLCInteractiveSession
 {
@@ -90,13 +90,14 @@ private:
     wil::unique_handle m_processHandle;
 
     // Background draining for deadlock prevention
-    std::atomic<bool> m_stopDraining{false};
-    std::atomic<bool> m_drainingStopped{false};
+    wil::unique_event m_stopEvent;
     std::thread m_drainThread;
     std::string m_stdoutBuffer;
     std::string m_stderrBuffer;
     std::mutex m_stdoutMutex;
     std::mutex m_stderrMutex;
+    wil::unique_event m_stdoutDataAvailable;
+    wil::unique_event m_stderrDataAvailable;
 };
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine);

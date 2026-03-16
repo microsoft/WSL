@@ -105,9 +105,9 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
     THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
     THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
-    auto process = std::make_unique<wsl::windows::common::SubProcess>(nullptr, cmd.c_str());
-    process->SetStdHandles(childStdinRead.get(), childStdoutWrite.get(), childStderrWrite.get());
-    wil::unique_handle processHandle = process->Start();
+    wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+    process.SetStdHandles(childStdinRead.get(), childStdoutWrite.get(), childStderrWrite.get());
+    wil::unique_handle processHandle = process.Start();
 
     childStdinRead.reset();
     childStdoutWrite.reset();
@@ -148,86 +148,123 @@ WSLCInteractiveSession::WSLCInteractiveSession(
     m_stdinWrite(std::move(stdinWrite)),
     m_stdoutRead(std::move(stdoutRead)),
     m_stderrRead(std::move(stderrRead)),
-    m_processHandle(std::move(processHandle))
+    m_processHandle(std::move(processHandle)),
+    m_stopEvent(wil::EventOptions::ManualReset),
+    m_stdoutDataAvailable(wil::EventOptions::ManualReset),
+    m_stderrDataAvailable(wil::EventOptions::ManualReset)
 {
     std::promise<void> drainThreadReady;
     auto drainThreadReadyFuture = drainThreadReady.get_future();
 
     m_drainThread = std::thread([this, ready = std::move(drainThreadReady)]() mutable { DrainPipes(std::move(ready)); });
 
-    // Wait for drain thread to be fully initialized
-    drainThreadReadyFuture.wait();
+    // Wait for drain thread to be fully initialized with timeout
+    auto waitResult = drainThreadReadyFuture.wait_for(std::chrono::milliseconds(DefaultWaitTimeoutMs));
+    if (waitResult == std::future_status::timeout)
+    {
+        m_stopEvent.SetEvent();
+        if (m_drainThread.joinable())
+        {
+            m_drainThread.join();
+        }
+        THROW_HR_MSG(E_FAIL, "Drain thread failed to initialize within %dms timeout", DefaultWaitTimeoutMs);
+    }
 }
 
 void WSLCInteractiveSession::DrainPipes(std::promise<void> ready)
 {
     using namespace wsl::windows::common::relay;
 
-    MultiHandleWait io;
+    // Track whether we've fulfilled the promise to prevent hangs in constructor
+    bool promiseFulfilled = false;
 
-    auto stdoutCallback = [this](const gsl::span<char>& data) {
-        std::lock_guard<std::mutex> lock(m_stdoutMutex);
-        m_stdoutBuffer.append(data.data(), data.size());
-    };
-
-    io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(m_stdoutRead)}, std::move(stdoutCallback)));
-
-    auto stderrCallback = [this](const gsl::span<char>& data) {
-        std::lock_guard<std::mutex> lock(m_stderrMutex);
-        m_stderrBuffer.append(data.data(), data.size());
-    };
-
-    io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(m_stderrRead)}, std::move(stderrCallback)));
-
-    ready.set_value();
-
-    while (!m_stopDraining)
-    {
-        try
+    // Ensure promise is always fulfilled to prevent hangs in constructor
+    auto ensurePromiseFulfilled = wil::scope_exit([&ready, &promiseFulfilled]() {
+        if (!promiseFulfilled)
         {
-            io.Run(std::chrono::milliseconds(100));
-        }
-        catch (const wil::ResultException& ex)
-        {
-            // ERROR_TIMEOUT is expected when there's no data - continue
-            if (ex.GetErrorCode() != HRESULT_FROM_WIN32(ERROR_TIMEOUT))
+            // If we haven't set the value yet, set it now (even on error path)
+            try
             {
-                break; // Exit on unexpected errors
+                ready.set_value();
+            }
+            catch (...)
+            {
+                // Promise was already fulfilled (shouldn't happen with our logic)
             }
         }
-        catch (...)
+    });
+
+    try
+    {
+        MultiHandleWait io;
+
+        auto stdoutCallback = [this](const gsl::span<char>& data) {
+            std::lock_guard<std::mutex> lock(m_stdoutMutex);
+            m_stdoutBuffer.append(data.data(), data.size());
+            m_stdoutDataAvailable.SetEvent();
+        };
+
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(m_stdoutRead)}, std::move(stdoutCallback)));
+
+        auto stderrCallback = [this](const gsl::span<char>& data) {
+            std::lock_guard<std::mutex> lock(m_stderrMutex);
+            m_stderrBuffer.append(data.data(), data.size());
+            m_stderrDataAvailable.SetEvent();
+        };
+
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(m_stderrRead)}, std::move(stderrCallback)));
+
+        // Add stop event to cancel the wait loop
+        io.AddHandle(std::make_unique<EventHandle>(HandleWrapper{m_stopEvent.get()}), MultiHandleWait::CancelOnCompleted);
+
+        // Signal that initialization is complete
+        ready.set_value();
+        promiseFulfilled = true;
+
+        // Run indefinitely until m_stopEvent is signaled or pipes are closed
+        // Will throw ERROR_CANCELLED when stop event is signaled
+        io.Run({});
+    }
+    catch (const wil::ResultException& ex)
+    {
+        // ERROR_CANCELLED means m_stopEvent was signaled - this is expected
+        if (ex.GetErrorCode() != HRESULT_FROM_WIN32(ERROR_CANCELLED))
         {
-            break; // Exit on unknown errors
+            Log::Error(std::format(
+                           L"Drain thread encountered unexpected error: 0x{:08X} - {}",
+                           ex.GetErrorCode(),
+                           wsl::shared::string::MultiByteToWide(ex.what()))
+                           .c_str());
         }
+    }
+    catch (...)
+    {
+        Log::Error(L"Drain thread encountered unknown exception");
     }
 }
 
 void WSLCInteractiveSession::StopDraining()
 {
-    // Only stop once - prevents double-close of handles
-    bool expected = false;
-    if (!m_drainingStopped.compare_exchange_strong(expected, true))
+    m_stopEvent.SetEvent();
+    if (m_drainThread.joinable())
     {
-        return;
+        m_drainThread.join();
     }
 
-    m_stopDraining = true;
+    // Wake up any waiting readers
+    m_stdoutDataAvailable.SetEvent();
+    m_stderrDataAvailable.SetEvent();
 }
 
 WSLCInteractiveSession::~WSLCInteractiveSession()
 {
     StopDraining();
-    if (m_drainThread.joinable())
-    {
-        m_drainThread.join();
-    }
 }
 
 std::string WSLCInteractiveSession::ReadStdout(DWORD timeoutMs)
 {
     auto startTime = GetTickCount64();
 
-    // Only use background buffer - no race conditions
     while (GetTickCount64() - startTime < timeoutMs)
     {
         {
@@ -236,10 +273,17 @@ std::string WSLCInteractiveSession::ReadStdout(DWORD timeoutMs)
             {
                 std::string result = std::move(m_stdoutBuffer);
                 m_stdoutBuffer.clear();
+                m_stdoutDataAvailable.ResetEvent();
                 return result;
             }
         }
-        Sleep(10);
+
+        // Wait for data to be available with remaining timeout
+        DWORD remainingTimeout = timeoutMs - static_cast<DWORD>(GetTickCount64() - startTime);
+        if (WaitForSingleObject(m_stdoutDataAvailable.get(), remainingTimeout) == WAIT_TIMEOUT)
+        {
+            break;
+        }
     }
 
     return {};
@@ -257,10 +301,17 @@ std::string WSLCInteractiveSession::ReadStderr(DWORD timeoutMs)
             {
                 std::string result = std::move(m_stderrBuffer);
                 m_stderrBuffer.clear();
+                m_stderrDataAvailable.ResetEvent();
                 return result;
             }
         }
-        Sleep(10);
+
+        // Wait for data to be available with remaining timeout
+        DWORD remainingTimeout = timeoutMs - static_cast<DWORD>(GetTickCount64() - startTime);
+        if (WaitForSingleObject(m_stderrDataAvailable.get(), remainingTimeout) == WAIT_TIMEOUT)
+        {
+            break;
+        }
     }
 
     return {};
@@ -283,14 +334,18 @@ std::string WSLCInteractiveSession::ReadUntil(const std::string& marker, DWORD t
 
                 if (accumulated.find(marker) != std::string::npos)
                 {
+                    m_stdoutDataAvailable.ResetEvent();
                     return accumulated;
                 }
             }
         }
 
-        // Don't do direct read - it can race with the drain thread
-        // Just wait for the drain thread to populate the buffer
-        Sleep(10);
+        // Wait for more data with remaining timeout
+        DWORD remainingTimeout = timeoutMs - static_cast<DWORD>(GetTickCount64() - startTime);
+        if (WaitForSingleObject(m_stdoutDataAvailable.get(), remainingTimeout) == WAIT_TIMEOUT)
+        {
+            break;
+        }
     }
 
     THROW_HR_MSG(
@@ -400,9 +455,16 @@ void WSLCInteractiveSession::WaitForExit(DWORD timeoutMs)
         THROW_HR_MSG(E_FAIL, "Process did not exit within timeout of %dms and was forcefully terminated", timeoutMs);
     }
 
+    if (result == WAIT_FAILED)
+    {
+        // Use the last error from WaitForSingleObject.
+        THROW_LAST_ERROR_MSG("WaitForSingleObject failed while waiting for process exit");
+    }
+
     if (result != WAIT_OBJECT_0)
     {
-        THROW_WIN32_MSG(result, "WaitForSingleObject failed with unexpected result");
+        // For process handles, any other result is unexpected and indicates a logic error.
+        THROW_HR_MSG(E_UNEXPECTED, "WaitForSingleObject returned unexpected result: 0x%08lx", result);
     }
 }
 
