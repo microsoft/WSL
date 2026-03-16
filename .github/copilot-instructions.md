@@ -196,7 +196,7 @@ Detailed guidelines auto-apply based on the files you're editing:
 | `azure-devops-pipelines.instructions.md` | `.pipelines/**/*.yml` | ADO pipeline guidelines |
 | `makefile.instructions.md` | `test/linux/unit_tests/Makefile` | Linux unit test Makefile |
 | `agents.instructions.md` | `**/*.agent.md` | Custom agent file guidelines |
-| `agent-skills.instructions.md` | `**/.github/skills/**/SKILL.md` | Agent Skills guidelines |
+| `agent-skills.instructions.md` | `.github/skills/**/SKILL.md` | Agent Skills guidelines |
 | `prompt.instructions.md` | `**/*.prompt.md` | Copilot prompt file guidelines |
 | `instructions.instructions.md` | `**/*.instructions.md` | Meta: writing instruction files |
 

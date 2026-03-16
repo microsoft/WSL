@@ -1,6 +1,6 @@
 ---
 description: 'Guidelines for creating Agent Skills for GitHub Copilot in the WSL repo'
-applyTo: '**/.github/skills/**/SKILL.md'
+applyTo: '.github/skills/**/SKILL.md'
 ---
 
 # Agent Skills File Guidelines — WSL
