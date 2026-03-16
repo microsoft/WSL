@@ -15,7 +15,7 @@ description: 'Generate a WSL-ready pull request description from the local diff'
 - Use WSL terminology when describing impacted components, such as `wsl.exe`, `wslservice`, `wslhost`, `init`, `gns`, `plan9`, `relay`, `drvfs`, `wslsettings`, `doc/`, or `distributions/`.
 
 **Workflow:**
-1. Determine the target branch from user context; default to `master` when no branch is supplied.
+1. Determine the target branch from user context; resolve the default dynamically via `git symbolic-ref refs/remotes/origin/HEAD` when no branch is supplied (falls back to `master` if the symbolic ref is not set).
 2. Run `git status --short` once to surface uncommitted files that may influence the summary.
 3. Run `git diff <target-branch>...HEAD` a single time to review the detailed changes. Only when confidence stays low dig deeper with focused calls such as `git diff <target-branch>...HEAD -- <path>`.
 4. From the diff, capture impacted WSL areas, key file changes, behavioral risks, migrations, and noteworthy edge cases. Use repo-specific component names when obvious (for example `service`, `wsl`, `init`, `gns`, `plan9`, `doc`, or `distributions`).

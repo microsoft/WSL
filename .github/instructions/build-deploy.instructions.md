@@ -63,4 +63,5 @@ set(WSL_DEV_BINARY_PATH "C:/wsldev")
 | Operation | Duration | Set Timeout |
 |-----------|----------|-------------|
 | Full build | 20–45 min | 60+ min |
-| NEVER cancel a build in progress. |
+
+> **NEVER cancel a build in progress.**
