@@ -370,14 +370,14 @@ STDAPI WslcPullSessionImage(_In_ WslcSession session, _In_ const WslcPullImageOp
 
 typedef struct WslcImageFileContent
 {
-    _In_ HANDLE handle;
+    _In_opt_ HANDLE handle;
     _In_ uint64_t length;
 } WslcImageFileContent;
 
 // Specifying both path and content will result in an error.
 typedef struct WslcImageFileSpecifier
 {
-    _In_z_ PCWSTR path;
+    _In_opt_z_ PCWSTR path;
     _In_ WslcImageFileContent content;
 } WslcImageFileSpecifier;
 
