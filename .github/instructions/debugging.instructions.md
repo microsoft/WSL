@@ -52,7 +52,7 @@ Example: `wpr -start diagnostics\wsl.wprp!WSL-Networking -filemode`
 
 ### Windows Processes
 - Attach usermode debuggers to wsl.exe, wslservice.exe, wslrelay.exe, etc.
-- Symbols available under `bin/<platform>/<target>/`
+- Symbols available under `bin\<platform>\<target>\`
 - For automatic crash dump collection, see `CONTRIBUTING.md` (section on reporting process crashes)
 
 ### Linux Processes

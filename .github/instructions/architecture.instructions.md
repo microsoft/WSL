@@ -55,7 +55,7 @@ Communication: wsl.exe ◄──hvsocket──► relay (stdin/stdout/stderr)
 
 | Component | Source | Purpose | Docs |
 |-----------|--------|---------|------|
-| **wsl.exe** | `src/windows/wsl/` | Main CLI entrypoint. Parses args (`src/windows/common/wslclient.cpp`), calls wslservice via COM (`src/windows/common/svccomm.cpp`), relays stdin/stdout/stderr (`src/windows/common/relay.cpp`). | [wsl.exe](https://wsl.dev/technical-documentation/wsl.exe/) |
+| **wsl.exe** | `src/windows/wsl/` | Main CLI entrypoint. Parses args (`src/windows/common/WslClient.cpp`), calls wslservice via COM (`src/windows/common/svccomm.cpp`), relays stdin/stdout/stderr (`src/windows/common/relay.cpp`). | [wsl.exe](https://wsl.dev/technical-documentation/wsl.exe/) |
 | **wslservice.exe** | `src/windows/service/` | Session 0 service (SYSTEM). Manages WSL sessions, VM lifecycle, distribution registration. COM interface: `ILxssUserSession` (defined in `src/windows/service/inc/wslservice.idl`). | [wslservice.exe](https://wsl.dev/technical-documentation/wslservice.exe/) |
 | **wslhost.exe** | `src/windows/wslhost/` | Desktop notifications (`src/windows/common/notifications.cpp`) and background Linux process lifetime management. | [wslhost.exe](https://wsl.dev/technical-documentation/wslhost.exe/) |
 | **wslrelay.exe** | `src/windows/wslrelay/` | Relays localhost network traffic (NAT mode) and debug console output from Linux to Windows. | [wslrelay.exe](https://wsl.dev/technical-documentation/wslrelay.exe/) |
@@ -141,7 +141,7 @@ See `WslEntryPoint()` in `src/linux/init/init.cpp`.
 | `src/windows/service/exe/DistributionRegistration.cpp` | Distribution registry lookup |
 | `src/windows/service/exe/Lifetime.cpp` | Process lifetime association |
 | `src/windows/common/GnsChannel.cpp` | Windows-side networking channel |
-| `src/windows/common/wslclient.cpp` | CLI argument parsing |
+| `src/windows/common/WslClient.cpp` | CLI argument parsing |
 | `src/windows/common/svccomm.cpp` | COM communication helpers |
 | `src/windows/common/relay.cpp` | Stdio relay logic |
 | `src/windows/common/hcs_schema.h` | HCS VM JSON schema |

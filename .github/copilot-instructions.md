@@ -86,7 +86,7 @@ powershell diagnostics\collect-wsl-logs.ps1 -LogProfile networking
 wsl --debug-shell
 
 # Windows debugger symbols
-# Available under bin/<platform>/<target>/
+# Available under bin\<platform>\<target>\
 ```
 
 **Key ETL providers**: `Microsoft.Windows.Lxss.Manager` (wslservice), `Microsoft.Windows.Subsystem.Lxss` (wsl.exe et al.), `Microsoft.Windows.Plan9.Server`
