@@ -9,6 +9,30 @@ Param (
 
 Set-StrictMode -Version Latest
 
+function Test-WslApplication {
+    param (
+        $Name,
+        $Command
+    )
+
+    # Log warning when tool is not present in WSL
+    try
+    {
+        & wsl.exe -e sh -lc "command -v $Command >/dev/null 2>&1"
+        $available = ($LASTEXITCODE -eq 0)
+
+        if (-not $available)
+        {
+            Write-Warning "$Name not found in WSL. For a more complete log collection install $Name."
+        }
+
+        return $available
+    }
+    catch {}
+
+    return $false
+}
+
 function Collect-WindowsNetworkState {
     param (
         $Folder,
@@ -89,6 +113,9 @@ else
 # Networking-specific setup
 if ($LogProfile -eq "networking")
 {
+    Test-WslApplication -Name "tcpdump" -Command "tcpdump --version" | Out-Null
+    Test-WslApplication -Name "iptables" -Command "iptables --version" | Out-Null
+
     # Copy/download networking.sh script
     $networkingBashScript = "$folder/networking.sh"
     if (Test-Path "$PSScriptRoot/networking.sh")
