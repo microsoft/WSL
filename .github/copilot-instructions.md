@@ -2,242 +2,283 @@
 
 **ALWAYS reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
 
-WSL is the Windows Subsystem for Linux - a compatibility layer for running Linux binary executables natively on Windows. This repository contains the core Windows components that enable WSL functionality.
+WSL is the Windows Subsystem for Linux — a compatibility layer for running Linux binary executables natively on Windows. This repository contains the core Windows and Linux components that enable WSL functionality.
 
-## Working Effectively
+## Documentation Links
 
-### Critical Platform Requirements
-- **Full builds ONLY work on Windows** with Visual Studio and Windows SDK 26100
-- **DO NOT attempt to build the main WSL components on Linux** - they require Windows-specific APIs, MSBuild, and Visual Studio toolchain
-- Many validation and development tasks CAN be performed on Linux (documentation, formatting, Python validation scripts)
+| Resource | URL |
+|----------|-----|
+| User documentation | https://learn.microsoft.com/windows/wsl/ |
+| Developer documentation | https://wsl.dev/ |
+| Build, test, deploy guide | https://wsl.dev/dev-loop/ |
+| Architecture overview | https://wsl.dev/technical-documentation/ |
+| Boot process deep-dive | https://wsl.dev/technical-documentation/boot-process/ |
+| Debugging guide | https://wsl.dev/debugging/ |
 
-### Windows Build Requirements (Required for Full Development)
-- CMake >= 3.25 (`winget install Kitware.CMake`)
-- Visual Studio with these components:
-  - Windows SDK 26100 
-  - MSBuild
-  - Universal Windows platform support for v143 build tools (X64 and ARM64)
-  - MSVC v143 - VS 2022 C++ ARM64 build tools (Latest + Spectre) (X64 and ARM64)
-  - C++ core features
-  - C++ ATL for latest v143 tools (X64 and ARM64)
-  - C++ Clang compiler for Windows
-  - .NET desktop development
-  - .NET WinUI app development tools
-- Enable Developer Mode in Windows Settings OR run with Administrator privileges (required for symbolic link support)
+## Architecture at a Glance
 
-### Building WSL (Windows Only)
-1. Clone the repository
-2. Generate Visual Studio solution: `cmake .`
-3. Build: `cmake --build . -- -m` OR open `wsl.sln` in Visual Studio
-4. **NEVER CANCEL: Build takes 20-45 minutes on typical hardware. Set timeout to 60+ minutes.**
-
-Build parameters:
-- `cmake . -A arm64` - Build for ARM64
-- `cmake . -DCMAKE_BUILD_TYPE=Release` - Release build  
-- `cmake . -DBUILD_BUNDLE=TRUE` - Build bundle msix package (requires ARM64 built first)
-
-### Deploying WSL (Windows Only)  
-- Install MSI: `bin\<platform>\<target>\wsl.msi`
-- OR use script: `powershell tools\deploy\deploy-to-host.ps1`
-- For Hyper-V VM: `powershell tools\deploy\deploy-to-vm.ps1 -VmName <vm> -Username <user> -Password <pass>`
-
-## Cross-Platform Development Tasks
-
-### Documentation (Works on Linux/Windows)
-- Install tools: `pip install mkdocs-mermaid2-plugin mkdocs --break-system-packages`
-- Build docs: `mkdocs build -f doc/mkdocs.yml`
-- **Build time: ~0.5 seconds. Set timeout to 5+ minutes for safety.**
-- Output location: `doc/site/`
-- **Note**: May show warnings about mermaid CDN access on restricted networks
-
-### Code Formatting and Validation (Works on Linux/Windows)
-- Format check: `clang-format --dry-run --style=file <files>`
-- Apply formatting: `clang-format -i --style=file <files>`
-- Format all source: `powershell formatsource.ps1` (available at repo root after running `cmake .`)
-- Validate copyright headers: `python3 tools/devops/validate-copyright-headers.py`
-  - **Note**: Will report missing headers in generated/dependency files (_deps/), which is expected
-- Validate localization: `python3 tools/devops/validate-localization.py` 
-  - **Note**: Only works after Windows build (requires localization/strings/en-us/Resources.resw)
-
-### Distribution Validation (Limited on Linux)
-- Validate distribution info: `python3 distributions/validate.py distributions/DistributionInfo.json`
-- **Note**: May fail on Linux due to network restrictions accessing distribution URLs
-
-## Testing
-
-### Unit Tests (Windows Only - TAEF Framework)
-
-**CRITICAL: ALWAYS build the ENTIRE project before running tests:**
-```powershell
-# Build everything first - this is required!
-cmake --build . -- -m
-
-# Then run tests
-bin\<platform>\<target>\test.bat
+```
+┌────────────────────────────── Windows ──────────────────────────────┐
+│                                                                     │
+│  wsl.exe ─────────┐                                                │
+│  wslg.exe ────────── COM ──► wslservice.exe ──► wslrelay.exe       │
+│  wslconfig.exe ───┘             │                wslhost.exe        │
+│  wslapi.dll ── COM ─┘          │                                   │
+│    ▲ LoadLibrary()              │                                   │
+│  debian.exe, ubuntu.exe, ...   │                                   │
+│                                 │                                   │
+│  Windows filesystem (//wsl.localhost)                                │
+│        │                        │                                   │
+└────────┼────────────────────────┼───────────────────────────────────┘
+         │ hvsocket               │ hvsocket
+┌────────┼────────────────────────┼────────────────────── Linux ──────┐
+│        │                   mini_init                                │
+│        │                 ┌────┼────┐                                │
+│        │                gns  init  localhost                        │
+│        │                      │                                     │
+│        │           ┌── Distribution ───────────────┐                │
+│      plan9 ◄───────│  plan9, session leader        │                │
+│                    │       └──► relay ──► bash      │                │
+│                    └───────────────────────────────┘                │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Why full build is required:**
-- Tests depend on multiple components (libwsl.dll, wsltests.dll, wslservice.exe, etc.)
-- Partial builds (e.g., only `configfile` or `wsltests`) will cause test failures
-- Changed components must be built together to ensure compatibility
-- **DO NOT skip the full build step even if only one file changed**
+**Key communication patterns:**
+- **Windows clients → wslservice**: COM (`ILxssUserSession`, defined in `src/windows/service/inc/wslservice.idl`)
+- **wslservice ↔ Linux (mini_init, gns, init)**: hvsocket channels (Hyper-V sockets)
+- **wsl.exe ↔ relay**: hvsocket (stdin/stdout/stderr relay)
+- **Windows filesystem ↔ plan9**: hvsocket via p9rdr.sys redirector (`\\wsl$`, `\\wsl.localhost`)
+- **Windows drives ↔ Linux**: drvfs mounts under `/mnt/` (plan9/virtio-plan9/virtiofs per config)
 
-Test execution:
-- Run all tests: `bin\<platform>\<target>\test.bat`
-- **NEVER CANCEL: Full test suite takes 30-60 minutes. Set timeout to 90+ minutes.**
-- Run subset: `bin\<platform>\<target>\test.bat /name:*UnitTest*`
-- Run specific test: `bin\<platform>\<target>\test.bat /name:<class>::<test>`
-- WSL1 tests: Add `-Version 1` flag
-- Fast mode (after first run): Add `-f` flag (requires `wsl --set-default test_distro`)
-- **Requires Administrator privileges** - test.bat will fail without admin rights
+## WSL2 Boot Sequence
 
-Test debugging:
-- Wait for debugger: `/waitfordebugger`
-- Break on failure: `/breakonfailure`
-- Run in-process: `/inproc`
+```
+wsl.exe                                                    
+  │ CreateInstance(<distro>) via COM                        
+  ▼                                                        
+wslservice.exe                                              
+  │ Creates VM via HCS (HcsCreateComputeSystem)             
+  │ VM boots kernel → executes mini_init from initramfs     
+  ▼                                                        
+mini_init                                                   
+  │ Receives LxMiniInitMessageEarlyConfig (VHDs, hostname)  
+  │ fork()/exec() → gns (networking: IP, DNS, routing)      
+  │ Receives LxMiniInitMessageInitialConfig (entropy, GPU)  
+  │ Receives LxMiniInitMessageLaunchInit                    
+  │ Mounts distro VHD → fork()/exec() → init               
+  ▼                                                        
+init                                                        
+  │ Mounts /proc, /sys, /dev; configures cgroups            
+  │ Registers binfmt interpreter for Windows interop        
+  │ Starts systemd (if enabled); mounts drvfs               
+  │ Receives LxInitMessageCreateSession                     
+  │ fork() → session leader                                 
+  ▼                                                        
+session leader                                              
+  │ Receives InitCreateProcessUtilityVm                     
+  │ fork() → relay                                          
+  ▼                                                        
+relay                                                       
+  │ Creates hvsocket channels for STDIN, STDOUT, STDERR     
+  │ fork()/exec() → /bin/bash (user command)                
+  │ Relays I/O between bash and wsl.exe via hvsockets       
+  ▼                                                        
+wsl.exe receives hvsocket handles, relays terminal I/O      
+```
 
-### Linux Unit Tests (Linux Only)
-- Location: `test/linux/unit_tests/`
-- Build script: `test/linux/unit_tests/build_tests.sh`
-- **Note**: Requires specific Linux build environment setup not covered in main build process
+## How to Build (Windows Only)
 
-## Validation Scenarios
+**Critical**: Full builds ONLY work on Windows with Visual Studio and Windows SDK 26100. DO NOT attempt to build main components on Linux.
 
-### Always Test These After Changes:
-1. **Documentation Build**: Run `mkdocs build -f doc/mkdocs.yml` and verify no errors
-2. **Code Formatting**: Run `clang-format --dry-run --style=file` on changed files
-3. **Windows Build** (if on Windows): Full cmake build cycle
-4. **Distribution Validation**: Run Python validation scripts on any distribution changes
+```powershell
+# 1. Generate Visual Studio solution
+cmake .
 
-### Manual Validation Requirements
-- **Windows builds**: Install MSI and test basic WSL functionality (`wsl --version`, `wsl -l`)
-- **Documentation changes**: Review generated HTML in `doc/site/`
-- **Distribution changes**: Test with actual WSL distribution installation
+# 2. Build (20–45 min — NEVER CANCEL)
+cmake --build . -- -m
+```
+
+| Parameter | Purpose |
+|-----------|---------|
+| `cmake . -A arm64` | ARM64 build |
+| `cmake . -DCMAKE_BUILD_TYPE=Release` | Release build |
+| `cmake . -DBUILD_BUNDLE=TRUE` | Bundle MSIX (ARM64 must be built first) |
+
+**Faster iteration**: Copy `UserConfig.cmake.sample` → `UserConfig.cmake`, uncomment `WSL_DEV_BINARY_PATH`. Also see `WSL_BUILD_THIN_PACKAGE` and `WSL_POST_BUILD_COMMAND`.
+
+**Deploy**: `bin\<platform>\<target>\wsl.msi` or `powershell tools\deploy\deploy-to-host.ps1`
+
+→ See `.github/instructions/build-deploy.instructions.md` for full details (ARM64 setup, Hyper-V deployment).
+
+## How to Test
+
+**CRITICAL: Always do a full build before running tests.**
+
+```powershell
+cmake --build . -- -m                                  # Full build first!
+bin\x64\debug\test.bat                                 # All tests (30–60 min)
+bin\x64\debug\test.bat /name:*UnitTest*                # Subset
+bin\x64\debug\test.bat /name:UnitTests::UnitTests::ModernInstall  # Specific test
+```
+
+- Requires **Administrator privileges**
+- Fast mode (skip install): `wsl --set-default test_distro` then add `-f` flag
+- WSL1 tests: add `-Version 1`
+- Debug: `/waitfordebugger`, `/breakonfailure`, `/inproc`
+
+**Linux unit tests**: `make` in `test/linux/unit_tests/` (GCC, produces `wsl_unit_tests`)
+
+→ See `.github/instructions/testing.instructions.md` for full details.
+
+## How to Debug
+
+```powershell
+# ETL tracing
+wpr -start diagnostics\wsl.wprp -filemode
+# [reproduce issue]
+wpr -stop logs.ETL
+# Profiles: WSL (default), WSL-Storage, WSL-Networking, WSL-HvSocket
+# Example: wpr -start diagnostics\wsl.wprp!WSL-Networking -filemode
+
+# Collect logs
+powershell diagnostics\collect-wsl-logs.ps1
+powershell diagnostics\collect-wsl-logs.ps1 -LogProfile networking
+
+# Debug console (add to %USERPROFILE%\.wslconfig)
+# [wsl2]
+# debugConsole=true
+
+# Debug shell (for gns, mini_init — root namespace)
+wsl --debug-shell
+
+# Windows debugger symbols
+# Available under bin/<platform>/<target>/
+```
+
+**Key ETL providers**: `Microsoft.Windows.Lxss.Manager` (wslservice), `Microsoft.Windows.Subsystem.Lxss` (wsl.exe et al.), `Microsoft.Windows.Plan9.Server`
+
+→ See `.github/instructions/debugging.instructions.md` for full provider event details and debugger attachment.
+
+## Best Practices & Guidelines
+
+### Code Formatting (Pre-Commit)
+
+1. `clang-format --dry-run --style=file` on changed C/C++ files
+2. `python3 tools/devops/validate-copyright-headers.py` (ignore `_deps/` warnings)
+3. `mkdocs build -f doc/mkdocs.yml` if documentation changed
+4. Full Windows build if core components changed
+
+- Format all: `powershell .\FormatSource.ps1 -ModifiedOnly $false` (requires `cmake .` first — script is generated from `tools/FormatSource.ps1.in`)
+- Auto-check on commit: `tools\SetupClangFormat.bat`
+
+### Validation After Changes
+
+| What changed | Validation |
+|--------------|------------|
+| C/C++ source | clang-format + copyright headers + full build + tests |
+| C# (wslsettings) | Full build (includes wslsettings) |
+| Documentation | `mkdocs build -f doc/mkdocs.yml`, review `doc/site/` |
+| Distributions | `python3 distributions/validate.py distributions/DistributionInfo.json` |
+| Localization | `python3 tools/devops/validate-localization.py` (after build) |
+
+### Build Artifacts
+
+The `.gitignore` excludes build artifacts (`*.sln`, `*.dll`, `*.pdb`, `obj/`, `bin/`, etc.) — do not commit these.
+
+### CI/CD
+
+| Pipeline | Type | Purpose |
+|----------|------|---------|
+| `distributions.yml` | GitHub Actions | Validate distribution metadata (Linux) |
+| `documentation.yml` | GitHub Actions | Build and deploy docs (Linux) |
+| `modern-distributions.yml` | GitHub Actions | Test modern distribution support |
+| `.pipelines/wsl-build-pr.yml` | Azure DevOps | PR validation builds |
+| `.pipelines/wsl-build-nightly-onebranch.yml` | Azure DevOps | Nightly builds |
+| `.pipelines/wsl-build-release-onebranch.yml` | Azure DevOps | Release builds |
+
+### Timing — NEVER Cancel These
+
+| Operation | Duration | Set Timeout |
+|-----------|----------|-------------|
+| Full Windows build | 20–45 min | 60+ min |
+| Full test suite | 30–60 min | 90+ min |
+| Unit test subset | 5–15 min | 30+ min |
+| Documentation build | ~0.5 sec | 5+ min |
+| Distribution validation | 2–5 min | 15+ min |
 
 ## Repository Navigation
 
 ### Key Directories
-- `src/windows/` - Main Windows WSL service components
-- `src/linux/` - Linux-side WSL components  
-- `src/shared/` - Shared code between Windows and Linux
-- `test/windows/` - Windows-based tests (TAEF framework)
-- `test/linux/unit_tests/` - Linux unit test suite
-- `doc/` - Documentation source (MkDocs)
-- `tools/` - Build and deployment scripts
-- `distributions/` - Distribution validation and metadata
+
+| Directory | Content |
+|-----------|---------|
+| `src/windows/service/` | wslservice.exe — core WSL service |
+| `src/windows/wsl/` | wsl.exe — CLI entrypoint |
+| `src/windows/common/` | Shared Windows utilities (relay, COM, HCS schema) |
+| `src/windows/libwsl/` | wslapi.dll — public API |
+| `src/windows/wslsettings/` | WinUI 3 settings app (C#) |
+| `src/windows/wslhost/` | Background process management |
+| `src/windows/wslrelay/` | Network/debug console relay |
+| `src/linux/init/` | mini_init, init, gns, plan9, session leader, relay, localhost |
+| `src/linux/` | Linux sub-components (inc, mountutil, netlinkutil, plan9) |
+| `src/shared/` | Cross-platform code (config, message definitions) |
+| `test/windows/` | Windows tests (TAEF framework) |
+| `test/linux/unit_tests/` | Linux unit tests (GCC/Makefile) |
+| `doc/` | MkDocs documentation source |
+| `tools/` | Build, deploy, and DevOps scripts |
+| `distributions/` | Distribution metadata and validation |
+| `diagnostics/` | ETL trace profiles and log collection scripts |
+| `.pipelines/` | Azure DevOps pipeline definitions |
+| `.github/workflows/` | GitHub Actions workflows |
 
 ### Key Files
-- `CMakeLists.txt` - Main build configuration
-- `doc/docs/dev-loop.md` - Developer build instructions
-- `test/README.md` - Testing framework documentation
-- `CONTRIBUTING.md` - Contribution guidelines
-- `.clang-format` - Code formatting rules
-- `UserConfig.cmake.sample` - Optional build customizations
 
-### Frequently Used Commands (Platform-Specific)
+| File | Purpose |
+|------|---------|
+| `CMakeLists.txt` | Root build configuration |
+| `UserConfig.cmake.sample` | Optional build customization template |
+| `.clang-format` | Code formatting rules |
+| `CONTRIBUTING.md` | Contribution guidelines |
+| `src/windows/service/inc/wslservice.idl` | COM interface definition |
+| `src/shared/inc/lxinitshared.h` | Cross-platform message definitions |
+| `src/linux/init/main.cpp` | Linux main() entrypoint |
+| `src/linux/init/init.cpp` | WslEntryPoint() — argv[0] dispatcher |
 
-#### Windows Development:
-```bash
-# Initial setup
-cmake .
-cmake --build . -- -m # 20-45 minutes, NEVER CANCEL
+## Scoped Instruction Files
 
-# Deploy and test  
-powershell tools\deploy\deploy-to-host.ps1
-wsl --version
+Detailed guidelines auto-apply based on the files you're editing:
 
-# Run tests
-bin\x64\debug\test.bat # 30-60 minutes, NEVER CANCEL
-```
-
-#### Cross-Platform Validation:
-```bash  
-# Documentation (0.5 seconds)
-mkdocs build -f doc/mkdocs.yml
-
-# Code formatting  
-find src -name "*.cpp" -o -name "*.h" | xargs clang-format --dry-run --style=file
-
-# Copyright header validation (reports expected issues in _deps/)
-python3 tools/devops/validate-copyright-headers.py
-
-# Distribution validation (may fail on networks without external access)
-python3 distributions/validate.py distributions/DistributionInfo.json
-```
-
-## Debugging and Logging
-
-### ETL Tracing (Windows Only)
-```powershell
-# Collect traces
-wpr -start diagnostics\wsl.wprp -filemode
-# [reproduce issue]  
-wpr -stop logs.ETL
-
-# Available profiles:
-# - WSL (default) - General WSL tracing
-# - WSL-Storage - Enhanced storage tracing
-# - WSL-Networking - Comprehensive networking tracing
-# - WSL-HvSocket - HvSocket-specific tracing
-# Example: wpr -start diagnostics\wsl.wprp!WSL -filemode
-```
-
-### Log Analysis Tools
-- Use WPA (Windows Performance Analyzer) for ETL traces
-- Key providers: `Microsoft.Windows.Lxss.Manager`, `Microsoft.Windows.Subsystem.Lxss`
-
-### Debug Console (Linux)
-Add to `%USERPROFILE%\.wslconfig`:
-```ini
-[wsl2]
-debugConsole=true
-```
-
-### Common Debugging Commands
-- Debug shell: `wsl --debug-shell`  
-- Collect WSL logs: `powershell diagnostics\collect-wsl-logs.ps1`
-- Network logs: `powershell diagnostics\collect-wsl-logs.ps1 -LogProfile networking`
-
-## Critical Timing and Timeout Guidelines
-
-**NEVER CANCEL these operations - always wait for completion:**
-
-- **Full Windows build**: 20-45 minutes (set timeout: 60+ minutes)
-- **Full test suite**: 30-60 minutes (set timeout: 90+ minutes)
-- **Unit test subset**: 5-15 minutes (set timeout: 30+ minutes)
-- **Documentation build**: ~0.5 seconds (set timeout: 5+ minutes)
-- **Distribution validation**: 2-5 minutes (set timeout: 15+ minutes)
-
-## CI/CD Integration
-
-### GitHub Actions
-- **distributions.yml**: Validates distribution metadata (Linux)
-- **documentation.yml**: Builds and deploys docs (Linux) 
-- **modern-distributions.yml**: Tests modern distribution support
-
-### Pre-commit Validation
-Always run before committing:
-1. `clang-format --dry-run --style=file` on changed C++ files
-2. `python3 tools/devops/validate-copyright-headers.py` (ignore _deps/ warnings)
-3. `mkdocs build -f doc/mkdocs.yml` if documentation changed
-4. Full Windows build if core components changed
-
-**Note**: The `.gitignore` file properly excludes build artifacts (*.sln, *.dll, *.pdb, obj/, bin/, etc.) - do not commit these files.
+| File | Scope | Content |
+|------|-------|---------|
+| `architecture.instructions.md` | `src/**` | Component deep-dives, source file map, boot sequence |
+| `cpp.instructions.md` | `**/*.{cpp,h,c}` | C/C++ style, clang-format, copyright, WIL/GSL |
+| `csharp.instructions.md` | `src/windows/wslsettings/**/*.cs` | WinUI 3, MVVM, .NET 8.0 conventions |
+| `build-deploy.instructions.md` | `**/CMakeLists.txt, **/*.cmake, tools/deploy/**` | Build prereqs, ARM64, UserConfig, deployment |
+| `testing.instructions.md` | `test/**` | TAEF framework, test commands, Linux unit tests |
+| `debugging.instructions.md` | `diagnostics/**` | ETL tracing, providers, debugger attachment |
+| `documentation.instructions.md` | `doc/**` | MkDocs build and validation |
+| `distributions.instructions.md` | `distributions/**` | Distribution metadata validation |
+| `python.instructions.md` | `**/*.py` | Python validation/DevOps script conventions |
+| `azure-devops-pipelines.instructions.md` | `.pipelines/**/*.yml` | ADO pipeline guidelines |
+| `makefile.instructions.md` | `test/linux/unit_tests/Makefile` | Linux unit test Makefile |
+| `agents.instructions.md` | `**/*.agent.md` | Custom agent file guidelines |
+| `agent-skills.instructions.md` | `**/.github/skills/**/SKILL.md` | Agent Skills guidelines |
+| `prompt.instructions.md` | `**/*.prompt.md` | Copilot prompt file guidelines |
+| `instructions.instructions.md` | `**/*.instructions.md` | Meta: writing instruction files |
 
 ## Development Environment Setup
 
 ### Windows (Full Development)
-1. Install Visual Studio with required components (listed above)
-2. Install CMake 3.25+
+1. Install Visual Studio with required components (see Build section)
+2. Install CMake 3.25+ (`winget install Kitware.CMake`)
 3. Enable Developer Mode
 4. Clone repository
-5. Run `cmake .` to generate solution
+5. `cmake .` to generate solution
 
-### Linux (Documentation/Validation Only)  
-1. Install Python 3.8+
-2. Install clang-format
-3. Install docs tools: `pip install mkdocs-mermaid2-plugin mkdocs`
-4. Clone repository
-5. Run validation commands as needed
+### Linux (Documentation/Validation Only)
+1. Install Python 3.8+, clang-format
+2. `pip install mkdocs-mermaid2-plugin mkdocs`
+3. Clone repository
+4. Run validation commands as needed
 
-Remember: **This is a Windows-focused project**. While some tasks can be performed on Linux, full WSL development requires Windows with Visual Studio.
+**This is a Windows-focused project.** While some tasks work on Linux, full WSL development requires Windows with Visual Studio.
