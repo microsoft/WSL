@@ -138,7 +138,7 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_PortAccessibleFromHost)
+    TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
     {
         WSL2_TEST_ONLY();
 
@@ -156,6 +156,16 @@ class WSLCE2EContainerCreateTests
         // the expected message
         auto response = ReadFromLoopback(hostPort);
         VERIFY_ARE_EQUAL(message, response);
+
+        // Also verify the port mapping is correct in the container inspect data
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+        
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+        VERIFY_ARE_EQUAL(std::to_string(hostPort), portBindings[0].HostPort);
+        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_PortMultipleMappings)
@@ -166,6 +176,8 @@ class WSLCE2EContainerCreateTests
         // Map two hsot ports to the same container port
         auto hostPort1 = GetFreePort();
         auto hostPort2 = GetFreePort();
+        VERIFY_ARE_NOT_EQUAL(hostPort1, hostPort2);
+
         auto message = L"WSLC E2E Test";
         auto result = RunWslc(std::format(
             L"container run -d --name {} -p {}:{} -p {}:{} {} perl -e \"{}\"",
@@ -343,16 +355,16 @@ private:
     {
         std::wstringstream ss;
         ss
-            << L"use IO::Socket::INET;"
-            << L"my $s = IO::Socket::INET->new("
-            << L"  LocalPort => " << port << L","
-            << L"  Listen    => 5,"
-            << L"  Reuse     => 1"
-            << L") or die $!;"
-            << L"while (my $c = $s->accept) {"
-            << L"  print $c '" << message << L"';"
-            << L"  close $c;"
-            << L"}";
+            << L"use IO::Socket::INET;" //
+            << L"my $s = IO::Socket::INET->new(" //
+            << L"  LocalPort => " << port << L"," //
+            << L"  Listen    => 5," //
+            << L"  Reuse     => 1" //
+            << L") or die $!;" //
+            << L"while (my $c = $s->accept) {" //
+            << L"  print $c '" << message << L"';" //
+            << L"  close $c;" //
+            << L"}"; //
         return ss.str();
     }
 
