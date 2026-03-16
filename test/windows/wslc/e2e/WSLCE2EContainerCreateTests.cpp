@@ -145,11 +145,14 @@ class WSLCE2EContainerCreateTests
         // Start a container with a simple server listening on a port
         auto hostPort = GetFreePort();
         auto message = L"WSLC E2E Test";
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
-            WslcContainerName,
-            hostPort, ContainerTestPort,
-            DebianImage.NameAndTag(), GetPerlHttpServerCode(message, ContainerTestPort)));
+        auto result = RunWslc(
+            std::format(
+                L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
+                WslcContainerName,
+                hostPort,
+                ContainerTestPort,
+                DebianImage.NameAndTag(),
+                GetPerlHttpServerCode(message, ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // From the host side, verify we can connect to the server and receive
@@ -161,7 +164,7 @@ class WSLCE2EContainerCreateTests
         auto inspectContainer = InspectContainer(WslcContainerName);
         auto portKey = std::to_string(ContainerTestPort) + "/tcp";
         VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
-        
+
         auto portBindings = inspectContainer.Ports[portKey];
         VERIFY_ARE_EQUAL(1u, portBindings.size());
         VERIFY_ARE_EQUAL(std::to_string(hostPort), portBindings[0].HostPort);
@@ -179,12 +182,16 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_NOT_EQUAL(hostPort1, hostPort2);
 
         auto message = L"WSLC E2E Test";
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} -p {}:{} -p {}:{} {} perl -e \"{}\"",
-            WslcContainerName,
-            hostPort1, ContainerTestPort,
-            hostPort2, ContainerTestPort,
-            DebianImage.NameAndTag(), GetPerlHttpServerCode(message, ContainerTestPort)));
+        auto result = RunWslc(
+            std::format(
+                L"container run -d --name {} -p {}:{} -p {}:{} {} perl -e \"{}\"",
+                WslcContainerName,
+                hostPort1,
+                ContainerTestPort,
+                hostPort2,
+                ContainerTestPort,
+                DebianImage.NameAndTag(),
+                GetPerlHttpServerCode(message, ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // From the host side, verify we can connect to both ports and receive
@@ -206,15 +213,18 @@ class WSLCE2EContainerCreateTests
         // Start a container with a simple server listening on a port
         auto hostPort = GetFreePort();
         auto message = L"WSLC E2E Test";
-        auto result1 = RunWslc(std::format(
-            L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
-            WslcContainerName,
-            hostPort, ContainerTestPort,
-            DebianImage.NameAndTag(), GetPerlHttpServerCode(message, ContainerTestPort)));
+        auto result1 = RunWslc(
+            std::format(
+                L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
+                WslcContainerName,
+                hostPort,
+                ContainerTestPort,
+                DebianImage.NameAndTag(),
+                GetPerlHttpServerCode(message, ContainerTestPort)));
         result1.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Attempt to start another container mapping the same host port
-        auto result2 = RunWslc(std::format(L"container run -p {}:{} {}",hostPort, ContainerTestPort, DebianImage.NameAndTag()));
+        auto result2 = RunWslc(std::format(L"container run -p {}:{} {}", hostPort, ContainerTestPort, DebianImage.NameAndTag()));
         result2.Verify({.ExitCode = 1});
     }
 
@@ -344,27 +354,24 @@ private:
             return wsl::shared::string::MultiByteToWide(response);
         };
 
-        return wsl::shared::retry::RetryWithTimeout<std::wstring>(
-            readOnce,
-            std::chrono::milliseconds(500),
-            std::chrono::minutes(1),
-            []() { return wil::ResultFromCaughtException() == E_FAIL; });
+        return wsl::shared::retry::RetryWithTimeout<std::wstring>(readOnce, std::chrono::milliseconds(500), std::chrono::minutes(1), []() {
+            return wil::ResultFromCaughtException() == E_FAIL;
+        });
     }
 
     std::wstring GetPerlHttpServerCode(std::wstring message, uint16_t port)
     {
         std::wstringstream ss;
-        ss
-            << L"use IO::Socket::INET;" //
-            << L"my $s = IO::Socket::INET->new(" //
-            << L"  LocalPort => " << port << L"," //
-            << L"  Listen    => 5," //
-            << L"  Reuse     => 1" //
-            << L") or die $!;" //
-            << L"while (my $c = $s->accept) {" //
-            << L"  print $c '" << message << L"';" //
-            << L"  close $c;" //
-            << L"}"; //
+        ss << L"use IO::Socket::INET;"            //
+           << L"my $s = IO::Socket::INET->new("   //
+           << L"  LocalPort => " << port << L","  //
+           << L"  Listen    => 5,"                //
+           << L"  Reuse     => 1"                 //
+           << L") or die $!;"                     //
+           << L"while (my $c = $s->accept) {"     //
+           << L"  print $c '" << message << L"';" //
+           << L"  close $c;"                      //
+           << L"}";                               //
         return ss.str();
     }
 
@@ -383,16 +390,12 @@ private:
         addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         addr.sin_port = htons(0);
 
-        THROW_LAST_ERROR_IF(bind(sock.get(),
-                                 reinterpret_cast<sockaddr*>(&addr),
-                                 sizeof(addr)) == SOCKET_ERROR);
+        THROW_LAST_ERROR_IF(bind(sock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
 
         sockaddr_in assigned{};
         int len = sizeof(assigned);
 
-        THROW_LAST_ERROR_IF(getsockname(sock.get(),
-                                        reinterpret_cast<sockaddr*>(&assigned),
-                                        &len) == SOCKET_ERROR);
+        THROW_LAST_ERROR_IF(getsockname(sock.get(), reinterpret_cast<sockaddr*>(&assigned), &len) == SOCKET_ERROR);
         return ntohs(assigned.sin_port);
     }
 };
