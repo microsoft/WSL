@@ -87,6 +87,11 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
     containerLauncher.SetContainerFlags(containerFlags);
 
+    for (const auto& port : options.Ports)
+    {
+        containerLauncher.AddPort(port.HostPort, port.ContainerPort, port.Family);
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
@@ -205,6 +210,33 @@ std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
+std::wstring ContainerService::FormatPorts(const std::vector<PortInformation>& ports)
+{
+    if (ports.empty())
+    {
+        return L"";
+    }
+
+    std::wstring result;
+    for (size_t i = 0; i < ports.size(); ++i)
+    {
+        const auto& port = ports[i];
+
+        // AF_INET = 2, AF_INET6 = 23
+        std::wstring hostIp = (port.Family == AF_INET6) ? L"[::]" : L"0.0.0.0";
+        std::wstring protocol = (port.Protocol == 1) ? L"udp" : L"tcp";
+
+        if (i > 0)
+        {
+            result += L", ";
+        }
+
+        result += std::format(L"{}:{}->{}/{}", hostIp, port.HostPort, port.ContainerPort, protocol);
+    }
+
+    return result;
+}
+
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
 {
     // Create the container
@@ -282,6 +314,24 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
+
+        // Extract ports
+        for (ULONG i = 0; i < current.PortsCount; ++i)
+        {
+            PortInformation port;
+            port.HostPort = current.Ports[i].HostPort;
+            port.ContainerPort = current.Ports[i].ContainerPort;
+            port.Family = current.Ports[i].Family;
+            port.Protocol = static_cast<int>(current.Ports[i].Protocol);
+            entry.Ports.push_back(port);
+        }
+
+        // Free nested ports array
+        if (current.Ports != nullptr)
+        {
+            CoTaskMemFree(current.Ports);
+        }
+
         result.emplace_back(std::move(entry));
     }
 

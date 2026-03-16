@@ -73,6 +73,7 @@ public:
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
     WSLAContainerState State() const noexcept;
+    const std::vector<WSLAPortMapping>& GetPorts() const noexcept;
 
     __requires_lock_held(m_lock) void Transition(WSLAContainerState State) noexcept;
 

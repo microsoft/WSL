@@ -139,7 +139,7 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
+        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS", L"PORTS"});
         for (const auto& container : containers)
         {
             tablePrinter.AddRow({
@@ -148,6 +148,7 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(container.Image),
                 ContainerService::FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
+                ContainerService::FormatPorts(container.Ports),
             });
         }
 
@@ -222,6 +223,29 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         for (const auto& arg : forwardArgs)
         {
             options.Arguments.emplace_back(WideToMultiByte(arg));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Publish))
+    {
+        for (const auto& publishArg : context.Args.GetAll<ArgType::Publish>())
+        {
+            auto portStr = WideToMultiByte(publishArg);
+
+            uint16_t hostPort = 0;
+            uint16_t containerPort = 0;
+            if (auto colon = portStr.find(':'); colon != std::string::npos)
+            {
+                hostPort = static_cast<uint16_t>(std::stoi(portStr.substr(0, colon)));
+                containerPort = static_cast<uint16_t>(std::stoi(portStr.substr(colon + 1)));
+            }
+            else
+            {
+                hostPort = static_cast<uint16_t>(std::stoi(portStr));
+                containerPort = hostPort;
+            }
+
+            options.Ports.push_back({hostPort, containerPort, AF_INET});
         }
     }
 

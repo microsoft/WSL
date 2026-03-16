@@ -92,7 +92,8 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 
 void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family)
 {
-    m_ports.emplace_back(WSLAPortMapping{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
+    m_ports.emplace_back(
+        WSLAPortMapping{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Protocol = WSLAPortProtocolTCP, .Family = Family});
 }
 
 void WSLAContainerLauncher::SetDefaultStopSignal(WSLASignal Signal)

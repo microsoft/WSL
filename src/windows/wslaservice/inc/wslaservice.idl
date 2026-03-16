@@ -190,10 +190,17 @@ typedef struct _WSLAVolume
     BOOL ReadOnly;
 } WSLAVolume;
 
+typedef enum _WSLAPortProtocol
+{
+    WSLAPortProtocolTCP = 0,
+    WSLAPortProtocolUDP = 1,
+} WSLAPortProtocol;
+
 typedef struct _WSLAPortMapping
 {
     USHORT HostPort;
     USHORT ContainerPort;
+    WSLAPortProtocol Protocol;
     int Family;
 } WSLAPortMapping;
 
@@ -283,6 +290,8 @@ typedef struct _WSLAContainerEntry
     ULONGLONG StateChangedAt;
     ULONGLONG CreatedAt;
     WSLAContainerState State;
+    [unique, size_is(PortsCount)] WSLAPortMapping* Ports;
+    ULONG PortsCount;
 } WSLAContainerEntry;
 
 typedef enum _WSLAProcessState

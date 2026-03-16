@@ -486,6 +486,7 @@ try
 
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
+            convertedPort.Protocol = static_cast<WSLAPortProtocol>(internalPort.protocol);
             // TODO: Only other supported value right now is AF_INET6; no user access.
             convertedPort.Family = AF_INET;
 

@@ -1111,6 +1111,13 @@ try
     auto output = wil::make_unique_cotaskmem<WSLAContainerEntry[]>(m_containers.size());
 
     size_t index = 0;
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        for (size_t i = 0; i < index; ++i)
+        {
+            CoTaskMemFree(output[i].Ports);
+        }
+    });
+
     for (const auto& e : m_containers)
     {
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
@@ -1119,9 +1126,31 @@ try
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
+
+        const auto& ports = e->GetPorts();
+        if (!ports.empty())
+        {
+            auto portsArray = wil::make_unique_cotaskmem<::WSLAPortMapping[]>(ports.size());
+            for (size_t i = 0; i < ports.size(); ++i)
+            {
+                portsArray[i].HostPort = ports[i].HostPort;
+                portsArray[i].ContainerPort = ports[i].ContainerPort;
+                portsArray[i].Family = ports[i].Family;
+                portsArray[i].Protocol = WSLAPortProtocolTCP; // TODO: UDP support
+            }
+            output[index].Ports = portsArray.release();
+            output[index].PortsCount = static_cast<ULONG>(ports.size());
+        }
+        else
+        {
+            output[index].Ports = nullptr;
+            output[index].PortsCount = 0;
+        }
+
         index++;
     }
 
+    errorCleanup.release();
     *Count = static_cast<ULONG>(m_containers.size());
     *Containers = output.release();
     return S_OK;

@@ -27,6 +27,13 @@ enum class FormatType
     Json,
 };
 
+struct PortOption
+{
+    uint16_t HostPort{};
+    uint16_t ContainerPort{};
+    int Family = AF_INET;
+};
+
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
@@ -35,6 +42,7 @@ struct ContainerOptions
     std::string Name;
     bool Remove = false;
     bool TTY = false;
+    std::vector<PortOption> Ports;
 };
 
 struct CreateContainerResult
@@ -55,6 +63,16 @@ struct KillContainerOptions
     int Signal = WSLASignalSIGKILL;
 };
 
+struct PortInformation
+{
+    uint16_t HostPort{};
+    uint16_t ContainerPort{};
+    int Family{};   // AF_INET or AF_INET6
+    int Protocol{}; // 0 = TCP, 1 = UDP
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(PortInformation, HostPort, ContainerPort, Family, Protocol);
+};
+
 struct ContainerInformation
 {
     std::string Id;
@@ -63,7 +81,8 @@ struct ContainerInformation
     WSLAContainerState State;
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
+    std::vector<PortInformation> Ports;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
 };
 } // namespace wsl::windows::wslc::models

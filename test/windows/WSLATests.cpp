@@ -2991,6 +2991,7 @@ class WSLATests
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
                 VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
                 VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
+                VERIFY_ARE_EQUAL(0, containers[i].PortsCount);
             }
         };
 
@@ -3258,6 +3259,7 @@ class WSLATests
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
                 VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
                 VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
+                VERIFY_ARE_EQUAL(0, containers[i].PortsCount);
             }
         };
 
@@ -3738,6 +3740,32 @@ class WSLATests
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
             ExpectHttpResponse(L"http://[::1]:1234", {});
+
+            // Verify that ListContainers returns the port data.
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>()));
+
+                bool found = false;
+                for (const auto& entry : containers)
+                {
+                    if (std::string(entry.Name) == "test-ports")
+                    {
+                        found = true;
+                        VERIFY_IS_NOT_NULL(entry.Ports);
+                        VERIFY_ARE_EQUAL(2, entry.PortsCount);
+                        VERIFY_ARE_EQUAL(1234, entry.Ports[0].HostPort);
+                        VERIFY_ARE_EQUAL(8000, entry.Ports[0].ContainerPort);
+                        VERIFY_ARE_EQUAL(AF_INET, entry.Ports[0].Family);
+                        VERIFY_ARE_EQUAL(1234, entry.Ports[1].HostPort);
+                        VERIFY_ARE_EQUAL(8000, entry.Ports[1].ContainerPort);
+                        VERIFY_ARE_EQUAL(AF_INET6, entry.Ports[1].Family);
+                        break;
+                    }
+                }
+
+                VERIFY_IS_TRUE(found);
+            }
 
             // Validate that the port cannot be reused while the container is running.
             WSLAContainerLauncher subLauncher(

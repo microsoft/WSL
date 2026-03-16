@@ -391,6 +391,11 @@ const std::string& WSLAContainerImpl::Name() const noexcept
     return m_name;
 }
 
+const std::vector<WSLAPortMapping>& WSLAContainerImpl::GetPorts() const noexcept
+{
+    return m_mappedPorts;
+}
+
 void WSLAContainerImpl::GetStateChangedAt(ULONGLONG* Result)
 {
     auto lock = m_lock.lock_shared();
