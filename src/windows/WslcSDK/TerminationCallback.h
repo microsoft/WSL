@@ -24,7 +24,7 @@ struct TerminationCallback : public winrt::implements<TerminationCallback, ITerm
     HRESULT STDMETHODCALLTYPE OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details) override;
 
     // Creates a TerminationCallback if the options provides a callback.
-    static winrt::com_ptr<TerminationCallback> CreateIf(const WSLC_SESSION_OPTIONS_INTERNAL* options);
+    static winrt::com_ptr<TerminationCallback> CreateIf(const WslcSessionOptionsInternal* options);
 
 private:
     WslcSessionTerminationCallback m_callback = nullptr;

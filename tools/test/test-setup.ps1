@@ -59,7 +59,13 @@ if ($Package) {
             )
 
         $exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
-        if ($exitCode -Ne 0)
+        # 1605 means that ProductCode was not present on the system
+        if ($exitCode -Eq 1605)
+        {
+            Write-Host "MSI product $($installedMsi.ProductCode) was not found, registry HKLM:Software\Microsoft\Windows\CurrentVersion\Lxss\MSI appears to have been leaked."
+            exit 1
+        }
+        elseif ($exitCode -Ne 0)
         {
             Write-Host "Failed to remove package: $exitCode"
             exit 1
@@ -121,6 +127,7 @@ New-ItemProperty -Path $UserLxssRegistryPath -Name "OOBEComplete" -Value "1" -Pr
 
 if ($DistroPath)
 {
+    Write-Host "Importing distro $DistroName($Version) from $DistroPath"
     & wsl.exe --unregister "$DistroName" # Ignore non-zero return for this call
     Run { wsl.exe --import "$DistroName" "$env:LocalAppData\lxss" "$DistroPath" --version "$Version" }
     Run { wsl.exe --set-default "$DistroName" }

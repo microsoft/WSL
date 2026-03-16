@@ -403,7 +403,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Mes
     std::promise<pid_t> childPid;
 
     {
-        auto childLogic = [ListenSocketFd = ListenSocket.get(), &SocketAddress, &Channel, &Message, &childPid]() mutable {
+        auto childLogic = [ListenSocketFd = ListenSocket.get(), SocketAddress, &Channel, &Message, &childPid]() mutable {
             wil::unique_fd ListenSocket;
 
             // Close parent channel
