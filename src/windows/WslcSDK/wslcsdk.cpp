@@ -1026,8 +1026,8 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(
-        internalType->session->ImportImage(HandleToULong(imageFile.Handle()), options->imageName, progressCallback.get(), imageFile.Length()));
+    return errorInfoWrapper.CaptureResult(internalType->session->ImportImage(
+        HandleToULong(imageFile.Handle()), options->imageName, progressCallback.get(), imageFile.Length()));
 }
 CATCH_RETURN();
 
@@ -1042,7 +1042,8 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
 }
 CATCH_RETURN();
 
