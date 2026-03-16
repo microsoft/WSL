@@ -14,77 +14,11 @@ WSL is the Windows Subsystem for Linux — a compatibility layer for running Lin
 | Architecture overview | https://wsl.dev/technical-documentation/ |
 | Boot process deep-dive | https://wsl.dev/technical-documentation/boot-process/ |
 | Debugging guide | https://wsl.dev/debugging/ |
+| Interop (Windows ↔ Linux) | https://wsl.dev/technical-documentation/interop/ |
+| Drvfs & Plan9 | https://wsl.dev/technical-documentation/drvfs/ |
+| Systemd integration | https://wsl.dev/technical-documentation/systemd/ |
 
-## Architecture at a Glance
-
-```
-┌────────────────────────────── Windows ──────────────────────────────┐
-│                                                                     │
-│  wsl.exe ─────────┐                                                │
-│  wslg.exe ────────── COM ──► wslservice.exe ──► wslrelay.exe       │
-│  wslconfig.exe ───┘             │                wslhost.exe        │
-│  wslapi.dll ── COM ─┘          │                                   │
-│    ▲ LoadLibrary()              │                                   │
-│  debian.exe, ubuntu.exe, ...   │                                   │
-│                                 │                                   │
-│  Windows filesystem (//wsl.localhost)                                │
-│        │                        │                                   │
-└────────┼────────────────────────┼───────────────────────────────────┘
-         │ hvsocket               │ hvsocket
-┌────────┼────────────────────────┼────────────────────── Linux ──────┐
-│        │                   mini_init                                │
-│        │                 ┌────┼────┐                                │
-│        │                gns  init  localhost                        │
-│        │                      │                                     │
-│        │           ┌── Distribution ───────────────┐                │
-│      plan9 ◄───────│  plan9, session leader        │                │
-│                    │       └──► relay ──► bash      │                │
-│                    └───────────────────────────────┘                │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**Key communication patterns:**
-- **Windows clients → wslservice**: COM (`ILxssUserSession`, defined in `src/windows/service/inc/wslservice.idl`)
-- **wslservice ↔ Linux (mini_init, gns, init)**: hvsocket channels (Hyper-V sockets)
-- **wsl.exe ↔ relay**: hvsocket (stdin/stdout/stderr relay)
-- **Windows filesystem ↔ plan9**: hvsocket via p9rdr.sys redirector (`\\wsl$`, `\\wsl.localhost`)
-- **Windows drives ↔ Linux**: drvfs mounts under `/mnt/` (plan9/virtio-plan9/virtiofs per config)
-
-## WSL2 Boot Sequence
-
-```
-wsl.exe                                                    
-  │ CreateInstance(<distro>) via COM                        
-  ▼                                                        
-wslservice.exe                                              
-  │ Creates VM via HCS (HcsCreateComputeSystem)             
-  │ VM boots kernel → executes mini_init from initramfs     
-  ▼                                                        
-mini_init                                                   
-  │ Receives LxMiniInitMessageEarlyConfig (VHDs, hostname)  
-  │ fork()/exec() → gns (networking: IP, DNS, routing)      
-  │ Receives LxMiniInitMessageInitialConfig (entropy, GPU)  
-  │ Receives LxMiniInitMessageLaunchInit                    
-  │ Mounts distro VHD → fork()/exec() → init               
-  ▼                                                        
-init                                                        
-  │ Mounts /proc, /sys, /dev; configures cgroups            
-  │ Registers binfmt interpreter for Windows interop        
-  │ Starts systemd (if enabled); mounts drvfs               
-  │ Receives LxInitMessageCreateSession                     
-  │ fork() → session leader                                 
-  ▼                                                        
-session leader                                              
-  │ Receives InitCreateProcessUtilityVm                     
-  │ fork() → relay                                          
-  ▼                                                        
-relay                                                       
-  │ Creates hvsocket channels for STDIN, STDOUT, STDERR     
-  │ fork()/exec() → /bin/bash (user command)                
-  │ Relays I/O between bash and wsl.exe via hvsockets       
-  ▼                                                        
-wsl.exe receives hvsocket handles, relays terminal I/O      
-```
+→ For full architecture details (component diagram, boot sequence, source file map), see `.github/instructions/architecture.instructions.md` (auto-applied when editing `src/**`).
 
 ## How to Build (Windows Only)
 

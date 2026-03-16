@@ -11,13 +11,14 @@ WSL is composed of Windows executables, Linux binaries, COM interfaces, and hvso
 
 ## Component Diagram
 
+Source: https://wsl.dev/technical-documentation/ (Mermaid flowchart)
+
 ```
 ┌─────────────────────────── Windows ───────────────────────────────┐
 │                                                                    │
 │  C:\Windows\System32\wsl.exe ──CreateProcess()──► wsl.exe         │
 │                                                     │ COM         │
 │  wslg.exe ──────────────── COM ──────────────►  wslservice.exe    │
-│  wslconfig.exe ──────────── COM ──────────────►     │             │
 │  wslapi.dll ──────────────── COM ──────────────►    │             │
 │    ▲ LoadLibrary()                                  │             │
 │  debian.exe, ubuntu.exe, ...            CreateProcessAsUser()     │
@@ -52,29 +53,29 @@ Communication: wsl.exe ◄──hvsocket──► relay (stdin/stdout/stderr)
 
 ## Windows Components
 
-| Component | Source | Purpose |
-|-----------|--------|---------|
-| **wsl.exe** | `src/windows/wsl/` | Main CLI entrypoint. Parses args (`src/windows/common/wslclient.cpp`), calls wslservice via COM (`src/windows/common/svccomm.cpp`), relays stdin/stdout/stderr (`src/windows/common/relay.cpp`). |
-| **wslservice.exe** | `src/windows/service/` | Session 0 service (SYSTEM). Manages WSL sessions, VM lifecycle, distribution registration. COM interface: `ILxssUserSession` (defined in `src/windows/service/inc/wslservice.idl`). |
-| **wslhost.exe** | `src/windows/wslhost/` | Desktop notifications (`src/windows/common/notifications.cpp`) and background Linux process lifetime management. |
-| **wslrelay.exe** | `src/windows/wslrelay/` | Relays localhost network traffic (NAT mode) and debug console output from Linux to Windows. |
-| **wslg.exe** | `src/windows/wslg/` | Like wsl.exe but Win32 (not console) — for graphical Linux apps without a console window. |
-| **wslconfig.exe** | (part of `src/windows/`) | Configure WSL distributions. Source not in a standalone directory; functionality integrated with other WSL executables. |
-| **wslapi.dll / libwsl** | `src/windows/libwsl/` | Public WSL API DLL (used by distribution launchers like ubuntu.exe). |
-| **wslsettings** | `src/windows/wslsettings/` | WinUI 3 / C# settings app (MVVM, .NET 8.0, WindowsAppSDK). |
-| **wslinstall** | `src/windows/wslinstall/` | Installation executables. |
+| Component | Source | Purpose | Docs |
+|-----------|--------|---------|------|
+| **wsl.exe** | `src/windows/wsl/` | Main CLI entrypoint. Parses args (`src/windows/common/wslclient.cpp`), calls wslservice via COM (`src/windows/common/svccomm.cpp`), relays stdin/stdout/stderr (`src/windows/common/relay.cpp`). | [wsl.exe](https://wsl.dev/technical-documentation/wsl.exe/) |
+| **wslservice.exe** | `src/windows/service/` | Session 0 service (SYSTEM). Manages WSL sessions, VM lifecycle, distribution registration. COM interface: `ILxssUserSession` (defined in `src/windows/service/inc/wslservice.idl`). | [wslservice.exe](https://wsl.dev/technical-documentation/wslservice.exe/) |
+| **wslhost.exe** | `src/windows/wslhost/` | Desktop notifications (`src/windows/common/notifications.cpp`) and background Linux process lifetime management. | [wslhost.exe](https://wsl.dev/technical-documentation/wslhost.exe/) |
+| **wslrelay.exe** | `src/windows/wslrelay/` | Relays localhost network traffic (NAT mode) and debug console output from Linux to Windows. | [wslrelay.exe](https://wsl.dev/technical-documentation/wslrelay.exe/) |
+| **wslg.exe** | `src/windows/wslg/` | Like wsl.exe but Win32 (not console) — for graphical Linux apps without a console window. | [wslg.exe](https://wsl.dev/technical-documentation/wslg.exe/) |
+| **wslconfig.exe** | (no standalone source directory) | Configure WSL distributions. Functionality integrated with other WSL executables. | [wslconfig.exe](https://wsl.dev/technical-documentation/wslconfig.exe/) |
+| **wslapi.dll / libwsl** | `src/windows/libwsl/` | Public WSL API DLL (used by distribution launchers like ubuntu.exe). | [wslapi.dll](https://learn.microsoft.com/windows/win32/api/wslapi/) |
+| **wslsettings** | `src/windows/wslsettings/` | WinUI 3 / C# settings app (MVVM, .NET 8.0, WindowsAppSDK). | — |
+| **wslinstall** | `src/windows/wslinstall/` | Installation executables. | — |
 
 ## Linux Components
 
-| Component | Source | Purpose |
-|-----------|--------|---------|
-| **mini_init** | `src/linux/init/` (entrypoint) | First process in WSL2 VM. Mounts filesystems, configures logging, connects hvsockets to wslservice, launches gns and distributions. |
-| **gns** | `src/linux/init/GnsEngine.cpp` | Networking configuration (IP, routing, DNS, MTU). Maintains hvsocket to wslservice. Handles DNS tunneling. |
-| **init** | `src/linux/init/` | Top-level process per distribution. Mounts /proc, /sys, /dev; configures cgroups; registers binfmt; starts systemd; mounts drvfs; creates session leaders. |
-| **session leader** | `src/linux/init/` | Forked from init. Creates Linux processes on behalf of users. Each is associated with a Windows console. |
-| **relay** | `src/linux/init/` | Created by session leader (WSL2). Creates hvsocket channels for stdin/stdout/stderr relay to wsl.exe. Forks into user process. |
-| **plan9** | `src/linux/init/plan9.cpp` | Plan9 filesystem server for accessing Linux files from Windows (`\\wsl.localhost\<distro>`). Windows-side uses p9rdr.sys redirector driver. |
-| **localhost** | `src/linux/init/localhost.cpp` | Forwards network traffic between WSL2 VM and Windows. NAT: watches TCP ports. Mirrored: BPF intercepts bind(). |
+| Component | Source | Purpose | Docs |
+|-----------|--------|---------|------|
+| **mini_init** | `src/linux/init/` (entrypoint) | First process in WSL2 VM. Mounts filesystems, configures logging, connects hvsockets to wslservice, launches gns and distributions. | [mini_init](https://wsl.dev/technical-documentation/mini_init/) |
+| **gns** | `src/linux/init/GnsEngine.cpp` | Networking configuration (IP, routing, DNS, MTU). Maintains hvsocket to wslservice. Handles DNS tunneling. | [gns](https://wsl.dev/technical-documentation/gns/) |
+| **init** | `src/linux/init/` | Top-level process per distribution. Mounts /proc, /sys, /dev; configures cgroups; registers binfmt; starts systemd; mounts drvfs; creates session leaders. | [init](https://wsl.dev/technical-documentation/init/) |
+| **session leader** | `src/linux/init/` | Forked from init. Creates Linux processes on behalf of users. Each is associated with a Windows console. | [session leader](https://wsl.dev/technical-documentation/session-leader/) |
+| **relay** | `src/linux/init/` | Created by session leader (WSL2). Creates hvsocket channels for stdin/stdout/stderr relay to wsl.exe. Forks into user process. | [relay](https://wsl.dev/technical-documentation/relay/) |
+| **plan9** | `src/linux/init/plan9.cpp` (server entrypoint) + `src/linux/plan9/` (protocol implementation) | Plan9 filesystem server for accessing Linux files from Windows (`\\wsl.localhost\<distro>`). Windows-side uses p9rdr.sys redirector driver. | [plan9](https://wsl.dev/technical-documentation/plan9/) |
+| **localhost** | `src/linux/init/localhost.cpp` | Forwards network traffic between WSL2 VM and Windows. NAT: watches TCP ports. Mirrored: BPF intercepts bind(). | [localhost](https://wsl.dev/technical-documentation/localhost/) |
 
 ## Shared Code
 
