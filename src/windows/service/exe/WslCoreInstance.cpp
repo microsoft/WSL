@@ -15,6 +15,29 @@ Abstract:
 #include "precomp.h"
 #include "WslCoreInstance.h"
 
+namespace {
+std::wstring CreateInstanceStepDescription(_In_ LX_MINI_CREATE_INSTANCE_STEP step)
+{
+    switch (step)
+    {
+    case LxInitCreateInstanceStepFormatDisk:
+        return wsl::shared::Localization::MessageCreateInstanceStepFormatDisk();
+
+    case LxInitCreateInstanceStepMountDisk:
+        return wsl::shared::Localization::MessageCreateInstanceStepMountDisk();
+
+    case LxInitCreateInstanceStepLaunchSystemDistro:
+        return wsl::shared::Localization::MessageCreateInstanceStepLaunchDistribution();
+
+    case LxInitCreateInstanceStepRunTar:
+        return wsl::shared::Localization::MessageCreateInstanceStepRunTar();
+
+    default:
+        return wsl::shared::Localization::MessageCreateInstanceStepUnknown();
+    }
+}
+} // namespace
+
 WslCoreInstance::WslCoreInstance(
     _In_ HANDLE UserToken,
     _In_ wil::unique_socket& InitSocket,
@@ -57,17 +80,49 @@ WslCoreInstance::WslCoreInstance(
         }
     }
 
+    const auto stepDescription = CreateInstanceStepDescription(result.FailureStep);
+    WSL_LOG(
+        "CreateInstanceGuestResult",
+        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(m_instanceId, "instanceId"),
+        TraceLoggingValue(m_runtimeId, "vmId"),
+        TraceLoggingValue(result.Result, "linuxError"),
+        TraceLoggingValue(static_cast<int>(result.FailureStep), "failureStep"),
+        TraceLoggingValue(stepDescription.c_str(), "failureStepDescription"),
+        TraceLoggingValue(result.Pid, "pid"),
+        TraceLoggingValue(result.ConnectPort, "connectPort"));
+
     if (result.Result != 0)
     {
+        WSL_LOG(
+            "CreateInstanceGuestFailure",
+            TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(m_instanceId, "instanceId"),
+            TraceLoggingValue(m_runtimeId, "vmId"),
+            TraceLoggingValue(result.Result, "linuxError"),
+            TraceLoggingValue(static_cast<int>(result.FailureStep), "failureStep"),
+            TraceLoggingValue(stepDescription.c_str(), "failureStepDescription"));
+
         // N.B. EUCLEAN (117) can be returned if the disk's journal is corrupted.
         if ((result.Result == EINVAL || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk)
         {
             THROW_HR(WSL_E_DISK_CORRUPTED);
         }
+        else if (result.FailureStep == LxInitCreateInstanceStepMountDisk)
+        {
+            wsl::windows::common::ExecutionContext stepContext(wsl::windows::common::Context::MountDisk);
+            THROW_HR_WITH_USER_ERROR(
+                E_FAIL,
+                wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(
+                    static_cast<int>(result.FailureStep), stepDescription, result.Result));
+        }
         else
         {
             THROW_HR_WITH_USER_ERROR(
-                E_FAIL, wsl::shared::Localization::MessageDistributionFailedToStart(result.Result, static_cast<int>(result.FailureStep)));
+                E_FAIL,
+                wsl::shared::Localization::MessageDistributionFailedToStart(
+                    static_cast<int>(result.FailureStep), stepDescription, result.Result));
         }
     }
 
