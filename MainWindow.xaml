@@ -175,17 +175,34 @@
 
                 <!-- Connection status (right side) -->
                 <StackPanel Grid.Column="1" 
-                            Orientation="Horizontal" 
-                            Spacing="6">
-                    <Ellipse x:Name="ConnectionDot" 
-                             Width="10" Height="10" 
-                             Fill="Red"
-                             VerticalAlignment="Center"/>
-                    <TextBlock x:Name="ConnectionStatusText"
-                               Text="Disconnected"
-                               FontSize="12"
-                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                               VerticalAlignment="Center"/>
+                            Orientation="Vertical" 
+                            Spacing="2">
+                    <!-- Container status -->
+                    <StackPanel Orientation="Horizontal" 
+                                Spacing="6">
+                        <Ellipse x:Name="ContainerDot" 
+                                 Width="10" Height="10" 
+                                 Fill="Gray"
+                                 VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ContainerStatusText"
+                                   Text="Container: Idle"
+                                   FontSize="12"
+                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <!-- Socket connection status -->
+                    <StackPanel Orientation="Horizontal" 
+                                Spacing="6">
+                        <Ellipse x:Name="ConnectionDot" 
+                                 Width="10" Height="10" 
+                                 Fill="Red"
+                                 VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ConnectionStatusText"
+                                   Text="Disconnected"
+                                   FontSize="12"
+                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>

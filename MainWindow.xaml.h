@@ -2,6 +2,7 @@
 
 #include "MainWindow.g.h"
 #include "Subtitler.h"
+#include "Container.h"
 #include <winrt/Windows.Media.Playback.h>
 #include <winrt/Windows.Media.Core.h>
 #include <winrt/Windows.Storage.h>
@@ -38,6 +39,9 @@ namespace winrt::WSLAMoviePlayer::implementation
         // Subtitler
         std::unique_ptr<Subtitler> m_subtitler;
         
+        // Container
+        std::unique_ptr<Container> m_container;
+        
         // State
         int64_t m_duration;  // in milliseconds
         PlaybackState m_playbackState;
@@ -72,6 +76,9 @@ namespace winrt::WSLAMoviePlayer::implementation
         void OnConnectionEstablished();
         void OnConnectionLost();
         void OnConnectionError(const winrt::hstring& error);
+        
+        // Container callbacks
+        void SetupContainerCallbacks();
         
         // Dispatcher for UI thread
         Microsoft::UI::Dispatching::DispatcherQueue m_dispatcherQueue{ nullptr };

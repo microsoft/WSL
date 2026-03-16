@@ -41,10 +41,21 @@ namespace winrt::WSLAMoviePlayer::implementation
         
         // Initialize subtitler connection (fire-and-forget)
         auto initAsync = m_subtitler->InitializeAsync();
+        
+        // Create and start container (fire-and-forget)
+        m_container = std::make_unique<Container>();
+        SetupContainerCallbacks();
+        auto containerAsync = m_container->StartAsync();
     }
 
     MainWindow::~MainWindow()
     {
+        // Stop container
+        if (m_container)
+        {
+            m_container->Stop();
+        }
+        
         // Clean up event handlers
         if (m_mediaPlayer)
         {
@@ -465,5 +476,51 @@ namespace winrt::WSLAMoviePlayer::implementation
         OutputDebugStringW((L"MainWindow: Connection error - " + error + L"\n").c_str());
         ConnectionDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 255, 0, 0)));
         ConnectionStatusText().Text(L"Error");
+    }
+
+    void MainWindow::SetupContainerCallbacks()
+    {
+        m_container->OnContainerStarted = [this]()
+        {
+            m_dispatcherQueue.TryEnqueue([this]()
+            {
+                OutputDebugStringW(L"MainWindow: Container started\n");
+                ContainerDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 0, 200, 0)));
+                ContainerStatusText().Text(L"Container: Running");
+            });
+        };
+
+        m_container->OnContainerStopped = [this]()
+        {
+            m_dispatcherQueue.TryEnqueue([this]()
+            {
+                OutputDebugStringW(L"MainWindow: Container stopped\n");
+                ContainerDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 128, 128, 128)));
+                ContainerStatusText().Text(L"Container: Exited");
+            });
+        };
+
+        m_container->OnContainerError = [this](const hstring& error)
+        {
+            m_dispatcherQueue.TryEnqueue([this, error]()
+            {
+                OutputDebugStringW((L"MainWindow: Container error - " + error + L"\n").c_str());
+                ContainerDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 255, 0, 0)));
+                ContainerStatusText().Text(L"Container: " + error);
+            });
+        };
+
+        m_container->OnContainerOutput = [this](const hstring& output)
+        {
+            m_dispatcherQueue.TryEnqueue([this, output]()
+            {
+                OutputDebugStringW((L"MainWindow: Container output - " + output + L"\n").c_str());
+                ContainerStatusText().Text(L"Container: " + output);
+            });
+        };
+
+        // Set initial "starting" state
+        ContainerDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 255, 165, 0)));
+        ContainerStatusText().Text(L"Container: Starting...");
     }
 }

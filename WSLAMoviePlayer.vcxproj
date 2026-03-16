@@ -93,6 +93,12 @@
       <WarningLevel>Level4</WarningLevel>
       <AdditionalOptions>%(AdditionalOptions) /bigobj</AdditionalOptions>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(ProjectDir)lib\WslcSDK.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "$(ProjectDir)dll\WslcSDK.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
@@ -120,6 +126,8 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="Subtitler.h" />
+    <ClInclude Include="Container.h" />
+    <ClInclude Include="wslcsdk.h" />
     <ClInclude Include="App.xaml.h">
       <DependentUpon>App.xaml</DependentUpon>
     </ClInclude>
@@ -137,6 +145,7 @@
     </ClCompile>
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="Subtitler.cpp" />
+    <ClCompile Include="Container.cpp" />
     <ClCompile Include="App.xaml.cpp">
       <DependentUpon>App.xaml</DependentUpon>
     </ClCompile>
@@ -175,6 +184,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="subtitler.tar">
+      <DeploymentContent>true</DeploymentContent>
+    </None>
   </ItemGroup>
   <!--
     Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution

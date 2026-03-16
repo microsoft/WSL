@@ -14,11 +14,14 @@
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
     <ClCompile Include="WSLAMoviePlayer\Socket.cpp" />
     <ClCompile Include="WSLAMoviePlayer\Subtitler.cpp" />
+    <ClCompile Include="Container.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="WSLAMoviePlayer\Socket.h" />
     <ClInclude Include="WSLAMoviePlayer\Subtitler.h" />
+    <ClInclude Include="Container.h" />
+    <ClInclude Include="wslcsdk.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
