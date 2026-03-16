@@ -517,8 +517,8 @@ class WslcSdkTests
         {
             WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr);
 
-            wil::unique_handle imageTarFileHandle{
-                CreateFileW(exportedImageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            wil::unique_handle imageTarFileHandle{CreateFileW(
+                exportedImageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
 
             LARGE_INTEGER fileSize{};
