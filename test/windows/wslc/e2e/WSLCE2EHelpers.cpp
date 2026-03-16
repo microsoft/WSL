@@ -153,7 +153,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     {
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
-            auto deleteResult = RunWslc(std::format(L"image delete {}", image.NameAndTag()));
+            auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }

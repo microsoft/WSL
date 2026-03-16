@@ -337,6 +337,12 @@ std::string WSLCInteractiveSession::ReadUntil(const std::string& marker, DWORD t
                     m_stdoutDataAvailable.ResetEvent();
                     return accumulated;
                 }
+
+                // Marker not found and buffer empty, reset event to wait for more data.
+                if (m_stdoutBuffer.empty())
+                {
+                    m_stdoutDataAvailable.ResetEvent();
+                }
             }
         }
 
@@ -378,7 +384,20 @@ void WSLCInteractiveSession::Write(const std::string& data)
         }
     }
 
-    THROW_IF_WIN32_BOOL_FALSE(FlushFileBuffers(m_stdinWrite.get()));
+    // Only flush if the handle is still valid (process might have closed it)
+    if (m_stdinWrite.get() != nullptr)
+    {
+        if (!FlushFileBuffers(m_stdinWrite.get()))
+        {
+            DWORD error = GetLastError();
+
+            // Ignore ERROR_BROKEN_PIPE - the process closed stdin, which is expected during shutdown
+            if (error != ERROR_BROKEN_PIPE)
+            {
+                THROW_WIN32(error);
+            }
+        }
+    }
 }
 
 void WSLCInteractiveSession::Write(const std::wstring& data)
@@ -497,8 +516,9 @@ int WSLCInteractiveSession::Exit(DWORD timeoutMs)
 
 int WSLCInteractiveSession::ExitAndVerifyNoErrors(DWORD timeoutMs)
 {
+    const auto exitCode = Exit(timeoutMs);
     VerifyNoErrors();
-    return Exit(timeoutMs);
+    return exitCode;
 }
 
 } // namespace WSLCE2ETests

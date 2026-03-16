@@ -99,6 +99,9 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_Remove)
     {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
         auto result = RunWslc(std::format(L"container create --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
@@ -112,6 +115,9 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Run_Remove)
     {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
         // Run the container with a valid image
         auto result = RunWslc(std::format(L"container run --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
