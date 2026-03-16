@@ -137,6 +137,8 @@ void ConvertSHA256Hash(const char* hashString, uint8_t sha256[32])
     memcpy(sha256, &hashBytes[0], s_sha256ByteCount);
 }
 
+// TODO: Replace with a derivation of wsl::windows::common::ExecutionContext when telemetry changes are introduced
+//       This will make usage even easier as we can just use the WIL result macros directly.
 struct ErrorInfoWrapper
 {
     ErrorInfoWrapper(PWSTR* errorMessage) : m_errorMessage(errorMessage)
@@ -162,21 +164,22 @@ struct ErrorInfoWrapper
     HRESULT CaptureResult(HRESULT hr)
     {
         m_hr = hr;
-        if (FAILED_LOG(m_hr))
+        if (FAILED_LOG(m_hr.value()))
         {
             GetErrorInfoFromCOM();
         }
-        return m_hr;
+        return m_hr.value();
     }
 
     operator HRESULT() const
     {
-        return m_hr;
+        THROW_HR_IF(E_UNEXPECTED, !m_hr);
+        return m_hr.value();
     }
 
 private:
     PWSTR* m_errorMessage = nullptr;
-    HRESULT m_hr = S_OK;
+    std::optional<HRESULT> m_hr;
 };
 
 void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
