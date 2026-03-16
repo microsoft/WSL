@@ -51,7 +51,7 @@ WSL CI/CD pipelines live under `.pipelines/` and use Azure DevOps (not GitHub Ac
 
 ## Branch and Trigger Strategy
 
-- Use path filters to trigger builds only when relevant files change (exclude `docs/`, `README.md`).
+- Use path filters to trigger builds only when relevant files change (exclude `doc/`, `README.md`).
 - Configure PR triggers for code validation.
 - Use scheduled triggers for nightly builds and localization syncs.
 

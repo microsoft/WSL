@@ -185,7 +185,7 @@ Detailed guidelines auto-apply based on the files you're editing:
 | File | Scope | Content |
 |------|-------|---------|
 | `architecture.instructions.md` | `src/**` | Component deep-dives, source file map, boot sequence |
-| `cpp.instructions.md` | `**/*.{cpp,h,c}` | C/C++ style, clang-format, copyright, WIL/GSL |
+| `cpp.instructions.md` | `**/*.cpp, **/*.h, **/*.c` | C/C++ style, clang-format, copyright, WIL/GSL |
 | `csharp.instructions.md` | `src/windows/wslsettings/**/*.cs` | WinUI 3, MVVM, .NET 8.0 conventions |
 | `build-deploy.instructions.md` | `**/CMakeLists.txt, **/*.cmake, tools/deploy/**` | Build prereqs, ARM64, UserConfig, deployment |
 | `testing.instructions.md` | `test/**` | TAEF framework, test commands, Linux unit tests |
