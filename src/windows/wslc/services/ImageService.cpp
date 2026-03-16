@@ -68,11 +68,11 @@ void ImageService::Build(
 
     auto contextPathStr = absolutePath.wstring();
     WSLABuildImageOptions options{
-        contextPathStr.c_str(),
-        HandleToULong(dockerfileHandle),
-        {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
-        {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
-        verbose,
+        .ContextPath = contextPathStr.c_str(),
+        .DockerfileHandle = HandleToULong(dockerfileHandle),
+        .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
+        .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
+        .Verbose = verbose,
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));

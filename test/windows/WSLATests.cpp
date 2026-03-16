@@ -1256,6 +1256,10 @@ class WSLATests
         auto contextDir = std::filesystem::current_path() / "build-context-buildargs";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            WSLADeleteImageOptions deleteOptions{.Image = "wsla-test-build-args:latest", .Flags = WSLADeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1276,10 +1280,8 @@ class WSLATests
 
         WSLAContainerLauncher launcher("wsla-test-build-args:latest", "wsla-build-args-container");
         auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
-
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("build-arg-value=hello-from-build-arg") != std::string::npos);
+        auto initProcess = container.GetInitProcess();
+        ValidateProcessOutput(initProcess, {{1, "build-arg-value=hello-from-build-arg\n"}});
     }
 
     TEST_METHOD(BuildImageMultipleTags)
@@ -1288,7 +1290,15 @@ class WSLATests
 
         auto contextDir = std::filesystem::current_path() / "build-context-multitag";
         std::filesystem::create_directories(contextDir);
+        LPCSTR tags[] = {"wsla-test-multitag:v1", "wsla-test-multitag:v2"};
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+            for (auto* tag : tags)
+            {
+                WSLADeleteImageOptions deleteOptions{.Image = tag, .Flags = WSLADeleteImageFlagsForce};
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+            }
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1298,8 +1308,6 @@ class WSLATests
             dockerfile << "FROM alpine\n";
             dockerfile << "CMD [\"echo\", \"multi-tag-ok\"]\n";
         }
-
-        LPCSTR tags[] = {"wsla-test-multitag:v1", "wsla-test-multitag:v2"};
         WSLABuildImageOptions options{.Tags = {tags, 2}};
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
         ExpectImagePresent(*m_defaultSession, "wsla-test-multitag:v1");

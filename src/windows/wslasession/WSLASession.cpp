@@ -427,6 +427,7 @@ try
     for (ULONG i = 0; i < Options->BuildArgs.Count; i++)
     {
         RETURN_HR_IF_NULL(E_INVALIDARG, Options->BuildArgs.Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Values[i][0] == '-');
         buildArgs.push_back("--build-arg");
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
