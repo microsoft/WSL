@@ -176,7 +176,7 @@ function New-WorktreeForExistingBranch {
       } else {
         git checkout --detach 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "Cannot free branch '$Branch' from main repo. Checkout a different branch first." }
-        Warn "Main repo is now in detached HEAD. Run 'git checkout master' when done."
+        Warn "Main repo is now in detached HEAD. Run 'git checkout $localDefault' when done."
       }
       # Now fall through to create the worktree below
     } else {
@@ -225,6 +225,7 @@ function Get-WorktreeEntries {
     if ($l -eq '') { if ($current.path -and $current.branch){ $entries += ,([pscustomobject]@{ Path=$current.path; Branch=($current.branch -replace '^refs/heads/','') }) }; $current=@{ path=$null; branch=$null }; continue }
     if ($l -like 'worktree *'){ $current.path = ($l -split ' ',2)[1] }
     elseif ($l -like 'branch *'){ $current.branch = ($l -split ' ',2)[1].Trim() }
+    elseif ($l -eq 'detached'){ $current.branch = '(detached)' }
   }
   if ($current.path -and $current.branch){ $entries += ,([pscustomobject]@{ Path=$current.path; Branch=($current.branch -replace '^refs/heads/','') }) }
   return ($entries | Sort-Object Path,Branch -Unique)
@@ -425,31 +426,31 @@ function Get-OrderedRemotes {
 
 <#
 .SYNOPSIS
-    Finds the best default base ref for new branches (upstream master/main).
+    Finds the best default base ref for new branches.
 
 .DESCRIPTION
-    Looks for the default branch on the canonical upstream remote.
-    In a fork setup (upstream=microsoft/WSL), returns upstream/master.
-    In a direct clone (origin=microsoft/WSL), returns origin/master.
-    Falls back to checking 'main' if 'master' doesn't exist.
+    Checks remote-tracking refs in this order: upstream/master, upstream/main,
+    origin/master, origin/main. If none of those refs exist locally, it tries to
+    resolve origin/HEAD and falls back to origin/main.
 
 .OUTPUTS
-    System.String. A remote ref like 'upstream/master' or 'origin/master'.
+    System.String. A remote ref such as 'upstream/master' or 'origin/main'.
 
 .EXAMPLE
     $base = Get-DefaultBaseRef
     # Fork:   'upstream/master'
-    # Direct: 'origin/master'
+    # Direct: 'origin/main' or 'origin/master'
 #>
 function Get-DefaultBaseRef {
-  $remotes = Get-OrderedRemotes
-  foreach ($remote in $remotes) {
-    foreach ($branch in @('master', 'main')) {
-      git show-ref --verify --quiet "refs/remotes/$remote/$branch" 2>$null
-      if ($LASTEXITCODE -eq 0) { return "$remote/$branch" }
-    }
+  foreach ($ref in @('upstream/master', 'upstream/main', 'origin/master', 'origin/main')) {
+    git show-ref --verify --quiet "refs/remotes/$ref" 2>$null
+    if ($LASTEXITCODE -eq 0) { return $ref }
   }
-  return 'origin/master'
+
+  $originHead = git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>$null
+  if ($LASTEXITCODE -eq 0 -and $originHead) { return $originHead.Trim() }
+
+  return 'origin/main'
 }
 
 <#

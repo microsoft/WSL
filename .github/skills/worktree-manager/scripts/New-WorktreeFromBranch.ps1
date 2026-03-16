@@ -53,7 +53,8 @@ if ($Help -or -not $Branch) { Show-FileEmbeddedHelp -ScriptPath $MyInvocation.My
 # Normalize <remote>/<name> to <name> for any configured remote
 $remotes = Get-OrderedRemotes
 foreach ($r in $remotes) {
-    if ($Branch -match "^$r/(.+)$") { $Branch = $Matches[1]; break }
+    $escapedRemote = [regex]::Escape($r)
+    if ($Branch -match "^$escapedRemote/(.+)$") { $Branch = $Matches[1]; break }
 }
 
 try {

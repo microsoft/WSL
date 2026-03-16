@@ -7,8 +7,8 @@
 
 .DESCRIPTION
     Composes a branch name as workitem/<number> or workitem/<number>-<slug> (slug from optional -Title).
-    If the branch does not already exist, it is created from -Base (default origin/main). Then a
-    worktree is created or reused.
+    If the branch does not already exist, it is created from -Base (auto-detected via Get-DefaultBaseRef
+    when omitted). Then a worktree is created or reused.
 
 .PARAMETER Number
     Azure DevOps work item number used to construct the branch name.
@@ -17,8 +17,8 @@
     Optional descriptive title; slug into the branch name.
 
 .PARAMETER Base
-    Base ref to branch from. Auto-detected if omitted: prefers upstream/master
-    (fork setup) then origin/master (direct clone), then origin/main.
+    Base ref to branch from. Auto-detected if omitted by checking, in order:
+    upstream/master, upstream/main, origin/master, origin/main, then origin/HEAD when available.
 
 .PARAMETER VSCodeProfile
     VS Code profile to open (Default).
@@ -53,7 +53,7 @@ $ErrorActionPreference = 'Stop'
 $scriptPath = $MyInvocation.MyCommand.Path
 if ($Help -or -not $Number) { Show-FileEmbeddedHelp -ScriptPath $scriptPath; return }
 
-# Auto-detect base if not provided: upstream/master > origin/master > origin/main
+# Auto-detect base if not provided: upstream/master > upstream/main > origin/master > origin/main > origin/HEAD
 if (-not $Base) { $Base = Get-DefaultBaseRef; Info "Auto-detected base: $Base" }
 
 # Compose branch name

@@ -8,4 +8,10 @@ if "%REPO_ROOT%"=="" (
     echo Error: Not inside a Git repository.
     exit /b 1
 )
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%\.github\skills\worktree-manager\scripts\Delete-Worktree.ps1" %*
+where pwsh >nul 2>nul
+if %ERRORLEVEL%==0 (
+    set "PS_EXE=pwsh"
+) else (
+    set "PS_EXE=powershell.exe"
+)
+"%PS_EXE%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%\.github\skills\worktree-manager\scripts\Delete-Worktree.ps1" %*

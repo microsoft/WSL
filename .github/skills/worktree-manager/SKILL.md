@@ -31,7 +31,7 @@ This skill provides helper scripts and workflows for creating and managing Git w
 ## Prerequisites
 
 - Git installed and configured
-- PowerShell 5.1+ (Windows) or PowerShell Core (cross-platform)
+- PowerShell 5.1+ on Windows (PowerShell 7+ recommended) or PowerShell Core cross-platform
 - VS Code installed (for automatic workspace opening)
 - Repository must be a Git repository (not inside a worktree already)
 
@@ -79,7 +79,7 @@ Start a new work item branch with consistent naming and create a worktree for it
 |-----------|----------|---------|-------------|
 | `-Number` | Yes | - | Azure DevOps work item number for branch naming |
 | `-Title` | No | - | Descriptive title (slugified into branch name) |
-| `-Base` | No | `origin/main` | Base ref to branch from |
+| `-Base` | No | Auto-detected (`upstream/master` > `upstream/main` > `origin/master` > `origin/main`, then `origin/HEAD` when available) | Base ref to branch from |
 
 **Examples**:
 ```powershell

@@ -41,7 +41,7 @@ Recommended: keep active parallel worktrees to **≤ 3** per developer to reduce
 | Script | Purpose |
 |--------|---------|
 | `New-WorktreeFromBranch.cmd` | Create/reuse a worktree for an existing local or remote (origin) branch |
-| `New-WorktreeFromIssue.cmd` | Start a new work item branch from a base (default `origin/main`) using naming `workitem/<number>-<slug>` |
+| `New-WorktreeFromIssue.cmd` | Start a new work item branch from an auto-detected base (`upstream/master` > `upstream/main` > `origin/master` > `origin/main`, then `origin/HEAD` when available) using naming `workitem/<number>-<slug>` |
 | `Delete-Worktree.cmd` | Remove a worktree and optionally its local branch |
 
 ## Typical Flows
@@ -57,7 +57,7 @@ Fetches if needed and creates a tracking branch if missing, then creates/reuses 
 New-WorktreeFromIssue.cmd -Number 1234 -Title "Crash on launch"
 ```
 Creates branch `workitem/1234-crash-on-launch` off the auto-detected base (or explicit `-Base`), then worktree.
-The base is auto-detected: `upstream/master` in a fork setup, `origin/master` in a direct clone.
+The base is auto-detected in this order: `upstream/master`, `upstream/main`, `origin/master`, `origin/main`, then `origin/HEAD` when available.
 
 ### 3. Delete a worktree when done
 ```cmd
@@ -67,7 +67,7 @@ If only one match, removes the worktree directory. Add `-Force` to discard local
 
 ## Naming & Locations
 
-- Worktrees are created as sibling folders of the repo root (e.g., `WindowsAppSDK` + `WindowsAppSDK-ab12`), using a hash/short pattern to avoid collisions
+- Worktrees are created as sibling folders of the repo root (e.g., `WSL` + `WSL-ab12`), using a hash/short pattern to avoid collisions
 - Work item branches: `workitem/<number>` or `workitem/<number>-<slug>`
 
 ## Best Practices

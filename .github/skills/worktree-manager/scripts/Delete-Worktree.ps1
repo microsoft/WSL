@@ -82,8 +82,7 @@ try {
     $branchName = $target.Branch
     
     # Check if this is the main worktree (repo root)
-    $mainWorktree = git rev-parse --git-dir 2>$null
-    if ($mainWorktree -and (Resolve-Path $worktreePath -ErrorAction SilentlyContinue) -eq (Resolve-Path $repoRoot -ErrorAction SilentlyContinue)) {
+    if ((Resolve-Path $worktreePath -ErrorAction SilentlyContinue) -eq (Resolve-Path $repoRoot -ErrorAction SilentlyContinue)) {
         Err "Cannot remove the main worktree (repository root)."
         exit 1
     }
@@ -92,7 +91,12 @@ try {
     
     # Remove the worktree
     if ($Force) {
-        git worktree remove --force $worktreePath 2>&1 | Out-Null
+        $result = git worktree remove --force $worktreePath 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Err "Failed to force-remove worktree."
+            Err $result
+            exit 1
+        }
     } else {
         $result = git worktree remove $worktreePath 2>&1
         if ($LASTEXITCODE -ne 0) {
