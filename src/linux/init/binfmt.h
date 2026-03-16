@@ -21,6 +21,6 @@ Abstract:
 #define LX_INIT_BINFMT_NAME "WSLInterop"
 #define BINFMT_MISC_MOUNT_TARGET "/proc/sys/fs/binfmt_misc"
 #define BINFMT_MISC_REGISTER_FILE BINFMT_MISC_MOUNT_TARGET "/register"
-#define BINFMT_INTEROP_REGISTRATION_STRING(Name) ":" Name ":M::MZ::" LX_INIT_PATH ":P"
+#define BINFMT_INTEROP_REGISTRATION_STRING(Name) ":" Name ":M::MZ::" LX_INIT_PATH ":FP"
 
 int CreateNtProcess(int Argc, char* Argv[]);
