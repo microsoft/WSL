@@ -97,6 +97,29 @@ class WSLCE2EContainerCreateTests
              .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_Remove)
+    {
+        auto result = RunWslc(std::format(L"container create --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Start the container.
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify with retry timeout of 1 minute.
+        VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Remove)
+    {
+        // Run the container with a valid image
+        auto result = RunWslc(std::format(L"container run --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Run should be deleted on return so no retry.
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     TEST_METHOD(WSLCE2E_Container_RunInteractive_TTY)
     {
         WSL2_TEST_ONLY();
@@ -141,8 +164,6 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
-        // Create the container with a valid image
         auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
@@ -162,8 +183,6 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
-        // Create the container with a valid image
         auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
@@ -192,7 +211,6 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
         auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
@@ -212,7 +230,6 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
         auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
@@ -241,8 +258,6 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
-        // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
@@ -262,8 +277,6 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
-        // Create the container with cat (no TTY)
         auto result = RunWslc(std::format(L"container create -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
