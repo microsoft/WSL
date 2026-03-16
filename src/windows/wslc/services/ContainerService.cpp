@@ -101,17 +101,16 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
             // - Host port mappings with UDP protocol
             if (portMapping.HostPort().IsEphemeral() || portMapping.HostIP().has_value() || portMapping.PortProtocol() == PublishPort::Protocol::UDP)
             {
-                THROW_HR_WITH_USER_ERROR(E_NOTIMPL, "Only host port mappings with TCP protocol are currently supported");
+                THROW_HR_WITH_USER_ERROR(E_FAIL, "Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported");
             }
         }
 
         auto containerPort = portMapping.ContainerPort();
         for (auto i = 0; i < containerPort.Count(); ++i)
         {
-            int family = portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6() ? AF_INET6 : AF_INET;
             auto currentContainerPort = containerPort.Start() + i;
-            auto currentHostPort = portMapping.HostPort().IsEphemeral() ? portMapping.HostPort().Start() : portMapping.HostPort().Start() + i;
-            containerLauncher.AddPort(currentHostPort, currentContainerPort, family);
+            auto currentHostPort = portMapping.HostPort().Start() + i;
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, AF_INET);
         }
     }
 

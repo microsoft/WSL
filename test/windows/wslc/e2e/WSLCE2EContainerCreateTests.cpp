@@ -15,6 +15,8 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include <wil/network.h>
+#include <wil/resource.h>
 
 namespace WSLCE2ETests {
 
@@ -25,12 +27,21 @@ class WSLCE2EContainerCreateTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+
+        // Initialize Winsock for loopback connectivity tests
+        WSADATA wsaData{};
+        const int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+        THROW_HR_IF(HRESULT_FROM_WIN32(result), result != 0);
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
+
+        // Cleanup Winsock
+        WSACleanup();
         return true;
     }
 
@@ -127,10 +138,106 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    TEST_METHOD(WSLCE2E_Container_Run_PortAccessibleFromHost)
+    {
+        WSL2_TEST_ONLY();
+
+        // Start a container with a simple server listening on a port
+        auto hostPort = GetFreePort();
+        auto message = L"WSLC E2E Test";
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
+            WslcContainerName,
+            hostPort, ContainerTestPort,
+            DebianImage.NameAndTag(), GetPerlHttpServerCode(message, ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // From the host side, verify we can connect to the server and receive
+        // the expected message
+        auto response = ReadFromLoopback(hostPort);
+        VERIFY_ARE_EQUAL(message, response);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_PortMultipleMappings)
+    {
+        WSL2_TEST_ONLY();
+
+        // Start a container with a simple server listening on a port
+        // Map two hsot ports to the same container port
+        auto hostPort1 = GetFreePort();
+        auto hostPort2 = GetFreePort();
+        auto message = L"WSLC E2E Test";
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} -p {}:{} {} perl -e \"{}\"",
+            WslcContainerName,
+            hostPort1, ContainerTestPort,
+            hostPort2, ContainerTestPort,
+            DebianImage.NameAndTag(), GetPerlHttpServerCode(message, ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // From the host side, verify we can connect to both ports and receive
+        // the expected message
+        auto response8090 = ReadFromLoopback(hostPort1);
+        VERIFY_ARE_EQUAL(message, response8090);
+
+        auto response8091 = ReadFromLoopback(hostPort2);
+        VERIFY_ARE_EQUAL(message, response8091);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_PortAlreadyInUse)
+    {
+        // Bug: https://github.com/microsoft/WSL/issues/14448
+        SKIP_TEST_NOT_IMPL();
+
+        WSL2_TEST_ONLY();
+
+        // Start a container with a simple server listening on a port
+        auto hostPort = GetFreePort();
+        auto message = L"WSLC E2E Test";
+        auto result1 = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
+            WslcContainerName,
+            hostPort, ContainerTestPort,
+            DebianImage.NameAndTag(), GetPerlHttpServerCode(message, ContainerTestPort)));
+        result1.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Attempt to start another container mapping the same host port
+        auto result2 = RunWslc(std::format(L"container run -p {}:{} {}",hostPort, ContainerTestPort, DebianImage.NameAndTag()));
+        result2.Verify({.ExitCode = 1});
+    }
+
+    // https://github.com/microsoft/WSL/issues/14433
+    TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral_NotSupported)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -p 80 {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
+    // https://github.com/microsoft/WSL/issues/14433
+    TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
+    // https://github.com/microsoft/WSL/issues/14433
+    TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+    const uint16_t ContainerTestPort = 8080;
 
     std::wstring GetHelpMessage() const
     {
@@ -190,6 +297,91 @@ private:
                 << L"  --virtualization  Expose virtualization capabilities to the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n\r\n";
         return options.str();
+    }
+
+    std::wstring ReadFromLoopback(uint16_t port)
+    {
+        SOCKADDR_IN address{};
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+        auto readOnce = [&]() -> std::wstring {
+            std::string response;
+
+            wil::unique_socket clientSocket(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+            THROW_HR_IF(E_FAIL, clientSocket.get() == INVALID_SOCKET);
+            THROW_HR_IF(E_FAIL, ::connect(clientSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR);
+
+            char buffer[256]{};
+            for (;;)
+            {
+                const int bytesRead = ::recv(clientSocket.get(), buffer, sizeof(buffer), 0);
+                THROW_HR_IF(E_FAIL, bytesRead == SOCKET_ERROR);
+
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                response.append(buffer, bytesRead);
+            }
+
+            // Empty payload is treated as transient startup/routing failure.
+            THROW_HR_IF(E_FAIL, response.empty());
+            return wsl::shared::string::MultiByteToWide(response);
+        };
+
+        return wsl::shared::retry::RetryWithTimeout<std::wstring>(
+            readOnce,
+            std::chrono::milliseconds(500),
+            std::chrono::minutes(1),
+            []() { return wil::ResultFromCaughtException() == E_FAIL; });
+    }
+
+    std::wstring GetPerlHttpServerCode(std::wstring message, uint16_t port)
+    {
+        std::wstringstream ss;
+        ss
+            << L"use IO::Socket::INET;"
+            << L"my $s = IO::Socket::INET->new("
+            << L"  LocalPort => " << port << L","
+            << L"  Listen    => 5,"
+            << L"  Reuse     => 1"
+            << L") or die $!;"
+            << L"while (my $c = $s->accept) {"
+            << L"  print $c '" << message << L"';"
+            << L"  close $c;"
+            << L"}";
+        return ss.str();
+    }
+
+    uint16_t GetFreePort()
+    {
+        // Note: This function finds a free port by binding to port 0, which
+        // tells the OS to assign an available port. While there is a potential
+        // race condition where the port could be taken by another process
+        // before it is used, this is acceptable for testing purposes.
+
+        wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+        THROW_LAST_ERROR_IF(sock.get() == INVALID_SOCKET);
+
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        addr.sin_port = htons(0);
+
+        THROW_LAST_ERROR_IF(bind(sock.get(),
+                                 reinterpret_cast<sockaddr*>(&addr),
+                                 sizeof(addr)) == SOCKET_ERROR);
+
+        sockaddr_in assigned{};
+        int len = sizeof(assigned);
+
+        THROW_LAST_ERROR_IF(getsockname(sock.get(),
+                                        reinterpret_cast<sockaddr*>(&assigned),
+                                        &len) == SOCKET_ERROR);
+        return ntohs(assigned.sin_port);
     }
 };
 } // namespace WSLCE2ETests
