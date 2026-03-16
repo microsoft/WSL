@@ -109,10 +109,10 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         }
 
         auto containerPort = portMapping.ContainerPort();
-        for (auto i = 0; i < containerPort.Count(); ++i)
+        for (uint16_t i = 0; i < containerPort.Count(); ++i)
         {
-            auto currentContainerPort = containerPort.Start() + i;
-            auto currentHostPort = portMapping.HostPort().Start() + i;
+            auto currentContainerPort = static_cast<uint16_t>(containerPort.Start() + i);
+            auto currentHostPort = static_cast<uint16_t>(portMapping.HostPort().Start() + i);
             containerLauncher.AddPort(currentHostPort, currentContainerPort, AF_INET);
         }
     }

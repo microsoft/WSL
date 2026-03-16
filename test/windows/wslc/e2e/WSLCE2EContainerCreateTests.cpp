@@ -176,7 +176,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
 
         // Start a container with a simple server listening on a port
-        // Map two hsot ports to the same container port
+        // Map two host ports to the same container port
         auto hostPort1 = GetFreePort();
         auto hostPort2 = GetFreePort();
         VERIFY_ARE_NOT_EQUAL(hostPort1, hostPort2);
@@ -309,6 +309,7 @@ private:
                 << L"  --name            Name of the container\r\n"
                 << L"  --no-dns          No configuration of DNS in the container\r\n"
                 << L"  --progress        Progress type (format: none|ansi) (default: ansi)\r\n"
+                << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --scheme          Use this scheme for registry connection\r\n"
                 << L"  --session         Specify the session to use\r\n"
