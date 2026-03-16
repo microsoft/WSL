@@ -51,11 +51,13 @@ Match the style used in surrounding files. Validate: `python3 tools/devops/valid
 
 ## Key Libraries
 
-| Library | Version | Usage |
-|---------|---------|-------|
-| **WIL** (Windows Implementation Library) | 1.0.251108.1 | RAII wrappers (`wil::unique_hkey`, `wil::unique_handle`, `wil::unique_cotaskmem_string`), COM helpers, error handling |
-| **GSL** (Guidelines Support Library) | 4.0.0 | Buffer safety (`gsl::span`, `gsl::make_span`), contracts |
-| **nlohmann/json** | 3.12.0 | JSON serialization for HCS VM config, networking requests |
+Versions are managed in [`packages.config`](../../packages.config) — do not hardcode version numbers here.
+
+| Library | Usage |
+|---------|-------|
+| **WIL** (Windows Implementation Library) | RAII wrappers (`wil::unique_hkey`, `wil::unique_handle`, `wil::unique_cotaskmem_string`), COM helpers, error handling |
+| **GSL** (Guidelines Support Library) | Buffer safety (`gsl::span`, `gsl::make_span`), contracts |
+| **nlohmann/json** | JSON serialization for HCS VM config, networking requests |
 
 ## Conventions
 

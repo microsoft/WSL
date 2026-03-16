@@ -24,7 +24,7 @@ Source: https://wsl.dev/technical-documentation/ (Mermaid flowchart)
 │  debian.exe, ubuntu.exe, ...            CreateProcessAsUser()     │
 │                                          ┌──────────┴──────────┐  │
 │  Windows filesystem                 wslrelay.exe    wslhost.exe   │
-│  (//wsl.localhost)                                                │
+│  (\\\\wsl.localhost)                                                │
 │        │                                                          │
 └────────┼──────────────────────────────────────────────────────────┘
          │ hvsocket              │ hvsocket          │ hvsocket
