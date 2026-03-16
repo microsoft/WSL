@@ -230,18 +230,18 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     {
         for (const auto& publishArg : context.Args.GetAll<ArgType::Publish>())
         {
-            auto portStr = WideToMultiByte(publishArg);
+            auto portStr = publishArg;
 
             uint16_t hostPort = 0;
             uint16_t containerPort = 0;
-            if (auto colon = portStr.find(':'); colon != std::string::npos)
+            if (auto colon = portStr.find(':'); colon != std::wstring::npos)
             {
-                hostPort = static_cast<uint16_t>(std::stoi(portStr.substr(0, colon)));
-                containerPort = static_cast<uint16_t>(std::stoi(portStr.substr(colon + 1)));
+                hostPort = validation::GetIntegerFromString<uint16_t>(portStr.substr(0, colon));
+                containerPort = validation::GetIntegerFromString<uint16_t>(portStr.substr(colon + 1));
             }
             else
             {
-                hostPort = static_cast<uint16_t>(std::stoi(portStr));
+                hostPort = validation::GetIntegerFromString<uint16_t>(portStr);
                 containerPort = hostPort;
             }
 

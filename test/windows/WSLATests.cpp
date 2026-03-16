@@ -3757,9 +3757,11 @@ class WSLATests
                         VERIFY_ARE_EQUAL(1234, entry.Ports[0].HostPort);
                         VERIFY_ARE_EQUAL(8000, entry.Ports[0].ContainerPort);
                         VERIFY_ARE_EQUAL(AF_INET, entry.Ports[0].Family);
+                        VERIFY_ARE_EQUAL(WSLAPortProtocolTCP, entry.Ports[0].Protocol);
                         VERIFY_ARE_EQUAL(1234, entry.Ports[1].HostPort);
                         VERIFY_ARE_EQUAL(8000, entry.Ports[1].ContainerPort);
                         VERIFY_ARE_EQUAL(AF_INET6, entry.Ports[1].Family);
+                        VERIFY_ARE_EQUAL(WSLAPortProtocolTCP, entry.Ports[1].Protocol);
                         break;
                     }
                 }

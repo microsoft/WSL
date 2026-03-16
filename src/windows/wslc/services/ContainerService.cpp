@@ -224,7 +224,7 @@ std::wstring ContainerService::FormatPorts(const std::vector<PortInformation>& p
 
         // AF_INET = 2, AF_INET6 = 23
         std::wstring hostIp = (port.Family == AF_INET6) ? L"[::]" : L"0.0.0.0";
-        std::wstring protocol = (port.Protocol == 1) ? L"udp" : L"tcp";
+        std::wstring protocol = (port.Protocol == WSLAPortProtocolUDP) ? L"udp" : L"tcp";
 
         if (i > 0)
         {
