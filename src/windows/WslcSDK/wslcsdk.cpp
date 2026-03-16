@@ -223,6 +223,54 @@ bool CopyProcessSettingsToRuntime(WSLAProcessOptions& runtimeOptions, const Wslc
         return false;
     }
 }
+
+// Normalizes file inputs to HANDLE+length.
+struct ImageFileResolver
+{
+    ImageFileResolver(const WslcImageFileSpecifier& imageFile)
+    {
+        bool pathSpecified = imageFile.path != nullptr;
+        bool handleSpecified = imageFile.content.handle != nullptr && imageFile.content.handle != INVALID_HANDLE_VALUE;
+
+        // Throw if both or neither options are given
+        THROW_HR_IF(E_INVALIDARG, (pathSpecified && handleSpecified) || (!pathSpecified && !handleSpecified));
+
+        if (pathSpecified)
+        {
+            wil::unique_handle imageFileHandle{
+                CreateFileW(imageFile.path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            THROW_LAST_ERROR_IF(!imageFileHandle);
+
+            LARGE_INTEGER fileSize{};
+            THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(imageFileHandle.get(), &fileSize));
+
+            m_fileHandle = std::move(imageFileHandle);
+            m_rawHandle = m_fileHandle.get();
+            m_length = static_cast<ULONGLONG>(fileSize.QuadPart);
+        }
+        else
+        {
+            THROW_HR_IF(E_INVALIDARG, imageFile.content.length == 0);
+            m_rawHandle = imageFile.content.handle;
+            m_length = imageFile.content.length;
+        }
+    }
+
+    HANDLE Handle() const
+    {
+        return m_rawHandle;
+    }
+
+    ULONGLONG Length() const
+    {
+        return m_length;
+    }
+
+private:
+    HANDLE m_rawHandle;
+    ULONGLONG m_length;
+    wil::unique_handle m_fileHandle;
+};
 } // namespace
 
 // SESSION DEFINITIONS
@@ -969,10 +1017,17 @@ CATCH_RETURN();
 STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    UNREFERENCED_PARAMETER(errorMessage);
-    return E_NOTIMPL;
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->imageName);
+    ImageFileResolver imageFile{options->imageFile};
+
+    auto progressCallback = ProgressCallback::CreateIf(options);
+
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->ImportImage(HandleToULong(imageFile.Handle()), options->imageName, progressCallback.get(), imageFile.Length()));
 }
 CATCH_RETURN();
 
@@ -983,13 +1038,11 @@ try
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, options);
-    RETURN_HR_IF(E_INVALIDARG, options->ImageHandle == nullptr || options->ImageHandle == INVALID_HANDLE_VALUE);
-    RETURN_HR_IF(E_INVALIDARG, options->ContentLength == 0);
+    ImageFileResolver imageFile{options->imageFile};
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(
-        internalType->session->LoadImage(HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength));
+    return errorInfoWrapper.CaptureResult(internalType->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
 }
 CATCH_RETURN();
 

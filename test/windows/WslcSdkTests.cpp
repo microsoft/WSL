@@ -174,16 +174,9 @@ class WslcSdkTests
     void LoadTestImage(std::string_view imageName)
     {
         std::filesystem::path imagePath = GetTestImagePath(imageName);
-        wil::unique_hfile imageFile{
-            CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        THROW_LAST_ERROR_IF(!imageFile);
-
-        LARGE_INTEGER fileSize{};
-        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
         WslcLoadImageOptions options{};
-        options.ImageHandle = imageFile.get();
-        options.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
+        options.imageFile.path = imagePath.c_str();
 
         THROW_IF_FAILED(WslcLoadSessionImage(m_defaultSession, &options, nullptr));
     }
@@ -451,8 +444,24 @@ class WslcSdkTests
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
             WslcLoadImageOptions opts{};
-            opts.ImageHandle = imageTarFileHandle.get();
-            opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
+            opts.imageFile.content.handle = imageTarFileHandle.get();
+            opts.imageFile.content.length = static_cast<uint64_t>(fileSize.QuadPart);
+            VERIFY_SUCCEEDED(WslcLoadSessionImage(m_defaultSession, &opts, nullptr));
+
+            // Verify the loaded image is usable.
+            auto output = RunContainerAndCapture(m_defaultSession, "hello-world:latest", {});
+            VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Positive: load a saved image tar and verify the image can be run.
+        {
+            // Remove the image first (ignore failure if it wasn't present).
+            WslcDeleteSessionImage(m_defaultSession, "hello-world:latest", nullptr);
+
+            std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
+
+            WslcLoadImageOptions opts{};
+            opts.imageFile.path = imageTar.c_str();
             VERIFY_SUCCEEDED(WslcLoadSessionImage(m_defaultSession, &opts, nullptr));
 
             // Verify the loaded image is usable.
@@ -466,23 +475,32 @@ class WslcSdkTests
         // Negative: null ImageHandle must fail.
         {
             WslcLoadImageOptions opts{};
-            opts.ContentLength = 1;
+            opts.imageFile.content.length = 1;
             VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
 
         // Negative: INVALID_HANDLE_VALUE must fail.
         {
             WslcLoadImageOptions opts{};
-            opts.ImageHandle = INVALID_HANDLE_VALUE;
-            opts.ContentLength = 1;
+            opts.imageFile.content.handle = INVALID_HANDLE_VALUE;
+            opts.imageFile.content.length = 1;
             VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
 
         // Negative: zero ContentLength must fail.
         {
             WslcLoadImageOptions opts{};
-            opts.ImageHandle = GetCurrentProcess();
-            opts.ContentLength = 0;
+            opts.imageFile.content.handle = GetCurrentThreadEffectiveToken();
+            opts.imageFile.content.length = 0;
+            VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: path and content must fail.
+        {
+            WslcLoadImageOptions opts{};
+            opts.imageFile.path = L"not-a-file.txt";
+            opts.imageFile.content.handle = GetCurrentThreadEffectiveToken();
+            opts.imageFile.content.length = 1;
             VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
     }
@@ -504,8 +522,8 @@ class WslcSdkTests
             VERIFY_IS_TRUE(GetFileSizeEx(selfFileHandle.get(), &fileSize));
 
             WslcLoadImageOptions opts{};
-            opts.ImageHandle = selfFileHandle.get();
-            opts.ContentLength = static_cast<uint64_t>(fileSize.QuadPart);
+            opts.imageFile.content.handle = selfFileHandle.get();
+            opts.imageFile.content.length = static_cast<uint64_t>(fileSize.QuadPart);
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_ARE_EQUAL(WslcLoadSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
             VERIFY_IS_NOT_NULL(errorMsg.get());
@@ -1407,7 +1425,7 @@ class WslcSdkTests
         WSL2_TEST_ONLY();
 
         WslcImportImageOptions opts{};
-        opts.imagePath = L"dummy.tar";
+        opts.imageFile.path = L"dummy.tar";
         VERIFY_ARE_EQUAL(WslcImportSessionImage(m_defaultSession, &opts, nullptr), E_NOTIMPL);
     }
 
