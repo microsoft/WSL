@@ -145,14 +145,13 @@ class WSLCE2EContainerCreateTests
         // Start a container with a simple server listening on a port
         auto hostPort = GetFreePort();
         auto message = L"WSLC E2E Test";
-        auto result = RunWslc(
-            std::format(
-                L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
-                WslcContainerName,
-                hostPort,
-                ContainerTestPort,
-                DebianImage.NameAndTag(),
-                GetPerlHttpServerCode(message, ContainerTestPort)));
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
+            WslcContainerName,
+            hostPort,
+            ContainerTestPort,
+            DebianImage.NameAndTag(),
+            GetPerlHttpServerCode(message, ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // From the host side, verify we can connect to the server and receive
@@ -182,16 +181,15 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_NOT_EQUAL(hostPort1, hostPort2);
 
         auto message = L"WSLC E2E Test";
-        auto result = RunWslc(
-            std::format(
-                L"container run -d --name {} -p {}:{} -p {}:{} {} perl -e \"{}\"",
-                WslcContainerName,
-                hostPort1,
-                ContainerTestPort,
-                hostPort2,
-                ContainerTestPort,
-                DebianImage.NameAndTag(),
-                GetPerlHttpServerCode(message, ContainerTestPort)));
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} -p {}:{} {} perl -e \"{}\"",
+            WslcContainerName,
+            hostPort1,
+            ContainerTestPort,
+            hostPort2,
+            ContainerTestPort,
+            DebianImage.NameAndTag(),
+            GetPerlHttpServerCode(message, ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // From the host side, verify we can connect to both ports and receive
@@ -213,14 +211,13 @@ class WSLCE2EContainerCreateTests
         // Start a container with a simple server listening on a port
         auto hostPort = GetFreePort();
         auto message = L"WSLC E2E Test";
-        auto result1 = RunWslc(
-            std::format(
-                L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
-                WslcContainerName,
-                hostPort,
-                ContainerTestPort,
-                DebianImage.NameAndTag(),
-                GetPerlHttpServerCode(message, ContainerTestPort)));
+        auto result1 = RunWslc(std::format(
+            L"container run -d --name {} -p {}:{} {} perl -e \"{}\"",
+            WslcContainerName,
+            hostPort,
+            ContainerTestPort,
+            DebianImage.NameAndTag(),
+            GetPerlHttpServerCode(message, ContainerTestPort)));
         result1.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Attempt to start another container mapping the same host port
