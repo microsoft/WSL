@@ -63,6 +63,9 @@ public:
         m_exitEvent = std::move(other.m_exitEvent);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
+        m_sent_messages = other.m_sent_messages;
+        m_expected_reply_sequence = std::move(other.m_expected_reply_sequence);
+        m_pending_reply_sequence = std::move(other.m_pending_reply_sequence);
 
         return *this;
     }
