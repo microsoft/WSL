@@ -48,6 +48,7 @@ enum class ConnCheckStatus
 {
     InProgress,
     Success,
+    NoRecordsForFamily,
     FailureGetAddrInfo,
     FailureConfig,
     FailureSocketConnect,
@@ -123,7 +124,7 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
                 // for domains that are IPv4-only or IPv6-only.
                 // This is not treated as an error; we simply skip this address family and
                 // continue testing the other protocols.
-                *connCheckStatus = ConnCheckStatus::Success;
+                *connCheckStatus = ConnCheckStatus::NoRecordsForFamily;
             }
             throw std::runtime_error(std::format("CheckConnection: getaddrinfo() failed: {}", status));
         }
