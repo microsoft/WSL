@@ -15,6 +15,7 @@ Abstract:
 #include <windows.h>
 #include "wslcsdk.h"
 #include "wslaservice.h"
+#include "IOCallback.h"
 #include <stdint.h>
 #include <wil/com.h> // COM helpers
 // #include <wil/resource.h> // handle wrappers
@@ -45,6 +46,14 @@ static_assert(std::is_trivial_v<WslcSessionOptionsInternal>, "WSLC_SESSION_OPTIO
 
 WslcSessionOptionsInternal* GetInternalType(WslcSessionSettings* settings);
 
+struct WslcContainerProcessIOCallbackOptions
+{
+    WslcStdIOCallback stdOutCallback;
+    PVOID stdOutCallbackContext;
+    WslcStdIOCallback stdErrCallback;
+    PVOID stdErrCallbackContext;
+};
+
 // PROCESS DEFINITIONS
 typedef struct WslcContainerProcessOptionsInternal
 {
@@ -53,10 +62,7 @@ typedef struct WslcContainerProcessOptionsInternal
     PCSTR const* environment;
     uint32_t environmentCount;
     PCSTR currentDirectory;
-    WslcStdIOCallback stdOutCallback;
-    PVOID stdOutCallbackContext;
-    WslcStdIOCallback stdErrCallback;
-    PVOID stdErrCallbackContext;
+    WslcContainerProcessIOCallbackOptions ioCallbacks;
 } WslcContainerProcessOptionsInternal;
 
 static_assert(
@@ -107,24 +113,11 @@ struct WslcSessionImpl
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
 
-// Holds IO callback objects.
-struct IOCallbackLifetime
-{
-    IOCallbackLifetime();
-    ~IOCallbackLifetime();
-
-    void Cancel();
-
-    static bool HasIOCallback(const WslcContainerProcessOptionsInternal& options);
-
-private:
-    std::thread m_thread;
-};
-
 struct WslcContainerImpl
 {
     wil::com_ptr<IWSLAContainer> container;
-    std::shared_ptr<IOCallbackLifetime> ioCallbacks;
+    WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
+    std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };
 
 WslcContainerImpl* GetInternalType(WslcContainer handle);
@@ -132,7 +125,7 @@ WslcContainerImpl* GetInternalType(WslcContainer handle);
 struct WslcProcessImpl
 {
     wil::com_ptr<IWSLAProcess> process;
-    std::shared_ptr<IOCallbackLifetime> ioCallbacks;
+    std::shared_ptr<IOCallback> ioCallbacks;
 };
 
 WslcProcessImpl* GetInternalType(WslcProcess handle);

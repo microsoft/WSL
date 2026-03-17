@@ -1432,7 +1432,7 @@ class WslcSdkTests
 
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-        VERIFY_ARE_EQUAL(WslcSetProcessSettingsIoCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, nullptr, nullptr), E_NOTIMPL);
+        VERIFY_ARE_EQUAL(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, nullptr, nullptr), E_NOTIMPL);
     }
 
     TEST_METHOD(SessionCreateVhdNotImplemented)

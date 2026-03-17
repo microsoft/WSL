@@ -498,7 +498,6 @@ class MultiHandleWait
 {
 public:
     NON_COPYABLE(MultiHandleWait);
-    DEFAULT_MOVABLE(MultiHandleWait);
 
     enum Flags
     {
@@ -509,13 +508,16 @@ public:
 
     MultiHandleWait() = default;
 
+    MultiHandleWait(MultiHandleWait&&) noexcept;
+    MultiHandleWait& operator=(MultiHandleWait&&) noexcept;
+
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
 
 private:
     std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
-    bool m_cancel = false;
+    std::atomic_bool m_cancel = false;
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(MultiHandleWait::Flags);

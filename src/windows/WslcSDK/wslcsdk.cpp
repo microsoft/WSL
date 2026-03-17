@@ -536,9 +536,9 @@ try
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
 
-        if (HasIOCallback(internalContainerSettings->initProcessOptions))
+        if (IOCallback::HasIOCallback(internalContainerSettings->initProcessOptions))
         {
-            result->container->GetInitProcess();
+            result->ioCallbackOptions = internalContainerSettings->initProcessOptions->ioCallbacks;
         }
 
         *container = reinterpret_cast<WslcContainer>(result.release());
@@ -555,7 +555,18 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    return errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr));
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
+    {
+        if (IOCallback::HasIOCallback(internalType->ioCallbackOptions))
+        {
+            wil::com_ptr<IWSLAProcess> process;
+            RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
+            internalType->ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+        }
+    }
+
+    return errorInfoWrapper;
 }
 CATCH_RETURN();
 
@@ -686,6 +697,12 @@ try
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalContainer->container->Exec(&runtimeOptions, nullptr, &result->process))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+
+        if (IOCallback::HasIOCallback(internalProcessSettings))
+        {
+            result->ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
+        }
+
         *newProcess = reinterpret_cast<WslcProcess>(result.release());
     }
 
@@ -730,6 +747,9 @@ try
     RETURN_IF_FAILED(internalType->container->GetInitProcess(&result->process));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+
+    result->ioCallbacks = internalType->ioCallbacks.load();
+
     *initProcess = reinterpret_cast<WslcProcess>(result.release());
 
     return S_OK;
@@ -930,13 +950,13 @@ try
 
     if (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT)
     {
-        internalType->stdOutCallback = stdIOCallback;
-        internalType->stdOutCallbackContext = context;
+        internalType->ioCallbacks.stdOutCallback = stdIOCallback;
+        internalType->ioCallbacks.stdOutCallbackContext = context;
     }
     else if (ioHandle == WSLC_PROCESS_IO_HANDLE_STDERR)
     {
-        internalType->stdErrCallback = stdIOCallback;
-        internalType->stdErrCallbackContext = context;
+        internalType->ioCallbacks.stdErrCallback = stdIOCallback;
+        internalType->ioCallbacks.stdErrCallbackContext = context;
     }
 
     return S_OK;
@@ -952,17 +972,10 @@ try
 
     *handle = nullptr;
 
-    ULONG ulongHandle = 0;
+    auto result = IOCallback::GetIOHandle(internalType->process.get(), ioHandle);
+    *handle = result.release();
 
-    HRESULT hr = internalType->process->GetStdHandle(
-        static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &ulongHandle);
-
-    if (SUCCEEDED_LOG(hr))
-    {
-        *handle = ULongToHandle(ulongHandle);
-    }
-
-    return hr;
+    return S_OK;
 }
 CATCH_RETURN();
 
