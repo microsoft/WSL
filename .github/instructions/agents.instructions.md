@@ -21,7 +21,7 @@ Instructions for creating custom agent files that provide specialized expertise 
 description: 'Brief description of the agent purpose and capabilities'
 # name: 'Agent Display Name'      # Optional
 # tools: ['read', 'edit', 'search']  # Optional
-# model: 'Claude Sonnet 4.5'      # Recommended
+# model: 'Claude Sonnet 4.5'      # Optional
 ---
 ```
 
@@ -32,7 +32,7 @@ description: 'Brief description of the agent purpose and capabilities'
 | `description` | **Yes** | Concise purpose statement (50–150 chars) |
 | `name` | No | Display name; defaults to filename |
 | `tools` | No | Tool list; omit for all tools |
-| `model` | Recommended | AI model to use |
+| `model` | Optional | AI model to use |
 | `target` | No | `'vscode'` or `'github-copilot'` |
 | `infer` | No | Auto-activate on context match (default: `true`) |
 | `handoffs` | No | Workflow transitions to other agents (VS Code 1.106+) |

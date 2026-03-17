@@ -14,7 +14,7 @@ applyTo: 'doc/**'
 ## Building Documentation (Linux or Windows)
 
 ```bash
-pip install mkdocs-mermaid2-plugin mkdocs --break-system-packages
+python -m pip install --break-system-packages mkdocs-mermaid2-plugin mkdocs
 mkdocs build -f doc/mkdocs.yml
 ```
 

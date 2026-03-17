@@ -49,10 +49,11 @@ cmake --build . -- -m
 **CRITICAL: Always do a full build before running tests.**
 
 ```powershell
-cmake --build . -- -m                                  # Full build first!
-bin\x64\debug\test.bat                                 # All tests (30–60 min)
-bin\x64\debug\test.bat /name:*UnitTest*                # Subset
-bin\x64\debug\test.bat /name:UnitTests::UnitTests::ModernInstall  # Specific test
+cmake --build . -- -m                                              # Full build first!
+bin\<platform>\<target>\test.bat                                   # All tests (30–60 min)
+bin\<platform>\<target>\test.bat /name:*UnitTest*                  # Subset
+bin\<platform>\<target>\test.bat /name:UnitTests::UnitTests::ModernInstall  # Specific test
+# Example: bin\x64\debug\test.bat
 ```
 
 - Requires **Administrator privileges**
@@ -78,15 +79,18 @@ wpr -stop logs.ETL
 powershell diagnostics\collect-wsl-logs.ps1
 powershell diagnostics\collect-wsl-logs.ps1 -LogProfile networking
 
-# Debug console (add to %USERPROFILE%\.wslconfig)
-# [wsl2]
-# debugConsole=true
-
 # Debug shell (for gns, mini_init — root namespace)
 wsl --debug-shell
 
 # Windows debugger symbols
 # Available under bin\<platform>\<target>\
+```
+
+**Debug console** — add to `%USERPROFILE%\.wslconfig`:
+
+```ini
+[wsl2]
+debugConsole=true
 ```
 
 **Key ETL providers**: `Microsoft.Windows.Lxss.Manager` (wslservice), `Microsoft.Windows.Subsystem.Lxss` (wsl.exe et al.), `Microsoft.Windows.Plan9.Server`

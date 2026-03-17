@@ -90,7 +90,7 @@ code example here
 - Use clear, concise language
 - Write in imperative mood ("Use", "Implement", "Avoid")
 - Be specific and actionable
-- Avoid ambiguous terms like "should", "might", "possibly"
+- Minimize hedging words ("might", "possibly") in imperative rules; prefer direct statements
 - Use bullet points and lists for readability
 - Keep sections focused and scannable
 
