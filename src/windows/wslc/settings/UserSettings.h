@@ -76,6 +76,10 @@ public:
     // - If type is Default:  creates the primary file from the commented-out defaults template.
     void PrepareToShellExecuteFile() const;
 
+    // Overwrites the primary settings file with the commented-out defaults template.
+    // Called by SettingsResetCommand.
+    static void Reset();
+
 private:
     UserSettings();
     ~UserSettings() = default;

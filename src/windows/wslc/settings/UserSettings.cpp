@@ -275,6 +275,16 @@ UserSettings::UserSettings()
     }
 }
 
+// static
+void UserSettings::Reset()
+{
+    const auto primaryPath = PrimaryFilePath();
+    std::filesystem::create_directories(primaryPath.parent_path());
+    std::ofstream file(primaryPath);
+    THROW_HR_IF_MSG(E_UNEXPECTED, !file.is_open(), "Failed to create settings file");
+    file << s_DefaultSettingsTemplate;
+}
+
 void UserSettings::PrepareToShellExecuteFile() const
 {
     const auto primaryPath = PrimaryFilePath();
