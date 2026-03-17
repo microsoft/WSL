@@ -36,7 +36,7 @@ public:
     {
         NON_COPYABLE(ContainerPortMapping);
 
-        ContainerPortMapping(WSLAVirtualMachine::VMPortMapping&& VmMapping, uint16_t ContainerPort) :
+        ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
             VmMapping(std::move(VmMapping)), ContainerPort(ContainerPort)
         {
         }
@@ -80,7 +80,7 @@ public:
                 .BindingAddress = VmMapping.BindingAddressString()};
         }
 
-        WSLAVirtualMachine::VMPortMapping VmMapping;
+        VMPortMapping VmMapping;
         uint16_t ContainerPort{};
     };
 

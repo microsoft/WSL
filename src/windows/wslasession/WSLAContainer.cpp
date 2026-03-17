@@ -32,6 +32,7 @@ using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wsla::RelayedProcessIO;
 using wsl::windows::service::wsla::WSLAContainer;
+using wsl::windows::service::wsla::VMPortMapping;
 using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAContainerMetadata;
 using wsl::windows::service::wsla::WSLAContainerMetadataV1;
@@ -123,23 +124,17 @@ std::pair<std::vector<WSLAContainerImpl::ContainerPortMapping>, std::string> Pro
     std::vector<WSLAContainerImpl::ContainerPortMapping> ports;
     ports.reserve(options.PortsCount);
 
-    std::vector<wsl::windows::service::wsla::VmPortAllocation> allocatedPorts;
-    if (options.ContainerNetwork.ContainerNetworkType == WSLAContainerNetworkTypeBridged)
-    {
-        allocatedPorts = virtualMachine.AllocatePorts(static_cast<uint16_t>(ports.size()));
-    }
-
     for (ULONG i = 0; i < options.PortsCount; i++)
     {
         auto& entry =
-            ports.emplace_back(WSLAVirtualMachine::VMPortMapping::FromWSLAPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
+            ports.emplace_back(VMPortMapping::FromWSLAPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
         if (networkType == WSLAContainerNetworkTypeBridged)
         {
             // Bridge mode ports are allocated when the container starts.
         }
         else if (networkType == WSLAContainerNetworkTypeHost)
         {
-            entry.VmMapping.AssignVmPort(std::move(allocatedPorts[i]));
+            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(options.Ports[i].Family, options.Ports[i].Protocol));
         }
     }
 
@@ -1128,9 +1123,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     for (const auto& e : metadata.Ports)
     {
         auto& inserted =
-            ports.emplace_back(ContainerPortMapping{WSLAVirtualMachine::VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
+            ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-        auto allocation = virtualMachine.TryAllocatePort(inserted.ContainerPort);
+        auto allocation = virtualMachine.TryAllocatePort(inserted.ContainerPort, e.Family, e.Protocol);
 
         THROW_HR_IF_MSG(
             ERROR_BUSY,
@@ -1287,7 +1282,7 @@ void WSLAContainerImpl::MapPorts()
         // In that case, allocate the VM ports to match the container ports.
         if (e.VmMapping.VmPort.Empty())
         {
-            auto allocatedPort = m_virtualMachine.TryAllocatePort(e.ContainerPort);
+            auto allocatedPort = m_virtualMachine.TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
             THROW_HR_IF_MSG(
                 HRESULT_FROM_WIN32(ERROR_BUSY),
                 !allocatedPort.has_value(),

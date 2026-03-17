@@ -50,9 +50,14 @@ class WSLAVirtualMachine;
 
 struct VmPortAllocation
 {
+    NON_COPYABLE(VmPortAllocation);
+
     VmPortAllocation() = default;
-    VmPortAllocation(uint16_t port, WSLAVirtualMachine& vm);
+    VmPortAllocation(uint16_t port, int Family, int Protocol, WSLAVirtualMachine& vm);
+    VmPortAllocation(VmPortAllocation&& Other);
     ~VmPortAllocation();
+
+    VmPortAllocation& operator=(VmPortAllocation&& Other);
 
     void Reset();
     void Release();
@@ -61,7 +66,42 @@ struct VmPortAllocation
 
 private:
     uint16_t m_port{};
+    int m_family{};
+    int m_protocol{};
     WSLAVirtualMachine* m_vm{};
+};
+
+struct VMPortMapping
+{
+    NON_COPYABLE(VMPortMapping);
+
+    VMPortMapping(int Protocol, const SOCKADDR_INET& BindAddress);
+    ~VMPortMapping();
+
+    VMPortMapping(VMPortMapping&& Other);
+    VMPortMapping& operator=(VMPortMapping&& Other);
+
+    void AssignVmPort(VmPortAllocation&& Port);
+
+    void Reset();
+    void Release();
+    bool IsLocalhost() const;
+    std::string BindingAddressString() const;
+    void Attach(WSLAVirtualMachine& Vm);
+    void Detach();
+
+    static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort);
+    static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping);
+    static VMPortMapping FromContainerMetaData(const wsla::WSLAPortMapping& Mapping);
+
+    int Protocol{};
+    VmPortAllocation VmPort;
+    SOCKADDR_INET BindAddress{};
+
+private:
+    static SOCKADDR_INET ParseBindingAddress(int Family, uint16_t Port, const char* Address);
+
+    WSLAVirtualMachine* Vm{};
 };
 
 class WSLAVirtualMachine
@@ -71,164 +111,6 @@ public:
     {
         int Fd{};
         wil::unique_socket Socket;
-    };
-
-    struct VMPortMapping
-    {
-        NON_COPYABLE(VMPortMapping);
-
-        VMPortMapping(int Protocol, const SOCKADDR_INET& BindAddress) : Protocol(Protocol), BindAddress(BindAddress)
-        {
-            WI_ASSERT(Protocol == IPPROTO_TCP || Protocol == IPPROTO_UDP);
-            WI_ASSERT(BindAddress.Ipv4.sin_family == AF_INET || BindAddress.Ipv4.sin_family == AF_INET6);
-        }
-
-        VMPortMapping(VMPortMapping&& Other)
-        {
-            *this = std::move(Other);
-        }
-
-        VMPortMapping& operator=(VMPortMapping&& Other)
-        {
-            if (this != &Other)
-            {
-                Reset();
-                Protocol = Other.Protocol;
-                VmPort = std::move(Other.VmPort);
-                BindAddress = Other.BindAddress;
-                Vm = Other.Vm;
-
-                Other.Protocol = 0;
-                ZeroMemory(&Other.BindAddress, sizeof(Other.BindAddress));
-                Other.Vm = nullptr;
-            }
-            return *this;
-        }
-
-        void AssignVmPort(VmPortAllocation&& Port)
-        {
-            WI_ASSERT(VmPort.Empty());
-            VmPort = std::move(Port);
-        }
-
-        void Reset()
-        {
-            if (Vm)
-            {
-                Vm->UnmapPort(*this);
-            }
-        }
-
-        void Release()
-        {
-            Vm = nullptr;
-            VmPort.Release();
-        }
-
-        bool IsLocalhost() const
-        {
-            if (BindAddress.Ipv4.sin_family == AF_INET6)
-            {
-                return IN6_IS_ADDR_LOOPBACK(&BindAddress.Ipv6.sin6_addr);
-            }
-            else
-            {
-                return IN4ADDR_ISLOOPBACK(&BindAddress.Ipv4);
-            }
-        }
-
-        std::string BindingAddressString() const
-        {
-            char buffer[INET6_ADDRSTRLEN]{};
-            if (BindAddress.Ipv4.sin_family == AF_INET6)
-            {
-                THROW_LAST_ERROR_IF(inet_ntop(AF_INET6, &BindAddress.Ipv6.sin6_addr, buffer, sizeof(buffer)) == nullptr);
-            }
-            else
-            {
-                THROW_LAST_ERROR_IF(inet_ntop(AF_INET, &BindAddress.Ipv4.sin_addr, buffer, sizeof(buffer)) == nullptr);
-            }
-
-            return buffer;
-        }
-
-        ~VMPortMapping()
-        {
-            Reset();
-        }
-
-        void Attach(WSLAVirtualMachine& Vm)
-        {
-            WI_ASSERT(this->Vm == nullptr);
-
-            this->Vm = &Vm;
-        }
-
-        void Detach()
-        {
-            WI_ASSERT(Vm != nullptr);
-
-            this->Vm = nullptr;
-        }
-
-        static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort)
-        {
-            SOCKADDR_INET localhost{};
-            localhost.si_family = Family;
-
-            if (Family == AF_INET)
-            {
-                localhost.Ipv4.sin_port = htons(WindowsPort);
-                localhost.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-            }
-            else
-            {
-                localhost.Ipv6.sin6_family = AF_INET6;
-                localhost.Ipv6.sin6_port = htons(WindowsPort);
-                localhost.Ipv6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
-            }
-
-            return VMPortMapping(IPPROTO_TCP, localhost);
-        }
-
-        static SOCKADDR_INET ParseBindingAddress(int Family, uint16_t Port, const char* Address)
-        {
-            SOCKADDR_INET bindAddress{};
-            bindAddress.si_family = Family;
-            if (Family == AF_INET)
-            {
-                bindAddress.Ipv4.sin_port = htons(Port);
-                common::wslutil::ParseIpv4Address(Address, bindAddress.Ipv4);
-            }
-            else if (Family == AF_INET6)
-            {
-                bindAddress.Ipv6.sin6_port = htons(Port);
-                common::wslutil::ParseIpv6Address(Address, bindAddress.Ipv6);
-            }
-            else
-            {
-                THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Family);
-            }
-
-            return bindAddress;
-        }
-
-        static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping)
-        {
-            return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress));
-        }
-
-        static VMPortMapping FromContainerMetaData(const wsla::WSLAPortMapping& Mapping)
-        {
-            return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str()));
-        }
-
-        int Protocol{};
-        VmPortAllocation VmPort;
-        SOCKADDR_INET BindAddress{};
-
-    private:
-        WSLAVirtualMachine* Vm{};
     };
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
@@ -248,9 +130,9 @@ public:
 
     void OnProcessReleased(int Pid);
 
-    std::optional<VmPortAllocation> TryAllocatePort(uint16_t Port);
-    std::vector<VmPortAllocation> AllocatePorts(uint16_t Count);
-    void ReleasePorts(const std::vector<uint16_t>& Ports);
+    std::optional<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
+    VmPortAllocation AllocatePort(int Family, int Protocol);
+    void ReleasePort(VmPortAllocation& Port);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,

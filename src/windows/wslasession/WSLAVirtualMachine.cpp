@@ -25,6 +25,7 @@ Abstract:
 
 using namespace wsl::windows::common;
 using wsl::windows::service::wsla::VmPortAllocation;
+using wsl::windows::service::wsla::VMPortMapping;
 using wsl::windows::service::wsla::WSLAProcess;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 namespace wslutil = wsl::windows::common::wslutil;
@@ -32,6 +33,209 @@ namespace wslutil = wsl::windows::common::wslutil;
 constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
+
+VmPortAllocation::VmPortAllocation(uint16_t port, int family, int protocol, WSLAVirtualMachine& vm) :
+    m_port(port), m_family(family), m_protocol(protocol), m_vm(&vm)
+{
+}
+
+VmPortAllocation::VmPortAllocation(VmPortAllocation&& Other)
+{
+    *this = std::move(Other);
+}
+
+VmPortAllocation& VmPortAllocation::operator=(VmPortAllocation&& Other)
+{
+    if (this != &Other)
+    {
+        Reset();
+        m_port = Other.m_port;
+        m_family = Other.m_family;
+        m_protocol = Other.m_protocol;
+
+        Other.Release();
+    }
+    return *this;
+}
+
+VmPortAllocation::~VmPortAllocation()
+{
+    Reset();
+}
+
+void VmPortAllocation::Reset()
+{
+    if (m_vm != nullptr)
+    {
+        m_vm->ReleasePort(*this);
+        Release();
+    }
+}
+
+void VmPortAllocation::Release()
+{
+    m_vm = nullptr;
+    m_port = 0;
+    m_family = 0;
+    m_protocol = 0;
+}
+
+bool VmPortAllocation::Empty() const
+{
+    return m_vm == nullptr;
+}
+
+uint16_t VmPortAllocation::Port() const
+{
+    WI_ASSERT(!Empty());
+    return m_port;
+}
+
+VMPortMapping::VMPortMapping(int protocol, const SOCKADDR_INET& bindAddress) : Protocol(protocol), BindAddress(bindAddress)
+{
+    WI_ASSERT(Protocol == IPPROTO_TCP || Protocol == IPPROTO_UDP);
+    WI_ASSERT(BindAddress.Ipv4.sin_family == AF_INET || BindAddress.Ipv4.sin_family == AF_INET6);
+}
+
+VMPortMapping::~VMPortMapping()
+{
+    Reset();
+}
+
+VMPortMapping::VMPortMapping(VMPortMapping&& Other)
+{
+    *this = std::move(Other);
+}
+
+void VMPortMapping::AssignVmPort(VmPortAllocation&& Port)
+{
+    WI_ASSERT(VmPort.Empty());
+    VmPort = std::move(Port);
+}
+
+void VMPortMapping::Reset()
+{
+    if (Vm)
+    {
+        Vm->UnmapPort(*this);
+    }
+}
+
+void VMPortMapping::Release()
+{
+    Vm = nullptr;
+    VmPort.Release();
+}
+
+bool VMPortMapping::IsLocalhost() const
+{
+    if (BindAddress.Ipv4.sin_family == AF_INET6)
+    {
+        return IN6_IS_ADDR_LOOPBACK(&BindAddress.Ipv6.sin6_addr);
+    }
+    else
+    {
+        return IN4ADDR_ISLOOPBACK(&BindAddress.Ipv4);
+    }
+}
+
+std::string VMPortMapping::BindingAddressString() const
+{
+    char buffer[INET6_ADDRSTRLEN]{};
+    if (BindAddress.Ipv4.sin_family == AF_INET6)
+    {
+        THROW_LAST_ERROR_IF(inet_ntop(AF_INET6, &BindAddress.Ipv6.sin6_addr, buffer, sizeof(buffer)) == nullptr);
+    }
+    else
+    {
+        THROW_LAST_ERROR_IF(inet_ntop(AF_INET, &BindAddress.Ipv4.sin_addr, buffer, sizeof(buffer)) == nullptr);
+    }
+
+    return buffer;
+}
+
+void VMPortMapping::Attach(WSLAVirtualMachine& Vm)
+{
+    WI_ASSERT(this->Vm == nullptr);
+
+    this->Vm = &Vm;
+}
+
+void VMPortMapping::Detach()
+{
+    WI_ASSERT(Vm != nullptr);
+
+    this->Vm = nullptr;
+}
+
+VMPortMapping VMPortMapping::LocalhostTcpMapping(int Family, uint16_t WindowsPort)
+{
+    SOCKADDR_INET localhost{};
+    localhost.si_family = Family;
+
+    if (Family == AF_INET)
+    {
+        localhost.Ipv4.sin_port = htons(WindowsPort);
+        localhost.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    }
+    else
+    {
+        localhost.Ipv6.sin6_family = AF_INET6;
+        localhost.Ipv6.sin6_port = htons(WindowsPort);
+        localhost.Ipv6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
+    }
+
+    return VMPortMapping(IPPROTO_TCP, localhost);
+}
+
+SOCKADDR_INET VMPortMapping::ParseBindingAddress(int Family, uint16_t Port, const char* Address)
+{
+    SOCKADDR_INET bindAddress{};
+    bindAddress.si_family = Family;
+    if (Family == AF_INET)
+    {
+        bindAddress.Ipv4.sin_port = htons(Port);
+        common::wslutil::ParseIpv4Address(Address, bindAddress.Ipv4);
+    }
+    else if (Family == AF_INET6)
+    {
+        bindAddress.Ipv6.sin6_port = htons(Port);
+        common::wslutil::ParseIpv6Address(Address, bindAddress.Ipv6);
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Family);
+    }
+
+    return bindAddress;
+}
+
+VMPortMapping VMPortMapping::FromWSLAPortMapping(const ::WSLAPortMapping& Mapping)
+{
+    return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress));
+}
+
+VMPortMapping VMPortMapping::FromContainerMetaData(const wsla::WSLAPortMapping& Mapping)
+{
+    return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str()));
+}
+
+VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
+{
+    if (this != &Other)
+    {
+        Reset();
+        Protocol = Other.Protocol;
+        VmPort = std::move(Other.VmPort);
+        BindAddress = Other.BindAddress;
+        Vm = Other.Vm;
+
+        Other.Protocol = 0;
+        ZeroMemory(&Other.BindAddress, sizeof(Other.BindAddress));
+        Other.Vm = nullptr;
+    }
+    return *this;
+}
 
 WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings) :
     m_vm(Vm),
@@ -864,7 +1068,7 @@ void WSLAVirtualMachine::OnProcessReleased(int Pid)
 }
 
 // TODO: Handle reservations per family.
-std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
+std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
 
@@ -874,7 +1078,7 @@ std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Por
 
     if (inserted)
     {
-        return VmPortAllocation{Port, *this};
+        return VmPortAllocation{Port, Family, Protocol, *this};
     }
     else
     {
@@ -882,16 +1086,33 @@ std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Por
     }
 }
 
-void WSLAVirtualMachine::ReleasePorts(const std::vector<uint16_t>& Ports)
+VmPortAllocation WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
 
-    for (const auto& port : Ports)
-    {
-        WSL_LOG("ReleasePort", TraceLoggingValue(port, "Port"));
+    std::optional<VmPortAllocation> port;
 
-        WI_VERIFY(m_allocatedPorts.erase(port) == 1);
+    // TODO: Split ports by protocol and family.
+    for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
+    {
+        if (!m_allocatedPorts.contains(i))
+        {
+            WI_VERIFY(m_allocatedPorts.insert(i).second);
+            return VmPortAllocation{i, Family, Protocol, *this};
+        }
     }
+
+    // Fail if we couldn't find a port.
+    THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES), "Failed to allocate port");
+}
+
+void WSLAVirtualMachine::ReleasePort(VmPortAllocation& Port)
+{
+    std::lock_guard lock{m_lock};
+
+    WSL_LOG("ReleasePort", TraceLoggingValue(Port.Port(), "Port"));
+
+    WI_VERIFY(m_allocatedPorts.erase(Port.Port()) == 1);
 }
 
 wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char* Path)
