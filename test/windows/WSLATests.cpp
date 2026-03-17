@@ -1561,12 +1561,22 @@ class WSLATests
         NON_COPYABLE(BlockingOperation);
         NON_MOVABLE(BlockingOperation);
 
-        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK) :
-            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult)
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK, bool AllowEarlyCompletion = false, bool UseOverlappedWritePipe = false) :
+            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult), m_allowEarlyCompletion(AllowEarlyCompletion)
         {
             wil::unique_handle pipeRead;
             wil::unique_handle pipeWrite;
-            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+
+            if (UseOverlappedWritePipe)
+            {
+                auto [read, write] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, true);
+                pipeRead.reset(read.release());
+                pipeWrite.reset(write.release());
+            }
+            else
+            {
+                VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+            }
 
             m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
             m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
@@ -1592,9 +1602,10 @@ class WSLATests
         {
             m_result.set_value(m_operation(Handle.get()));
 
-            // Fail if the operation completed before the test signaled completion.
+            // Fail if the operation completed before the test signaled completion
+            // (unless early completion is expected, e.g. session termination).
             // Don't use VERIFY macros since this is running in a separate thread.
-            WI_ASSERT(m_testCompleteEvent.is_signaled());
+            WI_ASSERT(m_allowEarlyCompletion || m_testCompleteEvent.is_signaled());
         }
 
         void RunIO(wil::unique_handle Handle)
@@ -1646,6 +1657,7 @@ class WSLATests
         std::thread m_ioThread;
         std::promise<HRESULT> m_result;
         HRESULT m_expectedResult{};
+        bool m_allowEarlyCompletion{};
     };
 
     TEST_METHOD(SaveImage)
@@ -5356,6 +5368,46 @@ class WSLATests
             auto [result, _] = WSLAProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
+    }
+
+    TEST_METHOD(SessionTerminationDuringSave)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that SaveImage is aborted when the session terminates mid-operation.
+        // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
+        BlockingOperation operation(
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); }, E_ABORT, true, true);
+
+        // Terminate the session while SaveImage is in-flight.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        operation.Complete();
+
+        // Re-create the session.
+        m_defaultSession.reset();
+        m_defaultSession = CreateSession(m_defaultSessionSettings);
+    }
+
+    TEST_METHOD(SessionTerminationDuringExport)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that container Export is aborted when the session terminates mid-operation.
+        WSLAContainerLauncher launcher("debian:latest", "test-export-session-terminate", {"echo", "OK"});
+        auto container = launcher.Launch(*m_defaultSession);
+        container.GetInitProcess().Wait();
+
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); }, E_ABORT, true);
+
+        // Terminate the session while Export is in-flight.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        operation.Complete();
+
+        // Re-create the session and clean up the leftover container.
+        m_defaultSession.reset();
+        m_defaultSession = CreateSession(m_defaultSessionSettings);
+        PruneResult result;
+        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
     }
 
     TEST_METHOD(InteractiveDetach)
