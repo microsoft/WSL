@@ -271,6 +271,7 @@ class UnitTests
         };
 
         // Validate user sessions state with gui apps disabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = false}));
         {
             validateUserSession();
 
@@ -284,7 +285,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps enabled.
         {
-            WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+            config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
             validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
