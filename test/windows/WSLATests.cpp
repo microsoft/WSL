@@ -871,7 +871,7 @@ class WSLATests
         }
     }
 
-    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLABuildImageOptions* options, const char* dockerfilePath = nullptr)
     {
         wil::unique_hfile dockerfileHandle;
         if (dockerfilePath != nullptr)
@@ -881,12 +881,12 @@ class WSLATests
             THROW_LAST_ERROR_IF(!dockerfileHandle);
         }
 
-        return BuildImageFromContext(contextDir, imageTag, dockerfileHandle.get());
-    }
+        auto contextPathStr = contextDir.wstring();
+        WSLABuildImageOptions optionsCopy = *options;
+        optionsCopy.ContextPath = contextPathStr.c_str();
+        optionsCopy.DockerfileHandle = HandleToULong(dockerfileHandle.get());
 
-    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, HANDLE dockerfileHandle)
-    {
-        auto buildResult = m_defaultSession->BuildImage(contextDir.wstring().c_str(), HandleToULong(dockerfileHandle), imageTag, nullptr);
+        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, nullptr);
 
         if (FAILED(buildResult))
         {
@@ -894,6 +894,15 @@ class WSLATests
         }
 
         return buildResult;
+    }
+
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
+    {
+        LPCSTR tag = imageTag;
+        WSLABuildImageOptions options{
+            .Tags = {&tag, 1},
+        };
+        return BuildImageFromContext(contextDir, &options, dockerfilePath);
     }
 
     TEST_METHOD(BuildImage)
@@ -1222,7 +1231,14 @@ class WSLATests
             WriteFile(writeHandle.get(), dockerfileContent, static_cast<DWORD>(strlen(dockerfileContent)), &bytesWritten, nullptr));
         writeHandle.reset();
 
-        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-stdin:latest", readHandle.get()));
+        auto contextPathStr = contextDir.wstring();
+        LPCSTR tag = "wsla-test-build-stdin:latest";
+        WSLABuildImageOptions options{
+            .ContextPath = contextPathStr.c_str(),
+            .DockerfileHandle = HandleToULong(readHandle.get()),
+            .Tags = {&tag, 1},
+        };
+        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr));
         ExpectImagePresent(*m_defaultSession, "wsla-test-build-stdin:latest");
 
         WSLAContainerLauncher launcher("wsla-test-build-stdin:latest", "wsla-build-stdin-container");
@@ -1231,6 +1247,71 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("stdin-dockerfile-ok") != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageBuildArgs)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-buildargs";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            WSLADeleteImageOptions deleteOptions{.Image = "wsla-test-build-args:latest", .Flags = WSLADeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "ARG TEST_VALUE\n";
+            dockerfile << "ENV TEST_VALUE=${TEST_VALUE}\n";
+            dockerfile << "CMD echo \"build-arg-value=${TEST_VALUE}\"\n";
+        }
+
+        LPCSTR tag = "wsla-test-build-args:latest";
+        LPCSTR buildArg = "TEST_VALUE=hello-from-build-arg";
+        WSLABuildImageOptions options{.Tags = {&tag, 1}, .BuildArgs = {&buildArg, 1}};
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-args:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-args:latest", "wsla-build-args-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+        ValidateProcessOutput(initProcess, {{1, "build-arg-value=hello-from-build-arg\n"}});
+    }
+
+    TEST_METHOD(BuildImageMultipleTags)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-multitag";
+        std::filesystem::create_directories(contextDir);
+        LPCSTR tags[] = {"wsla-test-multitag:v1", "wsla-test-multitag:v2"};
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+            for (auto* tag : tags)
+            {
+                WSLADeleteImageOptions deleteOptions{.Image = tag, .Flags = WSLADeleteImageFlagsForce};
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+            }
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "CMD [\"echo\", \"multi-tag-ok\"]\n";
+        }
+        WSLABuildImageOptions options{.Tags = {tags, 2}};
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-multitag:v1");
+        ExpectImagePresent(*m_defaultSession, "wsla-test-multitag:v2");
     }
 
     TEST_METHOD(TagImage)
