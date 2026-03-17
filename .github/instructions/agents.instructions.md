@@ -11,7 +11,7 @@ Instructions for creating custom agent files that provide specialized expertise 
 
 - File format: Markdown with YAML frontmatter
 - Naming: lowercase with hyphens (e.g., `wsl-build-helper.agent.md`)
-- Location: `.github/agents/` directory
+- Location: `.github/agents/` directory (create this directory when adding the first agent file)
 - Purpose: Define specialized agents with tailored expertise for WSL development
 
 ## Example Frontmatter
