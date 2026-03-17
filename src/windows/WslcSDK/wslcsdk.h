@@ -43,7 +43,7 @@ typedef struct WslcContainerSettings
 DECLARE_HANDLE(WslcContainer);
 
 // Process values
-#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 40
+#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 72
 #define WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT 8
 typedef struct WslcProcessSettings
 {
@@ -287,7 +287,7 @@ STDAPI WslcSetProcessSettingsEnvVariables(_In_ WslcProcessSettings* processSetti
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
 typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
-typedef enum WslcProcessIoHandle
+typedef enum WslcProcessIOHandle
 {
     WSLC_PROCESS_IO_HANDLE_STDIN = 0,
     WSLC_PROCESS_IO_HANDLE_STDOUT = 1,
@@ -295,8 +295,8 @@ typedef enum WslcProcessIoHandle
 } WslcProcessIoHandle;
 
 // Pass in Null for WslcStdIOCallback to clear the callback for the given handle
-STDAPI WslcSetProcessSettingsIoCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
+STDAPI WslcSetProcessSettingsIOCallback(
+    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIOHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
 
 // PROCESS MANAGEMENT
 
@@ -318,7 +318,7 @@ STDAPI WslcGetProcessExitCode(_In_ WslcProcess process, _Out_ PINT32 exitCode);
 
 STDAPI WslcSignalProcess(_In_ WslcProcess process, _In_ WslcSignal signal);
 
-STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIoHandle ioHandle, _Out_ HANDLE* handle);
+STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIOHandle ioHandle, _Out_ HANDLE* handle);
 
 STDAPI WslcReleaseProcess(_In_ WslcProcess process);
 

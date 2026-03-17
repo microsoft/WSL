@@ -53,11 +53,15 @@ typedef struct WslcContainerProcessOptionsInternal
     PCSTR const* environment;
     uint32_t environmentCount;
     PCSTR currentDirectory;
+    WslcStdIOCallback stdOutCallback;
+    PVOID stdOutCallbackContext;
+    WslcStdIOCallback stdErrCallback;
+    PVOID stdErrCallbackContext;
 } WslcContainerProcessOptionsInternal;
 
 static_assert(
     sizeof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
-    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 48 bytes");
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 72 bytes");
 static_assert(
     __alignof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
@@ -103,9 +107,24 @@ struct WslcSessionImpl
 
 WslcSessionImpl* GetInternalType(WslcSession handle);
 
+// Holds IO callback objects.
+struct IOCallbackLifetime
+{
+    IOCallbackLifetime();
+    ~IOCallbackLifetime();
+
+    void Cancel();
+
+    static bool HasIOCallback(const WslcContainerProcessOptionsInternal& options);
+
+private:
+    std::thread m_thread;
+};
+
 struct WslcContainerImpl
 {
     wil::com_ptr<IWSLAContainer> container;
+    std::shared_ptr<IOCallbackLifetime> ioCallbacks;
 };
 
 WslcContainerImpl* GetInternalType(WslcContainer handle);
@@ -113,6 +132,7 @@ WslcContainerImpl* GetInternalType(WslcContainer handle);
 struct WslcProcessImpl
 {
     wil::com_ptr<IWSLAProcess> process;
+    std::shared_ptr<IOCallbackLifetime> ioCallbacks;
 };
 
 WslcProcessImpl* GetInternalType(WslcProcess handle);
