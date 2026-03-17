@@ -195,6 +195,8 @@ typedef struct _WSLAPortMapping
     USHORT HostPort;
     USHORT ContainerPort;
     int Family;
+    int Protocol;
+    LPCSTR BindingAddress;
 } WSLAPortMapping;
 
 typedef struct _WSLATmpfsMount
@@ -534,8 +536,8 @@ interface IWSLASession : IUnknown
     // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
     HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath);
-    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
-    HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+    HRESULT MapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
+    HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
     // Session initialization - called by SYSTEM service after launching per-user process.
     // Returns a handle to this COM server process (used to add to job object).

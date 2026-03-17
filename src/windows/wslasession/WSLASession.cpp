@@ -1371,7 +1371,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::MapVmPort(int Family, short WindowsPort, short LinuxPort)
+HRESULT WSLASession::MapVmPort(int Family, unsigned short WindowsPort, unsigned short LinuxPort)
 try
 {
     COMServiceExecutionContext context;
@@ -1379,12 +1379,18 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort);
+    auto vmPort = m_virtualMachine->TryAllocatePort(LinuxPort);
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_BUSY), !vmPort.has_value(), "Port %d is already in use", LinuxPort);
+
+    auto mapping = WSLAVirtualMachine::VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
+    mapping.AssignVmPort(std::move(vmPort.value()));
+
+    mapping.Release();
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort, short LinuxPort)
+HRESULT WSLASession::UnmapVmPort(int Family, unsigned short WindowsPort, unsigned short LinuxPort)
 try
 {
     COMServiceExecutionContext context;
@@ -1392,7 +1398,13 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    m_virtualMachine->UnmapPort(Family, WindowsPort, LinuxPort);
+
+    auto mapping = WSLAVirtualMachine::VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
+    mapping.AssignVmPort(VmPortAllocation{LinuxPort, m_virtualMachine.value()});
+
+    mapping.Attach(m_virtualMachine.value());
+    mapping.Reset();
+
     return S_OK;
 }
 CATCH_RETURN();

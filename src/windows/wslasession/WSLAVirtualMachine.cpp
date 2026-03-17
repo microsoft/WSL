@@ -24,6 +24,7 @@ Abstract:
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
+using wsl::windows::service::wsla::VmPortAllocation;
 using wsl::windows::service::wsla::WSLAProcess;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 namespace wslutil = wsl::windows::common::wslutil;
@@ -638,7 +639,7 @@ void WSLAVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove)
+void WSLAVirtualMachine::MapRelayPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove)
 {
     std::lock_guard lock(m_portRelaylock);
 
@@ -661,14 +662,57 @@ void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _I
     THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
 
-void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
+void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
 {
-    MapPortImpl(Family, WindowsPort, LinuxPort, false);
+    THROW_HR_IF_MSG(E_INVALIDARG, Mapping.VmPort.Empty(), "Can't map a VM port without an allocated port");
+
+    if (m_networkingMode == WSLANetworkingModeNone)
+    {
+        THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
+    }
+    else if (m_networkingMode == WSLANetworkingModeNAT)
+    {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
+            "Unsupported port mapping for NAT mode: ");
+
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.BindAddress.Ipv4.sin_port, Mapping.VmPort.Port(), false);
+    }
+    else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
+    {
+        // TODO
+    }
+    else
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected networking mode: %i", m_networkingMode);
+    }
+
+    Mapping.Attach(*this);
 }
 
-void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
+void WSLAVirtualMachine::UnmapPort(VMPortMapping& Mapping)
 {
-    MapPortImpl(Family, WindowsPort, LinuxPort, true);
+    THROW_HR_IF_MSG(E_INVALIDARG, Mapping.VmPort.Empty(), "Can't unmap a VM port without an allocated port");
+
+    if (m_networkingMode == WSLANetworkingModeNone)
+    {
+        THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
+    }
+    else if (m_networkingMode == WSLANetworkingModeNAT)
+    {
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.BindAddress.Ipv4.sin_port, Mapping.VmPort.Port(), true);
+    }
+    else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
+    {
+        // TODO
+    }
+    else
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected networking mode: %i", m_networkingMode);
+    }
+
+    Mapping.Detach();
 }
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
@@ -820,7 +864,7 @@ void WSLAVirtualMachine::OnProcessReleased(int Pid)
 }
 
 // TODO: Handle reservations per family.
-bool WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
+std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
 {
     std::lock_guard lock{m_lock};
 
@@ -828,39 +872,17 @@ bool WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
 
     auto [_, inserted] = m_allocatedPorts.insert(Port);
 
-    return inserted;
-}
-
-std::set<uint16_t> WSLAVirtualMachine::AllocatePorts(uint16_t Count)
-{
-    std::lock_guard lock{m_lock};
-
-    std::set<uint16_t> allocatedRange;
-
-    // Add ports to the allocated list until we have enough
-    for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second && allocatedRange.size() < Count; i++)
+    if (inserted)
     {
-        if (!m_allocatedPorts.contains(i))
-        {
-            WI_VERIFY(allocatedRange.insert(i).second);
-        }
+        return VmPortAllocation{Port, *this};
     }
-
-    // Fail if we couldn't find enough free ports.
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES),
-        allocatedRange.size() < Count,
-        "Failed to allocate %u ports, only %zu available",
-        Count,
-        allocatedRange.size());
-
-    // Reserve the ports we found.
-    m_allocatedPorts.insert(allocatedRange.begin(), allocatedRange.end());
-
-    return allocatedRange;
+    else
+    {
+        return std::nullopt;
+    }
 }
 
-void WSLAVirtualMachine::ReleasePorts(const std::set<uint16_t>& Ports)
+void WSLAVirtualMachine::ReleasePorts(const std::vector<uint16_t>& Ports)
 {
     std::lock_guard lock{m_lock};
 

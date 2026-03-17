@@ -32,6 +32,58 @@ class WSLASession;
 class WSLAContainerImpl
 {
 public:
+    struct ContainerPortMapping
+    {
+        NON_COPYABLE(ContainerPortMapping);
+
+        ContainerPortMapping(WSLAVirtualMachine::VMPortMapping&& VmMapping, uint16_t ContainerPort) :
+            VmMapping(std::move(VmMapping)), ContainerPort(ContainerPort)
+        {
+        }
+
+        ContainerPortMapping(ContainerPortMapping&& Other) :
+            VmMapping(std::move(Other.VmMapping)), ContainerPort(Other.ContainerPort)
+        {
+        }
+
+        ContainerPortMapping& operator=(ContainerPortMapping&& Other)
+        {
+            if (this != &Other)
+            {
+                VmMapping = std::move(Other.VmMapping);
+                ContainerPort = Other.ContainerPort;
+            }
+            return *this;
+        }
+
+        const char* ProtocolString() const
+        {
+            if (VmMapping.Protocol == IPPROTO_TCP)
+            {
+                return "tcp";
+            }
+            else
+            {
+                WI_ASSERT(VmMapping.Protocol == IPPROTO_UDP);
+                return "udp";
+            }
+        }
+
+        WSLAPortMapping Serialize() const
+        {
+            return WSLAPortMapping{
+                .HostPort = ntohs(VmMapping.BindAddress.Ipv4.sin_port),
+                .VmPort = VmMapping.VmPort.Port(),
+                .ContainerPort = ContainerPort,
+                .Family = VmMapping.BindAddress.si_family,
+                .Protocol = VmMapping.Protocol,
+                .BindingAddress = VmMapping.BindingAddressString()};
+        }
+
+        WSLAVirtualMachine::VMPortMapping VmMapping;
+        uint16_t ContainerPort{};
+    };
+
     NON_COPYABLE(WSLAContainerImpl);
     NON_MOVABLE(WSLAContainerImpl);
 
@@ -42,8 +94,7 @@ public:
         std::string&& Name,
         std::string&& Image,
         std::vector<WSLAVolumeMount>&& volumes,
-        std::vector<WSLAPortMapping>&& ports,
-        std::shared_ptr<std::set<uint16_t>> allocatedVmPorts,
+        std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
@@ -118,6 +169,9 @@ private:
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
 
+    void MapPorts();
+    void UnmapPorts();
+
     mutable wil::srwlock m_lock;
     std::string m_name;
     std::string m_image;
@@ -136,8 +190,7 @@ private:
     WSLAContainerState m_state = WslaContainerStateInvalid;
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;
-    std::vector<WSLAPortMapping> m_mappedPorts;
-    std::shared_ptr<std::set<uint16_t>> m_allocatedVmPorts;
+    std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;

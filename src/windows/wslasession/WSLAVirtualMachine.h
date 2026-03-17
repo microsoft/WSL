@@ -19,6 +19,7 @@ Abstract:
 #include "wslaservice.h"
 #include "hcs.hpp"
 #include "WSLAProcess.h"
+#include "WSLAContainerMetadata.h"
 #include <thread>
 #include <filesystem>
 
@@ -45,6 +46,24 @@ struct WSLAProcessFd
     WSLAFdType Type{};
 };
 
+class WSLAVirtualMachine;
+
+struct VmPortAllocation
+{
+    VmPortAllocation() = default;
+    VmPortAllocation(uint16_t port, WSLAVirtualMachine& vm);
+    ~VmPortAllocation();
+
+    void Reset();
+    void Release();
+    bool Empty() const;
+    uint16_t Port() const;
+
+private:
+    uint16_t m_port{};
+    WSLAVirtualMachine* m_vm{};
+};
+
 class WSLAVirtualMachine
 {
 public:
@@ -54,6 +73,168 @@ public:
         wil::unique_socket Socket;
     };
 
+    struct VMPortMapping
+    {
+        NON_COPYABLE(VMPortMapping);
+
+        VMPortMapping(int Protocol, const SOCKADDR_INET& BindAddress) :
+            Protocol(Protocol), BindAddress(BindAddress)
+        {
+            WI_ASSERT(Protocol == IPPROTO_TCP || Protocol == IPPROTO_UDP);
+            WI_ASSERT(BindAddress.Ipv4.sin_family == AF_INET || BindAddress.Ipv4.sin_family == AF_INET6);
+        }
+
+        VMPortMapping(VMPortMapping&& Other)
+        {
+            *this = std::move(Other);
+        }
+
+        VMPortMapping& operator=(VMPortMapping&& Other)
+        {
+            if (this != &Other)
+            {
+                Reset();
+                Protocol = Other.Protocol;
+                VmPort = std::move(Other.VmPort);
+                BindAddress = Other.BindAddress;
+                Vm = Other.Vm;
+
+                Other.Protocol = 0;
+                ZeroMemory(&Other.BindAddress, sizeof(Other.BindAddress));
+                Other.Vm = nullptr;
+            }
+            return *this;
+        }
+
+        void AssignVmPort(VmPortAllocation&& Port)
+        {
+            WI_ASSERT(VmPort.Empty());
+            VmPort = std::move(Port);
+        }
+
+        void Reset()
+        {
+            if (Vm)
+            {
+                Vm->UnmapPort(*this);
+            }
+        }
+
+        void Release()
+        {
+            Vm = nullptr;
+            VmPort.Release();
+        }
+
+        bool IsLocalhost() const
+        {
+            if (BindAddress.Ipv4.sin_family == AF_INET6)
+            {
+                return IN6_IS_ADDR_LOOPBACK(&BindAddress.Ipv6.sin6_addr);
+            }
+            else
+            {
+                return IN4ADDR_ISLOOPBACK(&BindAddress.Ipv4);
+            }
+        }
+
+        std::string BindingAddressString() const
+        {
+            char buffer[INET6_ADDRSTRLEN]{};
+            if (BindAddress.Ipv4.sin_family == AF_INET6)
+            {
+                THROW_LAST_ERROR_IF(inet_ntop(AF_INET6, &BindAddress.Ipv6.sin6_addr, buffer, sizeof(buffer)) == nullptr);
+            }
+            else
+            {
+                THROW_LAST_ERROR_IF(inet_ntop(AF_INET, &BindAddress.Ipv4.sin_addr, buffer, sizeof(buffer)) == nullptr);
+            }
+
+            return buffer;
+        }
+
+        ~VMPortMapping()
+        {
+            Reset();
+        }
+
+        void Attach(WSLAVirtualMachine& Vm)
+        {
+            WI_ASSERT(this->Vm == nullptr);
+
+            this->Vm = &Vm;
+        }
+
+        void Detach()
+        {
+            WI_ASSERT(Vm != nullptr);
+
+            this->Vm = nullptr;
+        }
+
+        static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort)
+        {
+            SOCKADDR_INET localhost{};
+            localhost.si_family = Family;
+
+            if (Family == AF_INET)
+            {
+                localhost.Ipv4.sin_port = htons(WindowsPort);
+                localhost.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            }
+            else
+            {
+                localhost.Ipv6.sin6_family = AF_INET6;
+                localhost.Ipv6.sin6_port = htons(WindowsPort);
+                localhost.Ipv6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
+            }
+
+            return VMPortMapping(IPPROTO_TCP, localhost);
+        }
+
+        static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping)
+        {
+            SOCKADDR_INET bindAddress{};
+            bindAddress.si_family = Mapping.Family;
+            if (Mapping.Family == AF_INET)
+            {
+                bindAddress.Ipv4.sin_port = htons(Mapping.HostPort);
+
+                if (inet_pton(AF_INET, Mapping.BindingAddress, &bindAddress.Ipv4) == SOCKET_ERROR)
+                {
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Mapping.BindingAddress));
+                }
+            }
+            else if (Mapping.Family == AF_INET6)
+            {
+                bindAddress.Ipv6.sin6_port = htons(Mapping.HostPort);
+                if (inet_pton(AF_INET6, Mapping.BindingAddress, &bindAddress.Ipv6) == SOCKET_ERROR)
+                {
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Mapping.BindingAddress));
+                }
+            }
+            else
+            {
+                THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Mapping.Family);
+            }
+
+            return VMPortMapping(Mapping.Protocol, bindAddress);
+        }
+
+        static VMPortMapping FromContainerMetaData(const wsla::WSLAPortMapping& Mapping)
+        {
+        
+        }
+
+
+        int Protocol{};
+        VmPortAllocation VmPort;
+        SOCKADDR_INET BindAddress{};
+
+    private:
+        WSLAVirtualMachine* Vm{};
+    };
+
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
     WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings);
@@ -61,8 +242,8 @@ public:
 
     void Initialize();
 
-    void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
-    void UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
+    void MapPort(VMPortMapping& Mapping);
+    void UnmapPort(VMPortMapping& Mapping);
     void Unmount(_In_ const char* Path);
 
     HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);
@@ -71,9 +252,9 @@ public:
 
     void OnProcessReleased(int Pid);
 
-    bool TryAllocatePort(uint16_t Port);
-    std::set<uint16_t> AllocatePorts(uint16_t Count);
-    void ReleasePorts(const std::set<uint16_t>& Ports);
+    std::optional<VmPortAllocation> TryAllocatePort(uint16_t Port);
+    std::vector<VmPortAllocation> AllocatePorts(uint16_t Count);
+    void ReleasePorts(const std::vector<uint16_t>& Ports);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
@@ -101,7 +282,7 @@ public:
     }
 
 private:
-    void MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove);
+    void MapRelayPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove);
 
     // Initial setup during Connect()
     void ConfigureInitialMounts();

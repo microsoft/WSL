@@ -89,86 +89,9 @@ auto ValidatePortMappings(const WSLAContainerOptions& options)
     }
 }
 
-void UnmapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
-{
-    for (auto& e : ports)
-    {
-        if (e.MappedToHost)
-        {
-            try
-            {
-                vm.UnmapPort(e.Family, e.HostPort, e.VmPort);
-                e.MappedToHost = false;
-            }
-            CATCH_LOG();
-        }
-    }
-}
-
-auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
-{
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&ports, &vm]() { UnmapPorts(ports, vm); });
-
-    for (auto& e : ports)
-    {
-        WI_ASSERT(e.VmPort != 0);
-
-        vm.MapPort(e.Family, e.HostPort, e.VmPort);
-        e.MappedToHost = true;
-    }
-
-    return errorCleanup;
-}
-
-void ReleaseVmPorts(std::set<uint16_t>& allocatedPorts, WSLAVirtualMachine& vm)
-{
-    if (!allocatedPorts.empty())
-    {
-        vm.ReleasePorts(allocatedPorts);
-        allocatedPorts.clear();
-    }
-}
-
-auto AllocateVmPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
-{
-    auto allocatedPorts = std::make_shared<std::set<uint16_t>>();
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [allocatedPorts, &vm]() { ReleaseVmPorts(*allocatedPorts, vm); });
-
-    // Count ports that need VM port allocation (bridge mode ports have VmPort == 0).
-    size_t portsToAllocate = std::count_if(ports.begin(), ports.end(), [](const auto& p) { return p.VmPort == 0; });
-
-    if (portsToAllocate > 0)
-    {
-        *allocatedPorts = vm.AllocatePorts(static_cast<uint16_t>(portsToAllocate));
-
-        auto it = allocatedPorts->begin();
-        for (auto& port : ports)
-        {
-            if (port.VmPort == 0)
-            {
-                port.VmPort = *it++;
-            }
-        }
-    }
-
-    return std::make_pair(std::move(allocatedPorts), std::move(errorCleanup));
-}
-
-auto AllocateVmPorts(std::shared_ptr<std::set<uint16_t>> vmPorts, WSLAVirtualMachine& vm)
-{
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [vmPorts, &vm]() { ReleaseVmPorts(*vmPorts, vm); });
-
-    for (auto port : *vmPorts)
-    {
-        THROW_WIN32_IF_MSG(ERROR_BUSY, !vm.TryAllocatePort(port), "Port %hu is in use.", port);
-    }
-
-    return errorCleanup;
-}
-
 // Builds port mapping list from container options and returns the network mode string.
 // Note: For bridge mode, VM ports are set to 0 and will be allocated later by MapPorts().
-std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLAContainerOptions& options)
+std::pair<std::vector<WSLAContainerImpl::ContainerPortMapping>, std::string> ProcessPortMappings(const WSLAContainerOptions& options, WSLAVirtualMachine& virtualMachine)
 {
     WSLAContainerNetworkType networkType = options.ContainerNetwork.ContainerNetworkType;
 
@@ -197,24 +120,26 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const W
         options.PortsCount > 0 && networkType == WSLAContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
-    std::vector<WSLAPortMapping> ports;
+    std::vector<WSLAContainerImpl::ContainerPortMapping> ports;
     ports.reserve(options.PortsCount);
+
+    std::vector<wsl::windows::service::wsla::VmPortAllocation> allocatedPorts;
+    if (options.ContainerNetwork.ContainerNetworkType == WSLAContainerNetworkTypeBridged)
+    {
+        allocatedPorts = virtualMachine.AllocatePorts(static_cast<uint16_t>(ports.size()));
+    }
 
     for (ULONG i = 0; i < options.PortsCount; i++)
     {
-        const auto& port = options.Ports[i];
-        THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
-
+        auto& entry =
+            ports.emplace_back(WSLAVirtualMachine::VMPortMapping::FromWSLAPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
         if (networkType == WSLAContainerNetworkTypeBridged)
         {
-            // Note: For bridge mode, VM ports are initially set to 0 and later allocated from the VM port pool
-            // via AllocateVmPorts().
-            ports.push_back({port.HostPort, 0, port.ContainerPort, port.Family});
+            // Bridge mode ports are allocated when the container starts.
         }
         else if (networkType == WSLAContainerNetworkTypeHost)
         {
-            // In host mode, the container port is the same as the VM port.
-            ports.push_back({port.HostPort, port.ContainerPort, port.ContainerPort, port.Family});
+            entry.VmMapping.AssignVmPort(std::move(allocatedPorts[i]));
         }
     }
 
@@ -343,8 +268,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Name,
     std::string&& Image,
     std::vector<WSLAVolumeMount>&& volumes,
-    std::vector<WSLAPortMapping>&& ports,
-    std::shared_ptr<std::set<uint16_t>> allocatedVmPorts,
+    std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
@@ -360,7 +284,6 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
-    m_allocatedVmPorts(std::move(allocatedVmPorts)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
@@ -555,7 +478,9 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys)
     m_stoppedNotifiedEvent.ResetEvent();
 
     auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
-    auto portCleanup = MapPorts(m_mappedPorts, m_virtualMachine);
+
+    MapPorts();
+    auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
 
     try
     {
@@ -563,7 +488,6 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys)
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
-    portCleanup.release();
     volumeCleanup.release();
 
     Transition(WslaContainerStateRunning);
@@ -926,7 +850,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
         auto portKey = std::format("{}/tcp", e.ContainerPort);
 
         wsla_schema::InspectPortBinding portBinding{};
-        portBinding.HostPort = std::to_string(e.HostPort);
+        portBinding.HostPort = std::to_string(ntohs(e.VmMapping.BindAddress.Ipv4.sin_port));
 
         wslaInspect.Ports[portKey].push_back(std::move(portBinding));
     }
@@ -1097,21 +1021,19 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Process port mappings from container options.
-    auto [ports, networkMode] = ProcessPortMappings(containerOptions);
+    auto [ports, networkMode] = ProcessPortMappings(containerOptions, virtualMachine);
     request.HostConfig.NetworkMode = networkMode;
-
-    // Allocate VM ports for bridge-mode port mappings.
-    auto [allocatedVmPorts, vmPortCleanup] = AllocateVmPorts(ports, virtualMachine);
 
     for (const auto& e : ports)
     {
-        // TODO: UDP support
         // TODO: ipv6 support.
-        auto portKey = std::format("{}/tcp", e.ContainerPort);
+        auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
         request.ExposedPorts[portKey] = {};
 
+        // TODO: Custom binding address support.
         auto& portEntry = request.HostConfig.PortBindings[portKey];
-        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
+        portEntry.emplace_back(
+            common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.VmPort.Port())});
     }
 
     std::map<std::string, std::string> labels;
@@ -1133,7 +1055,11 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
-    metadata.Ports = ports;
+
+    for (const auto& e : ports)
+    {
+        metadata.Ports.emplace_back(e.Serialize());
+    }
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
     request.Labels.insert(labels.begin(), labels.end());
@@ -1157,7 +1083,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::move(ports),
-        std::move(allocatedVmPorts),
         std::move(labels),
         std::move(OnDeleted),
         EventTracker,
@@ -1166,8 +1091,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         WslaContainerStateCreated,
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
-
-    vmPortCleanup.release();
 
     return container;
 }
@@ -1201,17 +1124,23 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     auto networkMode = DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode);
 
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
-    auto vmPorts = std::make_shared<std::set<uint16_t>>();
-    if (networkMode == WSLAContainerNetworkTypeBridged)
+    std::vector<ContainerPortMapping> ports;
+    for (const auto& e : metadata.Ports)
     {
-        for (const auto& port : metadata.Ports)
-        {
-            WI_ASSERT(port.VmPort != 0);
-            vmPorts->insert(port.VmPort);
-        }
-    }
+        auto& inserted =
+            ports.emplace_back(ContainerPortMapping{WSLAVirtualMachine::VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-    auto errorCleanup = AllocateVmPorts(vmPorts, virtualMachine);
+        auto allocation = virtualMachine.TryAllocatePort(inserted.ContainerPort);
+
+        THROW_HR_IF_MSG(
+            ERROR_BUSY,
+            !allocation.has_value(),
+            "Port %hu is in use, cannot open container %hs",
+            inserted.ContainerPort,
+            dockerContainer.Id.c_str());
+
+        inserted.VmMapping.AssignVmPort(std::move(allocation.value()));
+    }
 
     auto container = std::make_unique<WSLAContainerImpl>(
         wslaSession,
@@ -1220,8 +1149,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::move(name),
         std::string(dockerContainer.Image),
         std::move(metadata.Volumes),
-        std::move(metadata.Ports),
-        std::move(vmPorts),
+        std::move(ports),
         std::move(labels),
         std::move(OnDeleted),
         EventTracker,
@@ -1248,7 +1176,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     }
     CATCH_LOG();
 
-    errorCleanup.release();
     return container;
 }
 
@@ -1352,12 +1279,43 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     return std::make_unique<RelayedProcessIO>(std::move(fds));
 }
 
+void WSLAContainerImpl::MapPorts()
+{
+    for (auto& e : m_mappedPorts)
+    {
+        // VmPort is empty when the container is using host mode.
+        // In that case, allocate the VM ports to match the container ports.
+        if (e.VmMapping.VmPort.Empty())
+        {
+            auto allocatedPort = m_virtualMachine.TryAllocatePort(e.ContainerPort);
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_BUSY),
+                !allocatedPort.has_value(),
+                "Port %hu is in use, cannot start container %hs",
+                e.ContainerPort,
+                m_id.c_str());
+
+                e.VmMapping.AssignVmPort(std::move(allocatedPort.value()));
+        }
+
+        m_virtualMachine.MapPort(e.VmMapping);
+    }
+}
+
+void WSLAContainerImpl::UnmapPorts()
+{
+    for (auto& e : m_mappedPorts)
+    {
+        e.VmMapping.Reset();
+    }
+}
+
 __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseRuntimeResources()
 {
     WSL_LOG("ReleaseRuntimeResources", TraceLoggingValue(m_id.c_str(), "ID"));
 
     // Release runtime resources (port relays, volume mounts) that were set up at Start().
-    UnmapPorts(m_mappedPorts, m_virtualMachine);
+    UnmapPorts();
     UnmountVolumes(m_mountedVolumes, m_virtualMachine);
 }
 
@@ -1368,7 +1326,10 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseResources(
     ReleaseRuntimeResources();
 
     // Release VM port allocations back to the pool.
-    ReleaseVmPorts(*m_allocatedVmPorts, m_virtualMachine);
+    for (auto& e : m_mappedPorts)
+    {
+        e.VmMapping.VmPort.Reset();
+    }
 
     // Disconnect the COM wrapper so no new RPC calls can reach this container.
     DisconnectComWrapper();
