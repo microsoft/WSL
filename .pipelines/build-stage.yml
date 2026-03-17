@@ -291,7 +291,7 @@ stages:
                       if (-not (Test-Path -Path $cabPath)) {
                           throw "CAB file was not created at expected path: $cabPath"
                       }
-          - ${{ if eq(parameters.isRelease, 'true') }}:
+              - ${{ if eq(parameters.isRelease, 'true') }}:
               - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
                 displayName: "Sign CAB (${{ platform }})"
                 condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
