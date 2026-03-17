@@ -1591,9 +1591,7 @@ class WslcSdkTests
         // stdout handle was consumed by the IOCallback — must not be obtainable.
         {
             HANDLE h = nullptr;
-            VERIFY_ARE_EQUAL(
-                WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &h),
-                HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &h), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
         // stderr handle was NOT consumed — must still be obtainable.
