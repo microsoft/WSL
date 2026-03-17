@@ -527,7 +527,13 @@ try
     else
     {
         it->second = m_guestDeviceManager->AddGuestDevice(
-            VIRTIO_FS_DEVICE_ID, m_virtioFsClassId, shareName.c_str(), L"", WindowsPath, VIRTIO_FS_FLAGS_TYPE_FILES, m_userToken.get());
+            VIRTIO_FS_DEVICE_ID,
+            m_virtioFsClassId,
+            shareName.c_str(),
+            ReadOnly ? L"ro" : L"",
+            WindowsPath,
+            VIRTIO_FS_FLAGS_TYPE_FILES,
+            m_userToken.get());
     }
 
     cleanup.release();
