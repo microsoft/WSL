@@ -46,12 +46,12 @@ using unique_socket = wil::unique_fd;
 
 enum class ConnCheckStatus
 {
-    InProgress,
-    Success,
-    NoRecordsForFamily,
-    FailureGetAddrInfo,
-    FailureConfig,
-    FailureSocketConnect,
+    InProgress = 0,
+    Success = 1,
+    FailureGetAddrInfo = 2,
+    FailureConfig = 3,
+    FailureSocketConnect = 4,
+    NoRecordsForFamily = 5,
 };
 
 struct ConnCheckResult
