@@ -96,9 +96,11 @@ try
         return std::nullopt;
     }
 
+    constexpr DWORD flags = RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ;
+
     DWORD size = 0;
-    LONG result = RegGetValueW(key, nullptr, name, RRF_RT_REG_SZ, nullptr, nullptr, &size);
-    if (result == ERROR_PATH_NOT_FOUND || result == ERROR_FILE_NOT_FOUND)
+    LONG result = RegGetValueW(key, nullptr, name, flags, nullptr, nullptr, &size);
+    if (result == ERROR_PATH_NOT_FOUND || result == ERROR_FILE_NOT_FOUND || size == 0)
     {
         return std::nullopt;
     }
@@ -106,14 +108,15 @@ try
     THROW_IF_WIN32_ERROR(result);
 
     std::wstring value(size / sizeof(wchar_t), L'\0');
-    result = RegGetValueW(key, nullptr, name, RRF_RT_REG_SZ, nullptr, value.data(), &size);
+    result = RegGetValueW(key, nullptr, name, flags, nullptr, value.data(), &size);
+    if (result == ERROR_PATH_NOT_FOUND || result == ERROR_FILE_NOT_FOUND || size == 0)
+    {
+        return std::nullopt;
+    }
+
     THROW_IF_WIN32_ERROR(result);
 
-    // Remove trailing null characters
-    while (!value.empty() && value.back() == L'\0')
-    {
-        value.pop_back();
-    }
+    value.resize(wcsnlen(value.c_str(), value.size()));
 
     if (value.empty())
     {

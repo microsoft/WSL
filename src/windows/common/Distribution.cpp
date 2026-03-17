@@ -189,7 +189,10 @@ DistributionList ReadFromJsonOrUrl(const std::wstring& value)
     const auto first = value.find_first_not_of(L" \t\r\n");
     if (first == std::wstring::npos)
     {
-        return ReadFromManifest(value);
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG,
+            wsl::shared::Localization::MessageCouldFetchDistributionList(
+                wsl::windows::policies::c_customDistributionManifest, wsl::windows::common::wslutil::GetSystemErrorString(E_INVALIDARG)));
     }
 
     const auto last = value.find_last_not_of(L" \t\r\n");
