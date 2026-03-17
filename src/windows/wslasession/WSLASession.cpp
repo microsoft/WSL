@@ -388,7 +388,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::BuildImage(const WSLABuildImageOptions* Options, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::BuildImage(const WSLABuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
     COMServiceExecutionContext context;
@@ -443,7 +443,7 @@ try
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, dockerfileFileHandle ? WSLAProcessFlagsStdin : WSLAProcessFlagsNone);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
-    auto io = CreateIOContext();
+    auto io = CreateIOContext(CancelEvent);
 
     if (dockerfileFileHandle)
     {
@@ -536,7 +536,28 @@ try
 
     io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
-    io.Run({});
+    try
+    {
+        io.Run({});
+    }
+    catch (...)
+    {
+        // If the IO loop was aborted (e.g. due to cancellation), terminate the build process and wait
+        // for it to exit before propagating the exception. SIGTERM lets the docker build client
+        // cancel the BuildKit build through the daemon's gRPC API, ensuring running build steps are
+        // torn down. If it doesn't exit within 10 seconds, SIGKILL forces termination.
+        LOG_IF_FAILED(buildProcess.Get().Signal(WSLASignalSIGTERM));
+        try
+        {
+            buildProcess.Wait(10 * 1000);
+        }
+        catch (...)
+        {
+            LOG_IF_FAILED(buildProcess.Get().Signal(WSLASignalSIGKILL));
+            buildProcess.Wait();
+        }
+        throw;
+    }
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));

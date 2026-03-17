@@ -886,7 +886,7 @@ class WSLATests
         optionsCopy.ContextPath = contextPathStr.c_str();
         optionsCopy.DockerfileHandle = HandleToULong(dockerfileHandle.get());
 
-        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, nullptr);
+        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, nullptr, nullptr);
 
         if (FAILED(buildResult))
         {
@@ -1238,7 +1238,7 @@ class WSLATests
             .DockerfileHandle = HandleToULong(readHandle.get()),
             .Tags = {&tag, 1},
         };
-        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr, nullptr));
         ExpectImagePresent(*m_defaultSession, "wsla-test-build-stdin:latest");
 
         WSLAContainerLauncher launcher("wsla-test-build-stdin:latest", "wsla-build-stdin-container");
@@ -1312,6 +1312,67 @@ class WSLATests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
         ExpectImagePresent(*m_defaultSession, "wsla-test-multitag:v1");
         ExpectImagePresent(*m_defaultSession, "wsla-test-multitag:v2");
+    }
+
+    TEST_METHOD(BuildImageCancel)
+    {
+        WSL2_TEST_ONLY();
+
+        class TestProgressCallback
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+        {
+        public:
+            TestProgressCallback(wil::unique_event& event) : m_event(event)
+            {
+            }
+
+            HRESULT OnProgress(LPCSTR, LPCSTR, ULONGLONG, ULONGLONG) override
+            {
+                m_event.SetEvent();
+                return S_OK;
+            }
+
+        private:
+            wil::unique_event& m_event;
+        };
+
+        auto contextDir = std::filesystem::current_path() / "build-context-cancel";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        // Use a Dockerfile that takes a long time to build so we can cancel it mid-build.
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN sleep 120\n";
+        }
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+        wil::unique_event progressEvent{wil::EventOptions::ManualReset};
+
+        // Use a progress callback to detect when the build is actively running
+        // before signaling cancellation, avoiding a racy Sleep().
+        auto callback = Microsoft::WRL::Make<TestProgressCallback>(progressEvent);
+
+        auto contextPathStr = contextDir.wstring();
+        LPCSTR tag = "wsla-test-build-cancel:latest";
+        WSLABuildImageOptions options{
+            .ContextPath = contextPathStr.c_str(),
+            .Tags = {&tag, 1},
+        };
+
+        std::promise<HRESULT> result;
+        std::thread buildThread(
+            [&]() { result.set_value(m_defaultSession->BuildImage(&options, callback.Get(), cancelEvent.get())); });
+
+        VERIFY_IS_TRUE(progressEvent.wait(60 * 1000));
+        cancelEvent.SetEvent();
+
+        VERIFY_ARE_EQUAL(E_ABORT, result.get_future().get());
+        buildThread.join();
     }
 
     TEST_METHOD(TagImage)

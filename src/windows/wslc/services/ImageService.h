@@ -28,7 +28,8 @@ public:
         const std::vector<std::wstring>& buildArgs,
         const std::wstring& dockerfilePath,
         bool verbose,
-        IProgressCallback* callback);
+        IProgressCallback* callback,
+        HANDLE cancelEvent = nullptr);
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);

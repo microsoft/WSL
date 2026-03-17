@@ -26,9 +26,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     }
     ~CLIExecutionContext() override = default;
 
-    CLIExecutionContext(const CLIExecutionContext&) = default;
-    CLIExecutionContext& operator=(const CLIExecutionContext&) = default;
-
+    NON_COPYABLE(CLIExecutionContext);
     CLIExecutionContext(CLIExecutionContext&&) = default;
     CLIExecutionContext& operator=(CLIExecutionContext&&) = default;
 
@@ -40,5 +38,9 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     // Process exit code set by tasks like Run/Exec. When set, CoreMain returns this
     // instead of the HRESULT, enabling `wslc run ... && echo success` patterns.
     std::optional<int> ExitCode;
+
+    // Event signaled when the user presses Ctrl-C. Long-running operations can pass
+    // this to COM APIs that accept a CancelEvent handle.
+    wil::unique_event CancelEvent{wil::EventOptions::ManualReset};
 };
 } // namespace wsl::windows::wslc::execution

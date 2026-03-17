@@ -47,6 +47,21 @@ try
     // COM references.
     CLIExecutionContext context;
 
+    // Register a console control handler so Ctrl-C signals the cancel event.
+    // This allows long-running operations (e.g. image build) to be cancelled.
+    // The static is required because SetConsoleCtrlHandler only accepts function pointers.
+    static HANDLE s_cancelEvent = context.CancelEvent.get();
+    auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
+        if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT)
+        {
+            SetEvent(s_cancelEvent);
+            return TRUE;
+        }
+        return FALSE;
+    };
+    SetConsoleCtrlHandler(ctrlHandler, TRUE);
+    auto unregisterHandler = wil::scope_exit([&]() { SetConsoleCtrlHandler(ctrlHandler, FALSE); });
+
     WSADATA data{};
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
@@ -89,6 +104,13 @@ try
         // Using WSL shared utility to get the HRESULT from the caught exception.
         // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
         result = wil::ResultFromCaughtException();
+
+        // If the user pressed Ctrl-C, exit silently instead of printing an error.
+        if (context.CancelEvent.is_signaled())
+        {
+            return 1;
+        }
+
         if (FAILED(result))
         {
             if (const auto& reported = context.ReportedError())
