@@ -398,7 +398,8 @@ STDAPI WslcLoadSessionImage(
     _In_opt_ const WslcLoadImageOptions* options,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-STDAPI WslcLoadSessionImageFromFile(_In_ WslcSession session, _In_z_ PCWSTR path, _In_opt_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcLoadSessionImageFromFile(
+    _In_ WslcSession session, _In_z_ PCWSTR path, _In_opt_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 #define WSLC_IMAGE_NAME_LENGTH 256 // 255 chars + null
 
