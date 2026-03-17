@@ -77,8 +77,7 @@ public:
     {
         NON_COPYABLE(VMPortMapping);
 
-        VMPortMapping(int Protocol, const SOCKADDR_INET& BindAddress) :
-            Protocol(Protocol), BindAddress(BindAddress)
+        VMPortMapping(int Protocol, const SOCKADDR_INET& BindAddress) : Protocol(Protocol), BindAddress(BindAddress)
         {
             WI_ASSERT(Protocol == IPPROTO_TCP || Protocol == IPPROTO_UDP);
             WI_ASSERT(BindAddress.Ipv4.sin_family == AF_INET || BindAddress.Ipv4.sin_family == AF_INET6);
@@ -192,40 +191,37 @@ public:
             return VMPortMapping(IPPROTO_TCP, localhost);
         }
 
-        static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping)
+        static SOCKADDR_INET ParseBindingAddress(int Family, uint16_t Port, const char* Address)
         {
             SOCKADDR_INET bindAddress{};
-            bindAddress.si_family = Mapping.Family;
-            if (Mapping.Family == AF_INET)
+            bindAddress.si_family = Family;
+            if (Family == AF_INET)
             {
-                bindAddress.Ipv4.sin_port = htons(Mapping.HostPort);
-
-                if (inet_pton(AF_INET, Mapping.BindingAddress, &bindAddress.Ipv4) == SOCKET_ERROR)
-                {
-                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Mapping.BindingAddress));
-                }
+                bindAddress.Ipv4.sin_port = htons(Port);
+                common::wslutil::ParseIpv4Address(Address, bindAddress.Ipv4);
             }
-            else if (Mapping.Family == AF_INET6)
+            else if (Family == AF_INET6)
             {
-                bindAddress.Ipv6.sin6_port = htons(Mapping.HostPort);
-                if (inet_pton(AF_INET6, Mapping.BindingAddress, &bindAddress.Ipv6) == SOCKET_ERROR)
-                {
-                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Mapping.BindingAddress));
-                }
+                bindAddress.Ipv6.sin6_port = htons(Port);
+                common::wslutil::ParseIpv6Address(Address, bindAddress.Ipv6);
             }
             else
             {
-                THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Mapping.Family);
+                THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Family);
             }
 
-            return VMPortMapping(Mapping.Protocol, bindAddress);
+            return bindAddress;
+        }
+
+        static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping)
+        {
+            return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress));
         }
 
         static VMPortMapping FromContainerMetaData(const wsla::WSLAPortMapping& Mapping)
         {
-        
+            return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str()));
         }
-
 
         int Protocol{};
         VmPortAllocation VmPort;
