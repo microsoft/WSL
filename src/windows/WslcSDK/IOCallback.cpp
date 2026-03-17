@@ -21,8 +21,9 @@ IOCallback::IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallba
         auto localCallback = options.stdOutCallback;
         auto localContext = options.stdOutCallbackContext;
         m_io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
-            GetIOHandle(process, WSLC_PROCESS_IO_HANDLE_STDOUT),
-            [localCallback, localContext](const auto& buffer) { localCallback(reinterpret_cast<const BYTE*>(buffer.data()), static_cast<uint32_t>(buffer.size()), localContext); }));
+            GetIOHandle(process, WSLC_PROCESS_IO_HANDLE_STDOUT), [localCallback, localContext](const auto& buffer) {
+                localCallback(reinterpret_cast<const BYTE*>(buffer.data()), static_cast<uint32_t>(buffer.size()), localContext);
+            }));
     }
 
     if (options.stdErrCallback)
@@ -40,7 +41,9 @@ IOCallback::IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallba
         {
             m_io.Run({});
         }
-        catch (...){}
+        catch (...)
+        {
+        }
     });
 }
 
@@ -72,8 +75,7 @@ wil::unique_handle IOCallback::GetIOHandle(IWSLAProcess* process, WslcProcessIOH
 {
     ULONG ulongHandle = 0;
 
-    THROW_IF_FAILED(process->GetStdHandle(
-        static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &ulongHandle));
+    THROW_IF_FAILED(process->GetStdHandle(static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &ulongHandle));
 
     return wil::unique_handle{ULongToHandle(ulongHandle)};
 }

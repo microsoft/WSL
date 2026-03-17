@@ -555,9 +555,14 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
+    bool hasIOCallback = IOCallback::HasIOCallback(internalType->ioCallbackOptions);
+    // If callbacks were provided, ATTACH must be used.
+    // TODO: Consider if we should just override flags when callbacks were provided instead.
+    RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
+
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
     {
-        if (IOCallback::HasIOCallback(internalType->ioCallbackOptions))
+        if (hasIOCallback)
         {
             wil::com_ptr<IWSLAProcess> process;
             RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
