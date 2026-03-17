@@ -116,7 +116,7 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
         auto status = getaddrinfo(hostname, port, &hints, &servinfo);
         if (status != 0)
         {
-            if (status == EAI_NODATA || status == EAI_NONAME) // Check for both as EAI_NODATA is deprecated on newr linux versions
+            if (status == EAI_NODATA || status == EAI_NONAME) // Check for both as EAI_NODATA is deprecated on newer linux versions
             {
                 // EAI_NODATA means the domain exists but lacks records for the requested
                 // address family (A for IPv4, AAAA for IPv6). This is expected behavior
