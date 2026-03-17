@@ -80,6 +80,10 @@ private:
     UserSettings();
     ~UserSettings() = default;
 
+    // Base directory shared by PrimaryFilePath() and BackupFilePath().
+    // Lazily initialized on first call; safe to call from any static context.
+    static const std::filesystem::path& SettingsDir();
+
     SettingsMap          m_settings;
     std::vector<Warning> m_warnings;
     UserSettingsType     m_type = UserSettingsType::Default;
