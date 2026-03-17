@@ -518,8 +518,7 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcImportSessionImageFromFile(m_defaultSession, nullptr, exportedImageTar.c_str(), &opts, nullptr), E_POINTER);
 
         // Negative: missing file input must fail.
-        VERIFY_ARE_EQUAL(
-            WslcImportSessionImageFromFile(m_defaultSession, "missing-file-input:test", nullptr, &opts, nullptr), E_POINTER);
+        VERIFY_ARE_EQUAL(WslcImportSessionImageFromFile(m_defaultSession, "missing-file-input:test", nullptr, &opts, nullptr), E_POINTER);
 
         // Negative: zero ContentLength must fail.
         VERIFY_ARE_EQUAL(WslcImportSessionImage(m_defaultSession, "zero-length:test", GetCurrentThreadEffectiveToken(), 0, &opts, nullptr), E_INVALIDARG);

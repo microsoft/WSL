@@ -1037,10 +1037,7 @@ try
 CATCH_RETURN();
 
 STDAPI WslcImportSessionImageFromFile(
-    _In_ WslcSession session,
-    _In_z_ PCSTR imageName,
-    _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options,
-    _Outptr_opt_result_z_ PWSTR* errorMessage)
+    _In_ WslcSession session, _In_z_ PCSTR imageName, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
@@ -1051,7 +1048,8 @@ try
 }
 CATCH_RETURN();
 
-static HRESULT WslcLoadSessionImageImpl(WslcSessionImpl* internalSession, const WslcLoadImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
+static HRESULT WslcLoadSessionImageImpl(
+    WslcSessionImpl* internalSession, const WslcLoadImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
 
