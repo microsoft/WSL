@@ -122,13 +122,12 @@ class WSLCE2EContainerCreateTests
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
 
-        auto result = RunWslc(
-            std::format(
-                L"container run --name {} --volume \"{}:/data:ro\" {} cat /data/{}",
-                WslcContainerName,
-                hostDirectory.wstring(),
-                AlpineImage.NameAndTag(),
-                fileName));
+        auto result = RunWslc(std::format(
+            L"container run --name {} --volume \"{}:/data:ro\" {} cat /data/{}",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            AlpineImage.NameAndTag(),
+            fileName));
         result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = S_OK});
     }
 
@@ -138,13 +137,12 @@ class WSLCE2EContainerCreateTests
 
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
-        auto result = RunWslc(
-            std::format(
-                L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
-                WslcContainerName,
-                hostDirectory.wstring(),
-                AlpineImage.NameAndTag(),
-                fileName));
+        auto result = RunWslc(std::format(
+            L"container run --name {} --volume \"{}:/data\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            AlpineImage.NameAndTag(),
+            fileName));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
 
         // Read all file content
@@ -160,13 +158,12 @@ class WSLCE2EContainerCreateTests
 
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
-        auto result = RunWslc(
-            std::format(
-                L"container run --name {} --volume \"{}:/data:rw\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
-                WslcContainerName,
-                hostDirectory.wstring(),
-                AlpineImage.NameAndTag(),
-                fileName));
+        auto result = RunWslc(std::format(
+            L"container run --name {} --volume \"{}:/data:rw\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            AlpineImage.NameAndTag(),
+            fileName));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
 
         // Read all file content
@@ -182,13 +179,12 @@ class WSLCE2EContainerCreateTests
 
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
-        auto result = RunWslc(
-            std::format(
-                L"container run --name {} --volume \"{}:/data:ro\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
-                WslcContainerName,
-                hostDirectory.wstring(),
-                AlpineImage.NameAndTag(),
-                fileName));
+        auto result = RunWslc(std::format(
+            L"container run --name {} --volume \"{}:/data:ro\" {} sh -c \"echo -n 'WSLC Volume Test' > /data/{}\"",
+            WslcContainerName,
+            hostDirectory.wstring(),
+            AlpineImage.NameAndTag(),
+            fileName));
         auto errorMessage = std::format(L"sh: can't create /data/{}: Read-only file system\n", fileName);
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
@@ -202,17 +198,16 @@ class WSLCE2EContainerCreateTests
         auto fileName1 = VolumeTestFile1.filename().wstring();
         auto hostDirectory2 = VolumeTestFile2.parent_path();
         auto fileName2 = VolumeTestFile2.filename().wstring();
-        auto result = RunWslc(
-            std::format(
-                L"container run --name {} --volume \"{}:/data1:rw\" --volume \"{}:/data2:rw\" {} sh -c \"echo -n 'Test1' > "
-                L"/data1/{} && "
-                L"echo -n 'Test2' > /data2/{}\"",
-                WslcContainerName,
-                hostDirectory1.wstring(),
-                hostDirectory2.wstring(),
-                AlpineImage.NameAndTag(),
-                fileName1,
-                fileName2));
+        auto result = RunWslc(std::format(
+            L"container run --name {} --volume \"{}:/data1:rw\" --volume \"{}:/data2:rw\" {} sh -c \"echo -n 'Test1' > "
+            L"/data1/{} && "
+            L"echo -n 'Test2' > /data2/{}\"",
+            WslcContainerName,
+            hostDirectory1.wstring(),
+            hostDirectory2.wstring(),
+            AlpineImage.NameAndTag(),
+            fileName1,
+            fileName2));
 
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
