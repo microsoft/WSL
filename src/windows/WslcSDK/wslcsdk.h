@@ -368,37 +368,37 @@ typedef struct WslcPullImageOptions
 
 STDAPI WslcPullSessionImage(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-typedef struct WslcImageFileContent
-{
-    _In_opt_ HANDLE handle;
-    _In_ uint64_t length;
-} WslcImageFileContent;
-
-// Specifying both path and content will result in an error.
-typedef struct WslcImageFileSpecifier
-{
-    _In_opt_z_ PCWSTR path;
-    _In_ WslcImageFileContent content;
-} WslcImageFileSpecifier;
-
 typedef struct WslcImportImageOptions
 {
-    _In_z_ PCSTR imageName;
-    _In_ WslcImageFileSpecifier imageFile;
     _In_opt_ WslcContainerImageProgressCallback progressCallback;
     _In_opt_ PVOID progressCallbackContext;
 } WslcImportImageOptions;
 
-STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcImportSessionImage(
+    _In_ WslcSession session,
+    _In_z_ PCSTR imageName,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcImportImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcImportSessionImageFromFile(
+    _In_ WslcSession session, _In_z_ PCSTR imageName, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcLoadImageOptions
 {
-    _In_ WslcImageFileSpecifier imageFile;
     _In_opt_ WslcContainerImageProgressCallback progressCallback;
     _In_opt_ PVOID progressCallbackContext;
 } WslcLoadImageOptions;
 
-STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcLoadSessionImage(
+    _In_ WslcSession session,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcLoadImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcLoadSessionImageFromFile(_In_ WslcSession session, _In_z_ PCWSTR path, _In_opt_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 #define WSLC_IMAGE_NAME_LENGTH 256 // 255 chars + null
 
