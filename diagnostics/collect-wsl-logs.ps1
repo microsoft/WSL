@@ -11,24 +11,45 @@ Set-StrictMode -Version Latest
 
 function Test-WslApplication {
     param (
-        $Name,
-        $Command
+        $Name
     )
 
     # Log warning when tool is not present in WSL
     try
     {
-        & wsl.exe -e sh -lc "command -v $Command >/dev/null 2>&1"
-        $available = ($LASTEXITCODE -eq 0)
+        # Capture any output/error from wsl.exe so we can distinguish
+        # between "command not found" and "WSL invocation failed".
+        $wslOutput = & wsl.exe -e sh -lc "command -v $Name >/dev/null 2>&1" 2>&1
+        $exitCode = $LASTEXITCODE
 
-        if (-not $available)
+        if ($exitCode -eq 0)
         {
-            Write-Warning "$Name not found in WSL. For a more complete log collection install $Name."
+            return $true
         }
 
-        return $available
+        # POSIX shells typically return 1 when command -v does not find the command, but we have seen sh returning 127.
+        if ($exitCode -eq 1 -or $exitCode -eq 127)
+        {
+            Write-Warning "$Name not found in WSL. For a more complete log collection install $Name."
+            return $false
+        }
+
+        # Any other exit code is assumed to indicate WSL itself failed
+        # (e.g., no distro installed, WSL disabled, or other startup error).
+        if (-not [string]::IsNullOrWhiteSpace($wslOutput))
+        {
+            Write-Warning "Unable to check for $Name in WSL. wsl.exe exited with code $exitCode. Output: $wslOutput"
+        }
+        else
+        {
+            Write-Warning "Unable to check for $Name in WSL. wsl.exe exited with code $exitCode."
+        }
+        return $false
     }
-    catch {}
+    catch
+    {
+        Write-Warning "Unexpected error while checking for $Name in WSL."
+    }
 
     return $false
 }
@@ -113,8 +134,8 @@ else
 # Networking-specific setup
 if ($LogProfile -eq "networking")
 {
-    Test-WslApplication -Name "tcpdump" -Command "tcpdump --version" | Out-Null
-    Test-WslApplication -Name "iptables" -Command "iptables --version" | Out-Null
+    Test-WslApplication -Name "tcpdump" | Out-Null
+    Test-WslApplication -Name "iptables" | Out-Null
 
     # Copy/download networking.sh script
     $networkingBashScript = "$folder/networking.sh"
