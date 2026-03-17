@@ -103,12 +103,22 @@ public:
 
         THROW_INVALID_ARG_IF(m_name == nullptr || span.size() < sizeof(TMessage));
 
-        m_sent_messages++;
-
         auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(span);
         WI_ASSERT(header->MessageSize == span.size());
 
-        header->SequenceNumber = m_sent_messages;
+        header->MessageMagic = MESSAGE_HEADER::Magic;
+
+        if (m_pending_reply_sequence.has_value())
+        {
+            header->SequenceNumber = m_pending_reply_sequence.value();
+            m_pending_reply_sequence.reset();
+        }
+        else
+        {
+            m_sent_messages++;
+            header->SequenceNumber = m_sent_messages;
+            m_expected_reply_sequence = m_sent_messages;
+        }
 
 #ifdef WIN32
 
@@ -199,47 +209,104 @@ public:
 #endif
         }
 
-        m_received_messages++;
-
-        auto receivedSpan = ReceiveImpl(TMessage::Type, timeout);
-        if (receivedSpan.empty())
+        // Use for loop to handle previous timed out replies in buffer.
+        for (;;)
         {
+            auto receivedSpan = ReceiveImpl(TMessage::Type, timeout);
+            if (receivedSpan.empty())
+            {
 
 #ifdef WIN32
-            if (errno == HCS_E_CONNECTION_TIMEOUT)
+                if (errno == HCS_E_CONNECTION_TIMEOUT)
+                {
+                    THROW_HR_MSG(HCS_E_CONNECTION_TIMEOUT, "Timeout: %d, expected type: %hs, channel: %hs", timeout, ToString(TMessage::Type), m_name);
+                }
+#endif
+
+                return {nullptr, {}};
+            }
+
+            auto* receivedHeader = gslhelpers::try_get_struct<MESSAGE_HEADER>(receivedSpan);
+            if (receivedHeader == nullptr)
             {
-                THROW_HR_MSG(HCS_E_CONNECTION_TIMEOUT, "Timeout: %d, expected type: %hs, channel: %hs", timeout, ToString(TMessage::Type), m_name);
+#ifdef WIN32
+                THROW_HR_MSG(E_UNEXPECTED, "Message too small for header: %zd, channel: %hs", receivedSpan.size(), m_name);
+#else
+                LOG_ERROR("Message too small for header: {}, channel: {}", receivedSpan.size(), m_name);
+                THROW_ERRNO(EINVAL);
+#endif
+            }
+
+            // Magic is already validated in ReceiveImpl.
+
+            // Validate sequence
+            if (m_expected_reply_sequence.has_value())
+            {
+                if (!m_ignore_sequence)
+                {
+                    auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_expected_reply_sequence.value());
+                    if (diff < 0)
+                    {
+                        // Skip outdated reply. Potentially from previous timeouts.
+#ifdef WIN32
+                        WSL_LOG(
+                            "DiscardStaleResponse",
+                            TraceLoggingValue(m_name, "Name"),
+                            TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
+                            TraceLoggingValue(m_expected_reply_sequence.value(), "ExpectedSeq"));
+#endif
+                        continue;
+                    }
+
+                    if (diff != 0)
+                    {
+#ifdef WIN32
+                        THROW_HR_MSG(E_UNEXPECTED, "Unexpected response sequence: %u, expected: %u, channel: %hs",
+                            receivedHeader->SequenceNumber, m_expected_reply_sequence.value(), m_name);
+#else
+                        LOG_ERROR("Unexpected response sequence: {}, expected: {}, channel: {}",
+                            receivedHeader->SequenceNumber, m_expected_reply_sequence.value(), m_name);
+                        THROW_ERRNO(EINVAL);
+#endif
+                    }
+                }
+
+                // Reply matched (or ignore_sequence) — clear expected reply.
+                m_expected_reply_sequence.reset();
+            }
+            else
+            {
+                // We are the responder receiving a request — cache for echo-back.
+                m_pending_reply_sequence = receivedHeader->SequenceNumber;
+            }
+
+            auto* message = gslhelpers::try_get_struct<TMessage>(receivedSpan);
+
+            if (message == nullptr)
+            {
+#ifdef WIN32
+                THROW_HR_MSG(
+                    E_UNEXPECTED, "Message size is too small: %zd, expected type: %hs, channel: %hs", receivedSpan.size(), ToString(TMessage::Type), m_name);
+#else
+                LOG_ERROR("MessageSize is too small: {}, expected type: {}, channel: {}", receivedSpan.size(), ToString(TMessage::Type), m_name);
+                THROW_ERRNO(EINVAL);
+#endif
+            }
+
+            // Validate type
+            ValidateMessageHeader(GetMessageHeader(*message), TMessage::Type);
+
+#ifdef WIN32
+            WSL_LOG(
+                "ReceivedMessage", TraceLoggingValue(m_name, "Name"), TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
+#else
+            if (LoggingEnabled())
+            {
+                LOG_INFO("ReceivedMessage on channel: {}: '{}'", m_name, message->PrettyPrint().c_str());
             }
 #endif
-
-            return {nullptr, {}};
+            return {message, receivedSpan};
         }
-
-        auto* message = gslhelpers::try_get_struct<TMessage>(receivedSpan);
-
-        if (message == nullptr)
-        {
-#ifdef WIN32
-            THROW_HR_MSG(
-                E_UNEXPECTED, "Message size is too small: %zd, expected type: %hs, channel: %hs", receivedSpan.size(), ToString(TMessage::Type), m_name);
-#else
-            LOG_ERROR("MessageSize is too small: {}, expected type: {}, channel: {}", receivedSpan.size(), ToString(TMessage::Type), m_name);
-            THROW_ERRNO(EINVAL);
-#endif
-        }
-
-        ValidateMessageHeader(GetMessageHeader(*message), TMessage::Type, m_received_messages);
-
-#ifdef WIN32
-        WSL_LOG(
-            "ReceivedMessage", TraceLoggingValue(m_name, "Name"), TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
-#else
-        if (LoggingEnabled())
-        {
-            LOG_INFO("ReceivedMessage on channel: {}: '{}'", m_name, message->PrettyPrint().c_str());
-        }
-#endif
-        return {message, receivedSpan};
     }
 
     template <typename TMessage>
@@ -321,33 +388,29 @@ private:
 
 #endif
 
-    void ValidateMessageHeader(const MESSAGE_HEADER& header, LX_MESSAGE_TYPE expected, unsigned int expectedSequence) const
+    void ValidateMessageHeader(const MESSAGE_HEADER& header, LX_MESSAGE_TYPE expected) const
     {
-        if (header.MessageSize < sizeof(header) || (expected != LxMiniInitMessageAny && header.MessageType != expected) ||
-            (!m_ignore_sequence && header.SequenceNumber != expectedSequence))
+
+        if (header.MessageSize < sizeof(header) || (expected != LxMiniInitMessageAny && header.MessageType != expected))
         {
 #ifdef WIN32
 
             THROW_HR_MSG(
                 E_UNEXPECTED,
-                "Protocol error: Received message size: %u, type: %u, sequence: %u. Expected type: %u, expected sequence: %u, "
+                "Protocol error: Received message size: %u, type: %u. Expected type: %u, "
                 "channel: %hs",
                 header.MessageSize,
                 header.MessageType,
-                header.SequenceNumber,
                 expected,
-                expectedSequence,
                 m_name);
 #else
 
             LOG_ERROR(
-                "Protocol error: Received message size: {}, type: {}, sequence: {}. Expected type: {}, expected sequence: {}, "
+                "Protocol error: Received message size: {}, type: {}. Expected type: {}, "
                 "channel: %s",
                 header.MessageSize,
                 header.MessageType,
-                header.SequenceNumber,
                 expected,
-                expectedSequence,
                 m_name);
 
             THROW_ERRNO(EINVAL);
@@ -393,7 +456,22 @@ private:
 
 #endif
     uint32_t m_sent_messages = 0;
-    uint32_t m_received_messages = 0;
+    // The assumption:
+    // 1. Request end and reply end is fixed for a given channel. That is, the message will always be:
+    //    - A -> B (request), then B -> A (reply) or
+    //    - A -> B (request), w/o a reply.
+    // 2. There are no concurrent requests being handled. That is:
+    //    - A will not initiate concurrent valid requests. Only the latest is valid.
+    //    - B will not start handling a new message until it finishes or fails to handle the previous one.
+    // This enables a simpler request-reply message id check instead of a full concurrent request-reply tracking.
+    // A -> (sending request): pending is not set -> this is a new request -> use incremented id and set expected reply.
+    // -> B (receiving request): expected id not set -> this is a request -> cache id as pending reply id.
+    // B -> (sending reply): pending is set -> this is a reply -> use pending id and clear it.
+    // -> A (receiving reply): expected id is set -> this is a reply -> check id with expected id and clear it.
+    // When A sends a new request when the previous one timed out: It's the same logic as sending a normal request.
+    // B will never initiate handling of a new message if it's still working on the previous one. So pending id is always tracking the correct request.
+    std::optional<uint32_t> m_expected_reply_sequence; // Request end: sequence we expect the reply to echo back.
+    std::optional<uint32_t> m_pending_reply_sequence;  // Reply end: sequence to echo back in the next outgoing message.
     bool m_ignore_sequence = false;
     const char* m_name{};
     std::mutex m_sendMutex;

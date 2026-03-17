@@ -478,12 +478,14 @@ inline void PrettyPrint(std::stringstream& Out, LX_MESSAGE_TYPE Value)
 struct MESSAGE_HEADER
 {
     static inline auto Type = LxMiniInitMessageAny; // Setting this allows using MESSAGE_HEADER to receive any type of message
+    static constexpr unsigned int Magic = 0x14538e5d;
 
     LX_MESSAGE_TYPE MessageType;
     unsigned int MessageSize;
     unsigned int SequenceNumber;
+    unsigned int MessageMagic = Magic;
 
-    PRETTY_PRINT(FIELD(MessageType), FIELD(MessageSize), FIELD(SequenceNumber));
+    PRETTY_PRINT(FIELD(MessageType), FIELD(MessageSize), FIELD(SequenceNumber), FIELD(MessageMagic));
 };
 
 //
@@ -771,7 +773,7 @@ typedef struct _LX_GNS_SET_PORT_LISTENER
     PRETTY_PRINT(FIELD(Header), FIELD(HvSocketPort));
 } LX_GNS_SET_PORT_LISTENER, *PLX_GNS_SET_PORT_LISTENER;
 
-static_assert(sizeof(LX_GNS_SET_PORT_LISTENER) == 16);
+static_assert(sizeof(LX_GNS_SET_PORT_LISTENER) == 20);
 
 typedef struct _LX_GNS_PORT_LISTENER_RELAY
 {
