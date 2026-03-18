@@ -31,7 +31,7 @@ class WSLCE2EContainerKillTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureContainerDoesNotExist(WslcSecondContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -39,7 +39,7 @@ class WSLCE2EContainerKillTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
-        EnsureContainerDoesNotExist(WslcSecondContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         return true;
     }
 
@@ -132,7 +132,7 @@ class WSLCE2EContainerKillTests
         VERIFY_IS_FALSE(firstContainerId.empty());
 
         // Run second container in background
-        result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcSecondContainerName, DebianImage.NameAndTag()));
+        result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName2, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         const auto secondContainerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(secondContainerId.empty());
@@ -152,7 +152,7 @@ class WSLCE2EContainerKillTests
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
-    const std::wstring WslcSecondContainerName = L"wslc-test-container-2";
+    const std::wstring WslcContainerName2 = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
 
     std::wstring GetHelpMessage() const
