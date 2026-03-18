@@ -5374,40 +5374,38 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // Validate that SaveImage is aborted when the session terminates mid-operation.
+        // Validate that SaveImage is aborted when the session terminates.
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
         BlockingOperation operation(
             [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); }, E_ABORT, true, true);
 
-        // Terminate the session while SaveImage is in-flight.
+        // Terminate the session.
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
         operation.Complete();
-
-        // Re-create the session.
-        m_defaultSession.reset();
-        m_defaultSession = CreateSession(m_defaultSessionSettings);
+        auto restore = ResetTestSession();
     }
 
     TEST_METHOD(SessionTerminationDuringExport)
     {
         WSL2_TEST_ONLY();
 
-        // Validate that container Export is aborted when the session terminates mid-operation.
+        // Validate that container Export is aborted when the session terminates.
         WSLAContainerLauncher launcher("debian:latest", "test-export-session-terminate", {"echo", "OK"});
         auto container = launcher.Launch(*m_defaultSession);
-        container.GetInitProcess().Wait();
+        VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 0);
 
-        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); }, E_ABORT, true);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            PruneResult result;
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        });
 
-        // Terminate the session while Export is in-flight.
+        // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); }, E_ABORT, true, true);
+
+        // Terminate the session.
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
         operation.Complete();
-
-        // Re-create the session and clean up the leftover container.
-        m_defaultSession.reset();
-        m_defaultSession = CreateSession(m_defaultSessionSettings);
-        PruneResult result;
-        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        auto restore = ResetTestSession();
     }
 
     TEST_METHOD(InteractiveDetach)
