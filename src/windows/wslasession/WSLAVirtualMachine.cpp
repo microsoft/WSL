@@ -885,7 +885,9 @@ void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
         THROW_HR_IF_MSG(
             HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
             !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for NAT mode: %hs, protocol: %i", Mapping.BindingAddressString().c_str(),  Mapping.Protocol);
+            "Unsupported port mapping for NAT mode: %hs, protocol: %i",
+            Mapping.BindingAddressString().c_str(),
+            Mapping.Protocol);
 
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), false);
     }

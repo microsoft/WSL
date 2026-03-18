@@ -1023,7 +1023,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         request.ExposedPorts[portKey] = {};
 
         auto& portEntry = request.HostConfig.PortBindings[portKey];
-        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.VmPort.Port())});
+        portEntry.emplace_back(
+            common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.VmPort.Port())});
     }
 
     std::map<std::string, std::string> labels;
