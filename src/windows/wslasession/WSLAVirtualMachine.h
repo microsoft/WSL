@@ -63,6 +63,8 @@ struct VmPortAllocation
     void Release();
     bool Empty() const;
     uint16_t Port() const;
+    int Family() const;
+    int Protocol() const;
 
 private:
     uint16_t m_port{};
@@ -89,6 +91,7 @@ struct VMPortMapping
     std::string BindingAddressString() const;
     void Attach(WSLAVirtualMachine& Vm);
     void Detach();
+    uint16_t HostPort() const;
 
     static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort);
     static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping);
@@ -160,7 +163,7 @@ public:
     }
 
 private:
-    void MapRelayPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove);
+    void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
 
     // Initial setup during Connect()
     void ConfigureInitialMounts();
@@ -210,7 +213,7 @@ private:
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;
 
-    std::set<uint16_t> m_allocatedPorts;
+    std::map<std::pair<int, int>, std::set<uint16_t>> m_allocatedPorts;
 
     GUID m_vmId{};
 

@@ -483,6 +483,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys)
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
+    portCleanup.release();
     volumeCleanup.release();
 
     Transition(WslaContainerStateRunning);

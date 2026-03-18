@@ -52,6 +52,7 @@ VmPortAllocation& VmPortAllocation::operator=(VmPortAllocation&& Other)
         m_port = Other.m_port;
         m_family = Other.m_family;
         m_protocol = Other.m_protocol;
+        m_vm = Other.m_vm;
 
         Other.Release();
     }
@@ -89,6 +90,18 @@ uint16_t VmPortAllocation::Port() const
 {
     WI_ASSERT(!Empty());
     return m_port;
+}
+
+int VmPortAllocation::Family() const
+{
+    WI_ASSERT(!Empty());
+    return m_family;
+}
+
+int VmPortAllocation::Protocol() const
+{
+    WI_ASSERT(!Empty());
+    return m_protocol;
 }
 
 VMPortMapping::VMPortMapping(int protocol, const SOCKADDR_INET& bindAddress) : Protocol(protocol), BindAddress(bindAddress)
@@ -136,6 +149,19 @@ bool VMPortMapping::IsLocalhost() const
     else
     {
         return IN4ADDR_ISLOOPBACK(&BindAddress.Ipv4);
+    }
+}
+
+uint16_t VMPortMapping::HostPort() const
+{
+    if (BindAddress.si_family == AF_INET6)
+    {
+        return ntohs(BindAddress.Ipv6.sin6_port);
+    }
+    else
+    {
+        WI_ASSERT(BindAddress.si_family == AF_INET);
+        return ntohs(BindAddress.Ipv4.sin_port);
     }
 }
 
@@ -843,7 +869,7 @@ void WSLAVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-void WSLAVirtualMachine::MapRelayPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove)
+void WSLAVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)
 {
     std::lock_guard lock(m_portRelaylock);
 
@@ -881,11 +907,12 @@ void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
             !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
             "Unsupported port mapping for NAT mode: ");
 
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.BindAddress.Ipv4.sin_port, Mapping.VmPort.Port(), false);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), false);
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
-        // TODO
+        // TODO: Switch to using the native virtionet relay.
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), false);
     }
     else
     {
@@ -905,11 +932,12 @@ void WSLAVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     }
     else if (m_networkingMode == WSLANetworkingModeNAT)
     {
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.BindAddress.Ipv4.sin_port, Mapping.VmPort.Port(), true);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), true);
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
-        // TODO
+        // TODO: Switch to using the native virtionet relay.
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), true);
     }
     else
     {
@@ -1074,7 +1102,7 @@ std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Por
 
     WSL_LOG("AllocatePort", TraceLoggingValue(Port, "Port"));
 
-    auto [_, inserted] = m_allocatedPorts.insert(Port);
+    auto [_, inserted] = m_allocatedPorts[std::make_pair(Family, Protocol)].insert(Port);
 
     if (inserted)
     {
@@ -1092,12 +1120,12 @@ VmPortAllocation WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
 
     std::optional<VmPortAllocation> port;
 
-    // TODO: Split ports by protocol and family.
+    auto& portMap = m_allocatedPorts[std::make_pair(Family, Protocol)];
     for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
-        if (!m_allocatedPorts.contains(i))
+        if (!portMap.contains(i))
         {
-            WI_VERIFY(m_allocatedPorts.insert(i).second);
+            WI_VERIFY(portMap.insert(i).second);
             return VmPortAllocation{i, Family, Protocol, *this};
         }
     }
@@ -1112,7 +1140,7 @@ void WSLAVirtualMachine::ReleasePort(VmPortAllocation& Port)
 
     WSL_LOG("ReleasePort", TraceLoggingValue(Port.Port(), "Port"));
 
-    WI_VERIFY(m_allocatedPorts.erase(Port.Port()) == 1);
+    LOG_HR_IF(E_UNEXPECTED, m_allocatedPorts[std::make_pair(Port.Family(), Port.Protocol())].erase(Port.Port()) != 1);
 }
 
 wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char* Path)

@@ -1379,13 +1379,12 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    auto vmPort = m_virtualMachine->TryAllocatePort(LinuxPort, AF_INET, IPPROTO_TCP);
-    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_BUSY), !vmPort.has_value(), "Port %d is already in use", LinuxPort);
-
     auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
-    mapping.AssignVmPort(std::move(vmPort.value()));
+    mapping.AssignVmPort({LinuxPort, Family, IPPROTO_TCP, m_virtualMachine.value()});
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&mapping]() { mapping.Release(); });
 
-    mapping.Release();
+    m_virtualMachine->MapPort(mapping);
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -1398,12 +1397,12 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-
     auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
-    mapping.AssignVmPort(VmPortAllocation{LinuxPort, AF_INET, IPPROTO_TCP, m_virtualMachine.value()});
-
+    mapping.AssignVmPort({LinuxPort, Family, IPPROTO_TCP, m_virtualMachine.value()});
     mapping.Attach(m_virtualMachine.value());
-    mapping.Reset();
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&mapping]() { mapping.Release(); });
+
+    m_virtualMachine->UnmapPort(mapping);
 
     return S_OK;
 }
