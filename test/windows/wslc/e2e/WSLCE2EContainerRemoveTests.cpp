@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCE2EContainerCreateTests.cpp
+    WSLCE2EContainerRemoveTests.cpp
 
 Abstract:
 
@@ -18,13 +18,20 @@ Abstract:
 
 namespace WSLCE2ETests {
 
-class WSLCE2EContainerDeleteTests
+class WSLCE2EContainerRemoveTests
 {
-    WSL_TEST_CLASS(WSLCE2EContainerDeleteTests)
+    WSL_TEST_CLASS(WSLCE2EContainerRemoveTests)
+
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        EnsureImageIsLoaded(DebianImage);
+        return true;
+    }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -34,21 +41,21 @@ class WSLCE2EContainerDeleteTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Delete_HelpCommand)
+    TEST_METHOD(WSLCE2E_Container_Remove_HelpCommand)
     {
-        auto result = RunWslc(L"container delete --help");
+        auto result = RunWslc(L"container remove --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Delete_NotFound)
+    TEST_METHOD(WSLCE2E_Container_Remove_NotFound)
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
-        auto result = RunWslc(std::format(L"container delete {}", WslcContainerName));
+        auto result = RunWslc(std::format(L"container remove {}", WslcContainerName));
         result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Delete_Valid)
+    TEST_METHOD(WSLCE2E_Container_Remove_Valid)
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
@@ -61,7 +68,7 @@ class WSLCE2EContainerDeleteTests
         VerifyContainerIsListed(containerId, L"created");
 
         // Delete the container
-        result = RunWslc(std::format(L"container delete {}", WslcContainerName));
+        result = RunWslc(std::format(L"container remove {}", WslcContainerName));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
 
         // Verify the container is no longer listed
@@ -75,22 +82,28 @@ private:
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
+        output << GetWslcHeader()              //
+               << GetDescription()             //
+               << GetUsage()                   //
+               << GetAvailableCommandAliases() //
+               << GetAvailableCommands()       //
                << GetAvailableOptions();
         return output.str();
     }
 
     std::wstring GetDescription() const
     {
-        return L"Deletes containers.\r\n\r\n";
+        return L"Removes containers.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
     {
-        return L"Usage: wslc container delete [<options>] [<container-id>]\r\n\r\n";
+        return L"Usage: wslc container remove [<options>] [<container-id>]\r\n\r\n";
+    }
+
+    std::wstring GetAvailableCommandAliases() const
+    {
+        return L"The following command aliases are available: rm\r\n\r\n";
     }
 
     std::wstring GetAvailableCommands() const

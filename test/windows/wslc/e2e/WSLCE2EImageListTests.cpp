@@ -35,7 +35,6 @@ class WSLCE2EImageListTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-
     TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
     {
         WSL2_TEST_ONLY();

@@ -113,7 +113,7 @@ private:
                 << L"  --progress        Progress type (format: none|ansi) (default: ansi)\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  --pull            Image pull policy (always|missing|never) (default:never)\r\n"
-                << L"  -rm,--remove      Remove the container after it stops\r\n"
+                << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --scheme          Use this scheme for registry connection\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"

@@ -45,7 +45,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Image command\r\n\r\n";
+        return L"Image command.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -57,9 +57,12 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following sub-commands are available:\r\n"
-                 << L"  pull  Pull images.\r\n"
-                 << L"  list  List images.\r\n"
-                 << L"  load  Load images.\r\n"
+                 << L"  build    Build an image from a Dockerfile.\r\n"
+                 << L"  delete   Delete images.\r\n"
+                 << L"  inspect  Inspect images.\r\n"
+                 << L"  list     List images.\r\n"
+                 << L"  load     Load images.\r\n"
+                 << L"  pull     Pull images.\r\n"
                  << L"\r\n"
                  << L"For more details on a specific command, pass it the help argument. [-h]\r\n"
                  << L"\r\n";
