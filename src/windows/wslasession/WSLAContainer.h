@@ -73,7 +73,7 @@ public:
         {
             return WSLAPortMapping{
                 .HostPort = VmMapping.HostPort(),
-                .VmPort = VmMapping.VmPort.Port(),
+                .VmPort = VmMapping.VmPort ? VmMapping.VmPort->Port() : VmMapping.HostPort(),
                 .ContainerPort = ContainerPort,
                 .Family = VmMapping.BindAddress.si_family,
                 .Protocol = VmMapping.Protocol,

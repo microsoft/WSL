@@ -118,6 +118,9 @@ private:
     WSLAFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminated{false};
+
+    // Used for testing only.
+    std::map<uint16_t, std::shared_ptr<VmPortAllocation>> m_allocatedPorts;
 };
 
 } // namespace wsl::windows::service::wsla

@@ -81,26 +81,18 @@ void VmPortAllocation::Release()
     m_protocol = 0;
 }
 
-bool VmPortAllocation::Empty() const
-{
-    return m_vm == nullptr;
-}
-
 uint16_t VmPortAllocation::Port() const
 {
-    WI_ASSERT(!Empty());
     return m_port;
 }
 
 int VmPortAllocation::Family() const
 {
-    WI_ASSERT(!Empty());
     return m_family;
 }
 
 int VmPortAllocation::Protocol() const
 {
-    WI_ASSERT(!Empty());
     return m_protocol;
 }
 
@@ -129,7 +121,7 @@ VMPortMapping::VMPortMapping(int protocol, int Family, uint16_t Port, const char
 
 VMPortMapping::~VMPortMapping()
 {
-    Reset();
+    Unmap();
 }
 
 VMPortMapping::VMPortMapping(VMPortMapping&& Other)
@@ -137,13 +129,13 @@ VMPortMapping::VMPortMapping(VMPortMapping&& Other)
     *this = std::move(Other);
 }
 
-void VMPortMapping::AssignVmPort(VmPortAllocation&& Port)
+void VMPortMapping::AssignVmPort(const std::shared_ptr<VmPortAllocation>& Port)
 {
-    WI_ASSERT(VmPort.Empty());
+    WI_ASSERT(!VmPort);
     VmPort = std::move(Port);
 }
 
-void VMPortMapping::Reset()
+void VMPortMapping::Unmap()
 {
     if (Vm)
     {
@@ -154,7 +146,7 @@ void VMPortMapping::Reset()
 void VMPortMapping::Release()
 {
     Vm = nullptr;
-    VmPort.Release();
+    VmPort.reset();
 }
 
 bool VMPortMapping::IsLocalhost() const
@@ -230,7 +222,7 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
 {
     if (this != &Other)
     {
-        Reset();
+        Unmap();
         Protocol = Other.Protocol;
         VmPort = std::move(Other.VmPort);
         BindAddress = Other.BindAddress;
@@ -874,7 +866,7 @@ void WSLAVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
 
 void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
 {
-    THROW_HR_IF_MSG(E_INVALIDARG, Mapping.VmPort.Empty(), "Can't map a VM port without an allocated port");
+    THROW_HR_IF_MSG(E_INVALIDARG, !Mapping.VmPort, "Can't map a VM port without an allocated port");
 
     if (m_networkingMode == WSLANetworkingModeNone)
     {
@@ -889,12 +881,12 @@ void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
             Mapping.BindingAddressString().c_str(),
             Mapping.Protocol);
 
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), false);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
         // TODO: Switch to using the native virtionet relay.
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), false);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
     else
     {
@@ -906,7 +898,7 @@ void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
 
 void WSLAVirtualMachine::UnmapPort(VMPortMapping& Mapping)
 {
-    THROW_HR_IF_MSG(E_INVALIDARG, Mapping.VmPort.Empty(), "Can't unmap a VM port without an allocated port");
+    THROW_HR_IF_MSG(E_INVALIDARG, !Mapping.VmPort, "Can't unmap a VM port without an allocated port");
 
     if (m_networkingMode == WSLANetworkingModeNone)
     {
@@ -914,12 +906,12 @@ void WSLAVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     }
     else if (m_networkingMode == WSLANetworkingModeNAT)
     {
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), true);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
         // TODO: Switch to using the native virtionet relay.
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), true);
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
     }
     else
     {
@@ -1077,8 +1069,7 @@ void WSLAVirtualMachine::OnProcessReleased(int Pid)
     std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
 }
 
-// TODO: Handle reservations per family.
-std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)
+std::shared_ptr<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
 
@@ -1088,15 +1079,15 @@ std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Por
 
     if (inserted)
     {
-        return VmPortAllocation{Port, Family, Protocol, *this};
+        return std::make_shared<VmPortAllocation>(Port, Family, Protocol, *this);
     }
     else
     {
-        return std::nullopt;
+        return {};
     }
 }
 
-VmPortAllocation WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
+std::shared_ptr<VmPortAllocation> WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
 
@@ -1105,7 +1096,7 @@ VmPortAllocation WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
         if (!m_allocatedPorts.contains(i))
         {
             WI_VERIFY(m_allocatedPorts.insert(i).second);
-            return VmPortAllocation{i, Family, Protocol, *this};
+            return std::make_shared<VmPortAllocation>(i, Family, Protocol, *this);
         }
     }
 

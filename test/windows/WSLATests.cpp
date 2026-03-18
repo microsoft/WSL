@@ -3737,7 +3737,7 @@ class WSLATests
             expectBoundPorts(container, {"8000/tcp"});
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
-            ExpectHttpResponse(L"http://[::1]:1234", {});
+            ExpectHttpResponse(L"http://[::1]:1234", 200);
 
             // Validate that the port cannot be reused while the container is running.
             WSLAContainerLauncher subLauncher(

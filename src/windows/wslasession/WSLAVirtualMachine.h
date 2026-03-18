@@ -52,7 +52,6 @@ struct VmPortAllocation
 {
     NON_COPYABLE(VmPortAllocation);
 
-    VmPortAllocation() = default;
     VmPortAllocation(uint16_t port, int Family, int Protocol, WSLAVirtualMachine& vm);
     VmPortAllocation(VmPortAllocation&& Other);
     ~VmPortAllocation();
@@ -61,7 +60,6 @@ struct VmPortAllocation
 
     void Reset();
     void Release();
-    bool Empty() const;
     uint16_t Port() const;
     int Family() const;
     int Protocol() const;
@@ -83,9 +81,9 @@ struct VMPortMapping
     VMPortMapping(VMPortMapping&& Other);
     VMPortMapping& operator=(VMPortMapping&& Other);
 
-    void AssignVmPort(VmPortAllocation&& Port);
+    void AssignVmPort(const std::shared_ptr<VmPortAllocation>& Port);
 
-    void Reset();
+    void Unmap();
     void Release();
     bool IsLocalhost() const;
     std::string BindingAddressString() const;
@@ -98,7 +96,7 @@ struct VMPortMapping
     static VMPortMapping FromContainerMetaData(const wsla::WSLAPortMapping& Mapping);
     
     int Protocol{};
-    VmPortAllocation VmPort;
+    std::shared_ptr<VmPortAllocation> VmPort;
     SOCKADDR_INET BindAddress{};
 
 private:
@@ -133,8 +131,8 @@ public:
 
     void OnProcessReleased(int Pid);
 
-    std::optional<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
-    VmPortAllocation AllocatePort(int Family, int Protocol);
+    std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
+    std::shared_ptr<VmPortAllocation> AllocatePort(int Family, int Protocol);
     void ReleasePort(VmPortAllocation& Port);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
