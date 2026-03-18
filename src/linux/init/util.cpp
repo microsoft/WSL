@@ -667,7 +667,7 @@ Return Value:
 
         if (UtilSetSignalHandlers(g_SavedSignalActions, false) < 0 || UtilRestoreBlockedSignals() < 0)
         {
-            exit(-1);
+            _exit(-1);
         }
 
         //
@@ -688,7 +688,7 @@ Return Value:
             if (setsid() == -1)
             {
                 LOG_ERROR("setsid failed {}", errno);
-                exit(-1);
+                _exit(-1);
             }
         }
 
@@ -702,7 +702,7 @@ Return Value:
         // with std::string anyway.
         execv(File, const_cast<char* const*>(Argv));
         LOG_ERROR("execv({}) failed with {}", File, errno);
-        exit(-1);
+        _exit(-1);
     }
 
     if (Status == nullptr)
