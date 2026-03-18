@@ -3858,7 +3858,7 @@ class WSLATests
             // TODO: Update once custom binding addresses are supported.
             {
                 WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
-                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "127.0.0.2");
+                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
 
                 VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)));
             }

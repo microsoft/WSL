@@ -98,7 +98,7 @@ int VmPortAllocation::Protocol() const
 
 VMPortMapping::VMPortMapping(int protocol, int Family, uint16_t Port, const char* Address) : Protocol(protocol)
 {
-    WI_ASSERT(Protocol == IPPROTO_TCP || Protocol == IPPROTO_UDP);
+    THROW_HR_IF_MSG(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP, "Invalid protocol: %i", Protocol);
 
     if (Family == AF_INET)
     {
@@ -886,6 +886,13 @@ void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
         // TODO: Switch to using the native virtionet relay.
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
+            "Unsupported port mapping for virtionet mode: %hs, protocol: %i",
+            Mapping.BindingAddressString().c_str(),
+            Mapping.Protocol);
+
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
     }
     else
