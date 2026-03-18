@@ -1100,8 +1100,6 @@ VmPortAllocation WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
 
-    std::optional<VmPortAllocation> port;
-
     for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
         if (!m_allocatedPorts.contains(i))

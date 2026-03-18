@@ -196,7 +196,7 @@ typedef struct _WSLAPortMapping
     USHORT ContainerPort;
     int Family;
     int Protocol;
-    LPCSTR BindingAddress;
+    [string] LPCSTR BindingAddress;
 } WSLAPortMapping;
 
 typedef struct _WSLATmpfsMount
