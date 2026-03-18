@@ -45,7 +45,7 @@ class WSLCE2EContainerRunTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(L"container run --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_Container_With_Command)
@@ -56,7 +56,7 @@ class WSLCE2EContainerRunTests
 
         auto command = L"echo echo_from_container";
         auto result = RunWslc(std::format(L"container run --name {} {} {}", WslcContainerName, DebianImage.NameAndTag(), command));
-        result.Verify({.Stdout = L"echo_from_container\n", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"echo_from_container\n", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(WslcContainerName, L"exited");
     }

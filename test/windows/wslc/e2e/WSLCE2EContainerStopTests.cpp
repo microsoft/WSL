@@ -84,7 +84,7 @@ class WSLCE2EContainerStopTests
 
         // Stop the container
         result = RunWslc(std::format(L"container stop {} -t 0", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify the container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
@@ -96,7 +96,7 @@ class WSLCE2EContainerStopTests
 
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
@@ -105,7 +105,7 @@ class WSLCE2EContainerStopTests
 
         // Stop by container name
         result = RunWslc(std::format(L"container stop {} -t 0", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify container is no longer running
         VerifyContainerIsListed(containerId, L"exited");
@@ -127,13 +127,13 @@ class WSLCE2EContainerStopTests
 
         // Run first container in background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto firstContainerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(firstContainerId.empty());
 
         // Run second container in background
         result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName2, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto secondContainerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(secondContainerId.empty());
 
@@ -143,7 +143,7 @@ class WSLCE2EContainerStopTests
 
         // Stop only the first container
         result = RunWslc(std::format(L"container stop {} -t 0", firstContainerId));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify first exited, second still running
         VerifyContainerIsListed(firstContainerId, L"exited");

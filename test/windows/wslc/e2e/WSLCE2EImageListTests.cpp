@@ -43,7 +43,7 @@ class WSLCE2EImageListTests
     {
         WSL2_TEST_ONLY();
         const auto result = RunWslc(L"image list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
@@ -51,7 +51,7 @@ class WSLCE2EImageListTests
         WSL2_TEST_ONLY();
 
         const auto result = RunWslc(L"image list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : result.GetStdoutLines())
         {
             if (line.find(DebianImage.NameAndTag()) != std::wstring::npos)
@@ -68,7 +68,7 @@ class WSLCE2EImageListTests
         WSL2_TEST_ONLY();
 
         const auto result = RunWslc(L"image list --quiet");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         bool imageFound = false;
         for (const auto& line : result.GetStdoutLines())
@@ -96,7 +96,7 @@ class WSLCE2EImageListTests
         WSL2_TEST_ONLY();
 
         const auto result = RunWslc(L"image list --format json");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto output = result.GetStdoutOneLine();
         const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(output.c_str());

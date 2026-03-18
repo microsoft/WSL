@@ -50,7 +50,7 @@ class WSLCE2EContainerListTests
     {
         WSL2_TEST_ONLY();
         auto result = RunWslc(L"container list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_List_AllOption)
@@ -60,13 +60,13 @@ class WSLCE2EContainerListTests
 
         // Create a container
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
         // Find container in list output
         result = RunWslc(L"container list --all");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto outputLines = result.GetStdoutLines();
         std::optional<std::wstring> foundContainerLine{};
         for (const auto& line : outputLines)
@@ -90,13 +90,13 @@ class WSLCE2EContainerListTests
 
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
         // Find container in list output with no options
         result = RunWslc(L"container list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto outputLines = result.GetStdoutLines();
         std::optional<std::wstring> foundContainerLine{};
         for (const auto& line : outputLines)
@@ -120,13 +120,13 @@ class WSLCE2EContainerListTests
 
         // Create (but do not start) a container.
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
         // Default list should only show running containers.
         result = RunWslc(L"container list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         bool isListed = false;
         for (const auto& line : result.GetStdoutLines())
         {
@@ -146,12 +146,12 @@ class WSLCE2EContainerListTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
         result = RunWslc(L"container list --all --quiet");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto outputLine = result.GetStdoutOneLine();
 
         VERIFY_ARE_EQUAL(containerId, outputLine);
@@ -172,13 +172,13 @@ class WSLCE2EContainerListTests
 
         // Create a container
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
         // List containers with json format
         result = RunWslc(L"container list --all --format json");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto output = result.GetStdoutOneLine();
 
         // Parse json and verify we got the expected container information back
@@ -188,13 +188,13 @@ class WSLCE2EContainerListTests
 
         // Create another container
         result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId2 = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId2.empty());
 
         // List containers with json format again
         result = RunWslc(L"container list --all --format json");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto output2 = result.GetStdoutOneLine();
 
         // Parse json and verify we got both containers back

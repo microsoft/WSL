@@ -26,14 +26,14 @@ class WSLCE2EImageTests
     {
         WSL2_TEST_ONLY();
         auto result = RunWslc(L"image --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Image_NoSubcommand_ShowsHelp)
     {
         WSL2_TEST_ONLY();
         auto result = RunWslc(L"image");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Image_InvalidCommand_DisplaysErrorMessage)

@@ -48,7 +48,7 @@ class WSLCE2EContainerRemoveTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(L"container remove --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_Remove_NotFound)
@@ -67,7 +67,7 @@ class WSLCE2EContainerRemoveTests
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         std::wstring containerId = result.GetStdoutOneLine();
 
         // Verify the container is listed with the correct status
@@ -75,7 +75,7 @@ class WSLCE2EContainerRemoveTests
 
         // Delete the container
         result = RunWslc(std::format(L"container remove {}", WslcContainerName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Verify the container is no longer listed
         VerifyContainerIsNotListed(WslcContainerName);
@@ -87,14 +87,14 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
         VerifyContainerIsListed(containerId, L"created");
 
         result = RunWslc(std::format(L"container remove {}", containerId));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsNotListed(containerId);
         VerifyContainerIsNotListed(WslcContainerName);
@@ -107,7 +107,7 @@ class WSLCE2EContainerRemoveTests
 
         // Run a container so it is in running state
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
 
@@ -122,7 +122,7 @@ class WSLCE2EContainerRemoveTests
 
         // Removing with force should succeed
         result = RunWslc(std::format(L"container remove --force {}", containerId));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsNotListed(containerId);
         VerifyContainerIsNotListed(WslcContainerName);
@@ -135,12 +135,12 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName2);
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId1 = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId1.empty());
 
         result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId2 = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId2.empty());
 
@@ -148,7 +148,7 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsListed(containerId2, L"created");
 
         result = RunWslc(std::format(L"container remove {} {}", containerId1, containerId2));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsNotListed(containerId1);
         VerifyContainerIsNotListed(containerId2);
