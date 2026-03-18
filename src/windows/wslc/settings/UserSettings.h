@@ -50,6 +50,13 @@ public:
     UserSettings(UserSettings&&) = delete;
     UserSettings& operator=(UserSettings&&) = delete;
 
+    // Returns the value for setting S, or its built-in default if not present in the file.
+    template <Setting S>
+    typename details::SettingMapping<S>::value_t Get() const
+    {
+        return m_settings.GetOrDefault<S>();
+    }
+
     SettingsMap const& GetSettings() const
     {
         return m_settings;
@@ -92,5 +99,12 @@ private:
     std::vector<Warning> m_warnings;
     UserSettingsType     m_type = UserSettingsType::Default;
 };
+
+// Convenience free function — returns the singleton instance.
+// Usage: settings::User().Get<Setting::Foo>()
+inline UserSettings const& User()
+{
+    return UserSettings::Instance();
+}
 
 } // namespace wsl::windows::wslc::settings

@@ -20,6 +20,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "RootCommand.h"
+#include "UserSettings.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -67,6 +68,13 @@ try
         {
             command = std::move(subCommand);
             subCommand = command->FindSubCommand(invocation);
+        }
+
+        // Load settings once and emit any load warnings.
+        const auto& userSettings = settings::UserSettings::Instance();
+        for (const auto& warning : userSettings.GetWarnings())
+        {
+            wslutil::PrintMessage(warning.Message, stderr);
         }
 
         command->ParseArguments(invocation, context.Args);

@@ -63,10 +63,10 @@ struct SettingMapping
     };
 
 //                         Setting               yaml_t       value_t       default  YamlPath
-DEFINE_SETTING_MAPPING(SessionCpuCount,      uint32_t,    uint32_t,     4,      "session.cpuCount")
-DEFINE_SETTING_MAPPING(SessionMemoryMb,      uint32_t,    uint32_t,     8192,   "session.memorySizeMb")
-DEFINE_SETTING_MAPPING(SessionStorageSizeMb, uint32_t,    uint32_t,     51200,  "session.maxStorageSizeMb")
-DEFINE_SETTING_MAPPING(SessionStoragePath,   std::string, std::wstring, {},     "session.defaultStoragePath")
+DEFINE_SETTING_MAPPING(SessionCpuCount,      uint32_t,    uint32_t,     4,     "session.cpuCount")
+DEFINE_SETTING_MAPPING(SessionMemoryMb,      uint32_t,    uint32_t,     2048,  "session.memorySizeMb")
+DEFINE_SETTING_MAPPING(SessionStorageSizeMb, uint32_t,    uint32_t,     10000, "session.maxStorageSizeMb")
+DEFINE_SETTING_MAPPING(SessionStoragePath,   std::string, std::wstring, {},    "session.defaultStoragePath")
 // clang-format on
 
 #undef DEFINE_SETTING_MAPPING
