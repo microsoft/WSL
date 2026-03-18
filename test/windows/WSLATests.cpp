@@ -3657,45 +3657,6 @@ class WSLATests
         VERIFY_ARE_EQUAL(process.GetExitCode(), 128 + WSLASignalSIGKILL);
     }
 
-    void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
-    {
-        const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
-        filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
-
-        const winrt::Windows::Web::Http::HttpClient client(filter);
-
-        try
-        {
-            auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
-            auto content = response.Content().ReadAsStringAsync().get();
-
-            if (expectedCode.has_value())
-            {
-                VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
-            }
-            else
-            {
-                LogError("Unexpected reply for: %ls", Url);
-                VERIFY_FAIL();
-            }
-        }
-        catch (...)
-        {
-            auto result = wil::ResultFromCaughtException();
-
-            if (!expectedCode.has_value())
-            {
-                // We currently reset the connection if connect() fails inside the VM. Consider failing the Windows connect() instead.
-                VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
-            }
-            else
-            {
-                LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
-                VERIFY_FAIL();
-            }
-        }
-    }
-
     void RunPortMappingsTest(IWSLASession& session, WSLAContainerNetworkType containerNetworkType)
     {
         LogInfo("Container network type: %d", static_cast<int>(containerNetworkType));
