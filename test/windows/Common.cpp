@@ -2867,13 +2867,9 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
 
     if (retry)
     {
-        wsl::shared::retry::RetryWithTimeout<void>(
-            sendRequest,
-            std::chrono::milliseconds(500),
-            std::chrono::seconds(30),
-            [&]() {
-                return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE);
-            });
+        wsl::shared::retry::RetryWithTimeout<void>(sendRequest, std::chrono::milliseconds(500), std::chrono::seconds(30), [&]() {
+            return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE);
+        });
     }
     else
     {
