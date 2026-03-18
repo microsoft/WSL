@@ -31,6 +31,9 @@ wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
 
+// Declare the WSLASessionManager COM class.
+CoCreatableClassWrlCreatorMapInclude(WSLASessionManager);
+
 struct WslServiceSecurityPolicy
 {
     static LPCWSTR GetSDDLText()
