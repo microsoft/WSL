@@ -104,10 +104,27 @@ int VmPortAllocation::Protocol() const
     return m_protocol;
 }
 
-VMPortMapping::VMPortMapping(int protocol, const SOCKADDR_INET& bindAddress) : Protocol(protocol), BindAddress(bindAddress)
+VMPortMapping::VMPortMapping(int protocol, int Family, uint16_t Port, const char* Address) : Protocol(protocol)
 {
     WI_ASSERT(Protocol == IPPROTO_TCP || Protocol == IPPROTO_UDP);
-    WI_ASSERT(BindAddress.Ipv4.sin_family == AF_INET || BindAddress.Ipv4.sin_family == AF_INET6);
+
+    if (Family == AF_INET)
+    {
+        common::wslutil::ParseIpv4Address(Address, BindAddress.Ipv4);
+        BindAddress.Ipv4.sin_port = htons(Port);
+    }
+    else if (Family == AF_INET6)
+    {
+        common::wslutil::ParseIpv6Address(Address, BindAddress.Ipv6);
+        BindAddress.Ipv6.sin6_port = htons(Port);
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Family);
+    }
+
+    // Must be assigned after parsing is done, since inet_pton writes to the family field as well.
+    BindAddress.si_family = Family;
 }
 
 VMPortMapping::~VMPortMapping()
@@ -196,54 +213,17 @@ void VMPortMapping::Detach()
 
 VMPortMapping VMPortMapping::LocalhostTcpMapping(int Family, uint16_t WindowsPort)
 {
-    SOCKADDR_INET localhost{};
-    localhost.si_family = Family;
-
-    if (Family == AF_INET)
-    {
-        localhost.Ipv4.sin_port = htons(WindowsPort);
-        localhost.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    }
-    else
-    {
-        localhost.Ipv6.sin6_family = AF_INET6;
-        localhost.Ipv6.sin6_port = htons(WindowsPort);
-        localhost.Ipv6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
-    }
-
-    return VMPortMapping(IPPROTO_TCP, localhost);
-}
-
-SOCKADDR_INET VMPortMapping::ParseBindingAddress(int Family, uint16_t Port, const char* Address)
-{
-    SOCKADDR_INET bindAddress{};
-    bindAddress.si_family = Family;
-    if (Family == AF_INET)
-    {
-        bindAddress.Ipv4.sin_port = htons(Port);
-        common::wslutil::ParseIpv4Address(Address, bindAddress.Ipv4);
-    }
-    else if (Family == AF_INET6)
-    {
-        bindAddress.Ipv6.sin6_port = htons(Port);
-        common::wslutil::ParseIpv6Address(Address, bindAddress.Ipv6);
-    }
-    else
-    {
-        THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Family);
-    }
-
-    return bindAddress;
+    return VMPortMapping(IPPROTO_TCP, Family, WindowsPort, Family == AF_INET ? "127.0.0.1" : "::1");
 }
 
 VMPortMapping VMPortMapping::FromWSLAPortMapping(const ::WSLAPortMapping& Mapping)
 {
-    return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress));
+    return VMPortMapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress);
 }
 
 VMPortMapping VMPortMapping::FromContainerMetaData(const wsla::WSLAPortMapping& Mapping)
 {
-    return VMPortMapping(Mapping.Protocol, ParseBindingAddress(Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str()));
+    return VMPortMapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str());
 }
 
 VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)

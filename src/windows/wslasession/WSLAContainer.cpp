@@ -841,12 +841,11 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
     for (const auto& e : m_mappedPorts)
     {
-        // TODO: UDP support
         // TODO: ipv6 support.
-        auto portKey = std::format("{}/tcp", e.ContainerPort);
+        auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
 
         wsla_schema::InspectPortBinding portBinding{};
-        portBinding.HostPort = std::to_string(ntohs(e.VmMapping.BindAddress.Ipv4.sin_port));
+        portBinding.HostPort = std::to_string(e.VmMapping.HostPort());
 
         wslaInspect.Ports[portKey].push_back(std::move(portBinding));
     }
@@ -1029,7 +1028,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         // TODO: Custom binding address support.
         auto& portEntry = request.HostConfig.PortBindings[portKey];
         portEntry.emplace_back(
-            common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.VmPort.Port())});
+            common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.HostPort())});
     }
 
     std::map<std::string, std::string> labels;
@@ -1126,7 +1125,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         auto& inserted =
             ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-        auto allocation = virtualMachine.TryAllocatePort(inserted.ContainerPort, e.Family, e.Protocol);
+        auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
         THROW_HR_IF_MSG(
             ERROR_BUSY,

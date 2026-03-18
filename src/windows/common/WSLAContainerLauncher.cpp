@@ -90,9 +90,15 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 {
 }
 
-void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family)
+void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol, const std::string& BindingAddress)
 {
-    m_ports.emplace_back(WSLAPortMapping{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
+    auto& inserted = m_bindingAddressStorage.emplace_back(BindingAddress);
+    m_ports.emplace_back(WSLAPortMapping{
+        .HostPort = WindowsPort,
+        .ContainerPort = ContainerPort,
+        .Family = Family,
+        .Protocol = Protocol,
+        .BindingAddress = inserted.c_str()});
 }
 
 void WSLAContainerLauncher::SetName(std::string&& Name)

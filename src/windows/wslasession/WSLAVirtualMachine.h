@@ -77,7 +77,7 @@ struct VMPortMapping
 {
     NON_COPYABLE(VMPortMapping);
 
-    VMPortMapping(int Protocol, const SOCKADDR_INET& BindAddress);
+    VMPortMapping(int Protocol, int Family, uint16_t Port, const char* Address);
     ~VMPortMapping();
 
     VMPortMapping(VMPortMapping&& Other);

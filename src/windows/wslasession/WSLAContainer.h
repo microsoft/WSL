@@ -72,7 +72,7 @@ public:
         WSLAPortMapping Serialize() const
         {
             return WSLAPortMapping{
-                .HostPort = ntohs(VmMapping.BindAddress.Ipv4.sin_port),
+                .HostPort = VmMapping.HostPort(),
                 .VmPort = VmMapping.VmPort.Port(),
                 .ContainerPort = ContainerPort,
                 .Family = VmMapping.BindAddress.si_family,
