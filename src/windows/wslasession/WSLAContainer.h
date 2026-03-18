@@ -154,7 +154,6 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 
 public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
-    ~WSLAContainer();
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds) override;
