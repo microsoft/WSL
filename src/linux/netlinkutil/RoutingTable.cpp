@@ -111,6 +111,10 @@ void RoutingTable::ModifyRouteImpl(const Route& route, Operation action)
     {
         ModifyLoopbackRouteImpl<TAddr>(route, operation, flags);
     }
+    else if (route.defaultRoute && route.IsOnlink())
+    {
+        ModifyDefaultLinkLocalRouteImpl<TAddr>(route, operation, flags);
+    }
     else if (route.defaultRoute)
     {
         ModifyDefaultRouteImpl<TAddr>(route, operation, flags);
@@ -231,6 +235,27 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 }
 
 template <typename TAddr>
+void RoutingTable::ModifyDefaultLinkLocalRouteImpl(const Route& route, int operation, int flags)
+{
+    struct Message : RouteMessage
+    {
+        utils::IntegerAttribute metric;
+    } __attribute__((packed));
+
+    GNS_LOG_INFO(
+        "SendMessage Route (default), operation ({}), netLinkflags ({})",
+        RouteOperationToString(operation),
+        NetLinkFormatFlagsToString(flags).c_str());
+
+    SendMessage<Message>(route, operation, flags, [&](Message& message) {
+        GNS_LOG_INFO(
+            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
+            route.metric);
+        utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
+    });
+}
+
+template <typename TAddr>
 void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int flags)
 {
     if (!route.via.has_value())
@@ -253,8 +278,7 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
-            route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
+            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
