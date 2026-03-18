@@ -287,9 +287,16 @@ void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::DeleteContainer(const std::string& Id)
+void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force)
 {
-    Transaction(verb::delete_, URL::Create("/containers/{}", Id));
+    auto url = URL::Create("/containers/{}", Id);
+
+    if (Force)
+    {
+        url.SetParameter("force", true);
+    }
+
+    Transaction(verb::delete_, url);
 }
 
 docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
@@ -365,6 +372,17 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALo
     }
 
     return std::move(socket);
+}
+
+docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const std::optional<docker_schema::PruneContainerLabelFilter>& Filter)
+{
+    auto url = URL::Create("/containers/prune");
+    if (Filter.has_value())
+    {
+        url.SetParameter("filters", shared::ToJson(Filter.value()));
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneContainerResult>(verb::post, url);
 }
 
 docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string& Container, const docker_schema::CreateExec& Request)
@@ -525,7 +543,18 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             auto contentLength = response.find(http::field::content_length);
             if (contentLength != response.end())
             {
-                RemainingContentLength = std::stoul(contentLength->value());
+                try
+                {
+                    RemainingContentLength = std::stoul(contentLength->value());
+                }
+                catch (const std::exception&)
+                {
+                    THROW_HR_MSG(
+                        E_UNEXPECTED,
+                        "Invalid Content-Length header: %.*hs",
+                        static_cast<int>(contentLength->value().size()),
+                        contentLength->value().data());
+                }
             }
         }
 

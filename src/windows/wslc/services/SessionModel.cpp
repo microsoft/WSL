@@ -23,7 +23,7 @@ SessionOptions SessionOptions::Default()
 
     // TODO: Have a configuration file for those.
     SessionOptions options{};
-    options.m_sessionSettings.DisplayName = L"wsla-cli";
+    options.m_sessionSettings.DisplayName = s_DefaultSessionName;
     options.m_sessionSettings.CpuCount = 4;
     options.m_sessionSettings.MemoryMb = 2048;
     options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
@@ -33,7 +33,7 @@ SessionOptions SessionOptions::Default()
     return options;
 }
 
-const WSLA_SESSION_SETTINGS* SessionOptions::Get() const
+const WSLASessionSettings* SessionOptions::Get() const
 {
     return &m_sessionSettings;
 }

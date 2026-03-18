@@ -17,6 +17,9 @@ Abstract:
 #include <wslaservice.h>
 
 namespace wsl::windows::wslc::models {
+
+inline constexpr wchar_t s_DefaultSessionName[] = L"wsla-cli";
+
 struct Session
 {
     explicit Session(wil::com_ptr<IWSLASession> session) : m_session(std::move(session))
@@ -34,9 +37,9 @@ private:
 struct SessionOptions
 {
     static SessionOptions Default();
-    const WSLA_SESSION_SETTINGS* Get() const;
+    const WSLASessionSettings* Get() const;
 
 private:
-    WSLA_SESSION_SETTINGS m_sessionSettings{};
+    WSLASessionSettings m_sessionSettings{};
 };
 } // namespace wsl::windows::wslc::models

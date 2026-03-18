@@ -126,7 +126,7 @@ public:
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds);
-    void DeleteContainer(const std::string& Id);
+    void DeleteContainer(const std::string& Id, bool Force);
     void SignalContainer(const std::string& Id, int Signal);
     common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
     common::docker_schema::InspectExec InspectExec(const std::string& Id);
@@ -134,6 +134,7 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
+    common::docker_schema::PruneContainerResult PruneContainers(const std::optional<common::docker_schema::PruneContainerLabelFilter>& Filter);
 
     // Image management.
     struct ListImagesFilters

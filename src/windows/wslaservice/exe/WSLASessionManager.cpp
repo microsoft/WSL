@@ -49,11 +49,11 @@ WSLASessionManagerImpl::~WSLASessionManagerImpl()
     }
 }
 
-void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
+void WSLASessionManagerImpl::CreateSession(const WSLASessionSettings* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
 {
     // Ensure that the session display name is non-null and not too long.
     THROW_HR_IF(E_INVALIDARG, Settings->DisplayName == nullptr);
-    THROW_HR_IF(E_INVALIDARG, wcslen(Settings->DisplayName) >= std::size(WSLA_SESSION_INFORMATION{}.DisplayName));
+    THROW_HR_IF(E_INVALIDARG, wcslen(Settings->DisplayName) >= std::size(WSLASessionInformation{}.DisplayName));
 
     auto tokenInfo = GetCallingProcessTokenInfo();
 
@@ -81,36 +81,52 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
         return; // Existing session was opened.
     }
 
-    // Get caller info.
-    const auto callerProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
-    const ULONG sessionId = m_nextSessionId++;
-    const DWORD creatorPid = GetProcessId(callerProcess.get());
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    wslutil::StopWatch stopWatch;
 
-    // Create the VM in the SYSTEM service (privileged).
-    auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+    HRESULT creationResult = wil::ResultFromException([&]() {
+        // Get caller info.
+        const auto callerProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
+        const ULONG sessionId = m_nextSessionId++;
+        const DWORD creatorPid = GetProcessId(callerProcess.get());
+        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
-    // Launch per-user COM server factory and add it to our job object for crash cleanup.
-    auto factory = wslutil::CreateComServerAsUser<IWSLASessionFactory>(__uuidof(WSLASessionFactory), userToken.get());
-    AddSessionProcessToJobObject(factory.get());
+        // Create the VM in the SYSTEM service (privileged).
+        auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
 
-    // Create the session via the factory.
-    const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings);
-    wil::com_ptr<IWSLASession> session;
-    wil::com_ptr<IWSLASessionReference> serviceRef;
-    THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), &session, &serviceRef));
+        // Launch per-user COM server factory and add it to our job object for crash cleanup.
+        auto factory = wslutil::CreateComServerAsUser<IWSLASessionFactory>(__uuidof(WSLASessionFactory), userToken.get());
+        AddSessionProcessToJobObject(factory.get());
 
-    // Track the session via its service ref, along with metadata and security info.
-    m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, Settings->DisplayName, std::move(tokenInfo)});
+        // Create the session via the factory.
+        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings);
+        wil::com_ptr<IWSLASession> session;
+        wil::com_ptr<IWSLASessionReference> serviceRef;
+        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), &session, &serviceRef));
 
-    // For persistent sessions, also hold a strong reference to keep them alive.
-    const bool persistent = WI_IsFlagSet(Flags, WSLASessionFlagsPersistent);
-    if (persistent)
-    {
-        m_persistentSessions.emplace_back(sessionId, session);
-    }
+        // Track the session via its service ref, along with metadata and security info.
+        m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, Settings->DisplayName, std::move(tokenInfo)});
 
-    *WslaSession = session.detach();
+        // For persistent sessions, also hold a strong reference to keep them alive.
+        const bool persistent = WI_IsFlagSet(Flags, WSLASessionFlagsPersistent);
+        if (persistent)
+        {
+            m_persistentSessions.emplace_back(sessionId, session);
+        }
+
+        *WslaSession = session.detach();
+    });
+
+    // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
+
+    WSL_LOG_TELEMETRY(
+        "WSLCCreateSession",
+        PDT_ProductAndServiceUsage,
+        TraceLoggingValue(Settings->DisplayName, "Name"),
+        TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
+        TraceLoggingValue(creationResult, "Result"),
+        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"));
+
+    THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", Settings->DisplayName);
 }
 
 void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
@@ -152,9 +168,9 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
     THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%ls' not found", DisplayName);
 }
 
-void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
+void WSLASessionManagerImpl::ListSessions(_Out_ WSLASessionInformation** Sessions, _Out_ ULONG* SessionsCount)
 {
-    std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
+    std::vector<WSLASessionInformation> sessionInfo;
 
     ForEachSession<void>([&](auto& entry, const auto&) noexcept {
         try
@@ -162,30 +178,30 @@ void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessi
             wil::unique_hlocal_string sidString;
             THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString));
 
-            auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
+            auto& it = sessionInfo.emplace_back(WSLASessionInformation{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
             wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
             wcscpy_s(it.DisplayName, _countof(it.DisplayName), entry.DisplayName.c_str());
         }
         CATCH_LOG()
     });
 
-    auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());
-    memcpy(output.get(), sessionInfo.data(), sessionInfo.size() * sizeof(WSLA_SESSION_INFORMATION));
+    auto output = wil::make_unique_cotaskmem<WSLASessionInformation[]>(sessionInfo.size());
+    memcpy(output.get(), sessionInfo.data(), sessionInfo.size() * sizeof(WSLASessionInformation));
 
     *Sessions = output.release();
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
 }
 
-void WSLASessionManagerImpl::GetVersion(_Out_ WSLA_VERSION* Version)
+void WSLASessionManagerImpl::GetVersion(_Out_ WSLAVersion* Version)
 {
     Version->Major = WSL_PACKAGE_VERSION_MAJOR;
     Version->Minor = WSL_PACKAGE_VERSION_MINOR;
     Version->Revision = WSL_PACKAGE_VERSION_REVISION;
 }
 
-WSLA_SESSION_INIT_SETTINGS WSLASessionManagerImpl::CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLA_SESSION_SETTINGS* Settings)
+WSLASessionInitSettings WSLASessionManagerImpl::CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLASessionSettings* Settings)
 {
-    WSLA_SESSION_INIT_SETTINGS sessionSettings{};
+    WSLASessionInitSettings sessionSettings{};
     sessionSettings.SessionId = SessionId;
     sessionSettings.CreatorPid = CreatorPid;
     sessionSettings.DisplayName = Settings->DisplayName;
@@ -257,17 +273,17 @@ WSLASessionManager::WSLASessionManager(WSLASessionManagerImpl* Impl) : COMImplCl
 {
 }
 
-HRESULT WSLASessionManager::GetVersion(_Out_ WSLA_VERSION* Version)
+HRESULT WSLASessionManager::GetVersion(_Out_ WSLAVersion* Version)
 {
     return CallImpl(&WSLASessionManagerImpl::GetVersion, Version);
 }
 
-HRESULT WSLASessionManager::CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession)
+HRESULT WSLASessionManager::CreateSession(const WSLASessionSettings* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession)
 {
     return CallImpl(&WSLASessionManagerImpl::CreateSession, WslaSessionSettings, Flags, WslaSession);
 }
 
-HRESULT WSLASessionManager::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
+HRESULT WSLASessionManager::ListSessions(_Out_ WSLASessionInformation** Sessions, _Out_ ULONG* SessionsCount)
 {
     return CallImpl(&WSLASessionManagerImpl::ListSessions, Sessions, SessionsCount);
 }

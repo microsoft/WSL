@@ -29,8 +29,6 @@ using namespace wsl::windows::common::distribution;
 using namespace wsl::windows::common::wslutil;
 
 namespace {
-std::vector<BYTE> ParseHex(const std::wstring& input);
-
 void EnforceFileHash(HANDLE file, const std::wstring& expectedHash)
 {
     wsl::windows::common::ExecutionContext context(wsl::windows::common::VerifyChecksum);
@@ -38,7 +36,7 @@ void EnforceFileHash(HANDLE file, const std::wstring& expectedHash)
     const auto fileHash = wsl::windows::common::wslutil::HashFile(file, CALG_SHA_256);
 
     THROW_LAST_ERROR_IF(SetFilePointer(file, 0, 0, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
-    if (fileHash != ParseHex(expectedHash))
+    if (fileHash != wsl::windows::common::string::HexToBytes(expectedHash))
     {
         THROW_HR_WITH_USER_ERROR(
             TRUST_E_BAD_DIGEST,
@@ -60,32 +58,6 @@ std::vector<std::wstring> GetInstalledOptionalComponents()
     }
 
     return installedComponents;
-}
-
-std::vector<BYTE> ParseHex(const std::wstring& input)
-{
-    std::vector<BYTE> result;
-    for (auto i = 0; i < input.size(); i += 2)
-    {
-        // Skip '0x', if any
-        if (i == 0 && input[0] == '0' && tolower(input[1]) == 'x')
-        {
-            continue;
-        }
-
-        auto current = input.substr(i, 2);
-        wchar_t* endPtr{};
-
-        const auto byte = wcstoul(current.data(), &endPtr, 16);
-        if (endPtr != current.data() + 2)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(input.c_str()));
-        }
-
-        result.push_back(static_cast<BYTE>(byte));
-    }
-
-    return result;
 }
 }; // namespace
 

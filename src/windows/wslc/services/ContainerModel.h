@@ -16,7 +16,6 @@ Abstract:
 
 #include <wslservice.h>
 #include <wslaservice.h>
-#include <docker_schema.h>
 #include <string>
 
 namespace wsl::windows::wslc::models {
@@ -34,6 +33,7 @@ struct ContainerOptions
     bool Detach = false;
     bool Interactive = false;
     std::string Name;
+    bool Remove = false;
     bool TTY = false;
 };
 
@@ -60,8 +60,10 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
-    WSLA_CONTAINER_STATE State;
+    WSLAContainerState State;
+    ULONGLONG StateChangedAt{};
+    ULONGLONG CreatedAt{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
 };
 } // namespace wsl::windows::wslc::models

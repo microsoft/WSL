@@ -18,17 +18,76 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
+using wsl::windows::common::wsla_schema::InspectImage;
+
+void ImageService::Build(
+    wsl::windows::wslc::models::Session& session,
+    const std::wstring& contextPath,
+    const std::vector<std::wstring>& tags,
+    const std::vector<std::wstring>& buildArgs,
+    const std::wstring& dockerfilePath,
+    bool verbose,
+    IProgressCallback* callback)
+{
+    auto absolutePath = std::filesystem::absolute(contextPath);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_DIRECTORY),
+        !std::filesystem::is_directory(absolutePath),
+        "Path must be a directory: %ls",
+        absolutePath.c_str());
+
+    HANDLE dockerfileHandle = nullptr;
+    wil::unique_hfile dockerfile;
+    if (dockerfilePath == L"-")
+    {
+        dockerfileHandle = GetStdHandle(STD_INPUT_HANDLE);
+    }
+    else if (!dockerfilePath.empty())
+    {
+        dockerfile.reset(CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF_MSG(!dockerfile, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
+        dockerfileHandle = dockerfile.get();
+    }
+
+    auto toMultiByte = [](const std::vector<std::wstring>& input, std::vector<std::string>& strings, std::vector<LPCSTR>& pointers) {
+        strings.reserve(input.size());
+        for (const auto& s : input)
+        {
+            strings.push_back(wsl::windows::common::string::WideToMultiByte(s));
+            pointers.push_back(strings.back().c_str());
+        }
+    };
+
+    std::vector<std::string> tagStrings;
+    std::vector<LPCSTR> tagPointers;
+    toMultiByte(tags, tagStrings, tagPointers);
+
+    std::vector<std::string> buildArgStrings;
+    std::vector<LPCSTR> buildArgPointers;
+    toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
+
+    auto contextPathStr = absolutePath.wstring();
+    WSLABuildImageOptions options{
+        .ContextPath = contextPathStr.c_str(),
+        .DockerfileHandle = HandleToULong(dockerfileHandle),
+        .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
+        .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
+        .Verbose = verbose,
+    };
+
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));
+}
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
 {
-    wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+    wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
     ULONG count = 0;
     THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, &count));
 
     std::vector<ImageInformation> result;
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
     {
-        const WSLA_IMAGE_INFORMATION& image = *ptr;
+        const WSLAImageInformation& image = *ptr;
         ImageInformation info{};
         info.Name = image.Image;
         info.Size = image.Size;
@@ -36,11 +95,6 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
     }
 
     return result;
-}
-
-void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
-{
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
 void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
@@ -51,6 +105,37 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
     THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+}
+
+void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
+{
+    WSLADeleteImageOptions options{};
+    options.Image = image.c_str();
+
+    if (force)
+    {
+        options.Flags |= WSLADeleteImageFlagsForce;
+    }
+
+    if (noPrune)
+    {
+        options.Flags |= WSLADeleteImageFlagsNoPrune;
+    }
+
+    wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+    THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+}
+
+void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+{
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
+}
+
+InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
+{
+    wil::unique_cotaskmem_ansistring inspectData;
+    THROW_IF_FAILED(session.Get()->InspectImage(image.c_str(), &inspectData));
+    return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
 void ImageService::Push()
@@ -68,9 +153,4 @@ void ImageService::Tag()
 void ImageService::Prune()
 {
 }
-
-void ImageService::Inspect()
-{
-}
-
 } // namespace wsl::windows::wslc::services

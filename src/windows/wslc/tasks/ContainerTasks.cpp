@@ -22,6 +22,7 @@ Abstract:
 #include "SessionService.h"
 #include "TablePrinter.h"
 #include <wil/result_macros.h>
+#include <wsla_schema.h>
 
 using namespace wsl::shared;
 using namespace wsl::shared::string;
@@ -31,6 +32,12 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+void AttachContainer::operator()(CLIExecutionContext& context) const
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    context.ExitCode = ContainerService::Attach(context.Data.Get<Data::Session>(), WideToMultiByte(m_containerId));
+}
+
 void CreateContainer(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -40,18 +47,6 @@ void CreateContainer(CLIExecutionContext& context)
     auto result = ContainerService::Create(
         context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>(), &callback);
     PrintMessage(MultiByteToWide(result.Id));
-}
-
-void DeleteContainers(CLIExecutionContext& context)
-{
-    WI_ASSERT(context.Data.Contains(Data::Session));
-    auto& session = context.Data.Get<Data::Session>();
-    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    bool force = context.Args.Contains(ArgType::Force);
-    for (const auto& id : containerIds)
-    {
-        ContainerService::Delete(session, WideToMultiByte(id), force);
-    }
 }
 
 void ExecContainer(CLIExecutionContext& context)
@@ -75,7 +70,7 @@ void InspectContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    std::vector<wsl::windows::common::docker_schema::InspectContainer> result;
+    std::vector<wsl::windows::common::wsla_schema::InspectContainer> result;
     for (const auto& id : containerIds)
     {
         auto inspectData = ContainerService::Inspect(session, WideToMultiByte(id));
@@ -112,7 +107,7 @@ void ListContainers(CLIExecutionContext& context)
     if (!context.Args.Contains(ArgType::All))
     {
         auto shouldRemove = [](const ContainerInformation& container) {
-            return container.State != WSLA_CONTAINER_STATE::WslaContainerStateRunning;
+            return container.State != WSLAContainerState::WslaContainerStateRunning;
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
     }
@@ -144,14 +139,15 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
+        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
         for (const auto& container : containers)
         {
             tablePrinter.AddRow({
                 MultiByteToWide(container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
-                ContainerService::ContainerStateToString(container.State),
+                ContainerService::FormatRelativeTime(container.CreatedAt),
+                ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
             });
         }
 
@@ -160,6 +156,18 @@ void ListContainers(CLIExecutionContext& context)
     }
     default:
         THROW_HR(E_UNEXPECTED);
+    }
+}
+
+void RemoveContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
+    bool force = context.Args.Contains(ArgType::Force);
+    for (const auto& id : containerIds)
+    {
+        ContainerService::Delete(session, WideToMultiByte(id), force);
     }
 }
 
@@ -195,6 +203,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Interactive))
     {
         options.Interactive = true;
+    }
+
+    if (context.Args.Contains(ArgType::Remove))
+    {
+        options.Remove = true;
     }
 
     if (context.Args.Contains(ArgType::Command))

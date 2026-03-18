@@ -1521,7 +1521,7 @@ DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 // Temporary debugging tool for WSLA
 int WslaShell(_In_ std::wstring_view commandLine)
 {
-    WSLA_SESSION_SETTINGS sessionSettings{};
+    WSLASessionSettings sessionSettings{};
     sessionSettings.DisplayName = L"WSLAShell";
     sessionSettings.CpuCount = 4;
     sessionSettings.MemoryMb = 4096;
@@ -1543,7 +1543,6 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(rootVhdOverride, L"--vhd");
     parser.AddArgument(Utf8String(shell), L"--shell");
     parser.AddArgument(SetFlag<WslaFeatureFlagsDnsTunneling>(sessionSettings.FeatureFlags), L"--dns-tunneling");
-    parser.AddArgument(SetFlag<WslaFeatureFlagsPmemVhds>(sessionSettings.FeatureFlags), L"--pmem-vhds");
     parser.AddArgument(SetFlag<WslaFeatureFlagsVirtioFs>(sessionSettings.FeatureFlags), L"--virtiofs");
     parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");

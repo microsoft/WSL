@@ -23,7 +23,7 @@ using wsl::windows::service::wsla::DockerExecProcessControl;
 using wsl::windows::service::wsla::VMProcessControl;
 using wsl::windows::service::wsla::WSLAProcessControl;
 
-std::pair<WSLA_PROCESS_STATE, int> WSLAProcessControl::GetState() const
+std::pair<WSLAProcessState, int> WSLAProcessControl::GetState() const
 {
     if (m_exitEvent.is_signaled())
     {

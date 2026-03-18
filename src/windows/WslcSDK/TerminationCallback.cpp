@@ -45,7 +45,7 @@ HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLAVirtualMachineT
     return S_OK;
 }
 
-winrt::com_ptr<TerminationCallback> TerminationCallback::CreateIf(const WSLC_SESSION_OPTIONS_INTERNAL* options)
+winrt::com_ptr<TerminationCallback> TerminationCallback::CreateIf(const WslcSessionOptionsInternal* options)
 {
     if (options->terminationCallback)
     {

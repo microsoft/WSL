@@ -4,10 +4,20 @@ set(CMAKE_SYSTEM_VERSION 10.0.26100.0)
 project(wsl)
 
 # Rationalize TARGET_PLATFORM
+# When neither CMAKE_GENERATOR_PLATFORM nor TARGET_PLATFORM is set, default to the host architecture.
+if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "" AND "${TARGET_PLATFORM}" STREQUAL "")
+    if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "ARM64")
+        set(TARGET_PLATFORM "arm64")
+    else()
+        set(TARGET_PLATFORM "x64")
+    endif()
+    message(STATUS "No platform specified, defaulting to '${TARGET_PLATFORM}' based on host architecture.")
+endif()
+
 if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "arm64" OR "${TARGET_PLATFORM}" STREQUAL "arm64")
     set(TARGET_PLATFORM "arm64")
     set(TEST_DISTRO_PLATFORM "arm64")
-elseif("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64|amd64|" OR "${TARGET_PLATFORM}" MATCHES "x64|amd64|")
+elseif("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64|amd64" OR "${TARGET_PLATFORM}" MATCHES "x64|amd64")
     set(TARGET_PLATFORM "x64")
     set(TEST_DISTRO_PLATFORM "amd64")
 else()
@@ -146,6 +156,16 @@ if (OFFICIAL_BUILD AND NOT PACKAGE_VERSION MATCHES "^([0-9]+).([0-9]+).([0-9]+).
     message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'. Needs to match '([0-9]+).([0-9]+).([0-9]+).0' for official builds")
 endif()
 
+if (${TARGET_PLATFORM} STREQUAL "x64")
+    set(DCAT_PRODUCT_NAME WSL.amd64)
+endif()
+
+if (${TARGET_PLATFORM} STREQUAL "arm64")
+    set(DCAT_PRODUCT_NAME WSL.arm64)
+endif()
+
+set(DCAT_REGISTRATION_KEY "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\DynamicInstalled\\${DCAT_PRODUCT_NAME}")
+
 # Configure output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug)
@@ -273,18 +293,31 @@ else()
     message(FATAL_ERROR "Unsupported platform: '${TARGET_PLATFORM}'")
 endif()
 
-# Determine the Visual Studio installation directory which contains LLVM tools
-# N.B. The version is set to VS2022 to ensure local runs match pipeline behavior
-# Require that Clang be installed in the product to potentially de-deduplicate
-execute_process(
-    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,19.0)" -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath -prerelease
-    OUTPUT_VARIABLE VS_INSTALL_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    COMMAND_ERROR_IS_FATAL ANY
-)
+# Determine the Visual Studio installation directory which contains LLVM tools.
+# Supported versions: VS2022 and VS2026.
+# Prefer VS2022 to keep local clang-format output aligned with pipeline expectations.
+function(find_vs_install_dir VERSION_RANGE OUTPUT_VAR)
+    execute_process(
+        COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "${VERSION_RANGE}" -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath -prerelease -latest
+        OUTPUT_VARIABLE _vs_install_dir
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+
+    set(${OUTPUT_VAR} "${_vs_install_dir}" PARENT_SCOPE)
+endfunction()
+
+find_vs_install_dir("[17.0,18.0)" VS_INSTALL_DIR)
 
 if (NOT VS_INSTALL_DIR)
-    message(FATAL_ERROR "Could not determine Visual Studio 2022 installation directory.")
+    find_vs_install_dir("[18.0,19.0)" VS_INSTALL_DIR)
+    if (VS_INSTALL_DIR)
+        message(WARNING "Visual Studio 2022 was not found; using Visual Studio 2026 instead. clang-format output may differ from pipeline expectations.")
+    endif()
+endif()
+
+if (NOT VS_INSTALL_DIR)
+    message(FATAL_ERROR "Could not determine Visual Studio installation directory.")
 endif()
 
 # Pick the first line returned from vswhere, in case multiple versions are returned.
@@ -379,6 +412,7 @@ set(LINUX_LDFLAGS -target ${LLVM_TARGET}
                   -static)
 
 set(COMMON_LINUX_LINK_LIBRARIES configfile)
+file(GLOB COMMON_LINUX_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/src/shared/inc/*.h")
 
 if(DEFINED ENV{WSL_DEV_BINARY_PATH})
     set(WSL_DEV_BINARY_PATH $ENV{WSL_DEV_BINARY_PATH})
@@ -439,7 +473,6 @@ add_subdirectory(src/windows/wslg)
 add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
-add_subdirectory(src/windows/wsladiag)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
 

@@ -72,6 +72,55 @@ struct COMErrorInfo
     wil::unique_bstr Source;
 };
 
+struct PruneResult
+{
+    NON_COPYABLE(PruneResult);
+    WSLAPruneContainersResults result{};
+
+    PruneResult() = default;
+
+    PruneResult(PruneResult&& other)
+    {
+        *this = std::move(other);
+    }
+
+    PruneResult& operator=(PruneResult&& other)
+    {
+        CoTaskMemFree(result.Containers);
+        result.Containers = other.result.Containers;
+        result.ContainersCount = other.result.ContainersCount;
+        result.SpaceReclaimed = other.result.SpaceReclaimed;
+
+        other.result.Containers = nullptr;
+        other.result.ContainersCount = 0;
+        other.result.SpaceReclaimed = 0;
+
+        return *this;
+    }
+
+    ~PruneResult()
+    {
+        CoTaskMemFree(result.Containers);
+    }
+};
+
+class StopWatch
+{
+    NON_COPYABLE(StopWatch);
+    NON_MOVABLE(StopWatch);
+
+public:
+    StopWatch() = default;
+
+    uint64_t ElapsedMilliseconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_startTime).count();
+    }
+
+private:
+    std::chrono::steady_clock::time_point m_startTime = std::chrono::steady_clock::now();
+};
+
 template <typename T>
 void AssertValidPrintfArg()
 {
@@ -111,9 +160,11 @@ std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
 
 std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
 
-[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE handleInTarget);
+[[nodiscard]] HANDLE DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = std::nullopt, _In_ BOOL InheritHandle = FALSE);
 
-[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> Permissions = {});
+[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE Handle);
+
+[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = {});
 
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
 
