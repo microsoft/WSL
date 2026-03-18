@@ -31,6 +31,7 @@ class WSLCE2EContainerRemoveTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -38,17 +39,21 @@ class WSLCE2EContainerRemoveTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         return true;
     }
 
     TEST_METHOD(WSLCE2E_Container_Remove_HelpCommand)
     {
+        WSL2_TEST_ONLY();
+
         auto result = RunWslc(L"container remove --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Container_Remove_NotFound)
     {
+        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container remove {}", WslcContainerName));
@@ -57,6 +62,7 @@ class WSLCE2EContainerRemoveTests
 
     TEST_METHOD(WSLCE2E_Container_Remove_Valid)
     {
+        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
@@ -75,8 +81,84 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    TEST_METHOD(WSLCE2E_Container_Remove_ById_Valid)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        VerifyContainerIsListed(containerId, L"created");
+
+        result = RunWslc(std::format(L"container remove {}", containerId));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+
+        VerifyContainerIsNotListed(containerId);
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Remove_Force_RunningContainer)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        // Run a container so it is in running state
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Removing without force should fail
+        result = RunWslc(std::format(L"container remove {}", containerId));
+        result.Verify({.ExitCode = 1});
+
+        // Container should still exist and be running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Removing with force should succeed
+        result = RunWslc(std::format(L"container remove --force {}", containerId));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+
+        VerifyContainerIsNotListed(containerId);
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Remove_Multiple_Valid)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName2);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId1 = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId1.empty());
+
+        result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId2 = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId2.empty());
+
+        VerifyContainerIsListed(containerId1, L"created");
+        VerifyContainerIsListed(containerId2, L"created");
+
+        result = RunWslc(std::format(L"container remove {} {}", containerId1, containerId2));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+
+        VerifyContainerIsNotListed(containerId1);
+        VerifyContainerIsNotListed(containerId2);
+        VerifyContainerIsNotListed(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName2);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring WslcContainerName2 = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
 
     std::wstring GetHelpMessage() const
