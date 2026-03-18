@@ -3421,7 +3421,7 @@ class WSLATests
             });
 
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
+                "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeBridged);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1235, 8000, AF_INET);
@@ -3440,7 +3440,7 @@ class WSLATests
             VERIFY_IS_FALSE(details.Created.empty());
 
             // Verify container state.
-            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
+            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "bridge");
             VERIFY_IS_TRUE(details.State.Running);
             VERIFY_ARE_EQUAL(details.State.Status, "running");
             VERIFY_IS_FALSE(details.State.StartedAt.empty());
@@ -3726,7 +3726,7 @@ class WSLATests
                 "python:3.12-alpine", "test-ports", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1234, 8000, AF_INET);
-            launcher.AddPort(1234, 8000, AF_INET6);
+            launcher.AddPort(1234, 8000, AF_INET6, IPPROTO_TCP, "::1");
 
             auto container = launcher.Launch(session);
             auto initProcess = container.GetInitProcess();
@@ -3744,6 +3744,7 @@ class WSLATests
                 "python:3.12-alpine", "test-ports-2", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             subLauncher.AddPort(1234, 8000, AF_INET);
+
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(session);
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
@@ -3864,7 +3865,7 @@ class WSLATests
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeNAT);
 
         RunPortMappingsTest(*session, WSLAContainerNetworkTypeBridged);
-        RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
+        // RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
     }
 
     TEST_METHOD(PortMappingsVirtioProxy)
@@ -3874,7 +3875,7 @@ class WSLATests
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeVirtioProxy);
 
         RunPortMappingsTest(*session, WSLAContainerNetworkTypeBridged);
-        RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
+        // RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
     }
 
     TEST_METHOD(PortMappingsNone)

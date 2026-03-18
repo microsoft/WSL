@@ -205,9 +205,9 @@ std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bo
 
 wil::unique_handle OpenCallingProcess(_In_ DWORD access);
 
-void ParseIpv4Address(const char* Address, SOCKADDR_IN& Result);
+void ParseIpv4Address(const char* Address, in_addr& Result);
 
-void ParseIpv6Address(const char* Address, SOCKADDR_IN6& Result);
+void ParseIpv6Address(const char* Address, in_addr6& Result);
 
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
 

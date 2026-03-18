@@ -110,12 +110,12 @@ VMPortMapping::VMPortMapping(int protocol, int Family, uint16_t Port, const char
 
     if (Family == AF_INET)
     {
-        common::wslutil::ParseIpv4Address(Address, BindAddress.Ipv4);
+        common::wslutil::ParseIpv4Address(Address, BindAddress.Ipv4.sin_addr);
         BindAddress.Ipv4.sin_port = htons(Port);
     }
     else if (Family == AF_INET6)
     {
-        common::wslutil::ParseIpv6Address(Address, BindAddress.Ipv6);
+        common::wslutil::ParseIpv6Address(Address, BindAddress.Ipv6.sin6_addr);
         BindAddress.Ipv6.sin6_port = htons(Port);
     }
     else
@@ -885,7 +885,7 @@ void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
         THROW_HR_IF_MSG(
             HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
             !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for NAT mode: ");
+            "Unsupported port mapping for NAT mode: %hs, protocol: %i", Mapping.BindingAddressString().c_str(),  Mapping.Protocol);
 
         MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort.Port(), false);
     }
@@ -1082,7 +1082,7 @@ std::optional<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Por
 
     WSL_LOG("AllocatePort", TraceLoggingValue(Port, "Port"));
 
-    auto [_, inserted] = m_allocatedPorts[std::make_pair(Family, Protocol)].insert(Port);
+    auto [_, inserted] = m_allocatedPorts.insert(Port);
 
     if (inserted)
     {
@@ -1100,12 +1100,11 @@ VmPortAllocation WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
 
     std::optional<VmPortAllocation> port;
 
-    auto& portMap = m_allocatedPorts[std::make_pair(Family, Protocol)];
     for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
-        if (!portMap.contains(i))
+        if (!m_allocatedPorts.contains(i))
         {
-            WI_VERIFY(portMap.insert(i).second);
+            WI_VERIFY(m_allocatedPorts.insert(i).second);
             return VmPortAllocation{i, Family, Protocol, *this};
         }
     }
@@ -1120,7 +1119,7 @@ void WSLAVirtualMachine::ReleasePort(VmPortAllocation& Port)
 
     WSL_LOG("ReleasePort", TraceLoggingValue(Port.Port(), "Port"));
 
-    LOG_HR_IF(E_UNEXPECTED, m_allocatedPorts[std::make_pair(Port.Family(), Port.Protocol())].erase(Port.Port()) != 1);
+    LOG_HR_IF(E_UNEXPECTED, m_allocatedPorts.erase(Port.Port()) != 1);
 }
 
 wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char* Path)

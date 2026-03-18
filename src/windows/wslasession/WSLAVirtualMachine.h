@@ -213,7 +213,7 @@ private:
     std::thread m_processExitThread;
     std::thread m_crashDumpThread;
 
-    std::map<std::pair<int, int>, std::set<uint16_t>> m_allocatedPorts;
+    std::set<uint16_t> m_allocatedPorts;
 
     GUID m_vmId{};
 

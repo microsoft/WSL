@@ -1365,17 +1365,17 @@ wil::unique_handle wsl::windows::common::wslutil::OpenCallingProcess(_In_ DWORD 
     return caller;
 }
 
-void wsl::windows::common::wslutil::ParseIpv4Address(const char* Address, SOCKADDR_IN& Result)
+void wsl::windows::common::wslutil::ParseIpv4Address(const char* Address, in_addr& Result)
 {
-    if (inet_pton(AF_INET, Address, &Result) == SOCKET_ERROR)
+    if (inet_pton(AF_INET, Address, &Result) != 1)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Address));
     }
 }
 
-void wsl::windows::common::wslutil::ParseIpv6Address(const char* Address, SOCKADDR_IN6& Result)
+void wsl::windows::common::wslutil::ParseIpv6Address(const char* Address, in_addr6& Result)
 {
-    if (inet_pton(AF_INET6, Address, &Result) == SOCKET_ERROR)
+    if (inet_pton(AF_INET6, Address, &Result) != 1)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidIp(Address));
     }

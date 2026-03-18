@@ -31,8 +31,8 @@ using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wsla::RelayedProcessIO;
-using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::VMPortMapping;
+using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAContainerMetadata;
 using wsl::windows::service::wsla::WSLAContainerMetadataV1;
@@ -121,21 +121,18 @@ std::pair<std::vector<WSLAContainerImpl::ContainerPortMapping>, std::string> Pro
         options.PortsCount > 0 && networkType == WSLAContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        options.PortsCount > 0 && networkType == WSLAContainerNetworkTypeHost,
+        "Port mappings are not supported in host mode");
+
     std::vector<WSLAContainerImpl::ContainerPortMapping> ports;
     ports.reserve(options.PortsCount);
 
     for (ULONG i = 0; i < options.PortsCount; i++)
     {
-        auto& entry =
-            ports.emplace_back(VMPortMapping::FromWSLAPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
-        if (networkType == WSLAContainerNetworkTypeBridged)
-        {
-            // Bridge mode ports are allocated when the container starts.
-        }
-        else if (networkType == WSLAContainerNetworkTypeHost)
-        {
-            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(options.Ports[i].Family, options.Ports[i].Protocol));
-        }
+        auto& entry = ports.emplace_back(VMPortMapping::FromWSLAPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
+        entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(options.Ports[i].Family, options.Ports[i].Protocol));
     }
 
     return {std::move(ports), std::move(networkMode)};
@@ -1025,10 +1022,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
         request.ExposedPorts[portKey] = {};
 
-        // TODO: Custom binding address support.
         auto& portEntry = request.HostConfig.PortBindings[portKey];
-        portEntry.emplace_back(
-            common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.HostPort())});
+        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.VmPort.Port())});
     }
 
     std::map<std::string, std::string> labels;
@@ -1051,9 +1046,13 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
 
-    for (const auto& e : ports)
+    // Only pass port metadata for bridged mode.
+    if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLAContainerNetworkTypeBridged)
     {
-        metadata.Ports.emplace_back(e.Serialize());
+        for (const auto& e : ports)
+        {
+            metadata.Ports.emplace_back(e.Serialize());
+        }
     }
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
@@ -1122,8 +1121,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     std::vector<ContainerPortMapping> ports;
     for (const auto& e : metadata.Ports)
     {
-        auto& inserted =
-            ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
+        auto& inserted = ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
         auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
@@ -1290,7 +1288,7 @@ void WSLAContainerImpl::MapPorts()
                 e.ContainerPort,
                 m_id.c_str());
 
-                e.VmMapping.AssignVmPort(std::move(allocatedPort.value()));
+            e.VmMapping.AssignVmPort(std::move(allocatedPort.value()));
         }
 
         m_virtualMachine.MapPort(e.VmMapping);
