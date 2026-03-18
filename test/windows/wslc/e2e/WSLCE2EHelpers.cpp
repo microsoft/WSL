@@ -30,6 +30,12 @@ const TestImage& DebianTestImage()
     return image;
 }
 
+const TestImage& AlpineTestImage()
+{
+    static const TestImage image{L"alpine", L"latest", std::filesystem::path{g_testDataPath} / L"alpine-latest.tar"};
+    return image;
+}
+
 const TestImage& InvalidTestImage()
 {
     static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", L"INVALID_PATH"};

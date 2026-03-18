@@ -13,10 +13,13 @@ Abstract:
 
 #include "precomp.h"
 #include "windows/Common.h"
+#include "ImageModel.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+
+using namespace wsl::windows::wslc::models;
 
 class WSLCE2EImageListTests
 {
@@ -25,26 +28,33 @@ class WSLCE2EImageListTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(ClassCleanup)
+    {
+        EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 
     TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
     {
         WSL2_TEST_ONLY();
-        auto result = RunWslc(L"image list --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        const auto result = RunWslc(L"image list --help");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(L"image list");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto outputLines = result.GetStdoutLines();
-        for (const auto& line : outputLines)
+        const auto result = RunWslc(L"image list");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        for (const auto& line : result.GetStdoutLines())
         {
-            if (line.find(DebianImage.NameAndTag()) != std::string::npos)
+            if (line.find(DebianImage.NameAndTag()) != std::wstring::npos)
             {
                 return;
             }
@@ -53,8 +63,59 @@ class WSLCE2EImageListTests
         VERIFY_FAIL(L"Failed to find the loaded image in the output");
     }
 
+    TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsNamesOnly)
+    {
+        WSL2_TEST_ONLY();
+
+        const auto result = RunWslc(L"image list --quiet");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        bool imageFound = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line == DebianImage.NameAndTag())
+            {
+                imageFound = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(imageFound);
+    }
+
+    TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)
+    {
+        WSL2_TEST_ONLY();
+
+        const auto result = RunWslc(L"image list --format invalid");
+        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
+    {
+        WSL2_TEST_ONLY();
+
+        const auto result = RunWslc(L"image list --format json");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto output = result.GetStdoutOneLine();
+        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(output.c_str());
+
+        VERIFY_ARE_EQUAL(2u, images.size());
+
+        std::vector<std::wstring> imageNames;
+        for (const auto& image : images)
+        {
+            imageNames.push_back(wsl::shared::string::MultiByteToWide(image.Name));
+        }
+
+        VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), DebianImage.NameAndTag()));
+        VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), AlpineImage.NameAndTag()));
+    }
+
 private:
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
 
     std::wstring GetHelpMessage() const
     {

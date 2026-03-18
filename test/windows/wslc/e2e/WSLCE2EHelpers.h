@@ -32,6 +32,7 @@ struct TestImage
 };
 
 const TestImage& DebianTestImage();
+const TestImage& AlpineTestImage();
 const TestImage& InvalidTestImage();
 
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
