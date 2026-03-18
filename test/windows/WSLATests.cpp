@@ -3865,7 +3865,7 @@ class WSLATests
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeNAT);
 
         RunPortMappingsTest(*session, WSLAContainerNetworkTypeBridged);
-        // RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
+        RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
     }
 
     TEST_METHOD(PortMappingsVirtioProxy)
@@ -3875,7 +3875,7 @@ class WSLATests
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeVirtioProxy);
 
         RunPortMappingsTest(*session, WSLAContainerNetworkTypeBridged);
-        // RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
+        RunPortMappingsTest(*session, WSLAContainerNetworkTypeHost);
     }
 
     TEST_METHOD(PortMappingsNone)

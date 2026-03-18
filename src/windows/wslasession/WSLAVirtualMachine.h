@@ -96,7 +96,7 @@ struct VMPortMapping
     static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort);
     static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping);
     static VMPortMapping FromContainerMetaData(const wsla::WSLAPortMapping& Mapping);
-
+    
     int Protocol{};
     VmPortAllocation VmPort;
     SOCKADDR_INET BindAddress{};

@@ -102,18 +102,18 @@ std::pair<std::vector<WSLAContainerImpl::ContainerPortMapping>, std::string> Pro
         options.PortsCount > 0 && networkType == WSLAContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        options.PortsCount > 0 && networkType == WSLAContainerNetworkTypeHost,
-        "Port mappings are not supported in host mode");
-
     std::vector<WSLAContainerImpl::ContainerPortMapping> ports;
     ports.reserve(options.PortsCount);
 
     for (ULONG i = 0; i < options.PortsCount; i++)
     {
         auto& entry = ports.emplace_back(VMPortMapping::FromWSLAPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
-        entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(options.Ports[i].Family, options.Ports[i].Protocol));
+
+        // Only allocate port for bridged network. Host mode ports are allocated when the container starts.
+        if (networkType == WSLAContainerNetworkTypeBridged)
+        {
+            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(options.Ports[i].Family, options.Ports[i].Protocol));
+        }
     }
 
     return {std::move(ports), std::move(networkMode)};
@@ -999,13 +999,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     for (const auto& e : ports)
     {
-        // TODO: ipv6 support.
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
         request.ExposedPorts[portKey] = {};
 
         auto& portEntry = request.HostConfig.PortBindings[portKey];
+
+        // In bridge mode, VmPort is empty until the container starts.
+        // In that networking mode, the host port always matches the vm port.
+        auto hostPort = e.VmMapping.VmPort.Empty() ? e.VmMapping.HostPort() : e.VmMapping.VmPort.Port();
+
         portEntry.emplace_back(
-            common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmMapping.VmPort.Port())});
+            common::docker_schema::PortMapping{.HostIp = e.VmMapping.BindingAddressString(), .HostPort = std::to_string(hostPort)});
     }
 
     std::map<std::string, std::string> labels;
@@ -1103,16 +1107,19 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     {
         auto& inserted = ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-        auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
+        if (DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode) == WSLAContainerNetworkTypeBridged)
+        {
+            auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_BUSY),
-            !allocation.has_value(),
-            "Port %hu is in use, cannot open container %hs",
-            inserted.ContainerPort,
-            dockerContainer.Id.c_str());
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_BUSY),
+                !allocation.has_value(),
+                "Port %hu is in use, cannot open container %hs",
+                inserted.ContainerPort,
+                dockerContainer.Id.c_str());
 
-        inserted.VmMapping.AssignVmPort(std::move(allocation.value()));
+            inserted.VmMapping.AssignVmPort(std::move(allocation.value()));
+        }
     }
 
     auto container = std::make_unique<WSLAContainerImpl>(
@@ -1279,6 +1286,11 @@ void WSLAContainerImpl::UnmapPorts()
 {
     for (auto& e : m_mappedPorts)
     {
+        if (m_networkingMode == WSLAContainerNetworkTypeHost)
+        {
+            e.VmMapping.VmPort.Reset();
+        }
+
         e.VmMapping.Reset();
     }
 }

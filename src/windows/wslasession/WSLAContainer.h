@@ -160,6 +160,7 @@ public:
 private:
     __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld(WSLADeleteFlags Flags);
 
+    void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
@@ -197,6 +198,7 @@ private:
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
+    WSLAContainerNetworkType m_networkingMode{};
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
