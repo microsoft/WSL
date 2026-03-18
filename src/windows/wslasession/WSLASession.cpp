@@ -1302,6 +1302,7 @@ try
     // - container logs relays
     m_ioRelay.Stop();
 
+    m_allocatedPorts.clear();
     m_eventTracker.reset();
     m_dockerClient.reset();
 
@@ -1400,6 +1401,9 @@ try
     mapping.AssignVmPort(vmPort);
 
     m_virtualMachine->MapPort(mapping);
+    m_allocatedPorts.emplace(LinuxPort, vmPort);
+
+    mapping.Release();
 
     return S_OK;
 }
@@ -1419,6 +1423,8 @@ try
     auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
     mapping.AssignVmPort(existing->second);
     mapping.Attach(m_virtualMachine.value());
+
+    auto cleanup = wil::scope_exit([&]() { mapping.Release(); });
 
     m_virtualMachine->UnmapPort(mapping);
 

@@ -3723,7 +3723,7 @@ class WSLATests
         // Test a simple port mapping.
         {
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine", "test-ports", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
+                "python:3.12-alpine", "test-ports", {"python3", "-m", "http.server", "--bind", "::"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET6, IPPROTO_TCP, "::1");
@@ -3732,11 +3732,12 @@ class WSLATests
             auto initProcess = container.GetInitProcess();
 
             // Wait for the container bind() to be completed.
-            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
 
             expectBoundPorts(container, {"8000/tcp"});
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
+
             ExpectHttpResponse(L"http://[::1]:1234", 200);
 
             // Validate that the port cannot be reused while the container is running.
@@ -3819,32 +3820,49 @@ class WSLATests
             }
         }
 
-        // TODO: Uncomment once ipv6 port mapping is supported.
-        // Validate ipv6 port mapping
-        /*{
-            WSLAContainerLauncher launcher(
-                "python:3.12-alpine",
-                "test-ports-ipv6",
-                {},
-                {"python3", "-m", "http.server", "--bind", "::1"},
-                {"PYTHONUNBUFFERED=1"},
-                containerNetworkType,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+        // Validate error paths
+        {
+            // Invalid IP address
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "invalid-ip");
 
-            launcher.AddPort(1234, 8000, AF_INET);
-            launcher.AddPort(1234, 8000, AF_INET6);
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(E_INVALIDARG));
+                ValidateCOMErrorMessage(L"Invalid IP address 'invalid-ip'");
+            }
 
-            auto container = launcher.Launch(session);
-            auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
+            // Invalid protocol
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, 1);
 
-            // Wait for the container bind() to be completed.
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on ::1 port 8000");
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(E_INVALIDARG));
+            }
 
-            ExpectHttpResponse(L"http://localhost:1234", {});
+            // Invalid address family
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, 1);
 
-            ExpectHttpResponse(L"http://[::1]:1234", 200);
-        }*/
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(E_INVALIDARG));
+            }
+
+            // TODO: Update once UDP is supported.
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_UDP);
+
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)));
+            }
+
+            // TODO: Update once custom binding addresses are supported.
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "127.0.0.2");
+
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)));
+            }
+        }
     }
 
     auto SetupPortMappingsTest(WSLANetworkingMode networkingMode)

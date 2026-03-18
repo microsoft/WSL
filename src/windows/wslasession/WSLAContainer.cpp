@@ -1113,7 +1113,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
             auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
             THROW_HR_IF_MSG(
-                HRESULT_FROM_WIN32(ERROR_BUSY),
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
                 !allocation,
                 "Port %hu is in use, cannot open container %hs",
                 inserted.ContainerPort,
@@ -1270,12 +1270,6 @@ void WSLAContainerImpl::MapPorts()
         // In that case, allocate the VM ports to match the container ports.
         if (!e.VmMapping.VmPort)
         {
-            THROW_HR_IF_MSG(
-                E_UNEXPECTED,
-                e.VmMapping.HostPort() != e.ContainerPort,
-                "Found unexpected port mapping for host mode networking: %hs",
-                shared::ToJson(e.Serialize()).c_str());
-
             // Reuse existing vm port allocation when possible.
             // This is required because the same container can be bind the port number for different families or protocols.
             auto existing = allocatedPorts.find(e.ContainerPort);
@@ -1285,12 +1279,15 @@ void WSLAContainerImpl::MapPorts()
             }
             else
             {
-
                 auto allocatedPort =
                     m_virtualMachine.TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
 
                 THROW_HR_IF_MSG(
-                    HRESULT_FROM_WIN32(ERROR_BUSY), !allocatedPort, "Port %hu is in use, cannot start container %hs", e.ContainerPort, m_id.c_str());
+                    HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                    !allocatedPort,
+                    "Port %hu is in use, cannot start container %hs",
+                    e.ContainerPort,
+                    m_id.c_str());
 
                 e.VmMapping.AssignVmPort(allocatedPort);
 
