@@ -82,6 +82,9 @@ namespace winrt::WSLAMoviePlayer::implementation
         
         // Dispatcher for UI thread
         Microsoft::UI::Dispatching::DispatcherQueue m_dispatcherQueue{ nullptr };
+
+        // Debug log
+        void AppendDebugLog(const winrt::hstring& message);
     };
 }
 

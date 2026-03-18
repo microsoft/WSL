@@ -7,7 +7,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="WSLA Movie Player">
+    Title="WSLA Movie Player (v2 - Rebuild Verified)">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
@@ -204,6 +204,34 @@
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Debug Log Panel -->
+        <Border Grid.Row="5"
+                Background="#1E1E1E"
+                BorderBrush="#333333"
+                BorderThickness="0,1,0,0"
+                MaxHeight="200">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Padding="8,4">
+                    <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" Foreground="#999" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="Debug Log" Foreground="#999" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+                <ScrollViewer x:Name="DebugScrollViewer" Grid.Row="1" Padding="8,0,8,4"
+                              VerticalScrollBarVisibility="Auto">
+                    <TextBlock x:Name="DebugLogText"
+                               Text=""
+                               Foreground="#00FF00"
+                               FontFamily="Consolas"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               IsTextSelectionEnabled="True"/>
+                </ScrollViewer>
             </Grid>
         </Border>
     </Grid>

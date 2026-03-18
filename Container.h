@@ -22,6 +22,7 @@ namespace winrt::WSLAMoviePlayer::implementation
         std::function<void()> OnContainerStopped;
         std::function<void(const winrt::hstring&)> OnContainerError;
         std::function<void(const winrt::hstring&)> OnContainerOutput;
+        std::function<void(const winrt::hstring&)> OnContainerLog;
 
     private:
         bool m_isRunning;
@@ -32,5 +33,6 @@ namespace winrt::WSLAMoviePlayer::implementation
         WslcProcess m_process;
 
         void Cleanup();
+        void Log(const std::wstring& msg);
     };
 }

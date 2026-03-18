@@ -214,6 +214,11 @@
     <Import Project="packages\Microsoft.Windows.SDK.BuildTools.10.0.26100.7463\build\Microsoft.Windows.SDK.BuildTools.targets" Condition="Exists('packages\Microsoft.Windows.SDK.BuildTools.10.0.26100.7463\build\Microsoft.Windows.SDK.BuildTools.targets')" />
     <Import Project="packages\Microsoft.Windows.ImplementationLibrary.1.0.250325.1\build\native\Microsoft.Windows.ImplementationLibrary.targets" Condition="Exists('packages\Microsoft.Windows.ImplementationLibrary.1.0.250325.1\build\native\Microsoft.Windows.ImplementationLibrary.targets')" />
   </ImportGroup>
+  <Target Name="CopyWslcSdkToAppx" AfterTargets="Build">
+    <Copy SourceFiles="$(ProjectDir)dll\WslcSDK.dll" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(OutDir)WSLAMoviePlayer.exe" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(OutDir)resources.pri" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)resources.pri')" />
+  </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>

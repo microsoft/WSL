@@ -29,6 +29,7 @@ namespace winrt::WSLAMoviePlayer::implementation
         , m_isSliderDragging(false)
     {
         InitializeComponent();
+        Title(L"WSLA Movie Player (v2 - Rebuild Verified)");
         
         // Get dispatcher queue for UI thread updates
         m_dispatcherQueue = Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
@@ -507,6 +508,7 @@ namespace winrt::WSLAMoviePlayer::implementation
                 OutputDebugStringW((L"MainWindow: Container error - " + error + L"\n").c_str());
                 ContainerDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 255, 0, 0)));
                 ContainerStatusText().Text(L"Container: " + error);
+                AppendDebugLog(L"[ERROR] " + error);
             });
         };
 
@@ -516,11 +518,35 @@ namespace winrt::WSLAMoviePlayer::implementation
             {
                 OutputDebugStringW((L"MainWindow: Container output - " + output + L"\n").c_str());
                 ContainerStatusText().Text(L"Container: " + output);
+                AppendDebugLog(L"[Output] " + output);
+            });
+        };
+
+        m_container->OnContainerLog = [this](const hstring& logMsg)
+        {
+            m_dispatcherQueue.TryEnqueue([this, logMsg]()
+            {
+                AppendDebugLog(logMsg);
             });
         };
 
         // Set initial "starting" state
         ContainerDot().Fill(Microsoft::UI::Xaml::Media::SolidColorBrush(Windows::UI::ColorHelper::FromArgb(255, 255, 165, 0)));
         ContainerStatusText().Text(L"Container: Starting...");
+    }
+
+    void MainWindow::AppendDebugLog(const winrt::hstring& message)
+    {
+        auto current = DebugLogText().Text();
+        if (current.size() > 8000)
+        {
+            // Trim old entries to prevent unbounded growth
+            auto trimmed = current.c_str() + current.size() - 4000;
+            current = winrt::hstring(trimmed);
+        }
+        auto newText = current + message + L"\n";
+        DebugLogText().Text(newText);
+        DebugScrollViewer().UpdateLayout();
+        DebugScrollViewer().ChangeView(nullptr, DebugScrollViewer().ScrollableHeight(), nullptr);
     }
 }
