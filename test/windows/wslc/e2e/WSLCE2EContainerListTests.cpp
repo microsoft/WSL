@@ -25,7 +25,6 @@ class WSLCE2EContainerListTests
 {
     WSL_TEST_CLASS(WSLCE2EContainerListTests)
 
-
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
