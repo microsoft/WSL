@@ -5402,6 +5402,10 @@ class WSLATests
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
         BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); }, E_ABORT, true, true);
 
+        // Avoid attempting container delete on scope exit after intentional session termination;
+        // rely on the prune scope-exit above to clean up instead.
+        container.SetDeleteOnClose(false);
+
         // Terminate the session.
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
         operation.Complete();
