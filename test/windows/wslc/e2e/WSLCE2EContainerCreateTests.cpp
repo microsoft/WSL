@@ -185,7 +185,7 @@ class WSLCE2EContainerCreateTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // From the host side, verify we can connect to both ports 
+        // From the host side, verify we can connect to both ports
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort2).c_str(), HTTP_STATUS_OK, true);
     }
