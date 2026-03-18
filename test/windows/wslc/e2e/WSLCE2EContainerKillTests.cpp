@@ -31,12 +31,15 @@ class WSLCE2EContainerKillTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcSecondContainerName);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcSecondContainerName);
         return true;
     }
 
@@ -69,8 +72,87 @@ class WSLCE2EContainerKillTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
+    TEST_METHOD(WSLCE2E_Container_Kill_ByName)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Kill by container name
+        result = RunWslc(std::format(L"container kill {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify container is no longer running
+        VerifyContainerIsListed(containerId, L"exited");
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Kill_NotFound)
+    {
+        WSL2_TEST_ONLY();
+
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container kill {}", WslcContainerName));
+        result.Verify({.Stderr = std::format(L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", WslcContainerName), .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Kill_InvalidSignal)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        {
+            result = RunWslc(std::format(L"container kill {} -s 0", WslcContainerName));
+            result.Verify({.Stderr = L"Invalid signal value: 0 is out of valid range (1-31).\r\n", .ExitCode = 1});
+        }
+
+        {
+            result = RunWslc(std::format(L"container kill {} -s 32", WslcContainerName));
+            result.Verify({.Stderr = L"Invalid signal value: 32 is out of valid range (1-31).\r\n", .ExitCode = 1});
+        }
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Kill_TargetedContainerOnly)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run first container in background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto firstContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(firstContainerId.empty());
+
+        // Run second container in background
+        result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcSecondContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto secondContainerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(secondContainerId.empty());
+
+        // Verify both are running
+        VerifyContainerIsListed(firstContainerId, L"running");
+        VerifyContainerIsListed(secondContainerId, L"running");
+
+        // Kill only the first container
+        result = RunWslc(std::format(L"container kill {}", firstContainerId));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify first exited, second still running
+        VerifyContainerIsListed(firstContainerId, L"exited");
+        VerifyContainerIsListed(secondContainerId, L"running");
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring WslcSecondContainerName = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
 
     std::wstring GetHelpMessage() const
