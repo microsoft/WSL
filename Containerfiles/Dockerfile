@@ -38,7 +38,6 @@ RUN pip install --no-cache-dir .
 # Copy application files
 COPY main.py .
 COPY test.py .
-COPY test.mp3 .
 COPY README.md .
 
 # Expose port
