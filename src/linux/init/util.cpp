@@ -685,7 +685,11 @@ Return Value:
 
         if (DetachTerminal)
         {
-            setsid();
+            if (setsid() == -1)
+            {
+                LOG_ERROR("setsid failed {}", errno);
+                exit(-1);
+            }
         }
 
         //
