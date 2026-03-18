@@ -22,9 +22,17 @@ class WSLCE2EContainerListTests
 {
     WSL_TEST_CLASS(WSLCE2EContainerListTests)
 
+
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        EnsureImageIsLoaded(DebianImage);
+        return true;
+    }
+
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -71,24 +79,6 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"created"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_QuietOption)
-    {
-        WSL2_TEST_ONLY();
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        // Create a container
-        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-        auto containerId = result.GetStdoutOneLine();
-        VERIFY_IS_FALSE(containerId.empty());
-
-        // Verify container ID is the only thing output with quiet option
-        result = RunWslc(L"container list --all --quiet");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-        auto outputLines = result.GetStdoutLines();
-        VERIFY_ARE_NOT_EQUAL(outputLines.end(), std::find(outputLines.begin(), outputLines.end(), containerId));
-    }
-
     TEST_METHOD(WSLCE2E_Container_List_NoOptions_RunningContainers)
     {
         WSL2_TEST_ONLY();
@@ -117,6 +107,62 @@ class WSLCE2EContainerListTests
         // Verify we found the container in the list output
         VERIFY_IS_TRUE(foundContainerLine.has_value());
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"running"));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_List_NoOptions_ExcludesCreatedContainers)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        // Create (but do not start) a container.
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Default list should only show running containers.
+        result = RunWslc(L"container list");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        bool isListed = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line.find(containerId) != std::wstring::npos)
+            {
+                isListed = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_FALSE(isListed);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_List_QuietOption_OutputsIdsOnly)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        result = RunWslc(L"container list --all --quiet");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto outputLine = result.GetStdoutOneLine();
+
+        VERIFY_ARE_EQUAL(containerId, outputLine);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
+    {
+        WSL2_TEST_ONLY();
+
+        const auto result = RunWslc(L"container list --format invalid");
+        VERIFY_IS_TRUE(result.ExitCode.has_value());
+        VERIFY_ARE_NOT_EQUAL(static_cast<DWORD>(S_OK), result.ExitCode.value());
+
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_FALSE(result.Stderr->empty());
     }
 
 private:
