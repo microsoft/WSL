@@ -15,6 +15,7 @@ Abstract:
 #include "SettingsCommand.h"
 #include "UserSettings.h"
 #include "wslutil.h"
+#include <iostream>
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
