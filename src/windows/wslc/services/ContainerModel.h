@@ -64,6 +64,6 @@ struct ContainerInformation
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
 };
 } // namespace wsl::windows::wslc::models

@@ -13,10 +13,13 @@ Abstract:
 
 #include "precomp.h"
 #include "windows/Common.h"
+#include "ContainerModel.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+
+using namespace wsl::windows::wslc::models;
 
 class WSLCE2EContainerListTests
 {
@@ -32,6 +35,7 @@ class WSLCE2EContainerListTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -39,6 +43,7 @@ class WSLCE2EContainerListTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         return true;
     }
 
@@ -158,15 +163,60 @@ class WSLCE2EContainerListTests
         WSL2_TEST_ONLY();
 
         const auto result = RunWslc(L"container list --format invalid");
-        VERIFY_IS_TRUE(result.ExitCode.has_value());
-        VERIFY_ARE_NOT_EQUAL(static_cast<DWORD>(S_OK), result.ExitCode.value());
+        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
+    }
 
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_IS_FALSE(result.Stderr->empty());
+    TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        // Create a container
+        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // List containers with json format
+        result = RunWslc(L"container list --all --format json");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto output = result.GetStdoutOneLine();
+
+        // Parse json and verify we got the expected container information back
+        auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(output.c_str());
+        VERIFY_ARE_EQUAL(1U, containers.size());
+        VERIFY_ARE_EQUAL(containerId, wsl::shared::string::MultiByteToWide(containers[0].Id));
+
+        // Create another container
+        result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto containerId2 = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId2.empty());
+
+        // List containers with json format again
+        result = RunWslc(L"container list --all --format json");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        const auto output2 = result.GetStdoutOneLine();
+
+        // Parse json and verify we got both containers back
+        containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(output2.c_str());
+        VERIFY_ARE_EQUAL(2U, containers.size());
+
+        // Extract container IDs
+        std::vector<std::wstring> containerIds;
+        for (const auto& container : containers)
+        {
+            containerIds.push_back(wsl::shared::string::MultiByteToWide(container.Id));
+        }
+
+        // Verify both container IDs are in the list
+        VERIFY_IS_TRUE(std::find(containerIds.begin(), containerIds.end(), containerId) != containerIds.end());
+        VERIFY_IS_TRUE(std::find(containerIds.begin(), containerIds.end(), containerId2) != containerIds.end());
     }
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring WslcContainerName2 = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
 
     std::wstring GetHelpMessage() const
