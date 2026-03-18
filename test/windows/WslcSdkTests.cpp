@@ -1594,12 +1594,10 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &h), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
-        // stderr handle was NOT consumed — must still be obtainable.
+        // stderr handle was also consumed in order to drain it despite not being given a callback.
         {
             HANDLE h = nullptr;
-            VERIFY_SUCCEEDED(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDERR, &h));
-            VERIFY_IS_NOT_NULL(h);
-            CloseHandle(h);
+            VERIFY_ARE_EQUAL(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDERR, &h), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 

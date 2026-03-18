@@ -13,7 +13,7 @@ Abstract:
 --*/
 #pragma once
 #include "wslaservice.h"
-#include "wslrelay.h"
+#include "relay.hpp"
 #include <thread>
 
 struct WslcContainerProcessIOCallbackOptions;
@@ -34,4 +34,5 @@ struct IOCallback
 private:
     std::thread m_thread;
     wsl::windows::common::relay::MultiHandleWait m_io;
+    wil::unique_event m_cancelEvent{wil::EventOptions::ManualReset};
 };

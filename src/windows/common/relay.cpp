@@ -961,18 +961,6 @@ try
 }
 CATCH_LOG()
 
-MultiHandleWait::MultiHandleWait(MultiHandleWait&& other) noexcept
-{
-    this->operator=(std::move(other));
-}
-
-MultiHandleWait& MultiHandleWait::operator=(MultiHandleWait&& other) noexcept
-{
-    this->m_handles = std::move(other.m_handles);
-    this->m_cancel = other.m_cancel.load();
-    return *this;
-}
-
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
     m_handles.emplace_back(flags, std::move(handle));

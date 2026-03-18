@@ -294,7 +294,8 @@ typedef enum WslcProcessIOHandle
     WSLC_PROCESS_IO_HANDLE_STDERR = 2
 } WslcProcessIOHandle;
 
-// Pass in Null for WslcStdIOCallback to clear the callback for the given handle
+// Only WSLC_PROCESS_IO_HANDLE_STDOUT and WSLC_PROCESS_IO_HANDLE_STDERR are supported for callbacks.
+// Pass in Null for WslcStdIOCallback to clear the callback for the given handle.
 STDAPI WslcSetProcessSettingsIOCallback(
     _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIOHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
 

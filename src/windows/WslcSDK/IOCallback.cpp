@@ -16,34 +16,36 @@ Abstract:
 
 IOCallback::IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallbackOptions& options)
 {
-    if (options.stdOutCallback)
-    {
-        auto localCallback = options.stdOutCallback;
-        auto localContext = options.stdOutCallbackContext;
-        m_io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
-            GetIOHandle(process, WSLC_PROCESS_IO_HANDLE_STDOUT), [localCallback, localContext](const auto& buffer) {
-                localCallback(reinterpret_cast<const BYTE*>(buffer.data()), static_cast<uint32_t>(buffer.size()), localContext);
-            }));
-    }
+    using namespace wsl::windows::common::relay;
 
-    if (options.stdErrCallback)
+    auto addIOCallback = [&](WslcProcessIOHandle ioHandle, WslcStdIOCallback callback, PVOID context)
     {
-        auto localCallback = options.stdErrCallback;
-        auto localContext = options.stdErrCallbackContext;
-        m_io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
-            GetIOHandle(process, WSLC_PROCESS_IO_HANDLE_STDERR), [localCallback, localContext](const auto& buffer) {
-                localCallback(reinterpret_cast<const BYTE*>(buffer.data()), static_cast<uint32_t>(buffer.size()), localContext);
-            }));
-    }
+        std::function<void(const gsl::span<char>& Buffer)> function;
+        if (callback)
+        {
+            function = [callback, context](const gsl::span<char>& buffer) {
+                callback(reinterpret_cast<const BYTE*>(buffer.data()), static_cast<uint32_t>(buffer.size()), context);
+                };
+        }
+        else
+        {
+            function = [](const gsl::span<char>&) {};
+        }
+
+        m_io.AddHandle(std::make_unique<ReadHandle>(GetIOHandle(process, ioHandle), std::move(function)));
+    };
+
+    addIOCallback(WSLC_PROCESS_IO_HANDLE_STDOUT, options.stdOutCallback, options.stdOutCallbackContext);
+    addIOCallback(WSLC_PROCESS_IO_HANDLE_STDERR, options.stdErrCallback, options.stdErrCallbackContext);
+
+    m_io.AddHandle(std::make_unique<EventHandle>(m_cancelEvent.get()), MultiHandleWait::CancelOnCompleted);
 
     m_thread = std::thread([this]() {
         try
         {
             m_io.Run({});
         }
-        catch (...)
-        {
-        }
+        CATCH_LOG();
     });
 }
 
@@ -58,7 +60,7 @@ IOCallback::~IOCallback()
 
 void IOCallback::Cancel()
 {
-    m_io.Cancel();
+    m_cancelEvent.SetEvent();
 }
 
 bool IOCallback::HasIOCallback(const WslcContainerProcessOptionsInternal* options)
