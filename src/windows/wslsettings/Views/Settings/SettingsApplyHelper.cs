@@ -3,6 +3,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using WslSettings.Contracts.Services;
@@ -213,7 +214,7 @@ internal static class SettingsApplyHelper
                 return localized;
             }
         }
-        catch (System.Exception)
+        catch (COMException)
         {
         }
 
