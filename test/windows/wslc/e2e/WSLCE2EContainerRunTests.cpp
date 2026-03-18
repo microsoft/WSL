@@ -42,12 +42,16 @@ class WSLCE2EContainerRunTests
 
     TEST_METHOD(WSLCE2E_Container_Run_HelpCommand)
     {
+         WSL2_TEST_ONLY();
+
         auto result = RunWslc(L"container run --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_Container_With_Command)
     {
+         WSL2_TEST_ONLY();
+
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto command = L"echo echo_from_container";

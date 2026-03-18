@@ -180,7 +180,7 @@ private:
 
     std::wstring GetUsage() const
     {
-        return L"Usage: wslc container remove [<options>] [<container-id>]\r\n\r\n";
+        return L"Usage: wslc container remove [<options>] <container-id>\r\n\r\n";
     }
 
     std::wstring GetAvailableCommandAliases() const
