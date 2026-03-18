@@ -453,7 +453,16 @@ void MirroredNetworking::AddNetworkEndpoint(const GUID& NetworkId) noexcept
                 TraceLoggingValue(NetworkId, "networkId"));
         }
 
-        if (m_config.FirewallConfig.Enabled() && !isLoopbackNetwork)
+        if (isLoopbackNetwork)
+        {
+            // Loopback networks require HostComputeNetwork (not VirtualNetwork) and don't support policies
+            hns::HostComputeEndpoint hnsEndpoint{};
+            hnsEndpoint.HostComputeNetwork = NetworkId;
+            hnsEndpoint.SchemaVersion.Major = 2;
+            hnsEndpoint.SchemaVersion.Minor = 16;
+            endpointSettings = ToJsonW(hnsEndpoint);
+        }
+        else if (m_config.FirewallConfig.Enabled())
         {
             // Create HNS firewall policy object for the endpoint
             hns::HostComputeEndpoint hnsEndpoint{};
@@ -481,15 +490,6 @@ void MirroredNetworking::AddNetworkEndpoint(const GUID& NetworkId) noexcept
             endpointFirewallPolicy.Settings = std::move(firewallPolicyObject);
             endpointFirewallPolicy.Type = hns::EndpointPolicyType::Firewall;
             hnsEndpoint.Policies.emplace_back(std::move(endpointFirewallPolicy));
-            endpointSettings = ToJsonW(hnsEndpoint);
-        }
-        else if (m_config.FirewallConfig.Enabled() && isLoopbackNetwork)
-        {
-            // Loopback networks require HostComputeNetwork (not VirtualNetwork) and don't support policies
-            hns::HostComputeEndpoint hnsEndpoint{};
-            hnsEndpoint.HostComputeNetwork = NetworkId;
-            hnsEndpoint.SchemaVersion.Major = 2;
-            hnsEndpoint.SchemaVersion.Minor = 16;
             endpointSettings = ToJsonW(hnsEndpoint);
         }
         else
