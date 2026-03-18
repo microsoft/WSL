@@ -145,7 +145,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
             if (line.find(L"running") != std::wstring::npos)
             {
                 auto result = RunWslc(std::format(L"container kill {}", containerName));
-                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             }
             auto result = RunWslc(std::format(L"container remove {}", containerName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
