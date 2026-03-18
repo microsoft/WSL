@@ -30,6 +30,7 @@ enum class FormatType
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
+    std::vector<std::string> EnvironmentVariables;
     bool Detach = false;
     bool Interactive = false;
     std::string Name;

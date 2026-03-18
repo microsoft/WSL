@@ -215,6 +215,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
     }
 
+    if (context.Args.Contains(ArgType::Env))
+    {
+        auto const& envArgs = context.Args.GetAll<ArgType::Env>();
+        options.EnvironmentVariables.reserve(options.EnvironmentVariables.size() + envArgs.size());
+        for (const auto& arg : envArgs)
+        {
+            options.EnvironmentVariables.emplace_back(WideToMultiByte(arg));
+        }
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();

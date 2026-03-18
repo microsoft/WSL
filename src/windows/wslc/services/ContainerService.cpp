@@ -84,7 +84,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
 
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLAContainerNetworkTypeHost, processFlags);
     containerLauncher.SetContainerFlags(containerFlags);
 
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
