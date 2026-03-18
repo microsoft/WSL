@@ -202,13 +202,21 @@ internal static class SettingsApplyHelper
 
     private static string FormatEnum<TEnum>(TEnum value) where TEnum : struct, Enum
     {
-        // Try resource lookup first (e.g., Settings_NetworkingMode_Bridge)
-        var resourceKey = $"Settings_{typeof(TEnum).Name}_{value}";
-        var localized = resourceKey.GetLocalized();
-        if (!string.IsNullOrEmpty(localized) && localized != resourceKey)
+        // Try resource lookup first using the pattern "Settings_{EnumTypeName}_{EnumValue}".
+        // GetLocalized throws COMException when the key doesn't exist, so fall back to the raw name.
+        try
         {
-            return localized;
+            var resourceKey = $"Settings_{typeof(TEnum).Name}_{value}";
+            var localized = resourceKey.GetLocalized();
+            if (!string.IsNullOrEmpty(localized) && localized != resourceKey)
+            {
+                return localized;
+            }
         }
+        catch (System.Exception)
+        {
+        }
+
         return value.ToString();
     }
 }

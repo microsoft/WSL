@@ -138,9 +138,18 @@ public class WslConfigService : IWslConfigService
                     }
                 }
 
-                // Re-read from disk so both snapshots reflect what actually got written
                 ReloadConfig_NoLock();
-                RefreshSnapshots_NoLock();
+                if (result == 0)
+                {
+                    // Full success - reset both snapshots from disk
+                    RefreshSnapshots_NoLock();
+                }
+                else
+                {
+                    // Partial failure - only refresh baseline so successfully-applied
+                    // entries drop out of pending, but unapplied entries remain.
+                    RefreshBaselineSnapshot_NoLock();
+                }
 
                 var hasPendingAfter = HasPendingChanges_NoLock();
                 // This controls whether the Apply button appears or disappears in the UI
@@ -227,8 +236,12 @@ public class WslConfigService : IWslConfigService
         }
     }
 
-    // Every WslConfigEntry value, cached once so we don't re-enumerate the enum each time.
-    private static readonly IReadOnlyList<WslConfigEntry> AllConfigEntries = Enum.GetValues(typeof(WslConfigEntry)).Cast<WslConfigEntry>().ToList();
+    // Every WslConfigEntry value (excluding the sentinel NoEntry), cached once so we don't re-enumerate the enum each time.
+    private static readonly IReadOnlyList<WslConfigEntry> AllConfigEntries =
+        Enum.GetValues(typeof(WslConfigEntry))
+            .Cast<WslConfigEntry>()
+            .Where(entry => entry != WslConfigEntry.NoEntry)
+            .ToList();
 
     // Free the native memory behind each setting in a snapshot and clear the dictionary.
     private static void DisposeSnapshot(IDictionary<WslConfigEntry, WslConfigSettingManaged> snapshot)
@@ -260,8 +273,20 @@ public class WslConfigService : IWslConfigService
         foreach (var entry in AllConfigEntries)
         {
             var persisted = GetPersistedWslConfigSetting(entry, defaultSetting: false);
-            _baselineSnapshot[entry] = persisted.Clone();
+            _baselineSnapshot[entry] = persisted;
             _workingSnapshot[entry] = persisted.Clone();
+        }
+    }
+
+    // Re-read only the baseline snapshot from disk, leaving the working snapshot intact.
+    // Used on partial commit failure so successfully-applied entries drop out of pending
+    // while unapplied entries remain.
+    private void RefreshBaselineSnapshot_NoLock()
+    {
+        DisposeSnapshot(_baselineSnapshot);
+        foreach (var entry in AllConfigEntries)
+        {
+            _baselineSnapshot[entry] = GetPersistedWslConfigSetting(entry, defaultSetting: false);
         }
     }
 
@@ -371,8 +396,18 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
         return new WslConfigSettingManaged(WslConfigSetting.__CreateInstance(nativeInternal));
     }
 
-    private object GetValueObject()
+    public bool Equals(WslConfigSettingManaged other)
     {
+        if (other is null)
+        {
+            return false;
+        }
+
+        if (ConfigSetting.ConfigEntry != other.ConfigSetting.ConfigEntry)
+        {
+            return false;
+        }
+
         switch (ConfigSetting.ConfigEntry)
         {
         case WslConfigEntry.SwapFilePath:
@@ -380,27 +415,25 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
         case WslConfigEntry.KernelPath:
         case WslConfigEntry.SystemDistroPath:
         case WslConfigEntry.KernelModulesPath:
-            return ConfigSetting.StringValue;
+            return string.Equals(
+                ConfigSetting.StringValue,
+                other.ConfigSetting.StringValue,
+                System.StringComparison.Ordinal);
         case WslConfigEntry.ProcessorCount:
         case WslConfigEntry.InitialAutoProxyTimeout:
         case WslConfigEntry.VMIdleTimeout:
-            return ConfigSetting.Int32Value;
+            return ConfigSetting.Int32Value == other.ConfigSetting.Int32Value;
         case WslConfigEntry.MemorySizeBytes:
         case WslConfigEntry.SwapSizeBytes:
         case WslConfigEntry.VhdSizeBytes:
-            return ConfigSetting.UInt64Value;
+            return ConfigSetting.UInt64Value == other.ConfigSetting.UInt64Value;
         case WslConfigEntry.NetworkingMode:
-            return ConfigSetting.NetworkingConfigurationValue;
+            return ConfigSetting.NetworkingConfigurationValue == other.ConfigSetting.NetworkingConfigurationValue;
         case WslConfigEntry.AutoMemoryReclaim:
-            return ConfigSetting.MemoryReclaimModeValue;
+            return ConfigSetting.MemoryReclaimModeValue == other.ConfigSetting.MemoryReclaimModeValue;
         default:
-            return ConfigSetting.BoolValue;
+            return ConfigSetting.BoolValue == other.ConfigSetting.BoolValue;
         }
-    }
-
-    public bool Equals(WslConfigSettingManaged other)
-    {
-        return Equals(other.GetValueObject());
     }
 
 #nullable enable
