@@ -613,7 +613,7 @@ Return Value:
     return SocketFd;
 }
 
-int UtilCreateProcessAndWait(const char* const File, const char* const Argv[], int* Status, const std::map<std::string, std::string>& Env)
+int UtilCreateProcessAndWait(const char* const File, const char* const Argv[], int* Status, const std::map<std::string, std::string>& Env, bool DetachTerminal)
 
 /*++
 
@@ -629,6 +629,9 @@ Arguments:
 
     Status - Supplies an optional pointer that receives the exit status of the
         process.
+
+    DetachTerminal - Supplies a boolean that, when true, calls setsid() in the
+        child process to detach it from the controlling terminal.
 
 Return Value:
 
@@ -674,6 +677,15 @@ Return Value:
         for (const auto& e : Env)
         {
             setenv(e.first.c_str(), e.second.c_str(), 1);
+        }
+
+        //
+        // Detach from the controlling terminal if requested.
+        //
+
+        if (DetachTerminal)
+        {
+            setsid();
         }
 
         //
