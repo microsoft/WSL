@@ -597,20 +597,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         // This can happen if Delete() is called by the user.
         if (previousState == WslaContainerStateRunning)
         {
-            // Use Docker's FinishedAt so the event path matches the
-            // value restored during recovery in Open().
-            std::optional<std::uint64_t> finishedAt;
-            try
-            {
-                auto inspectData = m_dockerClient.InspectContainer(m_id);
-                if (!inspectData.State.FinishedAt.empty())
-                {
-                    finishedAt = ParseDockerTimestamp(inspectData.State.FinishedAt);
-                }
-            }
-            CATCH_LOG();
-
-            Transition(WslaContainerStateExited, finishedAt);
+            Transition(WslaContainerStateExited, GetDockerFinishedAt());
 
             ReleaseRuntimeResources();
 
@@ -680,20 +667,7 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
         }
     }
 
-    // Use Docker's FinishedAt so the live stop path matches the
-    // value restored during recovery in Open().
-    std::optional<std::uint64_t> finishedAt;
-    try
-    {
-        auto inspectData = m_dockerClient.InspectContainer(m_id);
-        if (!inspectData.State.FinishedAt.empty())
-        {
-            finishedAt = ParseDockerTimestamp(inspectData.State.FinishedAt);
-        }
-    }
-    CATCH_LOG();
-
-    Transition(WslaContainerStateExited, finishedAt);
+    Transition(WslaContainerStateExited, GetDockerFinishedAt());
 
     ReleaseRuntimeResources();
 
@@ -1407,6 +1381,21 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DisconnectComWrap
         m_comWrapper->Disconnect();
         m_comWrapper.Reset();
     }
+}
+
+std::optional<std::uint64_t> WSLAContainerImpl::GetDockerFinishedAt() noexcept
+{
+    try
+    {
+        auto inspectData = m_dockerClient.InspectContainer(m_id);
+        if (!inspectData.State.FinishedAt.empty())
+        {
+            return ParseDockerTimestamp(inspectData.State.FinishedAt);
+        }
+    }
+    CATCH_LOG();
+
+    return std::nullopt;
 }
 
 __requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept
