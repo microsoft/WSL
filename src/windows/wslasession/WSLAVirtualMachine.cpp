@@ -9,7 +9,6 @@ Module Name:
 Abstract:
 
     Client-side class for WSLA virtual machine operations.
-     VMPortMapping::Reset
     The VM is created via IWSLAVirtualMachine (running in the SYSTEM service).
     This class connects to the existing VM for unprivileged operations
     and delegates privileged operations back to IWSLAVirtualMachine.

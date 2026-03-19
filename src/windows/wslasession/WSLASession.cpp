@@ -1302,7 +1302,11 @@ try
     // - container logs relays
     m_ioRelay.Stop();
 
-    m_allocatedPorts.clear();
+    {
+        std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
+        m_allocatedPorts.clear();
+    }
+
     m_eventTracker.reset();
     m_dockerClient.reset();
 
@@ -1443,7 +1447,7 @@ try
     it->second.second--;
 
     // If usage count drops to 0, release the port allocation.
-    if (it->second.first == 0)
+    if (it->second.second == 0)
     {
         m_allocatedPorts.erase(it);
     }
