@@ -156,6 +156,8 @@ int Initialize(const char* Hostname);
 
 void InjectEntropy(gsl::span<gsl::byte> EntropyBuffer);
 
+void IsolateCgroupNamespace(const char* DistributionName);
+
 void LaunchInit(
     int SocketFd,
     const char* Target,
@@ -1676,6 +1678,127 @@ Return Value:
     return;
 }
 
+void IsolateCgroupNamespace(const char* DistributionName)
+
+/*++
+
+Routine Description:
+
+    Isolate the cgroup hierarchy for a distro by creating a per-distro cgroup,
+    moving the current process into it, and unsharing the cgroup namespace.
+
+    This prevents user@<UID>.service conflicts when multiple distros share the
+    same UID (e.g. podman machine + user distro both having UID 1000). Without
+    isolation, all distros share the global cgroup tree and systemd in a second
+    distro fails with "Failed to attach to cgroup: Device or resource busy".
+
+    This is only applicable to cgroup v2. On cgroup v1 or when the distribution
+    name is not available, this function is a no-op.
+
+Arguments:
+
+    DistributionName - Supplies the name of the distribution used to create a
+        unique cgroup path. May be nullptr.
+
+Return Value:
+
+    None. Failures are logged but do not prevent the distro from starting.
+
+--*/
+
+{
+    if (!DistributionName || *DistributionName == '\0')
+    {
+        return;
+    }
+
+    //
+    // Only isolate on cgroup v2. The cgroup.controllers file is specific to cgroup v2;
+    // its absence indicates either cgroup v1 or a missing cgroup filesystem.
+    //
+
+    if (access("/sys/fs/cgroup/cgroup.controllers", F_OK) != 0)
+    {
+        return;
+    }
+
+    auto cgroupPath = std::format("/sys/fs/cgroup/wsl/{}", DistributionName);
+    if (UtilMkdir("/sys/fs/cgroup/wsl", 0755) < 0 && errno != EEXIST)
+    {
+        LOG_WARNING("Failed to create /sys/fs/cgroup/wsl: {}", errno);
+        return;
+    }
+
+    if (UtilMkdir(cgroupPath.c_str(), 0755) < 0 && errno != EEXIST)
+    {
+        LOG_WARNING("Failed to create {}: {}", cgroupPath, errno);
+        return;
+    }
+
+    // Helper to write a string to a cgroup control file.
+    auto writeCgroupFile = [](const char* path, const std::string& value) -> bool {
+        wil::unique_fd fd{open(path, O_WRONLY | O_TRUNC)};
+        if (!fd)
+        {
+            return false;
+        }
+
+        return write(fd.get(), value.c_str(), value.size()) >= 0;
+    };
+
+    //
+    // Enable controllers in the intermediate cgroups so systemd can manage resources.
+    // Read available controllers and convert "cpu io memory pids" to "+cpu +io +memory +pids".
+    //
+
+    try
+    {
+        auto available = UtilReadFileContent("/sys/fs/cgroup/cgroup.controllers");
+        std::string delegation;
+        std::string_view view(available);
+        while (!view.empty())
+        {
+            auto token = UtilStringNextToken(view, " \n");
+            if (!token.empty())
+            {
+                if (!delegation.empty())
+                {
+                    delegation += ' ';
+                }
+
+                delegation += '+';
+                delegation += token;
+            }
+        }
+
+        if (!delegation.empty())
+        {
+            writeCgroupFile("/sys/fs/cgroup/cgroup.subtree_control", delegation);
+            writeCgroupFile("/sys/fs/cgroup/wsl/cgroup.subtree_control", delegation);
+        }
+    }
+    CATCH_LOG()
+
+    //
+    // Move current process into the per-distro cgroup and create a new cgroup namespace.
+    // After unshare, the per-distro cgroup becomes the root of the new namespace, so
+    // systemd will create user.slice/user-1000.slice/... under it without conflicting
+    // with other distros.
+    //
+
+    auto procsPath = std::format("{}/cgroup.procs", cgroupPath);
+    if (!writeCgroupFile(procsPath.c_str(), std::to_string(getpid())))
+    {
+        LOG_WARNING("Failed to move process to cgroup {}", cgroupPath);
+        return;
+    }
+
+    if (unshare(CLONE_NEWCGROUP) < 0)
+    {
+        LOG_WARNING("unshare(CLONE_NEWCGROUP) failed: {}", errno);
+    }
+}
+
 void LaunchInit(
     int SocketFd,
     const char* Target,
@@ -1892,6 +2015,14 @@ try
 
         THROW_LAST_ERROR_IF(mount(nullptr, Target, nullptr, MS_REMOUNT | MS_RDONLY, nullptr) < 0);
     }
+
+    //
+    // Isolate the cgroup hierarchy for this distro so that each distro's systemd
+    // operates in its own cgroup namespace. This must be done before chroot since
+    // /sys/fs/cgroup is not available after the root is changed.
+    //
+
+    IsolateCgroupNamespace(DistributionName);
 
     //
     // Change the root of the calling process to the distro mountpoint.
