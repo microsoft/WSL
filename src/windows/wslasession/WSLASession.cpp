@@ -1383,8 +1383,6 @@ try
     std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
 
     // Look for an existing allocation first.
-    std::shared_ptr<VmPortAllocation> vmPort;
-
     auto it = m_allocatedPorts.find(LinuxPort);
 
     bool inserted = false;
@@ -1407,7 +1405,7 @@ try
     }
 
     auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
-    mapping.AssignVmPort(vmPort);
+    mapping.AssignVmPort(it->second.first);
 
     m_virtualMachine->MapPort(mapping);
 
