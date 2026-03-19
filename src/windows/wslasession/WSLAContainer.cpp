@@ -1358,6 +1358,12 @@ HRESULT WSLAContainer::GetState(WSLAContainerState* Result)
 {
     COMServiceExecutionContext context;
 
+    if (m_cachedState.has_value())
+    {
+        *Result = m_cachedState.value();
+        return S_OK;
+    }
+
     *Result = WslaContainerStateInvalid;
     return CallImpl(&WSLAContainerImpl::GetState, Result);
 }
@@ -1367,6 +1373,12 @@ HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
     COMServiceExecutionContext context;
 
     *Process = nullptr;
+
+    if (m_cachedInitProcess)
+    {
+        return m_cachedInitProcess.CopyTo(Process);
+    }
+
     return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
 }
 
@@ -1418,6 +1430,23 @@ try
 }
 CATCH_RETURN();
 
+void WSLAContainer::OnDisconnectLockHeld(WSLAContainerImpl* impl) noexcept
+try
+{
+    m_cachedId = impl->m_id;
+    m_cachedName = impl->m_name;
+    m_cachedState = impl->m_state;
+
+    {
+        std::lock_guard processesLock{impl->m_processesLock};
+        if (impl->m_initProcess)
+        {
+            impl->m_initProcess.CopyTo(m_cachedInitProcess.GetAddressOf());
+        }
+    }
+}
+CATCH_LOG();
+
 HRESULT WSLAContainer::Export(ULONG OutHandle)
 {
     COMServiceExecutionContext context;
@@ -1441,6 +1470,12 @@ try
 {
     COMServiceExecutionContext context;
 
+    if (m_cachedId.has_value())
+    {
+        WI_VERIFY(strcpy_s(Id, std::size<char>(WSLAContainerId{}), m_cachedId->c_str()) == 0);
+        return S_OK;
+    }
+
     auto [lock, impl] = LockImpl();
     WI_VERIFY(strcpy_s(Id, std::size<char>(WSLAContainerId{}), impl->ID().c_str()) == 0);
 
@@ -1454,6 +1489,12 @@ try
     COMServiceExecutionContext context;
 
     *Name = nullptr;
+
+    if (m_cachedName.has_value())
+    {
+        *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
+        return S_OK;
+    }
 
     auto [lock, impl] = LockImpl();
 

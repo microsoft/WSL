@@ -110,12 +110,17 @@ public:
         DockerHTTPClient& DockerClient,
         IORelay& Relay);
 
+    // WSLAContainer needs direct access to impl fields in OnDisconnectLockHeld() to cache
+    // read-only properties without re-acquiring m_lock (which would deadlock).
+    friend class WSLAContainer;
+
 private:
     __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld(WSLADeleteFlags Flags);
 
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
+    __requires_lock_not_held(m_lock) void DisconnectComWrapper();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
@@ -171,7 +176,18 @@ public:
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
+protected:
+    void OnDisconnectLockHeld(WSLAContainerImpl* impl) noexcept override;
+
 private:
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;
+
+    // Cached read-only properties populated by OnDisconnectLockHeld() so they remain
+    // accessible after the impl is disconnected.
+    std::optional<std::string> m_cachedId;
+    std::optional<std::string> m_cachedName;
+    std::optional<WSLAContainerState> m_cachedState;
+    Microsoft::WRL::ComPtr<IWSLAProcess> m_cachedInitProcess;
 };
+
 } // namespace wsl::windows::service::wsla

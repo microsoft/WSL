@@ -39,7 +39,21 @@ public:
         });
 
         WI_ASSERT(m_impl != nullptr);
+
+        // Allow subclasses to perform any necessary actions while the impl is still connected,
+        // such as caching properties that will be needed after disconnect.
+        OnDisconnectLockHeld(m_impl);
+
         m_impl = nullptr;
+    }
+
+protected:
+
+    // Called from Disconnect() while holding the internal lock, after all in-flight callers have drained
+    // but before m_impl is nulled. Subclasses can override this to perform any necessary actions while the 
+    // impl is still connected, such as caching properties that will be needed after disconnect.
+    virtual void OnDisconnectLockHeld(TImpl* /*impl*/) noexcept
+    {
     }
 
 protected:
