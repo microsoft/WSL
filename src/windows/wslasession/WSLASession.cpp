@@ -389,19 +389,21 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::BuildImage(LPCWSTR ContextPath, ULONG DockerfileHandle, LPCSTR ImageTag, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::BuildImage(const WSLABuildImageOptions* Options, IProgressCallback* ProgressCallback)
 try
 {
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF_NULL(E_POINTER, ContextPath);
-    RETURN_HR_IF(E_INVALIDARG, *ContextPath == L'\0');
-    RETURN_HR_IF(E_INVALIDARG, ImageTag != nullptr && strlen(ImageTag) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->ContextPath);
+    RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
+    RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
     wil::unique_handle dockerfileFileHandle;
-    if (DockerfileHandle != 0 && DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
+    if (Options->DockerfileHandle != 0 && Options->DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
     {
-        dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(DockerfileHandle)));
+        dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Options->DockerfileHandle)));
     }
 
     auto lock = m_lock.lock_shared();
@@ -411,15 +413,24 @@ try
     GUID volumeId{};
     THROW_IF_FAILED(CoCreateGuid(&volumeId));
     auto mountPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
-    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(ContextPath, mountPath.c_str(), TRUE));
+    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(Options->ContextPath, mountPath.c_str(), TRUE));
     auto unmountFolder =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
-    if (ImageTag != nullptr && *ImageTag != '\0')
+    for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->Tags.Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, strlen(Options->Tags.Values[i]) > WSLA_MAX_IMAGE_NAME_LENGTH);
         buildArgs.push_back("-t");
-        buildArgs.push_back(ImageTag);
+        buildArgs.push_back(Options->Tags.Values[i]);
+    }
+    for (ULONG i = 0; i < Options->BuildArgs.Count; i++)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->BuildArgs.Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Values[i][0] == '-');
+        buildArgs.push_back("--build-arg");
+        buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
     if (dockerfileFileHandle)
     {
@@ -442,10 +453,12 @@ try
             common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLAFDStdin)}));
     }
 
+    bool verbose = Options->Verbose;
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
     std::set<std::string> reportedErrors;
+    std::string exportingVertexDigest;
 
     auto reportProgress = [&](const std::string& message) {
         if (ProgressCallback != nullptr)
@@ -486,9 +499,16 @@ try
             {
                 allOutput.append(vertex.name).append("\n");
 
-                if (!isInternal && !vertex.name.empty() && vertex.name[0] == '[')
+                if (verbose || (!isInternal && !vertex.name.empty() && vertex.name[0] == '['))
                 {
                     reportProgress(vertex.name + "\n");
+                }
+
+                // Track the "exporting to image" vertex so we can report its statuses (image hash, tags)
+                // in non-verbose mode. This is a well-known BuildKit vertex name.
+                if (vertex.name == "exporting to image")
+                {
+                    exportingVertexDigest = vertex.digest;
                 }
             }
 
@@ -496,6 +516,14 @@ try
             {
                 allOutput.append(vertex.error).append("\n");
                 reportProgress(vertex.error + "\n");
+            }
+        }
+
+        for (const auto& entry : status.statuses)
+        {
+            if (!entry.id.empty() && reportedSteps.insert(entry.id).second && (verbose || entry.vertex == exportingVertexDigest))
+            {
+                reportProgress(entry.id + "\n");
             }
         }
     };
@@ -514,9 +542,6 @@ try
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
-
-    std::string tag = (ImageTag != nullptr && *ImageTag != '\0') ? ImageTag : "";
-    reportProgress(tag.empty() ? "\nBuild complete.\n" : "\nBuild complete: " + tag + "\n");
 
     return S_OK;
 }

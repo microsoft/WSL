@@ -6538,5 +6538,74 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(err, L"");
     }
 
+    TEST_METHOD(BytesToHex)
+    {
+        using wsl::windows::common::string::BytesToHex;
+
+        VERIFY_ARE_EQUAL(BytesToHex({}), L"0x");
+        VERIFY_ARE_EQUAL(BytesToHex({0x0F}), L"0x0f");
+        VERIFY_ARE_EQUAL(BytesToHex({0xDE, 0xAD, 0xBE, 0xEF}), L"0xdeadbeef");
+        VERIFY_ARE_EQUAL(BytesToHex({0x00, 0x00}), L"0x0000");
+        VERIFY_ARE_EQUAL(BytesToHex({0xFF, 0xFF}), L"0xffff");
+    }
+
+    TEST_METHOD(HexToBytes)
+    {
+        using wsl::windows::common::string::BytesToHex;
+        using wsl::windows::common::string::HexToBytes;
+        using ByteVec = std::vector<BYTE>;
+
+        // Wide string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes("0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Wide string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes("deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Empty string
+        VERIFY_ARE_EQUAL(HexToBytes(L""), (ByteVec{}));
+
+        // Single byte
+        VERIFY_ARE_EQUAL(HexToBytes(L"0x0f"), (ByteVec{0x0F}));
+
+        // Uppercase hex digits
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xDEADBEEF"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Round-trip: BytesToHex -> HexToBytes
+        const ByteVec original = {0x01, 0x23, 0xAB};
+        VERIFY_ARE_EQUAL(HexToBytes(BytesToHex(original)), original);
+
+        // Odd-length string (after stripping "0x") throws E_INVALIDARG
+        bool threw = false;
+        try
+        {
+            HexToBytes(L"0xabc");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
+
+        // Invalid hex character throws E_INVALIDARG
+        threw = false;
+        try
+        {
+            HexToBytes(L"0xZZ");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests

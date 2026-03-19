@@ -462,6 +462,15 @@ typedef struct _WSLADeleteImageOptions
     // TODO: Platforms: a json array of OCI platform strings.
 } WSLADeleteImageOptions;
 
+typedef struct _WSLABuildImageOptions
+{
+    LPCWSTR ContextPath;
+    ULONG DockerfileHandle;
+    WSLAStringArray Tags;
+    WSLAStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
+    BOOL Verbose; // Show all build progress including internal steps and all statuses.
+} WSLABuildImageOptions;
+
 typedef struct _WSLATagImageOptions
 {
     LPCSTR Image; // Source image name or ID.
@@ -522,7 +531,7 @@ interface IWSLASession : IUnknown
 
     // Image management.
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const  WslaRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT BuildImage([in] LPCWSTR ContextPath, [in] ULONG DockerfileHandle, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT BuildImage([in] const WSLABuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);

@@ -125,8 +125,6 @@ void WSLAVirtualMachine::ConfigureInitialMounts()
     const auto rootDevice = GetVhdDevicePath(0);
     const auto modulesDevice = GetVhdDevicePath(1);
 
-    WI_ASSERT(rootDevice == "/dev/sda" && modulesDevice == "/dev/sdb");
-
     // Mount root filesystem with overlay
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);
 
