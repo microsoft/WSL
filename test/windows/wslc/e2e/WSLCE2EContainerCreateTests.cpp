@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include <fstream>
 
 namespace WSLCE2ETests {
 
@@ -45,7 +46,16 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD_SETUP(TestMethodSetup)
     {
+        EnvTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
+        EnvTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
         EnsureContainerDoesNotExist(WslcContainerName);
+        return true;
+    }
+
+    TEST_METHOD_CLEANUP(TestMethodCleanup)
+    {
+        DeleteFileW(EnvTestFile1.c_str());
+        DeleteFileW(EnvTestFile2.c_str());
         return true;
     }
 
@@ -267,13 +277,99 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(foundEnv);
     }
 
+    TEST_METHOD(WSLCE2E_Container_Run_EnvFile)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        WriteEnvFile(EnvTestFile1, {
+            "WSLC_TEST_ENV_FILE_A=env-file-a",
+            "WSLC_TEST_ENV_FILE_B=env-file-b"
+        });
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} --env-file {} {} env",
+            WslcContainerName,
+            EscapePath(EnvTestFile1.wstring()),
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        bool foundFirstEnv = false;
+        bool foundSecondEnv = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line == L"WSLC_TEST_ENV_FILE_A=env-file-a")
+            {
+                foundFirstEnv = true;
+            }
+            else if (line == L"WSLC_TEST_ENV_FILE_B=env-file-b")
+            {
+                foundSecondEnv = true;
+            }
+        }
+
+        VERIFY_IS_TRUE(foundFirstEnv);
+        VERIFY_IS_TRUE(foundSecondEnv);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MixedWithEnvFile)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        WriteEnvFile(EnvTestFile1,
+        {
+            "WSLC_TEST_ENV_MIX_FILE_A=from-file-a",
+            "WSLC_TEST_ENV_MIX_FILE_B=from-file-b"
+        });
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} -e WSLC_TEST_ENV_MIX_CLI=from-cli --env-file {} {} env",
+            WslcContainerName,
+            EscapePath(EnvTestFile1.wstring()),
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        bool foundFileA = false;
+        bool foundFileB = false;
+        bool foundCli = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line == L"WSLC_TEST_ENV_MIX_FILE_A=from-file-a")
+            {
+                foundFileA = true;
+            }
+            else if (line == L"WSLC_TEST_ENV_MIX_FILE_B=from-file-b")
+            {
+                foundFileB = true;
+            }
+            else if (line == L"WSLC_TEST_ENV_MIX_CLI=from-cli")
+            {
+                foundCli = true;
+            }
+        }
+
+        VERIFY_IS_TRUE(foundFileA);
+        VERIFY_IS_TRUE(foundFileB);
+        VERIFY_IS_TRUE(foundCli);
+    }
+
 private:
+    // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
+
+    // Test environment variables
     const std::wstring HostEnvVariableName = L"WSLC_TEST_HOST_ENV";
     const std::wstring HostEnvVariableName2 = L"WSLC_TEST_HOST_ENV2";
     const std::wstring HostEnvVariableValue = L"wslc-host-env-value";
     const std::wstring HostEnvVariableValue2 = L"wslc-host-env-value2";
     const std::wstring MissingHostEnvVariableName = L"WSLC_TEST_MISSING_HOST_ENV";
+
+    // Test environment variable files
+    std::filesystem::path EnvTestFile1;
+    std::filesystem::path EnvTestFile2;
+
+    // Test images
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
@@ -336,5 +432,16 @@ private:
                 << L"  -h,--help         Shows help about the selected command\r\n\r\n";
         return options.str();
     }
+
+    void WriteEnvFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines) const
+    {
+        std::ofstream envFile(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+        VERIFY_IS_TRUE(envFile.is_open());
+        for (const auto& line : envVariableLines)
+        {
+            envFile << line << "\n";
+        }
+        VERIFY_IS_TRUE(envFile.good());
+    };
 };
 } // namespace WSLCE2ETests
