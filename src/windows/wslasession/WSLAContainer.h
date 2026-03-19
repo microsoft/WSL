@@ -109,7 +109,7 @@ public:
 private:
     __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld(WSLADeleteFlags Flags);
 
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode);
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
     void WaitForContainerEvent();
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();

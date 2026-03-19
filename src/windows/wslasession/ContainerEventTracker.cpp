@@ -147,11 +147,14 @@ void ContainerEventTracker::OnEvent(const std::string_view& event)
 
     std::lock_guard lock{m_lock};
 
+    auto timeEntry = parsed.find("time");
+    std::uint64_t eventTime = timeEntry != parsed.end() ? timeEntry->get<std::uint64_t>() : static_cast<std::uint64_t>(std::time(nullptr));
+
     for (const auto& e : m_callbacks)
     {
         if (e.ContainerId == containerId && (!e.ExecId.has_value() || e.ExecId == execId))
         {
-            e.Callback(it->second, exitCode);
+            e.Callback(it->second, exitCode, eventTime);
         }
     }
 }

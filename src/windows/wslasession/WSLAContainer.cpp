@@ -367,7 +367,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_eventTracker(EventTracker),
     m_ioRelay(Relay),
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2))),
+        m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))),
     m_state(InitialState),
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags)
@@ -570,7 +570,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys)
     cleanup.release();
 }
 
-void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode)
+void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime)
 {
     if (event == ContainerEvent::Stop)
     {
@@ -597,7 +597,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         // This can happen if Delete() is called by the user.
         if (previousState == WslaContainerStateRunning)
         {
-            Transition(WslaContainerStateExited, GetDockerFinishedAt());
+            Transition(WslaContainerStateExited, eventTime);
 
             ReleaseRuntimeResources();
 
