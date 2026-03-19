@@ -57,6 +57,7 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
+        WSLAContainerNetworkType NetworkMode,
         std::vector<WSLAVolumeMount>&& volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,

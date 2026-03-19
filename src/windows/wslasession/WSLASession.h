@@ -120,7 +120,8 @@ private:
     std::atomic<bool> m_terminated{false};
 
     // Used for testing only.
-    std::map<uint16_t, std::shared_ptr<VmPortAllocation>> m_allocatedPorts;
+    std::mutex m_allocatedPortsLock;
+    __guarded_by(m_allocatedPortsLock) std::map<uint16_t, std::pair<std::shared_ptr<VmPortAllocation>, size_t>> m_allocatedPorts;
 };
 
 } // namespace wsl::windows::service::wsla

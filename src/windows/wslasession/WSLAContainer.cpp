@@ -285,6 +285,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Id,
     std::string&& Name,
     std::string&& Image,
+    WSLAContainerNetworkType NetworkMode,
     std::vector<WSLAVolumeMount>&& volumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
@@ -299,6 +300,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_virtualMachine(virtualMachine),
     m_name(std::move(Name)),
     m_image(std::move(Image)),
+    m_networkingMode(NetworkMode),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
@@ -1049,7 +1051,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         auto& portEntry = request.HostConfig.PortBindings[portKey];
 
-        // In bridge mode, VmPort is empty until the container starts.
+        // In host mode, VmPort is empty until the container starts.
         // In that networking mode, the host port always matches the vm port.
         auto hostPort = e.VmMapping.VmPort ? e.VmMapping.VmPort->Port() : e.VmMapping.HostPort();
 
@@ -1085,7 +1087,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
     request.Labels.insert(labels.begin(), labels.end());
 
-    WSL_LOG("Create", TraceLoggingValue(wsl::shared::ToJson(request).c_str(), "json"));
     // Send the request to docker.
     auto result =
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
@@ -1103,6 +1104,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(result.Id),
         std::move(containerOptions.Name == nullptr ? CleanContainerName(inspectData.Name) : std::string(containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
+        containerOptions.ContainerNetwork.ContainerNetworkType,
         std::move(volumes),
         std::move(ports),
         std::move(labels),
@@ -1143,13 +1145,14 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     labels.erase(metadataIt);
 
+    auto networkingMode = DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode); 
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
     std::vector<ContainerPortMapping> ports;
     for (const auto& e : metadata.Ports)
     {
         auto& inserted = ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-        if (DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode) == WSLAContainerNetworkTypeBridged)
+        if (networkingMode == WSLAContainerNetworkTypeBridged)
         {
             auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
@@ -1157,7 +1160,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
                 !allocation,
                 "Port %hu is in use, cannot open container %hs",
-                inserted.ContainerPort,
+                e.VmPort,
                 dockerContainer.Id.c_str());
 
             inserted.VmMapping.AssignVmPort(allocation);
@@ -1170,6 +1173,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::string(dockerContainer.Id),
         std::move(name),
         std::string(dockerContainer.Image),
+        networkingMode,
         std::move(metadata.Volumes),
         std::move(ports),
         std::move(labels),
@@ -1346,12 +1350,16 @@ void WSLAContainerImpl::UnmapPorts()
     {
         try
         {
+            e.VmMapping.Unmap();
+        }
+        CATCH_LOG();
+
+        try
+        {
             if (m_networkingMode == WSLAContainerNetworkTypeHost)
             {
                 e.VmMapping.VmPort.reset();
             }
-
-            e.VmMapping.Unmap();
         }
         CATCH_LOG();
     }

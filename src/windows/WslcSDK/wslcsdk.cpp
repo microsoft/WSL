@@ -491,9 +491,8 @@ try
             convertedPort.Family = AF_INET;
 
             // TODO: Consider using standard protocol numbers instead of our own enum.
-            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP; 
+            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
             convertedPort.BindingAddress = "127.0.0.1";
-
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);

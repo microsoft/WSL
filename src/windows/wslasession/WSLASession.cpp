@@ -1380,30 +1380,42 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
+    std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
+
     // Look for an existing allocation first.
     std::shared_ptr<VmPortAllocation> vmPort;
 
     auto it = m_allocatedPorts.find(LinuxPort);
+
+    bool inserted = false;
+    auto cleanup = wil::scope_exit([&]() {
+        if (inserted)
+        {
+
+            m_allocatedPorts.erase(it);
+        }
+    });
+
     if (it == m_allocatedPorts.end())
     {
         // No existing port allocation, create a new one.
-        auto allocated = m_virtualMachine->TryAllocatePort(LinuxPort, Family, IPPROTO_TCP);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated == nullptr);
+        auto allocated = std::make_pair(m_virtualMachine->TryAllocatePort(LinuxPort, Family, IPPROTO_TCP), static_cast<size_t>(0));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.first == nullptr);
 
-        vmPort = allocated;
-    }
-    else
-    {
-        vmPort = it->second;
+        m_allocatedPorts.emplace(LinuxPort, allocated);
+        inserted = true;
     }
 
     auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
     mapping.AssignVmPort(vmPort);
 
     m_virtualMachine->MapPort(mapping);
-    m_allocatedPorts.emplace(LinuxPort, vmPort);
+
+    // Increase usage count.
+    it->second.second++;
 
     mapping.Release();
+    cleanup.release();
 
     return S_OK;
 }
@@ -1417,16 +1429,27 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    auto existing = m_allocatedPorts.find(LinuxPort);
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), existing == m_allocatedPorts.end());
+    std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
+
+    auto it = m_allocatedPorts.find(LinuxPort);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_allocatedPorts.end());
 
     auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
-    mapping.AssignVmPort(existing->second);
+    mapping.AssignVmPort(it->second.first);
     mapping.Attach(m_virtualMachine.value());
 
     auto cleanup = wil::scope_exit([&]() { mapping.Release(); });
 
     m_virtualMachine->UnmapPort(mapping);
+
+    it->second.second--;
+
+    // If usage count drops to 0, release the port allocation.
+    if (it->second.first == 0)
+    {
+        m_allocatedPorts.erase(it);
+    }
+
 
     return S_OK;
 }

@@ -3827,7 +3827,7 @@ class WSLATests
                 WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
                 launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "invalid-ip");
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(E_INVALIDARG));
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, E_INVALIDARG);
                 ValidateCOMErrorMessage(L"Invalid IP address 'invalid-ip'");
             }
 
@@ -3836,7 +3836,7 @@ class WSLATests
                 WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
                 launcher.AddPort(1234, 8000, AF_INET, 1);
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(E_INVALIDARG));
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, E_INVALIDARG);
             }
 
             // Invalid address family
@@ -3844,7 +3844,7 @@ class WSLATests
                 WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
                 launcher.AddPort(1234, 8000, 1);
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(E_INVALIDARG));
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, E_INVALIDARG);
             }
 
             // TODO: Update once UDP is supported.
@@ -3852,7 +3852,7 @@ class WSLATests
                 WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
                 launcher.AddPort(1234, 8000, AF_INET, IPPROTO_UDP);
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)));
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
             }
 
             // TODO: Update once custom binding addresses are supported.
@@ -3860,7 +3860,7 @@ class WSLATests
                 WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
                 launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)));
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
             }
         }
     }
