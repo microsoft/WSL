@@ -156,17 +156,7 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
-        bool foundEnv = false;
-        for (const auto& line : outputLines)
-        {
-            if (line == std::format(L"{}=A", HostEnvVariableName))
-            {
-                foundEnv = true;
-                break;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundEnv);
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=A", HostEnvVariableName)));
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MultipleValues)
@@ -182,22 +172,9 @@ class WSLCE2EContainerCreateTests
             DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        bool foundFirstEnv = false;
-        bool foundSecondEnv = false;
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line == std::format(L"{}=A", HostEnvVariableName))
-            {
-                foundFirstEnv = true;
-            }
-            else if (line == std::format(L"{}=B", HostEnvVariableName2))
-            {
-                foundSecondEnv = true;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundFirstEnv);
-        VERIFY_IS_TRUE(foundSecondEnv);
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=A", HostEnvVariableName)));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=B", HostEnvVariableName2)));
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_UsesHostValue)
@@ -209,18 +186,8 @@ class WSLCE2EContainerCreateTests
             L"container run --rm --name {} -e {} {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        const auto expectedLine = std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue);
-        bool foundEnv = false;
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line == expectedLine)
-            {
-                foundEnv = true;
-                break;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundEnv);
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_MultipleValues_UsesHostValues)
@@ -236,22 +203,9 @@ class WSLCE2EContainerCreateTests
             DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        bool foundFirstEnv = false;
-        bool foundSecondEnv = false;
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line == std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue))
-            {
-                foundFirstEnv = true;
-            }
-            else if (line == std::format(L"{}={}", HostEnvVariableName2, HostEnvVariableValue2))
-            {
-                foundSecondEnv = true;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundFirstEnv);
-        VERIFY_IS_TRUE(foundSecondEnv);
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName2, HostEnvVariableValue2)));
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvOption_EmptyValue)
@@ -263,18 +217,8 @@ class WSLCE2EContainerCreateTests
             L"container run --rm --name {} -e {}= {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        const auto expectedLine = std::format(L"{}=", HostEnvVariableName);
-        bool foundEnv = false;
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line == expectedLine)
-            {
-                foundEnv = true;
-                break;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundEnv);
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=", HostEnvVariableName)));
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvFile)
@@ -294,22 +238,9 @@ class WSLCE2EContainerCreateTests
             DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        bool foundFirstEnv = false;
-        bool foundSecondEnv = false;
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line == L"WSLC_TEST_ENV_FILE_A=env-file-a")
-            {
-                foundFirstEnv = true;
-            }
-            else if (line == L"WSLC_TEST_ENV_FILE_B=env-file-b")
-            {
-                foundSecondEnv = true;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundFirstEnv);
-        VERIFY_IS_TRUE(foundSecondEnv);
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_A=env-file-a"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_B=env-file-b"));
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MixedWithEnvFile)
@@ -330,31 +261,26 @@ class WSLCE2EContainerCreateTests
             DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        bool foundFileA = false;
-        bool foundFileB = false;
-        bool foundCli = false;
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line == L"WSLC_TEST_ENV_MIX_FILE_A=from-file-a")
-            {
-                foundFileA = true;
-            }
-            else if (line == L"WSLC_TEST_ENV_MIX_FILE_B=from-file-b")
-            {
-                foundFileB = true;
-            }
-            else if (line == L"WSLC_TEST_ENV_MIX_CLI=from-cli")
-            {
-                foundCli = true;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundFileA);
-        VERIFY_IS_TRUE(foundFileB);
-        VERIFY_IS_TRUE(foundCli);
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_MIX_FILE_A=from-file-a"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_MIX_FILE_B=from-file-b"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_MIX_CLI=from-cli"));
     }
 
 private:
+    bool ContainsOutputLine(const std::vector<std::wstring>& outputLines, const std::wstring& expectedLine) const
+    {
+        for (const auto& line : outputLines)
+        {
+            if (line == expectedLine)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
 
