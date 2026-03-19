@@ -1713,6 +1713,17 @@ Return Value:
     }
 
     //
+    // Reject distribution names containing path separators or traversal sequences
+    // to prevent creating cgroup directories outside the intended hierarchy.
+    //
+
+    if (strchr(DistributionName, '/') || strstr(DistributionName, ".."))
+    {
+        LOG_WARNING("Invalid distribution name for cgroup isolation: {}", DistributionName);
+        return;
+    }
+
+    //
     // Only isolate on cgroup v2. The cgroup.controllers file is specific to cgroup v2;
     // its absence indicates either cgroup v1 or a missing cgroup filesystem.
     //
@@ -1737,13 +1748,13 @@ Return Value:
 
     // Helper to write a string to a cgroup control file.
     auto writeCgroupFile = [](const char* path, const std::string& value) -> bool {
-        wil::unique_fd fd{open(path, O_WRONLY | O_TRUNC)};
+        wil::unique_fd fd{TEMP_FAILURE_RETRY(open(path, O_WRONLY | O_CLOEXEC))};
         if (!fd)
         {
             return false;
         }
 
-        return write(fd.get(), value.c_str(), value.size()) >= 0;
+        return TEMP_FAILURE_RETRY(write(fd.get(), value.c_str(), value.size())) >= 0;
     };
 
     //
@@ -1773,8 +1784,15 @@ Return Value:
 
         if (!delegation.empty())
         {
-            writeCgroupFile("/sys/fs/cgroup/cgroup.subtree_control", delegation);
-            writeCgroupFile("/sys/fs/cgroup/wsl/cgroup.subtree_control", delegation);
+            if (!writeCgroupFile("/sys/fs/cgroup/cgroup.subtree_control", delegation))
+            {
+                LOG_WARNING("Failed to enable controllers on /sys/fs/cgroup/cgroup.subtree_control: {}", errno);
+            }
+
+            if (!writeCgroupFile("/sys/fs/cgroup/wsl/cgroup.subtree_control", delegation))
+            {
+                LOG_WARNING("Failed to enable controllers on /sys/fs/cgroup/wsl/cgroup.subtree_control: {}", errno);
+            }
         }
     }
     CATCH_LOG()
@@ -1787,9 +1805,9 @@ Return Value:
     //
 
     auto procsPath = std::format("{}/cgroup.procs", cgroupPath);
-    if (!writeCgroupFile(procsPath.c_str(), std::to_string(getpid())))
+    if (!writeCgroupFile(procsPath.c_str(), std::to_string(getpid()) + "\n"))
     {
-        LOG_WARNING("Failed to move process to cgroup {}", cgroupPath);
+        LOG_WARNING("Failed to move process to cgroup {}: {}", cgroupPath, errno);
         return;
     }
 
