@@ -547,6 +547,29 @@ class WslcSdkTests
         }
     }
 
+    TEST_METHOD(ImportImageNonTar)
+    {
+        WSL2_TEST_ONLY();
+
+        // Negative: attempt to load a non-tar file.
+        {
+            std::filesystem::path pathToSelf = wil::QueryFullProcessImageNameW<std::wstring>(GetCurrentProcess());
+            wil::unique_handle selfFileHandle{
+                CreateFileW(pathToSelf.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == selfFileHandle.get());
+
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(selfFileHandle.get(), &fileSize));
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(
+                WslcImportSessionImage(m_defaultSession, "import-self:test", selfFileHandle.get(), static_cast<uint64_t>(fileSize.QuadPart), nullptr, &errorMsg),
+                E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
+            LogInfo("Import error: %ws", errorMsg.get());
+        }
+    }
+
     TEST_METHOD(ImageDelete)
     {
         WSL2_TEST_ONLY();

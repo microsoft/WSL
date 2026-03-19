@@ -227,7 +227,7 @@ bool CopyProcessSettingsToRuntime(WSLAProcessOptions& runtimeOptions, const Wslc
 // Normalizes file inputs to HANDLE+length.
 struct ImageFileResolver
 {
-    ImageFileResolver(PCWSTR path)
+    ImageFileResolver(PCWSTR path) : m_fileHandle(INVALID_HANDLE_VALUE)
     {
         THROW_HR_IF_NULL(E_POINTER, path);
 
@@ -239,22 +239,20 @@ struct ImageFileResolver
         THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(imageFileHandle.get(), &fileSize));
 
         m_fileHandle = std::move(imageFileHandle);
-        m_rawHandle = m_fileHandle.get();
         m_length = static_cast<ULONGLONG>(fileSize.QuadPart);
     }
 
-    ImageFileResolver(HANDLE imageContent, uint64_t imageContentLength)
+    ImageFileResolver(HANDLE imageContent, uint64_t imageContentLength) : m_fileHandle(imageContent)
     {
         THROW_HR_IF(E_INVALIDARG, imageContent == nullptr || imageContent == INVALID_HANDLE_VALUE);
         THROW_HR_IF(E_INVALIDARG, imageContentLength == 0);
 
-        m_rawHandle = imageContent;
         m_length = imageContentLength;
     }
 
     HANDLE Handle() const
     {
-        return m_rawHandle;
+        return m_fileHandle.Get();
     }
 
     ULONGLONG Length() const
@@ -263,9 +261,8 @@ struct ImageFileResolver
     }
 
 private:
-    HANDLE m_rawHandle;
+    wsl::windows::common::relay::HandleWrapper m_fileHandle;
     ULONGLONG m_length;
-    wil::unique_handle m_fileHandle;
 };
 } // namespace
 
