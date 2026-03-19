@@ -25,12 +25,19 @@ class WSLCE2EContainerCreateTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(MissingHostEnvVariableName.c_str(), nullptr));
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
+
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(MissingHostEnvVariableName.c_str(), nullptr));
         return true;
     }
 
@@ -127,8 +134,123 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
+    TEST_METHOD(WSLCE2E_Container_Run_EnvOption)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result =
+            RunWslc(std::format(L"container run --rm --name {} -e {}=A {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        bool foundEnv = false;
+        for (const auto& line : outputLines)
+        {
+            if (line == std::format(L"{}=A", HostEnvVariableName))
+            {
+                foundEnv = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(foundEnv);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MultipleValues)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} -e {}=A -e {}=B {} env",
+            WslcContainerName,
+            HostEnvVariableName,
+            HostEnvVariableName2,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        bool foundFirstEnv = false;
+        bool foundSecondEnv = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line == std::format(L"{}=A", HostEnvVariableName))
+            {
+                foundFirstEnv = true;
+            }
+            else if (line == std::format(L"{}=B", HostEnvVariableName2))
+            {
+                foundSecondEnv = true;
+            }
+        }
+
+        VERIFY_IS_TRUE(foundFirstEnv);
+        VERIFY_IS_TRUE(foundSecondEnv);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_UsesHostValue)
+    {
+        // https://github.com/microsoft/WSL/issues/14474
+        SKIP_TEST_NOT_IMPL();
+
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} -e {} {} env",
+            WslcContainerName,
+            HostEnvVariableName,
+            DebianImage.NameAndTag()));
+        result.Dump();
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto expectedLine = std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue);
+        bool foundEnv = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line == expectedLine)
+            {
+                foundEnv = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(foundEnv);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_HostVariableMissing)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} -e {} {} env",
+            WslcContainerName,
+            MissingHostEnvVariableName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto prefix = std::format(L"{}=", MissingHostEnvVariableName);
+        bool foundEnv = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line.rfind(prefix, 0) == 0)
+            {
+                foundEnv = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_FALSE(foundEnv);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring HostEnvVariableName = L"WSLC_TEST_HOST_ENV";
+    const std::wstring HostEnvVariableName2 = L"WSLC_TEST_HOST_ENV2";
+    const std::wstring HostEnvVariableValue = L"wslc-host-env-value";
+    const std::wstring HostEnvVariableValue2 = L"wslc-host-env-value2";
+    const std::wstring MissingHostEnvVariableName = L"WSLC_TEST_MISSING_HOST_ENV";
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
 
