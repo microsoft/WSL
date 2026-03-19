@@ -304,7 +304,7 @@ For information please visit https://aka.ms/enablevirtualization</value>
   <data name="MessageTooManyDisks" xml:space="preserve">
     <value>Too many virtual hard disks or physical disks are attached.</value>
   </data>
-  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+  <data name="MessageUserVhdAlreadyAttached2" xml:space="preserve">
     <value>The virtual disk '{}' is already attached.
 Unmount it with 'wsl.exe --unmount &lt;DiskPath&gt;' before attaching again.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--unmount "}Command line arguments, file names and string inserts should not be translated</comment>
