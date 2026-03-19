@@ -714,9 +714,8 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLo
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
-    ReleaseResources();
-
     Transition(WslaContainerStateDeleted);
+    ReleaseResources();
 }
 
 void WSLAContainerImpl::Export(ULONG OutHandle) const
