@@ -139,8 +139,8 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        auto result =
-            RunWslc(std::format(L"container run --rm --name {} -e {}=A {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} -e {}=A {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -197,10 +197,7 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e {} {} env",
-            WslcContainerName,
-            HostEnvVariableName,
-            DebianImage.NameAndTag()));
+            L"container run --rm --name {} -e {} {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
         result.Dump();
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
@@ -224,10 +221,7 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e {} {} env",
-            WslcContainerName,
-            MissingHostEnvVariableName,
-            DebianImage.NameAndTag()));
+            L"container run --rm --name {} -e {} {} env", WslcContainerName, MissingHostEnvVariableName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto prefix = std::format(L"{}=", MissingHostEnvVariableName);
