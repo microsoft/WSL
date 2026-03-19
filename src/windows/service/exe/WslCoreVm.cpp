@@ -1034,7 +1034,8 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             if (found != m_attachedDisks.end())
             {
                 // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the LUN of the mounted disk.
-                THROW_HR_WITH_USER_ERROR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, Localization::MessageUserVhdAlreadyAttached2(Disk), found->first.User);
+                THROW_HR_WITH_USER_ERROR_IF(
+                    WSL_E_USER_VHD_ALREADY_ATTACHED, Localization::MessageUserVhdAlreadyAttached2(Disk), found->first.User);
 
                 return found->second.Lun;
             }
