@@ -118,7 +118,7 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void DisconnectComWrapper();
-    
+
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;

@@ -3263,7 +3263,7 @@ class WSLATests
 
             VERIFY_SUCCEEDED(container->Get().Delete(WSLADeleteFlagsNone));
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateDeleted);
-            
+
             VERIFY_ARE_EQUAL(container->Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
         }
 
