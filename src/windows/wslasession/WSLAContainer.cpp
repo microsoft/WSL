@@ -301,7 +301,6 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
 void ProcessNamedVolumes(
     const WSLAContainerOptions& containerOptions,
     const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& sessionVolumes,
-    std::unordered_set<std::string>& containerMountTargets,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
     THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
@@ -311,17 +310,11 @@ void ProcessNamedVolumes(
         const auto& nv = containerOptions.NamedVolumes[i];
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, nv.Name, "NamedVolume at index %lu has null Name", i);
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, nv.ContainerPath, "NamedVolume at index %lu has null ContainerPath", i);
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-            !containerMountTargets.insert(nv.ContainerPath).second,
-            "Duplicate container mount path '%hs'",
-            nv.ContainerPath);
 
         std::string volumeName = nv.Name;
 
-        auto volume = sessionVolumes.find(volumeName);
         THROW_HR_WITH_USER_ERROR_IF(
-            WSLA_E_VOLUME_NOT_FOUND, wsl::shared::Localization::MessageWslaVolumeNotFound(nv.Name), volume == sessionVolumes.end());
+            WSLA_E_VOLUME_NOT_FOUND, wsl::shared::Localization::MessageWslaVolumeNotFound(nv.Name), !sessionVolumes.contains(volumeName));
 
         wsl::windows::common::docker_schema::Mount mount{};
         mount.Source = std::move(volumeName);
@@ -344,7 +337,7 @@ void ValidateNamedVolumes(
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLA_E_VOLUME_NOT_FOUND,
                 wsl::shared::Localization::MessageWslaVolumeNotFound(mount.Name),
-                sessionVolumes.find(mount.Name) == sessionVolumes.end());
+                !sessionVolumes.contains(mount.Name));
         }
     }
 }
@@ -1060,7 +1053,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     // Build volume list from container options.
     std::vector<WSLAVolumeMount> volumes;
     volumes.reserve(containerOptions.VolumesCount);
-    std::unordered_set<std::string> containerMountTargets;
 
     if (containerOptions.VolumesCount > 0)
     {
@@ -1077,9 +1069,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.HostPath, "Volumes[%lu].HostPath is null", i);
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
-
-        const auto [_, inserted] = containerMountTargets.insert(volume.ContainerPath);
-        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), !inserted, "Duplicate container mount path '%hs'", volume.ContainerPath);
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 
@@ -1105,7 +1094,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         }
     }
 
-    ProcessNamedVolumes(containerOptions, sessionVolumes, containerMountTargets, request);
+    ProcessNamedVolumes(containerOptions, sessionVolumes, request);
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);

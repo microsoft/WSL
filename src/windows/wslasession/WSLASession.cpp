@@ -1297,10 +1297,7 @@ try
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
-    WSL_LOG(
-        "VolumeCreated",
-        TraceLoggingValue(name.c_str(), "VolumeName"),
-        TraceLoggingValue(std::format("/mnt/wsla-volumes/{}", name).c_str(), "VirtualMachinePath"));
+    WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"));
 
     return S_OK;
 }
@@ -1532,15 +1529,15 @@ void WSLASession::RecoverExistingVolumes()
     WI_ASSERT(m_dockerClient.has_value());
     WI_ASSERT(m_virtualMachine.has_value());
 
-    std::vector<docker_schema::Volume> volumes;
-    try
-    {
-        volumes = m_dockerClient->ListVolumes();
-    }
-    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to enumerate docker volumes");
+    auto volumes = m_dockerClient->ListVolumes();
 
     for (const auto& volume : volumes)
     {
+        if (!volume.Labels.contains(WSLAVolumeMetadataLabel))
+        {
+            continue;
+        }
+
         try
         {
             WI_ASSERT(!m_volumes.contains(volume.Name));

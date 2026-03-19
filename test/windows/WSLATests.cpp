@@ -2487,56 +2487,6 @@ class WSLATests
             ValidateProcessOutput(duplicateNamedVolumesProcess, {{1, "duplicated\n"}});
         }
 
-        // Verify duplicate named volume container mount targets are rejected.
-        {
-            WSLAContainerLauncher duplicateNamedVolumeTargets("debian:latest", "named-volume-dup-target", {"echo", "dup-target"});
-            duplicateNamedVolumeTargets.AddNamedVolume(volumeName, "/data", false);
-            duplicateNamedVolumeTargets.AddNamedVolume(volumeName, "/data", false);
-
-            auto [result, _] = duplicateNamedVolumeTargets.CreateNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
-        }
-
-        // Verify duplicate container mount targets are rejected.
-        {
-            auto testFolderA = std::filesystem::current_path() / "named-volume-dup-volume-a";
-            auto testFolderB = std::filesystem::current_path() / "named-volume-dup-volume-b";
-            std::filesystem::create_directories(testFolderA);
-            std::filesystem::create_directories(testFolderB);
-
-            auto volumeCleanup = wil::scope_exit([&]() {
-                std::error_code ec;
-                std::filesystem::remove_all(testFolderA, ec);
-                std::filesystem::remove_all(testFolderB, ec);
-            });
-
-            WSLAContainerLauncher duplicateVolumes("debian:latest", "named-volume-dup-target", {"echo", "dup-target"});
-            duplicateVolumes.AddVolume(testFolderA.wstring(), "/data", false);
-            duplicateVolumes.AddVolume(testFolderB.wstring(), "/data", false);
-
-            auto [result, _] = duplicateVolumes.CreateNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
-        }
-
-        // Verify duplicate container mount targets are rejected across bind and named volumes.
-        {
-            auto testFolder = std::filesystem::current_path() / "named-volume-dup-cross-target";
-            std::filesystem::create_directories(testFolder);
-
-            auto volumeCleanup = wil::scope_exit([&]() {
-                std::error_code ec;
-                std::filesystem::remove_all(testFolder, ec);
-            });
-
-            WSLAContainerLauncher duplicateCrossTypeTargets(
-                "debian:latest", "named-volume-dup-cross-target", {"echo", "dup-cross-target"});
-            duplicateCrossTypeTargets.AddVolume(testFolder.wstring(), "/data", false);
-            duplicateCrossTypeTargets.AddNamedVolume(volumeName, "/data", false);
-
-            auto [result, _] = duplicateCrossTypeTargets.CreateNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
-        }
-
         // Verify CreateContainer with named volume mounts the volume into the container.
         {
             WSLAContainerLauncher writer(
