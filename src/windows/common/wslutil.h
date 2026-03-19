@@ -104,6 +104,23 @@ struct PruneResult
     }
 };
 
+class StopWatch
+{
+    NON_COPYABLE(StopWatch);
+    NON_MOVABLE(StopWatch);
+
+public:
+    StopWatch() = default;
+
+    uint64_t ElapsedMilliseconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_startTime).count();
+    }
+
+private:
+    std::chrono::steady_clock::time_point m_startTime = std::chrono::steady_clock::now();
+};
+
 template <typename T>
 void AssertValidPrintfArg()
 {

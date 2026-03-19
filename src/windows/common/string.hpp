@@ -41,6 +41,8 @@ std::wstring SockAddrInetToWstring(const SOCKADDR_INET& sockAddrInet);
 std::wstring IntegerIpv4ToWstring(const uint32_t ipAddress);
 SOCKADDR_INET StringToSockAddrInet(const std::wstring& stringIpAddress);
 std::wstring BytesToHex(const std::vector<BYTE>& bytes);
+std::vector<BYTE> HexToBytes(std::string_view input);
+std::vector<BYTE> HexToBytes(std::wstring_view input);
 
 std::string WideToMultiByte(_In_opt_ LPCWSTR Source, _In_ size_t CharacterCount = -1);
 

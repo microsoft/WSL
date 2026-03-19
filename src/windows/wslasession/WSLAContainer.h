@@ -43,6 +43,7 @@ public:
         std::string&& Image,
         std::vector<WSLAVolumeMount>&& volumes,
         std::vector<WSLAPortMapping>&& ports,
+        std::shared_ptr<std::set<uint16_t>> allocatedVmPorts,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
@@ -80,11 +81,6 @@ public:
 
     const std::string& ID() const noexcept;
 
-    // Called when the container stop event is observed so the
-    // implementation can update its internal state and notify
-    // any exec processes.
-    void OnStopped();
-
     // Returns the container flags used to decide whether to
     // auto-delete the container on stop.
     WSLAContainerFlags Flags() const noexcept
@@ -120,7 +116,9 @@ private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
-    __requires_lock_not_held(m_lock) void DisconnectComWrapper();
+    __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
+    __requires_exclusive_lock_held(m_lock) void DisconnectComWrapper();
+    
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
@@ -144,6 +142,7 @@ private:
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;
     std::vector<WSLAPortMapping> m_mappedPorts;
+    std::shared_ptr<std::set<uint16_t>> m_allocatedVmPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
