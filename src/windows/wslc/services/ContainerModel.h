@@ -70,7 +70,7 @@ struct ContainerInformation
 
 struct EnvironmentVariable
 {
-    static std::optional<std::string> Parse(std::string entry);
-    static std::vector<std::string> ParseFile(std::string filePath);
+    static std::optional<std::wstring> Parse(std::wstring entry);
+    static std::vector<std::wstring> ParseFile(std::wstring filePath);
 };
 } // namespace wsl::windows::wslc::models

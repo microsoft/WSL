@@ -220,8 +220,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         auto const& envFiles = context.Args.GetAll<ArgType::EnvFile>();
         for (const auto& envFile : envFiles)
         {
-            auto parsedEnvVars = EnvironmentVariable::ParseFile(WideToMultiByte(envFile));
-            options.EnvironmentVariables.insert(options.EnvironmentVariables.end(), parsedEnvVars.begin(), parsedEnvVars.end());
+            auto parsedEnvVars = EnvironmentVariable::ParseFile(envFile);
+            for (const auto& envVar : parsedEnvVars)
+            {
+                options.EnvironmentVariables.push_back(wsl::shared::string::WideToMultiByte(envVar));
+            }
         }
     }
 
@@ -230,10 +233,10 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         auto const& envArgs = context.Args.GetAll<ArgType::Env>();
         for (const auto& arg : envArgs)
         {
-            auto envVar = EnvironmentVariable::Parse(WideToMultiByte(arg));
+            auto envVar = EnvironmentVariable::Parse(arg);
             if (envVar)
             {
-                options.EnvironmentVariables.push_back(*envVar);
+                options.EnvironmentVariables.push_back(wsl::shared::string::WideToMultiByte(*envVar));
             }
         }
     }
