@@ -80,7 +80,7 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(std::wstring filePath)
 {
     if (!std::filesystem::exists(filePath))
     {
-        throw std::invalid_argument(std::format("Environment file '{}' does not exist", filePath));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment file '{}' does not exist", filePath));
     }
 
     // Read the file line by line

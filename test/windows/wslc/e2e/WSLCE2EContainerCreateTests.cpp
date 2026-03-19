@@ -297,6 +297,93 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_D=file2-d"));
     }
 
+    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MissingFile)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} --env-file ENV_FILE_NOT_FOUND {} env",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' does not exist\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_InvalidContent)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        WriteEnvFile(EnvTestFile1, {
+            "WSLC_TEST_ENV_VALID=ok",
+            "BAD KEY=value"
+        });
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} --env-file {} {} env",
+            WslcContainerName,
+            EscapePath(EnvTestFile1.wstring()),
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_DuplicateKeys_Precedence)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        WriteEnvFile(EnvTestFile1, {
+            "WSLC_TEST_ENV_DUP=from-file-1"
+        });
+
+        WriteEnvFile(EnvTestFile2, {
+            "WSLC_TEST_ENV_DUP=from-file-2"
+        });
+
+        // Later --env-file should win over earlier --env-file for duplicate keys
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} --env-file {} --env-file {} {} env",
+            WslcContainerName,
+            EscapePath(EnvTestFile1.wstring()),
+            EscapePath(EnvTestFile2.wstring()),
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_DUP=from-file-2"));
+
+        // Explicit -e should win over env-file value for duplicate keys
+        result = RunWslc(std::format(
+            L"container run --rm --name {} -e WSLC_TEST_ENV_DUP=from-cli --env-file {} --env-file {} {} env",
+            WslcContainerName,
+            EscapePath(EnvTestFile1.wstring()),
+            EscapePath(EnvTestFile2.wstring()),
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_DUP=from-cli"));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_ValueContainsEquals)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        WriteEnvFile(EnvTestFile1, {
+            "WSLC_TEST_ENV_EQUALS=value=with=equals"
+        });
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} --env-file {} {} env",
+            WslcContainerName,
+            EscapePath(EnvTestFile1.wstring()),
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_EQUALS=value=with=equals"));
+    }
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
