@@ -29,61 +29,25 @@ namespace wsl::windows::service::wsla {
 class WSLAContainer;
 class WSLASession;
 
+struct ContainerPortMapping
+{
+    NON_COPYABLE(ContainerPortMapping);
+
+    ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort);
+    ContainerPortMapping(ContainerPortMapping&& Other);
+
+    ContainerPortMapping& operator=(ContainerPortMapping&& Other);
+    const char* ProtocolString() const;
+
+    WSLAPortMapping Serialize() const;
+
+    VMPortMapping VmMapping;
+    uint16_t ContainerPort{};
+};
+
 class WSLAContainerImpl
 {
 public:
-    struct ContainerPortMapping
-    {
-        NON_COPYABLE(ContainerPortMapping);
-
-        ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
-            VmMapping(std::move(VmMapping)), ContainerPort(ContainerPort)
-        {
-        }
-
-        ContainerPortMapping(ContainerPortMapping&& Other) :
-            VmMapping(std::move(Other.VmMapping)), ContainerPort(Other.ContainerPort)
-        {
-        }
-
-        ContainerPortMapping& operator=(ContainerPortMapping&& Other)
-        {
-            if (this != &Other)
-            {
-                VmMapping = std::move(Other.VmMapping);
-                ContainerPort = Other.ContainerPort;
-            }
-            return *this;
-        }
-
-        const char* ProtocolString() const
-        {
-            if (VmMapping.Protocol == IPPROTO_TCP)
-            {
-                return "tcp";
-            }
-            else
-            {
-                WI_ASSERT(VmMapping.Protocol == IPPROTO_UDP);
-                return "udp";
-            }
-        }
-
-        WSLAPortMapping Serialize() const
-        {
-            return WSLAPortMapping{
-                .HostPort = VmMapping.HostPort(),
-                .VmPort = VmMapping.VmPort ? VmMapping.VmPort->Port() : ContainerPort,
-                .ContainerPort = ContainerPort,
-                .Family = VmMapping.BindAddress.si_family,
-                .Protocol = VmMapping.Protocol,
-                .BindingAddress = VmMapping.BindingAddressString()};
-        }
-
-        VMPortMapping VmMapping;
-        uint16_t ContainerPort{};
-    };
-
     NON_COPYABLE(WSLAContainerImpl);
     NON_MOVABLE(WSLAContainerImpl);
 

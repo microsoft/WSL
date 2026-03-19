@@ -9,7 +9,7 @@ Module Name:
 Abstract:
 
     Client-side class for WSLA virtual machine operations.
-
+     VMPortMapping::Reset
     The VM is created via IWSLAVirtualMachine (running in the SYSTEM service).
     This class connects to the existing VM for unprivileged operations
     and delegates privileged operations back to IWSLAVirtualMachine.
@@ -99,7 +99,7 @@ int VmPortAllocation::Protocol() const
 VMPortMapping::VMPortMapping(int protocol, int Family, uint16_t Port, const char* Address) : Protocol(protocol)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP, "Invalid protocol: %i", Protocol);
-
+    THROW_HR_IF(E_POINTER, Address == nullptr);
     if (Family == AF_INET)
     {
         common::wslutil::ParseIpv4Address(Address, BindAddress.Ipv4.sin_addr);

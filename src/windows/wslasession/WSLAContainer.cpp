@@ -30,6 +30,7 @@ using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
+using wsl::windows::service::wsla::ContainerPortMapping;
 using wsl::windows::service::wsla::RelayedProcessIO;
 using wsl::windows::service::wsla::VMPortMapping;
 using wsl::windows::service::wsla::WSLAContainer;
@@ -73,7 +74,7 @@ std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
 }
 
 // Builds port mapping list from container options and returns the network mode string.
-std::pair<std::vector<WSLAContainerImpl::ContainerPortMapping>, std::string> ProcessPortMappings(const WSLAContainerOptions& options, WSLAVirtualMachine& virtualMachine)
+std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(const WSLAContainerOptions& options, WSLAVirtualMachine& virtualMachine)
 {
     WSLAContainerNetworkType networkType = options.ContainerNetwork.ContainerNetworkType;
 
@@ -102,7 +103,7 @@ std::pair<std::vector<WSLAContainerImpl::ContainerPortMapping>, std::string> Pro
         options.PortsCount > 0 && networkType == WSLAContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
-    std::vector<WSLAContainerImpl::ContainerPortMapping> ports;
+    std::vector<ContainerPortMapping> ports;
     ports.reserve(options.PortsCount);
 
     for (ULONG i = 0; i < options.PortsCount; i++)
@@ -233,6 +234,50 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
 }
 
 } // namespace
+
+ContainerPortMapping::ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
+    VmMapping(std::move(VmMapping)), ContainerPort(ContainerPort)
+{
+}
+
+ContainerPortMapping::ContainerPortMapping(ContainerPortMapping&& Other) :
+    VmMapping(std::move(Other.VmMapping)), ContainerPort(Other.ContainerPort)
+{
+}
+
+ContainerPortMapping& ContainerPortMapping::operator=(ContainerPortMapping&& Other)
+{
+    if (this != &Other)
+    {
+        VmMapping = std::move(Other.VmMapping);
+        ContainerPort = Other.ContainerPort;
+    }
+    return *this;
+}
+
+const char* ContainerPortMapping::ProtocolString() const
+{
+    if (VmMapping.Protocol == IPPROTO_TCP)
+    {
+        return "tcp";
+    }
+    else
+    {
+        WI_ASSERT(VmMapping.Protocol == IPPROTO_UDP);
+        return "udp";
+    }
+}
+
+WSLAPortMapping ContainerPortMapping::Serialize() const
+{
+    return WSLAPortMapping{
+        .HostPort = VmMapping.HostPort(),
+        .VmPort = VmMapping.VmPort ? VmMapping.VmPort->Port() : ContainerPort,
+        .ContainerPort = ContainerPort,
+        .Family = VmMapping.BindAddress.si_family,
+        .Protocol = VmMapping.Protocol,
+        .BindingAddress = VmMapping.BindingAddressString()};
+}
 
 WSLAContainerImpl::WSLAContainerImpl(
     WSLASession& wslaSession,
@@ -1032,13 +1077,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
 
-    // Only pass port metadata for bridged mode.
-    if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLAContainerNetworkTypeBridged)
+    for (const auto& e : ports)
     {
-        for (const auto& e : ports)
-        {
-            metadata.Ports.emplace_back(e.Serialize());
-        }
+        metadata.Ports.emplace_back(e.Serialize());
     }
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
@@ -1303,12 +1344,16 @@ void WSLAContainerImpl::UnmapPorts()
 {
     for (auto& e : m_mappedPorts)
     {
-        if (m_networkingMode == WSLAContainerNetworkTypeHost)
+        try
         {
-            e.VmMapping.VmPort.reset();
-        }
+            if (m_networkingMode == WSLAContainerNetworkTypeHost)
+            {
+                e.VmMapping.VmPort.reset();
+            }
 
-        e.VmMapping.Unmap();
+            e.VmMapping.Unmap();
+        }
+        CATCH_LOG();
     }
 }
 

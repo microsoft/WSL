@@ -486,11 +486,14 @@ try
 
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
-            // TODO: Only other supported value right now is AF_INET6; no user access.
+
+            // TODO: Ipv6 & custom binding address support.
             convertedPort.Family = AF_INET;
 
-            // TODO: Unused protocol?
-            // TODO: Unused windowsAddress?
+            // TODO: Consider using standard protocol numbers instead of our own enum.
+            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP; 
+            convertedPort.BindingAddress = "127.0.0.1";
+
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
