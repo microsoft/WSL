@@ -230,7 +230,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         auto const& envArgs = context.Args.GetAll<ArgType::Env>();
         for (const auto& arg : envArgs)
         {
-            options.EnvironmentVariables.emplace_back(WideToMultiByte(arg));
+            auto envVar = EnvironmentVariable::Parse(WideToMultiByte(arg));
+            if (envVar)
+            {
+                options.EnvironmentVariables.push_back(*envVar);
+            }
         }
     }
 

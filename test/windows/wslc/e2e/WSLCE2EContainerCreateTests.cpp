@@ -190,15 +190,11 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_UsesHostValue)
     {
-        // https://github.com/microsoft/WSL/issues/14474
-        SKIP_TEST_NOT_IMPL();
-
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} -e {} {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
-        result.Dump();
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto expectedLine = std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue);
