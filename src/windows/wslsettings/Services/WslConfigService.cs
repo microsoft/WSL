@@ -157,6 +157,12 @@ public class WslConfigService : IWslConfigService
             }
             finally
             {
+                foreach (var change in pendingChanges)
+                {
+                    ((WslConfigSettingManaged)change.CurrentSetting).ConfigSetting.Dispose();
+                    ((WslConfigSettingManaged)change.PendingSetting).ConfigSetting.Dispose();
+                }
+
                 _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
             }
         }
@@ -206,9 +212,15 @@ public class WslConfigService : IWslConfigService
             // Any in-app pending changes are dropped.
             var hadPendingBefore = HasPendingChanges_NoLock();
             _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
-            ReloadConfig_NoLock();
-            RefreshSnapshots_NoLock();
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            try
+            {
+                ReloadConfig_NoLock();
+                RefreshSnapshots_NoLock();
+            }
+            finally
+            {
+                _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            }
 
             var hasPendingAfter = HasPendingChanges_NoLock();
             pendingStateChanged = hadPendingBefore != hasPendingAfter;
