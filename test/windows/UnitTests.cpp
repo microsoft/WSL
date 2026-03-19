@@ -1249,7 +1249,7 @@ class UnitTests
 
             ValidateErrorMessage(
                 L"--unmount DoesNotExist",
-                GetSystemErrorString(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)),
+                L"Disk not found: DoesNotExist",
                 L"Wsl/Service/DetachDisk/ERROR_FILE_NOT_FOUND");
 
             ValidateErrorMessage(
