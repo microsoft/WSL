@@ -120,7 +120,11 @@ VMPortMapping::VMPortMapping(int protocol, int Family, uint16_t Port, const char
 
 VMPortMapping::~VMPortMapping()
 {
-    Unmap();
+    try
+    {
+        Unmap();
+    }
+    CATCH_LOG();
 }
 
 VMPortMapping::VMPortMapping(VMPortMapping&& Other)
@@ -131,7 +135,8 @@ VMPortMapping::VMPortMapping(VMPortMapping&& Other)
 void VMPortMapping::AssignVmPort(const std::shared_ptr<VmPortAllocation>& Port)
 {
     WI_ASSERT(!VmPort);
-    VmPort = std::move(Port);
+
+    VmPort = Port;
 }
 
 void VMPortMapping::Unmap()
