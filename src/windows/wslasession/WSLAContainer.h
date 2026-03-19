@@ -75,7 +75,7 @@ public:
     const std::string& Name() const noexcept;
     WSLAContainerState State() const noexcept;
 
-    __requires_lock_held(m_lock) void Transition(WSLAContainerState State) noexcept;
+    __requires_lock_held(m_lock) void Transition(WSLAContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
     void OnProcessReleased(DockerExecProcessControl* process) noexcept;
 

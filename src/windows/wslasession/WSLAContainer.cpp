@@ -597,7 +597,20 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         // This can happen if Delete() is called by the user.
         if (previousState == WslaContainerStateRunning)
         {
-            Transition(WslaContainerStateExited);
+            // Use Docker's FinishedAt so the event path matches the
+            // value restored during recovery in Open().
+            std::optional<std::uint64_t> finishedAt;
+            try
+            {
+                auto inspectData = m_dockerClient.InspectContainer(m_id);
+                if (!inspectData.State.FinishedAt.empty())
+                {
+                    finishedAt = ParseDockerTimestamp(inspectData.State.FinishedAt);
+                }
+            }
+            CATCH_LOG();
+
+            Transition(WslaContainerStateExited, finishedAt);
 
             ReleaseRuntimeResources();
 
@@ -667,7 +680,20 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
         }
     }
 
-    Transition(WslaContainerStateExited);
+    // Use Docker's FinishedAt so the live stop path matches the
+    // value restored during recovery in Open().
+    std::optional<std::uint64_t> finishedAt;
+    try
+    {
+        auto inspectData = m_dockerClient.InspectContainer(m_id);
+        if (!inspectData.State.FinishedAt.empty())
+        {
+            finishedAt = ParseDockerTimestamp(inspectData.State.FinishedAt);
+        }
+    }
+    CATCH_LOG();
+
+    Transition(WslaContainerStateExited, finishedAt);
 
     ReleaseRuntimeResources();
 
@@ -1383,7 +1409,7 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DisconnectComWrap
     }
 }
 
-__requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerState State) noexcept
+__requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslaContainerStateDeleted);
@@ -1395,7 +1421,7 @@ __requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerSta
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
-    m_stateChangedAt = static_cast<std::uint64_t>(std::time(nullptr));
+    m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
