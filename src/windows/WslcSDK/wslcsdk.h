@@ -377,14 +377,15 @@ typedef struct WslcImportImageOptions
 
 STDAPI WslcImportSessionImage(
     _In_ WslcSession session,
-    _In_z_ PCSTR imageName,
+    _In_z_ PCSTR repo,
+    _In_z_ PCSTR tag,
     _In_ HANDLE imageContent,
     _In_ uint64_t imageContentLength,
     _In_opt_ const WslcImportImageOptions* options,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 STDAPI WslcImportSessionImageFromFile(
-    _In_ WslcSession session, _In_z_ PCSTR imageName, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+    _In_ WslcSession session, _In_z_ PCSTR repo, _In_z_ PCSTR tag, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcLoadImageOptions
 {

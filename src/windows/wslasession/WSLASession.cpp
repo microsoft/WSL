@@ -553,25 +553,25 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR Repo, LPCSTR Tag, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF_NULL(E_POINTER, ImageName);
-    RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, Repo);
+    RETURN_HR_IF_NULL(E_POINTER, Tag);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Repo) + strlen(Tag) + 1 > WSLA_MAX_IMAGE_NAME_LENGTH);
 
-    auto [repo, tag] = common::wslutil::ParseImage(ImageName);
-
-    THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
+    std::string repo{Repo};
+    std::string tag{Tag};
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tag.value(), ContentSize);
+    auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;

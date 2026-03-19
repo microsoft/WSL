@@ -1009,17 +1009,18 @@ try
 CATCH_RETURN();
 
 static HRESULT WslcImportSessionImageImpl(
-    WslcSessionImpl* internalSession, PCSTR imageName, const WslcImportImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
+    WslcSessionImpl* internalSession, PCSTR repo, PCSTR tag, const WslcImportImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+        HandleToULong(imageFile.Handle()), repo, tag, progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcImportSessionImage(
     _In_ WslcSession session,
-    _In_z_ PCSTR imageName,
+    _In_z_ PCSTR repo,
+    _In_z_ PCSTR tag,
     _In_ HANDLE imageContent,
     _In_ uint64_t imageContentLength,
     _In_opt_ const WslcImportImageOptions* options,
@@ -1029,20 +1030,24 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
-    THROW_HR_IF_NULL(E_POINTER, imageName);
-    return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {imageContent, imageContentLength});
+    THROW_HR_IF_NULL(E_POINTER, repo);
+    THROW_HR_IF_NULL(E_POINTER, tag);
+
+    return WslcImportSessionImageImpl(internalType, repo, tag, options, errorInfoWrapper, {imageContent, imageContentLength});
 }
 CATCH_RETURN();
 
 STDAPI WslcImportSessionImageFromFile(
-    _In_ WslcSession session, _In_z_ PCSTR imageName, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+    _In_ WslcSession session, _In_z_ PCSTR repo, _In_z_ PCSTR tag, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
-    THROW_HR_IF_NULL(E_POINTER, imageName);
-    return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {path});
+    THROW_HR_IF_NULL(E_POINTER, repo);
+    THROW_HR_IF_NULL(E_POINTER, tag);
+
+    return WslcImportSessionImageImpl(internalType, repo, tag, options, errorInfoWrapper, {path});
 }
 CATCH_RETURN();
 

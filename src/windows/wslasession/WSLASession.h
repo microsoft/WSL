@@ -53,7 +53,7 @@ public:
     IFACEMETHOD(PullImage)(_In_ LPCSTR Repo, _In_ LPCSTR Tag, _In_opt_ const WslaRegistryAuthInformation* RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLABuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
+    IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR Repo, _In_ LPCSTR Tag, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLAListImageOptions* Options, _Out_ WSLAImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLADeleteImageOptions* Options, _Out_ WSLADeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;

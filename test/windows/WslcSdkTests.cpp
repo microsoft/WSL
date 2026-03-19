@@ -492,13 +492,9 @@ class WslcSdkTests
         WSL2_TEST_ONLY();
 
         const auto exportedImageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
-        constexpr auto c_handleImportedImageName = "my-hello-world-handle:test";
-        constexpr auto c_pathImportedImageName = "my-hello-world-path:test";
 
         // Positive: import an exported image tar via handle+length and verify the image can be run.
         {
-            WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr);
-
             wil::unique_handle imageTarFileHandle{CreateFileW(
                 exportedImageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -507,32 +503,43 @@ class WslcSdkTests
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
             VERIFY_SUCCEEDED(WslcImportSessionImage(
-                m_defaultSession, c_handleImportedImageName, imageTarFileHandle.get(), static_cast<uint64_t>(fileSize.QuadPart), nullptr, nullptr));
+                m_defaultSession, "my-hello-world-handle", "test", imageTarFileHandle.get(), static_cast<uint64_t>(fileSize.QuadPart), nullptr, nullptr));
 
-            auto output = RunContainerAndCapture(m_defaultSession, c_handleImportedImageName, {"/hello"});
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, "my-hello-world-handle:test", nullptr));
+            });
+
+            auto output = RunContainerAndCapture(m_defaultSession, "my-hello-world-handle:test", {"/hello"});
             VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
         }
 
         // Positive: import an exported image tar via path and verify the image can be run.
         {
-            WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr);
+            VERIFY_SUCCEEDED(WslcImportSessionImageFromFile(
+                m_defaultSession, "my-hello-world-path", "test", exportedImageTar.c_str(), nullptr, nullptr));
 
-            VERIFY_SUCCEEDED(WslcImportSessionImageFromFile(m_defaultSession, c_pathImportedImageName, exportedImageTar.c_str(), nullptr, nullptr));
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, "my-hello-world-path:test", nullptr));
+            });
 
-            auto output = RunContainerAndCapture(m_defaultSession, c_pathImportedImageName, {"/hello"});
+            auto output = RunContainerAndCapture(m_defaultSession, "my-hello-world-path:test", {"/hello"});
             VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
         }
 
         WslcImportImageOptions opts{};
 
-        // Negative: null image name must fail.
-        VERIFY_ARE_EQUAL(WslcImportSessionImageFromFile(m_defaultSession, nullptr, exportedImageTar.c_str(), &opts, nullptr), E_POINTER);
+        // Negative: null repo must fail.
+        VERIFY_ARE_EQUAL(WslcImportSessionImageFromFile(m_defaultSession, nullptr, "test", exportedImageTar.c_str(), &opts, nullptr), E_POINTER);
+
+        // Negative: null tag must fail.
+        VERIFY_ARE_EQUAL(WslcImportSessionImageFromFile(m_defaultSession, "missing-tag", nullptr, exportedImageTar.c_str(), &opts, nullptr), E_POINTER);
 
         // Negative: missing file input must fail.
-        VERIFY_ARE_EQUAL(WslcImportSessionImageFromFile(m_defaultSession, "missing-file-input:test", nullptr, &opts, nullptr), E_POINTER);
+        VERIFY_ARE_EQUAL(WslcImportSessionImageFromFile(m_defaultSession, "missing-file-input", "test", nullptr, &opts, nullptr), E_POINTER);
 
         // Negative: zero ContentLength must fail.
-        VERIFY_ARE_EQUAL(WslcImportSessionImage(m_defaultSession, "zero-length:test", GetCurrentThreadEffectiveToken(), 0, &opts, nullptr), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(
+            WslcImportSessionImage(m_defaultSession, "zero-length", "test", GetCurrentThreadEffectiveToken(), 0, &opts, nullptr), E_INVALIDARG);
     }
 
     TEST_METHOD(LoadImageNonTar)
@@ -575,7 +582,7 @@ class WslcSdkTests
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_ARE_EQUAL(
                 WslcImportSessionImage(
-                    m_defaultSession, "import-self:test", selfFileHandle.get(), static_cast<uint64_t>(fileSize.QuadPart), nullptr, &errorMsg),
+                    m_defaultSession, "import-self", "test", selfFileHandle.get(), static_cast<uint64_t>(fileSize.QuadPart), nullptr, &errorMsg),
                 E_FAIL);
             VERIFY_IS_NOT_NULL(errorMsg.get());
             LogInfo("Import error: %ws", errorMsg.get());

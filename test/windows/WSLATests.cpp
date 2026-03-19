@@ -784,7 +784,7 @@ class WSLATests
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
         VERIFY_SUCCEEDED(
-            m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
+            m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", "test", nullptr, fileSize.QuadPart));
 
         ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
@@ -797,10 +797,10 @@ class WSLATests
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
 
-        // Validate that ImportImage fails if no tag is passed
+        // Validate that ImportImage fails if null tag is passed
         {
             VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, nullptr, fileSize.QuadPart), E_POINTER);
         }
     }
 
