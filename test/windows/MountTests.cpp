@@ -1547,7 +1547,7 @@ class MountTests
             // WSL is likely stuck; avoid running cleanup that calls LxsstuLaunchWsl again.
             cleanup.release();
             VERIFY_FAIL(L"WSL startup timed out - fstab mount likely blocked on /dev/tty");
-            // Warning: When this error happens, wsl will get stuck in a unrecoverable state.
+            // Warning: When this error happens, wsl will get stuck in an unrecoverable state.
         }
 
         VERIFY_ARE_EQUAL(waitResult, (DWORD)WAIT_OBJECT_0);
