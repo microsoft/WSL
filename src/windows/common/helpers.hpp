@@ -118,8 +118,6 @@ void CreateConsole(_In_ LPCWSTR ConsoleTitle = nullptr);
 
 unique_proc_attribute_list CreateProcThreadAttributeList(_In_ DWORD AttributeCount);
 
-[[nodiscard]] HANDLE DuplicateHandle(_In_ HANDLE Handle, _In_ DWORD DesiredAccess = 0, _In_ BOOL InheritHandle = FALSE, _In_ DWORD Options = DUPLICATE_SAME_ACCESS);
-
 std::vector<gsl::byte> GenerateConfigurationMessage(
     _In_ const std::wstring& DistributionName,
     _In_ ULONG FixedDrivesBitmap = 0,

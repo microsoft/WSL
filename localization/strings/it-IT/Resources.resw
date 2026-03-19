@@ -728,7 +728,7 @@ Potrebbe essere necessario riavviare il sistema per rendere effettive le modific
     <value>La rete bridged richiede l'impostazione di wsl2.vmSwitch.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Non è possibile recuperare la distribuzione degli elenchi da '{}'. {}</value>
+    <value>Recupero dell'elenco di distribuzione da '{}'. {} non riuscito</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -1061,7 +1061,7 @@ Fallback alla rete NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Non è stato possibile leggere la proprietà '{}' dalla distribuzione {} </value>
+    <value>Non è stato possibile leggere la proprietà '{}' dalla distribuzione {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1878,5 +1878,34 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Numero di millisecondi di inattività di una macchina virtuale prima dell'arresto.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>Compila, esegui, esegui il debug e profila le app in esecuzione in WSL da Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Esegui ed esegui il debug delle app in WSL da Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>Altre informazioni su WSL in Visual Studio per sviluppatori .NET</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>Altre informazioni su Visual Studio e WSL per sviluppatori C++</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>Puoi eseguire ed eseguire il debug delle app .NET Core e C++ multipiattaforma in Linux con facilità senza uscire Visual Studio usando il sottosistema Windows per Linux (WSL). Gli sviluppatori multipiattaforma possono usare questo metodo come approccio semplice per testare più ambienti di destinazione.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Integrazione di Visual Studio</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Integrazione di Visual Studio</value>
   </data>
 </root>
