@@ -224,6 +224,8 @@ wil::unique_handle OpenCallingProcess(_In_ DWORD access);
 
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
 
+std::pair<std::string, std::optional<std::string>> ParseImage(_In_ const std::string& Input);
+
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
 void PrintMessageImpl(_In_ const std::wstring& message, _In_ va_list& args, _Inout_ FILE* stream = stdout);

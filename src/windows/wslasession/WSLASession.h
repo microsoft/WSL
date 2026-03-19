@@ -50,7 +50,7 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLASessionState* State) override;
 
     // Image management.
-    IFACEMETHOD(PullImage)(_In_ LPCSTR ImageUri, _In_opt_ const WslaRegistryAuthInformation* RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(PullImage)(_In_ LPCSTR Repo, _In_ LPCSTR Tag, _In_opt_ const WslaRegistryAuthInformation* RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(BuildImage)(_In_ const WSLABuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;

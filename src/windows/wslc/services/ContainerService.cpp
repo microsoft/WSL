@@ -90,9 +90,13 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
-        PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
+        auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
+        const char* tagWithDefault = tag.has_value() ? tag->c_str() : "latest";
+
+        PrintMessage(L"Image '%hs' not found, pulling", stderr, repo, tagWithDefault);
+
         ImageService imageService;
-        imageService.Pull(session, image, callback);
+        imageService.Pull(session, repo, tagWithDefault, callback);
         return containerLauncher.Create(*session.Get());
     }
 

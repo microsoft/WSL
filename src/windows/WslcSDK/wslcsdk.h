@@ -360,7 +360,8 @@ typedef HRESULT(CALLBACK* WslcContainerImageProgressCallback)(const WslcImagePro
 // options struct typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
 {
-    _In_z_ PCSTR uri;
+    _In_z_ PCSTR repo;
+    _In_z_ PCSTR tag;
     WslcContainerImageProgressCallback progressCallback;
     PVOID progressCallbackContext;
     _In_opt_ const WslcRegistryAuthenticationInformation* authInfo;

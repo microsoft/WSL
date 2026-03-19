@@ -116,7 +116,8 @@ void PullImage(CLIExecutionContext& context)
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
     PullImageCallback callback;
-    services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
+    auto [repo, tag] = ParseImage(WideToMultiByte(imageId));
+    services::ImageService::Pull(session, repo, tag.value_or("latest"), &callback);
 }
 
 void DeleteImage(CLIExecutionContext& context)

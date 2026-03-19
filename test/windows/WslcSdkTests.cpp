@@ -334,7 +334,8 @@ class WslcSdkTests
         // Positive: pull a well-known image.
         {
             WslcPullImageOptions opts{};
-            opts.uri = "hello-world:linux";
+            opts.repo = "hello-world";
+            opts.tag = "linux";
             wil::unique_cotaskmem_string errorMsg;
             HRESULT pullResult = WslcPullSessionImage(m_defaultSession, &opts, &errorMsg);
 
@@ -361,7 +362,8 @@ class WslcSdkTests
         // Negative: pull an image that does not exist.
         {
             WslcPullImageOptions opts{};
-            opts.uri = "does-not:exist";
+            opts.repo = "does-not";
+            opts.tag = "exist";
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), WSLA_E_IMAGE_NOT_FOUND);
 
@@ -375,10 +377,19 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, nullptr, &errorMsg), E_POINTER);
         }
 
-        // Negative: null URI inside options must fail.
+        // Negative: null repo inside options must fail.
         {
             WslcPullImageOptions opts{};
-            opts.uri = nullptr;
+            opts.repo = nullptr;
+            opts.tag = "tag";
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: null repo inside options must fail.
+        {
+            WslcPullImageOptions opts{};
+            opts.repo = "repo";
+            opts.tag = nullptr;
             VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
     }

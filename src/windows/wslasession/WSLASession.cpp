@@ -28,19 +28,6 @@ constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
-{
-    size_t separator = Input.find_last_of(':');
-    if (separator == std::string::npos)
-    {
-        return {Input, {}};
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), separator >= Input.size() - 1 || separator == 0);
-
-    return {Input.substr(0, separator), Input.substr(separator + 1)};
-}
-
 void ValidateContainerName(LPCSTR Name)
 {
     const auto& locale = std::locale::classic();
@@ -304,20 +291,22 @@ void WSLASession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
 
-HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WslaRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::PullImage(LPCSTR Repo, LPCSTR Tag, const WslaRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
 
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF_NULL(E_POINTER, ImageUri);
+    RETURN_HR_IF_NULL(E_POINTER, Repo);
+    RETURN_HR_IF_NULL(E_POINTER, Tag);
 
-    auto [repo, tag] = ParseImage(ImageUri);
+    std::string repo{Repo};
+    std::string tag{Tag};
 
     auto lock = m_lock.lock_shared();
 
-    auto requestContext = m_dockerClient->PullImage(repo, tag);
+    auto requestContext = m_dockerClient->PullImage(repo, std::optional<std::string>{tag});
 
     auto io = CreateIOContext();
 
@@ -339,7 +328,7 @@ try
         }
 
         std::string contentString{Content.begin(), Content.end()};
-        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
+        WSL_LOG("ImagePullProgress", TraceLoggingValue(Repo, "Repo"), TraceLoggingValue(Tag, "Tag"), TraceLoggingValue(contentString.c_str(), "Content"));
 
         if (ProgressCallback == nullptr)
         {
@@ -574,7 +563,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
-    auto [repo, tag] = ParseImage(ImageName);
+    auto [repo, tag] = common::wslutil::ParseImage(ImageName);
 
     THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
 
@@ -839,7 +828,7 @@ try
 
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
-                auto repoName = ParseImage(tag).first;
+                auto repoName = common::wslutil::ParseImage(tag).first;
                 size_t colonPos = tag.find(':');
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())

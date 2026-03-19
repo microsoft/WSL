@@ -379,7 +379,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         {
-            HRESULT pullResult = m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr);
+            HRESULT pullResult = m_defaultSession->PullImage("hello-world", "linux", nullptr, nullptr);
 
             // Skip test if error is due to rate limit.
             if (pullResult == E_FAIL)
@@ -413,7 +413,7 @@ class WSLATests
                 L"pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
                 L"access to the resource is denied";
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLA_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not", "exist", nullptr, nullptr), WSLA_E_IMAGE_NOT_FOUND);
             auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
             VERIFY_IS_TRUE(comError.has_value());
 
@@ -5056,8 +5056,8 @@ class WSLATests
         std::string longName(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
         expectInvalidArg(longName);
 
-        auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr), E_INVALIDARG);
+        auto expectInvalidPull = [&](const char* repo, const char* tag, const char* errorPattern) {
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(repo, tag, nullptr, nullptr), E_INVALIDARG);
 
             auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
             VERIFY_IS_TRUE(comError.has_value());
@@ -5065,14 +5065,18 @@ class WSLATests
             VerifyPatternMatch(wsl::shared::string::WideToMultiByte(comError->Message.get()), errorPattern);
         };
 
-        expectInvalidPull("?foo&bar/url\n:name", "invalid reference format");
-        expectInvalidPull("?:&", "invalid reference format");
-        expectInvalidPull("/:/", "invalid reference format");
-        expectInvalidPull("\n: ", "invalid reference format");
-        expectInvalidPull("invalid\nrepo:valid-image", "invalid reference format");
-        expectInvalidPull("bad!repo:valid-image", "invalid reference format");
-        expectInvalidPull("repo:badimage!name", "invalid tag format");
-        expectInvalidPull("bad+image", "invalid reference format");
+        expectInvalidPull("?foo&bar/url\n", "name", "invalid reference format");
+        expectInvalidPull("?", "&", "invalid reference format");
+        expectInvalidPull("/", "/", "invalid reference format");
+        expectInvalidPull("\n", " ", "invalid reference format");
+        expectInvalidPull("invalid\nrepo", "valid-image", "invalid reference format");
+        expectInvalidPull("bad!repo", "valid-image", "invalid reference format");
+        expectInvalidPull("repo", "badimage!name", "invalid tag format");
+        expectInvalidPull("bad+image", "latest", "invalid reference format");
+
+        // Null repo or tag must fail.
+        VERIFY_ARE_EQUAL(m_defaultSession->PullImage(nullptr, "latest", nullptr, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+        VERIFY_ARE_EQUAL(m_defaultSession->PullImage("hello-world", nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
     }
 
     TEST_METHOD(PageReporting)

@@ -33,7 +33,7 @@ public:
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
     static wsl::windows::common::wsla_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
-    static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    static void Pull(wsl::windows::wslc::models::Session& session, const std::string& repo, const std::string& tag, IProgressCallback* callback);
     void Push();
     void Save();
     void Tag();

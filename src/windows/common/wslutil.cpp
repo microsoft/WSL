@@ -1386,6 +1386,19 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
+std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(_In_ const std::string& Input)
+{
+    size_t separator = Input.find_last_of(':');
+    if (separator == std::string::npos)
+    {
+        return {Input, {}};
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), separator >= Input.size() - 1 || separator == 0);
+
+    return {Input.substr(0, separator), Input.substr(separator + 1)};
+}
+
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
 {
     fwprintf(stream, L"%ls\n", GetSystemErrorString(result).c_str());

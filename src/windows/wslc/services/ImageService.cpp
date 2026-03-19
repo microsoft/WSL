@@ -126,9 +126,9 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 }
 
-void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& repo, const std::string& tag, IProgressCallback* callback)
 {
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
+    THROW_IF_FAILED(session.Get()->PullImage(repo.c_str(), tag.c_str(), nullptr, callback));
 }
 
 InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)

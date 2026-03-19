@@ -998,12 +998,13 @@ try
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, options);
-    RETURN_HR_IF_NULL(E_INVALIDARG, options->uri);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->repo);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->tag);
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     // TODO: Auth
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, nullptr, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->repo,options->tag, nullptr, progressCallback.get()));
 }
 CATCH_RETURN();
 
