@@ -328,7 +328,11 @@ try
         }
 
         std::string contentString{Content.begin(), Content.end()};
-        WSL_LOG("ImagePullProgress", TraceLoggingValue(Repo, "Repo"), TraceLoggingValue(Tag, "Tag"), TraceLoggingValue(contentString.c_str(), "Content"));
+        WSL_LOG(
+            "ImagePullProgress",
+            TraceLoggingValue(Repo, "Repo"),
+            TraceLoggingValue(Tag, "Tag"),
+            TraceLoggingValue(contentString.c_str(), "Content"));
 
         if (ProgressCallback == nullptr)
         {

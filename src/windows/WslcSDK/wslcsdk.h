@@ -385,7 +385,12 @@ STDAPI WslcImportSessionImage(
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 STDAPI WslcImportSessionImageFromFile(
-    _In_ WslcSession session, _In_z_ PCSTR repo, _In_z_ PCSTR tag, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+    _In_ WslcSession session,
+    _In_z_ PCSTR repo,
+    _In_z_ PCSTR tag,
+    _In_z_ PCWSTR path,
+    _In_opt_ const WslcImportImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcLoadImageOptions
 {

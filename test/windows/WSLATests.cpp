@@ -783,8 +783,8 @@ class WSLATests
         LARGE_INTEGER fileSize{};
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        VERIFY_SUCCEEDED(
-            m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", "test", nullptr, fileSize.QuadPart));
+        VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+            HandleToULong(imageTarFileHandle.get()), "my-hello-world", "test", nullptr, fileSize.QuadPart));
 
         ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
@@ -800,7 +800,9 @@ class WSLATests
         // Validate that ImportImage fails if null tag is passed
         {
             VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, nullptr, fileSize.QuadPart), E_POINTER);
+                m_defaultSession->ImportImage(
+                    HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, nullptr, fileSize.QuadPart),
+                E_POINTER);
         }
     }
 

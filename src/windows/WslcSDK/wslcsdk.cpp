@@ -1004,7 +1004,7 @@ try
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     // TODO: Auth
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->repo,options->tag, nullptr, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->repo, options->tag, nullptr, progressCallback.get()));
 }
 CATCH_RETURN();
 
