@@ -707,11 +707,10 @@ try
     });
 
     // Create the guest mount
+    auto [_, __, channel] = Fork(WSLA_FORK::Process);
     auto shareName = shared::string::GuidToString<char>(shareGuid, shared::string::None);
     if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
     {
-        auto [_, __, channel] = Fork(WSLA_FORK::Process);
-
         WSLA_CONNECT message;
         message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
 
@@ -731,7 +730,7 @@ try
     else
     {
         std::string options = WI_IsFlagSet(Flags, WSLAMountFlagsReadOnly) ? "ro" : "rw";
-        Mount(m_initChannel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
+        Mount(channel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
     }
 
     deleteOnFailure.release();
