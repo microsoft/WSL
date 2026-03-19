@@ -3920,12 +3920,23 @@ class WSLATests
                 VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, E_INVALIDARG);
             }
 
-            // Invalid address family
+            // Invalid address family (launched manually because AddPort() throws on unsupported family).
             {
-                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
-                launcher.AddPort(1234, 8000, 1);
+                WSLAPortMapping port{};
+                port.BindingAddress = "127.0.0.1";
+                port.HostPort = 1234;
+                port.ContainerPort = 1234;
+                port.Protocol = IPPROTO_TCP;
+                port.Family = AF_UNIX; // Unsupported
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, E_INVALIDARG);
+                WSLAContainerOptions options{};
+                options.Image = "python:3.12-alpine";
+                options.Ports = &port;
+                options.PortsCount = 1;
+                options.ContainerNetwork.ContainerNetworkType = containerNetworkType;
+                
+                wil::com_ptr<IWSLAContainer> container;
+                VERIFY_ARE_EQUAL(session.CreateContainer(&options, &container), E_INVALIDARG);
             }
 
             // TODO: Update once UDP is supported.
