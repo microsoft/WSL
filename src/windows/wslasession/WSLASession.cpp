@@ -1418,7 +1418,6 @@ try
     auto cleanup = wil::scope_exit([&]() {
         if (inserted)
         {
-
             m_allocatedPorts.erase(it);
         }
     });

@@ -63,7 +63,7 @@ public:
         uint16_t ContainerPort,
         int Family,
         int Protocol = IPPROTO_TCP,
-        const std::string& BindingAddress = "127.0.0.1");
+        const std::optional<std::string>& BindingAddress = {});
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
 

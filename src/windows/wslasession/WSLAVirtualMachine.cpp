@@ -209,6 +209,8 @@ void VMPortMapping::Detach()
 
 VMPortMapping VMPortMapping::LocalhostTcpMapping(int Family, uint16_t WindowsPort)
 {
+    WI_ASSERT(Family == AF_INET || Family == AF_INET6);
+
     return VMPortMapping(IPPROTO_TCP, Family, WindowsPort, Family == AF_INET ? "127.0.0.1" : "::1");
 }
 

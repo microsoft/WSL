@@ -90,9 +90,11 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 {
 }
 
-void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol, const std::string& BindingAddress)
+void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol, const std::optional<std::string>& BindingAddress)
 {
-    auto& inserted = m_bindingAddressStorage.emplace_back(BindingAddress);
+    THROW_HR_IF(E_INVALIDARG, Family != AF_INET && Family != AF_INET6);
+
+    auto& inserted = m_bindingAddressStorage.emplace_back(BindingAddress.value_or(Family == AF_INET ? "127.0.0.1" : "::1"));
     m_ports.emplace_back(WSLAPortMapping{
         .HostPort = WindowsPort,
         .ContainerPort = ContainerPort,
