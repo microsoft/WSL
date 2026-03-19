@@ -1402,7 +1402,7 @@ try
         auto allocated = std::make_pair(m_virtualMachine->TryAllocatePort(LinuxPort, Family, IPPROTO_TCP), static_cast<size_t>(0));
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.first == nullptr);
 
-        m_allocatedPorts.emplace(LinuxPort, allocated);
+        it = m_allocatedPorts.emplace(LinuxPort, allocated).first;
         inserted = true;
     }
 
