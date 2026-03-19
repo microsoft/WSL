@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "LxssSecurity.h"
 #include "LxssUserSessionFactory.h"
-#include "WSLASessionManagerFactory.h"
 #include "PluginManager.h"
 
 using namespace Microsoft::WRL;
@@ -36,43 +35,42 @@ std::optional<wsl::windows::service::PluginManager> g_pluginManager;
 extern unique_event g_networkingReady;
 extern bool g_lxcoreInitialized;
 
-void ClearSessionsAndBlockNewInstances()
+void ClearSessionsAndBlockNewInstancesLockHeld(std::optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>>& sessions)
 {
+    std::lock_guard lock(g_sessionTerminationLock);
+
+    if (sessions)
     {
-        std::optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>> sessions;
+        // Shutdown the session and prevent new session creation.
+        for (const auto& session : sessions.value())
         {
-            auto sessionsLock = g_sessionLock.lock_exclusive();
-            sessions = std::move(g_sessions);
+            // Because Shutdown() acquires the session inner lock, it shouldn't called while g_sessionLock is held,
+            // since that could lead to a deadlock if FindSessionByCookie is called since that would try to lock g_sessionLock
+            // while holding the session inner lock
 
-            // This is required because the moved-from std::optional<T> isn't made empty, so this needs to be done explicitly.
-            g_sessions.reset();
+            session->Shutdown(true, ShutdownBehavior::ForceAfter30Seconds);
         }
 
-        {
-            std::lock_guard lock(g_sessionTerminationLock);
-
-            if (sessions)
-            {
-                // Shutdown the session and prevent new session creation.
-                for (const auto& session : sessions.value())
-                {
-                    // Because Shutdown() acquires the session inner lock, it shouldn't called while g_sessionLock is held,
-                    // since that could lead to a deadlock if FindSessionByCookie is called since that would try to lock
-                    // g_sessionLock while holding the session inner lock
-
-                    session->Shutdown(true, ShutdownBehavior::ForceAfter30Seconds);
-                }
-
-                sessions.reset();
-            }
-
-            // Unload plugins
-            g_pluginManager.reset();
-        }
+        sessions.reset();
     }
 
-    // Also tear down WSLA sessions.
-    wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances();
+    // Unload plugins
+    g_pluginManager.reset();
+}
+
+void ClearSessionsAndBlockNewInstances()
+{
+    std::optional<std::vector<std::shared_ptr<LxssUserSessionImpl>>> sessions;
+
+    {
+        auto sessionsLock = g_sessionLock.lock_exclusive();
+        sessions = std::move(g_sessions);
+
+        // This is required because the moved-from std::optional<T> isn't made empty, so this needs to be done explicitly.
+        g_sessions.reset();
+    }
+
+    ClearSessionsAndBlockNewInstancesLockHeld(sessions);
 }
 
 void SetSessionPolicy(_In_ bool enabled)

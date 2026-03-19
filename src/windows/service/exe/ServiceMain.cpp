@@ -18,6 +18,7 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "LxssIpTables.h"
 #include "LxssUserSessionFactory.h"
+#include "WSLASessionManagerFactory.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -242,6 +243,9 @@ void WslService::ServiceStopped()
 
     // Terminate all user sessions.
     ClearSessionsAndBlockNewInstances();
+
+    // Also tear down WSLA sessions.
+    wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances();
 
     // Disconnect from the LxCore driver.
     if (g_lxcoreInitialized)
