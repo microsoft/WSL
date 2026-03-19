@@ -1564,9 +1564,7 @@ class WSLATests
         BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK, bool AllowEarlyCompletion = false, bool UseOverlappedWritePipe = false) :
             m_operation(std::move(Operation)), m_expectedResult(ExpectedResult), m_allowEarlyCompletion(AllowEarlyCompletion)
         {
-            auto [read, write] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, UseOverlappedWritePipe);
-            wil::unique_handle pipeRead(read.release());
-            wil::unique_handle pipeWrite(write.release());
+            auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, UseOverlappedWritePipe);
 
             m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
             m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
@@ -1588,7 +1586,7 @@ class WSLATests
             }
         }
 
-        void RunOperation(wil::unique_handle Handle)
+        void RunOperation(wil::unique_hfile Handle)
         {
             m_result.set_value(m_operation(Handle.get()));
 
@@ -1598,7 +1596,7 @@ class WSLATests
             WI_ASSERT(m_allowEarlyCompletion || m_testCompleteEvent.is_signaled());
         }
 
-        void RunIO(wil::unique_handle Handle)
+        void RunIO(wil::unique_hfile Handle)
         {
             std::vector<char> buffer(1024 * 1024);
             while (true)
