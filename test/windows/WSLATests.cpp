@@ -3934,7 +3934,7 @@ class WSLATests
                 options.Ports = &port;
                 options.PortsCount = 1;
                 options.ContainerNetwork.ContainerNetworkType = containerNetworkType;
-                
+
                 wil::com_ptr<IWSLAContainer> container;
                 VERIFY_ARE_EQUAL(session.CreateContainer(&options, &container), E_INVALIDARG);
             }
