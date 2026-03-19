@@ -1527,8 +1527,7 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountHelper), (DWORD)0);
 
         // Add fstab entry using this helper.
-        const std::wstring addFstab =
-            L"-- sh -c 'echo \"none /mnt/ttytest hang 0 0\" >> /etc/fstab'";
+        const std::wstring addFstab = L"-- sh -c 'echo \"none /mnt/ttytest hang 0 0\" >> /etc/fstab'";
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(addFstab), (DWORD)0);
 
         auto cleanup = wil::scope_exit([&]() {
