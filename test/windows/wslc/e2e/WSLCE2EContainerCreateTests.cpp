@@ -267,20 +267,37 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_MIX_CLI=from-cli"));
     }
 
-private:
-    bool ContainsOutputLine(const std::vector<std::wstring>& outputLines, const std::wstring& expectedLine) const
+    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MultipleFiles)
     {
-        for (const auto& line : outputLines)
-        {
-            if (line == expectedLine)
-            {
-                return true;
-            }
-        }
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
 
-        return false;
+        WriteEnvFile(EnvTestFile1, {
+            "WSLC_TEST_ENV_FILE_MULTI_A=file1-a",
+            "WSLC_TEST_ENV_FILE_MULTI_B=file1-b"
+        });
+
+        WriteEnvFile(EnvTestFile2, {
+            "WSLC_TEST_ENV_FILE_MULTI_C=file2-c",
+            "WSLC_TEST_ENV_FILE_MULTI_D=file2-d"
+        });
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --name {} --env-file {} --env-file {} {} env",
+            WslcContainerName,
+            EscapePath(EnvTestFile1.wstring()),
+            EscapePath(EnvTestFile2.wstring()),
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_A=file1-a"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_B=file1-b"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_C=file2-c"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_D=file2-d"));
     }
 
+private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
 
@@ -369,5 +386,18 @@ private:
         }
         VERIFY_IS_TRUE(envFile.good());
     };
+
+    bool ContainsOutputLine(const std::vector<std::wstring>& outputLines, const std::wstring& expectedLine) const
+    {
+        for (const auto& line : outputLines)
+        {
+            if (line == expectedLine)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 };
 } // namespace WSLCE2ETests
