@@ -75,6 +75,8 @@ class WSLCCLIEnvVarParserUnitTests
     {
         VERIFY_THROWS(models::EnvironmentVariable::Parse(L"=value"), std::exception);
         VERIFY_THROWS(models::EnvironmentVariable::Parse(L"BAD KEY=value"), std::exception);
+        VERIFY_THROWS(models::EnvironmentVariable::Parse(L"BAD\tKEY=value"), std::exception);
+        VERIFY_THROWS(models::EnvironmentVariable::Parse(L"BAD\nKEY=value"), std::exception);
     }
 
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileParsesAndSkipsExpectedLines)
@@ -107,6 +109,73 @@ class WSLCCLIEnvVarParserUnitTests
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileThrowsWhenMissing)
     {
         VERIFY_THROWS(models::EnvironmentVariable::ParseFile(L"ENV_FILE_NOT_FOUND"), std::exception);
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_ExplicitEmptyValueIsValid)
+    {
+        const auto parsed = models::EnvironmentVariable::Parse(L"FOO=");
+        VERIFY_IS_TRUE(parsed.has_value());
+        VERIFY_ARE_EQUAL(L"FOO=", parsed.value());
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_MultipleEqualsPreservedInValue)
+    {
+        const auto parsed = models::EnvironmentVariable::Parse(L"FOO=a=b=c");
+        VERIFY_IS_TRUE(parsed.has_value());
+        VERIFY_ARE_EQUAL(L"FOO=a=b=c", parsed.value());
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_EmptyInputReturnsNullopt)
+    {
+        const auto parsed = models::EnvironmentVariable::Parse(L"");
+        VERIFY_IS_FALSE(parsed.has_value());
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_UsesProcessEnvWhenValueIsExplicitlyEmpty)
+    {
+        constexpr const auto key = L"WSLC_TEST_ENV_EMPTY_VALUE";
+        VERIFY_IS_TRUE(SetEnvironmentVariableW(key, L""));
+
+        auto cleanup = wil::scope_exit([&] {
+            SetEnvironmentVariableW(key, nullptr);
+        });
+
+        const auto parsed = models::EnvironmentVariable::Parse(key);
+        VERIFY_IS_TRUE(parsed.has_value());
+        VERIFY_ARE_EQUAL(L"WSLC_TEST_ENV_EMPTY_VALUE=", parsed.value());
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_ParseFilePreservesTrailingWhitespaceInValue)
+    {
+        std::ofstream file(EnvTestFile);
+        VERIFY_IS_TRUE(file.is_open());
+        file << "KEY=value   \n";
+        file.close();
+
+        const auto parsed = models::EnvironmentVariable::ParseFile(EnvTestFile.wstring());
+
+        VERIFY_ARE_EQUAL(1U, parsed.size());
+        VERIFY_ARE_EQUAL(L"KEY=value   ", parsed[0]);
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_ParseFileThrowsOnInvalidLine)
+    {
+        std::ofstream file(EnvTestFile);
+        VERIFY_IS_TRUE(file.is_open());
+        file << "BAD KEY=value\n";
+        file.close();
+
+        VERIFY_THROWS(models::EnvironmentVariable::ParseFile(EnvTestFile.wstring()), std::exception);
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_ParseFileEmptyFileReturnsEmpty)
+    {
+        std::ofstream file(EnvTestFile);
+        VERIFY_IS_TRUE(file.is_open());
+        file.close();
+
+        const auto parsed = models::EnvironmentVariable::ParseFile(EnvTestFile.wstring());
+        VERIFY_ARE_EQUAL(0U, parsed.size());
     }
 
 private:
