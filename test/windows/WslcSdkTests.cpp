@@ -563,7 +563,8 @@ class WslcSdkTests
 
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_ARE_EQUAL(
-                WslcImportSessionImage(m_defaultSession, "import-self:test", selfFileHandle.get(), static_cast<uint64_t>(fileSize.QuadPart), nullptr, &errorMsg),
+                WslcImportSessionImage(
+                    m_defaultSession, "import-self:test", selfFileHandle.get(), static_cast<uint64_t>(fileSize.QuadPart), nullptr, &errorMsg),
                 E_FAIL);
             VERIFY_IS_NOT_NULL(errorMsg.get());
             LogInfo("Import error: %ws", errorMsg.get());
