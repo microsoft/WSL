@@ -1564,19 +1564,9 @@ class WSLATests
         BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK, bool AllowEarlyCompletion = false, bool UseOverlappedWritePipe = false) :
             m_operation(std::move(Operation)), m_expectedResult(ExpectedResult), m_allowEarlyCompletion(AllowEarlyCompletion)
         {
-            wil::unique_handle pipeRead;
-            wil::unique_handle pipeWrite;
-
-            if (UseOverlappedWritePipe)
-            {
-                auto [read, write] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, true);
-                pipeRead.reset(read.release());
-                pipeWrite.reset(write.release());
-            }
-            else
-            {
-                VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
-            }
+            auto [read, write] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, UseOverlappedWritePipe);
+            wil::unique_handle pipeRead(read.release());
+            wil::unique_handle pipeWrite(write.release());
 
             m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
             m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
