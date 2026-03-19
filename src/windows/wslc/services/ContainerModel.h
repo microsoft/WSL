@@ -67,4 +67,10 @@ struct ContainerInformation
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
 };
+
+struct EnvironmentVariable
+{
+    static std::optional<std::string> Parse(std::string entry);
+    static std::vector<std::string> ParseFile(std::string filePath);
+};
 } // namespace wsl::windows::wslc::models

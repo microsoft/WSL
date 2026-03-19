@@ -37,7 +37,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::DNSSearch),
         Argument::Create(ArgType::Entrypoint),
         Argument::Create(ArgType::Env, false, NO_LIMIT),
-        Argument::Create(ArgType::EnvFile),
+        Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
         Argument::Create(ArgType::GroupId),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Name),
