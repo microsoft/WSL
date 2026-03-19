@@ -1450,7 +1450,6 @@ try
         m_allocatedPorts.erase(it);
     }
 
-
     return S_OK;
 }
 CATCH_RETURN();

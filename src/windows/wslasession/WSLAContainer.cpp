@@ -1145,7 +1145,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     labels.erase(metadataIt);
 
-    auto networkingMode = DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode); 
+    auto networkingMode = DockerNetworkModeToWSLANetworkType(dockerContainer.HostConfig.NetworkMode);
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
     std::vector<ContainerPortMapping> ports;
     for (const auto& e : metadata.Ports)
