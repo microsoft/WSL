@@ -735,6 +735,7 @@ void WSLAContainerImpl::Export(ULONG OutHandle) const
     SocketCodePair = m_dockerClient.ExportContainer(m_id);
 
     wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutHandle))};
+    auto userHandleTracker = m_wslaSession.TrackUserHandle(containerFileHandle.get());
 
     wsl::windows::common::relay::MultiHandleWait io = m_wslaSession.CreateIOContext();
 

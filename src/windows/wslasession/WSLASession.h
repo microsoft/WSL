@@ -86,7 +86,44 @@ public:
 
     common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
+    // Track a user-provided HANDLE that the session is doing IO on.
+    // Returns an RAII guard that unregisters the handle when it goes out of scope.
+    class UserHandleTracker
+    {
+    public:
+        UserHandleTracker(WSLASession& session, HANDLE handle) : m_session(session), m_handle(handle)
+        {
+            if (m_handle != nullptr && m_handle != INVALID_HANDLE_VALUE)
+            {
+                std::lock_guard lock(m_session.m_userHandlesLock);
+                m_session.m_userHandles.push_back(m_handle);
+            }
+        }
+
+        ~UserHandleTracker()
+        {
+            if (m_handle != nullptr && m_handle != INVALID_HANDLE_VALUE)
+            {
+                std::lock_guard lock(m_session.m_userHandlesLock);
+                std::erase(m_session.m_userHandles, m_handle);
+            }
+        }
+
+        NON_COPYABLE(UserHandleTracker);
+        NON_MOVABLE(UserHandleTracker);
+
+    private:
+        WSLASession& m_session;
+        HANDLE m_handle;
+    };
+
+    [[nodiscard]] UserHandleTracker TrackUserHandle(HANDLE handle)
+    {
+        return UserHandleTracker(*this, handle);
+    }
+
 private:
+    void CancelUserHandleIO();
     ULONG m_id = 0;
 
     void ConfigureStorage(const WSLASessionInitSettings& Settings, PSID UserSid);
@@ -118,6 +155,11 @@ private:
     WSLAFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminated{false};
+
+    // User-provided handles that the session is currently doing IO on.
+    // Protected by m_userHandlesLock; independent of m_lock.
+    std::mutex m_userHandlesLock;
+    std::vector<HANDLE> m_userHandles;
 };
 
 } // namespace wsl::windows::service::wsla

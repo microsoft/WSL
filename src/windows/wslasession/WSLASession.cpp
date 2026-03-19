@@ -405,6 +405,8 @@ try
         dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Options->DockerfileHandle)));
     }
 
+    auto userHandleTracker = TrackUserHandle(dockerfileFileHandle.get());
+
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
@@ -592,6 +594,7 @@ CATCH_RETURN();
 void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(InputHandle))};
+    auto userHandleTracker = TrackUserHandle(imageFileHandle.get());
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -665,6 +668,7 @@ CATCH_RETURN();
 void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, HANDLE CancelEvent)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
+    auto userHandleTracker = TrackUserHandle(imageFileHandle.get());
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1312,6 +1316,10 @@ try
     // This allows a session to be unblocked if a stuck operation is holding the lock.
     m_sessionTerminatingEvent.SetEvent();
 
+    // Cancel any pending IO on user-provided handles to unblock operations
+    // in case the handles don't support overlapped IO.
+    CancelUserHandleIO();
+
     // Acquire an exclusive lock to ensure that no operation is running.
     auto lock = m_lock.lock_exclusive();
     std::lock_guard containersLock(m_containersLock);
@@ -1446,6 +1454,17 @@ MultiHandleWait WSLASession::CreateIOContext(HANDLE CancelHandle)
     }
 
     return io;
+}
+
+void WSLASession::CancelUserHandleIO()
+{
+    std::lock_guard lock(m_userHandlesLock);
+    for (auto handle : m_userHandles)
+    {
+        // CancelIoEx with nullptr cancels all pending IO on the handle.
+        // ERROR_NOT_FOUND is expected if no IO is pending.
+        CancelIoEx(handle, nullptr);
+    }
 }
 
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
