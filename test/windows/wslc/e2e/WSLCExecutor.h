@@ -20,7 +20,7 @@ Abstract:
 
 namespace WSLCE2ETests {
 
-constexpr DWORD DefaultWaitTimeoutMs = 60000;   // 60 seconds
+constexpr DWORD DefaultWaitTimeoutMs = 60000; // 60 seconds
 
 inline std::wstring GetWslcPath()
 {

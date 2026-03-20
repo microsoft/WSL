@@ -22,17 +22,17 @@ namespace WSLCE2ETests {
 
 // VT100/ANSI escape sequence constants for TTY testing
 namespace VT {
-    // Bracketed paste mode control sequences
-    #define VT_B_START "\x1b[?2004h"  // Enable bracketed paste mode
-    #define VT_B_END "\x1b[?2004l"    // Disable bracketed paste mode
+// Bracketed paste mode control sequences
+#define VT_B_START "\x1b[?2004h" // Enable bracketed paste mode
+#define VT_B_END "\x1b[?2004l"   // Disable bracketed paste mode
 
-    // Color/formatting sequences
-    #define VT_RESET "\x1b[0m"        // Reset all attributes
-    #define VT_RED "\x1b[1;31m"       // Bold red text
+// Color/formatting sequences
+#define VT_RESET "\x1b[0m"  // Reset all attributes
+#define VT_RED "\x1b[1;31m" // Bold red text
 
-    // Terminal control sequences
-    #define VT_ERASE_LINE "\x1b[K"    // Erase from cursor to end of line
-    #define VT_CR "\r"                // Carriage return
+// Terminal control sequences
+#define VT_ERASE_LINE "\x1b[K" // Erase from cursor to end of line
+#define VT_CR "\r"             // Carriage return
 
     // Prompt patterns used in WSLC.
     constexpr auto SESSION_PROMPT = VT_B_START VT_RED "root@ [ " VT_RESET "/" VT_RED " ]# ";
@@ -47,14 +47,14 @@ namespace VT {
     constexpr auto ERASE_LINE = VT_ERASE_LINE;
     constexpr auto CR = VT_CR;
 
-    // Remove macros to avoid polluting global namespace.
-    #undef VT_B_START
-    #undef VT_B_END
-    #undef VT_RESET
-    #undef VT_RED
-    #undef VT_ERASE_LINE
-    #undef VT_CR
-}
+// Remove macros to avoid polluting global namespace.
+#undef VT_B_START
+#undef VT_B_END
+#undef VT_RESET
+#undef VT_RED
+#undef VT_ERASE_LINE
+#undef VT_CR
+} // namespace VT
 
 struct TestImage
 {
