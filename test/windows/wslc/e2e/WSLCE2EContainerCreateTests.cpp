@@ -218,7 +218,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -p 80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
     // https://github.com/microsoft/WSL/issues/14433
@@ -227,7 +227,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
     // https://github.com/microsoft/WSL/issues/14433
@@ -236,7 +236,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
 private:

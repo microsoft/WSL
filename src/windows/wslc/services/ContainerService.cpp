@@ -103,7 +103,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
                 portMapping.PortProtocol() == PublishPort::Protocol::UDP)
             {
                 THROW_HR_WITH_USER_ERROR(
-                    E_FAIL,
+                    HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
                     "Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported");
             }
         }

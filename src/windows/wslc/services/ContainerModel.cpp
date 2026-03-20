@@ -59,72 +59,6 @@ PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& 
     return {port, port};
 }
 
-PublishPort::IPAddress PublishPort::IPAddress::ParseHostIP(const std::string& hostIpPart)
-{
-    // Check if it's an IPv6 address (enclosed in square brackets)
-    if (!hostIpPart.empty() && hostIpPart.front() == '[' && hostIpPart.back() == ']')
-    {
-        auto address = hostIpPart.substr(1, hostIpPart.size() - 2);
-        IN6_ADDR v6{};
-        if (inet_pton(AF_INET6, address.c_str(), &(v6)) == 1)
-        {
-            return PublishPort::IPAddress(v6);
-        }
-
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format("Invalid IPv6 address specified in port mapping: '{}'.", hostIpPart));
-    }
-    else
-    {
-        IN_ADDR v4{};
-        if (inet_pton(AF_INET, hostIpPart.c_str(), &(v4)) == 1)
-        {
-            return PublishPort::IPAddress(v4);
-        }
-
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format("Invalid IPv4 address specified in port mapping: '{}'.", hostIpPart));
-    }
-}
-
-bool PublishPort::IPAddress::IsAllInterfaces() const
-{
-    for (size_t i = 0; i < 16; i++)
-    {
-        if (m_bytes[i] != 0)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-std::string PublishPort::IPAddress::ToString() const
-{
-    char strBuffer[INET6_ADDRSTRLEN] = {};
-    if (IsIPv6())
-    {
-        inet_ntop(AF_INET6, m_bytes.data(), strBuffer, INET6_ADDRSTRLEN);
-    }
-    else
-    {
-        inet_ntop(AF_INET, m_bytes.data(), strBuffer, INET_ADDRSTRLEN);
-    }
-    return std::string(strBuffer);
-}
-
-bool PublishPort::IPAddress::IsLoopback() const
-{
-    if (IsIPv6())
-    {
-        // IPv6 loopback is ::1
-        static const std::array<uint8_t, 16> loopbackV6Bytes = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-        return m_bytes == loopbackV6Bytes;
-    }
-
-    // IPv4 loopback is 127.0.0.0/8
-    return m_bytes[0] == 127;
-}
-
 PublishPort PublishPort::Parse(const std::string& value)
 {
     PublishPort result{};
@@ -171,7 +105,7 @@ PublishPort PublishPort::Parse(const std::string& value)
         auto colonPos = hostPortPart->rfind(':');
         if (colonPos != std::string::npos)
         {
-            result.m_hostIP = PublishPort::IPAddress::ParseHostIP(hostPortPart->substr(0, colonPos));
+            result.m_hostIP = PublishPort::IPAddress(hostPortPart->substr(0, colonPos));
             auto hostPort = hostPortPart->substr(colonPos + 1);
             if (!hostPort.empty())
             {

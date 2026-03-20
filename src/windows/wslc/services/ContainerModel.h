@@ -125,14 +125,18 @@ struct PublishPort
 
     struct IPAddress
     {
-        explicit IPAddress(const IN_ADDR& v4) : m_isIPv6(false)
+        explicit IPAddress(std::string ip) : m_ip(std::move(ip))
         {
-            std::memcpy(m_bytes.data(), &v4, 4);
+            if (!m_ip.empty() && m_ip.front() == '[' && m_ip.back() == ']')
+            {
+                m_isIPv6 = true;
+                m_ip = m_ip.substr(1, m_ip.size() - 2);
+            }
         }
 
-        explicit IPAddress(const IN6_ADDR& v6) : m_isIPv6(true)
+        std::string IP() const
         {
-            std::memcpy(m_bytes.data(), &v6, 16);
+            return m_ip;
         }
 
         bool IsIPv6() const
@@ -140,19 +144,9 @@ struct PublishPort
             return m_isIPv6;
         }
 
-        const std::array<uint8_t, 16> GetBytes() const
-        {
-            return m_bytes;
-        }
-
-        static IPAddress ParseHostIP(const std::string& hostIpPart);
-        bool IsLoopback() const;
-        bool IsAllInterfaces() const;
-        std::string ToString() const;
-
     private:
         bool m_isIPv6 = false;
-        std::array<uint8_t, 16> m_bytes{};
+        std::string m_ip{};
     };
 
     static constexpr uint16_t MAX_PORT = std::numeric_limits<uint16_t>::max();
