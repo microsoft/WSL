@@ -165,7 +165,7 @@ class WslcSdkTests
 {
     WSLA_TEST_CLASS(WslcSdkTests)
 
-    CO_MTA_USAGE_COOKIE m_mtaCookie{};
+    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WslcSession m_defaultSession = nullptr;
