@@ -146,10 +146,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
 
         // Read all file content
-        std::wifstream in(VolumeTestFile1);
-        std::wstringstream buffer;
-        buffer << in.rdbuf();
-        VERIFY_ARE_EQUAL(L"WSLC Volume Test", buffer.str());
+        auto content = ReadFileContent(VolumeTestFile1.wstring());
+        VERIFY_ARE_EQUAL(L"WSLC Volume Test", content);
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermission)
