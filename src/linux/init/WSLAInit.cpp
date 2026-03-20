@@ -822,13 +822,12 @@ int WSLAEntryPoint(int Argc, char* Argv[])
 {
 
     //
-    // Mount devtmpfs.
+    // Perform initial mounts.
     //
 
-    int Result = UtilMount(nullptr, "/dev", "devtmpfs", 0, nullptr);
-    if (Result < 0)
+    if (UtilMount(nullptr, "/dev", "devtmpfs", 0, nullptr) < 0)
     {
-        FATAL_ERROR("Failed to mount /dev");
+        return -1;
     }
 
     if (UtilMount(nullptr, "/proc", "proc", 0, nullptr) < 0)
@@ -837,6 +836,16 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     }
 
     if (UtilMount(nullptr, "/sys", "sysfs", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, "/dev/pts", "devpts", MS_NOATIME | MS_NOSUID | MS_NOEXEC, "gid=5,mode=620") < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, "/sys/fs/cgroup", "cgroup2", 0, nullptr) < 0)
     {
         return -1;
     }
