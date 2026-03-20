@@ -44,35 +44,33 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Default path for container storage (default: %LocalAppData%\\wslc\\storage)\n"
     "  # defaultStoragePath: \"\"\n";
 
-
 // Validate individual setting specializations
 namespace details {
 
-#define WSLC_VALIDATE_SETTING(_setting_)                                                 \
-    std::optional<SettingMapping<Setting::_setting_>::value_t>                           \
-    SettingMapping<Setting::_setting_>::Validate(                                        \
+#define WSLC_VALIDATE_SETTING(_setting_) \
+    std::optional<SettingMapping<Setting::_setting_>::value_t> SettingMapping<Setting::_setting_>::Validate( \
         const SettingMapping<Setting::_setting_>::yaml_t& value)
 
-WSLC_VALIDATE_SETTING(SessionCpuCount)
-{
-    return value > 0 ? std::optional{value} : std::nullopt;
-}
+    WSLC_VALIDATE_SETTING(SessionCpuCount)
+    {
+        return value > 0 ? std::optional{value} : std::nullopt;
+    }
 
-WSLC_VALIDATE_SETTING(SessionMemoryMb)
-{
-    return value > 0 ? std::optional{value} : std::nullopt;
-}
+    WSLC_VALIDATE_SETTING(SessionMemoryMb)
+    {
+        return value > 0 ? std::optional{value} : std::nullopt;
+    }
 
-WSLC_VALIDATE_SETTING(SessionStorageSizeMb)
-{
-    return value > 0 ? std::optional{value} : std::nullopt;
-}
+    WSLC_VALIDATE_SETTING(SessionStorageSizeMb)
+    {
+        return value > 0 ? std::optional{value} : std::nullopt;
+    }
 
-// yaml_t = std::string (UTF-8 from yaml-cpp), value_t = std::wstring
-WSLC_VALIDATE_SETTING(SessionStoragePath)
-{
-    return MultiByteToWide(value);
-}
+    // yaml_t = std::string (UTF-8 from yaml-cpp), value_t = std::wstring
+    WSLC_VALIDATE_SETTING(SessionStoragePath)
+    {
+        return MultiByteToWide(value);
+    }
 
 #undef WSLC_VALIDATE_SETTING
 
@@ -81,111 +79,107 @@ WSLC_VALIDATE_SETTING(SessionStoragePath)
 // Helpers
 namespace {
 
-// Traverses a dot-separated path (e.g. "session.cpuCount") through a YAML node tree.
-// Returns nullopt if any segment is invalid or missing.
-std::optional<YAML::Node> NavigateYamlPath(const YAML::Node& root, std::string_view path)
-{
-    YAML::Node current = root;
-    auto subPaths = wsl::shared::string::Split(std::string{path}, '.');
-    for (auto const& subPath : subPaths)
+    // Traverses a dot-separated path (e.g. "session.cpuCount") through a YAML node tree.
+    // Returns nullopt if any segment is invalid or missing.
+    std::optional<YAML::Node> NavigateYamlPath(const YAML::Node& root, std::string_view path)
     {
-        if (current.IsDefined() && current.IsMap())
+        YAML::Node current = root;
+        auto subPaths = wsl::shared::string::Split(std::string{path}, '.');
+        for (auto const& subPath : subPaths)
         {
-            current = current[subPath];
+            if (current.IsDefined() && current.IsMap())
+            {
+                current = current[subPath];
+            }
+            else
+            {
+                return std::nullopt;
+            }
         }
-        else
+        return current;
+    }
+
+    // Validates and stores a single setting from the YAML document.
+    template <Setting S>
+    void ValidateSetting(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings)
+    {
+        constexpr auto path = details::SettingMapping<S>::YamlPath;
+        const YAML::Node node = NavigateYamlPath(root, path);
+
+        if (!node.IsDefined() || node.IsNull())
+        {
+            // Key absent — silently use the built-in default.
+            return;
+        }
+
+        try
+        {
+            auto rawValue = node.as<typename details::SettingMapping<S>::yaml_t>();
+            auto validated = details::SettingMapping<S>::Validate(rawValue);
+            if (validated.has_value())
+            {
+                map.Add<S>(std::move(validated.value()));
+            }
+            else
+            {
+                const auto widePath = MultiByteToWide(path);
+                warnings.push_back({std::format(L"Warning: Invalid value for setting '{}'. Using default.", widePath), widePath});
+            }
+        }
+        catch (const YAML::Exception&)
+        {
+            const auto widePath = MultiByteToWide(path);
+            warnings.push_back({std::format(L"Warning: Invalid type for setting '{}'. Using default.", widePath), widePath});
+        }
+    }
+
+    // Validates all settings via a fold over the Setting enum index sequence.
+    template <size_t... S>
+    void ValidateAll(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings, std::index_sequence<S...>)
+    {
+        (ValidateSetting<static_cast<Setting>(S)>(root, map, warnings), ...);
+    }
+
+    // Attempts to parse a YAML document from the given file path.
+    // Returns an empty optional and pushes a warning if the file exists but fails to parse.
+    std::optional<YAML::Node> TryLoadYaml(const std::filesystem::path& path, std::vector<Warning>& warnings)
+    {
+        std::ifstream stream(path);
+        if (!stream.is_open())
         {
             return std::nullopt;
         }
-    }
-    return current;
-}
 
-// Validates and stores a single setting from the YAML document.
-template <Setting S>
-void ValidateSetting(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings)
-{
-    constexpr auto path = details::SettingMapping<S>::YamlPath;
-    const YAML::Node node = NavigateYamlPath(root, path);
-
-    if (!node.IsDefined() || node.IsNull())
-    {
-        // Key absent — silently use the built-in default.
-        return;
-    }
-
-    try
-    {
-        auto rawValue = node.as<typename details::SettingMapping<S>::yaml_t>();
-        auto validated = details::SettingMapping<S>::Validate(rawValue);
-        if (validated.has_value())
+        try
         {
-            map.Add<S>(std::move(validated.value()));
+            return YAML::Load(stream);
         }
-        else
+        catch (const YAML::Exception& e)
         {
-            const auto widePath = MultiByteToWide(path);
             warnings.push_back(
-                {std::format(L"Warning: Invalid value for setting '{}'. Using default.", widePath), widePath});
+                {std::format(L"Warning: '{}' could not be parsed: {}.", path.filename().wstring(), MultiByteToWide(e.what())), {}});
+            return std::nullopt;
         }
     }
-    catch (const YAML::Exception&)
-    {
-        const auto widePath = MultiByteToWide(path);
-        warnings.push_back(
-            {std::format(L"Warning: Invalid type for setting '{}'. Using default.", widePath), widePath});
-    }
-}
 
-// Validates all settings via a fold over the Setting enum index sequence.
-template <size_t... S>
-void ValidateAll(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings, std::index_sequence<S...>)
-{
-    (ValidateSetting<static_cast<Setting>(S)>(root, map, warnings), ...);
-}
-
-// Attempts to parse a YAML document from the given file path.
-// Returns an empty optional and pushes a warning if the file exists but fails to parse.
-std::optional<YAML::Node> TryLoadYaml(const std::filesystem::path& path, std::vector<Warning>& warnings)
-{
-    std::ifstream stream(path);
-    if (!stream.is_open())
+    const std::filesystem::path& SettingsDir()
     {
-        return std::nullopt;
+        static const std::filesystem::path dir =
+            wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\settings";
+        return dir;
     }
 
-    try
+    std::filesystem::path PrimaryFilePath()
     {
-        return YAML::Load(stream);
+        return SettingsDir() / L"UserSettings.yaml";
     }
-    catch (const YAML::Exception& e)
+
+    std::filesystem::path BackupFilePath()
     {
-        warnings.push_back({std::format(L"Warning: '{}' could not be parsed: {}.",
-                                        path.filename().wstring(),
-                                        MultiByteToWide(e.what())),
-                            {}});
-        return std::nullopt;
+        return SettingsDir() / L"UserSettings.yaml.bak";
     }
-}
-
-const std::filesystem::path& SettingsDir()
-{
-    static const std::filesystem::path dir = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\settings";
-    return dir;
-}
-
-std::filesystem::path PrimaryFilePath()
-{
-    return SettingsDir() / L"UserSettings.yaml";
-}
-
-std::filesystem::path BackupFilePath()
-{
-    return SettingsDir() / L"UserSettings.yaml.bak";
-}
 
 } // namespace
-
 
 UserSettings const& UserSettings::Instance()
 {

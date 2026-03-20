@@ -20,7 +20,8 @@ namespace wsl::windows::wslc::models {
 SessionOptions SessionOptions::Default()
 {
     // Use a function-local static to defer path initialization until first use.
-    static const std::filesystem::path defaultPath = {wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\defaultstorage"};
+    static const std::filesystem::path defaultPath = {
+        wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\defaultstorage"};
 
     SessionOptions options{};
     options.m_sessionSettings.DisplayName = s_DefaultSessionName;

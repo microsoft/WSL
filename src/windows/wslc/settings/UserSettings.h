@@ -44,17 +44,17 @@ enum class Setting : size_t
 
 namespace details {
 
-template <Setting S>
-struct SettingMapping
-{
-    // yaml_t       - the C++ type read from the YAML node via node.as<yaml_t>()
-    // value_t      - the native type stored in SettingsMap
-    // DefaultValue - used when the key is absent or fails validation
-    // YamlPath     - dot-separated path into the YAML document (e.g. "session.cpuCount")
-    // Validate     - semantic validation; returns nullopt to reject and fall back to default
-};
+    template <Setting S>
+    struct SettingMapping
+    {
+        // yaml_t       - the C++ type read from the YAML node via node.as<yaml_t>()
+        // value_t      - the native type stored in SettingsMap
+        // DefaultValue - used when the key is absent or fails validation
+        // YamlPath     - dot-separated path into the YAML document (e.g. "session.cpuCount")
+        // Validate     - semantic validation; returns nullopt to reject and fall back to default
+    };
 
-// clang-format off
+    // clang-format off
 #define DEFINE_SETTING_MAPPING(_setting_, _yaml_t_, _value_t_, _default_, _path_) \
     template <>                                                                     \
     struct SettingMapping<Setting::_setting_>                                       \
@@ -66,13 +66,13 @@ struct SettingMapping
         static std::optional<value_t> Validate(const yaml_t& value);               \
     };
 
-DEFINE_SETTING_MAPPING(SessionCpuCount,      uint32_t,    uint32_t,     4,     "session.cpuCount")
-DEFINE_SETTING_MAPPING(SessionMemoryMb,      uint32_t,    uint32_t,     2048,  "session.memorySizeMb")
-DEFINE_SETTING_MAPPING(SessionStorageSizeMb, uint32_t,    uint32_t,     10000, "session.maxStorageSizeMb")
-DEFINE_SETTING_MAPPING(SessionStoragePath,   std::string, std::wstring, {},    "session.defaultStoragePath")
-// clang-format on
+    DEFINE_SETTING_MAPPING(SessionCpuCount,      uint32_t,    uint32_t,     4,     "session.cpuCount")
+    DEFINE_SETTING_MAPPING(SessionMemoryMb,      uint32_t,    uint32_t,     2048,  "session.memorySizeMb")
+    DEFINE_SETTING_MAPPING(SessionStorageSizeMb, uint32_t,    uint32_t,     10000, "session.maxStorageSizeMb")
+    DEFINE_SETTING_MAPPING(SessionStoragePath,   std::string, std::wstring, {},    "session.defaultStoragePath")
 
 #undef DEFINE_SETTING_MAPPING
+    // clang-format on
 
 } // namespace details
 
@@ -150,9 +150,9 @@ private:
     UserSettings();
     ~UserSettings() = default;
 
-    SettingsMap          m_settings;
+    SettingsMap m_settings;
     std::vector<Warning> m_warnings;
-    UserSettingsType     m_type = UserSettingsType::Default;
+    UserSettingsType m_type = UserSettingsType::Default;
 };
 
 // Convenience free function — returns the singleton instance.

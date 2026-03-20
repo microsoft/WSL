@@ -23,7 +23,6 @@ using namespace wsl::windows::wslc::settings;
 
 namespace wsl::windows::wslc {
 
-
 // SettingsCommand
 std::vector<std::unique_ptr<Command>> SettingsCommand::GetCommands() const
 {
@@ -44,9 +43,10 @@ std::wstring SettingsCommand::ShortDescription() const
 
 std::wstring SettingsCommand::LongDescription() const
 {
-    return {L"Opens the wslc user settings file in the system default editor for .yaml files.\n"
-            L"On first run, creates the file with all settings commented out at their defaults.\n"
-            L"A backup of the current settings is saved before the editor opens."};
+    return {
+        L"Opens the wslc user settings file in the system default editor for .yaml files.\n"
+        L"On first run, creates the file with all settings commented out at their defaults.\n"
+        L"A backup of the current settings is saved before the editor opens."};
 }
 
 void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
@@ -54,12 +54,14 @@ void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
     settings::User().PrepareToShellExecuteFile();
 
     const auto path = settings::User().SettingsFilePath();
-    const auto result = reinterpret_cast<INT_PTR>(
-        ShellExecuteW(nullptr, L"open", path.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL));
 
-    if (result <= 32)
+    // Some versions of windows will fail if no file extension association exists, other will pop up the dialog
+    // to make the user pick their default.
+    HINSTANCE res = ShellExecuteW(nullptr, nullptr, path.c_str(), nullptr, nullptr, SW_SHOW);
+    if (static_cast<int>(reinterpret_cast<uintptr_t>(res)) <= 32)
     {
-        THROW_HR_MSG(E_UNEXPECTED, "ShellExecuteW failed to open settings file (error %lld)", result);
+        // User doesn't have file type association. Default to notepad
+        ShellExecuteW(nullptr, nullptr, L"notepad", path.c_str(), nullptr, SW_SHOW);
     }
 }
 
@@ -76,8 +78,9 @@ std::wstring SettingsResetCommand::ShortDescription() const
 
 std::wstring SettingsResetCommand::LongDescription() const
 {
-    return {L"Overwrites the settings file with a commented-out defaults template.\n"
-            L"Use --force / -f to skip the confirmation prompt."};
+    return {
+        L"Overwrites the settings file with a commented-out defaults template.\n"
+        L"Use --force / -f to skip the confirmation prompt."};
 }
 
 void SettingsResetCommand::ExecuteInternal(CLIExecutionContext& context) const
