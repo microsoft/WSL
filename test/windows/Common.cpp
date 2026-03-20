@@ -2668,7 +2668,7 @@ std::string EscapeString(const std::string& Input)
         {
             Output += "\\t";
         }
-        else if (e == '\x1b')  // ESC character - start of VT sequence
+        else if (e == '\x1b') // ESC character - start of VT sequence
         {
             Output += "\\x1b";
         }
@@ -2747,9 +2747,11 @@ void PartialHandleRead::ExpectConsume(const std::string& Expected)
 
     if (content != Expected)
     {
-        VERIFY_FAIL(std::format(L"Expected: '{}' but got: '{}'",
-                                wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
-                                wsl::shared::string::MultiByteToWide(EscapeString(content))).c_str());
+        VERIFY_FAIL(std::format(
+                        L"Expected: '{}' but got: '{}'",
+                        wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
+                        wsl::shared::string::MultiByteToWide(EscapeString(content)))
+                        .c_str());
     }
 }
 
