@@ -172,27 +172,26 @@ void WSLCInteractiveSession::Write(const std::string& data)
         DWORD error = GetLastError();
         if (error == ERROR_IO_PENDING)
         {
-            THROW_LAST_ERROR_IF(WaitForSingleObject(event.get(), 5000) != WAIT_OBJECT_0);
+            // One minute timeout consistent with other timeouts in this test suite.
+            DWORD waitResult = WaitForSingleObject(event.get(), 60 * 1000);
+            if (waitResult == WAIT_TIMEOUT)
+            {
+                THROW_HR(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+            }
+            else if (waitResult == WAIT_FAILED)
+            {
+                THROW_LAST_ERROR();
+            }
+            else if (waitResult != WAIT_OBJECT_0)
+            {
+                THROW_HR_MSG(E_UNEXPECTED, "WaitForSingleObject returned unexpected result: 0x%08lx", waitResult);
+            }
+
             THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(m_stdinWrite.get(), &overlapped, &written, FALSE));
         }
         else
         {
             THROW_WIN32(error);
-        }
-    }
-
-    // Only flush if the handle is still valid (process might have closed it)
-    if (m_stdinWrite.get() != nullptr)
-    {
-        if (!FlushFileBuffers(m_stdinWrite.get()))
-        {
-            DWORD error = GetLastError();
-
-            // Ignore ERROR_BROKEN_PIPE - the process closed stdin, which is expected during shutdown
-            if (error != ERROR_BROKEN_PIPE)
-            {
-                THROW_WIN32(error);
-            }
         }
     }
 }
