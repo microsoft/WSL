@@ -2217,6 +2217,45 @@ class WSLATests
             ExpectMount(session.get(), "/win-path", {});
         }
 
+        // Validate that a read-only share cannot be made writeable via mount -o remount,rw.
+        {
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
+
+            // Attempt an in-place remount to read-write from the guest.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "mount -o remount,rw /win-path"}, 0);
+
+            // Verify the folder is still not writeable.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            ExpectMount(session.get(), "/win-path", {});
+        }
+
+        // Validate that the device host enforces read-only even if the guest tries to bypass mount options.
+        if (enableVirtioFs)
+        {
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
+
+            // Capture the mount source and type, unmount, then remount without read-only.
+            ExpectCommandResult(
+                session.get(),
+                {"/bin/sh",
+                 "-c",
+                 "src=$(findmnt -n -o SOURCE /win-path) && "
+                 "fstype=$(findmnt -n -o FSTYPE /win-path) && "
+                 "umount /win-path && "
+                 "mount -t $fstype $src /win-path"},
+                0);
+
+            // Verify the folder is still not writeable.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            ExpectMount(session.get(), "/win-path", {});
+        }
+
         // Validate various error paths
         {
             VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true), E_INVALIDARG);
