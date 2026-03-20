@@ -173,11 +173,7 @@ public:
 
     // Cache read-only properties so they remain accessible after the impl is disconnected.
     // Called from WSLAContainerImpl::DisconnectComWrapper() while m_lock is held exclusively.
-    void CacheState(
-        const std::string& id,
-        const std::string& name,
-        WSLAContainerState state,
-        const Microsoft::WRL::ComPtr<WSLAProcess>& initProcess) noexcept;
+    void CacheState(const std::string& id, const std::string& name, WSLAContainerState state, const Microsoft::WRL::ComPtr<WSLAProcess>& initProcess) noexcept;
 
 private:
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;

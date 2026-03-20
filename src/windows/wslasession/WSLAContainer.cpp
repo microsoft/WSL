@@ -1496,11 +1496,7 @@ try
 }
 CATCH_RETURN();
 
-void WSLAContainer::CacheState(
-    const std::string& id,
-    const std::string& name,
-    WSLAContainerState state,
-    const Microsoft::WRL::ComPtr<WSLAProcess>& initProcess) noexcept
+void WSLAContainer::CacheState(const std::string& id, const std::string& name, WSLAContainerState state, const Microsoft::WRL::ComPtr<WSLAProcess>& initProcess) noexcept
 try
 {
     m_cachedId = id;
