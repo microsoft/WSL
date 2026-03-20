@@ -36,6 +36,7 @@ struct ContainerOptions
     bool Remove = false;
     bool TTY = false;
     std::vector<std::string> Ports;
+    std::vector<std::wstring> Volumes;
 };
 
 struct CreateContainerResult
@@ -196,6 +197,40 @@ private:
     static constexpr bool IsValidPort(unsigned long port) noexcept
     {
         return port >= MIN_PORT && port <= MAX_PORT;
+    }
+};
+
+struct VolumeMount
+{
+    std::wstring HostPath() const
+    {
+        return m_hostPath;
+    }
+
+    std::string ContainerPath() const
+    {
+        return m_containerPath;
+    }
+
+    bool IsReadOnly() const
+    {
+        return m_isReadOnlyMode;
+    }
+    static VolumeMount Parse(const std::wstring& value);
+
+private:
+    std::wstring m_hostPath;
+    std::string m_containerPath;
+    bool m_isReadOnlyMode = false;
+
+    static bool IsReadOnlyMode(const std::wstring& mode)
+    {
+        return mode == L"ro";
+    }
+
+    static bool IsValidMode(const std::wstring& mode)
+    {
+        return IsReadOnlyMode(mode) || mode == L"rw";
     }
 };
 } // namespace wsl::windows::wslc::models

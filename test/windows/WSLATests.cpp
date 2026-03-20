@@ -1561,12 +1561,10 @@ class WSLATests
         NON_COPYABLE(BlockingOperation);
         NON_MOVABLE(BlockingOperation);
 
-        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK) :
-            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult)
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK, bool AllowEarlyCompletion = false, bool UseOverlappedWritePipe = false) :
+            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult), m_allowEarlyCompletion(AllowEarlyCompletion)
         {
-            wil::unique_handle pipeRead;
-            wil::unique_handle pipeWrite;
-            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+            auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, UseOverlappedWritePipe);
 
             m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
             m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
@@ -1588,16 +1586,17 @@ class WSLATests
             }
         }
 
-        void RunOperation(wil::unique_handle Handle)
+        void RunOperation(wil::unique_hfile Handle)
         {
             m_result.set_value(m_operation(Handle.get()));
 
-            // Fail if the operation completed before the test signaled completion.
+            // Fail if the operation completed before the test signaled completion
+            // (unless early completion is expected, e.g. session termination).
             // Don't use VERIFY macros since this is running in a separate thread.
-            WI_ASSERT(m_testCompleteEvent.is_signaled());
+            WI_ASSERT(m_allowEarlyCompletion || m_testCompleteEvent.is_signaled());
         }
 
-        void RunIO(wil::unique_handle Handle)
+        void RunIO(wil::unique_hfile Handle)
         {
             std::vector<char> buffer(1024 * 1024);
             while (true)
@@ -1646,6 +1645,7 @@ class WSLATests
         std::thread m_ioThread;
         std::promise<HRESULT> m_result;
         HRESULT m_expectedResult{};
+        bool m_allowEarlyCompletion{};
     };
 
     TEST_METHOD(SaveImage)
@@ -5317,6 +5317,48 @@ class WSLATests
             auto [result, _] = WSLAProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
+    }
+
+    TEST_METHOD(SessionTerminationDuringSave)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that SaveImage is aborted when the session terminates.
+        // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
+        BlockingOperation operation(
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); }, E_ABORT, true, true);
+
+        // Terminate the session.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        operation.Complete();
+        auto restore = ResetTestSession();
+    }
+
+    TEST_METHOD(SessionTerminationDuringExport)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that container Export is aborted when the session terminates.
+        WSLAContainerLauncher launcher("debian:latest", "test-export-session-terminate", {"echo", "OK"});
+        auto container = launcher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 0);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            PruneResult result;
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        });
+
+        // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); }, E_ABORT, true, true);
+
+        // Avoid attempting container delete on scope exit after intentional session termination;
+        // rely on the prune scope-exit above to clean up instead.
+        container.SetDeleteOnClose(false);
+
+        // Terminate the session.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        operation.Complete();
+        auto restore = ResetTestSession();
     }
 
     TEST_METHOD(InteractiveDetach)

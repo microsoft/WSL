@@ -50,7 +50,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
-        Argument::Create(ArgType::Volume),
+        Argument::Create(ArgType::Volume, false, NO_LIMIT),
         Argument::Create(ArgType::Virtual),
     };
     // clang-format on
