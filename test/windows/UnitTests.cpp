@@ -6547,7 +6547,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         DistroFileChange mountHelper(L"/sbin/mount.hang", false);
         mountHelper.SetContent(
             L"#!/bin/sh\n"
-            "read pass < /dev/tty\n");
+            L"read pass < /dev/tty\n");
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod +x /sbin/mount.hang"), (DWORD)0);
 
         // Add fstab entry using this helper.
