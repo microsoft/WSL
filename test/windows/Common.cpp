@@ -2734,6 +2734,12 @@ std::string PartialHandleRead::ConsumeBytes(size_t Length)
     return result;
 }
 
+std::string PartialHandleRead::GetData() const
+{
+    std::lock_guard lock{m_mutex};
+    return m_data;
+}
+
 void PartialHandleRead::Expect(const std::string& Expected)
 {
     auto content = ReadBytes(Expected.size());

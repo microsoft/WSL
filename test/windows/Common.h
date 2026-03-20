@@ -346,6 +346,8 @@ public:
     std::string ReadBytes(size_t Length);
     std::string ConsumeBytes(size_t Length);
 
+    std::string GetData() const;
+
 private:
     void Run();
 

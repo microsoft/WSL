@@ -265,6 +265,14 @@ bool WSLCInteractiveSession::Terminate(UINT exitCode)
 void WSLCInteractiveSession::VerifyNoErrors()
 {
     m_stderrReader->ExpectClosed(DefaultWaitTimeoutMs);
+
+    // Verify that stderr was actually empty - not just closed
+    const auto& stderrContent = m_stderrReader->GetData();
+    if (!stderrContent.empty())
+    {
+        VERIFY_FAIL(std::format(L"Expected no errors but stderr contained: {}", wsl::shared::string::MultiByteToWide(EscapeString(stderrContent)))
+                        .c_str());
+    }
 }
 
 int WSLCInteractiveSession::Exit(DWORD timeoutMs)
