@@ -2701,12 +2701,6 @@ PartialHandleRead::~PartialHandleRead()
     }
 }
 
-std::string PartialHandleRead::GetData() const
-{
-    std::lock_guard lock{m_mutex};
-    return m_data;
-}
-
 std::string PartialHandleRead::ReadBytes(size_t Length)
 {
     wsl::shared::retry::RetryWithTimeout<void>(

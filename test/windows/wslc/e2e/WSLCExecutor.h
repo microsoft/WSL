@@ -60,16 +60,6 @@ struct WSLCInteractiveSession
     void ExpectStderr(const std::string& expected);
     void WriteLineAndExpect(const std::string& line, const std::string& expectedOutput);
 
-    std::wstring GetStdOut() const
-    {
-        return wsl::shared::string::MultiByteToWide(EscapeString(m_stdoutReader->GetData()));
-    }
-
-    std::wstring GetStdErr() const
-    {
-        return wsl::shared::string::MultiByteToWide(EscapeString(m_stderrReader->GetData()));
-    }
-
     bool IsRunning() const;
     void CloseStdin();
     std::optional<int> GetExitCode() const;

@@ -343,9 +343,6 @@ public:
     void ExpectConsume(const std::string& Expected);
     void ExpectClosed(DWORD Timeout = 60 * 1000);
 
-    // Get current contents without consuming
-    std::string GetData() const;
-
     std::string ReadBytes(size_t Length);
     std::string ConsumeBytes(size_t Length);
 
