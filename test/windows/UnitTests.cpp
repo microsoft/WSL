@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 
 #include "Common.h"
+#include "install.h"
 #include <AclAPI.h>
 #include <fstream>
 #include <filesystem>
@@ -271,6 +272,7 @@ class UnitTests
         };
 
         // Validate user sessions state with gui apps disabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = false}));
         {
             validateUserSession();
 
@@ -284,7 +286,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps enabled.
         {
-            WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+            config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
             validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
@@ -2349,7 +2351,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             {
                 LogInfo("Validating signature for: %ls", e.path().c_str());
 
-                wsl::windows::common::wslutil::ValidateFileSignature(e.path().c_str());
+                wsl::windows::common::install::ValidateFileSignature(e.path().c_str());
                 signedFiles++;
             }
         }

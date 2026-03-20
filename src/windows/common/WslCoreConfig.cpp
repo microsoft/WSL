@@ -474,15 +474,19 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         EnableVirtio9p = false;
     }
 
-    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored)
+    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy)
     {
-        VALIDATE_CONFIG_OPTION((NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored), EnableDnsTunneling, false);
+        VALIDATE_CONFIG_OPTION(
+            (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy),
+            EnableDnsTunneling,
+            false);
     }
 
-    if (!EnableDnsTunneling)
+    if (!EnableDnsTunneling || NetworkingMode == NetworkingMode::VirtioProxy)
     {
-        VALIDATE_CONFIG_OPTION(!EnableDnsTunneling, BestEffortDnsParsing, false);
-        VALIDATE_CONFIG_OPTION(!EnableDnsTunneling, DnsTunnelingIpAddress, std::optional<uint32_t>{});
+        VALIDATE_CONFIG_OPTION(!EnableDnsTunneling || NetworkingMode == NetworkingMode::VirtioProxy, BestEffortDnsParsing, false);
+        VALIDATE_CONFIG_OPTION(
+            !EnableDnsTunneling || NetworkingMode == NetworkingMode::VirtioProxy, DnsTunnelingIpAddress, std::optional<uint32_t>{});
     }
 
     if (NetworkingMode != NetworkingMode::Mirrored)
