@@ -145,12 +145,12 @@ void ContainerEventTracker::OnEvent(const std::string_view& event)
         }
     }
 
-    std::lock_guard lock{m_lock};
-
     auto timeEntry = parsed.find("time");
     THROW_HR_IF_MSG(
         E_INVALIDARG, timeEntry == parsed.end(), "Failed to parse time from event: %.*hs", static_cast<int>(event.size()), event.data());
     std::uint64_t eventTime = timeEntry->get<std::uint64_t>();
+
+    std::lock_guard lock{m_lock};
 
     for (const auto& e : m_callbacks)
     {
