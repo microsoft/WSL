@@ -2650,8 +2650,10 @@ std::string EscapeString(const std::string& Input)
 {
     std::string Output;
 
-    for (auto e : Input)
+    for (size_t i = 0; i < Input.size(); ++i)
     {
+        auto e = Input[i];
+
         if (e == '\n')
         {
             Output += "\\n";
@@ -2667,6 +2669,16 @@ std::string EscapeString(const std::string& Input)
         else if (e == '\t')
         {
             Output += "\\t";
+        }
+        else if (e == '\x1b')  // ESC character - start of VT sequence
+        {
+            Output += "\\x1b";
+        }
+        else if (e < 32 || e >= 127)  // Other non-printable characters
+        {
+            char hex[8];
+            sprintf_s(hex, sizeof(hex), "\\x%02x", static_cast<unsigned char>(e));
+            Output += hex;
         }
         else
         {
@@ -2691,6 +2703,12 @@ PartialHandleRead::~PartialHandleRead()
     }
 }
 
+std::string PartialHandleRead::GetData() const
+{
+    std::lock_guard lock{m_mutex};
+    return m_data;
+}
+
 std::string PartialHandleRead::ReadBytes(size_t Length)
 {
     wsl::shared::retry::RetryWithTimeout<void>(
@@ -2707,11 +2725,35 @@ std::string PartialHandleRead::ReadBytes(size_t Length)
     return m_data.substr(0, Length);
 }
 
+std::string PartialHandleRead::ConsumeBytes(size_t Length)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&]() {
+            std::lock_guard lock{m_mutex};
+
+            THROW_HR_IF(E_ABORT, m_data.size() < Length);
+        },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(60));
+
+    std::lock_guard lock{m_mutex};
+    std::string result = m_data.substr(0, Length);
+    m_data.erase(0, Length);
+    return result;
+}
+
 void PartialHandleRead::Expect(const std::string& Expected)
 {
     auto content = ReadBytes(Expected.size());
 
     VERIFY_ARE_EQUAL(content, Expected);
+}
+
+void PartialHandleRead::ExpectConsume(const std::string& Expected)
+{
+    auto content = ConsumeBytes(Expected.size());
+
+    VERIFY_ARE_EQUAL(EscapeString(content), EscapeString(Expected));
 }
 
 void PartialHandleRead::ExpectClosed(DWORD Timeout)

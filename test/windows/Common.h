@@ -340,15 +340,20 @@ public:
     ~PartialHandleRead();
 
     void Expect(const std::string& Expected);
+    void ExpectConsume(const std::string& Expected);
     void ExpectClosed(DWORD Timeout = 60 * 1000);
 
+    // Get current contents without consuming
+    std::string GetData() const;
+
     std::string ReadBytes(size_t Length);
+    std::string ConsumeBytes(size_t Length);
 
 private:
     void Run();
 
     HANDLE m_handle{};
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     std::thread m_thread;
     std::string m_data;

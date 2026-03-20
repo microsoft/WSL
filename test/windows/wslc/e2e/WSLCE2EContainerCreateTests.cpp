@@ -18,6 +18,8 @@ Abstract:
 
 namespace WSLCE2ETests {
 
+using namespace WEX::Logging;
+
 class WSLCE2EContainerCreateTests
 {
     WSL_TEST_CLASS(WSLCE2EContainerCreateTests)
@@ -134,8 +136,9 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container run -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        WriteAndVerifyOutput(session, "echo hello", "hello");
-        WriteAndVerifyOutput(session, "whoami", "root");
+        session.ExpectStdout(VT::CONT_PROMPT);
+        session.WriteLineAndExpect("echo hello", std::format("echo hello\r\n{}\rhello\r\n{}root@:/# ", VT::B_END, VT::B_START));
+        session.WriteLineAndExpect("whoami", std::format("whoami\r\n{}\rroot\r\n{}root@:/# ", VT::B_END, VT::B_START));
 
         auto exitCode = session.ExitAndVerifyNoErrors();
         VERIFY_ARE_EQUAL(0, exitCode);
@@ -177,8 +180,11 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        WriteAndVerifyOutput(session, "echo hello", "hello");
-        WriteAndVerifyOutput(session, "whoami", "root");
+        // The container attach prompt appears twice.
+        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
+        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
+        session.WriteLineAndExpect("echo hello", std::format("echo hello\r\n{}\rhello\r\n{}root@:/# ", VT::B_END, VT::B_START));
+        session.WriteLineAndExpect("whoami", std::format("whoami\r\n{}\rroot\r\n{}root@:/# ", VT::B_END, VT::B_START));
 
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();
@@ -224,8 +230,9 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        WriteAndVerifyOutput(session, "echo hello", "hello");
-        WriteAndVerifyOutput(session, "whoami", "root");
+        session.ExpectStdout(VT::CONT_PROMPT);
+        session.WriteLineAndExpect("echo hello", std::format("echo hello\r\n{}\rhello\r\n{}root@:/# ", VT::B_END, VT::B_START));
+        session.WriteLineAndExpect("whoami", std::format("whoami\r\n{}\rroot\r\n{}root@:/# ", VT::B_END, VT::B_START));
 
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();
@@ -271,8 +278,11 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        WriteAndVerifyOutput(session, "echo hello", "hello");
-        WriteAndVerifyOutput(session, "whoami", "root");
+        // The container attach prompt appears twice.
+        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
+        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
+        session.WriteLineAndExpect("echo hello", std::format("echo hello\r\n{}\rhello\r\n{}root@:/# ", VT::B_END, VT::B_START));
+        session.WriteLineAndExpect("whoami", std::format("whoami\r\n{}\rroot\r\n{}root@:/# ", VT::B_END, VT::B_START));
 
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();
@@ -316,8 +326,9 @@ class WSLCE2EContainerCreateTests
             auto session = RunWslcInteractive(L"session shell");
             VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-            WriteAndVerifyOutput(session, "echo hello", "hello");
-            WriteAndVerifyOutput(session, "whoami", "root");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+            session.WriteLineAndExpect("echo hello", std::format("{}echo hello\r\n{}\rhello\r\n{}", VT::RESET, VT::B_END, VT::SESSION_PROMPT));
+            session.WriteLineAndExpect("whoami", std::format("{}whoami\r\n{}\rroot\r\n{}", VT::RESET, VT::B_END, VT::SESSION_PROMPT));
 
             session.ExitAndVerifyNoErrors();
             auto exitCode = session.Wait();
@@ -328,8 +339,9 @@ class WSLCE2EContainerCreateTests
             auto session = RunWslcInteractive(L"session shell wsla-cli");
             VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-            WriteAndVerifyOutput(session, "echo hello", "hello");
-            WriteAndVerifyOutput(session, "whoami", "root");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+            session.WriteLineAndExpect("echo hello", std::format("{}echo hello\r\n{}\rhello\r\n{}", VT::RESET, VT::B_END, VT::SESSION_PROMPT));
+            session.WriteLineAndExpect("whoami", std::format("{}whoami\r\n{}\rroot\r\n{}", VT::RESET, VT::B_END, VT::SESSION_PROMPT));
 
             session.ExitAndVerifyNoErrors();
             auto exitCode = session.Wait();
