@@ -33,7 +33,6 @@ constexpr auto c_releaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/r
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
 constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";
-constexpr auto c_unknownDiskName = L"<unknown>";
 
 namespace {
 
@@ -769,7 +768,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
         return Localization::MessageTooManyDisks();
 
     case WSL_E_USER_VHD_ALREADY_ATTACHED:
-        return Localization::MessageUserVhdAlreadyAttached2(c_unknownDiskName);
+        return Localization::MessageUserVhdAlreadyAttached();
 
     case WSL_E_VM_MODE_NOT_SUPPORTED:
         return Localization::MessageVmModeNotSupported();
