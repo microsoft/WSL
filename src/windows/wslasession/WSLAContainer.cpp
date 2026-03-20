@@ -1377,6 +1377,13 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DisconnectComWrap
 {
     if (m_comWrapper)
     {
+        // Cache read-only properties in the COM wrapper before disconnecting,
+        // so callers can still query state/process after the impl is gone.
+        {
+            std::lock_guard processesLock{m_processesLock};
+            m_comWrapper->CacheState(m_id, m_name, m_state, m_initProcess);
+        }
+
         m_comWrapper->Disconnect();
         m_comWrapper.Reset();
     }
@@ -1489,19 +1496,20 @@ try
 }
 CATCH_RETURN();
 
-void WSLAContainer::OnDisconnectLockHeld(WSLAContainerImpl* impl) noexcept
+void WSLAContainer::CacheState(
+    const std::string& id,
+    const std::string& name,
+    WSLAContainerState state,
+    const Microsoft::WRL::ComPtr<WSLAProcess>& initProcess) noexcept
 try
 {
-    m_cachedId = impl->m_id;
-    m_cachedName = impl->m_name;
-    m_cachedState = impl->m_state;
+    m_cachedId = id;
+    m_cachedName = name;
+    m_cachedState = state;
 
+    if (initProcess)
     {
-        std::lock_guard processesLock{impl->m_processesLock};
-        if (impl->m_initProcess)
-        {
-            impl->m_initProcess.CopyTo(m_cachedInitProcess.GetAddressOf());
-        }
+        initProcess.CopyTo(m_cachedInitProcess.GetAddressOf());
     }
 }
 CATCH_LOG();
