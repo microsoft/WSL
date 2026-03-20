@@ -136,15 +136,15 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container run -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("echo hello");
         session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
         session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         auto exitCode = session.ExitAndVerifyNoErrors();
         VERIFY_ARE_EQUAL(0, exitCode);
@@ -188,16 +188,16 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
         // The container attach prompt appears twice.
-        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
-        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_ATTACH_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_ATTACH_PROMPT);
 
         session.WriteLine("echo hello");
         session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
         session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();
@@ -244,15 +244,15 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("echo hello");
         session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
         session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();
@@ -300,16 +300,16 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
         // The container attach prompt appears twice.
-        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
-        session.ExpectStdout(VT::CONT_ATTACH_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_ATTACH_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_ATTACH_PROMPT);
 
         session.WriteLine("echo hello");
         session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
         session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
-        session.ExpectStdout(VT::CONT_PROMPT);
+        session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();

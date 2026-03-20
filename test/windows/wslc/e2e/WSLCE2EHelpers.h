@@ -36,8 +36,8 @@ namespace VT {
 
     // Prompt patterns used in WSLC.
     constexpr auto SESSION_PROMPT = VT_B_START VT_RED "root@ [ " VT_RESET "/" VT_RED " ]# ";
-    constexpr auto CONT_PROMPT = VT_B_START "root@:/# ";
-    constexpr auto CONT_ATTACH_PROMPT = VT_CR VT_ERASE_LINE VT_CR "root@:/# ";
+    constexpr auto CONTAINER_PROMPT = VT_B_START "root@:/# ";
+    constexpr auto CONTAINER_ATTACH_PROMPT = VT_CR VT_ERASE_LINE VT_CR "root@:/# ";
 
     // Constexpr representations of the control sequences for use in tests.
     constexpr auto B_START = VT_B_START;
