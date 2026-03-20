@@ -109,8 +109,6 @@ public:
         auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(span);
         WI_ASSERT(header->MessageSize == span.size());
 
-        header->MessageMagic = MESSAGE_HEADER::Magic;
-
         if (m_pending_reply_sequence.has_value())
         {
             header->SequenceNumber = m_pending_reply_sequence.value();
@@ -239,8 +237,6 @@ public:
                 THROW_ERRNO(EINVAL);
 #endif
             }
-
-            // Magic is already validated in ReceiveImpl.
 
             // Validate sequence
             if (m_expected_reply_sequence.has_value())
