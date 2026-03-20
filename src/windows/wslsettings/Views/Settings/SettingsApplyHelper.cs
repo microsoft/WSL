@@ -12,7 +12,7 @@ namespace WslSettings.Views.Settings;
 
 internal static class SettingsApplyHelper
 {
-    public static async Task ShowApplyChangesDialogAsync(XamlRoot? xamlRoot)
+    public static async Task ShowApplyChangesDialogAsync(XamlRoot xamlRoot)
     {
         var wslConfigService = App.GetService<IWslConfigService>();
         var pendingChanges = wslConfigService.GetPendingChanges();
@@ -96,7 +96,7 @@ internal static class SettingsApplyHelper
         // Esc / close — do nothing, leave changes pending
     }
 
-    private static async Task ShowFailureDialogAsync(XamlRoot? xamlRoot, string message)
+    private static async Task ShowFailureDialogAsync(XamlRoot xamlRoot, string message)
     {
         var dialog = new ContentDialog
         {
@@ -181,7 +181,7 @@ internal static class SettingsApplyHelper
             case WslConfigEntry.KernelPath:
             case WslConfigEntry.SystemDistroPath:
             case WslConfigEntry.KernelModulesPath:
-                return setting.StringValue;
+                return setting.StringValue ?? string.Empty;
             case WslConfigEntry.NetworkingMode:
                 return FormatEnum(setting.NetworkingConfigurationValue);
             case WslConfigEntry.AutoMemoryReclaim:

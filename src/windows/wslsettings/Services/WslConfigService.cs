@@ -382,7 +382,11 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
         case WslConfigEntry.KernelModulesPath:
             // Create via the managed clone constructor so string memory is owned
             var clone = WslConfigSetting.__CreateInstance(nativeInternal);
-            clone.StringValue = ConfigSetting.StringValue;
+            var stringValue = ConfigSetting.StringValue;
+            if (stringValue is not null)
+            {
+                clone.StringValue = stringValue;
+            }
             return new WslConfigSettingManaged(clone);
         case WslConfigEntry.ProcessorCount:
         case WslConfigEntry.InitialAutoProxyTimeout:
