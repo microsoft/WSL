@@ -104,9 +104,9 @@ namespace {
     void ValidateSetting(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings)
     {
         constexpr auto path = details::SettingMapping<S>::YamlPath;
-        const YAML::Node node = NavigateYamlPath(root, path);
+        auto node = NavigateYamlPath(root, path);
 
-        if (!node.IsDefined() || node.IsNull())
+        if (!node || !node->IsDefined() || node->IsNull())
         {
             // Key absent — silently use the built-in default.
             return;
@@ -114,7 +114,7 @@ namespace {
 
         try
         {
-            auto rawValue = node.as<typename details::SettingMapping<S>::yaml_t>();
+            auto rawValue = node->as<typename details::SettingMapping<S>::yaml_t>();
             auto validated = details::SettingMapping<S>::Validate(rawValue);
             if (validated.has_value())
             {
