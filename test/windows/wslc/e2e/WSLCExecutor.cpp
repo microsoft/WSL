@@ -144,6 +144,50 @@ WSLCInteractiveSession::WSLCInteractiveSession(
     m_stderrReader = std::make_unique<PartialHandleRead>(m_stderrRead.get());
 }
 
+WSLCInteractiveSession::~WSLCInteractiveSession()
+{
+    try
+    {
+        // Check if the process is still running
+        DWORD exitCode = 0;
+        if (!GetExitCodeProcess(m_processHandle.get(), &exitCode) || exitCode == STILL_ACTIVE)
+        {
+            Log::Warning(L"WSLCInteractiveSession destroyed while process still running - attempting cleanup");
+
+            // Close stdin to signal EOF to the child process
+            m_stdinWrite.reset();
+
+            // Give the process a short time to exit gracefully. Standard 1 minute for these tests.
+            constexpr DWORD gracefulExitTimeoutMs = 60 * 1000;
+            DWORD waitResult = WaitForSingleObject(m_processHandle.get(), gracefulExitTimeoutMs);
+
+            if (waitResult == WAIT_TIMEOUT)
+            {
+                // Process didn't exit gracefully, force termination
+                Log::Warning(L"Process did not exit gracefully, terminating forcefully");
+                if (Terminate(1))
+                {
+                    // Wait a short time for termination to complete
+                    WaitForSingleObject(m_processHandle.get(), 1000);
+                }
+            }
+            else if (waitResult == WAIT_FAILED)
+            {
+                Log::Error(std::format(L"WaitForSingleObject failed during cleanup: {}", GetLastError()).c_str());
+            }
+        }
+
+        // Clean up reader threads before closing handles
+        m_stdoutReader.reset();
+        m_stderrReader.reset();
+    }
+    catch (...)
+    {
+        // Destructors should not throw - log the error but don't propagate
+        Log::Error(std::format(L"Exception during WSLCInteractiveSession cleanup: 0x{:08x}", wil::ResultFromCaughtException()).c_str());
+    }
+}
+
 void WSLCInteractiveSession::ExpectStdout(const std::string& expected)
 {
     m_stdoutReader->ExpectConsume(expected);

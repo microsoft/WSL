@@ -44,7 +44,7 @@ struct WSLCExecutionResult
 struct WSLCInteractiveSession
 {
     WSLCInteractiveSession(std::wstring commandLine, wil::unique_hfile stdinWrite, wil::unique_hfile stdoutRead, wil::unique_hfile stderrRead, wil::unique_handle processHandle);
-    ~WSLCInteractiveSession() = default;
+    ~WSLCInteractiveSession();
 
     // Non-copyable, non-movable
     WSLCInteractiveSession(const WSLCInteractiveSession&) = delete;
