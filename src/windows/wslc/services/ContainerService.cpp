@@ -86,7 +86,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
 
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
+        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeBridged, processFlags);
 
     // Set port options if provided
     for (const auto& port : options.Ports)
