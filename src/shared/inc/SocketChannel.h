@@ -63,9 +63,10 @@ public:
         m_exitEvent = std::move(other.m_exitEvent);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
+        m_strict_request_end = other.m_strict_request_end;
+        m_strict_reply_end = other.m_strict_reply_end;
         m_sent_messages = other.m_sent_messages;
-        m_expected_reply_sequence = std::move(other.m_expected_reply_sequence);
-        m_pending_reply_sequence = std::move(other.m_pending_reply_sequence);
+        m_received_messages = other.m_received_messages;
 
         return *this;
     }
@@ -106,28 +107,17 @@ public:
 
         THROW_INVALID_ARG_IF(m_name == nullptr || span.size() < sizeof(TMessage));
 
+        uint32_t sequenceNumber = 0;
+        {
+            std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
+            m_sent_messages++;
+            sequenceNumber = m_sent_messages;
+        }
+
         auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(span);
         WI_ASSERT(header->MessageSize == span.size());
 
-        if (m_ignore_sequence)
-        {
-            header->SequenceNumber = m_sent_messages++;
-        }
-        else
-        {
-            std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
-            if (m_pending_reply_sequence.has_value())
-            {
-                header->SequenceNumber = m_pending_reply_sequence.value();
-                m_pending_reply_sequence.reset();
-            }
-            else
-            {
-                m_sent_messages++;
-                header->SequenceNumber = m_sent_messages;
-                m_expected_reply_sequence = m_sent_messages;
-            }
-        }
+        header->SequenceNumber = sequenceNumber;
 
 #ifdef WIN32
 
@@ -220,6 +210,9 @@ public:
 
         for (;;)
         {
+
+            m_received_messages++;
+
             auto receivedSpan = ReceiveImpl(TMessage::Type, timeout);
             if (receivedSpan.empty())
             {
@@ -249,25 +242,25 @@ public:
 #endif
                 }
 
-                std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
-                if (m_expected_reply_sequence.has_value())
+                if (m_strict_request_end)
                 {
-                    auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_expected_reply_sequence.value());
+                    // Skip stale message for strict request end.
+                    std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
+                    auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_sent_messages);
                     if (diff < 0)
                     {
-                        // Skip stale message.
 #ifdef WIN32
                         WSL_LOG(
                             "DiscardStaleResponse",
                             TraceLoggingValue(m_name, "Name"),
                             TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
-                            TraceLoggingValue(m_expected_reply_sequence.value(), "ExpectedSeq"));
+                            TraceLoggingValue(m_sent_messages, "ExpectedSeq"));
 #else
                         LOG_WARNING(
                             "Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}",
                             m_name,
                             receivedHeader->SequenceNumber,
-                            m_expected_reply_sequence.value());
+                            m_sent_messages);
 #endif
                         continue;
                     }
@@ -279,23 +272,43 @@ public:
                             E_UNEXPECTED,
                             "Unexpected response sequence: %u, expected: %u, channel: %hs",
                             receivedHeader->SequenceNumber,
-                            m_expected_reply_sequence.value(),
+                            m_sent_messages,
                             m_name);
 #else
                         LOG_ERROR(
                             "Unexpected response sequence: {}, expected: {}, channel: {}",
                             receivedHeader->SequenceNumber,
-                            m_expected_reply_sequence.value(),
+                            m_sent_messages,
                             m_name);
                         THROW_ERRNO(EINVAL);
 #endif
                     }
-
-                    m_expected_reply_sequence.reset();
                 }
-                else
+                else if (m_strict_reply_end)
                 {
-                    m_pending_reply_sequence = receivedHeader->SequenceNumber;
+                    // The send id must catch up to the latest received id.
+                    std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
+                    // - 1: m_sent_messages will be ++ before used.
+                    m_sent_messages = receivedHeader->SequenceNumber - 1;
+                }
+                else if (receivedHeader->SequenceNumber != m_received_messages)
+                {
+                    // Ensure consecutive sequence numbers
+#ifdef WIN32
+                    THROW_HR_MSG(
+                        E_UNEXPECTED,
+                        "Unexpected message sequence: %u, expected: %u, channel: %hs",
+                        receivedHeader->SequenceNumber,
+                        m_received_messages,
+                        m_name);
+#else
+                    LOG_ERROR(
+                        "Unexpected message sequence: {}, expected: {}, channel: {}",
+                        receivedHeader->SequenceNumber,
+                        m_received_messages,
+                        m_name);
+                    THROW_ERRNO(EINVAL);
+#endif
                 }
             }
 
@@ -381,6 +394,18 @@ public:
     void IgnoreSequenceNumbers()
     {
         m_ignore_sequence = true;
+    }
+
+    // This end always requests. With 0 or 1 reply message.
+    void SetStrictRequestEnd()
+    {
+        m_strict_request_end = true;
+    }
+
+    // This end always replys. With 0 or 1 reply message.
+    void SetStrictReplyEnd()
+    {
+        m_strict_reply_end = true;
     }
 
 #ifndef WIN32
@@ -477,16 +502,10 @@ private:
 
 #endif
     uint32_t m_sent_messages = 0;
-    // The assumption when sequence numbers are used:
-    // 1. Request end and reply end is fixed for a given channel. That is, the message will always be:
-    //    - A -> B (request), then B -> A (reply) or
-    //    - A -> B (request), w/o a reply.
-    // 2. There are no concurrent valid requests. That is:
-    //    - A will not initiate concurrent requests. Only the latest one is valid.
-    //    - B will not start handling a new message until it finishes or fails to handle the previous one.
-    std::optional<uint32_t> m_expected_reply_sequence;
-    std::optional<uint32_t> m_pending_reply_sequence;
+    uint32_t m_received_messages = 0;
     bool m_ignore_sequence = false;
+    bool m_strict_request_end = false;
+    bool m_strict_reply_end = false;
     const char* m_name{};
     std::mutex m_sendMutex;
     std::mutex m_receiveMutex;
