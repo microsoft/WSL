@@ -23,7 +23,9 @@ WslcSetSessionSettingsVHD
 WslcTerminateSession
 WslcPullSessionImage
 WslcImportSessionImage
+WslcImportSessionImageFromFile
 WslcLoadSessionImage
+WslcLoadSessionImageFromFile
 WslcDeleteSessionImage
 WslcListSessionImages
 WslcCreateSessionVhd
