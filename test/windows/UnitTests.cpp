@@ -1262,9 +1262,7 @@ class UnitTests
             }
 
             ValidateErrorMessage(
-                L"--unmount DoesNotExist",
-                L"Disk not found: DoesNotExist",
-                L"Wsl/Service/DetachDisk/ERROR_FILE_NOT_FOUND");
+                L"--unmount DoesNotExist", L"Disk not found: DoesNotExist", L"Wsl/Service/DetachDisk/ERROR_FILE_NOT_FOUND");
 
             ValidateErrorMessage(
                 WSL_MANAGE_ARG L" " LXSS_DISTRO_NAME_TEST L" " WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L" false_",
