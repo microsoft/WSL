@@ -24,6 +24,12 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
+const TestImage& AlpineTestImage()
+{
+    static const TestImage image{L"alpine", L"latest", std::filesystem::path{g_testDataPath} / L"alpine-latest.tar"};
+    return image;
+}
+
 const TestImage& DebianTestImage()
 {
     static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / L"debian-latest.tar"};

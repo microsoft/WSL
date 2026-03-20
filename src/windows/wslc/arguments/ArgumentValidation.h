@@ -56,4 +56,6 @@ WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
 
+void ValidateVolumeMount(const std::vector<std::wstring>& values);
+
 } // namespace wsl::windows::wslc::validation

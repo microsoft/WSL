@@ -205,6 +205,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Interactive = true;
     }
 
+    if (context.Args.Contains(ArgType::Volume))
+    {
+        auto volumes = context.Args.GetAll<ArgType::Volume>();
+        options.Volumes.reserve(options.Volumes.size() + volumes.size());
+        for (const auto& volume : volumes)
+        {
+            options.Volumes.emplace_back(volume);
+        }
+    }
+
     if (context.Args.Contains(ArgType::Remove))
     {
         options.Remove = true;

@@ -84,7 +84,17 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
 
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLAContainerNetworkTypeHost, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLAContainerNetworkTypeBridged, processFlags);
+
+    // Add volumes if specified
+    for (const auto& volumeSpec : options.Volumes)
+    {
+        auto volume = VolumeMount::Parse(volumeSpec);
+        auto host = volume.HostPath();
+        auto container = volume.ContainerPath();
+        containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+    }
+
     containerLauncher.SetContainerFlags(containerFlags);
 
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
