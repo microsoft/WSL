@@ -2733,7 +2733,7 @@ public:
     NON_MOVABLE(ReadHandleWithTargetValue);
 
     ReadHandleWithTargetValue(wsl::windows::common::relay::HandleWrapper&& MovedHandle, std::string_view targetValue) :
-        ReadHandle(std::move(MovedHandle), [&](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
+        ReadHandle(std::move(MovedHandle), [this](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
         m_targetValue(targetValue)
     {
     }
