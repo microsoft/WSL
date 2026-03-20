@@ -165,26 +165,26 @@ internal static class SettingsApplyHelper
 
     private static string FormatSettingValue(IWslConfigSetting setting)
     {
-        switch (setting.ConfigEntry)
+        switch (setting.ConfigEntry.GetValueKind())
         {
-            case WslConfigEntry.MemorySizeBytes:
-            case WslConfigEntry.SwapSizeBytes:
-            case WslConfigEntry.VhdSizeBytes:
+            case WslConfigValueKind.UInt64:
                 return string.Format("Settings_MegabyteStringFormat".GetLocalized(), setting.UInt64Value / Constants.MB);
-            case WslConfigEntry.ProcessorCount:
-                return setting.Int32Value.ToString();
-            case WslConfigEntry.InitialAutoProxyTimeout:
-            case WslConfigEntry.VMIdleTimeout:
-                return string.Format("Settings_MillisecondsStringFormat".GetLocalized(), setting.Int32Value);
-            case WslConfigEntry.SwapFilePath:
-            case WslConfigEntry.IgnoredPorts:
-            case WslConfigEntry.KernelPath:
-            case WslConfigEntry.SystemDistroPath:
-            case WslConfigEntry.KernelModulesPath:
+            case WslConfigValueKind.Int32:
+                switch (setting.ConfigEntry)
+                {
+                    case WslConfigEntry.ProcessorCount:
+                        return setting.Int32Value.ToString();
+                    case WslConfigEntry.InitialAutoProxyTimeout:
+                    case WslConfigEntry.VMIdleTimeout:
+                        return string.Format("Settings_MillisecondsStringFormat".GetLocalized(), setting.Int32Value);
+                    default:
+                        return setting.Int32Value.ToString();
+                }
+            case WslConfigValueKind.String:
                 return setting.StringValue ?? string.Empty;
-            case WslConfigEntry.NetworkingMode:
+            case WslConfigValueKind.NetworkingConfiguration:
                 return FormatEnum(setting.NetworkingConfigurationValue);
-            case WslConfigEntry.AutoMemoryReclaim:
+            case WslConfigValueKind.MemoryReclaimMode:
                 return FormatEnum(setting.MemoryReclaimModeValue);
             default:
                 return FormatBool(setting.BoolValue);

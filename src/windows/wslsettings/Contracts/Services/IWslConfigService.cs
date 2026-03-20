@@ -48,3 +48,46 @@ public interface IWslConfigSetting
     uint SetValue(object? value);
     bool Equals(object? obj);
 }
+
+/// <summary>
+/// Describes which union field a <see cref="WslConfigEntry"/> uses inside the native WslConfigSetting struct.
+/// </summary>
+public enum WslConfigValueKind
+{
+    Bool,
+    Int32,
+    UInt64,
+    String,
+    NetworkingConfiguration,
+    MemoryReclaimMode,
+}
+
+public static class WslConfigEntryExtensions
+{
+    /// <summary>
+    /// Returns the <see cref="WslConfigValueKind"/> that describes which union field this entry uses.
+    /// Keep this in sync with the native WslConfigSetting union in WslCoreConfigInterface.h.
+    /// </summary>
+    public static WslConfigValueKind GetValueKind(this WslConfigEntry entry) => entry switch
+    {
+        WslConfigEntry.SwapFilePath or
+        WslConfigEntry.IgnoredPorts or
+        WslConfigEntry.KernelPath or
+        WslConfigEntry.SystemDistroPath or
+        WslConfigEntry.KernelModulesPath => WslConfigValueKind.String,
+
+        WslConfigEntry.ProcessorCount or
+        WslConfigEntry.InitialAutoProxyTimeout or
+        WslConfigEntry.VMIdleTimeout => WslConfigValueKind.Int32,
+
+        WslConfigEntry.MemorySizeBytes or
+        WslConfigEntry.SwapSizeBytes or
+        WslConfigEntry.VhdSizeBytes => WslConfigValueKind.UInt64,
+
+        WslConfigEntry.NetworkingMode => WslConfigValueKind.NetworkingConfiguration,
+
+        WslConfigEntry.AutoMemoryReclaim => WslConfigValueKind.MemoryReclaimMode,
+
+        _ => WslConfigValueKind.Bool,
+    };
+}

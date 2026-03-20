@@ -373,13 +373,9 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
     {
         var nativeInternal = new WslConfigSetting.__Internal();
         nativeInternal.ConfigEntry = ConfigSetting.ConfigEntry;
-        switch (ConfigSetting.ConfigEntry)
+        switch (ConfigSetting.ConfigEntry.GetValueKind())
         {
-        case WslConfigEntry.SwapFilePath:
-        case WslConfigEntry.IgnoredPorts:
-        case WslConfigEntry.KernelPath:
-        case WslConfigEntry.SystemDistroPath:
-        case WslConfigEntry.KernelModulesPath:
+        case WslConfigValueKind.String:
             // Create via the managed clone constructor so string memory is owned
             var clone = WslConfigSetting.__CreateInstance(nativeInternal);
             var stringValue = ConfigSetting.StringValue;
@@ -388,20 +384,16 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
                 clone.StringValue = stringValue;
             }
             return new WslConfigSettingManaged(clone);
-        case WslConfigEntry.ProcessorCount:
-        case WslConfigEntry.InitialAutoProxyTimeout:
-        case WslConfigEntry.VMIdleTimeout:
+        case WslConfigValueKind.Int32:
             nativeInternal.Int32Value = ConfigSetting.Int32Value;
             break;
-        case WslConfigEntry.MemorySizeBytes:
-        case WslConfigEntry.SwapSizeBytes:
-        case WslConfigEntry.VhdSizeBytes:
+        case WslConfigValueKind.UInt64:
             nativeInternal.UInt64Value = ConfigSetting.UInt64Value;
             break;
-        case WslConfigEntry.NetworkingMode:
+        case WslConfigValueKind.NetworkingConfiguration:
             nativeInternal.NetworkingConfigurationValue = ConfigSetting.NetworkingConfigurationValue;
             break;
-        case WslConfigEntry.AutoMemoryReclaim:
+        case WslConfigValueKind.MemoryReclaimMode:
             nativeInternal.MemoryReclaimModeValue = ConfigSetting.MemoryReclaimModeValue;
             break;
         default:
@@ -412,6 +404,7 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
         return new WslConfigSettingManaged(WslConfigSetting.__CreateInstance(nativeInternal));
     }
 
+    // Exact value comparison used by snapshot diffing (HasPendingChanges / EnumeratePendingChanges).
     public bool Equals(WslConfigSettingManaged other)
     {
         if (other is null)
@@ -424,31 +417,25 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
             return false;
         }
 
-        switch (ConfigSetting.ConfigEntry)
+        return Equals(other.GetValueAsObject());
+    }
+
+    private object GetValueAsObject()
+    {
+        switch (ConfigSetting.ConfigEntry.GetValueKind())
         {
-        case WslConfigEntry.SwapFilePath:
-        case WslConfigEntry.IgnoredPorts:
-        case WslConfigEntry.KernelPath:
-        case WslConfigEntry.SystemDistroPath:
-        case WslConfigEntry.KernelModulesPath:
-            return string.Equals(
-                ConfigSetting.StringValue,
-                other.ConfigSetting.StringValue,
-                System.StringComparison.Ordinal);
-        case WslConfigEntry.ProcessorCount:
-        case WslConfigEntry.InitialAutoProxyTimeout:
-        case WslConfigEntry.VMIdleTimeout:
-            return ConfigSetting.Int32Value == other.ConfigSetting.Int32Value;
-        case WslConfigEntry.MemorySizeBytes:
-        case WslConfigEntry.SwapSizeBytes:
-        case WslConfigEntry.VhdSizeBytes:
-            return ConfigSetting.UInt64Value == other.ConfigSetting.UInt64Value;
-        case WslConfigEntry.NetworkingMode:
-            return ConfigSetting.NetworkingConfigurationValue == other.ConfigSetting.NetworkingConfigurationValue;
-        case WslConfigEntry.AutoMemoryReclaim:
-            return ConfigSetting.MemoryReclaimModeValue == other.ConfigSetting.MemoryReclaimModeValue;
-        default:
-            return ConfigSetting.BoolValue == other.ConfigSetting.BoolValue;
+            case WslConfigValueKind.String:
+                return ConfigSetting.StringValue;
+            case WslConfigValueKind.Int32:
+                return ConfigSetting.Int32Value;
+            case WslConfigValueKind.UInt64:
+                return ConfigSetting.UInt64Value;
+            case WslConfigValueKind.NetworkingConfiguration:
+                return ConfigSetting.NetworkingConfigurationValue;
+            case WslConfigValueKind.MemoryReclaimMode:
+                return ConfigSetting.MemoryReclaimModeValue;
+            default:
+                return ConfigSetting.BoolValue;
         }
     }
 
@@ -460,33 +447,26 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
             throw new ArgumentNullException(nameof(value));
         }
 
-        if ("".GetType() == value.GetType())
+        switch (ConfigSetting.ConfigEntry.GetValueKind())
         {
-            ConfigSetting.StringValue = (string)value;
-        }
-        else if (ConfigSetting.UInt64Value.GetType() == value.GetType())
-        {
-            ConfigSetting.UInt64Value = (ulong)value;
-        }
-        else if (ConfigSetting.Int32Value.GetType() == value.GetType())
-        {
-            ConfigSetting.Int32Value = (int)value;
-        }
-        else if (ConfigSetting.BoolValue.GetType() == value.GetType())
-        {
-            ConfigSetting.BoolValue = (bool)value;
-        }
-        else if (ConfigSetting.NetworkingConfigurationValue.GetType() == value.GetType())
-        {
-            ConfigSetting.NetworkingConfigurationValue = (NetworkingConfiguration)value;
-        }
-        else if (ConfigSetting.MemoryReclaimModeValue.GetType() == value.GetType())
-        {
-            ConfigSetting.MemoryReclaimModeValue = (MemoryReclaimMode)value;
-        }
-        else
-        {
-            throw new InvalidDataException();
+            case WslConfigValueKind.String:
+                ConfigSetting.StringValue = (string)value;
+                break;
+            case WslConfigValueKind.Int32:
+                ConfigSetting.Int32Value = (int)value;
+                break;
+            case WslConfigValueKind.UInt64:
+                ConfigSetting.UInt64Value = (ulong)value;
+                break;
+            case WslConfigValueKind.NetworkingConfiguration:
+                ConfigSetting.NetworkingConfigurationValue = (NetworkingConfiguration)value;
+                break;
+            case WslConfigValueKind.MemoryReclaimMode:
+                ConfigSetting.MemoryReclaimModeValue = (MemoryReclaimMode)value;
+                break;
+            default:
+                ConfigSetting.BoolValue = (bool)value;
+                break;
         }
 
         return App.GetService<IWslConfigService>().SetWslConfigSetting(this);
@@ -507,34 +487,7 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
             return ((ulong)value / Constants.MB) == (UInt64Value / Constants.MB);
         }
 
-        if ("".GetType() == value.GetType())
-        {
-            return ConfigSetting.StringValue == (string)value;
-        }
-        else if (ConfigSetting.UInt64Value.GetType() == value.GetType())
-        {
-            return ConfigSetting.UInt64Value == (ulong)value;
-        }
-        else if (ConfigSetting.Int32Value.GetType() == value.GetType())
-        {
-            return ConfigSetting.Int32Value == (int)value;
-        }
-        else if (ConfigSetting.BoolValue.GetType() == value.GetType())
-        {
-            return ConfigSetting.BoolValue == (bool)value;
-        }
-        else if (ConfigSetting.NetworkingConfigurationValue.GetType() == value.GetType())
-        {
-            return ConfigSetting.NetworkingConfigurationValue == (NetworkingConfiguration)value;
-        }
-        else if (ConfigSetting.MemoryReclaimModeValue.GetType() == value.GetType())
-        {
-            return ConfigSetting.MemoryReclaimModeValue == (MemoryReclaimMode)value;
-        }
-        else
-        {
-            throw new InvalidDataException();
-        }
+        return GetValueAsObject().Equals(value);
     }
 
     public override int GetHashCode()
