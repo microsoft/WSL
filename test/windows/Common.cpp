@@ -2672,12 +2672,6 @@ std::string EscapeString(const std::string& Input)
         {
             Output += "\\x1b";
         }
-        else if (e < 32 || e >= 127)  // Other non-printable characters
-        {
-            char hex[8];
-            sprintf_s(hex, sizeof(hex), "\\x%02x", static_cast<unsigned char>(e));
-            Output += hex;
-        }
         else
         {
             Output += e;

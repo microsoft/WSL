@@ -324,7 +324,7 @@ class WSLCE2EContainerCreateTests
         {
             // Session shell should attach to the wslc session.
             auto session = RunWslcInteractive(L"session shell");
-            VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
             session.ExpectStdout(VT::SESSION_PROMPT);
             session.WriteLineAndExpect("echo hello", std::format("{}echo hello\r\n{}\rhello\r\n{}", VT::RESET, VT::B_END, VT::SESSION_PROMPT));
@@ -337,7 +337,7 @@ class WSLCE2EContainerCreateTests
         {
             // Session shell should attach to the wslc by name also.
             auto session = RunWslcInteractive(L"session shell wsla-cli");
-            VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
             session.ExpectStdout(VT::SESSION_PROMPT);
             session.WriteLineAndExpect("echo hello", std::format("{}echo hello\r\n{}\rhello\r\n{}", VT::RESET, VT::B_END, VT::SESSION_PROMPT));
