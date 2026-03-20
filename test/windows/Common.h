@@ -109,7 +109,6 @@ using namespace std::chrono_literals;
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslaservice.exe") \
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslasession.exe") \
     END_TEST_CLASS()
 
@@ -563,7 +562,6 @@ inline auto EnableSystemd(const std::string& extraConfig = "")
 std::wstring EscapePath(std::wstring_view Path);
 
 void StopWslService();
-void StopWslaService();
 
 std::optional<GUID> GetDistributionId(LPCWSTR Name);
 wil::unique_hkey OpenDistributionKey(LPCWSTR Name);

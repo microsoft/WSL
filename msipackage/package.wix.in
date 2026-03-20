@@ -238,25 +238,13 @@
                      N.B. It shouldn't be started on install because it will fail to start if the OC is missing, 
                      which would fail the install. -->
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
-            </Component>
 
-            <Component Id="wslaservice" Guid="DC97520E-BFA5-4559-960F-D580E151629F" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
-                <!-- WSLAServiceProxyStub. -->
-                <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}">
-                    <RegistryValue Value="PSFactoryBuffer" Type="string" />
-                    <RegistryKey Key="InProcServer32">
-                        <RegistryValue Value="[INSTALLDIR]wslaserviceproxystub.dll" Type="string" />
-                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
-                    </RegistryKey>
-                </RegistryKey>
-
-                <!-- WSLAService COM app -->
+                <!-- WSLA COM app - activated through WSLService -->
                 <RegistryKey Root="HKCR" Key="AppID\{E9B79997-57E3-4201-AECC-6A464E530DD2}">
-
                     <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
                     <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
                     <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
-                    <RegistryValue Name="LocalService" Value="WSLAService" Type="string" />
+                    <RegistryValue Name="LocalService" Value="WSLService" Type="string" />
                 </RegistryKey>
 
                 <!-- WSLAContainer -->
@@ -289,7 +277,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8760}">
                     <RegistryValue Value="IWSLASessionManager" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -297,7 +285,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{7577FE8D-DE85-471E-B870-11669986F332}">
                     <RegistryValue Value="IWSLAContainer" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -305,7 +293,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{1AD163CD-393D-4B33-83A2-8A3F3F23E608}">
                     <RegistryValue Value="IWSLAProcess" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -313,7 +301,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE}">
                     <RegistryValue Value="ITerminationCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -321,7 +309,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{5038842F-53DB-4F30-A6D0-A41B02C94AC1}">
                     <RegistryValue Value="IProgressCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -329,7 +317,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{EF0661E4-6364-40EA-B433-E2FDF11F3519}">
                     <RegistryValue Value="IWSLASession" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -337,7 +325,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{B3A72F48-9D15-4E8A-A621-7C3E84F09B52}">
                     <RegistryValue Value="IWSLASessionReference" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -345,7 +333,7 @@
                 <RegistryKey Root="HKCR" Key="Interface\{C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91}">
                     <RegistryValue Value="IWSLASessionFactory" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
@@ -353,16 +341,11 @@
                 <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
                     <RegistryValue Value="IWSLAVirtualMachine" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
-                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <File Id="wslaservice.exe" Source="${BIN}/wslaservice.exe"  KeyPath="yes" />
                 <File Id="wslasession.exe" Source="${BIN}/wslasession.exe" />
-                <File Id="wslaserviceproxystub.dll" Name="wslaserviceproxystub.dll" Source="${BIN}/wslaserviceproxystub.dll" />
-
-                <ServiceInstall Name="WSLAService" DisplayName="WSLA Service" Description="WSLA Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
-                <ServiceControl Id="StopWSLAService" Stop="both" Remove="uninstall" Name="WSLAService" Wait="yes" />
             </Component>
             <Component Id="wslg" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134731" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
@@ -502,7 +485,6 @@
         <Feature Id="WSL" Title="Windows Subsystem for Linux" Level="1">
             <ComponentRef Id="wsl" />
             <ComponentRef Id="wslservice" />
-            <ComponentRef Id="wslaservice" />
             <ComponentRef Id="wslg" />
             <ComponentRef Id="tools" />
             <ComponentRef Id="explorershell" />
