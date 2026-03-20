@@ -166,8 +166,7 @@ class WSLCE2EContainerCreateTests
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
         // limitation where we are not getting stdout data correctly from non-TTY process.
-        // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
-        // fails due to not receiving any output in the pipe.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -225,8 +224,7 @@ class WSLCE2EContainerCreateTests
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
         // limitation where we are not getting stdout data correctly from non-TTY process.
-        // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
-        // fails due to not receiving any output in the pipe.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -282,8 +280,7 @@ class WSLCE2EContainerCreateTests
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
         // limitation where we are not getting stdout data correctly from non-TTY process.
-        // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
-        // fails due to not receiving any output in the pipe.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -342,8 +339,7 @@ class WSLCE2EContainerCreateTests
 
         // Stdin relay is confirmed working. Stdout verification is skipped due to a known
         // limitation where we are not getting stdout data correctly from non-TTY process.
-        // Calling session.ReadUntil() or WriteAndVerifyOutput(session, "test", "test")
-        // fails due to not receiving any output in the pipe.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
