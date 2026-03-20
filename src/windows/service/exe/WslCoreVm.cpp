@@ -358,7 +358,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         gpuRequest.RequestType = hcs::ModifyRequestType::Update;
         gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
         gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
+        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
         {
             gpuRequest.Settings.DisableGdiAcceleration = true;
             gpuRequest.Settings.DisablePresentation = true;

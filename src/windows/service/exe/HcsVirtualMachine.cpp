@@ -266,7 +266,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
         gpuRequest.RequestType = hcs::ModifyRequestType::Update;
         gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
         gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
+        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
         {
             gpuRequest.Settings.DisableGdiAcceleration = true;
             gpuRequest.Settings.DisablePresentation = true;
