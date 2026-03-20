@@ -13,6 +13,7 @@ Abstract:
 
 --*/
 #pragma once
+#include "defs.h"
 #include "EnumVariantMap.h"
 #include <cstdint>
 #include <filesystem>
@@ -24,7 +25,7 @@ Abstract:
 // How to add a setting:
 // 1 - Add an entry to the Setting enum.
 // 2 - Add a DEFINE_SETTING_MAPPING specialization with yaml_t, value_t, default, and YAML path.
-// 3 - Implement the Validate function in UserSettings.cpp.
+// 3 - Implement the Validate function in UserSettings.cpp if needed, otherwise use pass through.
 
 namespace wsl::windows::wslc::settings {
 
@@ -33,7 +34,7 @@ namespace wsl::windows::wslc::settings {
 // Max must be last and unused.
 enum class Setting : size_t
 {
-    SessionCpuCount,
+    SessionCpuCount = 0,
     SessionMemoryMb,
     SessionStorageSizeMb,
     SessionStoragePath,
@@ -65,7 +66,6 @@ struct SettingMapping
         static std::optional<value_t> Validate(const yaml_t& value);               \
     };
 
-//                         Setting               yaml_t       value_t       default  YamlPath
 DEFINE_SETTING_MAPPING(SessionCpuCount,      uint32_t,    uint32_t,     4,     "session.cpuCount")
 DEFINE_SETTING_MAPPING(SessionMemoryMb,      uint32_t,    uint32_t,     2048,  "session.memorySizeMb")
 DEFINE_SETTING_MAPPING(SessionStorageSizeMb, uint32_t,    uint32_t,     10000, "session.maxStorageSizeMb")
@@ -77,8 +77,6 @@ DEFINE_SETTING_MAPPING(SessionStoragePath,   std::string, std::wstring, {},    "
 } // namespace details
 
 // Type-safe enum-indexed map of all settings values, backed by EnumBasedVariantMap.
-// Each setting key holds at most one value; Contains(S) indicates whether the setting
-// was explicitly loaded from the file (vs. falling back to DefaultValue).
 struct SettingsMap : wsl::windows::wslc::EnumBasedVariantMap<Setting, details::SettingMapping>
 {
     // Returns the stored value if present, otherwise the compile-time default.
@@ -118,21 +116,14 @@ public:
     // Returns the singleton instance. Loaded on first call; subsequent calls are no-ops.
     static UserSettings const& Instance();
 
-    UserSettings(const UserSettings&) = delete;
-    UserSettings& operator=(const UserSettings&) = delete;
-    UserSettings(UserSettings&&) = delete;
-    UserSettings& operator=(UserSettings&&) = delete;
+    NON_COPYABLE(UserSettings);
+    NON_MOVABLE(UserSettings);
 
     // Returns the value for setting S, or its built-in default if not present in the file.
     template <Setting S>
     typename details::SettingMapping<S>::value_t Get() const
     {
         return m_settings.GetOrDefault<S>();
-    }
-
-    SettingsMap const& GetSettings() const
-    {
-        return m_settings;
     }
 
     std::vector<Warning> const& GetWarnings() const
@@ -145,28 +136,19 @@ public:
         return m_type;
     }
 
-    // Full path to %LOCALAPPDATA%\Microsoft\wslc\UserSettings.yaml
-    static std::filesystem::path PrimaryFilePath();
-
-    // Full path to %LOCALAPPDATA%\Microsoft\wslc\UserSettings.yaml.bak
-    static std::filesystem::path BackupFilePath();
-
     // Called before opening the settings file in an editor.
     // - If type is Standard: copies the primary file to the backup path.
     // - If type is Default:  creates the primary file from the commented-out defaults template.
     void PrepareToShellExecuteFile() const;
 
+    static std::filesystem::path SettingsFilePath();
+
     // Overwrites the primary settings file with the commented-out defaults template.
-    // Called by SettingsResetCommand.
     static void Reset();
 
 private:
     UserSettings();
     ~UserSettings() = default;
-
-    // Base directory shared by PrimaryFilePath() and BackupFilePath().
-    // Lazily initialized on first call; safe to call from any static context.
-    static const std::filesystem::path& SettingsDir();
 
     SettingsMap          m_settings;
     std::vector<Warning> m_warnings;

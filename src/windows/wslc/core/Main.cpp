@@ -56,6 +56,13 @@ try
 
     try
     {
+        // Emit any settings load warnings.
+        for (const auto& warning : settings::User().GetWarnings())
+        {
+            // Todo: print as warning after reporter support, or maybe move to output warnings only in settings commands.
+            wslutil::PrintMessage(warning.Message);
+        }
+
         std::vector<std::wstring> args;
         for (int i = 1; i < argc; ++i)
         {
@@ -68,13 +75,6 @@ try
         {
             command = std::move(subCommand);
             subCommand = command->FindSubCommand(invocation);
-        }
-
-        // Load settings once and emit any load warnings.
-        const auto& userSettings = settings::UserSettings::Instance();
-        for (const auto& warning : userSettings.GetWarnings())
-        {
-            wslutil::PrintMessage(warning.Message, stderr);
         }
 
         command->ParseArguments(invocation, context.Args);

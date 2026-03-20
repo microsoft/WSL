@@ -24,10 +24,9 @@ using namespace wsl::windows::common::string;
 
 namespace wsl::windows::wslc::settings {
 
-// ---------------------------------------------------------------------------
 // Default settings file template — written on first run.
 // All entries are commented out; the values shown are the built-in defaults.
-// ---------------------------------------------------------------------------
+// TODO: localization for comments needed?
 static constexpr std::string_view s_DefaultSettingsTemplate =
     "# wslc user settings\n"
     "# https://aka.ms/wslc-settings\n"
@@ -42,12 +41,11 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size in megabytes (default: 10000)\n"
     "  # maxStorageSizeMb: 10000\n"
     "\n"
-    "  # Default path for container storage (default: system managed)\n"
+    "  # Default path for container storage (default: %LocalAppData%\\wslc\\storage)\n"
     "  # defaultStoragePath: \"\"\n";
 
-// ---------------------------------------------------------------------------
-// Validate specializations
-// ---------------------------------------------------------------------------
+
+// Validate individual setting specializations
 namespace details {
 
 #define WSLC_VALIDATE_SETTING(_setting_)                                                 \
@@ -80,67 +78,27 @@ WSLC_VALIDATE_SETTING(SessionStoragePath)
 
 } // namespace details
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
+// Helpers
 namespace {
 
 // Traverses a dot-separated path (e.g. "session.cpuCount") through a YAML node tree.
-// Returns an undefined node if any segment is missing.
-YAML::Node NavigateYamlPath(const YAML::Node& root, std::string_view path)
+// Returns nullopt if any segment is invalid or missing.
+std::optional<YAML::Node> NavigateYamlPath(const YAML::Node& root, std::string_view path)
 {
     YAML::Node current = root;
-    size_t start = 0;
-    while (start < path.size() && current.IsDefined())
+    auto subPaths = wsl::shared::string::Split(std::string{path}, '.');
+    for (auto const& subPath : subPaths)
     {
-        const size_t dot = path.find('.', start);
-        const auto segment = std::string(path.substr(start, dot == std::string_view::npos ? dot : dot - start));
-        current = current[segment];
-        start = (dot == std::string_view::npos) ? path.size() : dot + 1;
+        if (current.IsDefined() && current.IsMap())
+        {
+            current = current[subPath];
+        }
+        else
+        {
+            return std::nullopt;
+        }
     }
     return current;
-}
-
-// Builds the set of all known YAML paths from the SettingMapping specializations.
-template <size_t... S>
-std::set<std::string> BuildKnownPaths(std::index_sequence<S...>)
-{
-    return {std::string(details::SettingMapping<static_cast<Setting>(S)>::YamlPath)...};
-}
-
-// Recursively walks a YAML map node and warns about any key whose full dot-separated
-// path is not a known setting path or a known intermediate prefix.
-void WarnUnknownKeysInMap(
-    const YAML::Node& node,
-    const std::set<std::string>& knownPaths,
-    const std::string& prefix,
-    std::vector<Warning>& warnings)
-{
-    if (!node.IsMap())
-    {
-        return;
-    }
-
-    for (const auto& kv : node)
-    {
-        const auto key = kv.first.as<std::string>();
-        const auto fullPath = prefix.empty() ? key : prefix + "." + key;
-
-        const bool isKnownLeaf = knownPaths.count(fullPath) > 0;
-        const bool isKnownPrefix = std::any_of(knownPaths.begin(), knownPaths.end(), [&](const std::string& p) {
-            return p.starts_with(fullPath + ".");
-        });
-
-        if (!isKnownLeaf && !isKnownPrefix)
-        {
-            const auto widePath = MultiByteToWide(fullPath);
-            warnings.push_back({std::format(L"Warning: Unknown settings key '{}'. Ignoring.", widePath), widePath});
-        }
-        else if (isKnownPrefix && kv.second.IsMap())
-        {
-            WarnUnknownKeysInMap(kv.second, knownPaths, fullPath, warnings);
-        }
-    }
 }
 
 // Validates and stores a single setting from the YAML document.
@@ -210,36 +168,29 @@ std::optional<YAML::Node> TryLoadYaml(const std::filesystem::path& path, std::ve
     }
 }
 
-} // namespace
-
-// ---------------------------------------------------------------------------
-// UserSettings
-// ---------------------------------------------------------------------------
-
-// static
-UserSettings const& UserSettings::Instance()
+const std::filesystem::path& SettingsDir()
 {
-    static UserSettings instance;
-    return instance;
-}
-
-// static
-const std::filesystem::path& UserSettings::SettingsDir()
-{
-    static const std::filesystem::path dir = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc";
+    static const std::filesystem::path dir = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\settings";
     return dir;
 }
 
-// static
-std::filesystem::path UserSettings::PrimaryFilePath()
+std::filesystem::path PrimaryFilePath()
 {
     return SettingsDir() / L"UserSettings.yaml";
 }
 
-// static
-std::filesystem::path UserSettings::BackupFilePath()
+std::filesystem::path BackupFilePath()
 {
     return SettingsDir() / L"UserSettings.yaml.bak";
+}
+
+} // namespace
+
+
+UserSettings const& UserSettings::Instance()
+{
+    static UserSettings instance;
+    return instance;
 }
 
 UserSettings::UserSettings()
@@ -262,7 +213,6 @@ UserSettings::UserSettings()
             m_type = UserSettingsType::Backup;
             m_warnings.push_back({L"Warning: UserSettings.yaml could not be loaded. Using backup settings.", {}});
         }
-        // If neither file exists at all, emit no warning (first run).
     }
 
     if (root.has_value())
@@ -270,12 +220,10 @@ UserSettings::UserSettings()
         constexpr auto settingCount = static_cast<size_t>(Setting::Max);
         ValidateAll(root.value(), m_settings, m_warnings, std::make_index_sequence<settingCount>());
 
-        const auto knownPaths = BuildKnownPaths(std::make_index_sequence<settingCount>());
-        WarnUnknownKeysInMap(root.value(), knownPaths, {}, m_warnings);
+        // TODO: Iterate through all nodes and warn about unknown keys?
     }
 }
 
-// static
 void UserSettings::Reset()
 {
     const auto primaryPath = PrimaryFilePath();
@@ -283,25 +231,27 @@ void UserSettings::Reset()
     std::ofstream file(primaryPath);
     THROW_HR_IF_MSG(E_UNEXPECTED, !file.is_open(), "Failed to create settings file");
     file << s_DefaultSettingsTemplate;
+    file.flush();
+    file.close();
 }
 
 void UserSettings::PrepareToShellExecuteFile() const
 {
-    const auto primaryPath = PrimaryFilePath();
-
     if (m_type == UserSettingsType::Standard)
     {
         // Valid settings loaded — back them up before the user edits.
-        std::filesystem::copy_file(primaryPath, BackupFilePath(), std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(PrimaryFilePath(), BackupFilePath(), std::filesystem::copy_options::overwrite_existing);
     }
     else if (m_type == UserSettingsType::Default)
     {
         // First run — create the directory and write the commented-out defaults template.
-        std::filesystem::create_directories(primaryPath.parent_path());
-        std::ofstream file(primaryPath);
-        THROW_HR_IF_MSG(E_UNEXPECTED, !file.is_open(), "Failed to create settings file");
-        file << s_DefaultSettingsTemplate;
+        Reset();
     }
+}
+
+std::filesystem::path UserSettings::SettingsFilePath()
+{
+    return PrimaryFilePath();
 }
 
 } // namespace wsl::windows::wslc::settings

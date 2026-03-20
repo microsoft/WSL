@@ -23,10 +23,8 @@ using namespace wsl::windows::wslc::settings;
 
 namespace wsl::windows::wslc {
 
-// ---------------------------------------------------------------------------
-// SettingsCommand
-// ---------------------------------------------------------------------------
 
+// SettingsCommand
 std::vector<std::unique_ptr<Command>> SettingsCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
@@ -53,10 +51,9 @@ std::wstring SettingsCommand::LongDescription() const
 
 void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    const auto& settings = UserSettings::Instance();
-    settings.PrepareToShellExecuteFile();
+    settings::User().PrepareToShellExecuteFile();
 
-    const auto path = UserSettings::PrimaryFilePath();
+    const auto path = settings::User().SettingsFilePath();
     const auto result = reinterpret_cast<INT_PTR>(
         ShellExecuteW(nullptr, L"open", path.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL));
 
@@ -66,15 +63,10 @@ void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
     }
 }
 
-// ---------------------------------------------------------------------------
 // SettingsResetCommand
-// ---------------------------------------------------------------------------
-
 std::vector<Argument> SettingsResetCommand::GetArguments() const
 {
-    return {
-        Argument::Create(ArgType::Force),
-    };
+    return {};
 }
 
 std::wstring SettingsResetCommand::ShortDescription() const
@@ -90,18 +82,8 @@ std::wstring SettingsResetCommand::LongDescription() const
 
 void SettingsResetCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    if (!context.Args.Contains(ArgType::Force))
-    {
-        wprintf(L"This will reset all settings to defaults. Continue? [y/N] ");
-        std::wstring response;
-        std::getline(std::wcin, response);
-        if (response != L"y" && response != L"Y")
-        {
-            return;
-        }
-    }
-
-    UserSettings::Reset();
+    // Todo: do we need prompt support?
+    settings::User().Reset();
     PrintMessage(L"Settings reset to defaults.");
 }
 
