@@ -597,28 +597,56 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     auto io = CreateIOContext();
 
-    std::optional<boost::beast::http::status> importResult;
-
+    std::optional<std::string> pendingErrorJson;
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("ImageImportHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
-        importResult = response.result();
+        if (response.result_int() != 200)
+        {
+            auto it = response.find(boost::beast::http::field::content_type);
+
+            THROW_HR_IF_MSG(
+                E_UNEXPECTED,
+                it == response.end() || !it->value().starts_with("application/json"),
+                "Received HTTP %i but Content-Type is not json",
+                response.result_int());
+
+            pendingErrorJson.emplace();
+        }
     };
 
-    std::string errorJson;
+    std::optional<std::string> errorMessage;
     auto onProgress = [&](const gsl::span<char>& buffer) {
-        WI_ASSERT(importResult.has_value());
-
-        if (importResult.value() != boost::beast::http::status::ok)
+        if (pendingErrorJson.has_value())
         {
-            // If the import failed, accumulate the error message.
-            errorJson.append(buffer.data(), buffer.size());
+            // If we received a non-200 status code, then the response body is an error message. Accumulate to the error message.
+            pendingErrorJson->append(buffer.data(), buffer.size());
+            return;
+        }
+
+        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(std::string(buffer.begin(), buffer.end()).c_str());
+
+        if (parsed.errorDetail.has_value())
+        {
+            if (errorMessage.has_value())
+            {
+                LOG_HR_MSG(
+                    E_UNEXPECTED,
+                    "Overriding previous error message '%hs' with new message '%hs'",
+                    errorMessage->c_str(),
+                    parsed.errorDetail->message.c_str());
+            }
+
+            errorMessage = std::move(parsed.errorDetail->message);
+        }
+        else if (parsed.stream.has_value())
+        {
+            // TODO: report progress to caller.
+            WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
         }
         else
         {
-            // TODO: report progress to caller.
-            std::string entry = {buffer.begin(), buffer.end()};
-            WSL_LOG("ImageImportProgress", TraceLoggingValue(entry.c_str(), "Content"));
+            LOG_HR_MSG(E_UNEXPECTED, "Failed to parse import progress: %.*hs", static_cast<int>(buffer.size()), buffer.data());
         }
     };
 
@@ -631,16 +659,16 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     io.Run({});
 
-    THROW_HR_IF(E_UNEXPECTED, !importResult.has_value());
-
-    if (importResult.value() != boost::beast::http::status::ok)
+    // Look for an error message returned as an HTTP response (non HTTP 200)
+    if (pendingErrorJson.has_value())
     {
-        // Import failed, parse the error message.
-        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(pendingErrorJson->c_str());
 
-        // TODO: Return error message to client.
         THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
+
+    // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
 }
 
 HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)

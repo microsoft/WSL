@@ -744,7 +744,6 @@ class WSLATests
         ExpectImagePresent(*m_defaultSession, "debian:latest", true);
     }
 
-    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {
         WSL2_TEST_ONLY();
@@ -768,9 +767,18 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+
+        // Validate that invalid tars fail with proper error message and code.
+        {
+            auto currentExecutableHandle = wil::open_file(wil::GetModuleFileNameW<std::wstring>().c_str());
+            VERIFY_IS_TRUE(GetFileSizeEx(currentExecutableHandle.get(), &fileSize));
+
+            VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(HandleToULong(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
+
+            ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+        }
     }
 
-    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(ImportImage)
     {
         WSL2_TEST_ONLY();
@@ -801,6 +809,20 @@ class WSLATests
         {
             VERIFY_ARE_EQUAL(
                 m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+        }
+
+        // Validate that invalid tars fail with proper error message and code.
+        {
+            auto currentExecutableHandle = wil::open_file(wil::GetModuleFileNameW<std::wstring>().c_str());
+
+            VERIFY_IS_TRUE(GetFileSizeEx(currentExecutableHandle.get(), &fileSize));
+
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->ImportImage(
+                    HandleToULong(currentExecutableHandle.get()), "invalid-image:test", nullptr, fileSize.QuadPart),
+                E_FAIL);
+
+            ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
         }
     }
 
@@ -1785,10 +1807,19 @@ class WSLATests
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
-                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(containerTarFileHandle.get()), nullptr, fileSize.QuadPart));
+
+                auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                    WSLADeleteImageOptions options{.Image = "test-imported-container:latest", .Flags = WSLADeleteImageFlagsNone};
+                    wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+                    LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+                });
+
+                VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+                    HandleToULong(containerTarFileHandle.get()), "test-imported-container:latest", nullptr, fileSize.QuadPart));
+
                 // Verify that the image is in the list of images.
-                ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-                WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+                ExpectImagePresent(*m_defaultSession, "test-imported-container:latest");
+                WSLAContainerLauncher launcher("test-imported-container:latest", "wsla-hello-world-container", {"/hello"});
                 auto container = launcher.Launch(*m_defaultSession);
                 auto result = container.GetInitProcess().WaitAndCaptureOutput();
                 VERIFY_ARE_EQUAL(0, result.Code);
