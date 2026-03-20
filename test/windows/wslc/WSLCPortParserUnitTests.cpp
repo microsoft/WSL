@@ -374,17 +374,14 @@ private:
         VerifyRange(result.ContainerPort(), start, end);
     }
 
-    static void VerifyHostIPv4(
-        const PublishPort& result, const std::string& expectedString)
+    static void VerifyHostIPv4(const PublishPort& result, const std::string& expectedString)
     {
         VERIFY_IS_TRUE(result.HostIP().has_value());
         VERIFY_IS_FALSE(result.HostIP()->IsIPv6());
         VERIFY_ARE_EQUAL(expectedString, result.HostIP()->IP());
-
     }
 
-    static void VerifyHostIPv6(
-        const PublishPort& result, const std::string& expectedString)
+    static void VerifyHostIPv6(const PublishPort& result, const std::string& expectedString)
     {
         VERIFY_IS_TRUE(result.HostIP().has_value());
         VERIFY_IS_TRUE(result.HostIP()->IsIPv6());
