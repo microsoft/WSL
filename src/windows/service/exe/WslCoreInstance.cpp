@@ -46,8 +46,6 @@ WslCoreInstance::WslCoreInstance(
     // Read a message from the init daemon. This will let us know if anything failed during startup.
     gsl::span<gsl::byte> span;
     const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
-    // After the first message. Enable strict request-end sequencing.
-    m_initChannel->GetChannel().SetStrictRequestEnd();
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -379,6 +377,9 @@ void WslCoreInstance::Initialize()
 
     // Create a console manager that will be used to manage session leaders.
     m_consoleManager = ConsoleManager::CreateConsoleManager(m_initChannel);
+
+    // Enable strict request-end sequencing.
+    m_initChannel->GetChannel().SetStrictRequestEnd();
 
     // Send the initial configuration information to the init daemon.
     ULONG fixedDrives = 0;

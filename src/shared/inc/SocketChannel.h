@@ -395,7 +395,7 @@ public:
         m_strict_request_end = true;
     }
 
-    // This end always replys. Without concurrent requests.
+    // This end always replies. Without concurrent requests.
     void SetStrictReplyEnd()
     {
         m_strict_reply_end = true;

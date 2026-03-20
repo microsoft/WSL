@@ -2300,9 +2300,6 @@ Return Value:
 
     channel.SendMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(message.Span());
 
-    // After the initial message, enable strict reply-end sequencing.
-    channel.SetStrictReplyEnd();
-
     std::optional<pid_t> distroInitPid;
     const auto distroInitPidString = getenv(LX_WSL2_DISTRO_INIT_PID);
     if (distroInitPidString != nullptr)
@@ -2431,6 +2428,9 @@ Return Value:
         PollDescriptors[1].fd = SignalFd.get();
         PollDescriptors[1].events = POLLIN;
     }
+
+    // Enable strict reply-end sequencing before receiving any messages from Windows.
+    channel.SetStrictReplyEnd();
 
     for (;;)
     {
