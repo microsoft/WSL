@@ -1516,45 +1516,5 @@ class MountTests
             ValidateOffline(false);
         }
     }
-
-    TEST_METHOD(TestInteractiveMountDoesNotBlockStartup)
-    {
-        WSL2_TEST_ONLY();
-
-        // Add a fake interactive mount helper.
-        const std::wstring mountHelper =
-            L"-- sh -c 'printf \"#!/bin/sh\\nread pass < /dev/tty\\n\" > /sbin/mount.hang && chmod +x /sbin/mount.hang'";
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountHelper), (DWORD)0);
-
-        // Add fstab entry using this helper.
-        const std::wstring addFstab = L"-- sh -c 'echo \"none /mnt/ttytest hang 0 0\" >> /etc/fstab'";
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(addFstab), (DWORD)0);
-
-        auto cleanup = wil::scope_exit([&]() {
-            LxsstuLaunchWsl(L"-- sed -i '/\\/mnt\\/ttytest/d' /etc/fstab");
-            LxsstuLaunchWsl(L"-- rm -f /sbin/mount.hang");
-        });
-
-        // Restart the distro with this mount.
-        WslShutdown();
-
-        auto cmd = LxssGenerateWslCommandLine(L"echo booted");
-        auto process = LxsstuStartProcess(cmd.data());
-        auto waitResult = WaitForSingleObject(process.get(), 60 * 1000);
-        if (waitResult == WAIT_TIMEOUT)
-        {
-            TerminateProcess(process.get(), 1);
-            // WSL is likely stuck; avoid running cleanup that calls LxsstuLaunchWsl again.
-            cleanup.release();
-            VERIFY_FAIL(L"WSL startup timed out - fstab mount likely blocked on /dev/tty");
-            // Warning: When this error happens, wsl will get stuck in an unrecoverable state.
-        }
-
-        VERIFY_ARE_EQUAL(waitResult, (DWORD)WAIT_OBJECT_0);
-
-        DWORD exitCode = 0;
-        VERIFY_IS_TRUE(GetExitCodeProcess(process.get(), &exitCode));
-        VERIFY_ARE_EQUAL(exitCode, (DWORD)0);
-    }
 };
 } // namespace MountTests

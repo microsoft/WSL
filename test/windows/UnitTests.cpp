@@ -6538,5 +6538,28 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(err, L"");
     }
 
+    TEST_METHOD(InteractiveMount)
+    {
+        WSL2_TEST_ONLY();
+
+        // Add a fake interactive mount helper.
+        DistroFileChange mountHelper(L"/sbin/mount.hang", false);
+        mountHelper.SetContent(
+            L"#!/bin/sh\n"
+            "read pass < /dev/tty\n");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod +x /sbin/mount.hang"), (DWORD)0);
+
+        // Add fstab entry using this helper.
+        DistroFileChange fstab(L"/etc/fstab");
+        fstab.SetContent(L"none /mnt/ttytest hang 0 0\n");
+
+        // Restart the distro with this mount.
+        WslShutdown();
+        wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(L"echo booted").c_str());
+        auto result = process.RunAndCaptureOutput(60 * 1000);
+        VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
+        VERIFY_ARE_EQUAL(result.ExitCode, 0);
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests
