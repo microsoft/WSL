@@ -2745,7 +2745,12 @@ void PartialHandleRead::ExpectConsume(const std::string& Expected)
 {
     auto content = ConsumeBytes(Expected.size());
 
-    VERIFY_ARE_EQUAL(EscapeString(content), EscapeString(Expected));
+    if (content != Expected)
+    {
+        VERIFY_FAIL(std::format(L"Expected: '{}' but got: '{}'",
+                                wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
+                                wsl::shared::string::MultiByteToWide(EscapeString(content))).c_str());
+    }
 }
 
 void PartialHandleRead::ExpectClosed(DWORD Timeout)

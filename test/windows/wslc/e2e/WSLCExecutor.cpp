@@ -247,7 +247,7 @@ void WSLCInteractiveSession::WaitForExit(DWORD timeoutMs)
         Terminate(999);
         WaitForSingleObject(m_processHandle.get(), DefaultWaitTimeoutMs);
 
-        THROW_HR_MSG(E_FAIL, "Process did not exit within timeout of %dms and was forcefully terminated", timeoutMs);
+        THROW_HR_MSG(E_FAIL, "Process did not exit within timeout of %lums and was forcefully terminated", timeoutMs);
     }
 
     if (result == WAIT_FAILED)
