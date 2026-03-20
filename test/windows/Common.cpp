@@ -2650,10 +2650,8 @@ std::string EscapeString(const std::string& Input)
 {
     std::string Output;
 
-    for (size_t i = 0; i < Input.size(); ++i)
+    for (const auto& e : Input)
     {
-        auto e = Input[i];
-
         if (e == '\n')
         {
             Output += "\\n";
