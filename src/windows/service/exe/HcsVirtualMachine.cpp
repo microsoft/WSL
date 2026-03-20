@@ -407,7 +407,8 @@ try
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
-        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::None;
+        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
+        WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, SUCCEEDED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods()));
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
             wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
