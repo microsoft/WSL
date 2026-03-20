@@ -35,6 +35,14 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+struct ImageLoadResult
+{
+    std::optional<std::string> stream;
+    std::optional<ErrorResponse> errorDetail;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, errorDetail);
+};
+
 struct EmptyRequest
 {
     using TResponse = void;

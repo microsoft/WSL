@@ -139,6 +139,7 @@ Invoke-Command -Session $Session -ArgumentList $RemoteFolder -ScriptBlock {
 }
 Copy-Item -ToSession $Session -Path "$Bin/installer.msix"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$Bin/wsltests.dll"  -Destination $RemoteFolder -Force
+Copy-Item -ToSession $Session -Path "$Bin/wslcsdk.dll"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$Bin/testplugin.dll"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$PSScriptRoot/test-setup.ps1"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$PSScriptRoot/run-tests.ps1"  -Destination $RemoteFolder -Force
