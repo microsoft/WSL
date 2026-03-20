@@ -336,6 +336,10 @@ int GenerateSystemdUnits(int Argc, char** Argv)
         // Mask NetworkManager-wait-online.service for the same reason, as it causes timeouts on distros using NetworkManager.
         THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/NetworkManager-wait-online.service", installPath).c_str()) < 0);
 
+        // Mask console-getty.service since /dev/tty devices are shared at the VM level across all distros.
+        // When multiple distros are running, the second distro's getty fails because the tty is already held.
+        THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/console-getty.service", installPath).c_str()) < 0);
+
         // Only create the wslg unit if both enabled in wsl.conf, and if the wslg folder actually exists.
         if (enableGuiApps && access("/mnt/wslg/runtime-dir", F_OK) == 0)
         {

@@ -224,6 +224,12 @@ class UnitTests
             LxsstuLaunchWslAndCaptureOutput(L"systemctl status NetworkManager-wait-online.service  | grep -iF Loaded:");
 
         VERIFY_ARE_EQUAL(outNm, L"     Loaded: masked (Reason: Unit NetworkManager-wait-online.service is masked.)\n");
+
+        // Validate that console-getty.service is masked (tty devices are shared at VM level across distros).
+        auto [outGetty, ___] =
+            LxsstuLaunchWslAndCaptureOutput(L"systemctl status console-getty.service  | grep -iF Loaded:");
+
+        VERIFY_ARE_EQUAL(outGetty, L"     Loaded: masked (Reason: Unit console-getty.service is masked.)\n");
     }
 
     TEST_METHOD(SystemdUser)
