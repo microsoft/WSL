@@ -256,11 +256,7 @@ public:
                             TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
                             TraceLoggingValue(m_sent_messages, "ExpectedSeq"));
 #else
-                        LOG_WARNING(
-                            "Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}",
-                            m_name,
-                            receivedHeader->SequenceNumber,
-                            m_sent_messages);
+                        LOG_WARNING("Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}", m_name, receivedHeader->SequenceNumber, m_sent_messages);
 #endif
                         continue;
                     }
@@ -268,18 +264,9 @@ public:
                     if (diff != 0)
                     {
 #ifdef WIN32
-                        THROW_HR_MSG(
-                            E_UNEXPECTED,
-                            "Unexpected response sequence: %u, expected: %u, channel: %hs",
-                            receivedHeader->SequenceNumber,
-                            m_sent_messages,
-                            m_name);
+                        THROW_HR_MSG(E_UNEXPECTED, "Unexpected response sequence: %u, expected: %u, channel: %hs", receivedHeader->SequenceNumber, m_sent_messages, m_name);
 #else
-                        LOG_ERROR(
-                            "Unexpected response sequence: {}, expected: {}, channel: {}",
-                            receivedHeader->SequenceNumber,
-                            m_sent_messages,
-                            m_name);
+                        LOG_ERROR("Unexpected response sequence: {}, expected: {}, channel: {}", receivedHeader->SequenceNumber, m_sent_messages, m_name);
                         THROW_ERRNO(EINVAL);
 #endif
                     }
@@ -295,18 +282,9 @@ public:
                 {
                     // Ensure consecutive sequence numbers
 #ifdef WIN32
-                    THROW_HR_MSG(
-                        E_UNEXPECTED,
-                        "Unexpected message sequence: %u, expected: %u, channel: %hs",
-                        receivedHeader->SequenceNumber,
-                        m_received_messages,
-                        m_name);
+                    THROW_HR_MSG(E_UNEXPECTED, "Unexpected message sequence: %u, expected: %u, channel: %hs", receivedHeader->SequenceNumber, m_received_messages, m_name);
 #else
-                    LOG_ERROR(
-                        "Unexpected message sequence: {}, expected: {}, channel: {}",
-                        receivedHeader->SequenceNumber,
-                        m_received_messages,
-                        m_name);
+                    LOG_ERROR("Unexpected message sequence: {}, expected: {}, channel: {}", receivedHeader->SequenceNumber, m_received_messages, m_name);
                     THROW_ERRNO(EINVAL);
 #endif
                 }
@@ -396,13 +374,13 @@ public:
         m_ignore_sequence = true;
     }
 
-    // This end always requests. With 0 or 1 reply message.
+    // This end always requests. With 0 or 1 reply message. Without concurrent requests.
     void SetStrictRequestEnd()
     {
         m_strict_request_end = true;
     }
 
-    // This end always replys. With 0 or 1 reply message.
+    // This end always replys. With 0 or 1 reply message. Without concurrent requests.
     void SetStrictReplyEnd()
     {
         m_strict_reply_end = true;

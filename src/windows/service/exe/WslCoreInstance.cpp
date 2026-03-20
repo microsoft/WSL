@@ -533,6 +533,7 @@ WslCoreInstance::WslCorePort::WslCorePort(_In_ SOCKET Socket, _In_ const GUID& R
 
 {
     // N.B. The class takes ownership of the socket.
+    m_channel.SetStrictRequestEnd();
 }
 
 std::shared_ptr<LxssPort> WslCoreInstance::WslCorePort::CreateSessionLeader(_In_ HANDLE)

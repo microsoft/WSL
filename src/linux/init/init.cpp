@@ -1250,6 +1250,8 @@ try
                     _exit(1);
                 }
 
+                channel.SetStrictReplyEnd();
+
                 SessionLeaderEntryUtilityVm(channel, Config);
             });
     }
