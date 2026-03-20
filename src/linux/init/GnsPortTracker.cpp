@@ -424,7 +424,7 @@ int GnsPortTracker::GetSocketProtocol(int pid, int fd)
 
     if (result < 0)
     {
-        RuntimeErrorWithSourceLocation(std::format("Failed to read protocol for socket: {}, {}", path, errno));
+        throw RuntimeErrorWithSourceLocation(std::format("Failed to read protocol for socket: {}, {}", path, errno));
     }
 
     // In case the size of the attribute shrunk between the two getxattr calls
