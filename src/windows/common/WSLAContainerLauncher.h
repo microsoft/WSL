@@ -59,7 +59,7 @@ public:
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly);
-    void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
+    void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol = IPPROTO_TCP, const std::optional<std::string>& BindingAddress = {});
     void AddLabel(const std::string& Key, const std::string& Value);
     void AddTmpfs(const std::string& ContainerPath, const std::string& Options);
 
@@ -85,6 +85,7 @@ public:
 private:
     std::string m_image;
     std::string m_name;
+    std::deque<std::string> m_bindingAddressStorage;
     std::vector<WSLAPortMapping> m_ports;
     std::vector<WSLAVolume> m_volumes;
     std::vector<WSLANamedVolume> m_namedVolumes;
