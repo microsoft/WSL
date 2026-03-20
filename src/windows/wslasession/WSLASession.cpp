@@ -1046,8 +1046,7 @@ try
 
     try
     {
-        std::lock_guard containersLock{m_containersLock};
-        std::lock_guard volumesLock(m_volumesLock);
+        std::scoped_lock lock(m_containersLock, m_volumesLock);
 
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
@@ -1555,6 +1554,8 @@ void WSLASession::RecoverExistingVolumes()
     WI_ASSERT(m_virtualMachine.has_value());
 
     auto volumes = m_dockerClient->ListVolumes();
+
+    std::lock_guard volumesLock(m_volumesLock);
 
     for (const auto& volume : volumes)
     {
