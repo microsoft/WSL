@@ -802,7 +802,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(
                 m_defaultSession->ImportImage(
                     HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, nullptr, fileSize.QuadPart),
-                E_POINTER);
+                HRESULT_FROM_WIN32(FWP_E_NULL_POINTER));
         }
     }
 
