@@ -223,6 +223,47 @@ bool CopyProcessSettingsToRuntime(WSLAProcessOptions& runtimeOptions, const Wslc
         return false;
     }
 }
+
+// Normalizes file inputs to HANDLE+length.
+struct ImageFileResolver
+{
+    ImageFileResolver(PCWSTR path) : m_fileHandle(INVALID_HANDLE_VALUE)
+    {
+        THROW_HR_IF_NULL(E_POINTER, path);
+
+        wil::unique_handle imageFileHandle{
+            CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!imageFileHandle);
+
+        LARGE_INTEGER fileSize{};
+        THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(imageFileHandle.get(), &fileSize));
+
+        m_fileHandle = std::move(imageFileHandle);
+        m_length = static_cast<ULONGLONG>(fileSize.QuadPart);
+    }
+
+    ImageFileResolver(HANDLE imageContent, uint64_t imageContentLength) : m_fileHandle(imageContent)
+    {
+        THROW_HR_IF(E_INVALIDARG, imageContent == nullptr || imageContent == INVALID_HANDLE_VALUE);
+        THROW_HR_IF(E_INVALIDARG, imageContentLength == 0);
+
+        m_length = imageContentLength;
+    }
+
+    HANDLE Handle() const
+    {
+        return m_fileHandle.Get();
+    }
+
+    ULONGLONG Length() const
+    {
+        return m_length;
+    }
+
+private:
+    wsl::windows::common::relay::HandleWrapper m_fileHandle;
+    ULONGLONG m_length;
+};
 } // namespace
 
 // SESSION DEFINITIONS
@@ -513,11 +554,13 @@ try
 
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
-            // TODO: Only other supported value right now is AF_INET6; no user access.
+
+            // TODO: Ipv6 & custom binding address support.
             convertedPort.Family = AF_INET;
 
-            // TODO: Unused protocol?
-            // TODO: Unused windowsAddress?
+            // TODO: Consider using standard protocol numbers instead of our own enum.
+            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
+            convertedPort.BindingAddress = "127.0.0.1";
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
@@ -966,30 +1009,75 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
-try
+static HRESULT WslcImportSessionImageImpl(
+    WslcSessionImpl* internalSession, PCSTR imageName, const WslcImportImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    UNREFERENCED_PARAMETER(errorMessage);
-    return E_NOTIMPL;
-}
-CATCH_RETURN();
+    auto progressCallback = ProgressCallback::CreateIf(options);
 
-STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+    return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
+        HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+}
+
+STDAPI WslcImportSessionImage(
+    _In_ WslcSession session,
+    _In_z_ PCSTR imageName,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcImportImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
-    RETURN_HR_IF_NULL(E_POINTER, options);
-    RETURN_HR_IF(E_INVALIDARG, options->ImageHandle == nullptr || options->ImageHandle == INVALID_HANDLE_VALUE);
-    RETURN_HR_IF(E_INVALIDARG, options->ContentLength == 0);
+    THROW_HR_IF_NULL(E_POINTER, imageName);
+    return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {imageContent, imageContentLength});
+}
+CATCH_RETURN();
 
+STDAPI WslcImportSessionImageFromFile(
+    _In_ WslcSession session, _In_z_ PCSTR imageName, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    THROW_HR_IF_NULL(E_POINTER, imageName);
+    return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {path});
+}
+CATCH_RETURN();
+
+static HRESULT WslcLoadSessionImageImpl(
+    WslcSessionImpl* internalSession, const WslcLoadImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
+{
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalType->session->LoadImage(HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength));
+        internalSession->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+}
+
+STDAPI WslcLoadSessionImage(
+    _In_ WslcSession session,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcLoadImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    return WslcLoadSessionImageImpl(internalType, options, errorInfoWrapper, {imageContent, imageContentLength});
+}
+CATCH_RETURN();
+
+STDAPI WslcLoadSessionImageFromFile(_In_ WslcSession session, _In_z_ PCWSTR path, _In_opt_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    return WslcLoadSessionImageImpl(internalType, options, errorInfoWrapper, {path});
 }
 CATCH_RETURN();
 

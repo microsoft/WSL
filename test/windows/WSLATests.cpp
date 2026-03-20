@@ -744,7 +744,6 @@ class WSLATests
         ExpectImagePresent(*m_defaultSession, "debian:latest", true);
     }
 
-    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {
         WSL2_TEST_ONLY();
@@ -768,9 +767,18 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+
+        // Validate that invalid tars fail with proper error message and code.
+        {
+            auto currentExecutableHandle = wil::open_file(wil::GetModuleFileNameW<std::wstring>().c_str());
+            VERIFY_IS_TRUE(GetFileSizeEx(currentExecutableHandle.get(), &fileSize));
+
+            VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(HandleToULong(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
+
+            ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+        }
     }
 
-    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(ImportImage)
     {
         WSL2_TEST_ONLY();
@@ -801,6 +809,20 @@ class WSLATests
         {
             VERIFY_ARE_EQUAL(
                 m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+        }
+
+        // Validate that invalid tars fail with proper error message and code.
+        {
+            auto currentExecutableHandle = wil::open_file(wil::GetModuleFileNameW<std::wstring>().c_str());
+
+            VERIFY_IS_TRUE(GetFileSizeEx(currentExecutableHandle.get(), &fileSize));
+
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->ImportImage(
+                    HandleToULong(currentExecutableHandle.get()), "invalid-image:test", nullptr, fileSize.QuadPart),
+                E_FAIL);
+
+            ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
         }
     }
 
@@ -1561,12 +1583,10 @@ class WSLATests
         NON_COPYABLE(BlockingOperation);
         NON_MOVABLE(BlockingOperation);
 
-        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK) :
-            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult)
+        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK, bool AllowEarlyCompletion = false, bool UseOverlappedWritePipe = false) :
+            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult), m_allowEarlyCompletion(AllowEarlyCompletion)
         {
-            wil::unique_handle pipeRead;
-            wil::unique_handle pipeWrite;
-            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+            auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, UseOverlappedWritePipe);
 
             m_operationThread = std::thread(&BlockingOperation::RunOperation, this, std::move(pipeWrite));
             m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
@@ -1588,16 +1608,17 @@ class WSLATests
             }
         }
 
-        void RunOperation(wil::unique_handle Handle)
+        void RunOperation(wil::unique_hfile Handle)
         {
             m_result.set_value(m_operation(Handle.get()));
 
-            // Fail if the operation completed before the test signaled completion.
+            // Fail if the operation completed before the test signaled completion
+            // (unless early completion is expected, e.g. session termination).
             // Don't use VERIFY macros since this is running in a separate thread.
-            WI_ASSERT(m_testCompleteEvent.is_signaled());
+            WI_ASSERT(m_allowEarlyCompletion || m_testCompleteEvent.is_signaled());
         }
 
-        void RunIO(wil::unique_handle Handle)
+        void RunIO(wil::unique_hfile Handle)
         {
             std::vector<char> buffer(1024 * 1024);
             while (true)
@@ -1646,6 +1667,7 @@ class WSLATests
         std::thread m_ioThread;
         std::promise<HRESULT> m_result;
         HRESULT m_expectedResult{};
+        bool m_allowEarlyCompletion{};
     };
 
     TEST_METHOD(SaveImage)
@@ -1785,10 +1807,19 @@ class WSLATests
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
-                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(containerTarFileHandle.get()), nullptr, fileSize.QuadPart));
+
+                auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                    WSLADeleteImageOptions options{.Image = "test-imported-container:latest", .Flags = WSLADeleteImageFlagsNone};
+                    wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+                    LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+                });
+
+                VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+                    HandleToULong(containerTarFileHandle.get()), "test-imported-container:latest", nullptr, fileSize.QuadPart));
+
                 // Verify that the image is in the list of images.
-                ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-                WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+                ExpectImagePresent(*m_defaultSession, "test-imported-container:latest");
+                WSLAContainerLauncher launcher("test-imported-container:latest", "wsla-hello-world-container", {"/hello"});
                 auto container = launcher.Launch(*m_defaultSession);
                 auto result = container.GetInitProcess().WaitAndCaptureOutput();
                 VERIFY_ARE_EQUAL(0, result.Code);
@@ -2159,7 +2190,7 @@ class WSLATests
         auto process = WSLAProcessLauncher{"/bin/cat", {"/bin/cat"}, {}, WSLAProcessFlagsStdin}.Launch(*m_defaultSession);
 
         // Stop the service
-        StopWslaService();
+        StopWslService();
 
         ResetTestSession(); // Reopen the session since the service was stopped.
     }
@@ -2211,6 +2242,45 @@ class WSLATests
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Validate that folder is not writeable from linux
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            ExpectMount(session.get(), "/win-path", {});
+        }
+
+        // Validate that a read-only share cannot be made writeable via mount -o remount,rw.
+        {
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
+
+            // Attempt an in-place remount to read-write from the guest.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "mount -o remount,rw /win-path"}, 0);
+
+            // Verify the folder is still not writeable.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            ExpectMount(session.get(), "/win-path", {});
+        }
+
+        // Validate that the device host enforces read-only even if the guest tries to bypass mount options.
+        if (enableVirtioFs)
+        {
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
+
+            // Capture the mount source and type, unmount, then remount without read-only.
+            ExpectCommandResult(
+                session.get(),
+                {"/bin/sh",
+                 "-c",
+                 "src=$(findmnt -n -o SOURCE /win-path) && "
+                 "fstype=$(findmnt -n -o FSTYPE /win-path) && "
+                 "umount /win-path && "
+                 "mount -t $fstype $src /win-path"},
+                0);
+
+            // Verify the folder is still not writeable.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
             VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
@@ -3502,7 +3572,7 @@ class WSLATests
             });
 
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeHost);
+                "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeBridged);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1235, 8000, AF_INET);
@@ -3521,7 +3591,7 @@ class WSLATests
             VERIFY_IS_FALSE(details.Created.empty());
 
             // Verify container state.
-            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
+            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "bridge");
             VERIFY_IS_TRUE(details.State.Running);
             VERIFY_ARE_EQUAL(details.State.Status, "running");
             VERIFY_IS_FALSE(details.State.StartedAt.empty());
@@ -3804,27 +3874,29 @@ class WSLATests
         // Test a simple port mapping.
         {
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine", "test-ports", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
+                "python:3.12-alpine", "test-ports", {"python3", "-m", "http.server", "--bind", "::"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1234, 8000, AF_INET);
-            launcher.AddPort(1234, 8000, AF_INET6);
+            launcher.AddPort(1234, 8000, AF_INET6, IPPROTO_TCP, "::1");
 
             auto container = launcher.Launch(session);
             auto initProcess = container.GetInitProcess();
 
             // Wait for the container bind() to be completed.
-            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
 
             expectBoundPorts(container, {"8000/tcp"});
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
-            ExpectHttpResponse(L"http://[::1]:1234", {});
+
+            ExpectHttpResponse(L"http://[::1]:1234", 200);
 
             // Validate that the port cannot be reused while the container is running.
             WSLAContainerLauncher subLauncher(
                 "python:3.12-alpine", "test-ports-2", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             subLauncher.AddPort(1234, 8000, AF_INET);
+
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(session);
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
@@ -3899,32 +3971,60 @@ class WSLATests
             }
         }
 
-        // TODO: Uncomment once ipv6 port mapping is supported.
-        // Validate ipv6 port mapping
-        /*{
-            WSLAContainerLauncher launcher(
-                "python:3.12-alpine",
-                "test-ports-ipv6",
-                {},
-                {"python3", "-m", "http.server", "--bind", "::1"},
-                {"PYTHONUNBUFFERED=1"},
-                containerNetworkType,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+        // Validate error paths
+        {
+            // Invalid IP address
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "invalid-ip");
 
-            launcher.AddPort(1234, 8000, AF_INET);
-            launcher.AddPort(1234, 8000, AF_INET6);
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, E_INVALIDARG);
+                ValidateCOMErrorMessage(L"Invalid IP address 'invalid-ip'");
+            }
 
-            auto container = launcher.Launch(session);
-            auto initProcess = container.GetInitProcess();
-            auto stdoutHandle = initProcess.GetStdHandle(1);
+            // Invalid protocol
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, 1);
 
-            // Wait for the container bind() to be completed.
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on ::1 port 8000");
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, E_INVALIDARG);
+            }
 
-            ExpectHttpResponse(L"http://localhost:1234", {});
+            // Invalid address family (launched manually because AddPort() throws on unsupported family).
+            {
+                WSLAPortMapping port{};
+                port.BindingAddress = "127.0.0.1";
+                port.HostPort = 1234;
+                port.ContainerPort = 1234;
+                port.Protocol = IPPROTO_TCP;
+                port.Family = AF_UNIX; // Unsupported
 
-            ExpectHttpResponse(L"http://[::1]:1234", 200);
-        }*/
+                WSLAContainerOptions options{};
+                options.Image = "python:3.12-alpine";
+                options.Ports = &port;
+                options.PortsCount = 1;
+                options.ContainerNetwork.ContainerNetworkType = containerNetworkType;
+
+                wil::com_ptr<IWSLAContainer> container;
+                VERIFY_ARE_EQUAL(session.CreateContainer(&options, &container), E_INVALIDARG);
+            }
+
+            // TODO: Update once UDP is supported.
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_UDP);
+
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            }
+
+            // TODO: Update once custom binding addresses are supported.
+            {
+                WSLAContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                launcher.AddPort(1234, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
+
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            }
+        }
     }
 
     auto SetupPortMappingsTest(WSLANetworkingMode networkingMode)
@@ -5356,6 +5456,48 @@ class WSLATests
             auto [result, _] = WSLAProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
+    }
+
+    TEST_METHOD(SessionTerminationDuringSave)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that SaveImage is aborted when the session terminates.
+        // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
+        BlockingOperation operation(
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); }, E_ABORT, true, true);
+
+        // Terminate the session.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        operation.Complete();
+        auto restore = ResetTestSession();
+    }
+
+    TEST_METHOD(SessionTerminationDuringExport)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that container Export is aborted when the session terminates.
+        WSLAContainerLauncher launcher("debian:latest", "test-export-session-terminate", {"echo", "OK"});
+        auto container = launcher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(), 0);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            PruneResult result;
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        });
+
+        // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); }, E_ABORT, true, true);
+
+        // Avoid attempting container delete on scope exit after intentional session termination;
+        // rely on the prune scope-exit above to clean up instead.
+        container.SetDeleteOnClose(false);
+
+        // Terminate the session.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        operation.Complete();
+        auto restore = ResetTestSession();
     }
 
     TEST_METHOD(InteractiveDetach)
