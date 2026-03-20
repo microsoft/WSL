@@ -109,6 +109,11 @@ public:
         auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(span);
         WI_ASSERT(header->MessageSize == span.size());
 
+        if (m_ignore_sequence)
+        {
+            header->SequenceNumber = m_sent_messages++;
+        }
+        else
         {
             std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
             if (m_pending_reply_sequence.has_value())
@@ -229,63 +234,61 @@ public:
                 return {nullptr, {}};
             }
 
-            // Use header only since this could be a stale message of the wrong type.
-            auto* receivedHeader = gslhelpers::try_get_struct<MESSAGE_HEADER>(receivedSpan);
-            if (receivedHeader == nullptr)
-            {
-#ifdef WIN32
-                THROW_HR_MSG(E_UNEXPECTED, "Message too small for header: %zd, channel: %hs", receivedSpan.size(), m_name);
-#else
-                LOG_ERROR("Message too small for header: {}, channel: {}", receivedSpan.size(), m_name);
-                THROW_ERRNO(EINVAL);
-#endif
-            }
-
             // Validate sequence
+            if (!m_ignore_sequence)
             {
+                // Use header only since this could be a stale message of the wrong type.
+                auto* receivedHeader = gslhelpers::try_get_struct<MESSAGE_HEADER>(receivedSpan);
+                if (receivedHeader == nullptr)
+                {
+#ifdef WIN32
+                    THROW_HR_MSG(E_UNEXPECTED, "Message too small for header: %zd, channel: %hs", receivedSpan.size(), m_name);
+#else
+                    LOG_ERROR("Message too small for header: {}, channel: {}", receivedSpan.size(), m_name);
+                    THROW_ERRNO(EINVAL);
+#endif
+                }
+
                 std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
                 if (m_expected_reply_sequence.has_value())
                 {
-                    if (!m_ignore_sequence)
+                    auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_expected_reply_sequence.value());
+                    if (diff < 0)
                     {
-                        auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_expected_reply_sequence.value());
-                        if (diff < 0)
-                        {
-                            // Skip stale message.
+                        // Skip stale message.
 #ifdef WIN32
-                            WSL_LOG(
-                                "DiscardStaleResponse",
-                                TraceLoggingValue(m_name, "Name"),
-                                TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
-                                TraceLoggingValue(m_expected_reply_sequence.value(), "ExpectedSeq"));
+                        WSL_LOG(
+                            "DiscardStaleResponse",
+                            TraceLoggingValue(m_name, "Name"),
+                            TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
+                            TraceLoggingValue(m_expected_reply_sequence.value(), "ExpectedSeq"));
 #else
-                            LOG_WARNING(
-                                "Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}",
-                                m_name,
-                                receivedHeader->SequenceNumber,
-                                m_expected_reply_sequence.value());
+                        LOG_WARNING(
+                            "Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}",
+                            m_name,
+                            receivedHeader->SequenceNumber,
+                            m_expected_reply_sequence.value());
 #endif
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        if (diff != 0)
-                        {
+                    if (diff != 0)
+                    {
 #ifdef WIN32
-                            THROW_HR_MSG(
-                                E_UNEXPECTED,
-                                "Unexpected response sequence: %u, expected: %u, channel: %hs",
-                                receivedHeader->SequenceNumber,
-                                m_expected_reply_sequence.value(),
-                                m_name);
+                        THROW_HR_MSG(
+                            E_UNEXPECTED,
+                            "Unexpected response sequence: %u, expected: %u, channel: %hs",
+                            receivedHeader->SequenceNumber,
+                            m_expected_reply_sequence.value(),
+                            m_name);
 #else
-                            LOG_ERROR(
-                                "Unexpected response sequence: {}, expected: {}, channel: {}",
-                                receivedHeader->SequenceNumber,
-                                m_expected_reply_sequence.value(),
-                                m_name);
-                            THROW_ERRNO(EINVAL);
+                        LOG_ERROR(
+                            "Unexpected response sequence: {}, expected: {}, channel: {}",
+                            receivedHeader->SequenceNumber,
+                            m_expected_reply_sequence.value(),
+                            m_name);
+                        THROW_ERRNO(EINVAL);
 #endif
-                        }
                     }
 
                     m_expected_reply_sequence.reset();
@@ -474,11 +477,11 @@ private:
 
 #endif
     uint32_t m_sent_messages = 0;
-    // The assumption:
+    // The assumption when sequence numbers are used:
     // 1. Request end and reply end is fixed for a given channel. That is, the message will always be:
     //    - A -> B (request), then B -> A (reply) or
     //    - A -> B (request), w/o a reply.
-    // 2. There are no concurrent requests being handled. That is:
+    // 2. There are no concurrent valid requests. That is:
     //    - A will not initiate concurrent requests. Only the latest one is valid.
     //    - B will not start handling a new message until it finishes or fails to handle the previous one.
     std::optional<uint32_t> m_expected_reply_sequence;
