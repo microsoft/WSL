@@ -38,7 +38,7 @@ struct CommandLineTestCase
 
 class WSLCCLIExecutionUnitTests
 {
-    WSL_TEST_CLASS(WSLCCLIExecutionUnitTests)
+    WSLA_TEST_CLASS(WSLCCLIExecutionUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
