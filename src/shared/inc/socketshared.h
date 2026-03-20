@@ -53,19 +53,8 @@ try
 #endif
     }
 
-    // Validate the magic number to detect framing corruption early.
-    const auto* ReceivedHeader = gslhelpers::get_struct<MESSAGE_HEADER>(Message);
-    if (ReceivedHeader->MessageMagic != MESSAGE_HEADER::Magic)
-    {
-#if defined(_MSC_VER)
-        THROW_HR_MSG(E_UNEXPECTED, "Invalid message magic: 0x%08x", ReceivedHeader->MessageMagic);
-#elif defined(__GNUC__)
-        THROW_UNEXCEPTED();
-#endif
-    }
-
     // Grow the message buffer if needed and read the rest of the message.
-    MessageSize = ReceivedHeader->MessageSize;
+    MessageSize = gslhelpers::get_struct<MESSAGE_HEADER>(Message)->MessageSize;
     if (MessageSize < sizeof(MESSAGE_HEADER))
     {
 #if defined(_MSC_VER)
