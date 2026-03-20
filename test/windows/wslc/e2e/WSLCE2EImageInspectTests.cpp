@@ -21,7 +21,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EImageInspectTests
 {
-    WSL_TEST_CLASS(WSLCE2EImageInspectTests)
+    WSLA_TEST_CLASS(WSLCE2EImageInspectTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {

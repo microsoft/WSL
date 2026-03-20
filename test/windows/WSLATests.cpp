@@ -34,9 +34,9 @@ extern bool g_fastTestRun;
 
 class WSLATests
 {
-    WSL_TEST_CLASS(WSLATests)
+    WSLA_TEST_CLASS(WSLATests)
 
-    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
+    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WSLASessionSettings m_defaultSessionSettings{};
@@ -58,6 +58,7 @@ class WSLATests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
+        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         // The WSLC SDK tests use this same storage to reduce pull overhead.
