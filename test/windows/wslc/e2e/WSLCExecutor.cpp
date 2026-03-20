@@ -174,12 +174,6 @@ void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
     m_stderrReader->ExpectConsume(expected);
 }
 
-void WSLCInteractiveSession::WriteLineAndExpect(const std::string& line, const std::string& expectedOutput)
-{
-    WriteLine(line);
-    ExpectStdout(expectedOutput);
-}
-
 void WSLCInteractiveSession::Write(const std::string& data)
 {
     OVERLAPPED overlapped{};
