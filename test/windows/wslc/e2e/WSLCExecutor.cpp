@@ -154,13 +154,12 @@ WSLCInteractiveSession::~WSLCInteractiveSession()
 
     CloseStdin();
 
-    constexpr DWORD waitTimeoutMs = 60 * 1000;
-    DWORD waitResult = ::WaitForSingleObject(m_processHandle.get(), waitTimeoutMs);
+    DWORD waitResult = ::WaitForSingleObject(m_processHandle.get(), DefaultWaitTimeoutMs);
     if (waitResult == WAIT_TIMEOUT)
     {
         // Still running: terminate and wait again, but do not throw.
         ::TerminateProcess(m_processHandle.get(), 1);
-        ::WaitForSingleObject(m_processHandle.get(), waitTimeoutMs);
+        ::WaitForSingleObject(m_processHandle.get(), DefaultWaitTimeoutMs);
     }
 }
 
@@ -186,8 +185,7 @@ void WSLCInteractiveSession::Write(const std::string& data)
         DWORD error = GetLastError();
         if (error == ERROR_IO_PENDING)
         {
-            // One minute timeout consistent with other timeouts in this test suite.
-            DWORD waitResult = WaitForSingleObject(event.get(), 60 * 1000);
+            DWORD waitResult = WaitForSingleObject(event.get(), DefaultWaitTimeoutMs);
             if (waitResult == WAIT_TIMEOUT)
             {
                 THROW_HR(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
@@ -247,7 +245,7 @@ void WSLCInteractiveSession::WaitForExit(DWORD timeoutMs)
         Log::Warning(std::format(L"Process (PID: {}) did not exit within timeout of {}ms", processId, timeoutMs).c_str());
         Log::Warning(L"Attempting to terminate process forcefully");
         Terminate(999);
-        WaitForSingleObject(m_processHandle.get(), 1000);
+        WaitForSingleObject(m_processHandle.get(), DefaultWaitTimeoutMs);
 
         THROW_HR_MSG(E_FAIL, "Process did not exit within timeout of %dms and was forcefully terminated", timeoutMs);
     }

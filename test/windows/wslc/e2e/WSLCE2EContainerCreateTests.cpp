@@ -173,6 +173,7 @@ class WSLCE2EContainerCreateTests
         // Wait for cat to exit with code 0
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
     }
 
     TEST_METHOD(WSLCE2E_Container_RunAttach_TTY)
@@ -229,6 +230,7 @@ class WSLCE2EContainerCreateTests
         // Wait for cat to exit with code 0
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
     }
 
     TEST_METHOD(WSLCE2E_Container_ExecInteractive_TTY)
@@ -283,6 +285,7 @@ class WSLCE2EContainerCreateTests
         // Wait for cat to exit with code 0
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
     }
 
     TEST_METHOD(WSLCE2E_Container_CreateStartAttach_TTY)
@@ -340,6 +343,7 @@ class WSLCE2EContainerCreateTests
         // Wait for cat to exit with code 0
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
     }
 
     TEST_METHOD(WSLCE2E_Session_Shell)
