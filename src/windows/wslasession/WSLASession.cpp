@@ -21,6 +21,7 @@ Abstract:
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
 using wsl::shared::Localization;
+using wsl::windows::service::wsla::UserHandle;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
@@ -96,6 +97,43 @@ wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
 } // namespace
 
 namespace wsl::windows::service::wsla {
+
+UserHandle::UserHandle(WSLASession& Session, wil::unique_handle&& handle) : m_session(&Session), m_handle(std::move(handle))
+{
+    WI_ASSERT(!!m_handle);
+}
+
+UserHandle::UserHandle(UserHandle&& Other)
+{
+    *this = std::move(Other);
+}
+
+UserHandle& UserHandle::operator=(UserHandle&& Other)
+{
+    if (this != &Other)
+    {
+        m_session = Other.m_session;
+        m_handle = std::move(Other.m_handle);
+
+        Other.m_session = nullptr;
+    }
+    return *this;
+}
+
+UserHandle::~UserHandle()
+{
+    if (m_handle)
+    {
+        WI_ASSERT(m_session != nullptr);
+
+        m_session->ReleaseUserHandle(m_handle.get());
+    }
+}
+
+HANDLE UserHandle::Get() const noexcept
+{
+    return m_handle.get();
+}
 
 HRESULT WSLASession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try
@@ -399,13 +437,11 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
-    wil::unique_handle dockerfileFileHandle;
+    std::optional<UserHandle> dockerfileFileHandle;
     if (Options->DockerfileHandle != 0 && Options->DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
     {
-        dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Options->DockerfileHandle)));
+        dockerfileFileHandle = OpenUserHandle(Options->DockerfileHandle, GENERIC_READ | SYNCHRONIZE);
     }
-
-    auto userHandleTracker = TrackUserHandle(dockerfileFileHandle.get());
 
     auto lock = m_lock.lock_shared();
 
@@ -433,11 +469,13 @@ try
         buildArgs.push_back("--build-arg");
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
-    if (dockerfileFileHandle)
+
+    if (dockerfileFileHandle.has_value())
     {
         buildArgs.push_back("-f");
         buildArgs.push_back("-");
     }
+
     buildArgs.push_back(mountPath);
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
@@ -450,8 +488,7 @@ try
     if (dockerfileFileHandle)
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-            common::relay::HandleWrapper{std::move(dockerfileFileHandle)},
-            common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLAFDStdin)}));
+            common::relay::HandleWrapper{dockerfileFileHandle->Get()}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLAFDStdin)}));
     }
 
     bool verbose = Options->Verbose;
@@ -593,8 +630,7 @@ CATCH_RETURN();
 
 void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(InputHandle))};
-    auto userHandleTracker = TrackUserHandle(imageFileHandle.get());
+    auto userHandle = OpenUserHandle(InputHandle, GENERIC_READ | SYNCHRONIZE);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -626,7 +662,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     };
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
+        userHandle.Get(), common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -667,8 +703,7 @@ CATCH_RETURN();
 
 void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, HANDLE CancelEvent)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
-    auto userHandleTracker = TrackUserHandle(imageFileHandle.get());
+    auto userHandle = OpenUserHandle(OutputHandle, GENERIC_WRITE | SYNCHRONIZE);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -691,7 +726,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         io.AddHandle(
             std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, common::relay::HandleWrapper{std::move(imageFileHandle)}),
+                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             MultiHandleWait::CancelOnCompleted);
     }
 
@@ -1456,14 +1491,43 @@ MultiHandleWait WSLASession::CreateIOContext(HANDLE CancelHandle)
     return io;
 }
 
+UserHandle WSLASession::OpenUserHandle(ULONG Handle, DWORD Access)
+{
+    // Don't allow new handles to be added to the list if the session is terminating.
+    THROW_HR_IF_MSG(
+        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to open a user handle while the session is terminating.");
+
+    wil::unique_handle duplicatedHandle{common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Handle), Access)};
+
+    {
+        std::lock_guard lock(m_userHandlesLock);
+        m_userHandles.emplace_back(duplicatedHandle.get());
+    }
+
+    return UserHandle{*this, std::move(duplicatedHandle)};
+}
+
+void WSLASession::ReleaseUserHandle(HANDLE Handle)
+{
+    std::lock_guard lock(m_userHandlesLock);
+
+    auto it = std::ranges::find(m_userHandles, Handle);
+    WI_ASSERT(it != m_userHandles.end());
+
+    m_userHandles.erase(it);
+}
+
 void WSLASession::CancelUserHandleIO()
 {
     std::lock_guard lock(m_userHandlesLock);
     for (auto handle : m_userHandles)
     {
-        // CancelIoEx with nullptr cancels all pending IO on the handle.
-        // ERROR_NOT_FOUND is expected if no IO is pending.
-        CancelIoEx(handle, nullptr);
+        // Cancell all IO on the handle.
+        // N.B. This only cancels IO happening in this process.
+        if (!CancelIoEx(handle, nullptr))
+        {
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        }
     }
 }
 

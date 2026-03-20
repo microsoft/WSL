@@ -25,6 +25,25 @@ namespace wsl::windows::service::wsla {
 
 class WSLASession;
 
+class UserHandle
+{
+    NON_COPYABLE(UserHandle);
+
+public:
+    UserHandle(WSLASession& Session, wil::unique_handle&& handle);
+    UserHandle(UserHandle&& Other);
+
+    ~UserHandle();
+
+    UserHandle& operator=(UserHandle&& Other);
+
+    HANDLE Get() const noexcept;
+
+private:
+    WSLASession* m_session{};
+    wil::unique_handle m_handle;
+};
+
 //
 // WSLASession - Implements IWSLASession for container management.
 // Runs in a per-user COM server process for security isolation.
@@ -86,46 +105,13 @@ public:
 
     common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
-    // Track a user-provided HANDLE that the session is doing IO on.
-    // Returns an RAII guard that unregisters the handle when it goes out of scope.
-    class UserHandleTracker
-    {
-    public:
-        UserHandleTracker(WSLASession& session, HANDLE handle) : m_session(session), m_handle(handle)
-        {
-            if (m_handle != nullptr && m_handle != INVALID_HANDLE_VALUE)
-            {
-                std::lock_guard lock(m_session.m_userHandlesLock);
-                m_session.m_userHandles.push_back(m_handle);
-            }
-        }
-
-        ~UserHandleTracker()
-        {
-            if (m_handle != nullptr && m_handle != INVALID_HANDLE_VALUE)
-            {
-                std::lock_guard lock(m_session.m_userHandlesLock);
-                std::erase(m_session.m_userHandles, m_handle);
-            }
-        }
-
-        NON_COPYABLE(UserHandleTracker);
-        NON_MOVABLE(UserHandleTracker);
-
-    private:
-        WSLASession& m_session;
-        HANDLE m_handle;
-    };
-
-    [[nodiscard]] UserHandleTracker TrackUserHandle(HANDLE handle)
-    {
-        return UserHandleTracker(*this, handle);
-    }
+    UserHandle OpenUserHandle(ULONG Handle, DWORD Access);
+    void ReleaseUserHandle(HANDLE Handle);
 
 private:
-    void CancelUserHandleIO();
     ULONG m_id = 0;
 
+    void CancelUserHandleIO();
     void ConfigureStorage(const WSLASessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
@@ -157,9 +143,8 @@ private:
     std::atomic<bool> m_terminated{false};
 
     // User-provided handles that the session is currently doing IO on.
-    // Protected by m_userHandlesLock; independent of m_lock.
     std::mutex m_userHandlesLock;
-    std::vector<HANDLE> m_userHandles;
+    __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
 };
 
 } // namespace wsl::windows::service::wsla

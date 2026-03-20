@@ -473,7 +473,9 @@ void WSLAContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, U
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
     {
-        *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(ioHandle.get())));
+        *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(
+            reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE));
+
         return;
     }
 
@@ -497,9 +499,14 @@ void WSLAContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, U
 
     m_ioRelay.AddHandles(std::move(handles));
 
-    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get())));
-    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get())));
-    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get())));
+    *Stdin = HandleToULong(
+        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE));
+
+    *Stdout = HandleToULong(
+        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE));
+
+    *Stderr = HandleToULong(
+        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE));
 }
 
 void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags, LPCSTR DetachKeys)
@@ -734,8 +741,7 @@ void WSLAContainerImpl::Export(ULONG OutHandle) const
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     SocketCodePair = m_dockerClient.ExportContainer(m_id);
 
-    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutHandle))};
-    auto userHandleTracker = m_wslaSession.TrackUserHandle(containerFileHandle.get());
+    auto userHandle = m_wslaSession.OpenUserHandle(OutHandle, GENERIC_WRITE | SYNCHRONIZE);
 
     wsl::windows::common::relay::MultiHandleWait io = m_wslaSession.CreateIOContext();
 
@@ -752,8 +758,7 @@ void WSLAContainerImpl::Export(ULONG OutHandle) const
     else
     {
         io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
-                HandleWrapper{std::move(SocketCodePair.second)}, HandleWrapper{std::move(containerFileHandle)}),
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted);
     }
 
@@ -1296,7 +1301,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get()));
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get(), GENERIC_READ | SYNCHRONIZE));
     }
     else
     {
@@ -1309,8 +1314,8 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
 
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get()));
-        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get()));
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE));
+        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get(), GENERIC_READ | SYNCHRONIZE));
     }
 }
 
