@@ -741,9 +741,15 @@ class UnitTests
         }
         else
         {
+            // Verify cgroup2 is mounted correctly. The nsdelegate option is hidden by the kernel
+            // when running inside a child cgroup namespace (per-distro cgroup isolation), so accept
+            // its absence only if the cgroup namespace differs from init's.
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(
-                    L"mount | grep -iF 'cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,nsdelegate)'", nullptr, nullptr, nullptr, nullptr),
+                    L"mount | grep -iF 'cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime' && "
+                    L"(mount | grep -qF nsdelegate || "
+                    L"[ \"$(stat -c %%i /proc/1/ns/cgroup)\" != \"$(stat -c %%i /proc/self/ns/cgroup)\" ])",
+                    nullptr, nullptr, nullptr, nullptr),
                 0u);
         }
     }
@@ -6436,7 +6442,32 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         };
 
         // Validate that cgroupv2 is mounted by default.
-        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+        // The nsdelegate mount option is hidden by the kernel when running inside a child cgroup
+        // namespace (per-distro cgroup isolation). Accept its absence only in that case.
+        auto isChildCgroupNs = [] {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(
+                L"[ \"$(stat -c %i /proc/1/ns/cgroup)\" != \"$(stat -c %i /proc/self/ns/cgroup)\" ] && echo yes || echo no");
+            return out == L"yes\n";
+        };
+
+        const bool childCgroupNs = isChildCgroupNs();
+
+        auto expectedCgroup2Mount = [&](const char* path, const wchar_t* expectedWithNsdelegate, const wchar_t* expectedWithout) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
+
+            if (childCgroupNs)
+            {
+                VERIFY_ARE_EQUAL(out, expectedWithout);
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(out, expectedWithNsdelegate);
+            }
+        };
+
+        expectedCgroup2Mount("/sys/fs/cgroup",
+            L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n",
+            L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime\n");
 
         // Validate that setting cgroup=v1 causes unified cgroups to be mounted.
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
@@ -6444,8 +6475,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         TerminateDistribution();
 
-        expectedMount(
-            "/sys/fs/cgroup/unified", L"/sys/fs/cgroup/unified cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+        expectedCgroup2Mount("/sys/fs/cgroup/unified",
+            L"/sys/fs/cgroup/unified cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n",
+            L"/sys/fs/cgroup/unified cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime\n");
 
         // Validate that the cgroupv1 mounts are present.
         expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
@@ -6454,7 +6486,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
 
         expectedMount("/sys/fs/cgroup/unified", L"");
-        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+        expectedCgroup2Mount("/sys/fs/cgroup",
+            L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n",
+            L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime\n");
 
         auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
         VERIFY_ARE_NOT_EQUAL(
