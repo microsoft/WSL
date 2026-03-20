@@ -77,7 +77,7 @@ namespace winrt::WSLAMoviePlayer::implementation
             Log(L"[Container] Storage path: " + storagePath);
 
             Log(L"[Container] Calling WslcInitSessionSettings...");
-            hr = WslcInitSessionSettings(L"WSLAMoviePlayer_Session", storagePath.c_str(), &sessionSettings);
+            hr = WslcInitSessionSettings(L"WSLAMoviePlayer_Session01", storagePath.c_str(), &sessionSettings);
             if (FAILED(hr))
             {
                 auto msg = FormatHResult(hr, L"WslcInitSessionSettings failed");
@@ -91,6 +91,7 @@ namespace winrt::WSLAMoviePlayer::implementation
             WslcVhdRequirements vhdReqs = {};
             vhdReqs.sizeInBytes = 15ULL * 1024 * 1024 * 1024;
             vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
+            
             hr = WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs);
             if (FAILED(hr))
             {
@@ -99,6 +100,7 @@ namespace winrt::WSLAMoviePlayer::implementation
                 if (OnContainerError) OnContainerError(winrt::hstring(msg));
                 co_return;
             }
+            
             Log(L"[Container] VHD settings OK");
 
             Log(L"[Container] Calling WslcSetSessionSettingsFeatureFlags (GPU)...");
@@ -131,9 +133,33 @@ namespace winrt::WSLAMoviePlayer::implementation
                 co_return;
             }
             Log(L"[Container] Session created OK");
+            Log(L"[Container] Importing subtitler.tar");
+			WslcImportImageOptions importOptions = {};
+			importOptions.progressCallback = nullptr;
+			importOptions.progressCallbackContext = nullptr;
 
+			hr = WslcImportSessionImageFromFile(m_session,
+                                                "subtitler:latest",
+                                                L"c:\\users\\public\\subtitler.tar",
+                                                &importOptions, 
+                                                &errorMessage);
+            if (FAILED(hr))
+            {
+                std::wstring detail = L"WslcImportSessionImageFromFile failed";
+                if (errorMessage)
+                {
+                    detail += L": ";
+                    detail += errorMessage;
+                    CoTaskMemFree(errorMessage);
+                    errorMessage = nullptr;
+                }
+                auto msg = FormatHResult(hr, detail.c_str());
+                Log(L"[Container] " + msg);
+                if (OnContainerError) OnContainerError(winrt::hstring(msg));
+                co_return;
+            }
             Log(L"[Container] Calling WslcContainerInitSettings(\"subtitler:latest\")...");
-            hr = WslcContainerInitSettings("subtitler:latest", &containerSettings);
+            hr = WslcInitContainerSettings("subtitler:latest", &containerSettings);
             if (FAILED(hr))
             {
                 auto msg = FormatHResult(hr, L"WslcContainerInitSettings failed");
@@ -144,39 +170,46 @@ namespace winrt::WSLAMoviePlayer::implementation
             Log(L"[Container] Container settings initialized OK");
 
             Log(L"[Container] Setting container name, GPU flag, port mapping...");
-            WslcContainerSettingsSetName(&containerSettings, "WSLAMoviePlayer_container");
-            WslcContainerSettingsSetFlags(&containerSettings,
+            WslcSetContainerSettingsName(&containerSettings, "WSLAMoviePlayer_container15");//<-----------------delete this before running
+            WslcSetContainerSettingsFlags(&containerSettings,
                 WslcContainerFlags::WSLC_CONTAINER_FLAG_ENABLE_GPU);
-
+            
             WslcContainerPortMapping portMapping = {};
+            sockaddr_storage l_SockAddStorage = {};
+            l_SockAddStorage.ss_family = AF_INET;   //ipv4
+            
             portMapping.windowsPort = 8000;
             portMapping.containerPort = 8000;
             portMapping.protocol = WslcPortProtocol::WSLC_PORT_PROTOCOL_TCP;
-            portMapping.windowsAddress = nullptr;
-            WslcContainerSettingsSetPortMapping(&containerSettings, &portMapping, 1);
+            portMapping.windowsAddress = &l_SockAddStorage;
 
+            WslcSetContainerSettingsPortMappings(&containerSettings, &portMapping, 1);
+            
             Log(L"[Container] Setting init process...");
             WslcProcessSettings processSettings = {};
-            hr = WslcProcessInitSettings(&processSettings);
+            hr = WslcInitProcessSettings(&processSettings);
             if (FAILED(hr))
             {
-                auto msg = FormatHResult(hr, L"WslcProcessInitSettings failed");
+                auto msg = FormatHResult(hr, L"WslcInitProcessSettings failed");
                 Log(L"[Container] " + msg);
                 if (OnContainerError) OnContainerError(winrt::hstring(msg));
                 co_return;
             }
+            
             PCSTR args[] = { "/bin/sh", "-c", "echo Container started && sleep infinity" };
-            hr = WslcProcessSettingsSetCmdLineArgs(&processSettings, args, _countof(args));
+            //PCSTR args[] = { "run", "--rm subtitler : latest" };
+            //PCSTR args[] = { "python","main.py" };
+            hr = WslcSetProcessSettingsCmdLine(&processSettings, args, _countof(args));
             Log(L"[Container] SetCmdLineArgs hr=0x" + std::to_wstring(static_cast<unsigned int>(hr)));
-            hr = WslcContainerSettingsSetInitProcess(&containerSettings, &processSettings);
+            hr = WslcSetContainerSettingsInitProcess(&containerSettings, &processSettings);
             Log(L"[Container] SetInitProcess hr=0x" + std::to_wstring(static_cast<unsigned int>(hr)));
             Log(L"[Container] Container options set OK");
-
+            
             Log(L"[Container] Calling WslcContainerCreate...");
-            hr = WslcContainerCreate(m_session, &containerSettings, &m_container, &containerErrorMessage);
+            hr = WslcCreateContainer(m_session, &containerSettings, &m_container, &containerErrorMessage);
             if (FAILED(hr))
             {
-                std::wstring detail = L"WslcContainerCreate failed";
+                std::wstring detail = L"WslcCreateContainer failed";
                 if (containerErrorMessage)
                 {
                     detail += L": ";
@@ -191,11 +224,11 @@ namespace winrt::WSLAMoviePlayer::implementation
             }
             Log(L"[Container] Container created OK");
 
-            Log(L"[Container] Calling WslcContainerStart...");
-            hr = WslcContainerStart(m_container, WslcContainerStartFlags::WSLC_CONTAINER_START_FLAG_NONE);
+            Log(L"[Container] Calling WslcStartContainer...");
+            hr = WslcStartContainer(m_container, WslcContainerStartFlags::WSLC_CONTAINER_START_FLAG_ATTACH, &errorMessage);
             if (FAILED(hr))
             {
-                auto msg = FormatHResult(hr, L"WslcContainerStart failed");
+                auto msg = FormatHResult(hr, L"WslcStartContainer failed");
                 Log(L"[Container] " + msg);
                 if (OnContainerError) OnContainerError(winrt::hstring(msg));
                 co_return;
@@ -209,18 +242,18 @@ namespace winrt::WSLAMoviePlayer::implementation
                 OnContainerStarted();
             }
 
-            hr = WslcContainerGetInitProcess(m_container, &m_process);
+            hr = WslcGetContainerInitProcess(m_container, &m_process);
             if (SUCCEEDED(hr))
             {
                 Log(L"[Container] Got init process, waiting for exit...");
                 HANDLE exitEvent = nullptr;
-                hr = WslcProcessGetExitEvent(m_process, &exitEvent);
+                hr = WslcGetProcessExitEvent(m_process, &exitEvent);
                 if (SUCCEEDED(hr) && exitEvent)
                 {
                     WaitForSingleObject(exitEvent, INFINITE);
 
                     INT32 exitCode = -1;
-                    WslcProcessGetExitCode(m_process, &exitCode);
+                    WslcGetProcessExitCode(m_process, &exitCode);
                     Log(L"[Container] Process exited with code " + std::to_wstring(exitCode));
 
                     if (OnContainerOutput)
@@ -279,17 +312,18 @@ namespace winrt::WSLAMoviePlayer::implementation
 
     void Container::Cleanup()
     {
+		PWSTR errorMessage = nullptr;
         if (m_process)
         {
-            WslcProcessRelease(m_process);
+            WslcReleaseProcess(m_process);
             m_process = nullptr;
         }
         if (m_container)
         {
             OutputDebugStringW(L"Container: Stopping and deleting container...\n");
-            WslcContainerStop(m_container, WslcSignal::WSLC_SIGNAL_SIGKILL, 0);
-            WslcContainerDelete(m_container, WSLC_DELETE_CONTAINER_FLAG_NONE);
-            WslcContainerRelease(m_container);
+            WslcStopContainer(m_container, WslcSignal::WSLC_SIGNAL_SIGKILL, 0, &errorMessage);
+            WslcDeleteContainer(m_container, WSLC_DELETE_CONTAINER_FLAG_NONE, &errorMessage);
+            WslcReleaseContainer(m_container);
             m_container = nullptr;
         }
         if (m_session)

@@ -38,7 +38,7 @@ namespace winrt::WSLAMoviePlayer::implementation
         
         // Create subtitler
         m_subtitler = std::make_unique<Subtitler>();
-        SetupConnections();
+        //richfr removed SetupConnections();
         
         // Initialize subtitler connection (fire-and-forget)
         auto initAsync = m_subtitler->InitializeAsync();
