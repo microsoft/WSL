@@ -13,7 +13,6 @@ Abstract:
 
 #include "precomp.h"
 #include "ContainerModel.h"
-#include <cctype>
 
 namespace wsl::windows::wslc::models {
 
@@ -88,7 +87,7 @@ std::optional<std::wstring> EnvironmentVariable::Parse(std::wstring entry)
 
     if (key.empty())
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Environment variable key cannot be empty");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Environment variable key cannot be empty");
     }
 
     if (std::any_of(key.begin(), key.end(), IsSpace))
@@ -126,9 +125,14 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(std::wstring filePath)
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment file '{}' does not exist", filePath));
     }
 
+    std::ifstream file(filePath);
+    if (!file.is_open() || !file.good())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment file '{}' cannot be opened for reading", filePath));
+    }
+
     // Read the file line by line
     std::vector<std::wstring> envVars;
-    std::ifstream file(filePath);
     std::string line;
     while (std::getline(file, line))
     {

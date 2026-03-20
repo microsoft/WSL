@@ -96,7 +96,7 @@ class WSLCCLIEnvVarParserUnitTests
 
         const auto parsed = models::EnvironmentVariable::ParseFile(EnvTestFile.wstring());
 
-        VERIFY_ARE_EQUAL(3, static_cast<int>(parsed.size()));
+        VERIFY_ARE_EQUAL(3U, parsed.size());
         VERIFY_ARE_EQUAL(L"KEY1=VALUE1", parsed[0]);
         VERIFY_ARE_EQUAL(L"KEY2=VALUE2", parsed[1]);
         VERIFY_ARE_EQUAL(L"WSLC_TEST_ENV_FROM_FILE=file_process_value", parsed[2]);

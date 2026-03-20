@@ -767,7 +767,7 @@ private:
             envFile << line << "\n";
         }
         VERIFY_IS_TRUE(envFile.good());
-    };
+    }
 
     bool ContainsOutputLine(const std::vector<std::wstring>& outputLines, const std::wstring& expectedLine) const
     {
