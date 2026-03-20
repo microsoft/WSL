@@ -1910,45 +1910,49 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Интеграция Visual Studio</value>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
-    <value>wslc — CLI контейнера WSL
-Использование:
+    <value>wslc - WSL Container CLI
+Usage:
   wslc --help</value>
     <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaSessionNotFound" xml:space="preserve">
-    <value>Сеанс не найден: "{}"</value>
+    <value>Session not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidIp" xml:space="preserve">
+    <value>Invalid IP address '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
-    <value>Сбой OpenSessionByName("{}")</value>
+    <value>OpenSessionByName('{}') failed</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>Сеансы WSLA не найдены.</value>
+    <value>No WSLA sessions found.</value>
   </data>
   <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>Найден {} сеанс WSLA{}:</value>
+    <value>Found {} WSLA session{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaShellExited" xml:space="preserve">
-    <value>{} выходит с: {}</value>
+    <value>{} exited with: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaHeaderId" xml:space="preserve">
-    <value>Код</value>
+    <value>ID</value>
   </data>
   <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
-    <value>ИД процесса автора</value>
+    <value>Creator PID</value>
   </data>
   <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
-    <value>Выводимое имя</value>
+    <value>Display Name</value>
   </data>
   <data name="MessageWslaUnknownCommand" xml:space="preserve">
-    <value>Неизвестная команда: "{}"</value>
+    <value>Unknown command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
-    <value>Нераспознанная команда: "{}"</value>
+    <value>Unrecognized command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
@@ -1960,50 +1964,50 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
-    <value>Отображает справку по выбранной команде</value>
+    <value>Shows help about the selected command</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
     <value>Multiple mutually exclusive arguments provided: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
-    <value>Аргумент {} можно использовать только с {}</value>
+    <value>Argument {} can only be used with {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Использование: {} {}</value>
+    <value>Usage: {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
-    <value>команда</value>
+    <value>command</value>
   </data>
   <data name="WSLCCLI_Options" xml:space="preserve">
-    <value>параметры</value>
+    <value>options</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
-    <value>Доступны следующие псевдонимы команд.</value>
+    <value>The following command aliases are available:</value>
   </data>
   <data name="WSLCCLI_AvailableCommands" xml:space="preserve">
-    <value>Применимы следующие команды:</value>
+    <value>The following commands are available:</value>
   </data>
   <data name="WSLCCLI_AvailableSubcommands" xml:space="preserve">
-    <value>Доступны следующие подкоманды:</value>
+    <value>The following sub-commands are available:</value>
   </data>
   <data name="WSLCCLI_AvailableOptions" xml:space="preserve">
-    <value>Доступны следующие опции:</value>
+    <value>The following options are available:</value>
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
-    <value>Доступны следующие аргументы:</value>
+    <value>The following arguments are available:</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
-    <value>Для более подробной информации о конкретной команде передайте ей аргумент справки.</value>
+    <value>For more details on a specific command, pass it the help argument.</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
     <value>Argument name was not recognized for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
-    <value>Для выполнения этой команды требуются права администратора.</value>
+    <value>This command requires administrator privileges to execute.</value>
   </data>
   <data name="WSLCCLI_SessionIdArgDescription" xml:space="preserve">
     <value>Specify the session to use</value>
@@ -2018,10 +2022,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Specify the port to use</value>
   </data>
   <data name="WSLCCLI_ContainerIdArgDescription" xml:space="preserve">
-    <value>ИД контейнера</value>
+    <value>Container ID</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Отсутствует значение аргумента: "{}"</value>
+    <value>Missing argument value: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
@@ -2053,7 +2057,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Отсутствует имя аргумента в: "{}"</value>
+     <value>Missing argument name at: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
@@ -2061,11 +2065,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
-     <value>Обнаружен недопустимый дополнительный аргумент: "{}"</value>
+     <value>Invalid extra argument encountered: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Аргументы псевдонима со значением должны быть последними в цепочке псевдонимов: "{}"</value>
+     <value>Alias arguments with a value must be last in the alias chain: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -2074,15 +2078,15 @@ For privacy information about this product please visit https://aka.ms/privacy.<
      <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
-    <value>Недопустимое изображение: "{}"</value>
+    <value>Invalid image: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaInvalidContainerName" xml:space="preserve">
-    <value>Недопустимое имя контейнера: "{}"</value>
+    <value>Invalid container name: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
-    <value>Путь не является абсолютным: "{}"</value>
+    <value>Path is not absolute: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
