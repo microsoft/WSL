@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentTypes.h"
 #include "ArgumentValidation.h"
+#include "ContainerModel.h"
 #include "Exceptions.h"
 #include <charconv>
 #include <format>
@@ -39,6 +40,10 @@ void Argument::Validate(const ArgMap& execArgs) const
 
     case ArgType::Time:
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
+        break;
+
+    case ArgType::Volume:
+        validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
 
     default:
@@ -69,6 +74,14 @@ void ValidateWSLASignalFromString(const std::vector<std::wstring>& values, const
     for (const auto& value : values)
     {
         std::ignore = GetWSLASignalFromString(value, argName);
+    }
+}
+
+void ValidateVolumeMount(const std::vector<std::wstring>& values)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = models::VolumeMount::Parse(value);
     }
 }
 
