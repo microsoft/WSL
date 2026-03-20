@@ -2161,7 +2161,7 @@ class WSLATests
         auto process = WSLAProcessLauncher{"/bin/cat", {"/bin/cat"}, {}, WSLAProcessFlagsStdin}.Launch(*m_defaultSession);
 
         // Stop the service
-        StopWslaService();
+        StopWslService();
 
         ResetTestSession(); // Reopen the session since the service was stopped.
     }
