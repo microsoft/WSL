@@ -226,10 +226,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteEnvFile(EnvTestFile1, {
-            "WSLC_TEST_ENV_FILE_A=env-file-a",
-            "WSLC_TEST_ENV_FILE_B=env-file-b"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_A=env-file-a", "WSLC_TEST_ENV_FILE_B=env-file-b"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} {} env",
@@ -248,11 +245,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteEnvFile(EnvTestFile1,
-        {
-            "WSLC_TEST_ENV_MIX_FILE_A=from-file-a",
-            "WSLC_TEST_ENV_MIX_FILE_B=from-file-b"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_ENV_MIX_FILE_B=from-file-b"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} -e WSLC_TEST_ENV_MIX_CLI=from-cli --env-file {} {} env",
@@ -272,15 +265,9 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteEnvFile(EnvTestFile1, {
-            "WSLC_TEST_ENV_FILE_MULTI_A=file1-a",
-            "WSLC_TEST_ENV_FILE_MULTI_B=file1-b"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_ENV_FILE_MULTI_B=file1-b"});
 
-        WriteEnvFile(EnvTestFile2, {
-            "WSLC_TEST_ENV_FILE_MULTI_C=file2-c",
-            "WSLC_TEST_ENV_FILE_MULTI_D=file2-d"
-        });
+        WriteEnvFile(EnvTestFile2, {"WSLC_TEST_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_ENV_FILE_MULTI_D=file2-d"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} --env-file {} {} env",
@@ -303,9 +290,7 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
-            L"container run --rm --name {} --env-file ENV_FILE_NOT_FOUND {} env",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+            L"container run --rm --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' does not exist\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
@@ -314,10 +299,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteEnvFile(EnvTestFile1, {
-            "WSLC_TEST_ENV_VALID=ok",
-            "BAD KEY=value"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_VALID=ok", "BAD KEY=value"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} {} env",
@@ -332,13 +314,9 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteEnvFile(EnvTestFile1, {
-            "WSLC_TEST_ENV_DUP=from-file-1"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_DUP=from-file-1"});
 
-        WriteEnvFile(EnvTestFile2, {
-            "WSLC_TEST_ENV_DUP=from-file-2"
-        });
+        WriteEnvFile(EnvTestFile2, {"WSLC_TEST_ENV_DUP=from-file-2"});
 
         // Later --env-file should win over earlier --env-file for duplicate keys
         auto result = RunWslc(std::format(
@@ -370,9 +348,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteEnvFile(EnvTestFile1, {
-            "WSLC_TEST_ENV_EQUALS=value=with=equals"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_EQUALS=value=with=equals"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} {} env",
@@ -389,15 +365,10 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sleep infinity",
-            WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        result = RunWslc(std::format(
-            L"container exec -e {}=A {} env",
-            HostEnvVariableName,
-            WslcContainerName));
+        result = RunWslc(std::format(L"container exec -e {}=A {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -408,15 +379,10 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sleep infinity",
-            WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        result = RunWslc(std::format(
-            L"container exec -e {} {} env",
-            HostEnvVariableName,
-            WslcContainerName));
+        result = RunWslc(std::format(L"container exec -e {} {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -427,20 +393,12 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
 
-        WriteEnvFile(EnvTestFile1, {
-            "WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a",
-            "WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a", "WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"});
 
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sleep infinity",
-            WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        result = RunWslc(std::format(
-            L"container exec --env-file {} {} env",
-            EscapePath(EnvTestFile1.wstring()),
-            WslcContainerName));
+        result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -452,20 +410,13 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
 
-        WriteEnvFile(EnvTestFile1, {
-            "WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a",
-            "WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"
-        });
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"});
 
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sleep infinity",
-            WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         result = RunWslc(std::format(
-            L"container exec -e WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli --env-file {} {} env",
-            EscapePath(EnvTestFile1.wstring()),
-            WslcContainerName));
+            L"container exec -e WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -478,16 +429,13 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sleep infinity",
-            WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        result = RunWslc(std::format(
-            L"container exec --env-file ENV_FILE_NOT_FOUND {} env",
-            WslcContainerName));
+        result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
         result.Verify({.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' does not exist\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";

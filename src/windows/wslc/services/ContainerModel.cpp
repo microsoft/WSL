@@ -24,7 +24,7 @@ static inline bool IsSpace(wchar_t ch)
 
 std::optional<std::wstring> EnvironmentVariable::Parse(std::wstring entry)
 {
-    if(entry.empty() || std::all_of(entry.begin(), entry.end(), IsSpace))
+    if (entry.empty() || std::all_of(entry.begin(), entry.end(), IsSpace))
     {
         return std::nullopt;
     }
@@ -90,9 +90,7 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(std::wstring filePath)
     while (std::getline(file, line))
     {
         // Remove leading whitespace
-        line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) {
-            return !std::isspace(ch);
-        }));
+        line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) { return !std::isspace(ch); }));
 
         // Skip empty lines and comments
         if (line.empty() || line[0] == '#')

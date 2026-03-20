@@ -52,9 +52,7 @@ class WSLCCLIEnvVarParserUnitTests
         constexpr const auto key = L"WSLC_TEST_ENV_FROM_PROCESS";
         VERIFY_IS_TRUE(SetEnvironmentVariableW(key, L"process_value"));
 
-        auto cleanup = wil::scope_exit([&] {
-            SetEnvironmentVariableW(key, nullptr);
-        });
+        auto cleanup = wil::scope_exit([&] { SetEnvironmentVariableW(key, nullptr); });
 
         const auto parsed = models::EnvironmentVariable::Parse(key);
         VERIFY_IS_TRUE(parsed.has_value());
@@ -84,9 +82,7 @@ class WSLCCLIEnvVarParserUnitTests
         constexpr const auto key = L"WSLC_TEST_ENV_FROM_FILE";
         VERIFY_IS_TRUE(SetEnvironmentVariableW(key, L"file_process_value") == TRUE);
 
-        auto envCleanup = wil::scope_exit([&] {
-            SetEnvironmentVariableW(key, nullptr);
-        });
+        auto envCleanup = wil::scope_exit([&] { SetEnvironmentVariableW(key, nullptr); });
 
         std::ofstream file(EnvTestFile);
         VERIFY_IS_TRUE(file.is_open());
@@ -136,9 +132,7 @@ class WSLCCLIEnvVarParserUnitTests
         constexpr const auto key = L"WSLC_TEST_ENV_EMPTY_VALUE";
         VERIFY_IS_TRUE(SetEnvironmentVariableW(key, L""));
 
-        auto cleanup = wil::scope_exit([&] {
-            SetEnvironmentVariableW(key, nullptr);
-        });
+        auto cleanup = wil::scope_exit([&] { SetEnvironmentVariableW(key, nullptr); });
 
         const auto parsed = models::EnvironmentVariable::Parse(key);
         VERIFY_IS_TRUE(parsed.has_value());
