@@ -66,6 +66,7 @@ public:
         m_strict_request_end = other.m_strict_request_end;
         m_strict_reply_end = other.m_strict_reply_end;
         m_sent_messages = other.m_sent_messages;
+        m_next_send_increment = other.m_next_send_increment;
         m_received_messages = other.m_received_messages;
 
         return *this;
@@ -86,7 +87,7 @@ public:
 #endif
 
     template <typename TMessage>
-    void SendMessage(gsl::span<gsl::byte> span)
+    void SendMessage(gsl::span<gsl::byte> span, uint32_t nextSendIncrement = 1)
     {
         // Ensure that no other thread is using this channel.
         const std::unique_lock<std::mutex> lock{m_sendMutex, std::try_to_lock};
@@ -108,8 +109,21 @@ public:
         THROW_INVALID_ARG_IF(m_name == nullptr || span.size() < sizeof(TMessage));
 
         uint32_t sequenceNumber = 0;
+        if (m_strict_request_end)
         {
             std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
+            m_sent_messages += m_next_send_increment;
+            m_next_send_increment = nextSendIncrement;
+            sequenceNumber = m_sent_messages;
+        }
+        else if (m_strict_reply_end)
+        {
+            std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
+            m_sent_messages++;
+            sequenceNumber = m_sent_messages;
+        }
+        else
+        {
             m_sent_messages++;
             sequenceNumber = m_sent_messages;
         }
@@ -159,7 +173,7 @@ public:
     }
 
     template <typename TMessage>
-    void SendMessage(TMessage& message)
+    void SendMessage(TMessage& message, uint32_t nextSendIncrement = 1)
     {
         // Catch situations where the other SendMessage() method should be used
         const auto& header = GetMessageHeader(message);
@@ -173,7 +187,7 @@ public:
 #endif
         }
 
-        SendMessage<TMessage>(gslhelpers::struct_as_writeable_bytes(message));
+        SendMessage<TMessage>(gslhelpers::struct_as_writeable_bytes(message), nextSendIncrement);
     }
 
     template <typename TResult>
@@ -188,7 +202,7 @@ public:
     }
 
     template <typename TMessage>
-    std::pair<TMessage*, gsl::span<gsl::byte>> ReceiveMessageOrClosed(TTimeout timeout = DefaultSocketTimeout)
+    std::pair<TMessage*, gsl::span<gsl::byte>> ReceiveMessageOrClosed(TTimeout timeout = DefaultSocketTimeout, uint32_t expectedOffset = 0)
     {
         WI_ASSERT(m_name != nullptr);
 
@@ -246,7 +260,8 @@ public:
                 {
                     // Skip stale message for strict request end.
                     std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
-                    auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_sent_messages);
+                    uint32_t expectedSequence = m_sent_messages + expectedOffset;
+                    auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - expectedSequence);
                     if (diff < 0)
                     {
 #ifdef WIN32
@@ -254,9 +269,9 @@ public:
                             "DiscardStaleResponse",
                             TraceLoggingValue(m_name, "Name"),
                             TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
-                            TraceLoggingValue(m_sent_messages, "ExpectedSeq"));
+                            TraceLoggingValue(expectedSequence, "ExpectedSeq"));
 #else
-                        LOG_WARNING("Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}", m_name, receivedHeader->SequenceNumber, m_sent_messages);
+                        LOG_WARNING("Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}", m_name, receivedHeader->SequenceNumber, expectedSequence);
 #endif
                         continue;
                     }
@@ -264,9 +279,9 @@ public:
                     if (diff != 0)
                     {
 #ifdef WIN32
-                        THROW_HR_MSG(E_UNEXPECTED, "Unexpected response sequence: %u, expected: %u, channel: %hs", receivedHeader->SequenceNumber, m_sent_messages, m_name);
+                        THROW_HR_MSG(E_UNEXPECTED, "Unexpected response sequence: %u, expected: %u, channel: %hs", receivedHeader->SequenceNumber, expectedSequence, m_name);
 #else
-                        LOG_ERROR("Unexpected response sequence: {}, expected: {}, channel: {}", receivedHeader->SequenceNumber, m_sent_messages, m_name);
+                        LOG_ERROR("Unexpected response sequence: {}, expected: {}, channel: {}", receivedHeader->SequenceNumber, expectedSequence, m_name);
                         THROW_ERRNO(EINVAL);
 #endif
                     }
@@ -322,9 +337,9 @@ public:
     }
 
     template <typename TMessage>
-    TMessage& ReceiveMessage(gsl::span<gsl::byte>* responseSpan = nullptr, TTimeout timeout = DefaultSocketTimeout)
+    TMessage& ReceiveMessage(gsl::span<gsl::byte>* responseSpan = nullptr, TTimeout timeout = DefaultSocketTimeout, uint32_t expectedOffset = 0)
     {
-        auto [message, span] = ReceiveMessageOrClosed<TMessage>(timeout);
+        auto [message, span] = ReceiveMessageOrClosed<TMessage>(timeout, expectedOffset);
         if (message == nullptr)
         {
 #ifdef WIN32
@@ -374,13 +389,13 @@ public:
         m_ignore_sequence = true;
     }
 
-    // This end always requests. With 0 or 1 reply message. Without concurrent requests.
+    // This end always requests. Without concurrent requests.
     void SetStrictRequestEnd()
     {
         m_strict_request_end = true;
     }
 
-    // This end always replys. With 0 or 1 reply message. Without concurrent requests.
+    // This end always replys. Without concurrent requests.
     void SetStrictReplyEnd()
     {
         m_strict_reply_end = true;
@@ -480,6 +495,7 @@ private:
 
 #endif
     uint32_t m_sent_messages = 0;
+    uint32_t m_next_send_increment = 1;
     uint32_t m_received_messages = 0;
     bool m_ignore_sequence = false;
     bool m_strict_request_end = false;

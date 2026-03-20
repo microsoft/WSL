@@ -46,6 +46,8 @@ WslCoreInstance::WslCoreInstance(
     // Read a message from the init daemon. This will let us know if anything failed during startup.
     gsl::span<gsl::byte> span;
     const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
+    // After the first message. Enable strict request-end sequencing.
+    m_initChannel->GetChannel().SetStrictRequestEnd();
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -533,7 +535,6 @@ WslCoreInstance::WslCorePort::WslCorePort(_In_ SOCKET Socket, _In_ const GUID& R
 
 {
     // N.B. The class takes ownership of the socket.
-    m_channel.SetStrictRequestEnd();
 }
 
 std::shared_ptr<LxssPort> WslCoreInstance::WslCorePort::CreateSessionLeader(_In_ HANDLE)
@@ -545,7 +546,9 @@ std::shared_ptr<LxssPort> WslCoreInstance::WslCorePort::CreateSessionLeader(_In_
     const auto& response = m_channel.Transaction(message, nullptr, m_socketTimeout);
 
     wil::unique_socket socket = wsl::windows::common::hvsocket::Connect(m_runtimeId, response.Port);
-    return std::make_shared<WslCorePort>(socket.release(), m_runtimeId, m_socketTimeout);
+    auto sessionLeader = std::make_shared<WslCorePort>(socket.release(), m_runtimeId, m_socketTimeout);
+    sessionLeader->GetChannel().SetStrictRequestEnd();
+    return sessionLeader;
 }
 
 void WslCoreInstance::WslCorePort::DisconnectConsole(_In_ HANDLE)

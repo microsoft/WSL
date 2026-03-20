@@ -85,16 +85,15 @@ public:
         wsl::shared::MessageWriter<CREATE_PROCESS_MESSAGE> message(LxInitCreateProcess);
         message.WriteString(message->PathIndex, Path);
         gsl::copy(as_bytes(gsl::span(ArgumentsData)), message.InsertBuffer(message->CommandLineIndex, ArgumentsData.size()));
-        channel.SendMessage<CREATE_PROCESS_MESSAGE>(message.Span());
+        channel.SendMessage<CREATE_PROCESS_MESSAGE>(message.Span(), 2);
 
-        auto readResult = [&]() {
-            const auto& message = channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, Timeout);
-            return message.Result;
+        auto readResult = [&](uint32_t expectedOffset = 0) {
+            return channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, Timeout, expectedOffset).Result;
         };
 
         auto processSocket = wsl::windows::common::hvsocket::Connect(RuntimeId, readResult(), terminatingEvent);
 
-        const auto execResult = readResult();
+        const auto execResult = readResult(1);
         THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
 
         return processSocket;
