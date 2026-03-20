@@ -6550,8 +6550,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"read pass < /dev/tty\n");
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod +x /sbin/mount.hang"), (DWORD)0);
 
-        // Add fstab entry using this helper.
-        DistroFileChange fstab(L"/etc/fstab");
+        // Don't keep the original fstab as it can be missing on the pipeline.
+        DistroFileChange fstab(L"/etc/fstab", false);
         fstab.SetContent(L"none /mnt/ttytest hang 0 0\n");
 
         // Restart the distro with this mount.
