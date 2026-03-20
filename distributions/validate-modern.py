@@ -34,6 +34,7 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'tmp.mount',
                             'NetworkManager.service',
                             'NetworkManager-wait-online.service',
+                            'console-getty.service',
                             'networking.service',
                             'hypervkvpd.service']
 
