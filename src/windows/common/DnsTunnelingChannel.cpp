@@ -10,6 +10,9 @@ DnsTunnelingChannel::DnsTunnelingChannel(wil::unique_socket&& socket, DnsTunneli
 {
     WSL_LOG("DnsTunnelingChannel::DnsTunnelingChannel [Windows]", TraceLoggingValue(m_channel.Socket(), "socket"));
 
+    // Disable sequence number checking.
+    m_channel.IgnoreSequenceNumbers();
+
     // Start thread waiting for incoming messages from Linux side
     m_receiveWorkerThread = std::thread([this]() { ReceiveLoop(); });
 }

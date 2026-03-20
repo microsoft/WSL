@@ -11,6 +11,9 @@
 DnsTunnelingChannel::DnsTunnelingChannel(int channelFd, DnsTunnelingCallback&& reportDnsResponse) :
     m_channel(wil::unique_fd{channelFd}, "DnsTunneling"), m_reportDnsResponse(std::move(reportDnsResponse))
 {
+    // Disable sequence number checking.
+    m_channel.IgnoreSequenceNumbers();
+
     // Create a pipe to be used for signalling the receive loop to stop
     m_shutdownReceiveWorkerPipe = wil::unique_pipe::create(0);
 
