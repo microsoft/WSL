@@ -527,6 +527,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
             target = readField(Message.DestinationIndex);
         }
 
+        // Chroot without OverlayFs is not supported — the chroot logic depends on the overlay target path.
+        THROW_ERRNO_IF(EINVAL, WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot) && !WI_IsFlagSet(Message.Flags, WSLA_MOUNT::OverlayFs));
+
         THROW_LAST_ERROR_IF(
             UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
 
@@ -548,18 +551,28 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
                 // We'll chroot into it later, so moving the mountpoint isn't needed.
                 target = overlayTarget->c_str();
 
-                THROW_LAST_ERROR_IF(MountInit((overlayTarget.value() + "/wsl-init").c_str()) < 0); // Required to call /gns later
+                // Move standard filesystem mounts into the chroot.
+                // MS_MOVE moves the entire subtree, so /dev/pts comes with /dev and /sys/fs/cgroup comes with /sys.
+                for (const auto* mountPoint : {"/dev", "/proc", "/sys"})
+                {
+                    auto chrootTarget = std::format("{}{}", target, mountPoint);
+                    std::filesystem::create_directories(chrootTarget);
+
+                    THROW_LAST_ERROR_IF(mount(mountPoint, chrootTarget.c_str(), "none", MS_MOVE, nullptr) < 0);
+                }
+
+                THROW_LAST_ERROR_IF(MountInit(std::format("{}/wsl-init", target).c_str()) < 0); // Required to call /gns later
 
                 // If it exists, mount /etc/resolv.conf
                 if (std::filesystem::exists("/etc/resolv.conf"))
                 {
-                    THROW_LAST_ERROR_IF(UtilMountFile("/etc/resolv.conf", (overlayTarget.value() + "/etc/resolv.conf").c_str()) < 0);
+                    THROW_LAST_ERROR_IF(UtilMountFile("/etc/resolv.conf", std::format("{}/etc/resolv.conf", target).c_str()) < 0);
                 }
 
                 // If the modules were previously mounted, move them to the chroot.
                 if (g_state.ModulesMountPoint.has_value())
                 {
-                    auto chrootTarget = std::format("{}/{}", overlayTarget.value(), g_state.ModulesMountPoint->native());
+                    auto chrootTarget = std::format("{}/{}", target, g_state.ModulesMountPoint->native());
                     std::filesystem::create_directories(chrootTarget);
 
                     THROW_LAST_ERROR_IF(mount(g_state.ModulesMountPoint->c_str(), chrootTarget.c_str(), "none", MS_MOVE, nullptr) < 0);
