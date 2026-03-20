@@ -139,11 +139,13 @@ class WSLCE2EContainerCreateTests
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("echo hello");
-        session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
-        session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         auto exitCode = session.ExitAndVerifyNoErrors();
@@ -192,11 +194,13 @@ class WSLCE2EContainerCreateTests
         session.ExpectStdout(VT::CONTAINER_ATTACH_PROMPT);
 
         session.WriteLine("echo hello");
-        session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
-        session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.ExitAndVerifyNoErrors();
@@ -247,11 +251,13 @@ class WSLCE2EContainerCreateTests
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("echo hello");
-        session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
-        session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.ExitAndVerifyNoErrors();
@@ -304,11 +310,13 @@ class WSLCE2EContainerCreateTests
         session.ExpectStdout(VT::CONTAINER_ATTACH_PROMPT);
 
         session.WriteLine("echo hello");
-        session.ExpectStdout(std::format("echo hello\r\n{}\rhello\r\n", VT::B_END));
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.WriteLine("whoami");
-        session.ExpectStdout(std::format("whoami\r\n{}\rroot\r\n", VT::B_END));
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
         session.ExpectStdout(VT::CONTAINER_PROMPT);
 
         session.ExitAndVerifyNoErrors();
@@ -357,11 +365,15 @@ class WSLCE2EContainerCreateTests
             session.ExpectStdout(VT::SESSION_PROMPT);
 
             session.WriteLine("echo hello");
-            session.ExpectStdout(std::format("{}echo hello\r\n{}\rhello\r\n", VT::RESET, VT::B_END));
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("echo hello");
+            session.ExpectStdout("hello\r\n");
             session.ExpectStdout(VT::SESSION_PROMPT);
 
             session.WriteLine("whoami");
-            session.ExpectStdout(std::format("{}whoami\r\n{}\rroot\r\n", VT::RESET, VT::B_END));
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("whoami");
+            session.ExpectStdout("root\r\n");
             session.ExpectStdout(VT::SESSION_PROMPT);
 
             session.ExitAndVerifyNoErrors();
@@ -376,11 +388,15 @@ class WSLCE2EContainerCreateTests
             session.ExpectStdout(VT::SESSION_PROMPT);
 
             session.WriteLine("echo hello");
-            session.ExpectStdout(std::format("{}echo hello\r\n{}\rhello\r\n", VT::RESET, VT::B_END));
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("echo hello");
+            session.ExpectStdout("hello\r\n");
             session.ExpectStdout(VT::SESSION_PROMPT);
 
             session.WriteLine("whoami");
-            session.ExpectStdout(std::format("{}whoami\r\n{}\rroot\r\n", VT::RESET, VT::B_END));
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("whoami");
+            session.ExpectStdout("root\r\n");
             session.ExpectStdout(VT::SESSION_PROMPT);
 
             session.ExitAndVerifyNoErrors();

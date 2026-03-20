@@ -16,6 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
+#include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
 
@@ -171,6 +172,12 @@ void WSLCInteractiveSession::ExpectStdout(const std::string& expected)
 void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
 {
     m_stderrReader->ExpectConsume(expected);
+}
+
+void WSLCInteractiveSession::ExpectCommandEcho(const std::string& command)
+{
+    // TTY mode: expect command echo, then B_END and carriage return
+    ExpectStdout(std::format("{}\r\n{}\r", command, VT::B_END));
 }
 
 void WSLCInteractiveSession::Write(const std::string& data)

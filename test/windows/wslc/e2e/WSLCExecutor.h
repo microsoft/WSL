@@ -58,6 +58,7 @@ struct WSLCInteractiveSession
     void WriteLine(const std::string& line);
     void ExpectStdout(const std::string& expected);
     void ExpectStderr(const std::string& expected);
+    void ExpectCommandEcho(const std::string& command);
 
     bool IsRunning() const;
     void CloseStdin();
