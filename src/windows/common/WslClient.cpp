@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "WslInstall.h"
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
@@ -156,7 +157,7 @@ int BashMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     const auto options = ParseLegacyArguments(commandLine);
@@ -1265,7 +1266,7 @@ int UpdatePackage(std::wstring_view commandLine)
     parser.AddArgument(NoOp(), WSL_UPDATE_ARG_PROMPT_OPTION_LONG);
     parser.Parse();
 
-    return wsl::windows::common::wslutil::UpdatePackage(preRelease, false);
+    return wsl::windows::common::install::UpdatePackage(preRelease, false);
 }
 
 int Uninstall()
@@ -1274,7 +1275,7 @@ int Uninstall()
     auto clearLogs =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFile(logFile.c_str())); });
 
-    const auto exitCode = wsl::windows::common::wslutil::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::wslutil::MsiMessageCallback);
+    const auto exitCode = wsl::windows::common::install::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::install::MsiMessageCallback);
 
     if (exitCode != 0)
     {
@@ -1311,7 +1312,7 @@ int WslconfigMain(_In_ int argc, _In_reads_(argc) LPWSTR* argv)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     using wsl::shared::string::IsEqual;
@@ -1524,7 +1525,7 @@ int WslMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     // Use exit code -1 so invokers of wsl.exe can distinguish between a Linux

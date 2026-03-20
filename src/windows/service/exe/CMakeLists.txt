@@ -57,7 +57,9 @@ add_compile_definitions(USE_COM_CONTEXT_DEF=1)
 set_target_properties(wslservice PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /include:__minATLObjMap_LxssUserSession_COM")
 target_link_libraries(wslservice
                       ${COMMON_LINK_LIBRARIES}
-                      computecore
+                      ${MSI_LINK_LIBRARIES}
+                      ${HCS_LINK_LIBRARIES}
+                      ${SERVICE_LINK_LIBRARIES}
                       common
                       configfile
                       legacy_stdio_definitions

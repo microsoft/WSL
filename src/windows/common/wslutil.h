@@ -70,8 +70,6 @@ void AssertValidPrintfArg()
     static_assert(std::is_fundamental_v<T> || std::is_same_v<wchar_t*, T> || std::is_same_v<char*, T> || std::is_same_v<HRESULT, T>);
 }
 
-int CallMsiPackage();
-
 template <typename TInterface>
 wil::com_ptr<TInterface> CoGetCallContext();
 
@@ -153,8 +151,6 @@ bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
 
-void MsiMessageCallback(INSTALLMESSAGE type, LPCWSTR message);
-
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 
 wil::unique_handle OpenCallingProcess(_In_ DWORD access);
@@ -198,17 +194,7 @@ void SetCrtEncoding(int Mode);
 
 void SetThreadDescription(LPCWSTR Name);
 
-wil::unique_hfile ValidateFileSignature(LPCWSTR Path);
-
 wil::unique_hlocal_string SidToString(_In_ PSID Sid);
-
-int UpdatePackage(bool PreRelease, bool Repair);
-
-UINT UpgradeViaMsi(_In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
-
-UINT UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
-
-void WriteInstallLog(const std::string& Content);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 
