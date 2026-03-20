@@ -16,7 +16,6 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
-#include <algorithm>
 
 namespace WSLCE2ETests {
 
