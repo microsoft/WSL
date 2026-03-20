@@ -275,13 +275,19 @@ set(COMMON_LINK_LIBRARIES
     Shlwapi.lib
     synchronization.lib
     Bcrypt.lib
-    Iphlpapi.lib
-    icu.lib
+    icu.lib)
+
+set(MSI_LINK_LIBRARIES
+    Wintrust.lib
+    msi.lib)
+
+set(HCS_LINK_LIBRARIES
     computecore.lib
     computenetwork.lib
+    Iphlpapi.lib)
+
+set(SERVICE_LINK_LIBRARIES
     MI.lib
-    Wintrust.lib
-    msi.lib
     wsldeps.lib)
 
 # Linux
