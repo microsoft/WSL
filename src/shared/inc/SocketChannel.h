@@ -109,16 +109,19 @@ public:
         auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(span);
         WI_ASSERT(header->MessageSize == span.size());
 
-        if (m_pending_reply_sequence.has_value())
         {
-            header->SequenceNumber = m_pending_reply_sequence.value();
-            m_pending_reply_sequence.reset();
-        }
-        else
-        {
-            m_sent_messages++;
-            header->SequenceNumber = m_sent_messages;
-            m_expected_reply_sequence = m_sent_messages;
+            std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
+            if (m_pending_reply_sequence.has_value())
+            {
+                header->SequenceNumber = m_pending_reply_sequence.value();
+                m_pending_reply_sequence.reset();
+            }
+            else
+            {
+                m_sent_messages++;
+                header->SequenceNumber = m_sent_messages;
+                m_expected_reply_sequence = m_sent_messages;
+            }
         }
 
 #ifdef WIN32
@@ -210,7 +213,6 @@ public:
 #endif
         }
 
-        // Use for loop to handle previous timed out replies in buffer.
         for (;;)
         {
             auto receivedSpan = ReceiveImpl(TMessage::Type, timeout);
@@ -227,6 +229,7 @@ public:
                 return {nullptr, {}};
             }
 
+            // Use header only since this could be a stale message of the wrong type.
             auto* receivedHeader = gslhelpers::try_get_struct<MESSAGE_HEADER>(receivedSpan);
             if (receivedHeader == nullptr)
             {
@@ -239,44 +242,58 @@ public:
             }
 
             // Validate sequence
-            if (m_expected_reply_sequence.has_value())
             {
-                if (!m_ignore_sequence)
+                std::lock_guard<std::mutex> sequenceLock{m_sequenceMutex};
+                if (m_expected_reply_sequence.has_value())
                 {
-                    auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_expected_reply_sequence.value());
-                    if (diff < 0)
+                    if (!m_ignore_sequence)
                     {
-                        // Skip outdated reply. Potentially from previous timeouts.
+                        auto diff = static_cast<int32_t>(receivedHeader->SequenceNumber - m_expected_reply_sequence.value());
+                        if (diff < 0)
+                        {
+                            // Skip stale message.
 #ifdef WIN32
-                        WSL_LOG(
-                            "DiscardStaleResponse",
-                            TraceLoggingValue(m_name, "Name"),
-                            TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
-                            TraceLoggingValue(m_expected_reply_sequence.value(), "ExpectedSeq"));
-#endif
-                        continue;
-                    }
-
-                    if (diff != 0)
-                    {
-#ifdef WIN32
-                        THROW_HR_MSG(E_UNEXPECTED, "Unexpected response sequence: %u, expected: %u, channel: %hs",
-                            receivedHeader->SequenceNumber, m_expected_reply_sequence.value(), m_name);
+                            WSL_LOG(
+                                "DiscardStaleResponse",
+                                TraceLoggingValue(m_name, "Name"),
+                                TraceLoggingValue(receivedHeader->SequenceNumber, "StaleSeq"),
+                                TraceLoggingValue(m_expected_reply_sequence.value(), "ExpectedSeq"));
 #else
-                        LOG_ERROR("Unexpected response sequence: {}, expected: {}, channel: {}",
-                            receivedHeader->SequenceNumber, m_expected_reply_sequence.value(), m_name);
-                        THROW_ERRNO(EINVAL);
+                            LOG_WARNING(
+                                "Discard stale response on channel: {}. StaleSeq: {}, ExpectedSeq: {}",
+                                m_name,
+                                receivedHeader->SequenceNumber,
+                                m_expected_reply_sequence.value());
 #endif
-                    }
-                }
+                            continue;
+                        }
 
-                // Reply matched (or ignore_sequence) — clear expected reply.
-                m_expected_reply_sequence.reset();
-            }
-            else
-            {
-                // We are the responder receiving a request — cache for echo-back.
-                m_pending_reply_sequence = receivedHeader->SequenceNumber;
+                        if (diff != 0)
+                        {
+#ifdef WIN32
+                            THROW_HR_MSG(
+                                E_UNEXPECTED,
+                                "Unexpected response sequence: %u, expected: %u, channel: %hs",
+                                receivedHeader->SequenceNumber,
+                                m_expected_reply_sequence.value(),
+                                m_name);
+#else
+                            LOG_ERROR(
+                                "Unexpected response sequence: {}, expected: {}, channel: {}",
+                                receivedHeader->SequenceNumber,
+                                m_expected_reply_sequence.value(),
+                                m_name);
+                            THROW_ERRNO(EINVAL);
+#endif
+                        }
+                    }
+
+                    m_expected_reply_sequence.reset();
+                }
+                else
+                {
+                    m_pending_reply_sequence = receivedHeader->SequenceNumber;
+                }
             }
 
             auto* message = gslhelpers::try_get_struct<TMessage>(receivedSpan);
@@ -297,7 +314,9 @@ public:
 
 #ifdef WIN32
             WSL_LOG(
-                "ReceivedMessage", TraceLoggingValue(m_name, "Name"), TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
+                "ReceivedMessage",
+                TraceLoggingValue(m_name, "Name"),
+                TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
 #else
             if (LoggingEnabled())
             {
@@ -460,20 +479,14 @@ private:
     //    - A -> B (request), then B -> A (reply) or
     //    - A -> B (request), w/o a reply.
     // 2. There are no concurrent requests being handled. That is:
-    //    - A will not initiate concurrent valid requests. Only the latest is valid.
+    //    - A will not initiate concurrent requests. Only the latest one is valid.
     //    - B will not start handling a new message until it finishes or fails to handle the previous one.
-    // This enables a simpler request-reply message id check instead of a full concurrent request-reply tracking.
-    // A -> (sending request): pending is not set -> this is a new request -> use incremented id and set expected reply.
-    // -> B (receiving request): expected id not set -> this is a request -> cache id as pending reply id.
-    // B -> (sending reply): pending is set -> this is a reply -> use pending id and clear it.
-    // -> A (receiving reply): expected id is set -> this is a reply -> check id with expected id and clear it.
-    // When A sends a new request when the previous one timed out: It's the same logic as sending a normal request.
-    // B will never initiate handling of a new message if it's still working on the previous one. So pending id is always tracking the correct request.
-    std::optional<uint32_t> m_expected_reply_sequence; // Request end: sequence we expect the reply to echo back.
-    std::optional<uint32_t> m_pending_reply_sequence;  // Reply end: sequence to echo back in the next outgoing message.
+    std::optional<uint32_t> m_expected_reply_sequence;
+    std::optional<uint32_t> m_pending_reply_sequence;
     bool m_ignore_sequence = false;
     const char* m_name{};
     std::mutex m_sendMutex;
     std::mutex m_receiveMutex;
+    std::mutex m_sequenceMutex;
 };
 } // namespace wsl::shared
