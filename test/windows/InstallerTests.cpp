@@ -968,7 +968,7 @@ class InstallerTests
     {
         // Starting the service should create the registration if it is missing
         StopWslService();
-        wsl::windows::common::registry::DeleteKey(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY));
+        VERIFY_ARE_EQUAL(wsl::windows::common::registry::DeleteKey(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY)), true);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list"), 0);
         ValidateDcatRegistration();
 
