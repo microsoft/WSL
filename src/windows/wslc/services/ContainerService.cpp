@@ -299,7 +299,7 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
 
     ConsoleService consoleService;
     return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, {}, execFlags).Launch(*container));
+        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
