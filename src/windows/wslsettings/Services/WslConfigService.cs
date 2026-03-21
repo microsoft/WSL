@@ -487,7 +487,8 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
             return ((ulong)value / Constants.MB) == (UInt64Value / Constants.MB);
         }
 
-        return GetValueAsObject().Equals(value);
+        // object.Equals handles null on either side (returns true if both null, false if one null).
+        return object.Equals(GetValueAsObject(), value);
     }
 
     public override int GetHashCode()
