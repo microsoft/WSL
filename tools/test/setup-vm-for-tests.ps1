@@ -95,7 +95,7 @@ $Platform = switch ($Arch) {
 
 if ([string]::IsNullOrEmpty($TestDistroPath)) {
     $TestDistroVersion = (Select-Xml -Path "$PSScriptRoot\..\..\packages.config" -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
-    $TestDistroPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz"
+    $TestDistroPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestDistro.$TestDistroVersion\$Platform\test_distro.tar.xz"
 }
 
 if ([string]::IsNullOrEmpty($ArtifactFolder)) {
