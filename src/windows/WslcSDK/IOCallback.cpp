@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "WslcsdkPrivate.h"
 
-IOCallback::IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
+IOCallback::IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallbackOptions& options) :
     m_process(process), m_callbackOptions(std::make_unique<WslcContainerProcessIOCallbackOptions>(options))
 {
     using namespace wsl::windows::common::relay;
@@ -55,7 +55,7 @@ IOCallback::IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallba
 
             if (runResult && m_process && m_callbackOptions && m_callbackOptions->onExit)
             {
-                WSLAProcessState state{};
+                WSLCProcessState state{};
                 int exitCode = -1;
 
                 // Prefer to make the callback even if we don't properly retrieve the exit code.
@@ -66,7 +66,7 @@ IOCallback::IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallba
                 }
                 else
                 {
-                    WI_ASSERT(state == WslaProcessStateExited);
+                    WI_ASSERT(state == WslcProcessStateExited);
                 }
 
                 // Regardless of our ability to get the proper exit code, inform the caller that the process
@@ -102,7 +102,7 @@ bool IOCallback::HasIOCallback(const WslcContainerProcessIOCallbackOptions& opti
     return options.onStdOut || options.onStdErr || options.onExit;
 }
 
-wil::unique_handle IOCallback::GetIOHandle(IWSLAProcess* process, WslcProcessIOHandle ioHandle)
+wil::unique_handle IOCallback::GetIOHandle(IWSLCProcess* process, WslcProcessIOHandle ioHandle)
 {
     ULONG ulongHandle = 0;
 

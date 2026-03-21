@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Implementation of IWSLAVirtualMachine - represents a single HCS-based VM instance.
+    Implementation of IWSLCVirtualMachine - represents a single HCS-based VM instance.
 
 --*/
 
@@ -24,13 +24,13 @@ Abstract:
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
-using wsl::windows::service::wsla::HcsVirtualMachine;
+using wsl::windows::service::wslc::HcsVirtualMachine;
 
 constexpr auto MAX_VM_CRASH_FILES = 3;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
-HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
+HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 {
     THROW_HR_IF(E_POINTER, Settings == nullptr);
 
@@ -43,7 +43,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
 
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
-    m_featureFlags = static_cast<WSLAFeatureFlags>(Settings->FeatureFlags);
+    m_featureFlags = static_cast<WSLCFeatureFlags>(Settings->FeatureFlags);
     m_networkingMode = Settings->NetworkingMode;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
 
@@ -102,7 +102,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
 #endif
 
     // Initialize kernel command line.
-    std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLA_ROOT_INIT_ENV) L"=1 panic=-1";
+    std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
 
     // Enable timesync workaround to sync on resume from sleep in modern standby.
@@ -117,9 +117,9 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
     }
 
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslaFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
 
-    if (FeatureEnabled(WslaFeatureFlagsEarlyBootDmesg))
+    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
     {
         kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
         vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
@@ -234,12 +234,12 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
     systemSettings.VirtualMachine = std::move(vmSettings);
     auto json = wsl::shared::ToJsonW(systemSettings);
 
-    WSL_LOG("CreateWSLAVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
+    WSL_LOG("CreateWSLCVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
 
     // Create and start compute system
     m_computeSystem = hcs::CreateComputeSystem(m_vmIdString.c_str(), json.c_str());
 
-    if (FeatureEnabled(WslaFeatureFlagsVirtioFs) || m_networkingMode == WSLANetworkingModeVirtioProxy)
+    if (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
         m_guestDeviceManager = std::make_shared<::GuestDeviceManager>(m_vmIdString, m_vmId);
     }
@@ -259,7 +259,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
     hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
 
     // Add GPU to the VM if requested
-    if (FeatureEnabled(WslaFeatureFlagsGPU))
+    if (FeatureEnabled(WslcFeatureFlagsGPU))
     {
         hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
         gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
@@ -292,7 +292,7 @@ HcsVirtualMachine::~HcsVirtualMachine()
         CATCH_LOG()
     }
 
-    WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"));
+    WSL_LOG("WSLCTerminateVm", TraceLoggingValue(forceTerminate, "forced"));
 
     // N.B. Destruction order matters: the networking engine and device manager must be torn down
     // before the compute system handle is closed. The networking engine holds a shared_ptr to
@@ -326,7 +326,7 @@ HcsVirtualMachine::~HcsVirtualMachine()
     }
 }
 
-bool HcsVirtualMachine::FeatureEnabled(WSLAFeatureFlags Value) const
+bool HcsVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
 {
     return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
 }
@@ -356,7 +356,7 @@ try
     std::lock_guard lock(m_lock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkEngine != nullptr);
 
-    if (m_networkingMode == WSLANetworkingModeNone)
+    if (m_networkingMode == WSLCNetworkingModeNone)
     {
         return S_OK;
     }
@@ -365,11 +365,11 @@ try
     // so we need our own copies to take ownership.
     wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
     wil::unique_socket dnsSocketHandle;
-    if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
+    if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
         THROW_HR_IF(E_INVALIDARG, DnsSocket == nullptr);
         THROW_HR_IF_MSG(
-            E_NOTIMPL, m_networkingMode == WSLANetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
+            E_NOTIMPL, m_networkingMode == WSLCNetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
 
         THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
         dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
@@ -379,7 +379,7 @@ try
         THROW_HR_IF(E_INVALIDARG, DnsSocket != nullptr);
     }
 
-    if (m_networkingMode == WSLANetworkingModeNAT)
+    if (m_networkingMode == WSLCNetworkingModeNAT)
     {
         // TODO: refactor this to avoid using wsl config
         wsl::core::Config config(nullptr);
@@ -389,7 +389,7 @@ try
         }
 
         // Enable DNS tunneling if a DNS socket was provided
-        if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
+        if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
             config.EnableDnsTunneling = true;
             in_addr address{};
@@ -405,7 +405,7 @@ try
             std::move(dnsSocketHandle),
             nullptr);
     }
-    else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
+    else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
         wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
         WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, SUCCEEDED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods()));
@@ -512,7 +512,7 @@ try
     auto it = m_shares.emplace(shareIdLocal, std::nullopt).first;
     auto cleanup = wil::scope_exit([&]() { m_shares.erase(it); });
 
-    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
+    if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
     {
         auto flags = hcs::Plan9ShareFlags::AllowOptions;
         WI_SetFlagIf(flags, hcs::Plan9ShareFlags::ReadOnly, ReadOnly);
@@ -594,7 +594,7 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
-    auto reason = WSLAVirtualMachineTerminationReasonUnknown;
+    auto reason = WSLCVirtualMachineTerminationReasonUnknown;
 
     if (exitStatus.ExitType.has_value())
     {
@@ -602,13 +602,13 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
         {
         case hcs::NotificationType::ForcedExit:
         case hcs::NotificationType::GracefulExit:
-            reason = WSLAVirtualMachineTerminationReasonShutdown;
+            reason = WSLCVirtualMachineTerminationReasonShutdown;
             break;
         case hcs::NotificationType::UnexpectedExit:
-            reason = WSLAVirtualMachineTerminationReasonCrashed;
+            reason = WSLCVirtualMachineTerminationReasonCrashed;
             break;
         default:
-            reason = WSLAVirtualMachineTerminationReasonUnknown;
+            reason = WSLCVirtualMachineTerminationReasonUnknown;
             break;
         }
     }
@@ -643,7 +643,7 @@ void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
 std::filesystem::path HcsVirtualMachine::GetCrashDumpFolder()
 {
     auto tempPath = wsl::windows::common::filesystem::GetTempFolderPath(m_userToken.get());
-    return tempPath / L"wsla-crashes";
+    return tempPath / L"wslc-crashes";
 }
 
 void HcsVirtualMachine::CreateVmSavedStateFile(HANDLE InUserToken)

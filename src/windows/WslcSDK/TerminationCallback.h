@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "wslaservice.h"
+#include "wslc.h"
 #include "wslcsdkprivate.h"
 #include <winrt/base.h>
 
@@ -21,7 +21,7 @@ struct TerminationCallback : public winrt::implements<TerminationCallback, ITerm
     TerminationCallback(WslcSessionTerminationCallback callback, PVOID context);
 
     // ITerminationCallback
-    HRESULT STDMETHODCALLTYPE OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details) override;
+    HRESULT STDMETHODCALLTYPE OnTermination(WSLCVirtualMachineTerminationReason Reason, LPCWSTR Details) override;
 
     // Creates a TerminationCallback if the options provides a callback.
     static winrt::com_ptr<TerminationCallback> CreateIf(const WslcSessionOptionsInternal* options);
