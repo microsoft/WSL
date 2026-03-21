@@ -422,6 +422,64 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(PullImageAdvanced)
+    {
+        WSL2_TEST_ONLY();
+
+        // TODO: Enable once custom registries are supported, to avoid hitting public registry rate limits.
+        SKIP_TEST_UNSTABLE();
+
+        auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
+
+            auto cleanup = wil::scope_exit([&]() {
+                WSLADeleteImageOptions options{.Flags = WSLADeleteImageFlagsForce};
+                options.Image = ExpectedTag.has_value() ? ExpectedTag->c_str() : Image.c_str();
+                wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            });
+
+            if (!ExpectedTag.has_value())
+            {
+
+                wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+                for (const auto& e : images)
+                {
+                    wil::unique_cotaskmem_ansistring json;
+                    VERIFY_SUCCEEDED(m_defaultSession->InspectImage(e.Hash, &json));
+
+                    auto parsed = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(json.get());
+
+                    for (const auto& repoTag : parsed.RepoDigests.value_or({}))
+                    {
+                        if (Image == repoTag)
+                        {
+                            return;
+                        }
+                    }
+                }
+
+                LogError("Expected digest '%hs' not found ", Image.c_str());
+
+                VERIFY_FAIL();
+            }
+            else
+            {
+                ExpectImagePresent(*m_defaultSession, ExpectedTag->c_str());
+            }
+        };
+
+        validatePull(
+            "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30", {});
+
+        validatePull("ubuntu", "ubuntu:latest");
+        validatePull("debian:bookworm", "debian:bookworm");
+
+        // TODO: Add test coverage with custom registries once supported.
+    }
+
     TEST_METHOD(ListImages)
     {
         WSL2_TEST_ONLY();
@@ -5749,14 +5807,21 @@ class WSLATests
             "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         ValidateImageParsing(
-            "myregistry.io:5000/myimage@sha256:abcdef1234567890", "myregistry.io:5000/myimage", "sha256:abcdef1234567890");
+            "myregistry.io:5000/myimage@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "myregistry.io:5000/myimage",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
-        ValidateImageParsing("ubuntu:22.04@sha256:abcdef1234567890", "ubuntu", "sha256:abcdef1234567890");
+        ValidateImageParsing(
+            "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "ubuntu",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
 
         // Invalid inputs
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":debian:latest"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian:latest@"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian::latest@foo:bar:baz"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("registry.example.com:8080:tag:extra"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("a:"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":b"); }), E_INVALIDARG);
     }
 };

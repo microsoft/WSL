@@ -1405,36 +1405,10 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
 std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input)
 {
     // Format: <repo>[:<tag>][@<digest>]
-    auto parts = shared::string::Split(Input, ':');
-    if (parts.size() == 1)
-    {
-        // No tag or digest specified, return the whole input as the repo.
-        return {parts[0], {}};
-    }
-    else if (parts.size() == 2)
-    {
-        // Could be either 
-        // 1) <repo>:<tag> or
-        // 2) <domain-name>:<port>/[path]
+    // N.B. This parser isn't designed to fully validate the reference, but to extract the repo and tag / digest.
+    // If the format is invalid, the moby API will reject the format.
 
-        if (parts[0].find('/') == std::string::npos)
-        {
-            // Case 1)
-            return {parts[0], parts[1]};
-        }
-        else
-        {
-            // Case 2)
-            return {Input, {}};
-        }
-    }
-    else if (parts.size() == 3)
-    {
-        
-    }
-
-
-
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), Input.empty());
 
     // The tag/digest separators only appear after the last '/' in the reference.
     // This ensures port numbers in custom registries (e.g. myregistry.io:5000/image) are not mistaken for tags.
