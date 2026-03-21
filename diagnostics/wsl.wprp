@@ -322,7 +322,7 @@
             <EventProviderId Value="vmwp"/>
             <EventProviderId Value="wsl_devicehost"/>
             <EventProviderId Value="wslapi"/>
-            <EventProviderId Value="wslaservice"/>
+            <EventProviderId Value="wslc"/>
             <EventProviderId Value="wslclient"/>
           </EventProviders>
         </EventCollectorId>
