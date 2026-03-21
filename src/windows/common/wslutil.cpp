@@ -1402,6 +1402,69 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
+std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input)
+{
+    // Format: <repo>[:<tag>][@<digest>]
+    auto parts = shared::string::Split(Input, ':');
+    if (parts.size() == 1)
+    {
+        // No tag or digest specified, return the whole input as the repo.
+        return {parts[0], {}};
+    }
+    else if (parts.size() == 2)
+    {
+        // Could be either 
+        // 1) <repo>:<tag> or
+        // 2) <domain-name>:<port>/[path]
+
+        if (parts[0].find('/') == std::string::npos)
+        {
+            // Case 1)
+            return {parts[0], parts[1]};
+        }
+        else
+        {
+            // Case 2)
+            return {Input, {}};
+        }
+    }
+    else if (parts.size() == 3)
+    {
+        
+    }
+
+
+
+
+    // The tag/digest separators only appear after the last '/' in the reference.
+    // This ensures port numbers in custom registries (e.g. myregistry.io:5000/image) are not mistaken for tags.
+    const auto lastSlash = Input.find_last_of('/');
+    const auto nameStart = (lastSlash != std::string::npos) ? lastSlash + 1 : 0;
+
+    // Check for digest reference (@) first. This takes precedence over the tag.
+    const auto atPos = Input.find('@', nameStart);
+    if (atPos != std::string::npos)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), atPos >= Input.size() - 1 || atPos == nameStart);
+
+        // If both tag and digest are present (repo:tag@digest), strip the tag from the repo.
+        const auto colonPos = Input.find(':', nameStart);
+        const auto repoEnd = (colonPos != std::string::npos && colonPos < atPos) ? colonPos : atPos;
+
+        return {Input.substr(0, repoEnd), Input.substr(atPos + 1)};
+    }
+
+    const auto separator = Input.find(':', nameStart);
+    if (separator == std::string::npos)
+    {
+        return {Input, {}};
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), separator >= Input.size() - 1 || separator == nameStart);
+
+    return {Input.substr(0, separator), Input.substr(separator + 1)};
+}
+
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
 {
     fwprintf(stream, L"%ls\n", GetSystemErrorString(result).c_str());

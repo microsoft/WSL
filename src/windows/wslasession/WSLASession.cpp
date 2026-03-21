@@ -28,19 +28,6 @@ constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
-{
-    size_t separator = Input.find_last_of(':');
-    if (separator == std::string::npos)
-    {
-        return {Input, {}};
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), separator >= Input.size() - 1 || separator == 0);
-
-    return {Input.substr(0, separator), Input.substr(separator + 1)};
-}
-
 void ValidateContainerName(LPCSTR Name)
 {
     const auto& locale = std::locale::classic();
@@ -313,7 +300,12 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
-    auto [repo, tag] = ParseImage(ImageUri);
+    auto [repo, tag] = wslutil::ParseImage(ImageUri);
+
+    if (!tag.has_value())
+    {
+        tag = "latest";
+    }
 
     auto lock = m_lock.lock_shared();
 
@@ -574,7 +566,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
-    auto [repo, tag] = ParseImage(ImageName);
+    auto [repo, tag] = wslutil::ParseImage(ImageName);
 
     THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
 
@@ -867,7 +859,7 @@ try
 
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
-                auto repoName = ParseImage(tag).first;
+                auto repoName = wslutil::ParseImage(tag).first;
                 size_t colonPos = tag.find(':');
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())

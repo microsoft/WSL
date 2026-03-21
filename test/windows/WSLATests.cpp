@@ -5714,4 +5714,49 @@ class WSLATests
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
     }
+
+    TEST_METHOD(ImageParsing)
+    {
+        using wsl::windows::common::wslutil::ParseImage;
+
+        auto ValidateImageParsing = [](const std::string& input, const std::string& expectedRepo, const std::optional<std::string>& expectedTag) {
+            auto [repo, tag] = ParseImage(input);
+            VERIFY_ARE_EQUAL(repo, expectedRepo);
+            VERIFY_ARE_EQUAL(tag, expectedTag);
+        };
+
+        ValidateImageParsing("ubuntu:22.04", "ubuntu", "22.04");
+        ValidateImageParsing("ubuntu", "ubuntu", {});
+        ValidateImageParsing("library/ubuntu:latest", "library/ubuntu", "latest");
+        ValidateImageParsing("myregistry.io:5000/myimage:v1", "myregistry.io:5000/myimage", "v1");
+        ValidateImageParsing("myregistry.io:5000/myimage", "myregistry.io:5000/myimage", {});
+
+        ValidateImageParsing(
+            "registry.example.com:8080/org/project/image:stable", "registry.example.com:8080/org/project/image", "stable");
+
+        ValidateImageParsing("localhost:5000/myimage:latest", "localhost:5000/myimage", "latest");
+        ValidateImageParsing("ghcr.io/owner/repo:sha-abc123", "ghcr.io/owner/repo", "sha-abc123");
+
+        ValidateImageParsing(
+            "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "ubuntu",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        // Validate that the digest takes precedence over the tag.
+        ValidateImageParsing(
+            "ubuntu:latest@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "ubuntu",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        ValidateImageParsing(
+            "myregistry.io:5000/myimage@sha256:abcdef1234567890", "myregistry.io:5000/myimage", "sha256:abcdef1234567890");
+
+        ValidateImageParsing("ubuntu:22.04@sha256:abcdef1234567890", "ubuntu", "sha256:abcdef1234567890");
+
+        // Invalid inputs
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":debian:latest"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian:latest@"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian::latest@foo:bar:baz"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("registry.example.com:8080:tag:extra"); }), E_INVALIDARG);
+    }
 };
