@@ -362,18 +362,26 @@ struct PortRelay
     {
         WI_VERIFY(PendingSocket);
 
-        std::thread thread{[WindowsSocket = std::move(PendingSocket), LinuxPort = LinuxPort, RelayPort = RelayPort, Family = Family, VmId = VmId]() {
-            try
-            {
+        std::thread thread{
+            [WindowsSocket = std::move(PendingSocket), LinuxPort = LinuxPort, RelayPort = RelayPort, Family = Family, VmId = VmId]() {
+                try
+                {
+                    WSL_LOG(
+                        "StartPortRelay",
+                        TraceLoggingValue(LinuxPort, "LinuxPort"),
+                        TraceLoggingValue(WindowsSocket.get(), "Socket"),
+                        TraceLoggingValue(Family, "Family"));
+
+                    RunRelay(WindowsSocket.get(), VmId, LinuxPort, RelayPort, Family);
+                }
+                CATCH_LOG();
+
                 WSL_LOG(
-                    "StartPortRelay", TraceLoggingValue(LinuxPort, "LinuxPort"), TraceLoggingValue(WindowsSocket.get(), "Socket"));
-
-                RunRelay(WindowsSocket.get(), VmId, LinuxPort, RelayPort, Family);
-            }
-            CATCH_LOG();
-
-            WSL_LOG("StopPortRelay", TraceLoggingValue(LinuxPort, "LinuxPort"), TraceLoggingValue(WindowsSocket.get(), "Socket"));
-        }};
+                    "StopPortRelay",
+                    TraceLoggingValue(LinuxPort, "LinuxPort"),
+                    TraceLoggingValue(WindowsSocket.get(), "Socket"),
+                    TraceLoggingValue(Family, "Family"));
+            }};
 
         thread.detach();
     }
@@ -553,6 +561,7 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
             WSL_LOG(
                 "PortMapping",
                 TraceLoggingValue(result, "Result"),
+                TraceLoggingValue(message->AddressFamily, "Family"),
                 TraceLoggingValue(message->WindowsPort, "WindowsPort"),
                 TraceLoggingValue(message->LinuxPort, "LinuxPort"),
                 TraceLoggingValue(message->Stop, "Remove"));

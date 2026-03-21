@@ -163,9 +163,9 @@ ProcessOutput RunContainerAndCapture(
 
 class WslcSdkTests
 {
-    WSL_TEST_CLASS(WslcSdkTests)
+    WSLA_TEST_CLASS(WslcSdkTests)
 
-    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
+    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WslcSession m_defaultSession = nullptr;
@@ -179,6 +179,7 @@ class WslcSdkTests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
+        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         // Use the same storage path as WSLA runtime tests to reduce pull overhead.

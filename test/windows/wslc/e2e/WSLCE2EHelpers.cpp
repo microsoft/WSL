@@ -36,6 +36,12 @@ const TestImage& DebianTestImage()
     return image;
 }
 
+const TestImage& PythonTestImage()
+{
+    static const TestImage image{L"python", L"3.12-alpine", std::filesystem::path{g_testDataPath} / L"python-3_12-alpine.tar"};
+    return image;
+}
+
 const TestImage& InvalidTestImage()
 {
     static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", L"INVALID_PATH"};
@@ -149,7 +155,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
             }
 
             auto result = RunWslc(std::format(L"container remove {}", containerName));
-            result.Verify({.Stderr = L"", .ExitCode = 0});
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }
     }

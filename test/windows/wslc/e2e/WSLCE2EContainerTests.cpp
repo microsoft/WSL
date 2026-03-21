@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EContainerTests
 {
-    WSL_TEST_CLASS(WSLCE2EContainerTests)
+    WSLA_TEST_CLASS(WSLCE2EContainerTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

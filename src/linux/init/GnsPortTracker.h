@@ -1,7 +1,9 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
+#include <deque>
 #include <map>
+#include <mutex>
 #include <set>
 #include <utility>
 #include <optional>
@@ -92,9 +94,27 @@ public:
         }
     };
 
+    struct DeferredPortLookup
+    {
+        pid_t Pid;
+        wil::unique_fd DuplicatedSocketFd; // Duplicated via pidfd_getfd while process was stopped
+        int Protocol;
+
+        DeferredPortLookup(pid_t Pid, wil::unique_fd DuplicatedSocketFd, int Protocol) :
+            Pid(Pid), DuplicatedSocketFd(std::move(DuplicatedSocketFd)), Protocol(Protocol)
+        {
+        }
+
+        DeferredPortLookup(DeferredPortLookup&&) = default;
+        DeferredPortLookup& operator=(DeferredPortLookup&&) = default;
+        DeferredPortLookup(const DeferredPortLookup&) = delete;
+        DeferredPortLookup& operator=(const DeferredPortLookup&) = delete;
+    };
+
     struct BindCall
     {
         std::optional<PortAllocation> Request;
+        std::optional<DeferredPortLookup> PortZeroBind;
         std::uint64_t CallId;
     };
 
@@ -118,13 +138,19 @@ private:
 
     int RequestPort(const PortAllocation& Port, bool Allocate);
 
-    int ClosePort(const PortAllocation& Port);
-
     int HandleRequest(const PortAllocation& Request);
 
     void CompleteRequest(uint64_t Id, int Result);
 
     static int GetSocketProtocol(int Pid, int Fd);
+
+    static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
+
+    void ResolvePortZeroBind(DeferredPortLookup lookup);
+
+    void RunDeferredResolve();
+
+    void TrackPort(PortAllocation allocation);
 
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
@@ -137,6 +163,15 @@ private:
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
 
     std::string m_networkNamespace;
+
+    std::mutex m_deferredMutex;
+    std::condition_variable m_deferredCv;
+    std::deque<DeferredPortLookup> m_deferredQueue;
+
+    // Resolved port-0 allocations posted by the background RunDeferredResolve thread
+    // for the main Run() loop to process (keeps SocketChannel access single-threaded).
+    std::mutex m_resolvedMutex;
+    std::deque<PortAllocation> m_resolvedQueue;
 };
 
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& portAllocation);
