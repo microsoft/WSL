@@ -88,7 +88,7 @@ private:
         ss << "|";
         for (size_t i = 0; i < row.size(); ++i)
         {
-            ss << " " << row[i] << std::wstring(m_widths[i] - row[i].size(), ' ') << " |";
+            ss << " " << row[i] << std::wstring((m_widths[i] > row[i].size()) ? (m_widths[i] - row[i].size()) : 0, ' ') << " |";
         }
         wsl::windows::common::wslutil::PrintMessage(ss.str(), stdout);
     }

@@ -11,6 +11,8 @@ Abstract:
     This file contains the ContainerService implementation
 
 --*/
+
+#include <precomp.h>
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "ImageService.h"
@@ -84,7 +86,46 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
 
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
+        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeBridged, processFlags);
+
+    // Set port options if provided
+    for (const auto& port : options.Ports)
+    {
+        auto portMapping = PublishPort::Parse(port);
+
+        {
+            // https://github.com/microsoft/WSL/issues/14433
+            // The following scenarios are currently not implemented:
+            // - Ephemeral host port mappings
+            // - Host port mappings with a specific host IP
+            // - Host port mappings with UDP protocol
+            if (portMapping.HostPort().IsEphemeral() || portMapping.HostIP().has_value() ||
+                portMapping.PortProtocol() == PublishPort::Protocol::UDP)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+                    "Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported");
+            }
+        }
+
+        auto containerPort = portMapping.ContainerPort();
+        for (uint16_t i = 0; i < containerPort.Count(); ++i)
+        {
+            auto currentContainerPort = static_cast<uint16_t>(containerPort.Start() + i);
+            auto currentHostPort = static_cast<uint16_t>(portMapping.HostPort().Start() + i);
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, AF_INET);
+        }
+    }
+
+    // Add volumes if specified
+    for (const auto& volumeSpec : options.Volumes)
+    {
+        auto volume = VolumeMount::Parse(volumeSpec);
+        auto host = volume.HostPath();
+        auto container = volume.ContainerPath();
+        containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+    }
+
     containerLauncher.SetContainerFlags(containerFlags);
 
     for (const auto& port : options.Ports)

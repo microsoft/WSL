@@ -206,6 +206,26 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Interactive = true;
     }
 
+    if (context.Args.Contains(ArgType::Publish))
+    {
+        auto ports = context.Args.GetAll<ArgType::Publish>();
+        options.Ports.reserve(options.Ports.size() + ports.size());
+        for (const auto& port : ports)
+        {
+            options.Ports.emplace_back(WideToMultiByte(port));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Volume))
+    {
+        auto volumes = context.Args.GetAll<ArgType::Volume>();
+        options.Volumes.reserve(options.Volumes.size() + volumes.size());
+        for (const auto& volume : volumes)
+        {
+            options.Volumes.emplace_back(volume);
+        }
+    }
+
     if (context.Args.Contains(ArgType::Remove))
     {
         options.Remove = true;

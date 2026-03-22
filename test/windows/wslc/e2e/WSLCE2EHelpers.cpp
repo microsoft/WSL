@@ -24,9 +24,21 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
+const TestImage& AlpineTestImage()
+{
+    static const TestImage image{L"alpine", L"latest", std::filesystem::path{g_testDataPath} / L"alpine-latest.tar"};
+    return image;
+}
+
 const TestImage& DebianTestImage()
 {
     static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / L"debian-latest.tar"};
+    return image;
+}
+
+const TestImage& PythonTestImage()
+{
+    static const TestImage image{L"python", L"3.12-alpine", std::filesystem::path{g_testDataPath} / L"python-3_12-alpine.tar"};
     return image;
 }
 
@@ -136,8 +148,14 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
+            if (line.find(L"running") != std::wstring::npos)
+            {
+                auto result = RunWslc(std::format(L"container kill {}", containerName));
+                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            }
+
             auto result = RunWslc(std::format(L"container remove {}", containerName));
-            result.Verify({.Stderr = L"", .ExitCode = 0});
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }
     }
