@@ -128,11 +128,6 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
 
     containerLauncher.SetContainerFlags(containerFlags);
 
-    for (const auto& port : options.Ports)
-    {
-        containerLauncher.AddPort(port.HostPort, port.ContainerPort, port.Family);
-    }
-
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
@@ -265,7 +260,7 @@ std::wstring ContainerService::FormatPorts(const std::vector<PortInformation>& p
 
         // AF_INET = 2, AF_INET6 = 23
         std::wstring hostIp = (port.Family == AF_INET6) ? L"[::]" : L"0.0.0.0";
-        std::wstring protocol = (port.Protocol == WSLAPortProtocolUDP) ? L"udp" : L"tcp";
+        std::wstring protocol = (port.Protocol == IPPROTO_UDP) ? L"udp" : L"tcp";
 
         if (i > 0)
         {
@@ -368,10 +363,11 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         }
 
         // Free nested ports array
-        if (current.Ports != nullptr)
+        for (ULONG i = 0; i < current.PortsCount; ++i)
         {
-            CoTaskMemFree(current.Ports);
+            CoTaskMemFree(const_cast<LPSTR>(current.Ports[i].BindingAddress));
         }
+        CoTaskMemFree(current.Ports);
 
         result.emplace_back(std::move(entry));
     }

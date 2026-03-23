@@ -373,7 +373,7 @@ const std::string& WSLAContainerImpl::Name() const noexcept
     return m_name;
 }
 
-const std::vector<WSLAPortMapping>& WSLAContainerImpl::GetPorts() const noexcept
+const std::vector<ContainerPortMapping>& WSLAContainerImpl::GetPorts() const noexcept
 {
     return m_mappedPorts;
 }

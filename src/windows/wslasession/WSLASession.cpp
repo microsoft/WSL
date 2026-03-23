@@ -1167,6 +1167,10 @@ try
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         for (size_t i = 0; i < index; ++i)
         {
+            for (ULONG j = 0; j < output[i].PortsCount; ++j)
+            {
+                CoTaskMemFree(const_cast<LPSTR>(output[i].Ports[j].BindingAddress));
+            }
             CoTaskMemFree(output[i].Ports);
         }
     });
@@ -1186,10 +1190,13 @@ try
             auto portsArray = wil::make_unique_cotaskmem<::WSLAPortMapping[]>(ports.size());
             for (size_t i = 0; i < ports.size(); ++i)
             {
-                portsArray[i].HostPort = ports[i].HostPort;
+                portsArray[i].HostPort = ports[i].VmMapping.HostPort();
                 portsArray[i].ContainerPort = ports[i].ContainerPort;
-                portsArray[i].Family = ports[i].Family;
-                portsArray[i].Protocol = WSLAPortProtocolTCP; // TODO: UDP support
+                portsArray[i].Family = ports[i].VmMapping.BindAddress.si_family;
+                portsArray[i].Protocol = ports[i].VmMapping.Protocol;
+                portsArray[i].BindingAddress =
+                    wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(ports[i].VmMapping.BindingAddressString().c_str())
+                        .release();
             }
             output[index].Ports = portsArray.release();
             output[index].PortsCount = static_cast<ULONG>(ports.size());

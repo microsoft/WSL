@@ -246,29 +246,6 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
-    if (context.Args.Contains(ArgType::Publish))
-    {
-        for (const auto& publishArg : context.Args.GetAll<ArgType::Publish>())
-        {
-            auto portStr = publishArg;
-
-            uint16_t hostPort = 0;
-            uint16_t containerPort = 0;
-            if (auto colon = portStr.find(':'); colon != std::wstring::npos)
-            {
-                hostPort = validation::GetIntegerFromString<uint16_t>(portStr.substr(0, colon));
-                containerPort = validation::GetIntegerFromString<uint16_t>(portStr.substr(colon + 1));
-            }
-            else
-            {
-                hostPort = validation::GetIntegerFromString<uint16_t>(portStr);
-                containerPort = hostPort;
-            }
-
-            options.Ports.push_back({hostPort, containerPort, AF_INET});
-        }
-    }
-
     context.Data.Add<Data::ContainerOptions>(std::move(options));
 }
 
