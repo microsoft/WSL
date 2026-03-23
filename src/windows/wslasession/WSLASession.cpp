@@ -1423,13 +1423,19 @@ CATCH_RETURN();
 HRESULT WSLASession::Terminate()
 try
 {
-    // m_sessionTerminatingEvent is always valid, so it can be signalled with the lock.
-    // This allows a session to be unblocked if a stuck operation is holding the lock.
-    m_sessionTerminatingEvent.SetEvent();
 
-    // Cancel any pending IO on user-provided handles to unblock operations
-    // in case the handles don't support overlapped IO.
-    CancelUserHandleIO();
+    {
+        std::lock_guard lock(m_userHandlesLock);
+
+        // m_sessionTerminatingEvent is always valid, so it can be signalled without holding m_lock.
+        // This allows a session to be unblocked if a stuck operation is holding m_lock.
+        // N.B. This must happen under m_userHandlesLock to synchronize with potentially running operations.
+        m_sessionTerminatingEvent.SetEvent();
+
+        // Cancel any pending IO on user-provided handles to unblock operations
+        // in case the handles don't support overlapped IO.
+        CancelUserHandleIO();
+    }
 
     // Acquire an exclusive lock to ensure that no operation is running.
     auto lock = m_lock.lock_exclusive();
@@ -1628,16 +1634,17 @@ MultiHandleWait WSLASession::CreateIOContext(HANDLE CancelHandle)
 
 UserHandle WSLASession::OpenUserHandle(ULONG Handle, DWORD Access)
 {
+    std::lock_guard lock(m_userHandlesLock);
+
     // Don't allow new handles to be added to the list if the session is terminating.
+    // N.B. This check must happen under m_userHandlesLock to synchronize with Terminate().
+
     THROW_HR_IF_MSG(
         E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to open a user handle while the session is terminating.");
 
     wil::unique_handle duplicatedHandle{common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Handle), Access)};
 
-    {
-        std::lock_guard lock(m_userHandlesLock);
-        m_userHandles.emplace_back(duplicatedHandle.get());
-    }
+    m_userHandles.emplace_back(duplicatedHandle.get());
 
     return UserHandle{*this, std::move(duplicatedHandle)};
 }
@@ -1654,7 +1661,6 @@ void WSLASession::ReleaseUserHandle(HANDLE Handle)
 
 void WSLASession::CancelUserHandleIO()
 {
-    std::lock_guard lock(m_userHandlesLock);
     for (auto handle : m_userHandles)
     {
         // Cancell all IO on the handle.

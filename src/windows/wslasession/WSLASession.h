@@ -118,7 +118,7 @@ public:
 private:
     ULONG m_id = 0;
 
-    void CancelUserHandleIO();
+    __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     void ConfigureStorage(const WSLASessionInitSettings& Settings, PSID UserSid);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);
