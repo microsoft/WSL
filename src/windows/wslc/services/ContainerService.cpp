@@ -142,6 +142,17 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
+static PortInformation PortInformationFromWSLAPortMapping(const WSLAPortMapping& mapping)
+{
+    return PortInformation{
+        .HostPort = mapping.HostPort,
+        .ContainerPort = mapping.ContainerPort,
+        .Family = mapping.Family,
+        .Protocol = static_cast<int>(mapping.Protocol),
+        .BindingAddress = mapping.BindingAddress ? mapping.BindingAddress : "",
+    };
+}
+
 static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONG timeout = -1)
 {
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
@@ -258,16 +269,18 @@ std::wstring ContainerService::FormatPorts(const std::vector<PortInformation>& p
     {
         const auto& port = ports[i];
 
-        // AF_INET = 2, AF_INET6 = 23
-        std::wstring hostIp = (port.Family == AF_INET6) ? L"[::]" : L"0.0.0.0";
-        std::wstring protocol = (port.Protocol == IPPROTO_UDP) ? L"udp" : L"tcp";
+        std::wstring hostIp = wsl::shared::string::MultiByteToWide(port.BindingAddress);
+        std::wstring protocol = (port.Protocol == IPPROTO_TCP)   ? L"tcp"
+                                : (port.Protocol == IPPROTO_UDP) ? L"udp"
+                                                                 : std::format(L"{}", port.Protocol);
 
         if (i > 0)
         {
             result += L", ";
         }
 
-        result += std::format(L"{}:{}->{}/{}", hostIp, port.HostPort, port.ContainerPort, protocol);
+        result += std::format(
+            L"{}:{}->{}/{}", (port.Family == AF_INET6) ? std::format(L"[{}]", hostIp) : hostIp, port.HostPort, port.ContainerPort, protocol);
     }
 
     return result;
@@ -354,12 +367,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         // Extract ports
         for (ULONG i = 0; i < current.PortsCount; ++i)
         {
-            PortInformation port;
-            port.HostPort = current.Ports[i].HostPort;
-            port.ContainerPort = current.Ports[i].ContainerPort;
-            port.Family = current.Ports[i].Family;
-            port.Protocol = static_cast<int>(current.Ports[i].Protocol);
-            entry.Ports.push_back(port);
+            entry.Ports.push_back(PortInformationFromWSLAPortMapping(current.Ports[i]));
         }
 
         // Free nested ports array

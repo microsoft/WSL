@@ -63,8 +63,9 @@ struct PortInformation
     uint16_t ContainerPort{};
     int Family{};   // AF_INET or AF_INET6
     int Protocol{}; // IP protocol number (e.g., IPPROTO_TCP or IPPROTO_UDP)
+    std::string BindingAddress;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(PortInformation, HostPort, ContainerPort, Family, Protocol);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(PortInformation, HostPort, ContainerPort, Family, Protocol, BindingAddress);
 };
 
 struct ContainerInformation
