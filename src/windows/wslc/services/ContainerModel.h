@@ -27,13 +27,6 @@ enum class FormatType
     Json,
 };
 
-struct PortOption
-{
-    uint16_t HostPort{};
-    uint16_t ContainerPort{};
-    int Family = AF_INET;
-};
-
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
@@ -69,7 +62,7 @@ struct PortInformation
     uint16_t HostPort{};
     uint16_t ContainerPort{};
     int Family{};   // AF_INET or AF_INET6
-    int Protocol{}; // 0 = TCP, 1 = UDP
+    int Protocol{}; // IP protocol number (e.g., IPPROTO_TCP or IPPROTO_UDP)
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(PortInformation, HostPort, ContainerPort, Family, Protocol);
 };

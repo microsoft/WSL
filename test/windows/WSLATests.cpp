@@ -3863,6 +3863,10 @@ class WSLATests
                 auto freeNestedPorts = wil::scope_exit([&]() noexcept {
                     for (const auto& entry : containers)
                     {
+                        for (ULONG j = 0; j < entry.PortsCount; ++j)
+                        {
+                            CoTaskMemFree(const_cast<LPSTR>(entry.Ports[j].BindingAddress));
+                        }
                         CoTaskMemFree(entry.Ports);
                     }
                 });

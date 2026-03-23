@@ -1188,6 +1188,14 @@ try
         if (!ports.empty())
         {
             auto portsArray = wil::make_unique_cotaskmem<::WSLAPortMapping[]>(ports.size());
+            size_t portsBuilt = 0;
+            auto portsCleanup = wil::scope_exit([&]() {
+                for (size_t j = 0; j < portsBuilt; ++j)
+                {
+                    CoTaskMemFree(const_cast<LPSTR>(portsArray[j].BindingAddress));
+                }
+            });
+
             for (size_t i = 0; i < ports.size(); ++i)
             {
                 portsArray[i].HostPort = ports[i].VmMapping.HostPort();
@@ -1197,9 +1205,12 @@ try
                 portsArray[i].BindingAddress =
                     wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(ports[i].VmMapping.BindingAddressString().c_str())
                         .release();
+                portsBuilt++;
             }
+
             output[index].Ports = portsArray.release();
             output[index].PortsCount = static_cast<ULONG>(ports.size());
+            portsCleanup.release();
         }
         else
         {
