@@ -72,8 +72,8 @@ struct ContainerInformation
 
 struct EnvironmentVariable
 {
-    static std::optional<std::wstring> Parse(std::wstring entry);
-    static std::vector<std::wstring> ParseFile(std::wstring filePath);
+    static std::optional<std::wstring> Parse(const std::wstring& entry);
+    static std::vector<std::wstring> ParseFile(const std::wstring& filePath);
 };
 
 struct PublishPort

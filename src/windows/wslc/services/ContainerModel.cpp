@@ -195,7 +195,7 @@ static inline bool IsSpace(wchar_t ch)
     return std::iswspace(ch) != 0;
 }
 
-std::optional<std::wstring> EnvironmentVariable::Parse(std::wstring entry)
+std::optional<std::wstring> EnvironmentVariable::Parse(const std::wstring& entry)
 {
     if (entry.empty() || std::all_of(entry.begin(), entry.end(), IsSpace))
     {
@@ -228,34 +228,21 @@ std::optional<std::wstring> EnvironmentVariable::Parse(std::wstring entry)
 
     if (!value.has_value())
     {
-        const DWORD valueLength = GetEnvironmentVariableW(key.c_str(), nullptr, 0);
-        if (valueLength > 0)
-        {
-            std::wstring envValue(valueLength, L'\0');
-            GetEnvironmentVariableW(key.c_str(), envValue.data(), valueLength);
-            if (!envValue.empty() && envValue.back() == L'\0')
-            {
-                envValue.pop_back();
-            }
-
-            value = envValue;
-        }
-        else
+        wil::unique_hglobal_string envValue;
+        auto hr = wil::GetEnvironmentVariableW(key.c_str(), envValue);
+        if (FAILED(hr) || envValue.get() == nullptr)
         {
             return std::nullopt;
         }
+
+        value = std::wstring(envValue.get());
     }
 
     return std::format(L"{}={}", key, value.value());
 }
 
-std::vector<std::wstring> EnvironmentVariable::ParseFile(std::wstring filePath)
+std::vector<std::wstring> EnvironmentVariable::ParseFile(const std::wstring& filePath)
 {
-    if (!std::filesystem::exists(filePath))
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment file '{}' does not exist", filePath));
-    }
-
     std::ifstream file(filePath);
     if (!file.is_open() || !file.good())
     {
