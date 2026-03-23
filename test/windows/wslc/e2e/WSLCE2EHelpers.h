@@ -54,6 +54,30 @@ namespace VT {
 #undef VT_RED
 #undef VT_ERASE_LINE
 #undef VT_CR
+
+    // Helper function to build container prompt with container ID (first 12 chars)
+    // Example: root@2a88a6f4b7c8:/#
+    inline std::string BuildContainerPrompt(const std::string& containerId, bool withBracketedPaste = true)
+    {
+        const std::string shortId = containerId.substr(0, 12);
+        if (withBracketedPaste)
+        {
+            return std::format("{}root@{}:/# ", B_START, shortId);
+        }
+        return std::format("root@{}:/# ", shortId);
+    }
+
+    // Helper function to build container prompt by inspecting the container
+    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste = true);
+
+    inline std::string BuildContainerAttachPrompt(const std::string& containerId)
+    {
+        const std::string shortId = containerId.substr(0, 12);
+        return std::format("{}{}{}root@{}:/# ", CR, ERASE_LINE, CR, shortId);
+    }
+
+    // Helper function to build container attach prompt by inspecting the container
+    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId);
 } // namespace VT
 
 struct TestImage
