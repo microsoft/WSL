@@ -28,7 +28,7 @@ constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
 
-void ValidateContainerName(LPCSTR Name)
+void ValidateName(LPCSTR Name)
 {
     const auto& locale = std::locale::classic();
     size_t i = 0;
