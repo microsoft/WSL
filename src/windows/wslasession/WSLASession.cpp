@@ -861,7 +861,6 @@ try
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
                 auto repoName = wslutil::ParseImage(tag).first;
-                size_t colonPos = tag.find(':');
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())
                 {

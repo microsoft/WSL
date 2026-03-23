@@ -427,7 +427,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // TODO: Enable once custom registries are supported, to avoid hitting public registry rate limits.
-        SKIP_TEST_UNSTABLE();
+        //SKIP_TEST_UNSTABLE();
 
         auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
             VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
@@ -5951,7 +5951,7 @@ class WSLATests
         auto ValidateImageParsing = [](const std::string& input, const std::string& expectedRepo, const std::optional<std::string>& expectedTag) {
             auto [repo, tag] = ParseImage(input);
             VERIFY_ARE_EQUAL(repo, expectedRepo);
-            VERIFY_ARE_EQUAL(tag, expectedTag);
+            VERIFY_ARE_EQUAL(tag.value_or("<empty>"), expectedTag.value_or("<empty>"));
         };
 
         ValidateImageParsing("ubuntu:22.04", "ubuntu", "22.04");
