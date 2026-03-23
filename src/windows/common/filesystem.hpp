@@ -229,11 +229,6 @@ std::wstring UnquotePath(_In_ LPCWSTR Path);
 void UpdateInit(_In_ PCWSTR BasePath, _In_ ULONG DistroVersion);
 
 /// <summary>
-/// Creates a CPIO newc format initrd archive from a single source file.
-/// </summary>
-void CreateCpioInitrd(_In_ const std::filesystem::path& SourcePath, _In_ const std::filesystem::path& DestPath);
-
-/// <summary>
 /// Wipes out the directory with the given path if it exists, then creates it again and returns
 /// an open directory handle onto it.
 /// </summary>
