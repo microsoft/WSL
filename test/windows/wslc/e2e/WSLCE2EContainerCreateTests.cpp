@@ -544,7 +544,8 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' does not exist\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_EnvFile_InvalidContent)
@@ -686,7 +687,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
-        result.Verify({.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' does not exist\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_RunInteractive_TTY)
