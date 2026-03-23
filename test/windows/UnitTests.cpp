@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 
 #include "Common.h"
+#include "install.h"
 #include <AclAPI.h>
 #include <fstream>
 #include <filesystem>
@@ -2373,7 +2374,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             {
                 LogInfo("Validating signature for: %ls", e.path().c_str());
 
-                wsl::windows::common::wslutil::ValidateFileSignature(e.path().c_str());
+                wsl::windows::common::install::ValidateFileSignature(e.path().c_str());
                 signedFiles++;
             }
         }
@@ -6559,6 +6560,29 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
             L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(InteractiveMount)
+    {
+        WSL2_TEST_ONLY();
+
+        // Add a fake interactive mount helper.
+        DistroFileChange mountHelper(L"/sbin/mount.hang", false);
+        mountHelper.SetContent(
+            L"#!/bin/sh\n"
+            L"read pass < /dev/tty\n");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod +x /sbin/mount.hang"), (DWORD)0);
+
+        // Don't keep the original fstab as it can be missing on the pipeline.
+        DistroFileChange fstab(L"/etc/fstab", false);
+        fstab.SetContent(L"none /mnt/ttytest hang 0 0\n");
+
+        // Restart the distro with this mount.
+        WslShutdown();
+        wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(L"echo booted").c_str());
+        auto result = process.RunAndCaptureOutput(60 * 1000);
+        VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
+        VERIFY_ARE_EQUAL(result.ExitCode, 0);
     }
 
 }; // namespace UnitTests
