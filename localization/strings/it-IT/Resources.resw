@@ -968,7 +968,7 @@ Fallback alla rete NAT.</value>
   </data>
   <data name="MessageUninstallNoArguments" xml:space="preserve">
     <value>{} non accetta argomenti. Per annullare la registrazione di una distribuzione, usare {} al suo posto.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="--uninstall"}{Locked="--unregister"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Disinstallazione non riuscita (codice di uscita: {}).</value>
