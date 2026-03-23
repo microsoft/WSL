@@ -434,12 +434,10 @@
 
        選項:
             --enable-wsl1
-                啟用 WSL1 支援。
- 
+                啟用 WSL1 支援。 
 
             --fixed-vhd
-                建立大小固定的磁碟，以儲存發佈。
- 
+                建立大小固定的磁碟，以儲存發佈。 
 
             --from-file &lt;Path&gt;
                 從本機檔案安裝發佈。
@@ -467,10 +465,8 @@
 
             --web-download
                 從網際網路下載發佈，而非從 Microsoft Store 下載。
-
- 
-    --manage &lt;Distro&gt; &lt;Options...&gt;
- 
+ 
+    --manage &lt;Distro&gt; &lt;Options...&gt; 
         變更 distro 指定選項。
 
         選項:
@@ -478,8 +474,7 @@
                 將發佈移動到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
-將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。
- 
+將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。 
 
             --set-default-user &lt;Username&gt;
                 設定發佈的預設使用者。
@@ -519,8 +514,7 @@
         選項:
             --force
                 結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
-
- 
+ 
     --status
         顯示 Linux 版 Windows 子系統的狀態。
 
@@ -547,8 +541,7 @@
         將發行版本匯出至 tar 檔案。
         stdout 的檔案名稱可以是 -。
 
-        選項:
- 
+        選項: 
             --format &lt;Format&gt;
                 指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
 
