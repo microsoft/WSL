@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "PluginManager.h"
 #include "WslPluginApi.h"
 #include "LxssUserSessionFactory.h"
@@ -150,7 +151,7 @@ void PluginManager::LoadPlugin(LPCWSTR Name, LPCWSTR ModulePath)
     wil::unique_hfile pluginHandle;
     if constexpr (wsl::shared::OfficialBuild)
     {
-        pluginHandle = wsl::windows::common::wslutil::ValidateFileSignature(ModulePath);
+        pluginHandle = wsl::windows::common::install::ValidateFileSignature(ModulePath);
         WI_ASSERT(pluginHandle.is_valid());
     }
 

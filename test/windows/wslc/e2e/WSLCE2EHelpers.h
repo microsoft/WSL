@@ -20,6 +20,66 @@ Abstract:
 
 namespace WSLCE2ETests {
 
+// VT100/ANSI escape sequence constants for TTY testing
+namespace VT {
+// Bracketed paste mode control sequences
+#define VT_B_START "\x1b[?2004h" // Enable bracketed paste mode
+#define VT_B_END "\x1b[?2004l"   // Disable bracketed paste mode
+
+// Color/formatting sequences
+#define VT_RESET "\x1b[0m"  // Reset all attributes
+#define VT_RED "\x1b[1;31m" // Bold red text
+
+// Terminal control sequences
+#define VT_ERASE_LINE "\x1b[K" // Erase from cursor to end of line
+#define VT_CR "\r"             // Carriage return
+
+    // Prompt patterns used in WSLC.
+    constexpr auto SESSION_PROMPT = VT_B_START VT_RED "root@ [ " VT_RESET "/" VT_RED " ]# ";
+    constexpr auto CONTAINER_PROMPT = VT_B_START "root@:/# ";
+    constexpr auto CONTAINER_ATTACH_PROMPT = VT_CR VT_ERASE_LINE VT_CR "root@:/# ";
+
+    // Constexpr representations of the control sequences for use in tests.
+    constexpr auto B_START = VT_B_START;
+    constexpr auto B_END = VT_B_END;
+    constexpr auto RESET = VT_RESET;
+    constexpr auto RED = VT_RED;
+    constexpr auto ERASE_LINE = VT_ERASE_LINE;
+    constexpr auto CR = VT_CR;
+
+// Remove macros to avoid polluting global namespace.
+#undef VT_B_START
+#undef VT_B_END
+#undef VT_RESET
+#undef VT_RED
+#undef VT_ERASE_LINE
+#undef VT_CR
+
+    // Helper function to build container prompt with container ID (first 12 chars)
+    // Example: root@2a88a6f4b7c8:/#
+    inline std::string BuildContainerPrompt(const std::string& containerId, bool withBracketedPaste = true)
+    {
+        const std::string shortId = containerId.substr(0, 12);
+        if (withBracketedPaste)
+        {
+            return std::format("{}root@{}:/# ", B_START, shortId);
+        }
+        return std::format("root@{}:/# ", shortId);
+    }
+
+    // Helper function to build container prompt by inspecting the container
+    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste = true);
+
+    inline std::string BuildContainerAttachPrompt(const std::string& containerId)
+    {
+        const std::string shortId = containerId.substr(0, 12);
+        return std::format("{}{}{}root@{}:/# ", CR, ERASE_LINE, CR, shortId);
+    }
+
+    // Helper function to build container attach prompt by inspecting the container
+    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId);
+} // namespace VT
+
 struct TestImage
 {
     std::wstring Name;
@@ -33,6 +93,7 @@ struct TestImage
 
 const TestImage& AlpineTestImage();
 const TestImage& DebianTestImage();
+const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);

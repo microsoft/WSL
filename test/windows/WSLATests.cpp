@@ -34,9 +34,9 @@ extern bool g_fastTestRun;
 
 class WSLATests
 {
-    WSL_TEST_CLASS(WSLATests)
+    WSLA_TEST_CLASS(WSLATests)
 
-    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
+    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WSLASessionSettings m_defaultSessionSettings{};
@@ -58,6 +58,7 @@ class WSLATests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
+        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         // The WSLC SDK tests use this same storage to reduce pull overhead.
@@ -2596,6 +2597,217 @@ class WSLATests
         VERIFY_ARE_EQUAL(m_defaultSession->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     }
 
+    TEST_METHOD(NamedVolumesTest)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        const std::string volumeName = "wsla-test-named-volume";
+        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
+
+        // Best-effort cleanup in case of leftovers from a previous failed run.
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        });
+
+        WSLAVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Type = "vhd";
+        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
+
+        // Create volume and validate duplicate volume name handling.
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+        // Verify volume VHD exists and mount point is present in the VM.
+        VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+        ExpectMount(m_defaultSession.get(), std::format("/mnt/wsla-volumes/{}", volumeName), std::optional<std::string>{"*ext4*"});
+
+        // Verify the same named volume can be mounted more than once with different container paths.
+        {
+            WSLAContainerLauncher duplicateNamedVolumes(
+                "debian:latest", "named-volume-dup", {"/bin/sh", "-c", "echo duplicated >/data-a/dup.txt ; cat /data-b/dup.txt"});
+            duplicateNamedVolumes.AddNamedVolume(volumeName, "/data-a", false);
+            duplicateNamedVolumes.AddNamedVolume(volumeName, "/data-b", true);
+
+            auto duplicateNamedVolumesContainer = duplicateNamedVolumes.Launch(*m_defaultSession);
+            auto duplicateNamedVolumesProcess = duplicateNamedVolumesContainer.GetInitProcess();
+            ValidateProcessOutput(duplicateNamedVolumesProcess, {{1, "duplicated\n"}});
+        }
+
+        // Verify CreateContainer with named volume mounts the volume into the container.
+        {
+            WSLAContainerLauncher writer(
+                "debian:latest", "named-volume-writer", {"/bin/sh", "-c", "echo wsla-named-volume >/data/marker.txt"});
+            writer.AddNamedVolume(volumeName, "/data", false);
+
+            auto writerContainer = writer.Launch(*m_defaultSession);
+            auto writerProcess = writerContainer.GetInitProcess();
+            ValidateProcessOutput(writerProcess, {});
+
+            WSLAContainerLauncher reader("debian:latest", "named-volume-reader", {"/bin/sh", "-c", "cat /data/marker.txt"});
+            reader.AddNamedVolume(volumeName, "/data", true);
+
+            auto readerContainer = reader.Launch(*m_defaultSession);
+            auto readerProcess = readerContainer.GetInitProcess();
+            ValidateProcessOutput(readerProcess, {{1, "wsla-named-volume\n"}});
+        }
+
+        // Verify we cannot delete a named volume while a container references it.
+        WSLAContainerLauncher holder("debian:latest", "named-volume-holder", {"sleep", "99999"});
+        holder.AddNamedVolume(volumeName, "/data", false);
+
+        auto [holderCreateResult, holderContainerResult] = holder.CreateNoThrow(*m_defaultSession);
+        VERIFY_SUCCEEDED(holderCreateResult);
+        VERIFY_IS_TRUE(holderContainerResult.has_value());
+
+        auto holderContainer = std::move(holderContainerResult.value());
+        holderContainer.SetDeleteOnClose(false);
+
+        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION));
+
+        // Verify that after deleting the container, the volume can be deleted.
+        VERIFY_SUCCEEDED(holderContainer.Get().Delete(WSLADeleteFlagsNone));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+        ExpectMount(m_defaultSession.get(), std::format("/mnt/wsla-volumes/{}", volumeName), std::nullopt);
+        VERIFY_IS_FALSE(std::filesystem::exists(volumeVhdPath));
+
+        cleanup.release();
+    }
+
+    TEST_METHOD(NamedVolumesSessionRecovery)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        const std::string volumeName = "wsla-test-named-volume";
+        const std::string containerName = "wsla-test-container";
+        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
+
+        // Best-effort cleanup in case prior failed runs left artifacts behind.
+        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        {
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        }
+
+        auto cleanup = wil::scope_exit([&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+            std::error_code ec;
+            std::filesystem::remove(volumeVhdPath, ec);
+        });
+
+        WSLAVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Type = "vhd";
+        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+
+        // Create a container that uses the named volume and writes a marker.
+        {
+            WSLAContainerLauncher writer(
+                "debian:latest", containerName, {"/bin/sh", "-c", "echo named-volume-recovery >/data/marker.txt"});
+            writer.AddNamedVolume(volumeName, "/data", false);
+
+            auto writerContainer = writer.Launch(*m_defaultSession);
+            writerContainer.SetDeleteOnClose(false);
+
+            auto writerProcess = writerContainer.GetInitProcess();
+            ValidateProcessOutput(writerProcess, {});
+        }
+
+        // Restart the session and verify the container is recovered.
+        ResetTestSession();
+
+        auto recoveredContainer = OpenContainer(m_defaultSession.get(), containerName);
+        recoveredContainer.SetDeleteOnClose(false);
+
+        // Verify the named volume still contains the marker after restart.
+        {
+            WSLAContainerLauncher reader("debian:latest", "wsla-test-container-reader", {"/bin/sh", "-c", "cat /data/marker.txt"});
+            reader.AddNamedVolume(volumeName, "/data", true);
+
+            auto readerContainer = reader.Launch(*m_defaultSession);
+            auto readerProcess = readerContainer.GetInitProcess();
+            ValidateProcessOutput(readerProcess, {{1, "named-volume-recovery\n"}});
+        }
+
+        // Stop the session, delete the backing VHD, and restart.
+        {
+            auto restartSession = ResetTestSession();
+
+            VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+
+            std::error_code error;
+            VERIFY_IS_TRUE(std::filesystem::remove(volumeVhdPath, error));
+            VERIFY_ARE_EQUAL(error, std::error_code{});
+        }
+
+        wil::com_ptr<IWSLAContainer> notFound;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerName.c_str(), &notFound), E_UNEXPECTED);
+
+        // Deleting the named volume should fail since the volume was not recovered.
+        VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLA_E_VOLUME_NOT_FOUND);
+    }
+
+    TEST_METHOD(NamedVolumeOptionsParseTest)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        const std::string volumeName = "wsla-volume-name";
+
+        auto validateInvalidOptionsFailure =
+            [&](const std::string& options, HRESULT expectedResult, const std::optional<std::wstring>& expectedMessage = std::nullopt) {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+                auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+                WSLAVolumeOptions volumeOptions{};
+                volumeOptions.Name = volumeName.c_str();
+                volumeOptions.Type = "vhd";
+                volumeOptions.Options = options.c_str();
+
+                const auto result = m_defaultSession->CreateVolume(&volumeOptions);
+
+                if (result != expectedResult)
+                {
+                    LogInfo(
+                        "CreateVolume mismatch options='%hs' result=0x%08x expected=0x%08x",
+                        options.c_str(),
+                        static_cast<unsigned int>(result),
+                        static_cast<unsigned int>(expectedResult));
+                }
+
+                VERIFY_ARE_EQUAL(result, expectedResult);
+                if (expectedMessage.has_value())
+                {
+                    ValidateCOMErrorMessage(expectedMessage);
+                }
+            };
+
+        validateInvalidOptionsFailure("not-json", WSL_E_INVALID_JSON);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"abc"})", WSL_E_INVALID_JSON);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"+-1"})", WSL_E_INVALID_JSON);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"123abc"})", WSL_E_INVALID_JSON);
+
+        validateInvalidOptionsFailure(R"({"SizeBytes":"18446744073709551616"})", E_INVALIDARG);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"-1"})", E_INVALIDARG);
+        validateInvalidOptionsFailure(R"({"SizeBytes":"0"})", E_INVALIDARG, L"Invalid size: 0");
+        validateInvalidOptionsFailure("{}", E_INVALIDARG, L"Invalid volume options: '{}'");
+        validateInvalidOptionsFailure("", WSL_E_INVALID_JSON);
+    }
+
     TEST_METHOD(CreateContainer)
     {
         WSL2_TEST_ONLY();
@@ -3104,21 +3316,21 @@ class WSLATests
         // Test error paths
         {
             expectOpen("", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: ''");
+            ValidateCOMErrorMessage(L"Invalid name: ''");
 
             expectOpen("non-existing-container", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             expectOpen("/", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: '/'");
+            ValidateCOMErrorMessage(L"Invalid name: '/'");
 
             expectOpen("?foo=bar", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: '?foo=bar'");
+            ValidateCOMErrorMessage(L"Invalid name: '?foo=bar'");
 
             expectOpen("\n", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: '\n'");
+            ValidateCOMErrorMessage(L"Invalid name: '\n'");
 
             expectOpen(" ", E_INVALIDARG);
-            ValidateCOMErrorMessage(L"Invalid container name: ' '");
+            ValidateCOMErrorMessage(L"Invalid name: ' '");
         }
     }
 
@@ -3806,45 +4018,6 @@ class WSLATests
         // The exec process exit event must be signaled within a reasonable timeout.
         VERIFY_IS_TRUE(exitEvent.wait(30 * 1000));
         VERIFY_ARE_EQUAL(process.GetExitCode(), 128 + WSLASignalSIGKILL);
-    }
-
-    void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
-    {
-        const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
-        filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
-
-        const winrt::Windows::Web::Http::HttpClient client(filter);
-
-        try
-        {
-            auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
-            auto content = response.Content().ReadAsStringAsync().get();
-
-            if (expectedCode.has_value())
-            {
-                VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
-            }
-            else
-            {
-                LogError("Unexpected reply for: %ls", Url);
-                VERIFY_FAIL();
-            }
-        }
-        catch (...)
-        {
-            auto result = wil::ResultFromCaughtException();
-
-            if (!expectedCode.has_value())
-            {
-                // We currently reset the connection if connect() fails inside the VM. Consider failing the Windows connect() instead.
-                VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
-            }
-            else
-            {
-                LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
-                VERIFY_FAIL();
-            }
-        }
     }
 
     void RunPortMappingsTest(IWSLASession& session, WSLAContainerNetworkType containerNetworkType)
@@ -5143,7 +5316,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &container), E_INVALIDARG);
             VERIFY_IS_NULL(container.get());
 
-            ValidateCOMErrorMessage(std::format(L"Invalid container name: '{}'", name));
+            ValidateCOMErrorMessage(std::format(L"Invalid name: '{}'", name));
         };
 
         expectInvalidArg("container with spaces");

@@ -87,25 +87,19 @@ void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_
 
     if (Stdin.is_valid())
     {
-        // Required because ReadFile() blocks if stdin is a tty.
-        if (wsl::windows::common::wslutil::IsInteractiveConsole())
-        {
-            // TODO: Will output CR instead of LF's which can confuse the linux app.
-            // Consider a custom relay logic to fix this.
-            inputThread = std::thread{[&]() {
-                try
-                {
-                    wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
-                }
-                CATCH_LOG();
+        // Required because ReadFile() blocks if stdin doesn't support overlapped IO.
+        // This can create pipe deadlocks if we get blocked reading stdin while data is available on stdout / stderr.
+        // TODO: Will output CR instead of LF's which can confuse the linux app.
+        // Consider a custom relay logic to fix this.
+        inputThread = std::thread{[&]() {
+            try
+            {
+                wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
+            }
+            CATCH_LOG();
 
-                Stdin.reset();
-            }};
-        }
-        else
-        {
-            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), std::move(Stdin)));
-        }
+            Stdin.reset();
+        }};
     }
 
     io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));

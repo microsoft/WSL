@@ -1485,8 +1485,6 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         return value;
     };
 
-    // TODO: Reset guiApplications to true by default once the virtio hang is solved.
-
     std::wstring newConfig =
         L"[wsl2]\n"
         L"crashDumpFolder=" +
@@ -1499,7 +1497,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         EscapePath(kernelLogs) +
         L"\n"
         L"telemetry=false\n" +
-        boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, false) +
+        boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
         L"earlyBootLogging=false\n" + networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())
@@ -2638,7 +2636,7 @@ std::string EscapeString(const std::string& Input)
 {
     std::string Output;
 
-    for (auto e : Input)
+    for (const auto& e : Input)
     {
         if (e == '\n')
         {
@@ -2655,6 +2653,10 @@ std::string EscapeString(const std::string& Input)
         else if (e == '\t')
         {
             Output += "\\t";
+        }
+        else if (e == '\x1b') // ESC character - start of VT sequence
+        {
+            Output += "\\x1b";
         }
         else
         {
@@ -2695,11 +2697,48 @@ std::string PartialHandleRead::ReadBytes(size_t Length)
     return m_data.substr(0, Length);
 }
 
+std::string PartialHandleRead::ConsumeBytes(size_t Length)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&]() {
+            std::lock_guard lock{m_mutex};
+
+            THROW_HR_IF(E_ABORT, m_data.size() < Length);
+        },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(60));
+
+    std::lock_guard lock{m_mutex};
+    std::string result = m_data.substr(0, Length);
+    m_data.erase(0, Length);
+    return result;
+}
+
+std::string PartialHandleRead::GetData() const
+{
+    std::lock_guard lock{m_mutex};
+    return m_data;
+}
+
 void PartialHandleRead::Expect(const std::string& Expected)
 {
     auto content = ReadBytes(Expected.size());
 
     VERIFY_ARE_EQUAL(content, Expected);
+}
+
+void PartialHandleRead::ExpectConsume(const std::string& Expected)
+{
+    auto content = ConsumeBytes(Expected.size());
+
+    if (content != Expected)
+    {
+        VERIFY_FAIL(std::format(
+                        L"Expected: '{}' but got: '{}'",
+                        wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
+                        wsl::shared::string::MultiByteToWide(EscapeString(content)))
+                        .c_str());
+    }
 }
 
 void PartialHandleRead::ExpectClosed(DWORD Timeout)
@@ -2733,7 +2772,7 @@ public:
     NON_MOVABLE(ReadHandleWithTargetValue);
 
     ReadHandleWithTargetValue(wsl::windows::common::relay::HandleWrapper&& MovedHandle, std::string_view targetValue) :
-        ReadHandle(std::move(MovedHandle), [&](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
+        ReadHandle(std::move(MovedHandle), [this](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
         m_targetValue(targetValue)
     {
     }
@@ -2812,41 +2851,55 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     return result;
 }
 
-void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
 {
     const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
     filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
 
     const winrt::Windows::Web::Http::HttpClient client(filter);
 
-    try
-    {
-        auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
-        auto content = response.Content().ReadAsStringAsync().get();
+    const auto sendRequest = [&]() {
+        try
+        {
+            LogInfo("Sending request to: %ls", Url);
+            auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
+            auto content = response.Content().ReadAsStringAsync().get();
 
-        if (expectedCode.has_value())
-        {
-            VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
+            if (expectedCode.has_value())
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
+            }
+            else
+            {
+                LogError("Unexpected reply for: %ls", Url);
+                VERIFY_FAIL();
+            }
         }
-        else
+        catch (...)
         {
-            LogError("Unexpected reply for: %ls", Url);
-            VERIFY_FAIL();
+            auto result = wil::ResultFromCaughtException();
+
+            if (!expectedCode.has_value())
+            {
+                // We currently reset the connection if connect() fails inside
+                // the VM. Consider failing the Windows connect() instead.
+                VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
+                return;
+            }
+
+            // Throw so RetryWithTimeout can decide whether to retry.
+            THROW_HR(result);
         }
+    };
+
+    if (retry)
+    {
+        wsl::shared::retry::RetryWithTimeout<void>(sendRequest, std::chrono::milliseconds(500), std::chrono::seconds(30), [&]() {
+            return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE);
+        });
     }
-    catch (...)
+    else
     {
-        auto result = wil::ResultFromCaughtException();
-
-        if (!expectedCode.has_value())
-        {
-            // We currently reset the connection if connect() fails inside the VM. Consider failing the Windows connect() instead.
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
-        }
-        else
-        {
-            LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
-            VERIFY_FAIL();
-        }
+        sendRequest();
     }
 }

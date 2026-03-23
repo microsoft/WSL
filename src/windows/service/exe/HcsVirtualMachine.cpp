@@ -266,7 +266,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
         gpuRequest.RequestType = hcs::ModifyRequestType::Update;
         gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
         gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
+        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
         {
             gpuRequest.Settings.DisableGdiAcceleration = true;
             gpuRequest.Settings.DisablePresentation = true;
@@ -407,7 +407,8 @@ try
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
-        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::None;
+        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
+        WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, SUCCEEDED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods()));
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
             wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
