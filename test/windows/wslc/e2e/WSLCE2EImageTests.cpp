@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EImageTests
 {
-    WSL_TEST_CLASS(WSLCE2EImageTests)
+    WSLA_TEST_CLASS(WSLCE2EImageTests)
 
     TEST_METHOD(WSLCE2E_Image_HelpCommand)
     {
@@ -44,8 +44,6 @@ class WSLCE2EImageTests
     }
 
 private:
-    const TestImage& DebianImage = DebianTestImage();
-
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;

@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EContainerKillTests
 {
-    WSL_TEST_CLASS(WSLCE2EContainerKillTests)
+    WSLA_TEST_CLASS(WSLCE2EContainerKillTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {

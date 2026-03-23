@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EContainerRemoveTests
 {
-    WSL_TEST_CLASS(WSLCE2EContainerRemoveTests)
+    WSLA_TEST_CLASS(WSLCE2EContainerRemoveTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {
