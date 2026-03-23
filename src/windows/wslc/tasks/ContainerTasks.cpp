@@ -205,6 +205,26 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Interactive = true;
     }
 
+    if (context.Args.Contains(ArgType::Publish))
+    {
+        auto ports = context.Args.GetAll<ArgType::Publish>();
+        options.Ports.reserve(options.Ports.size() + ports.size());
+        for (const auto& port : ports)
+        {
+            options.Ports.emplace_back(WideToMultiByte(port));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Volume))
+    {
+        auto volumes = context.Args.GetAll<ArgType::Volume>();
+        options.Volumes.reserve(options.Volumes.size() + volumes.size());
+        for (const auto& volume : volumes)
+        {
+            options.Volumes.emplace_back(volume);
+        }
+    }
+
     if (context.Args.Contains(ArgType::Remove))
     {
         options.Remove = true;
@@ -233,7 +253,7 @@ void StartContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    ContainerService::Start(context.Data.Get<Data::Session>(), id);
+    ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
 }
 
 void StopContainers(CLIExecutionContext& context)

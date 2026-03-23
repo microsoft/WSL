@@ -136,6 +136,11 @@ public:
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
     common::docker_schema::PruneContainerResult PruneContainers(const std::optional<common::docker_schema::PruneContainerLabelFilter>& Filter);
 
+    // Volume management.
+    void CreateVolume(const common::docker_schema::CreateVolume& Request);
+    void RemoveVolume(const std::string& Name);
+    std::vector<common::docker_schema::Volume> ListVolumes();
+
     // Image management.
     struct ListImagesFilters
     {

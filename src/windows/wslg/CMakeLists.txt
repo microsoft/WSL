@@ -12,8 +12,10 @@ add_dependencies(wslg
 
 target_link_libraries(wslg
                       ${COMMON_LINK_LIBRARIES}
+                      ${MSI_LINK_LIBRARIES}
                       common
-                      VirtDisk.lib)
+                      delayimp.lib)
 
+set_target_properties(wslg PROPERTIES LINK_FLAGS "/DELAYLOAD:msi.dll /DELAYLOAD:WINTRUST.dll")
 target_precompile_headers(wslg REUSE_FROM common)
 set_target_properties(wslg PROPERTIES FOLDER windows)

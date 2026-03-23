@@ -558,7 +558,7 @@ private:
             m_buffer.resize(BufferSize);
             Result = GetAdaptersAddresses(
                 AF_UNSPEC,
-                (GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST),
+                (GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_INCLUDE_GATEWAYS),
                 nullptr,
                 (PIP_ADAPTER_ADDRESSES)m_buffer.data(),
                 &BufferSize);

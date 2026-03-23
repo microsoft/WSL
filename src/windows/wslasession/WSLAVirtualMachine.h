@@ -19,6 +19,7 @@ Abstract:
 #include "wslaservice.h"
 #include "hcs.hpp"
 #include "WSLAProcess.h"
+#include "WSLAContainerMetadata.h"
 #include <thread>
 #include <filesystem>
 
@@ -45,6 +46,65 @@ struct WSLAProcessFd
     WSLAFdType Type{};
 };
 
+class WSLAVirtualMachine;
+
+struct VmPortAllocation
+{
+    NON_COPYABLE(VmPortAllocation);
+
+    VmPortAllocation(uint16_t port, int Family, int Protocol, WSLAVirtualMachine& vm);
+    VmPortAllocation(VmPortAllocation&& Other);
+    ~VmPortAllocation();
+
+    VmPortAllocation& operator=(VmPortAllocation&& Other);
+
+    void Reset();
+    void Release();
+    uint16_t Port() const;
+    int Family() const;
+    int Protocol() const;
+
+private:
+    uint16_t m_port{};
+    int m_family{};
+    int m_protocol{};
+    WSLAVirtualMachine* m_vm{};
+};
+
+struct VMPortMapping
+{
+    NON_COPYABLE(VMPortMapping);
+
+    VMPortMapping(int Protocol, int Family, uint16_t Port, const char* Address);
+    ~VMPortMapping();
+
+    VMPortMapping(VMPortMapping&& Other);
+    VMPortMapping& operator=(VMPortMapping&& Other);
+
+    void AssignVmPort(const std::shared_ptr<VmPortAllocation>& Port);
+
+    void Unmap();
+    void Release();
+    bool IsLocalhost() const;
+    std::string BindingAddressString() const;
+    void Attach(WSLAVirtualMachine& Vm);
+    void Detach();
+    uint16_t HostPort() const;
+
+    static VMPortMapping LocalhostTcpMapping(int Family, uint16_t WindowsPort);
+    static VMPortMapping FromWSLAPortMapping(const ::WSLAPortMapping& Mapping);
+    static VMPortMapping FromContainerMetaData(const wsla::WSLAPortMapping& Mapping);
+
+    int Protocol{};
+    std::shared_ptr<VmPortAllocation> VmPort;
+    SOCKADDR_INET BindAddress{};
+
+private:
+    static SOCKADDR_INET ParseBindingAddress(int Family, uint16_t Port, const char* Address);
+
+    WSLAVirtualMachine* Vm{};
+};
+
 class WSLAVirtualMachine
 {
 public:
@@ -61,8 +121,8 @@ public:
 
     void Initialize();
 
-    void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
-    void UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
+    void MapPort(VMPortMapping& Mapping);
+    void UnmapPort(VMPortMapping& Mapping);
     void Unmount(_In_ const char* Path);
 
     HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);
@@ -71,9 +131,9 @@ public:
 
     void OnProcessReleased(int Pid);
 
-    bool TryAllocatePort(uint16_t Port);
-    std::set<uint16_t> AllocatePorts(uint16_t Count);
-    void ReleasePorts(const std::set<uint16_t>& Ports);
+    std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
+    std::shared_ptr<VmPortAllocation> AllocatePort(int Family, int Protocol);
+    void ReleasePort(VmPortAllocation& Port);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ LPCSTR Executable,
@@ -83,6 +143,7 @@ public:
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
     void DetachDisk(_In_ ULONG Lun);
+    void Ext4Format(_In_ const std::string& Device);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
@@ -101,7 +162,7 @@ public:
     }
 
 private:
-    void MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove);
+    void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
 
     // Initial setup during Connect()
     void ConfigureInitialMounts();

@@ -115,6 +115,9 @@ class WSLCE2EContainerRemoveTests
 
         // Removing without force should fail
         result = RunWslc(std::format(L"container remove {}", containerId));
+
+        // TODO Add .Stderr after this issue is resolved:
+        // https://github.com/microsoft/WSL/issues/14510
         result.Verify({.ExitCode = 1});
 
         // Container should still exist and be running

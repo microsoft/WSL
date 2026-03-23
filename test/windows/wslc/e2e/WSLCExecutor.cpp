@@ -16,6 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
+#include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
 
@@ -99,8 +100,7 @@ std::wstring WSLCExecutionResult::GetStdoutOneLine() const
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine)
 {
-    auto wslcPath = std::filesystem::path(wslutil::GetMsiPackagePath().value()) / L"wslc.exe";
-    auto cmd = L"\"" + wslcPath.wstring() + L"\" " + commandLine;
+    auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
     const auto output = process.RunAndCaptureOutput();
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = output.ExitCode};
@@ -119,4 +119,206 @@ std::wstring GetWslcHeader()
            << L"\r\n";
     return header.str();
 }
+
+WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
+{
+    auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
+
+    auto [childStdinRead, parentStdinWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, false, true);
+    auto [parentStdoutRead, childStdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
+    auto [parentStderrRead, childStderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(65536, true, false);
+
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdinRead.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+    wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+    process.SetStdHandles(childStdinRead.get(), childStdoutWrite.get(), childStderrWrite.get());
+    wil::unique_handle processHandle = process.Start();
+
+    childStdinRead.reset();
+    childStdoutWrite.reset();
+    childStderrWrite.reset();
+
+    return WSLCInteractiveSession(
+        commandLine, std::move(parentStdinWrite), std::move(parentStdoutRead), std::move(parentStderrRead), std::move(processHandle));
+}
+
+// WSLCInteractiveSession implementation
+
+WSLCInteractiveSession::WSLCInteractiveSession(
+    std::wstring commandLine, wil::unique_hfile stdinWrite, wil::unique_hfile stdoutRead, wil::unique_hfile stderrRead, wil::unique_handle processHandle) :
+    CommandLine(std::move(commandLine)),
+    m_stdinWrite(std::move(stdinWrite)),
+    m_stdoutRead(std::move(stdoutRead)),
+    m_stderrRead(std::move(stderrRead)),
+    m_processHandle(std::move(processHandle))
+{
+    m_stdoutReader = std::make_unique<PartialHandleRead>(m_stdoutRead.get());
+    m_stderrReader = std::make_unique<PartialHandleRead>(m_stderrRead.get());
+}
+
+WSLCInteractiveSession::~WSLCInteractiveSession()
+{
+    // Best-effort cleanup to avoid orphaned wslc process if Exit()/Wait() were not called.
+    if (!m_processHandle.is_valid())
+    {
+        return;
+    }
+
+    CloseStdin();
+
+    DWORD waitResult = ::WaitForSingleObject(m_processHandle.get(), DefaultWaitTimeoutMs);
+    if (waitResult == WAIT_TIMEOUT)
+    {
+        // Still running: terminate and wait again, but do not throw.
+        ::TerminateProcess(m_processHandle.get(), 1);
+        ::WaitForSingleObject(m_processHandle.get(), DefaultWaitTimeoutMs);
+    }
+}
+
+void WSLCInteractiveSession::ExpectStdout(const std::string& expected)
+{
+    m_stdoutReader->ExpectConsume(expected);
+}
+
+void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
+{
+    m_stderrReader->ExpectConsume(expected);
+}
+
+void WSLCInteractiveSession::ExpectCommandEcho(const std::string& command)
+{
+    // TTY mode: expect command echo, then B_END and carriage return
+    ExpectStdout(std::format("{}\r\n{}\r", command, VT::B_END));
+}
+
+void WSLCInteractiveSession::Write(const std::string& data)
+{
+    OVERLAPPED overlapped{};
+    wil::unique_event event(wil::EventOptions::ManualReset);
+    overlapped.hEvent = event.get();
+
+    DWORD written = 0;
+    if (!WriteFile(m_stdinWrite.get(), data.c_str(), static_cast<DWORD>(data.size()), &written, &overlapped))
+    {
+        DWORD error = GetLastError();
+        if (error == ERROR_IO_PENDING)
+        {
+            DWORD waitResult = WaitForSingleObject(event.get(), DefaultWaitTimeoutMs);
+            if (waitResult == WAIT_TIMEOUT)
+            {
+                THROW_HR(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+            }
+            else if (waitResult == WAIT_FAILED)
+            {
+                THROW_LAST_ERROR();
+            }
+            else if (waitResult != WAIT_OBJECT_0)
+            {
+                THROW_HR_MSG(E_UNEXPECTED, "WaitForSingleObject returned unexpected result: 0x%08lx", waitResult);
+            }
+
+            THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(m_stdinWrite.get(), &overlapped, &written, FALSE));
+        }
+        else
+        {
+            THROW_WIN32(error);
+        }
+    }
+}
+
+void WSLCInteractiveSession::WriteLine(const std::string& line)
+{
+    Write(line + "\n");
+}
+
+bool WSLCInteractiveSession::IsRunning() const
+{
+    DWORD exitCode = 0;
+    return GetExitCodeProcess(m_processHandle.get(), &exitCode) && exitCode == STILL_ACTIVE;
+}
+
+void WSLCInteractiveSession::CloseStdin()
+{
+    m_stdinWrite.reset();
+}
+
+std::optional<int> WSLCInteractiveSession::GetExitCode() const
+{
+    DWORD exitCode = 0;
+    if (GetExitCodeProcess(m_processHandle.get(), &exitCode) && exitCode != STILL_ACTIVE)
+    {
+        return static_cast<int>(exitCode);
+    }
+
+    return std::nullopt;
+}
+
+void WSLCInteractiveSession::WaitForExit(DWORD timeoutMs)
+{
+    auto result = WaitForSingleObject(m_processHandle.get(), timeoutMs);
+    if (result == WAIT_TIMEOUT)
+    {
+        DWORD processId = GetProcessId(m_processHandle.get());
+
+        Log::Warning(std::format(L"Process (PID: {}) did not exit within timeout of {}ms", processId, timeoutMs).c_str());
+        Log::Warning(L"Attempting to terminate process forcefully");
+        Terminate(999);
+        WaitForSingleObject(m_processHandle.get(), DefaultWaitTimeoutMs);
+
+        THROW_HR_MSG(E_FAIL, "Process did not exit within timeout of %lums and was forcefully terminated", timeoutMs);
+    }
+
+    if (result == WAIT_FAILED)
+    {
+        THROW_LAST_ERROR_MSG("WaitForSingleObject failed while waiting for process exit");
+    }
+
+    if (result != WAIT_OBJECT_0)
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "WaitForSingleObject returned unexpected result: 0x%08lx", result);
+    }
+}
+
+int WSLCInteractiveSession::Wait(DWORD timeoutMs)
+{
+    WaitForExit(timeoutMs);
+    DWORD exitCode = 0;
+    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(m_processHandle.get(), &exitCode));
+    return static_cast<int>(exitCode);
+}
+
+bool WSLCInteractiveSession::Terminate(UINT exitCode)
+{
+    return TerminateProcess(m_processHandle.get(), exitCode) != FALSE;
+}
+
+void WSLCInteractiveSession::VerifyNoErrors()
+{
+    m_stderrReader->ExpectClosed(DefaultWaitTimeoutMs);
+
+    // Verify that stderr was actually empty - not just closed
+    const auto& stderrContent = m_stderrReader->GetData();
+    if (!stderrContent.empty())
+    {
+        VERIFY_FAIL(std::format(L"Expected no errors but stderr contained: {}", wsl::shared::string::MultiByteToWide(EscapeString(stderrContent)))
+                        .c_str());
+    }
+}
+
+int WSLCInteractiveSession::Exit(DWORD timeoutMs)
+{
+    WriteLine("exit");
+    CloseStdin();
+    return Wait(timeoutMs);
+}
+
+int WSLCInteractiveSession::ExitAndVerifyNoErrors(DWORD timeoutMs)
+{
+    const auto exitCode = Exit(timeoutMs);
+    VerifyNoErrors();
+    return exitCode;
+}
+
 } // namespace WSLCE2ETests
