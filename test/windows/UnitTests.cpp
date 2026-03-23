@@ -355,7 +355,7 @@ class UnitTests
         WSL2_TEST_ONLY();
 
         // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
 
         auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
@@ -3807,7 +3807,7 @@ localhostForwarding=true
         validateUidChange(L"root", 0, L"The operation completed successfully. \r\n", L"", 0);
 
         const std::wstring invalidUser = L"Nonexistent";
-        validateUidChange(invalidUser, 0, L"", L"/usr/bin/id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
+        validateUidChange(invalidUser, 0, L"", L"id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
@@ -3931,7 +3931,7 @@ localhostForwarding=true
             VERIFY_ARE_EQUAL(ExpectedVersion, version);
         };
 
-        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"12");
+        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"13");
 
         constexpr auto testTar = L"exported-distro.tar";
         constexpr auto tmpDistroName = L"tmpdistro";
@@ -4031,10 +4031,10 @@ VERSION_ID="Invalid|Format"
         // Verify that importing a distribution with an os-release as then converting works as well
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--import {} . {} --version {}", tmpDistroName, g_testDistroPath, convertVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--set-version {} {}", tmpDistroName, currentVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
     }
 
     TEST_METHOD(DistributionId)
@@ -6411,8 +6411,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     // See https://github.com/microsoft/WSL/issues/13173.
     TEST_METHOD(SetSidNoWarning)
     {
-        auto [out, err] =
-            LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,stderr");
 
         VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
         VERIFY_ARE_EQUAL(err, L"");
@@ -6607,6 +6606,29 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             threw = true;
         }
         VERIFY_IS_TRUE(threw);
+    }
+
+    TEST_METHOD(InteractiveMount)
+    {
+        WSL2_TEST_ONLY();
+
+        // Add a fake interactive mount helper.
+        DistroFileChange mountHelper(L"/sbin/mount.hang", false);
+        mountHelper.SetContent(
+            L"#!/bin/sh\n"
+            L"read pass < /dev/tty\n");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod +x /sbin/mount.hang"), (DWORD)0);
+
+        // Don't keep the original fstab as it can be missing on the pipeline.
+        DistroFileChange fstab(L"/etc/fstab", false);
+        fstab.SetContent(L"none /mnt/ttytest hang 0 0\n");
+
+        // Restart the distro with this mount.
+        WslShutdown();
+        wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(L"echo booted").c_str());
+        auto result = process.RunAndCaptureOutput(60 * 1000);
+        VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
+        VERIFY_ARE_EQUAL(result.ExitCode, 0);
     }
 
 }; // namespace UnitTests
