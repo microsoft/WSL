@@ -182,6 +182,13 @@ typedef struct _WSLAProcessOptions
     ULONG TtyColumns;
 } WSLAProcessOptions;
 
+typedef struct _WSLANamedVolume
+{
+    LPCSTR Name;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+} WSLANamedVolume;
+
 typedef struct _WSLAVolume
 {
     LPCWSTR HostPath;
@@ -263,6 +270,9 @@ typedef struct _WSLAContainerOptions
     WSLAContainerNetwork ContainerNetwork;
     [unique, size_is(TmpfsCount)] const WSLATmpfsMount* Tmpfs;
     ULONG TmpfsCount;
+
+    [unique, size_is(NamedVolumesCount)] WSLANamedVolume* NamedVolumes;
+    ULONG NamedVolumesCount;
 } WSLAContainerOptions;
 
 typedef enum _WSLAContainerState
@@ -469,6 +479,13 @@ typedef struct _WSLATagImageOptions
     LPCSTR Tag;   // Target tag name.
 } WSLATagImageOptions;
 
+typedef struct _WSLAVolumeOptions
+{
+    LPCSTR Name;
+    LPCSTR Type;
+    [unique] LPCSTR Options;
+} WSLAVolumeOptions;
+
 typedef struct _WSLAContainerPruneFilter
 {
     LPCSTR Key;
@@ -490,7 +507,7 @@ typedef enum _WSLASessionState
 } WSLASessionState;
 
 // Settings for IWSLASession::Initialize - passed from service to per-user process
-typedef struct _WSLASessionInitSettings 
+typedef struct _WSLASessionInitSettings
 {
     ULONG SessionId;
     ULONG CreatorPid;
@@ -556,6 +573,9 @@ interface IWSLASession : IUnknown
         [in] const WSLASessionInitSettings* Settings,
         [in] IWSLAVirtualMachine* Vm);
 
+    // Volume management.
+    HRESULT CreateVolume([in] const WSLAVolumeOptions* Options);
+    HRESULT DeleteVolume([in] LPCSTR Name);
 }
 
 //
@@ -635,3 +655,4 @@ cpp_quote("#define WSLA_E_BASE (0x0600)")
 cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")
 cpp_quote("#define WSLA_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 2) /* 0x80040602 */")
 cpp_quote("#define WSLA_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 3) /* 0x80040603 */")
+cpp_quote("#define WSLA_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 4) /* 0x80040604 */")
