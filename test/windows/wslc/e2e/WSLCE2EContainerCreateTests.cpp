@@ -21,6 +21,8 @@ Abstract:
 
 namespace WSLCE2ETests {
 
+using namespace WEX::Logging;
+
 class WSLCE2EContainerCreateTests
 {
     WSLA_TEST_CLASS(WSLCE2EContainerCreateTests)
@@ -373,7 +375,6 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
@@ -686,6 +687,289 @@ class WSLCE2EContainerCreateTests
 
         result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
         result.Verify({.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' does not exist\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_RunInteractive_TTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session = RunWslcInteractive(std::format(L"container run -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        session.ExpectStdout(expectedPrompt);
+
+        session.WriteLine("echo hello");
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.WriteLine("whoami");
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        auto exitCode = session.ExitAndVerifyNoErrors();
+        VERIFY_ARE_EQUAL(0, exitCode);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_RunInteractive_NoTTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto session = RunWslcInteractive(std::format(L"container run -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // Write test data to stdin
+        session.WriteLine("test line 1");
+        session.WriteLine("test line 2");
+
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY process.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+
+        // Close stdin to signal EOF to cat
+        session.CloseStdin();
+
+        // Wait for cat to exit with code 0
+        auto exitCode = session.Wait(10000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
+    }
+
+    TEST_METHOD(WSLCE2E_Container_RunAttach_TTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+
+        auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // The container attach prompt appears twice.
+        session.ExpectStdout(expectedAttachPrompt);
+        session.ExpectStdout(expectedAttachPrompt);
+
+        session.WriteLine("echo hello");
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.WriteLine("whoami");
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.ExitAndVerifyNoErrors();
+        auto exitCode = session.Wait();
+        VERIFY_ARE_EQUAL(0, exitCode);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_RunAttach_NoTTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // Write test data to stdin
+        session.WriteLine("test line 1");
+        session.WriteLine("test line 2");
+
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY process.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+
+        // Close stdin to signal EOF to cat
+        session.CloseStdin();
+
+        // Wait for cat to exit with code 0
+        auto exitCode = session.Wait(10000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
+    }
+
+    TEST_METHOD(WSLCE2E_Container_ExecInteractive_TTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        session.ExpectStdout(expectedPrompt);
+
+        session.WriteLine("echo hello");
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.WriteLine("whoami");
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.ExitAndVerifyNoErrors();
+        auto exitCode = session.Wait();
+        VERIFY_ARE_EQUAL(0, exitCode);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_ExecInteractive_NoTTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        auto session = RunWslcInteractive(std::format(L"container exec -i {} cat", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // Write test data to stdin
+        session.WriteLine("test line 1");
+        session.WriteLine("test line 2");
+
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY process.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+
+        // Close stdin to signal EOF to cat
+        session.CloseStdin();
+
+        // Wait for cat to exit with code 0
+        auto exitCode = session.Wait(10000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
+    }
+
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_TTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container create -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        // The container attach prompt is different for the first prompt.
+        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+
+        auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // The container attach prompt appears twice.
+        session.ExpectStdout(expectedAttachPrompt);
+        session.ExpectStdout(expectedAttachPrompt);
+
+        session.WriteLine("echo hello");
+        session.ExpectCommandEcho("echo hello");
+        session.ExpectStdout("hello\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.WriteLine("whoami");
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.ExitAndVerifyNoErrors();
+        auto exitCode = session.Wait();
+        VERIFY_ARE_EQUAL(0, exitCode);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_NoTTY)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+        auto result = RunWslc(std::format(L"container create -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        auto containerId = result.GetStdoutOneLine();
+
+        // Start with attach
+        auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+
+        // Write test data to stdin
+        session.WriteLine("test line 1");
+        session.WriteLine("test line 2");
+
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY process.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+
+        // Close stdin to signal EOF to cat
+        session.CloseStdin();
+
+        // Wait for cat to exit with code 0
+        auto exitCode = session.Wait(10000);
+        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
+        session.VerifyNoErrors();
+    }
+
+    TEST_METHOD(WSLCE2E_Session_Shell)
+    {
+        WSL2_TEST_ONLY();
+        {
+            // Session shell should attach to the wslc session.
+            auto session = RunWslcInteractive(L"session shell");
+            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
+
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("echo hello");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("echo hello");
+            session.ExpectStdout("hello\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("whoami");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("whoami");
+            session.ExpectStdout("root\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.ExitAndVerifyNoErrors();
+            auto exitCode = session.Wait();
+            VERIFY_ARE_EQUAL(0, exitCode);
+        }
+        {
+            // Session shell should attach to the wslc by name also.
+            auto session = RunWslcInteractive(L"session shell wsla-cli");
+            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
+
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("echo hello");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("echo hello");
+            session.ExpectStdout("hello\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("whoami");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("whoami");
+            session.ExpectStdout("root\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.ExitAndVerifyNoErrors();
+            auto exitCode = session.Wait();
+            VERIFY_ARE_EQUAL(0, exitCode);
+        }
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
