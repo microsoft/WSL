@@ -149,8 +149,6 @@ std::filesystem::path GetUserProfilePath(_In_opt_ HANDLE userToken = nullptr);
 
 std::filesystem::path GetWslConfigPath(_In_opt_ HANDLE userToken = nullptr);
 
-bool IsDisableVgpuSettingsSupported();
-
 bool IsPackageInstalled(_In_ LPCWSTR PackageFamilyName);
 
 bool IsServicePresent(_In_ LPCWSTR ServiceName);

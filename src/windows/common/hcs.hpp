@@ -84,4 +84,6 @@ unique_hcn_service_callback RegisterServiceCallback(_In_ HCS_NOTIFICATION_CALLBA
 unique_hcn_guest_network_service_callback RegisterGuestNetworkServiceCallback(
     _In_ const unique_hcn_guest_network_service& GuestNetworkService, _In_ HCS_NOTIFICATION_CALLBACK Callback, _In_ PVOID Context);
 
+bool IsDisableVgpuSettingsSupported();
+
 } // namespace wsl::windows::common::hcs

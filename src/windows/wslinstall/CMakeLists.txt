@@ -10,8 +10,8 @@ target_precompile_headers(wslinstall REUSE_FROM common)
 
 target_link_libraries(wslinstall
                       ${COMMON_LINK_LIBRARIES}
+                      ${MSI_LINK_LIBRARIES}
                       common
                       legacy_stdio_definitions
-                      Msi.lib
                       Crypt32.lib
                       sfc.lib)

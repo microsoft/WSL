@@ -348,15 +348,19 @@ public:
     ~PartialHandleRead();
 
     void Expect(const std::string& Expected);
+    void ExpectConsume(const std::string& Expected);
     void ExpectClosed(DWORD Timeout = 60 * 1000);
 
     std::string ReadBytes(size_t Length);
+    std::string ConsumeBytes(size_t Length);
+
+    std::string GetData() const;
 
 private:
     void Run();
 
     HANDLE m_handle{};
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     std::thread m_thread;
     std::string m_data;
@@ -591,7 +595,7 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
-void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode);
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 
 template <typename T>
 void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
