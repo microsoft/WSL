@@ -301,16 +301,16 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
-    auto [repo, tag] = wslutil::ParseImage(ImageUri);
+    auto [repo, tagOrDigest] = wslutil::ParseImage(ImageUri);
 
-    if (!tag.has_value())
+    if (!tagOrDigest.has_value())
     {
-        tag = "latest";
+        tagOrDigest = "latest";
     }
 
     auto lock = m_lock.lock_shared();
 
-    auto requestContext = m_dockerClient->PullImage(repo, tag);
+    auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest);
 
     auto io = CreateIOContext();
 
@@ -567,15 +567,15 @@ try
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
-    auto [repo, tag] = wslutil::ParseImage(ImageName);
+    auto [repo, tagOrDigest] = wslutil::ParseImage(ImageName);
 
-    THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
+    THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tag.value(), ContentSize);
+    auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;
