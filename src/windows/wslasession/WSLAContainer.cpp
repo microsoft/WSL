@@ -1440,10 +1440,13 @@ HRESULT WSLAContainer::GetState(WSLAContainerState* Result)
 {
     COMServiceExecutionContext context;
 
-    if (m_cachedState.has_value())
     {
-        *Result = m_cachedState.value();
-        return S_OK;
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedState.has_value())
+        {
+            *Result = m_cachedState.value();
+            return S_OK;
+        }
     }
 
     *Result = WslaContainerStateInvalid;
@@ -1456,9 +1459,12 @@ HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
 
     *Process = nullptr;
 
-    if (m_cachedInitProcess)
     {
-        return m_cachedInitProcess.CopyTo(Process);
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedInitProcess)
+        {
+            return m_cachedInitProcess.CopyTo(Process);
+        }
     }
 
     return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
@@ -1515,14 +1521,15 @@ CATCH_RETURN();
 void WSLAContainer::CacheState(const std::string& id, const std::string& name, WSLAContainerState state, const Microsoft::WRL::ComPtr<WSLAProcess>& initProcess) noexcept
 try
 {
+    auto cacheLock = m_cacheLock.lock_exclusive();
+
+    // CacheState must only be called once, during DisconnectComWrapper().
+    WI_ASSERT(!m_cachedState.has_value());
+
     m_cachedId = id;
     m_cachedName = name;
     m_cachedState = state;
-
-    if (initProcess)
-    {
-        initProcess.CopyTo(m_cachedInitProcess.GetAddressOf());
-    }
+    m_cachedInitProcess = initProcess;
 }
 CATCH_LOG();
 
@@ -1549,10 +1556,13 @@ try
 {
     COMServiceExecutionContext context;
 
-    if (m_cachedId.has_value())
     {
-        WI_VERIFY(strcpy_s(Id, std::size<char>(WSLAContainerId{}), m_cachedId->c_str()) == 0);
-        return S_OK;
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedId.has_value())
+        {
+            WI_VERIFY(strcpy_s(Id, std::size<char>(WSLAContainerId{}), m_cachedId->c_str()) == 0);
+            return S_OK;
+        }
     }
 
     auto [lock, impl] = LockImpl();
@@ -1569,10 +1579,13 @@ try
 
     *Name = nullptr;
 
-    if (m_cachedName.has_value())
     {
-        *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
-        return S_OK;
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedName.has_value())
+        {
+            *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
+            return S_OK;
+        }
     }
 
     auto [lock, impl] = LockImpl();

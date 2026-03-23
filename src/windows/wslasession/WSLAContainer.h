@@ -200,10 +200,11 @@ private:
 
     // Cached read-only properties populated by CacheState() so they remain
     // accessible after the impl is disconnected.
-    std::optional<std::string> m_cachedId;
-    std::optional<std::string> m_cachedName;
-    std::optional<WSLAContainerState> m_cachedState;
-    Microsoft::WRL::ComPtr<IWSLAProcess> m_cachedInitProcess;
+    mutable wil::srwlock m_cacheLock;
+    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedId;
+    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedName;
+    _Guarded_by_(m_cacheLock) std::optional<WSLAContainerState> m_cachedState;
+    _Guarded_by_(m_cacheLock) Microsoft::WRL::ComPtr<IWSLAProcess> m_cachedInitProcess;
 };
 
 } // namespace wsl::windows::service::wsla
