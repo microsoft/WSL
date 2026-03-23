@@ -43,13 +43,14 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Name),
         Argument::Create(ArgType::NoDNS),
         Argument::Create(ArgType::Progress),
+        Argument::Create(ArgType::Publish, false, NO_LIMIT),
         Argument::Create(ArgType::Remove),
         Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
-        Argument::Create(ArgType::Volume),
+        Argument::Create(ArgType::Volume, false, NO_LIMIT),
         Argument::Create(ArgType::Virtual),
     };
     // clang-format on

@@ -29,11 +29,10 @@ struct WSLAPortMapping
     uint16_t VmPort{};
     uint16_t ContainerPort{};
     int Family{};
+    int Protocol{};
+    std::string BindingAddress;
 
-    // Runtime-only field. Not serialized to JSON.
-    bool MappedToHost{};
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAPortMapping, HostPort, VmPort, ContainerPort, Family);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAPortMapping, HostPort, VmPort, ContainerPort, Family, Protocol, BindingAddress);
 };
 
 struct WSLAVolumeMount

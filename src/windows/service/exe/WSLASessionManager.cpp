@@ -22,7 +22,7 @@ Abstract:
       reference to keep them alive until explicitly terminated.
 
     A job object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE ensures that all
-    per-user COM server processes are automatically terminated if wslaservice
+    per-user COM server processes are automatically terminated if wslservice
     crashes or exits unexpectedly.
 
 --*/
@@ -227,7 +227,7 @@ void WSLASessionManagerImpl::AddSessionProcessToJobObject(_In_ IWSLASessionFacto
 void WSLASessionManagerImpl::EnsureJobObjectCreated()
 {
     // Create a job object that will automatically terminate all child processes
-    // when the job handle is closed (i.e., when wslaservice exits or crashes).
+    // when the job handle is closed (i.e., when wslservice exits or crashes).
     std::call_once(m_jobObjectInitFlag, [this] {
         m_sessionJobObject.reset(CreateJobObjectW(nullptr, nullptr));
         THROW_LAST_ERROR_IF(!m_sessionJobObject);

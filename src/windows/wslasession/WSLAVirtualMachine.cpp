@@ -9,7 +9,6 @@ Module Name:
 Abstract:
 
     Client-side class for WSLA virtual machine operations.
-
     The VM is created via IWSLAVirtualMachine (running in the SYSTEM service).
     This class connects to the existing VM for unprivileged operations
     and delegates privileged operations back to IWSLAVirtualMachine.
@@ -24,6 +23,8 @@ Abstract:
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
+using wsl::windows::service::wsla::VmPortAllocation;
+using wsl::windows::service::wsla::VMPortMapping;
 using wsl::windows::service::wsla::WSLAProcess;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 namespace wslutil = wsl::windows::common::wslutil;
@@ -31,6 +32,214 @@ namespace wslutil = wsl::windows::common::wslutil;
 constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
+
+VmPortAllocation::VmPortAllocation(uint16_t port, int family, int protocol, WSLAVirtualMachine& vm) :
+    m_port(port), m_family(family), m_protocol(protocol), m_vm(&vm)
+{
+}
+
+VmPortAllocation::VmPortAllocation(VmPortAllocation&& Other)
+{
+    *this = std::move(Other);
+}
+
+VmPortAllocation& VmPortAllocation::operator=(VmPortAllocation&& Other)
+{
+    if (this != &Other)
+    {
+        Reset();
+        m_port = Other.m_port;
+        m_family = Other.m_family;
+        m_protocol = Other.m_protocol;
+        m_vm = Other.m_vm;
+
+        Other.Release();
+    }
+    return *this;
+}
+
+VmPortAllocation::~VmPortAllocation()
+{
+    Reset();
+}
+
+void VmPortAllocation::Reset()
+{
+    if (m_vm != nullptr)
+    {
+        m_vm->ReleasePort(*this);
+        Release();
+    }
+}
+
+void VmPortAllocation::Release()
+{
+    m_vm = nullptr;
+    m_port = 0;
+    m_family = 0;
+    m_protocol = 0;
+}
+
+uint16_t VmPortAllocation::Port() const
+{
+    return m_port;
+}
+
+int VmPortAllocation::Family() const
+{
+    return m_family;
+}
+
+int VmPortAllocation::Protocol() const
+{
+    return m_protocol;
+}
+
+VMPortMapping::VMPortMapping(int protocol, int Family, uint16_t Port, const char* Address) : Protocol(protocol)
+{
+    THROW_HR_IF_MSG(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP, "Invalid protocol: %i", Protocol);
+    THROW_HR_IF(E_POINTER, Address == nullptr);
+    if (Family == AF_INET)
+    {
+        common::wslutil::ParseIpv4Address(Address, BindAddress.Ipv4.sin_addr);
+        BindAddress.Ipv4.sin_port = htons(Port);
+    }
+    else if (Family == AF_INET6)
+    {
+        common::wslutil::ParseIpv6Address(Address, BindAddress.Ipv6.sin6_addr);
+        BindAddress.Ipv6.sin6_port = htons(Port);
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid address family: %i", Family);
+    }
+
+    // Must be assigned after parsing is done, since inet_pton writes to the family field as well.
+    BindAddress.si_family = Family;
+}
+
+VMPortMapping::~VMPortMapping()
+{
+    try
+    {
+        Unmap();
+    }
+    CATCH_LOG();
+}
+
+VMPortMapping::VMPortMapping(VMPortMapping&& Other)
+{
+    *this = std::move(Other);
+}
+
+void VMPortMapping::AssignVmPort(const std::shared_ptr<VmPortAllocation>& Port)
+{
+    WI_ASSERT(!VmPort);
+
+    VmPort = Port;
+}
+
+void VMPortMapping::Unmap()
+{
+    if (Vm)
+    {
+        Vm->UnmapPort(*this);
+    }
+}
+
+void VMPortMapping::Release()
+{
+    Vm = nullptr;
+    VmPort.reset();
+}
+
+bool VMPortMapping::IsLocalhost() const
+{
+    if (BindAddress.Ipv4.sin_family == AF_INET6)
+    {
+        return IN6_IS_ADDR_LOOPBACK(&BindAddress.Ipv6.sin6_addr);
+    }
+    else
+    {
+        return IN4ADDR_ISLOOPBACK(&BindAddress.Ipv4);
+    }
+}
+
+uint16_t VMPortMapping::HostPort() const
+{
+    if (BindAddress.si_family == AF_INET6)
+    {
+        return ntohs(BindAddress.Ipv6.sin6_port);
+    }
+    else
+    {
+        WI_ASSERT(BindAddress.si_family == AF_INET);
+        return ntohs(BindAddress.Ipv4.sin_port);
+    }
+}
+
+std::string VMPortMapping::BindingAddressString() const
+{
+    char buffer[INET6_ADDRSTRLEN]{};
+    if (BindAddress.Ipv4.sin_family == AF_INET6)
+    {
+        THROW_LAST_ERROR_IF(inet_ntop(AF_INET6, &BindAddress.Ipv6.sin6_addr, buffer, sizeof(buffer)) == nullptr);
+    }
+    else
+    {
+        THROW_LAST_ERROR_IF(inet_ntop(AF_INET, &BindAddress.Ipv4.sin_addr, buffer, sizeof(buffer)) == nullptr);
+    }
+
+    return buffer;
+}
+
+void VMPortMapping::Attach(WSLAVirtualMachine& Vm)
+{
+    WI_ASSERT(this->Vm == nullptr);
+
+    this->Vm = &Vm;
+}
+
+void VMPortMapping::Detach()
+{
+    WI_ASSERT(Vm != nullptr);
+
+    this->Vm = nullptr;
+}
+
+VMPortMapping VMPortMapping::LocalhostTcpMapping(int Family, uint16_t WindowsPort)
+{
+    WI_ASSERT(Family == AF_INET || Family == AF_INET6);
+
+    return VMPortMapping(IPPROTO_TCP, Family, WindowsPort, Family == AF_INET ? "127.0.0.1" : "::1");
+}
+
+VMPortMapping VMPortMapping::FromWSLAPortMapping(const ::WSLAPortMapping& Mapping)
+{
+    return VMPortMapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress);
+}
+
+VMPortMapping VMPortMapping::FromContainerMetaData(const wsla::WSLAPortMapping& Mapping)
+{
+    return VMPortMapping(Mapping.Protocol, Mapping.Family, Mapping.HostPort, Mapping.BindingAddress.c_str());
+}
+
+VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
+{
+    if (this != &Other)
+    {
+        Unmap();
+        Protocol = Other.Protocol;
+        VmPort = std::move(Other.VmPort);
+        BindAddress = Other.BindAddress;
+        Vm = Other.Vm;
+
+        Other.Protocol = 0;
+        ZeroMemory(&Other.BindAddress, sizeof(Other.BindAddress));
+        Other.Vm = nullptr;
+    }
+    return *this;
+}
 
 WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings) :
     m_vm(Vm),
@@ -71,8 +280,12 @@ void WSLAVirtualMachine::Initialize()
     // Configure networking
     ConfigureNetworking();
 
-    // Configure initial mounts
-    ConfigureInitialMounts();
+    // Mount VHDs
+    const auto rootDevice = GetVhdDevicePath(0);
+    Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);
+
+    const auto modulesDevice = GetVhdDevicePath(1);
+    Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     // Configure GPU mounts if enabled
     MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
@@ -117,28 +330,6 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     {
         e->OnVmTerminated();
     }
-}
-
-void WSLAVirtualMachine::ConfigureInitialMounts()
-{
-    // Determine device paths from guest
-    const auto rootDevice = GetVhdDevicePath(0);
-    const auto modulesDevice = GetVhdDevicePath(1);
-
-    // Mount root filesystem with overlay
-    Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);
-
-    // Mount standard filesystems
-    Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
-    Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
-    Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
-    Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
-
-    // Mount kernel modules
-    Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
-
-    // Mount cgroup
-    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
 }
 
 void WSLAVirtualMachine::ConfigureNetworking()
@@ -280,6 +471,15 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     detachOnFailure.release();
 
     return {Lun, Device};
+}
+
+void WSLAVirtualMachine::Ext4Format(const std::string& Device)
+{
+    constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
+    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 }
 
 void WSLAVirtualMachine::Unmount(_In_ const char* Path)
@@ -636,7 +836,7 @@ void WSLAVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove)
+void WSLAVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)
 {
     std::lock_guard lock(m_portRelaylock);
 
@@ -659,14 +859,68 @@ void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _I
     THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
 
-void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
+void WSLAVirtualMachine::MapPort(VMPortMapping& Mapping)
 {
-    MapPortImpl(Family, WindowsPort, LinuxPort, false);
+    THROW_HR_IF_MSG(E_INVALIDARG, !Mapping.VmPort, "Can't map a VM port without an allocated port");
+
+    if (m_networkingMode == WSLANetworkingModeNone)
+    {
+        THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
+    }
+    else if (m_networkingMode == WSLANetworkingModeNAT)
+    {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
+            "Unsupported port mapping for NAT mode: %hs, protocol: %i",
+            Mapping.BindingAddressString().c_str(),
+            Mapping.Protocol);
+
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
+    }
+    else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
+    {
+        // TODO: Switch to using the native virtionet relay.
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
+            "Unsupported port mapping for virtionet mode: %hs, protocol: %i",
+            Mapping.BindingAddressString().c_str(),
+            Mapping.Protocol);
+
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
+    }
+    else
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected networking mode: %i", m_networkingMode);
+    }
+
+    Mapping.Attach(*this);
 }
 
-void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
+void WSLAVirtualMachine::UnmapPort(VMPortMapping& Mapping)
 {
-    MapPortImpl(Family, WindowsPort, LinuxPort, true);
+    THROW_HR_IF_MSG(E_INVALIDARG, !Mapping.VmPort, "Can't unmap a VM port without an allocated port");
+
+    if (m_networkingMode == WSLANetworkingModeNone)
+    {
+        THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Port mapping is not supported with the current networking mode");
+    }
+    else if (m_networkingMode == WSLANetworkingModeNAT)
+    {
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
+    }
+    else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
+    {
+        // TODO: Switch to using the native virtionet relay.
+        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
+    }
+    else
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected networking mode: %i", m_networkingMode);
+    }
+
+    Mapping.Detach();
 }
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
@@ -817,8 +1071,7 @@ void WSLAVirtualMachine::OnProcessReleased(int Pid)
     std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
 }
 
-// TODO: Handle reservations per family.
-bool WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
+std::shared_ptr<VmPortAllocation> WSLAVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
 
@@ -826,48 +1079,40 @@ bool WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
 
     auto [_, inserted] = m_allocatedPorts.insert(Port);
 
-    return inserted;
+    if (inserted)
+    {
+        return std::make_shared<VmPortAllocation>(Port, Family, Protocol, *this);
+    }
+    else
+    {
+        return {};
+    }
 }
 
-std::set<uint16_t> WSLAVirtualMachine::AllocatePorts(uint16_t Count)
+std::shared_ptr<VmPortAllocation> WSLAVirtualMachine::AllocatePort(int Family, int Protocol)
 {
     std::lock_guard lock{m_lock};
 
-    std::set<uint16_t> allocatedRange;
-
-    // Add ports to the allocated list until we have enough
-    for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second && allocatedRange.size() < Count; i++)
+    for (auto i = CONTAINER_PORT_RANGE.first; i <= CONTAINER_PORT_RANGE.second; i++)
     {
         if (!m_allocatedPorts.contains(i))
         {
-            WI_VERIFY(allocatedRange.insert(i).second);
+            WI_VERIFY(m_allocatedPorts.insert(i).second);
+            return std::make_shared<VmPortAllocation>(i, Family, Protocol, *this);
         }
     }
 
-    // Fail if we couldn't find enough free ports.
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES),
-        allocatedRange.size() < Count,
-        "Failed to allocate %u ports, only %zu available",
-        Count,
-        allocatedRange.size());
-
-    // Reserve the ports we found.
-    m_allocatedPorts.insert(allocatedRange.begin(), allocatedRange.end());
-
-    return allocatedRange;
+    // Fail if we couldn't find a port.
+    THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NO_SYSTEM_RESOURCES), "Failed to allocate port");
 }
 
-void WSLAVirtualMachine::ReleasePorts(const std::set<uint16_t>& Ports)
+void WSLAVirtualMachine::ReleasePort(VmPortAllocation& Port)
 {
     std::lock_guard lock{m_lock};
 
-    for (const auto& port : Ports)
-    {
-        WSL_LOG("ReleasePort", TraceLoggingValue(port, "Port"));
+    WSL_LOG("ReleasePort", TraceLoggingValue(Port.Port(), "Port"));
 
-        WI_VERIFY(m_allocatedPorts.erase(port) == 1);
-    }
+    LOG_HR_IF(E_UNEXPECTED, m_allocatedPorts.erase(Port.Port()) != 1);
 }
 
 wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char* Path)
