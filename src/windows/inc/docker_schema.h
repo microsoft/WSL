@@ -35,6 +35,14 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+struct ImageLoadResult
+{
+    std::optional<std::string> stream;
+    std::optional<ErrorResponse> errorDetail;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, errorDetail);
+};
+
 struct EmptyRequest
 {
     using TResponse = void;
@@ -84,9 +92,10 @@ struct HostConfig
     std::optional<std::vector<std::string>> Dns;
     std::optional<std::vector<std::string>> DnsSearch;
     std::optional<std::vector<std::string>> DnsOptions;
+    std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Tmpfs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs);
 };
 
 struct CreateContainer
@@ -359,8 +368,9 @@ struct ContainerInfo
     std::vector<Port> Ports;
     ContainerState State{ContainerState::Unknown};
     int64_t Created{};
+    HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State, Created);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State, Created, HostConfig);
 };
 
 struct BuildKitVertex
@@ -373,11 +383,20 @@ struct BuildKitVertex
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
 };
 
+struct BuildKitStatus
+{
+    std::string id;
+    std::string vertex;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+};
+
 struct BuildKitSolveStatus
 {
     std::vector<BuildKitVertex> vertexes;
+    std::vector<BuildKitStatus> statuses;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes, statuses);
 };
 
 struct CreateImageProgressDetails

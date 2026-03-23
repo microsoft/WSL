@@ -95,22 +95,30 @@ using namespace std::chrono_literals;
         return; \
     }
 
+#define WSL_TEST_CLASS_PROPERTIES \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManager.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManagerProxyStub.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslclient.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslservice.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslasession.exe")
+
 #define WSL_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManager.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManagerProxyStub.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslclient.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslservice.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslaservice.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslasession.exe") \
+        WSL_TEST_CLASS_PROPERTIES \
+    END_TEST_CLASS()
+
+#define WSLA_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"WSLA") \
     END_TEST_CLASS()
 
 //
@@ -567,7 +575,6 @@ inline auto EnableSystemd(const std::string& extraConfig = "")
 std::wstring EscapePath(std::wstring_view Path);
 
 void StopWslService();
-void StopWslaService();
 
 std::optional<GUID> GetDistributionId(LPCWSTR Name);
 wil::unique_hkey OpenDistributionKey(LPCWSTR Name);
@@ -588,7 +595,7 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
-void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode);
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
 
 template <typename T>
 void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())

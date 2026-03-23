@@ -388,19 +388,21 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::BuildImage(LPCWSTR ContextPath, ULONG DockerfileHandle, LPCSTR ImageTag, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::BuildImage(const WSLABuildImageOptions* Options, IProgressCallback* ProgressCallback)
 try
 {
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF_NULL(E_POINTER, ContextPath);
-    RETURN_HR_IF(E_INVALIDARG, *ContextPath == L'\0');
-    RETURN_HR_IF(E_INVALIDARG, ImageTag != nullptr && strlen(ImageTag) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->ContextPath);
+    RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
+    RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
     wil::unique_handle dockerfileFileHandle;
-    if (DockerfileHandle != 0 && DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
+    if (Options->DockerfileHandle != 0 && Options->DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
     {
-        dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(DockerfileHandle)));
+        dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Options->DockerfileHandle)));
     }
 
     auto lock = m_lock.lock_shared();
@@ -410,15 +412,24 @@ try
     GUID volumeId{};
     THROW_IF_FAILED(CoCreateGuid(&volumeId));
     auto mountPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
-    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(ContextPath, mountPath.c_str(), TRUE));
+    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(Options->ContextPath, mountPath.c_str(), TRUE));
     auto unmountFolder =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
-    if (ImageTag != nullptr && *ImageTag != '\0')
+    for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->Tags.Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, strlen(Options->Tags.Values[i]) > WSLA_MAX_IMAGE_NAME_LENGTH);
         buildArgs.push_back("-t");
-        buildArgs.push_back(ImageTag);
+        buildArgs.push_back(Options->Tags.Values[i]);
+    }
+    for (ULONG i = 0; i < Options->BuildArgs.Count; i++)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, Options->BuildArgs.Values[i]);
+        RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Values[i][0] == '-');
+        buildArgs.push_back("--build-arg");
+        buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
     if (dockerfileFileHandle)
     {
@@ -441,10 +452,12 @@ try
             common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLAFDStdin)}));
     }
 
+    bool verbose = Options->Verbose;
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
     std::set<std::string> reportedErrors;
+    std::string exportingVertexDigest;
 
     auto reportProgress = [&](const std::string& message) {
         if (ProgressCallback != nullptr)
@@ -485,9 +498,16 @@ try
             {
                 allOutput.append(vertex.name).append("\n");
 
-                if (!isInternal && !vertex.name.empty() && vertex.name[0] == '[')
+                if (verbose || (!isInternal && !vertex.name.empty() && vertex.name[0] == '['))
                 {
                     reportProgress(vertex.name + "\n");
+                }
+
+                // Track the "exporting to image" vertex so we can report its statuses (image hash, tags)
+                // in non-verbose mode. This is a well-known BuildKit vertex name.
+                if (vertex.name == "exporting to image")
+                {
+                    exportingVertexDigest = vertex.digest;
                 }
             }
 
@@ -495,6 +515,14 @@ try
             {
                 allOutput.append(vertex.error).append("\n");
                 reportProgress(vertex.error + "\n");
+            }
+        }
+
+        for (const auto& entry : status.statuses)
+        {
+            if (!entry.id.empty() && reportedSteps.insert(entry.id).second && (verbose || entry.vertex == exportingVertexDigest))
+            {
+                reportProgress(entry.id + "\n");
             }
         }
     };
@@ -513,9 +541,6 @@ try
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
-
-    std::string tag = (ImageTag != nullptr && *ImageTag != '\0') ? ImageTag : "";
-    reportProgress(tag.empty() ? "\nBuild complete.\n" : "\nBuild complete: " + tag + "\n");
 
     return S_OK;
 }
@@ -572,28 +597,56 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     auto io = CreateIOContext();
 
-    std::optional<boost::beast::http::status> importResult;
-
+    std::optional<std::string> pendingErrorJson;
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("ImageImportHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
-        importResult = response.result();
+        if (response.result_int() != 200)
+        {
+            auto it = response.find(boost::beast::http::field::content_type);
+
+            THROW_HR_IF_MSG(
+                E_UNEXPECTED,
+                it == response.end() || !it->value().starts_with("application/json"),
+                "Received HTTP %i but Content-Type is not json",
+                response.result_int());
+
+            pendingErrorJson.emplace();
+        }
     };
 
-    std::string errorJson;
+    std::optional<std::string> errorMessage;
     auto onProgress = [&](const gsl::span<char>& buffer) {
-        WI_ASSERT(importResult.has_value());
-
-        if (importResult.value() != boost::beast::http::status::ok)
+        if (pendingErrorJson.has_value())
         {
-            // If the import failed, accumulate the error message.
-            errorJson.append(buffer.data(), buffer.size());
+            // If we received a non-200 status code, then the response body is an error message. Accumulate to the error message.
+            pendingErrorJson->append(buffer.data(), buffer.size());
+            return;
+        }
+
+        auto parsed = shared::FromJson<docker_schema::ImageLoadResult>(std::string(buffer.begin(), buffer.end()).c_str());
+
+        if (parsed.errorDetail.has_value())
+        {
+            if (errorMessage.has_value())
+            {
+                LOG_HR_MSG(
+                    E_UNEXPECTED,
+                    "Overriding previous error message '%hs' with new message '%hs'",
+                    errorMessage->c_str(),
+                    parsed.errorDetail->message.c_str());
+            }
+
+            errorMessage = std::move(parsed.errorDetail->message);
+        }
+        else if (parsed.stream.has_value())
+        {
+            // TODO: report progress to caller.
+            WSL_LOG("ImageImportProgress", TraceLoggingValue(parsed.stream->c_str(), "Content"));
         }
         else
         {
-            // TODO: report progress to caller.
-            std::string entry = {buffer.begin(), buffer.end()};
-            WSL_LOG("ImageImportProgress", TraceLoggingValue(entry.c_str(), "Content"));
+            LOG_HR_MSG(E_UNEXPECTED, "Failed to parse import progress: %.*hs", static_cast<int>(buffer.size()), buffer.data());
         }
     };
 
@@ -606,16 +659,16 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     io.Run({});
 
-    THROW_HR_IF(E_UNEXPECTED, !importResult.has_value());
-
-    if (importResult.value() != boost::beast::http::status::ok)
+    // Look for an error message returned as an HTTP response (non HTTP 200)
+    if (pendingErrorJson.has_value())
     {
-        // Import failed, parse the error message.
-        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(pendingErrorJson->c_str());
 
-        // TODO: Return error message to client.
         THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
+
+    // Otherwise look for an error message returned via the progress stream (HTTP 200 followed by a stream error).
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
 }
 
 HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
@@ -1302,6 +1355,11 @@ try
     // - container logs relays
     m_ioRelay.Stop();
 
+    {
+        std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
+        m_allocatedPorts.clear();
+    }
+
     m_eventTracker.reset();
     m_dockerClient.reset();
 
@@ -1371,7 +1429,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::MapVmPort(int Family, short WindowsPort, short LinuxPort)
+HRESULT WSLASession::MapVmPort(int Family, unsigned short WindowsPort, unsigned short LinuxPort)
 try
 {
     COMServiceExecutionContext context;
@@ -1379,12 +1437,45 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort);
+    std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
+
+    // Look for an existing allocation first.
+    auto it = m_allocatedPorts.find(LinuxPort);
+
+    bool inserted = false;
+    auto cleanup = wil::scope_exit([&]() {
+        if (inserted)
+        {
+            m_allocatedPorts.erase(it);
+        }
+    });
+
+    if (it == m_allocatedPorts.end())
+    {
+        // No existing port allocation, create a new one.
+        auto allocated = std::make_pair(m_virtualMachine->TryAllocatePort(LinuxPort, Family, IPPROTO_TCP), static_cast<size_t>(0));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.first == nullptr);
+
+        it = m_allocatedPorts.emplace(LinuxPort, allocated).first;
+        inserted = true;
+    }
+
+    auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
+    mapping.AssignVmPort(it->second.first);
+
+    m_virtualMachine->MapPort(mapping);
+
+    // Increase usage count.
+    it->second.second++;
+
+    mapping.Release();
+    cleanup.release();
+
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort, short LinuxPort)
+HRESULT WSLASession::UnmapVmPort(int Family, unsigned short WindowsPort, unsigned short LinuxPort)
 try
 {
     COMServiceExecutionContext context;
@@ -1392,7 +1483,27 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    m_virtualMachine->UnmapPort(Family, WindowsPort, LinuxPort);
+    std::lock_guard allocatedPortsLock(m_allocatedPortsLock);
+
+    auto it = m_allocatedPorts.find(LinuxPort);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_allocatedPorts.end());
+
+    auto mapping = VMPortMapping::LocalhostTcpMapping(Family, WindowsPort);
+    mapping.AssignVmPort(it->second.first);
+    mapping.Attach(m_virtualMachine.value());
+
+    auto cleanup = wil::scope_exit([&]() { mapping.Release(); });
+
+    m_virtualMachine->UnmapPort(mapping);
+
+    it->second.second--;
+
+    // If usage count drops to 0, release the port allocation.
+    if (it->second.second == 0)
+    {
+        m_allocatedPorts.erase(it);
+    }
+
     return S_OK;
 }
 CATCH_RETURN();

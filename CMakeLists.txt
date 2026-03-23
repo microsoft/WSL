@@ -275,13 +275,19 @@ set(COMMON_LINK_LIBRARIES
     Shlwapi.lib
     synchronization.lib
     Bcrypt.lib
-    Iphlpapi.lib
-    icu.lib
+    icu.lib)
+
+set(MSI_LINK_LIBRARIES
+    Wintrust.lib
+    msi.lib)
+
+set(HCS_LINK_LIBRARIES
     computecore.lib
     computenetwork.lib
+    Iphlpapi.lib)
+
+set(SERVICE_LINK_LIBRARIES
     MI.lib
-    Wintrust.lib
-    msi.lib
     wsldeps.lib)
 
 # Linux
@@ -436,7 +442,6 @@ include_directories(${WSLDEPS_SOURCE_DIR}/include/lxcore)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/inc)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslaservice/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/linux/init/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common)
@@ -462,7 +467,6 @@ add_subdirectory(msipackage)
 add_subdirectory(msixinstaller)
 add_subdirectory(src/windows/common)
 add_subdirectory(src/windows/service)
-add_subdirectory(src/windows/wslaservice)
 add_subdirectory(src/windows/wslasession)
 add_subdirectory(src/windows/wslinstaller/inc)
 add_subdirectory(src/windows/wslinstaller/stub)

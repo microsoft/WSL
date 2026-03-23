@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EGlobalTests
 {
-    WSL_TEST_CLASS(WSLCE2EGlobalTests)
+    WSLA_TEST_CLASS(WSLCE2EGlobalTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
