@@ -838,17 +838,17 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     // Perform initial mounts.
     //
 
-    if (UtilMount(nullptr, "/dev", "devtmpfs", 0, nullptr) < 0)
+    if (UtilMount(nullptr, "/dev", "devtmpfs", MS_SHARED, nullptr) < 0)
     {
         return -1;
     }
 
-    if (UtilMount(nullptr, "/proc", "proc", 0, nullptr) < 0)
+    if (UtilMount(nullptr, "/proc", "proc", MS_SHARED, nullptr) < 0)
     {
         return -1;
     }
 
-    if (UtilMount(nullptr, "/sys", "sysfs", 0, nullptr) < 0)
+    if (UtilMount(nullptr, "/sys", "sysfs", MS_SHARED, nullptr) < 0)
     {
         return -1;
     }
