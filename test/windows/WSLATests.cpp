@@ -1920,6 +1920,7 @@ class WSLATests
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
 
         auto createVmWithDmesg = [this](bool earlyBootLogging) {
             auto [read, write] = CreateSubprocessPipe(false, false);
@@ -2668,7 +2669,6 @@ class WSLATests
     TEST_METHOD(NamedVolumesTest)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         const std::string volumeName = "wsla-test-named-volume";
         const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
@@ -2751,7 +2751,6 @@ class WSLATests
     TEST_METHOD(NamedVolumesSessionRecovery)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         const std::string volumeName = "wsla-test-named-volume";
         const std::string containerName = "wsla-test-container";
@@ -2831,7 +2830,6 @@ class WSLATests
     TEST_METHOD(NamedVolumeOptionsParseTest)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         const std::string volumeName = "wsla-volume-name";
 
@@ -2879,7 +2877,6 @@ class WSLATests
     TEST_METHOD(CreateContainer)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Test a simple container start.
         {
@@ -3405,7 +3402,6 @@ class WSLATests
     TEST_METHOD(ContainerState)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
@@ -3672,7 +3668,6 @@ class WSLATests
     TEST_METHOD(ContainerNetwork)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
@@ -3778,7 +3773,6 @@ class WSLATests
     TEST_METHOD(ContainerInspect)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Helper to verify port mappings.
         auto expectPorts = [&](const auto& actualPorts, const std::map<std::string, std::set<std::string>>& expectedPorts) {
@@ -3922,7 +3916,6 @@ class WSLATests
     TEST_METHOD(Exec)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Create a container.
         WSLAContainerLauncher launcher(
@@ -4069,7 +4062,6 @@ class WSLATests
     TEST_METHOD(ExecContainerDelete)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         WSLAContainerLauncher launcher("debian:latest", "test-exec-dtor", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeNone);
 
@@ -4313,7 +4305,6 @@ class WSLATests
     void ValidateContainerVolumes(bool enableVirtioFs)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession();
         auto hostFolder = std::filesystem::current_path() / "test-volume";
@@ -4389,7 +4380,6 @@ class WSLATests
     void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto hostFolder = std::filesystem::current_path() / "test-volume";
         auto storage = std::filesystem::current_path() / "storage";
@@ -4716,7 +4706,6 @@ class WSLATests
     TEST_METHOD(ContainerRecoveryFromStorage)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession(); // Required to access the storage folder.
 
@@ -4784,7 +4773,6 @@ class WSLATests
     TEST_METHOD(ContainerVolumeAndPortRecoveryFromStorage)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession();
 
@@ -5130,7 +5118,6 @@ class WSLATests
     TEST_METHOD(ContainerLabels)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
         std::map<std::string, std::string> labels = {{"key1", "value1"}, {"key2", std::string(10000, 'a')}};
@@ -5419,6 +5406,7 @@ class WSLATests
     TEST_METHOD(PageReporting)
     {
         WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
 
         // Determine expected page reporting order based on Windows version.
         // On Germanium or later: 5 (128k), otherwise: 9 (2MB).
@@ -5435,7 +5423,6 @@ class WSLATests
     TEST_METHOD(ContainerAutoRemove)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Test that a container with the Rm flag is automatically deleted on Stop().
         {
@@ -5542,7 +5529,6 @@ class WSLATests
     TEST_METHOD(DeferredPortAndVolumeMappingOnStart)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Verify port mapping.
         // Two containers created with the same host port, only the first Start() succeeds.
