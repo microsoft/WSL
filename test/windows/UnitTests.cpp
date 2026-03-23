@@ -6562,5 +6562,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(result.ExitCode, 0);
     }
 
+    TEST_METHOD(UninstallRejectsArguments)
+    {
+        VerifyOutput(
+            L"--uninstall Distro",
+            wsl::shared::Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG) + L"\r\n",
+            -1);
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests

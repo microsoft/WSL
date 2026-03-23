@@ -960,6 +960,10 @@ Mer information finns på https://aka.ms/wslinstall</value>
     <value>Uppdateringen misslyckades (slutkod: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} tar inga argument. Använd {} istället för att avregistrera en distribution.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--uninstall"}{Locked="--unregister"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Avinstallationen misslyckades (slutkod: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
