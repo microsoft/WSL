@@ -150,6 +150,110 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(secondContainerId, L"running");
     }
 
+    TEST_METHOD(WSLCE2E_Container_Stop_SignalByName)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Stop the container using signal name
+        result = RunWslc(std::format(L"container stop {} -s SIGKILL -t 0", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Verify the container is no longer running
+        VerifyContainerIsListed(containerId, L"exited");
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignalName)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Try to stop with an invalid signal name
+        result = RunWslc(std::format(L"container stop {} -s SIGINVALID -t 0", containerId));
+        result.Verify({.Stderr = L"Invalid signal value: SIGINVALID is not a recognized signal name or number (Example: SIGKILL, kill, or 9).\r\n", .ExitCode = 1});
+
+        // Verify container is still running after failed stop request
+        VerifyContainerIsListed(containerId, L"running");
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Stop_InvalidTimeout)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        {
+            // Invalid integer
+            result = RunWslc(std::format(L"container stop {} -t abc", containerId));
+            result.Verify({.Stderr = L"Invalid time argument value: abc\r\n", .ExitCode = 1});
+
+            // Should still be running after failed stop
+            VerifyContainerIsListed(containerId, L"running");
+        }
+
+        {
+            // Another invalid integer shape
+            result = RunWslc(std::format(L"container stop {} -t 1.5", containerId));
+            result.Verify({.Stderr = L"Invalid time argument value: 1.5\r\n", .ExitCode = 1});
+
+            // Should still be running after failed stop
+            VerifyContainerIsListed(containerId, L"running");
+        }
+
+        {
+            // Invalid integer prefixed
+            result = RunWslc(std::format(L"container stop {} -t 9abc", containerId));
+            result.Verify({.Stderr = L"Invalid time argument value: 9abc\r\n", .ExitCode = 1});
+
+            // Should still be running after failed stop
+            VerifyContainerIsListed(containerId, L"running");
+        }
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Stop_ValidTimeoutNegativeOne)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Verify container is running
+        VerifyContainerIsListed(containerId, L"running");
+
+        // -1 is a valid timeout value
+        result = RunWslc(std::format(L"container stop {} -t -1", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Verify the container is no longer running
+        VerifyContainerIsListed(containerId, L"exited");
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";
