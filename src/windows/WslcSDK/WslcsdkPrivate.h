@@ -46,12 +46,9 @@ static_assert(std::is_trivial_v<WslcSessionOptionsInternal>, "WSLC_SESSION_OPTIO
 
 WslcSessionOptionsInternal* GetInternalType(WslcSessionSettings* settings);
 
-struct WslcContainerProcessIOCallbackOptions
+struct WslcContainerProcessIOCallbackOptions : public WslcProcessCallbacks
 {
-    WslcStdIOCallback stdOutCallback;
-    PVOID stdOutCallbackContext;
-    WslcStdIOCallback stdErrCallback;
-    PVOID stdErrCallbackContext;
+    PVOID callbackContext;
 };
 
 // PROCESS DEFINITIONS

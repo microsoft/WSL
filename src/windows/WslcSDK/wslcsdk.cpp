@@ -945,23 +945,24 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetProcessSettingsIOCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIOHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context)
+STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context)
 try
 {
     auto internalType = CheckAndGetInternalType(processSettings);
-    RETURN_HR_IF(E_INVALIDARG, ioHandle != WSLC_PROCESS_IO_HANDLE_STDOUT && ioHandle != WSLC_PROCESS_IO_HANDLE_STDERR);
-    RETURN_HR_IF(E_INVALIDARG, stdIOCallback == nullptr && context != nullptr);
+    RETURN_HR_IF(E_INVALIDARG, callbacks == nullptr && context != nullptr);
 
-    if (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT)
+    static_assert(std::is_trivial_v<WslcProcessCallbacks>, "WslcProcessCallbacks must be trivial.");
+
+    WslcProcessCallbacks* internalCallbacks = &internalType->ioCallbacks;
+
+    if (callbacks)
     {
-        internalType->ioCallbacks.stdOutCallback = stdIOCallback;
-        internalType->ioCallbacks.stdOutCallbackContext = context;
+        *internalCallbacks = *callbacks;
+        internalType->ioCallbacks.callbackContext = context;
     }
-    else if (ioHandle == WSLC_PROCESS_IO_HANDLE_STDERR)
+    else
     {
-        internalType->ioCallbacks.stdErrCallback = stdIOCallback;
-        internalType->ioCallbacks.stdErrCallbackContext = context;
+        *internalCallbacks = {};
     }
 
     return S_OK;

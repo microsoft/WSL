@@ -46,7 +46,7 @@ WslcDeleteContainer
 WslcGetContainerID
 WslcGetContainerInitProcess
 
-WslcSetProcessSettingsIOCallback
+WslcSetProcessSettingsCallbacks
 WslcSetProcessSettingsCurrentDirectory
 WslcSetProcessSettingsCmdLine
 WslcSetProcessSettingsEnvVariables

@@ -539,7 +539,8 @@ class WslcSdkTests
         VERIFY_IS_TRUE(checkForImage("hello-world:latest"));
 
         // Positive: delete an existing image.
-        VERIFY_SUCCEEDED(WslcDeleteSessionImage(m_defaultSession, "hello-world:latest", nullptr));
+        wil::unique_cotaskmem_string errorMsg;
+        VERIFY_SUCCEEDED(WslcDeleteSessionImage(m_defaultSession, "hello-world:latest", &errorMsg));
 
         // Verify the image is no longer present in the list.
         VERIFY_IS_FALSE(checkForImage("hello-world:latest"));
@@ -1387,66 +1388,75 @@ class WslcSdkTests
     }
 
     // -----------------------------------------------------------------------
-    // WslcSetProcessSettingsIOCallback tests
+    // WslcSetProcessSettingsCallbacks tests
     // -----------------------------------------------------------------------
 
     TEST_METHOD(ProcessIoCallbackUnit)
     {
         WSL2_TEST_ONLY();
 
-        auto noopCb = [](const BYTE*, uint32_t, PVOID) {};
+        auto noopIoCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID) {};
+        auto noopExitCb = [](INT32, PVOID) {};
 
         // Negative: null processSettings must fail.
-        VERIFY_ARE_EQUAL(WslcSetProcessSettingsIOCallback(nullptr, WSLC_PROCESS_IO_HANDLE_STDOUT, noopCb, nullptr), E_POINTER);
-
-        // Negative: STDIN is not a valid output handle.
         {
-            WslcProcessSettings procSettings;
-            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_ARE_EQUAL(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDIN, noopCb, nullptr), E_INVALIDARG);
+            WslcProcessCallbacks callbacks{};
+            callbacks.onStdOut = noopIoCb;
+            VERIFY_ARE_EQUAL(WslcSetProcessSettingsCallbacks(nullptr, &callbacks, nullptr), E_POINTER);
         }
 
-        // Negative: out-of-range handle value must fail.
-        {
-            WslcProcessSettings procSettings;
-            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_ARE_EQUAL(WslcSetProcessSettingsIOCallback(&procSettings, static_cast<WslcProcessIOHandle>(99), noopCb, nullptr), E_INVALIDARG);
-        }
-
-        // Negative: null callback with non-null context must fail.
+        // Negative: null callbacks pointer with non-null context must fail.
         {
             int ctx = 0;
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_ARE_EQUAL(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, nullptr, &ctx), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcSetProcessSettingsCallbacks(&procSettings, nullptr, &ctx), E_INVALIDARG);
         }
 
-        // Positive: clear STDOUT (null callback, null context) must succeed.
+        // Positive: null callbacks pointer with null context clears all callbacks.
         {
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, nullptr, nullptr));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, nullptr, nullptr));
         }
 
-        // Positive: clear STDERR (null callback, null context) must succeed.
+        // Positive: set onStdOut only.
         {
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDERR, nullptr, nullptr));
+            WslcProcessCallbacks callbacks{};
+            callbacks.onStdOut = noopIoCb;
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, nullptr));
         }
 
-        // Positive: set a valid STDOUT callback must succeed.
+        // Positive: set onStdErr only.
         {
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, noopCb, nullptr));
+            WslcProcessCallbacks callbacks{};
+            callbacks.onStdErr = noopIoCb;
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, nullptr));
         }
 
-        // Positive: set a valid STDERR callback must succeed.
+        // Positive: set onExit only.
         {
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDERR, noopCb, nullptr));
+            WslcProcessCallbacks callbacks{};
+            callbacks.onExit = noopExitCb;
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, nullptr));
+        }
+
+        // Positive: set all three callbacks with a context.
+        {
+            int ctx = 0;
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            WslcProcessCallbacks callbacks{};
+            callbacks.onStdOut = noopIoCb;
+            callbacks.onStdErr = noopIoCb;
+            callbacks.onExit = noopExitCb;
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
         }
 
         // Negative: StartContainer without ATTACH fails when callbacks are registered.
@@ -1456,7 +1466,9 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
             const char* argv[] = {"/bin/sleep", "1"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, noopCb, nullptr));
+            WslcProcessCallbacks callbacks{};
+            callbacks.onStdOut = noopIoCb;
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, nullptr));
 
             WslcContainerSettings containerSettings;
             VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
@@ -1472,19 +1484,28 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        std::string stdoutData;
-        std::string stderrData;
+        struct IOContext
+        {
+            std::string stdoutData;
+            std::string stderrData;
+        } ioContext;
 
-        auto appendToContextString = [](const BYTE* data, uint32_t size, PVOID ctx) {
-            static_cast<std::string*>(ctx)->append(reinterpret_cast<const char*>(data), size);
+        // Both streams share one callback; ioHandle distinguishes which accumulator to use.
+        auto ioCb = [](WslcProcessIOHandle ioHandle, const BYTE* data, uint32_t size, PVOID ctx) {
+            auto* c = static_cast<IOContext*>(ctx);
+            auto& target = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? c->stdoutData : c->stderrData;
+            target.append(reinterpret_cast<const char*>(data), size);
         };
 
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sh", "-c", "echo STDOUT && echo STDERR >&2"};
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
-        VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, appendToContextString, &stdoutData));
-        VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDERR, appendToContextString, &stderrData));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        callbacks.onStdErr = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ioContext));
 
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
@@ -1507,8 +1528,8 @@ class WslcSdkTests
         process.reset();
         container.reset();
 
-        VERIFY_ARE_EQUAL(stdoutData, "STDOUT\n");
-        VERIFY_ARE_EQUAL(stderrData, "STDERR\n");
+        VERIFY_ARE_EQUAL(ioContext.stdoutData, "STDOUT\n");
+        VERIFY_ARE_EQUAL(ioContext.stderrData, "STDERR\n");
     }
 
     TEST_METHOD(ProcessIoCallbackExecProcess)
@@ -1529,22 +1550,27 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
         VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
 
-        std::string stdoutData;
-        std::string stderrData;
+        struct IOContext
+        {
+            std::string stdoutData;
+            std::string stderrData;
+        } ioContext;
 
-        auto stdoutCb = [](const BYTE* data, uint32_t size, PVOID ctx) {
-            static_cast<std::string*>(ctx)->append(reinterpret_cast<const char*>(data), size);
-        };
-        auto stderrCb = [](const BYTE* data, uint32_t size, PVOID ctx) {
-            static_cast<std::string*>(ctx)->append(reinterpret_cast<const char*>(data), size);
+        auto ioCb = [](WslcProcessIOHandle ioHandle, const BYTE* data, uint32_t size, PVOID ctx) {
+            auto* c = static_cast<IOContext*>(ctx);
+            auto& target = (ioHandle == WSLC_PROCESS_IO_HANDLE_STDOUT) ? c->stdoutData : c->stderrData;
+            target.append(reinterpret_cast<const char*>(data), size);
         };
 
         WslcProcessSettings execProcSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&execProcSettings));
         const char* execArgv[] = {"/bin/sh", "-c", "echo EXEC_OUT && echo EXEC_ERR >&2"};
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&execProcSettings, execArgv, ARRAYSIZE(execArgv)));
-        VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&execProcSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, stdoutCb, &stdoutData));
-        VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&execProcSettings, WSLC_PROCESS_IO_HANDLE_STDERR, stderrCb, &stderrData));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        callbacks.onStdErr = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&execProcSettings, &callbacks, &ioContext));
 
         UniqueProcess execProcess;
         VERIFY_SUCCEEDED(WslcCreateContainerProcess(container.get(), &execProcSettings, &execProcess, nullptr));
@@ -1557,25 +1583,27 @@ class WslcSdkTests
         // thread, ensuring all bytes are delivered before assertions.
         execProcess.reset();
 
-        VERIFY_ARE_EQUAL(stdoutData, "EXEC_OUT\n");
-        VERIFY_ARE_EQUAL(stderrData, "EXEC_ERR\n");
+        VERIFY_ARE_EQUAL(ioContext.stdoutData, "EXEC_OUT\n");
+        VERIFY_ARE_EQUAL(ioContext.stderrData, "EXEC_ERR\n");
     }
 
     TEST_METHOD(ProcessIoCallbackHandleExclusion)
     {
         WSL2_TEST_ONLY();
 
-        // Register a stdout callback only — no stderr callback.
-        // The IOCallback object will claim stdout's pipe handle via GetStdHandle (ownership
-        // transfer); calling WslcGetProcessIOHandle for stdout afterwards must therefore fail
-        // with ERROR_INVALID_STATE.  The stderr handle (no callback) must remain obtainable.
-        auto noopCb = [](const BYTE*, uint32_t, PVOID) {};
+        // Register a stdout callback only. IOCallback always acquires ALL pipe handles
+        // (draining uncallbacked streams to prevent deadlock), so both stdout and stderr
+        // handles are consumed and neither can be obtained via WslcGetProcessIOHandle.
+        auto noopIoCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID) {};
 
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
-        VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, noopCb, nullptr));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = noopIoCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, nullptr));
 
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
@@ -1601,6 +1629,74 @@ class WslcSdkTests
         }
     }
 
+    TEST_METHOD(ProcessIoCallbackExitCallback)
+    {
+        WSL2_TEST_ONLY();
+
+        // Verify the onExit callback fires with the correct exit code after IO has been flushed.
+        // We test both exit 0 and a non-zero exit code.
+        auto RunAndCaptureExit = [&](int exitCodeArg) -> std::pair<INT32, std::string> {
+            std::string stdoutData;
+            std::atomic<INT32> capturedExitCode{-999};
+
+            struct Context
+            {
+                std::string* stdoutData;
+                std::atomic<INT32>* capturedExitCode;
+                wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+            } ctx{&stdoutData, &capturedExitCode};
+
+            auto ioCb = [](WslcProcessIOHandle, const BYTE* data, uint32_t size, PVOID c) {
+                static_cast<Context*>(c)->stdoutData->append(reinterpret_cast<const char*>(data), size);
+            };
+            auto exitCb = [](INT32 code, PVOID c) {
+                static_cast<Context*>(c)->capturedExitCode->store(code);
+                static_cast<Context*>(c)->exitEvent.SetEvent();
+            };
+
+            std::string script = "echo HELLO && exit " + std::to_string(exitCodeArg);
+            const char* argv[] = {"/bin/sh", "-c", script.c_str()};
+
+            WslcProcessSettings procSettings;
+            THROW_IF_FAILED(WslcInitProcessSettings(&procSettings));
+            THROW_IF_FAILED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcProcessCallbacks callbacks{};
+            callbacks.onStdOut = ioCb;
+            callbacks.onExit = exitCb;
+            THROW_IF_FAILED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
+
+            WslcContainerSettings containerSettings;
+            THROW_IF_FAILED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            THROW_IF_FAILED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            UniqueContainer container;
+            THROW_IF_FAILED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            THROW_IF_FAILED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+            UniqueProcess process;
+            THROW_IF_FAILED(WslcGetContainerInitProcess(container.get(), &process));
+
+            THROW_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), WaitForSingleObject(ctx.exitEvent.get(), 60 * 1000) != WAIT_OBJECT_0);
+
+            return {capturedExitCode.load(), stdoutData};
+        };
+
+        // Exit 0: onExit must fire with code 0; IO must have been delivered first.
+        {
+            auto [exitCode, output] = RunAndCaptureExit(0);
+            VERIFY_ARE_EQUAL(exitCode, 0);
+            VERIFY_ARE_EQUAL(output, "HELLO\n");
+        }
+
+        // Non-zero exit: onExit must report the correct code.
+        {
+            auto [exitCode, output] = RunAndCaptureExit(42);
+            VERIFY_ARE_EQUAL(exitCode, 42);
+            VERIFY_ARE_EQUAL(output, "HELLO\n");
+        }
+    }
+
     TEST_METHOD(ProcessIoCallbackLargeOutput)
     {
         WSL2_TEST_ONLY();
@@ -1613,7 +1709,7 @@ class WslcSdkTests
         std::string stdoutData;
         stdoutData.reserve(c_expectedMinBytes + 4096);
 
-        auto stdoutCb = [](const BYTE* data, uint32_t size, PVOID ctx) {
+        auto ioCb = [](WslcProcessIOHandle, const BYTE* data, uint32_t size, PVOID ctx) {
             static_cast<std::string*>(ctx)->append(reinterpret_cast<const char*>(data), size);
         };
 
@@ -1621,7 +1717,10 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sh", "-c", "dd if=/dev/zero bs=1024 count=1024 2>/dev/null | base64"};
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
-        VERIFY_SUCCEEDED(WslcSetProcessSettingsIOCallback(&procSettings, WSLC_PROCESS_IO_HANDLE_STDOUT, stdoutCb, &stdoutData));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &stdoutData));
 
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));

@@ -261,10 +261,21 @@ STDAPI WslcSetProcessSettingsCmdLine(_In_ WslcProcessSettings* processSettings, 
 
 STDAPI WslcSetProcessSettingsEnvVariables(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* key_value, size_t argc);
 
+typedef enum WslcProcessIOHandle
+{
+    WSLC_PROCESS_IO_HANDLE_STDIN = 0,
+    WSLC_PROCESS_IO_HANDLE_STDOUT = 1,
+    WSLC_PROCESS_IO_HANDLE_STDERR = 2
+} WslcProcessIOHandle;
+
 // Callback invoked when stdout or stderr data is available from a running
 // WSLC process.
 //
 // Parameters:
+//   ioHandle
+//       The WslcProcessIOHandle that the IO callback is for.
+//       Only STDOUT and STDERR will recieve callbacks.
+//
 //   data
 //       Pointer to a buffer containing the bytes read. The buffer is owned
 //       by WSLC and is valid only for the duration of the callback.
@@ -286,18 +297,34 @@ STDAPI WslcSetProcessSettingsEnvVariables(_In_ WslcProcessSettings* processSetti
 //     WSLC's internal I/O processing.
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
-typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
-typedef enum WslcProcessIOHandle
-{
-    WSLC_PROCESS_IO_HANDLE_STDIN = 0,
-    WSLC_PROCESS_IO_HANDLE_STDOUT = 1,
-    WSLC_PROCESS_IO_HANDLE_STDERR = 2
-} WslcProcessIOHandle;
+typedef __callback void(CALLBACK* WslcStdIOCallback)(
+    WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
 
-// Only WSLC_PROCESS_IO_HANDLE_STDOUT and WSLC_PROCESS_IO_HANDLE_STDERR are supported for callbacks.
-// Pass in Null for WslcStdIOCallback to clear the callback for the given handle.
-STDAPI WslcSetProcessSettingsIOCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIOHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
+// Callback invoked when a WSLC process has exited AND any remaining IO has been flushed.
+//
+// Parameters:
+//   exitCode
+//       The exit code of the process.
+//
+//   context
+//       Caller-supplied context pointer that was provided when the callback
+//       was registered.
+//
+// Notes:
+//   - Once this callback is invoked, any registered IO callbacks will no longer be called.
+//
+typedef __callback void(CALLBACK* WslcProcessExitCallback)(INT32 exitCode, _In_opt_ PVOID context);
+
+// Using any callbacks will consume the IO handles, preventing acquisition through WslcGetProcessIOHandle.
+// If using IO callbacks, also use the exit callback to prevent a race between process exit and IO buffer flushing.
+typedef struct WslcProcessCallbacks
+{
+    WslcStdIOCallback onStdOut;
+    WslcStdIOCallback onStdErr;
+    WslcProcessExitCallback onExit;
+} WslcProcessCallbacks;
+
+STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
 
 // PROCESS MANAGEMENT
 
