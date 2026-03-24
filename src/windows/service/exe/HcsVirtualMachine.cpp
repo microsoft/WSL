@@ -44,7 +44,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_featureFlags = static_cast<WSLAFeatureFlags>(Settings->FeatureFlags);
-    m_networkingMode = Settings->NetworkingMode;
+    m_networkingMode = WSLANetworkingModeNAT;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
 
     // Build HCS settings

@@ -244,7 +244,7 @@ VMPortMapping& VMPortMapping::operator=(VMPortMapping&& Other)
 WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLASessionInitSettings* Settings) :
     m_vm(Vm),
     m_featureFlags(static_cast<WSLAFeatureFlags>(Settings->FeatureFlags)),
-    m_networkingMode(Settings->NetworkingMode),
+    m_networkingMode(WSLANetworkingModeNAT),
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4")
 {
