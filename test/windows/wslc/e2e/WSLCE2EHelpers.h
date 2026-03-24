@@ -34,7 +34,34 @@ struct TestImage
 const TestImage& DebianTestImage();
 const TestImage& InvalidTestImage();
 
-void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
+struct TestSession
+{
+    static TestSession Create(const std::wstring& displayName);
+
+    TestSession(std::wstring name, std::wstring storagePath, wil::com_ptr<IWSLASession> session) :
+        m_name(std::move(name)), m_storagePath(std::move(storagePath)), m_session(std::move(session))
+    {
+    }
+
+    ~TestSession();
+
+    const std::wstring& Name() const
+    {
+        return m_name;
+    }
+
+    const std::wstring& StoragePath() const
+    {
+        return m_storagePath;
+    }
+
+private:
+    std::wstring m_name;
+    std::filesystem::path m_storagePath;
+    wil::com_ptr<IWSLASession> m_session;
+};
+
+void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 

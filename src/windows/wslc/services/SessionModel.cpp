@@ -18,19 +18,19 @@ Abstract:
 namespace wsl::windows::wslc::models {
 
 namespace {
-    std::wstring GetStoragePath(const std::wstring& displayName)
+    std::wstring GetStoragePath()
     {
-        // To avoid collisions with other sessions, storage path uses display name as part of its path.
-        const std::filesystem::path storagePath =
-            wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::c_storagePathPrefix / displayName;
-        return storagePath.wstring();
+        // Storage path is determined once at runtime and remains static thereafter.
+        static const std::wstring storagePath =
+            (wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::c_defaultDisplayName).wstring();
+        return storagePath;
     }
 } // namespace
 
-SessionOptions::SessionOptions(std::wstring displayName, uint32_t cpuCount, uint32_t memoryMb, uint32_t bootTimeoutMs, uint64_t maximumStorageSizeMb, WSLANetworkingMode networkingMode) :
-    m_displayName(std::move(displayName)), m_storagePath(GetStoragePath(m_displayName))
+SessionOptions::SessionOptions(uint32_t cpuCount, uint32_t memoryMb, uint32_t bootTimeoutMs, uint64_t maximumStorageSizeMb, WSLANetworkingMode networkingMode) :
+    m_storagePath(GetStoragePath())
 {
-    m_sessionSettings.DisplayName = m_displayName.c_str();
+    m_sessionSettings.DisplayName = c_defaultDisplayName;
     m_sessionSettings.StoragePath = m_storagePath.c_str();
     m_sessionSettings.CpuCount = cpuCount;
     m_sessionSettings.MemoryMb = memoryMb;
@@ -38,19 +38,4 @@ SessionOptions::SessionOptions(std::wstring displayName, uint32_t cpuCount, uint
     m_sessionSettings.MaximumStorageSizeMb = maximumStorageSizeMb;
     m_sessionSettings.NetworkingMode = networkingMode;
 }
-
-SessionOptions SessionOptions::Default()
-{
-    return SessionOptions();
-}
-
-void SessionOptions::SetDisplayName(const std::wstring& displayName)
-{
-    // Setting the display name also affects the storage path.
-    m_displayName = displayName;
-    m_storagePath = GetStoragePath(m_displayName);
-    m_sessionSettings.DisplayName = m_displayName.c_str();
-    m_sessionSettings.StoragePath = m_storagePath.c_str();
-}
-
 } // namespace wsl::windows::wslc::models

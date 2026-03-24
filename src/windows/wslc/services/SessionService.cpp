@@ -133,4 +133,16 @@ std::vector<SessionInformation> SessionService::List()
 
     return result;
 }
+
+Session SessionService::OpenSession(const std::wstring& displayName)
+{
+    wil::com_ptr<IWSLASessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    wil::com_ptr<IWSLASession> session;
+    THROW_IF_FAILED(sessionManager->OpenSessionByName(displayName.c_str(), &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+    return Session(std::move(session));
+}
 } // namespace wsl::windows::wslc::services

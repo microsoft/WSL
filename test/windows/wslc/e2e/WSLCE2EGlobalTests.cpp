@@ -15,12 +15,17 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
+#include "WSLCE2EHelpers.h"
+
+using namespace WEX::Logging;
 
 namespace WSLCE2ETests {
 
 class WSLCE2EGlobalTests
 {
     WSL_TEST_CLASS(WSLCE2EGlobalTests)
+
+    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -42,6 +47,53 @@ class WSLCE2EGlobalTests
     {
         WSL2_TEST_ONLY();
         RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Session_Targeting)
+    {
+        WSL2_TEST_ONLY();
+
+        auto session = TestSession::Create(L"wslc-test-session");
+
+        // Verify session list
+        auto result = RunWslc(L"session list");
+        result.Dump();
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify targeting a non-existent session fails.
+        result = RunWslc(L"container list --session INVALID_SESSION_NAME");
+        result.Dump();
+        result.Verify({.Stdout = L"", .Stderr = L"Element not found.\r\nError code: ERROR_NOT_FOUND\n", .ExitCode = 1});
+
+        // Verify the session name appears in the output
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_ARE_NOT_EQUAL(
+            result.Stdout->find(L"wslc-test-session"),
+            std::wstring::npos,
+            L"Session name 'wslc-test-session' not found in session list output");
+
+        // Run container list a valid image in the test session which should succeed if the session is valid.
+        result = RunWslc(std::format(L"container list --session {}", session.Name()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Add a container to the session and verify it is listed.
+        result = RunWslc(
+            std::format(L"container create --session {} --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
+
+        // Verify session list
+        result = RunWslc(L"container list -a");
+        result.Dump();
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container list --session {} -a", session.Name()));
+        result.Dump();
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify container exists in the custom session
+        VerifyContainerIsListed(L"test-cont", L"created", session.Name());
+
+        // Verify container does not exist in the default CLI session.
+        VerifyContainerIsNotListed(L"test-cont");
     }
 
 private:

@@ -44,12 +44,18 @@ void AttachToSession(CLIExecutionContext& context)
 
 void CreateSession(CLIExecutionContext& context)
 {
-    SessionOptions options = SessionOptions::Default();
     if (context.Args.Contains(ArgType::Session))
     {
-        options.SetDisplayName(context.Args.Get<ArgType::Session>());
+        // If provided session name is not the default CLI session, open that one.
+        const auto& sessionName = context.Args.Get<ArgType::Session>();
+        if (!wsl::shared::string::IsEqual(sessionName, SessionOptions::c_defaultDisplayName))
+        {
+            context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
+        }
     }
 
+    // Create/open the CLI session.
+    SessionOptions options = SessionOptions::Default();
     context.Data.Add<Data::Session>(SessionService::CreateSession(options));
 }
 

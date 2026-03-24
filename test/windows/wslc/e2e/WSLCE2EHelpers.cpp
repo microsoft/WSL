@@ -24,6 +24,72 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
+namespace {
+    const std::filesystem::path s_sessionStorageBasePath =
+        std::filesystem::absolute(std::filesystem::path(g_testDataPath) / L"wslc-cli-test-sessions");
+
+    static wil::com_ptr<IWSLASessionManager> OpenSessionManager()
+    {
+        wil::com_ptr<IWSLASessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        return sessionManager;
+    }
+
+    wil::com_ptr<IWSLASession> CreateSession(const WSLASessionSettings& sessionSettings, WSLASessionFlags Flags = WSLASessionFlagsNone)
+    {
+        const auto sessionManager = OpenSessionManager();
+        wil::com_ptr<IWSLASession> session;
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+        WSLASessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLASessionStateRunning);
+
+        return session;
+    }
+
+    WSLASessionSettings GetDefaultSessionSettings(LPCWSTR name, LPCWSTR storagePath, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
+    {
+        WSLASessionSettings settings{};
+        settings.DisplayName = name;
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.StoragePath = storagePath;
+        settings.MaximumStorageSizeMb = 4096; // 4GB.
+        settings.NetworkingMode = networkingMode;
+        return settings;
+    }
+
+    wil::com_ptr<IWSLASession> CreateCustomSession(const std::wstring& sessionName, const std::wstring& storagePath, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
+    {
+        WSLASessionSettings sessionSettings = GetDefaultSessionSettings(sessionName.c_str(), storagePath.c_str(), networkingMode);
+        return CreateSession(sessionSettings);
+    }
+
+    void CleanupCustomSession(wil::com_ptr<IWSLASession>& session, const std::filesystem::path& storagePath)
+    {
+        if (session)
+        {
+            session->Terminate();
+        }
+
+        session.reset();
+
+        if (!storagePath.empty())
+        {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+            if (error)
+            {
+                Log::Error(std::format(L"Failed to cleanup storage path {}: {}", storagePath.wstring(), error.message()).c_str());
+            }
+        }
+    }
+} // namespace
+
 const TestImage& DebianTestImage()
 {
     static const TestImage image{L"debian", L"latest", std::filesystem::path{g_testDataPath} / L"debian-latest.tar"};
@@ -36,9 +102,27 @@ const TestImage& InvalidTestImage()
     return image;
 }
 
-void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
+TestSession TestSession::Create(const std::wstring& displayName)
 {
-    auto result = RunWslc(L"container list --all");
+    auto storagePath = s_sessionStorageBasePath / displayName;
+    auto session = CreateCustomSession(displayName, storagePath.wstring());
+    return TestSession{displayName, storagePath.wstring(), std::move(session)};
+}
+
+TestSession::~TestSession()
+{
+    CleanupCustomSession(m_session, m_storagePath);
+}
+
+void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status, const std::wstring& sessionName)
+{
+    std::wstring command = L"container list --all";
+    if (!sessionName.empty())
+    {
+        command = std::format(L"container list --all --session {}", sessionName);
+    }
+
+    auto result = RunWslc(command);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
