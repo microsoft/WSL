@@ -966,10 +966,6 @@ Fallback auf NAT-Netzwerk.</value>
     <value>Fehler beim Aktualisieren (Exitcode: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageUninstallNoArguments" xml:space="preserve">
-    <value>{} akzeptiert keine Argumente. Verwenden Sie stattdessen {}, um die Registrierung einer Distribution aufzuheben.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Fehler bei der Deinstallation (Exitcode: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
