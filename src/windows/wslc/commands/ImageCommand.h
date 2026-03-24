@@ -99,7 +99,7 @@ struct ImageRemoveCommand final : public Command
     // When parented directly to the root, ImageRemoveCommand uses a different name
     constexpr static std::wstring_view RootCommandName = L"rmi";
 
-    ImageRemoveCommand(const std::wstring& parent) : Command(CommandName, { L"delete", L"rm" }, parent)
+    ImageRemoveCommand(const std::wstring& parent) : Command(CommandName, {L"delete", L"rm"}, parent)
     {
     }
 

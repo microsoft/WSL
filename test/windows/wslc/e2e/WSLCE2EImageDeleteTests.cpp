@@ -131,11 +131,11 @@ private:
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
+        output << GetWslcHeader()              //
+               << GetDescription()             //
+               << GetUsage()                   //
                << GetAvailableCommandAliases() //
-               << GetAvailableCommands() //
+               << GetAvailableCommands()       //
                << GetAvailableOptions();
         return output.str();
     }
