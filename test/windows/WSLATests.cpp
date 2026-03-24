@@ -421,7 +421,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(expectedError, comError->Message.get());
         }
 
-        // Validat that PullImage() returns the appropriate error if the session is terminated.
+        // Validate that PullImage() returns the appropriate error if the session is terminated.
         {
             VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
