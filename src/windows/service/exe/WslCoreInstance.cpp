@@ -375,11 +375,11 @@ void WslCoreInstance::Initialize()
         drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
 
-    // Create a console manager that will be used to manage session leaders.
-    m_consoleManager = ConsoleManager::CreateConsoleManager(m_initChannel);
-
     // Enable strict request-end sequencing.
     m_initChannel->GetChannel().SetStrictRequestEnd();
+
+    // Create a console manager that will be used to manage session leaders.
+    m_consoleManager = ConsoleManager::CreateConsoleManager(m_initChannel);
 
     // Send the initial configuration information to the init daemon.
     ULONG fixedDrives = 0;
