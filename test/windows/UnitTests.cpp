@@ -379,7 +379,7 @@ class UnitTests
                 auto [serviceOverride, __] =
                     LxsstuLaunchWslAndCaptureOutput(L"cat /run/systemd/generator/systemd-binfmt.service.d/override.conf");
                 VERIFY_IS_TRUE(serviceOverride.find(L"ExecStop=") != std::wstring::npos);
-                VERIFY_IS_TRUE(serviceOverride.find(L"ExecStart=") == std::wstring::npos);
+                VERIFY_IS_TRUE(serviceOverride.find(L"ExecStartPost=") != std::wstring::npos);
 
                 auto [mountOverride, ___] =
                     LxsstuLaunchWslAndCaptureOutput(L"cat /run/systemd/generator/proc-sys-fs-binfmt_misc.mount.d/override.conf");
