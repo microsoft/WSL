@@ -1765,9 +1765,9 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // Create a blocked operation that will cause the service to get stuck on WriteFile() call.
+        // Create a blocked operation that will cause the service to get stuck on a ReadFile() call.
         // Because the pipe handle that we're passing in doesn't support overlapped IO, the service will get stuck in a
-        // synchronous WriteFile() call. Validate that terminating the session correctly cancels the IO.
+        // synchronous ReadFile() call. Validate that terminating the session correctly cancels the IO.
 
         wil::unique_handle pipeRead;
         wil::unique_handle pipeWrite;

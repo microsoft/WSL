@@ -41,6 +41,7 @@ public:
     UserHandle& operator=(UserHandle&& Other);
 
     HANDLE Get() const noexcept;
+    void Reset();
 
 private:
     WSLASession* m_session{};

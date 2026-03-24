@@ -112,6 +112,7 @@ UserHandle& UserHandle::operator=(UserHandle&& Other)
 {
     if (this != &Other)
     {
+        Reset();
         m_session = Other.m_session;
         m_handle = std::move(Other.m_handle);
 
@@ -120,7 +121,7 @@ UserHandle& UserHandle::operator=(UserHandle&& Other)
     return *this;
 }
 
-UserHandle::~UserHandle()
+void UserHandle::Reset()
 {
     if (m_handle)
     {
@@ -128,6 +129,11 @@ UserHandle::~UserHandle()
 
         m_session->ReleaseUserHandle(m_handle.get());
     }
+}
+
+UserHandle::~UserHandle()
+{
+    Reset();
 }
 
 HANDLE UserHandle::Get() const noexcept
@@ -1663,7 +1669,7 @@ void WSLASession::CancelUserHandleIO()
 {
     for (auto handle : m_userHandles)
     {
-        // Cancell all IO on the handle.
+        // Cancel all IO on the handle.
         // N.B. This only cancels IO happening in this process.
         if (!CancelIoEx(handle, nullptr))
         {
