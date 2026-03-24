@@ -126,7 +126,7 @@ TestSession TestSession::Create(const std::wstring& displayName, WSLANetworkingM
 {
     const std::filesystem::path& basePath = SessionStorageBasePathAccessor();
     auto storagePath = basePath / displayName;
-    auto session = CreateCustomSession(displayName, storagePath.wstring(), networkingMode);
+    auto session = CreateCustomSession(displayName, storagePath, networkingMode);
     return TestSession{displayName, storagePath.wstring(), std::move(session)};
 }
 
