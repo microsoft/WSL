@@ -5068,6 +5068,5 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
-
 };
 } // namespace NetworkTests
