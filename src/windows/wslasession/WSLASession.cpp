@@ -292,23 +292,24 @@ void WSLASession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
 
-HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WslaRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::PullImage(LPCSTR Image, const WslaRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
 
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF_NULL(E_POINTER, ImageUri);
+    RETURN_HR_IF_NULL(E_POINTER, Image);
 
-    auto [repo, tagOrDigest] = wslutil::ParseImage(ImageUri);
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
 
     if (!tagOrDigest.has_value())
     {
         tagOrDigest = "latest";
     }
-
-    auto lock = m_lock.lock_shared();
 
     auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest);
 
@@ -332,7 +333,7 @@ try
         }
 
         std::string contentString{Content.begin(), Content.end()};
-        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
+        WSL_LOG("ImagePullProgress", TraceLoggingValue(Image, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
 
         if (ProgressCallback == nullptr)
         {

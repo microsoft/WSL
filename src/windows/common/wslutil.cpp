@@ -1165,41 +1165,57 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
+std::regex BuildImageReferenceRegex()
+{
+    // See: https://github.com/containers/image/blob/main/docker/reference/regexp.go
+
+    std::string alphaNum = "[a-z0-9]+";
+    std::string separator = "(?:[._]|__|[-]*)";
+    std::string domainComponent = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
+    std::string tag = "[\\w][\\w.-]{0,127}";
+    std::string digest = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
+    std::string identifier = "([a-f0-9]{64})";
+    std::string shortIdentifier = "([a-f0-9]{6,64})";
+
+    auto group = [](const auto& exp) { return std::format("(?:{})", exp); };
+    auto optional = [&group](const auto& exp) { return group(exp) + "?"; };
+    auto repeated = [&group](const auto& exp) { return group(exp) + "+"; };
+    auto capture = [](const auto& exp) { return std::format("({})", exp); };
+
+    auto nameComponent = alphaNum + optional(repeated(separator + alphaNum));
+    auto domain = domainComponent + optional(repeated("\\." + domainComponent)) + optional(":[0-9]+");
+    auto namePat = optional(domain + "\\/") + nameComponent + optional(repeated("\\/" + nameComponent));
+
+    return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
+}
+
 std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input)
 {
-    // Format: <repo>[:<tag>][@<digest>]
-    // N.B. This parser isn't designed to fully validate the reference, but to extract the repo and tag / digest.
-    // If the format is invalid, the moby API will reject the format.
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), Input.empty());
-
-    // The tag/digest separators only appear after the last '/' in the reference.
-    // This ensures port numbers in custom registries (e.g. myregistry.io:5000/image) are not mistaken for tags.
-    const auto lastSlash = Input.find_last_of('/');
-    const auto nameStart = (lastSlash != std::string::npos) ? lastSlash + 1 : 0;
-
-    // Check for digest reference (@) first. This takes precedence over the tag.
-    const auto atPos = Input.find('@', nameStart);
-    if (atPos != std::string::npos)
+    static const auto regex = BuildImageReferenceRegex();
+    std::smatch match;
+    if (!std::regex_match(Input, match, regex))
     {
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), atPos >= Input.size() - 1 || atPos == nameStart);
-
-        // If both tag and digest are present (repo:tag@digest), strip the tag from the repo.
-        const auto colonPos = Input.find(':', nameStart);
-        const auto repoEnd = (colonPos != std::string::npos && colonPos < atPos) ? colonPos : atPos;
-
-        return {Input.substr(0, repoEnd), Input.substr(atPos + 1)};
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslaInvalidImage(Input.c_str()));
     }
 
-    const auto separator = Input.find(':', nameStart);
-    if (separator == std::string::npos)
+    const auto &repo = match[1];
+    const auto &tag = match[2];
+    const auto &digest = match[3];
+
+    THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
+
+    if (digest.matched) // <repo>:[tag]@<digest] (If both digest and tag are specified, digest takes precedence).
     {
-        return {Input, {}};
+        return {repo.str(), digest.str()};
     }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), separator >= Input.size() - 1 || separator == nameStart);
-
-    return {Input.substr(0, separator), Input.substr(separator + 1)};
+    else if (tag.matched) // <repo>:<tag>
+    {
+        return {repo.str(), tag.str()}; // <repo>
+    }
+    else
+    {
+        return {repo.str(), std::nullopt};
+    }
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
