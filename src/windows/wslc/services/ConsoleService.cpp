@@ -21,10 +21,59 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 
+class ScopedCursorVisibility
+{
+public:
+    ScopedCursorVisibility()
+    {
+        m_outputHandle.reset(CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
+
+        if (!m_outputHandle)
+        {
+            LOG_LAST_ERROR_MSG("CreateFileW(CONOUT$) failed");
+            return;
+        }
+
+        CONSOLE_CURSOR_INFO cursorInfo{};
+        if (!GetConsoleCursorInfo(m_outputHandle.get(), &cursorInfo))
+        {
+            LOG_LAST_ERROR_MSG("GetConsoleCursorInfo failed");
+            return;
+        }
+
+        m_savedCursorInfo = cursorInfo;
+
+        if (!cursorInfo.bVisible)
+        {
+            cursorInfo.bVisible = TRUE;
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_outputHandle.get(), &cursorInfo));
+        }
+    }
+
+    ~ScopedCursorVisibility()
+    {
+        if (m_outputHandle && m_savedCursorInfo.has_value())
+        {
+            LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_outputHandle.get(), &m_savedCursorInfo.value()));
+        }
+    }
+
+    ScopedCursorVisibility(const ScopedCursorVisibility&) = delete;
+    ScopedCursorVisibility& operator=(const ScopedCursorVisibility&) = delete;
+    ScopedCursorVisibility(ScopedCursorVisibility&&) = delete;
+    ScopedCursorVisibility& operator=(ScopedCursorVisibility&&) = delete;
+
+private:
+    wil::unique_hfile m_outputHandle;
+    std::optional<CONSOLE_CURSOR_INFO> m_savedCursorInfo{};
+};
+
 bool ConsoleService::RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh)
 {
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
+    ScopedCursorVisibility cursorVisibility;
 
     if (triggerRefresh)
     {
