@@ -152,8 +152,6 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
 
-    std::lock_guard lock(m_wslaSessionsLock);
-
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) noexcept -> std::optional<HRESULT> {
         if (!wsl::shared::string::IsEqual(entry.DisplayName.c_str(), DisplayName))
         {
