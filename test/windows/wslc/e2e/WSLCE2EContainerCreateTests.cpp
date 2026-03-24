@@ -646,7 +646,7 @@ class WSLCE2EContainerCreateTests
         }
         {
             // Session shell should attach to the wslc by name also.
-            auto session = RunWslcInteractive(L"session shell wsla-cli");
+            auto session = RunWslcInteractive(L"session shell wslc-cli");
             VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
             session.ExpectStdout(VT::SESSION_PROMPT);
