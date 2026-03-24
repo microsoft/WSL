@@ -151,7 +151,6 @@ static PortInformation PortInformationFromWSLAPortMapping(const WSLAPortMapping&
     return PortInformation{
         .HostPort = mapping.HostPort,
         .ContainerPort = mapping.ContainerPort,
-        .Family = mapping.Family,
         .Protocol = static_cast<int>(mapping.Protocol),
         .BindingAddress = mapping.BindingAddress ? mapping.BindingAddress : "",
     };
