@@ -1198,9 +1198,9 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslaInvalidImage(Input.c_str()));
     }
 
-    const auto &repo = match[1];
-    const auto &tag = match[2];
-    const auto &digest = match[3];
+    const auto& repo = match[1];
+    const auto& tag = match[2];
+    const auto& digest = match[3];
 
     THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
 
