@@ -18,10 +18,16 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
-using wsl::windows::common::docker_schema::InspectImage;
+using wsl::windows::common::wsla_schema::InspectImage;
 
 void ImageService::Build(
-    wsl::windows::wslc::models::Session& session, const std::wstring& contextPath, const std::wstring& tag, const std::wstring& dockerfilePath, IProgressCallback* callback)
+    wsl::windows::wslc::models::Session& session,
+    const std::wstring& contextPath,
+    const std::vector<std::wstring>& tags,
+    const std::vector<std::wstring>& buildArgs,
+    const std::wstring& dockerfilePath,
+    bool verbose,
+    IProgressCallback* callback)
 {
     auto absolutePath = std::filesystem::absolute(contextPath);
     THROW_HR_IF_MSG(
@@ -43,9 +49,33 @@ void ImageService::Build(
         dockerfileHandle = dockerfile.get();
     }
 
-    std::string imageTag = tag.empty() ? "" : wsl::windows::common::string::WideToMultiByte(tag);
-    THROW_IF_FAILED(session.Get()->BuildImage(
-        absolutePath.wstring().c_str(), HandleToULong(dockerfileHandle), imageTag.empty() ? nullptr : imageTag.c_str(), callback));
+    auto toMultiByte = [](const std::vector<std::wstring>& input, std::vector<std::string>& strings, std::vector<LPCSTR>& pointers) {
+        strings.reserve(input.size());
+        for (const auto& s : input)
+        {
+            strings.push_back(wsl::windows::common::string::WideToMultiByte(s));
+            pointers.push_back(strings.back().c_str());
+        }
+    };
+
+    std::vector<std::string> tagStrings;
+    std::vector<LPCSTR> tagPointers;
+    toMultiByte(tags, tagStrings, tagPointers);
+
+    std::vector<std::string> buildArgStrings;
+    std::vector<LPCSTR> buildArgPointers;
+    toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
+
+    auto contextPathStr = absolutePath.wstring();
+    WSLABuildImageOptions options{
+        .ContextPath = contextPathStr.c_str(),
+        .DockerfileHandle = HandleToULong(dockerfileHandle),
+        .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
+        .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
+        .Verbose = verbose,
+    };
+
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)

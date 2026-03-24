@@ -31,7 +31,7 @@
       </disabledValue>
     </policy>
 
-   <policy name="AllowWSL1" class="Machine" displayName="$(string.AllowWSL1)" explainText="$(string.AllowWSL1Explain)" key="Software\Policies\WSL" valueName="AllowWSL1">
+    <policy name="AllowWSL1" class="Machine" displayName="$(string.AllowWSL1)" explainText="$(string.AllowWSL1Explain)" key="Software\Policies\WSL" valueName="AllowWSL1">
       <parentCategory ref="WSL" />
       <supportedOn ref="windows:SUPPORTED_Windows10" />
       <enabledValue>
@@ -42,7 +42,7 @@
       </disabledValue>
     </policy>
 
-   <policy name="CustomKernelUserSettingConfigurable" class="Machine" displayName="$(string.CustomKernelUserSettingConfigurable)" explainText="$(string.CustomKernelExplain)" key="Software\Policies\WSL" valueName="AllowKernelUserSetting">
+    <policy name="CustomKernelUserSettingConfigurable" class="Machine" displayName="$(string.CustomKernelUserSettingConfigurable)" explainText="$(string.CustomKernelExplain)" key="Software\Policies\WSL" valueName="AllowKernelUserSetting">
       <parentCategory ref="WSL" />
       <supportedOn ref="windows:SUPPORTED_Windows10" />
       <enabledValue>

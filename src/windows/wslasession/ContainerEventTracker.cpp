@@ -97,7 +97,8 @@ void ContainerEventTracker::OnEvent(const std::string_view& event)
 {
     WSL_LOG(
         "DockerEvent",
-        TraceLoggingCountedString(event.data(), static_cast<UINT16>(event.size()), "Data"),
+        TraceLoggingCountedString(
+            event.data(), static_cast<UINT16>(std::min(event.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
         TraceLoggingValue(m_sessionId, "SessionId"));
 
     static std::map<std::string, ContainerEvent> events{

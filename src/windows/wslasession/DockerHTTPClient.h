@@ -134,6 +134,12 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
+    common::docker_schema::PruneContainerResult PruneContainers(const std::optional<common::docker_schema::PruneContainerLabelFilter>& Filter);
+
+    // Volume management.
+    void CreateVolume(const common::docker_schema::CreateVolume& Request);
+    void RemoveVolume(const std::string& Name);
+    std::vector<common::docker_schema::Volume> ListVolumes();
 
     // Image management.
     struct ListImagesFilters
@@ -145,7 +151,7 @@ public:
         std::vector<std::string> labels;
     };
 
-    std::unique_ptr<HTTPRequestContext> PullImage(const std::string& Repo, const std::optional<std::string>& Tag);
+    std::unique_ptr<HTTPRequestContext> PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);

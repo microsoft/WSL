@@ -11,21 +11,24 @@ Abstract:
     This file contains the ContainerService implementation
 
 --*/
+
+#include <precomp.h>
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "ImageService.h"
+#include "PullImageCallback.h"
 #include <wslutil.h>
 #include <WSLAProcessLauncher.h>
-#include <docker_schema.h>
 #include <CommandLine.h>
 #include <unordered_map>
 #include <wslaservice.h>
 
 namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
-using wsl::windows::common::docker_schema::InspectContainer;
+using wsl::windows::common::wsla_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
+using namespace std::chrono_literals;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
@@ -73,20 +76,68 @@ static void SetContainerArguments(WSLAProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLAContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
+static wsl::windows::common::RunningWSLAContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
 {
     auto processFlags = WSLAProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
+
+    auto containerFlags = WSLAContainerFlagsNone;
+    WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
+
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeHost, processFlags);
+        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeBridged, processFlags);
+
+    // Set port options if provided
+    for (const auto& port : options.Ports)
+    {
+        auto portMapping = PublishPort::Parse(port);
+
+        {
+            // https://github.com/microsoft/WSL/issues/14433
+            // The following scenarios are currently not implemented:
+            // - Ephemeral host port mappings
+            // - Host port mappings with a specific host IP
+            // - Host port mappings with UDP protocol
+            if (portMapping.HostPort().IsEphemeral() || portMapping.HostIP().has_value() ||
+                portMapping.PortProtocol() == PublishPort::Protocol::UDP)
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+                    "Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported");
+            }
+        }
+
+        auto containerPort = portMapping.ContainerPort();
+        for (uint16_t i = 0; i < containerPort.Count(); ++i)
+        {
+            auto currentContainerPort = static_cast<uint16_t>(containerPort.Start() + i);
+            auto currentHostPort = static_cast<uint16_t>(portMapping.HostPort().Start() + i);
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, AF_INET);
+        }
+    }
+
+    // Add volumes if specified
+    for (const auto& volumeSpec : options.Volumes)
+    {
+        auto volume = VolumeMount::Parse(volumeSpec);
+        auto host = volume.HostPath();
+        auto container = volume.ContainerPath();
+        containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+    }
+
+    containerLauncher.SetContainerFlags(containerFlags);
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
-        PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
-        ImageService imageService;
-        imageService.Pull(session, image, callback);
+        {
+            // Attempt to pull the image if not found
+            PullImageCallback callback;
+            PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
+            ImageService imageService;
+            imageService.Pull(session, image, &callback);
+        }
         return containerLauncher.Create(*session.Get());
     }
 
@@ -98,6 +149,34 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
 static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONG timeout = -1)
 {
     THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
+}
+
+std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
+{
+    constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
+    constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
+    constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+
+    auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
+    if (elapsed < 0)
+    {
+        elapsed = 0;
+    }
+
+    if (elapsed < SecondsPerMinute)
+    {
+        return std::format(L"{} seconds ago", elapsed);
+    }
+    else if (elapsed < SecondsPerHour)
+    {
+        return std::format(L"{} minutes ago", elapsed / SecondsPerMinute);
+    }
+    else if (elapsed < SecondsPerDay)
+    {
+        return std::format(L"{} hours ago", elapsed / SecondsPerHour);
+    }
+
+    return std::format(L"{} days ago", elapsed / SecondsPerDay);
 }
 
 int ContainerService::Attach(Session& session, const std::string& id)
@@ -140,29 +219,41 @@ int ContainerService::Attach(Session& session, const std::string& id)
     return runningProcess.Wait();
 }
 
-std::wstring ContainerService::ContainerStateToString(WSLAContainerState state)
+std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, ULONGLONG stateChangedAt)
 {
+    std::wstring stateString;
     switch (state)
     {
     case WSLAContainerState::WslaContainerStateCreated:
-        return L"created";
+        stateString = L"created";
+        break;
     case WSLAContainerState::WslaContainerStateRunning:
-        return L"running";
+        stateString = L"running";
+        break;
     case WSLAContainerState::WslaContainerStateDeleted:
-        return L"stopped";
+        stateString = L"stopped";
+        break;
     case WSLAContainerState::WslaContainerStateExited:
-        return L"exited";
+        stateString = L"exited";
+        break;
     case WSLAContainerState::WslaContainerStateInvalid:
         return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
+
+    if (stateChangedAt == 0)
+    {
+        return stateString;
+    }
+
+    return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
-int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
+int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions, callback);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
 
@@ -184,9 +275,9 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     return 0;
 }
 
-CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
+CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
-    auto runningContainer = CreateInternal(session, image, runOptions, callback);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLAContainerId id{};
@@ -194,11 +285,12 @@ CreateContainerResult ContainerService::Create(Session& session, const std::stri
     return {.Id = id};
 }
 
-void ContainerService::Start(Session& session, const std::string& id)
+void ContainerService::Start(Session& session, const std::string& id, bool attach)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Start(WSLAContainerStartFlags::WSLAContainerStartFlagsNone, nullptr)); // TODO: Error message, detach keys
+    WSLAContainerStartFlags flags = attach ? WSLAContainerStartFlagsAttach : WSLAContainerStartFlagsNone;
+    THROW_IF_FAILED(container->Start(flags, nullptr));
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
@@ -234,6 +326,8 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Image = current.Image;
         entry.State = current.State;
         entry.Id = current.Id;
+        entry.StateChangedAt = current.StateChangedAt;
+        entry.CreatedAt = current.CreatedAt;
         result.emplace_back(std::move(entry));
     }
 

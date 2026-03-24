@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EImageDeleteTests
 {
-    WSL_TEST_CLASS(WSLCE2EImageDeleteTests)
+    WSLA_TEST_CLASS(WSLCE2EImageDeleteTests)
 
     TEST_METHOD_SETUP(MethodSetup)
     {

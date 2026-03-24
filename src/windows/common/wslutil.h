@@ -72,13 +72,60 @@ struct COMErrorInfo
     wil::unique_bstr Source;
 };
 
+struct PruneResult
+{
+    NON_COPYABLE(PruneResult);
+    WSLAPruneContainersResults result{};
+
+    PruneResult() = default;
+
+    PruneResult(PruneResult&& other)
+    {
+        *this = std::move(other);
+    }
+
+    PruneResult& operator=(PruneResult&& other)
+    {
+        CoTaskMemFree(result.Containers);
+        result.Containers = other.result.Containers;
+        result.ContainersCount = other.result.ContainersCount;
+        result.SpaceReclaimed = other.result.SpaceReclaimed;
+
+        other.result.Containers = nullptr;
+        other.result.ContainersCount = 0;
+        other.result.SpaceReclaimed = 0;
+
+        return *this;
+    }
+
+    ~PruneResult()
+    {
+        CoTaskMemFree(result.Containers);
+    }
+};
+
+class StopWatch
+{
+    NON_COPYABLE(StopWatch);
+    NON_MOVABLE(StopWatch);
+
+public:
+    StopWatch() = default;
+
+    uint64_t ElapsedMilliseconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_startTime).count();
+    }
+
+private:
+    std::chrono::steady_clock::time_point m_startTime = std::chrono::steady_clock::now();
+};
+
 template <typename T>
 void AssertValidPrintfArg()
 {
     static_assert(std::is_fundamental_v<T> || std::is_same_v<wchar_t*, T> || std::is_same_v<char*, T> || std::is_same_v<HRESULT, T>);
 }
-
-int CallMsiPackage();
 
 template <typename TInterface>
 wil::com_ptr<TInterface> CoGetCallContext();
@@ -111,9 +158,11 @@ std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
 
 std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
 
-[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE handleInTarget);
+[[nodiscard]] HANDLE DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = std::nullopt, _In_ BOOL InheritHandle = FALSE);
 
-[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> Permissions = {});
+[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE Handle);
+
+[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = {});
 
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
 
@@ -165,13 +214,17 @@ bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
 
-void MsiMessageCallback(INSTALLMESSAGE type, LPCWSTR message);
-
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 
 wil::unique_handle OpenCallingProcess(_In_ DWORD access);
 
+void ParseIpv4Address(const char* Address, in_addr& Result);
+
+void ParseIpv6Address(const char* Address, in_addr6& Result);
+
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
+
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input);
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
@@ -210,17 +263,7 @@ void SetCrtEncoding(int Mode);
 
 void SetThreadDescription(LPCWSTR Name);
 
-wil::unique_hfile ValidateFileSignature(LPCWSTR Path);
-
 wil::unique_hlocal_string SidToString(_In_ PSID Sid);
-
-int UpdatePackage(bool PreRelease, bool Repair);
-
-UINT UpgradeViaMsi(_In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
-
-UINT UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
-
-void WriteInstallLog(const std::string& Content);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 

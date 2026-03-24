@@ -37,11 +37,8 @@ void BuildImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& contextPath = context.Args.Get<ArgType::Path>();
 
-    std::wstring tag;
-    if (context.Args.Contains(ArgType::Tag))
-    {
-        tag = context.Args.Get<ArgType::Tag>();
-    }
+    auto tags = context.Args.GetAll<ArgType::Tag>();
+    auto buildArgs = context.Args.GetAll<ArgType::BuildArg>();
 
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
@@ -51,8 +48,10 @@ void BuildImage(CLIExecutionContext& context)
 
     PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
 
+    bool verbose = context.Args.Contains(ArgType::Verbose);
+
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tag, dockerfilePath, &callback);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback);
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -182,7 +181,7 @@ void InspectImages(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto imageIds = context.Args.GetAll<ArgType::ImageId>();
 
-    std::vector<wsl::windows::common::docker_schema::InspectImage> result;
+    std::vector<wsl::windows::common::wsla_schema::InspectImage> result;
     for (const auto& id : imageIds)
     {
         auto inspectData = ImageService::Inspect(session, WideToMultiByte(id));

@@ -24,7 +24,6 @@ Abstract:
 #include <gslhelpers.h>
 #include "registry.hpp"
 #include "versionhelpers.h"
-#include "hcs.hpp"
 #include <regstr.h>
 
 // Version numbers for various functionality that was backported.
@@ -275,16 +274,6 @@ wsl::windows::common::helpers::unique_proc_attribute_list wsl::windows::common::
     return List;
 }
 
-[[nodiscard]] HANDLE wsl::windows::common::helpers::DuplicateHandle(_In_ HANDLE Handle, _In_ DWORD DesiredAccess, _In_ BOOL InheritHandle, _In_ DWORD Options)
-{
-    // N.B. This function does not return a wil::unique_handle so that the caller
-    //      can pick its own desired type (e.g. wil::unique_event).
-    HANDLE Result;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(GetCurrentProcess(), Handle, GetCurrentProcess(), &Result, DesiredAccess, InheritHandle, Options));
-
-    return Result;
-}
-
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
     _In_ const std::wstring& DistributionName,
     _In_ ULONG FixedDrivesBitmap,
@@ -464,14 +453,6 @@ std::string wsl::windows::common::helpers::GetWindowsVersionString()
 std::filesystem::path wsl::windows::common::helpers::GetWslConfigPath(_In_opt_ HANDLE userToken)
 {
     return wsl::windows::common::helpers::GetUserProfilePath(userToken) / L".wslconfig";
-}
-
-bool wsl::windows::common::helpers::IsDisableVgpuSettingsSupported()
-{
-    static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
-
-    // See if the Windows version has the required platform change.
-    return ((wsl::windows::common::hcs::GetSchemaVersion() >= c_schemaVersionNickel) && (GetWindowsVersion().BuildNumber >= 22545));
 }
 
 bool wsl::windows::common::helpers::IsPackageInstalled(_In_ LPCWSTR PackageFamilyName)

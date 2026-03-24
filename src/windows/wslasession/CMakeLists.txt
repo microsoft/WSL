@@ -17,6 +17,9 @@ set(SOURCES
     WSLAProcessControl.cpp
     WSLAProcessIO.cpp
 
+    # Volume management
+    WSLAVhdVolume.cpp
+
     # Supporting classes
     ContainerEventTracker.cpp
     DockerHTTPClient.cpp
@@ -37,7 +40,8 @@ set(HEADERS
     WSLASession.h
     WSLASessionFactory.h
     WSLASessionReference.h
-    WSLAVirtualMachine.h)
+    WSLAVirtualMachine.h
+    WSLAVhdVolume.h)
 
 add_executable(wslasession WIN32 ${SOURCES} ${HEADERS})
 add_dependencies(wslasession wslaserviceidl)

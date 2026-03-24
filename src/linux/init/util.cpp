@@ -1756,13 +1756,18 @@ Return Value:
     //      - For Plan9 (9p): device is busy or not found
     //      - For VirtioFS: invalid tag (device not ready)
     //
+    // N.B. MS_SHARED must be applied in a separate mount() call, so it is
+    //      stripped from the initial mount flags and applied after the mount.
+    //
+
+    const unsigned long initialFlags = MountFlags & ~MS_SHARED;
 
     try
     {
         if (TimeoutSeconds.has_value())
         {
             wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() { THROW_LAST_ERROR_IF(mount(Source, Target, Type, MountFlags, Options) < 0); },
+                [&]() { THROW_LAST_ERROR_IF(mount(Source, Target, Type, initialFlags, Options) < 0); },
                 c_defaultRetryPeriod,
                 TimeoutSeconds.value(),
                 [&]() {
@@ -1788,7 +1793,7 @@ Return Value:
         }
         else
         {
-            THROW_LAST_ERROR_IF(mount(Source, Target, Type, MountFlags, Options) < 0);
+            THROW_LAST_ERROR_IF(mount(Source, Target, Type, initialFlags, Options) < 0);
         }
     }
     catch (...)
@@ -1796,6 +1801,16 @@ Return Value:
         errno = wil::ResultFromCaughtException();
         LOG_ERROR("mount({}, {}, {}, {:#x}, {}) failed {}", Source, Target, Type, MountFlags, Options, errno);
         return -errno;
+    }
+
+    // N.B. The shared flag must be applied in a separate mount() call.
+    if (WI_IsFlagSet(MountFlags, MS_SHARED))
+    {
+        if (mount(nullptr, Target, nullptr, MS_SHARED, nullptr) < 0)
+        {
+            LOG_ERROR("Failed to make shared mount {} {}", Target, errno);
+            return -errno;
+        }
     }
 
     return 0;

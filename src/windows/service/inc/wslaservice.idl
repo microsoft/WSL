@@ -8,8 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains the COM object definitions used to talk with the WSLa
-    service "WslaService"
+    This file contains the WSLA-related COM object definitions.
 
 --*/
 
@@ -183,6 +182,13 @@ typedef struct _WSLAProcessOptions
     ULONG TtyColumns;
 } WSLAProcessOptions;
 
+typedef struct _WSLANamedVolume
+{
+    LPCSTR Name;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+} WSLANamedVolume;
+
 typedef struct _WSLAVolume
 {
     LPCWSTR HostPath;
@@ -195,6 +201,8 @@ typedef struct _WSLAPortMapping
     USHORT HostPort;
     USHORT ContainerPort;
     int Family;
+    int Protocol;
+    [string] LPCSTR BindingAddress;
 } WSLAPortMapping;
 
 typedef struct _WSLATmpfsMount
@@ -262,6 +270,9 @@ typedef struct _WSLAContainerOptions
     WSLAContainerNetwork ContainerNetwork;
     [unique, size_is(TmpfsCount)] const WSLATmpfsMount* Tmpfs;
     ULONG TmpfsCount;
+
+    [unique, size_is(NamedVolumesCount)] WSLANamedVolume* NamedVolumes;
+    ULONG NamedVolumesCount;
 } WSLAContainerOptions;
 
 typedef enum _WSLAContainerState
@@ -280,9 +291,9 @@ typedef struct _WSLAContainerEntry
     char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     WSLAContainerId Id;
+    ULONGLONG StateChangedAt;
+    ULONGLONG CreatedAt;
     WSLAContainerState State;
-
-    // TODO: Add creation timestamp and other fields that the command line tool might want to display.
 } WSLAContainerEntry;
 
 typedef enum _WSLAProcessState
@@ -324,8 +335,7 @@ typedef enum _WSLAFeatureFlags
     WslaFeatureFlagsEarlyBootDmesg = 2,
     WslaFeatureFlagsGPU = 4,
     WslaFeatureFlagsVirtioFs = 8,
-    WslaFeatureFlagsPmemVhds = 16,
-    WslaFeatureFlagsDebug = 32,
+    WslaFeatureFlagsDebug = 16,
 } WSLAFeatureFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
@@ -453,12 +463,42 @@ typedef struct _WSLADeleteImageOptions
     // TODO: Platforms: a json array of OCI platform strings.
 } WSLADeleteImageOptions;
 
+typedef struct _WSLABuildImageOptions
+{
+    LPCWSTR ContextPath;
+    ULONG DockerfileHandle;
+    WSLAStringArray Tags;
+    WSLAStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
+    BOOL Verbose; // Show all build progress including internal steps and all statuses.
+} WSLABuildImageOptions;
+
 typedef struct _WSLATagImageOptions
 {
     LPCSTR Image; // Source image name or ID.
     LPCSTR Repo;  // Target repository name.
     LPCSTR Tag;   // Target tag name.
 } WSLATagImageOptions;
+
+typedef struct _WSLAVolumeOptions
+{
+    LPCSTR Name;
+    LPCSTR Type;
+    [unique] LPCSTR Options;
+} WSLAVolumeOptions;
+
+typedef struct _WSLAContainerPruneFilter
+{
+    LPCSTR Key;
+    [unique] LPCSTR Value;
+    BOOL Present;
+} WSLAContainerPruneFilter;
+
+typedef struct _WSLAPruneContainersResults
+{
+    [unique, size_is(ContainersCount)] WSLAContainerId* Containers;
+    ULONG ContainersCount;
+    ULONGLONG SpaceReclaimed;
+} WSLAPruneContainersResults;
 
 typedef enum _WSLASessionState
 {
@@ -467,7 +507,7 @@ typedef enum _WSLASessionState
 } WSLASessionState;
 
 // Settings for IWSLASession::Initialize - passed from service to per-user process
-typedef struct _WSLASessionInitSettings 
+typedef struct _WSLASessionInitSettings
 {
     ULONG SessionId;
     ULONG CreatorPid;
@@ -491,11 +531,11 @@ interface IWSLASession : IUnknown
     HRESULT GetState([out] WSLASessionState* State);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const  WslaRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT BuildImage([in] LPCWSTR ContextPath, [in] ULONG DockerfileHandle, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] const  WslaRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT BuildImage([in] const WSLABuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
+    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLAListImageOptions* Options, [out, size_is(, *Count)] WSLAImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLADeleteImageOptions* Options, [out, size_is(, *Count)] WSLADeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLATagImageOptions* Options);
@@ -505,6 +545,7 @@ interface IWSLASession : IUnknown
     HRESULT CreateContainer([in] const WSLAContainerOptions* Options, [out] IWSLAContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] WSLAContainerEntry** Images, [out] ULONG* Count);
+    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLAContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLAPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLAProcessOptions* Options, [out] IWSLAProcess** Process, [out] int* Errno);
@@ -520,8 +561,8 @@ interface IWSLASession : IUnknown
     // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
     HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath);
-    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
-    HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+    HRESULT MapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
+    HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
     // Session initialization - called by SYSTEM service after launching per-user process.
     // Returns a handle to this COM server process (used to add to job object).
@@ -532,6 +573,9 @@ interface IWSLASession : IUnknown
         [in] const WSLASessionInitSettings* Settings,
         [in] IWSLAVirtualMachine* Vm);
 
+    // Volume management.
+    HRESULT CreateVolume([in] const WSLAVolumeOptions* Options);
+    HRESULT DeleteVolume([in] LPCSTR Name);
 }
 
 //
@@ -611,3 +655,4 @@ cpp_quote("#define WSLA_E_BASE (0x0600)")
 cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")
 cpp_quote("#define WSLA_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 2) /* 0x80040602 */")
 cpp_quote("#define WSLA_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 3) /* 0x80040603 */")
+cpp_quote("#define WSLA_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 4) /* 0x80040604 */")

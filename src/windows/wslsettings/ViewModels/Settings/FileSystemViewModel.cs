@@ -38,7 +38,14 @@ public partial class FileSystemViewModel : WslConfigSettingViewModel
         {
             if (ValidateInput(value, Constants.WholeNumberRegex))
             {
-                Set(ref _defaultVHDSize!, Convert.ToUInt64(value));
+                if (UInt64.TryParse(value, out ulong parsedValue))
+                {
+                    Set(ref _defaultVHDSize!, parsedValue);
+                }
+                else
+                {
+                    OnPropertyChanged();
+                }
             }
         }
     }

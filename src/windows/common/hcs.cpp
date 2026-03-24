@@ -325,3 +325,11 @@ wsl::windows::common::hcs::unique_hcn_guest_network_service_callback wsl::window
 
     return callbackHandle;
 }
+
+bool wsl::windows::common::hcs::IsDisableVgpuSettingsSupported()
+{
+    static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
+
+    // See if the Windows version has the required platform change.
+    return ((GetSchemaVersion() >= c_schemaVersionNickel) && (wsl::windows::common::helpers::GetWindowsVersion().BuildNumber >= 22545));
+}

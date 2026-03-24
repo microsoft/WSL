@@ -36,27 +36,16 @@ const TestImage& DebianTestImage()
     return image;
 }
 
+const TestImage& PythonTestImage()
+{
+    static const TestImage image{L"python", L"3.12-alpine", std::filesystem::path{g_testDataPath} / L"python-3_12-alpine.tar"};
+    return image;
+}
+
 const TestImage& InvalidTestImage()
 {
     static const TestImage image{L"mcr.microsoft.com/invalid-image", L"latest", L"INVALID_PATH"};
     return image;
-}
-
-void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
-{
-    auto result = RunWslc(L"container list --all");
-    result.Verify({.Stderr = L"", .ExitCode = 0});
-
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
-    {
-        if (line.find(containerNameOrId) != std::wstring::npos)
-        {
-            const std::wstring message =
-                L"Container '" + containerNameOrId + L"' found in container list output but it should not be listed";
-            VERIFY_FAIL(message.c_str());
-        }
-    }
 }
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
@@ -158,25 +147,41 @@ std::string GetHashId(const std::string& id, bool fullId)
     return id.substr(0, shortIdLength);
 }
 
-docker_schema::InspectContainer InspectContainer(const std::wstring& containerName)
+wsla_schema::InspectContainer InspectContainer(const std::wstring& containerName)
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectContainer>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wsla_schema::InspectContainer>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
 
-docker_schema::InspectImage InspectImage(const std::wstring& imageName)
+wsla_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<docker_schema::InspectImage>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wsla_schema::InspectImage>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
+
+namespace VT {
+    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste)
+    {
+        const auto containerId = InspectContainer(containerNameOrId).Id;
+        const auto shortId = GetHashId(containerId);
+        return BuildContainerPrompt(shortId, withBracketedPaste);
+    }
+
+    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId)
+    {
+        const auto containerId = InspectContainer(containerNameOrId).Id;
+        const auto shortId = GetHashId(containerId);
+        return BuildContainerAttachPrompt(shortId);
+    }
+} // namespace VT
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
@@ -188,8 +193,14 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
-            auto result = RunWslc(std::format(L"container delete {}", containerName));
-            result.Verify({.Stderr = L"", .ExitCode = 0});
+            if (line.find(L"running") != std::wstring::npos)
+            {
+                auto result = RunWslc(std::format(L"container kill {}", containerName));
+                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            }
+
+            auto result = RunWslc(std::format(L"container remove --force {}", containerName));
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }
     }
@@ -205,7 +216,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     {
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
-            auto deleteResult = RunWslc(std::format(L"image delete {}", image.NameAndTag()));
+            auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }

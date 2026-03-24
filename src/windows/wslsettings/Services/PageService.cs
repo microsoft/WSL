@@ -26,6 +26,7 @@ public class PageService : IPageService
         Configure<GeneralViewModel, GeneralPage>();
         Configure<WorkingAcrossFileSystemsViewModel, WorkingAcrossFileSystemsPage>();
         Configure<VSCodeIntegrationViewModel, VSCodeIntegrationPage>();
+        Configure<VSIntegrationViewModel, VSIntegrationPage>();
         Configure<GUIAppsViewModel, GUIAppsPage>();
         Configure<GPUAccelerationViewModel, GPUAccelerationPage>();
         Configure<DockerDesktopIntegrationViewModel, DockerDesktopIntegrationPage>();

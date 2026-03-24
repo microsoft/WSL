@@ -189,43 +189,22 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
 
     // Setup boot VHDs
     hcs::Scsi scsiController{};
-    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
-    {
-        auto attachScsiDisk = [&](PCWSTR path) {
-            const ULONG lun = AllocateLun();
-            hcs::Attachment disk{};
-            disk.Type = hcs::AttachmentType::VirtualDisk;
-            disk.Path = path;
-            disk.ReadOnly = true;
-            disk.SupportCompressedVolumes = true;
-            disk.AlwaysAllowSparseFiles = true;
-            disk.SupportEncryptedFiles = true;
-            scsiController.Attachments[std::to_string(lun)] = std::move(disk);
-            DiskInfo diskInfo{path};
-            m_attachedDisks.emplace(lun, std::move(diskInfo));
-        };
+    auto attachScsiDisk = [&](PCWSTR path) {
+        const ULONG lun = AllocateLun();
+        hcs::Attachment disk{};
+        disk.Type = hcs::AttachmentType::VirtualDisk;
+        disk.Path = path;
+        disk.ReadOnly = true;
+        disk.SupportCompressedVolumes = true;
+        disk.AlwaysAllowSparseFiles = true;
+        disk.SupportEncryptedFiles = true;
+        scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+        DiskInfo diskInfo{path};
+        m_attachedDisks.emplace(lun, std::move(diskInfo));
+    };
 
-        attachScsiDisk(rootVhdPath.c_str());
-        attachScsiDisk(kernelModulesPath.c_str());
-    }
-    else
-    {
-        hcs::VirtualPMemController pmemController{};
-        pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
-        ULONG nextDeviceId = 0;
-        auto attachPmemDisk = [&](PCWSTR path) {
-            auto deviceId = nextDeviceId++;
-            hcs::VirtualPMemDevice vhd{};
-            vhd.HostPath = path;
-            vhd.ReadOnly = true;
-            vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
-            pmemController.Devices[std::to_string(deviceId)] = std::move(vhd);
-        };
-
-        attachPmemDisk(rootVhdPath.c_str());
-        attachPmemDisk(kernelModulesPath.c_str());
-        vmSettings.Devices.VirtualPMem = std::move(pmemController);
-    }
+    attachScsiDisk(rootVhdPath.c_str());
+    attachScsiDisk(kernelModulesPath.c_str());
 
     vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 
@@ -287,7 +266,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLASessionSettings* Settings)
         gpuRequest.RequestType = hcs::ModifyRequestType::Update;
         gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
         gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
+        if (wsl::windows::common::hcs::IsDisableVgpuSettingsSupported())
         {
             gpuRequest.Settings.DisableGdiAcceleration = true;
             gpuRequest.Settings.DisablePresentation = true;
@@ -384,7 +363,7 @@ try
 
     // Duplicate the socket handles - COM manages the lifetime of the marshalled handles,
     // so we need our own copies to take ownership.
-    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(helpers::DuplicateHandle(GnsSocket))};
+    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
     wil::unique_socket dnsSocketHandle;
     if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
     {
@@ -393,7 +372,7 @@ try
             E_NOTIMPL, m_networkingMode == WSLANetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
 
         THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
-        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(helpers::DuplicateHandle(*DnsSocket)));
+        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
     }
     else
     {
@@ -428,7 +407,8 @@ try
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
-        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::None;
+        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
+        WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, SUCCEEDED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods()));
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
             wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
@@ -548,7 +528,13 @@ try
     else
     {
         it->second = m_guestDeviceManager->AddGuestDevice(
-            VIRTIO_FS_DEVICE_ID, m_virtioFsClassId, shareName.c_str(), L"", WindowsPath, VIRTIO_FS_FLAGS_TYPE_FILES, m_userToken.get());
+            VIRTIO_FS_DEVICE_ID,
+            m_virtioFsClassId,
+            shareName.c_str(),
+            ReadOnly ? L"ro" : L"",
+            WindowsPath,
+            VIRTIO_FS_FLAGS_TYPE_FILES,
+            m_userToken.get());
     }
 
     cleanup.release();

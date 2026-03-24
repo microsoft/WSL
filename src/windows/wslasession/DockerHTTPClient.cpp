@@ -118,14 +118,16 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 {
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& Tag)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest)
 {
     auto url = URL::Create("/images/create");
+
+    // TODO: Support pulling from other registries.
     url.SetParameter("fromImage", std::format("library/{}", Repo));
 
-    if (Tag.has_value())
+    if (tagOrDigest.has_value())
     {
-        url.SetParameter("tag", Tag.value());
+        url.SetParameter("tag", tagOrDigest.value());
     }
 
     return SendRequestImpl(verb::post, url, {}, {});
@@ -342,6 +344,22 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
+void DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
+{
+    Transaction(verb::post, URL::Create("/volumes/create"), Request);
+}
+
+void DockerHTTPClient::RemoveVolume(const std::string& Name)
+{
+    Transaction(verb::delete_, URL::Create("/volumes/{}", Name));
+}
+
+std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
+{
+    auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, URL::Create("/volumes"));
+    return response.Volumes;
+}
+
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
@@ -372,6 +390,17 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALo
     }
 
     return std::move(socket);
+}
+
+docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const std::optional<docker_schema::PruneContainerLabelFilter>& Filter)
+{
+    auto url = URL::Create("/containers/prune");
+    if (Filter.has_value())
+    {
+        url.SetParameter("filters", shared::ToJson(Filter.value()));
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneContainerResult>(verb::post, url);
 }
 
 docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string& Container, const docker_schema::CreateExec& Request)
@@ -532,7 +561,18 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             auto contentLength = response.find(http::field::content_length);
             if (contentLength != response.end())
             {
-                RemainingContentLength = std::stoul(contentLength->value());
+                try
+                {
+                    RemainingContentLength = std::stoul(contentLength->value());
+                }
+                catch (const std::exception&)
+                {
+                    THROW_HR_MSG(
+                        E_UNEXPECTED,
+                        "Invalid Content-Length header: %.*hs",
+                        static_cast<int>(contentLength->value().size()),
+                        contentLength->value().data());
+                }
             }
         }
 
