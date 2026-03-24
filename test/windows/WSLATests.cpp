@@ -5397,23 +5397,23 @@ class WSLATests
         std::string longName(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
         expectInvalidArg(longName);
 
-        auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
+        auto expectInvalidPull = [&](const char* name) {
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr), E_INVALIDARG);
 
             auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
             VERIFY_IS_TRUE(comError.has_value());
 
-            VerifyPatternMatch(wsl::shared::string::WideToMultiByte(comError->Message.get()), errorPattern);
+            VERIFY_ARE_EQUAL(comError->Message.get(), std::format(L"Invalid image: '{}'", name));
         };
 
-        expectInvalidPull("?foo&bar/url\n:name", "invalid reference format");
-        expectInvalidPull("?:&", "invalid reference format");
-        expectInvalidPull("/:/", "invalid reference format");
-        expectInvalidPull("\n: ", "invalid reference format");
-        expectInvalidPull("invalid\nrepo:valid-image", "invalid reference format");
-        expectInvalidPull("bad!repo:valid-image", "invalid reference format");
-        expectInvalidPull("repo:badimage!name", "invalid tag format");
-        expectInvalidPull("bad+image", "invalid reference format");
+        expectInvalidPull("?foo&bar/url\n:name");
+        expectInvalidPull("?:&");
+        expectInvalidPull("/:/");
+        expectInvalidPull("\n: ");
+        expectInvalidPull("invalid\nrepo:valid-image");
+        expectInvalidPull("bad!repo:valid-image");
+        expectInvalidPull("repo:badimage!name");
+        expectInvalidPull("bad+image");
     }
 
     TEST_METHOD(PageReporting)
