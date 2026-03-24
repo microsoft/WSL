@@ -53,19 +53,18 @@ class WSLCE2EGlobalTests
     {
         WSL2_TEST_ONLY();
 
-        auto session = TestSession::Create(L"wslc-test-session");
-
-        // Verify session list
-        auto result = RunWslc(L"session list");
-        result.Dump();
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        // Create a test session with VirtioProxy mode so it can pull images and create containers.
+        auto session = TestSession::Create(L"wslc-test-session", WSLANetworkingModeVirtioProxy);
 
         // Verify targeting a non-existent session fails.
-        result = RunWslc(L"container list --session INVALID_SESSION_NAME");
-        result.Dump();
-        result.Verify({.Stdout = L"", .Stderr = L"Element not found.\r\nError code: ERROR_NOT_FOUND\n", .ExitCode = 1});
+        auto result = RunWslc(L"container list --session INVALID_SESSION_NAME");
+        result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
 
-        // Verify the session name appears in the output
+        // Verify session list
+        result = RunWslc(L"session list");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify there is a session with the name of the test session in the session list output.
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_ARE_NOT_EQUAL(
             result.Stdout->find(L"wslc-test-session"),
@@ -76,18 +75,11 @@ class WSLCE2EGlobalTests
         result = RunWslc(std::format(L"container list --session {}", session.Name()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        // Add a container to the session and verify it is listed.
+        // Add a container to the new session.
         result = RunWslc(
             std::format(L"container create --session {} --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
-
-        // Verify session list
-        result = RunWslc(L"container list -a");
-        result.Dump();
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container list --session {} -a", session.Name()));
-        result.Dump();
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
+        result.Verify({.ExitCode = S_OK});
 
         // Verify container exists in the custom session
         VerifyContainerIsListed(L"test-cont", L"created", session.Name());

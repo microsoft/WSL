@@ -114,10 +114,10 @@ const TestImage& InvalidTestImage()
     return image;
 }
 
-TestSession TestSession::Create(const std::wstring& displayName)
+TestSession TestSession::Create(const std::wstring& displayName, WSLANetworkingMode networkingMode)
 {
     auto storagePath = s_sessionStorageBasePath / displayName;
-    auto session = CreateCustomSession(displayName, storagePath.wstring());
+    auto session = CreateCustomSession(displayName, storagePath.wstring(), networkingMode);
     return TestSession{displayName, storagePath.wstring(), std::move(session)};
 }
 

@@ -98,7 +98,7 @@ const TestImage& InvalidTestImage();
 
 struct TestSession
 {
-    static TestSession Create(const std::wstring& displayName);
+    static TestSession Create(const std::wstring& displayName, WSLANetworkingMode networkingMode = WSLANetworkingModeNone);
 
     TestSession(std::wstring name, std::wstring storagePath, wil::com_ptr<IWSLASession> session) :
         m_name(std::move(name)), m_storagePath(std::move(storagePath)), m_session(std::move(session))
