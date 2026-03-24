@@ -165,18 +165,22 @@ std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 
     if (elapsed < SecondsPerMinute)
     {
-        return std::format(L"{} seconds ago", elapsed);
+        const auto seconds = elapsed;
+        return std::format(L"{} {} ago", seconds, (seconds == 1 ? L"second" : L"seconds"));
     }
     else if (elapsed < SecondsPerHour)
     {
-        return std::format(L"{} minutes ago", elapsed / SecondsPerMinute);
+        const auto minutes = elapsed / SecondsPerMinute;
+        return std::format(L"{} {} ago", minutes, (minutes == 1 ? L"minute" : L"minutes"));
     }
     else if (elapsed < SecondsPerDay)
     {
-        return std::format(L"{} hours ago", elapsed / SecondsPerHour);
+        const auto hours = elapsed / SecondsPerHour;
+        return std::format(L"{} {} ago", hours, (hours == 1 ? L"hour" : L"hours"));
     }
 
-    return std::format(L"{} days ago", elapsed / SecondsPerDay);
+    const auto days = elapsed / SecondsPerDay;
+    return std::format(L"{} {} ago", days, (days == 1 ? L"day" : L"days"));
 }
 
 int ContainerService::Attach(Session& session, const std::string& id)
