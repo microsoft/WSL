@@ -22,7 +22,7 @@ Abstract:
       reference to keep them alive until explicitly terminated.
 
     A job object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE ensures that all
-    per-user COM server processes are automatically terminated if wslaservice
+    per-user COM server processes are automatically terminated if wslservice
     crashes or exits unexpectedly.
 
 --*/
@@ -81,36 +81,52 @@ void WSLASessionManagerImpl::CreateSession(const WSLASessionSettings* Settings, 
         return; // Existing session was opened.
     }
 
-    // Get caller info.
-    const auto callerProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
-    const ULONG sessionId = m_nextSessionId++;
-    const DWORD creatorPid = GetProcessId(callerProcess.get());
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    wslutil::StopWatch stopWatch;
 
-    // Create the VM in the SYSTEM service (privileged).
-    auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+    HRESULT creationResult = wil::ResultFromException([&]() {
+        // Get caller info.
+        const auto callerProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
+        const ULONG sessionId = m_nextSessionId++;
+        const DWORD creatorPid = GetProcessId(callerProcess.get());
+        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
-    // Launch per-user COM server factory and add it to our job object for crash cleanup.
-    auto factory = wslutil::CreateComServerAsUser<IWSLASessionFactory>(__uuidof(WSLASessionFactory), userToken.get());
-    AddSessionProcessToJobObject(factory.get());
+        // Create the VM in the SYSTEM service (privileged).
+        auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
 
-    // Create the session via the factory.
-    const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings);
-    wil::com_ptr<IWSLASession> session;
-    wil::com_ptr<IWSLASessionReference> serviceRef;
-    THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), &session, &serviceRef));
+        // Launch per-user COM server factory and add it to our job object for crash cleanup.
+        auto factory = wslutil::CreateComServerAsUser<IWSLASessionFactory>(__uuidof(WSLASessionFactory), userToken.get());
+        AddSessionProcessToJobObject(factory.get());
 
-    // Track the session via its service ref, along with metadata and security info.
-    m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, Settings->DisplayName, std::move(tokenInfo)});
+        // Create the session via the factory.
+        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings);
+        wil::com_ptr<IWSLASession> session;
+        wil::com_ptr<IWSLASessionReference> serviceRef;
+        THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), &session, &serviceRef));
 
-    // For persistent sessions, also hold a strong reference to keep them alive.
-    const bool persistent = WI_IsFlagSet(Flags, WSLASessionFlagsPersistent);
-    if (persistent)
-    {
-        m_persistentSessions.emplace_back(sessionId, session);
-    }
+        // Track the session via its service ref, along with metadata and security info.
+        m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, Settings->DisplayName, std::move(tokenInfo)});
 
-    *WslaSession = session.detach();
+        // For persistent sessions, also hold a strong reference to keep them alive.
+        const bool persistent = WI_IsFlagSet(Flags, WSLASessionFlagsPersistent);
+        if (persistent)
+        {
+            m_persistentSessions.emplace_back(sessionId, session);
+        }
+
+        *WslaSession = session.detach();
+    });
+
+    // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
+
+    WSL_LOG_TELEMETRY(
+        "WSLCCreateSession",
+        PDT_ProductAndServiceUsage,
+        TraceLoggingValue(Settings->DisplayName, "Name"),
+        TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
+        TraceLoggingValue(creationResult, "Result"),
+        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"));
+
+    THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", Settings->DisplayName);
 }
 
 void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
@@ -213,7 +229,7 @@ void WSLASessionManagerImpl::AddSessionProcessToJobObject(_In_ IWSLASessionFacto
 void WSLASessionManagerImpl::EnsureJobObjectCreated()
 {
     // Create a job object that will automatically terminate all child processes
-    // when the job handle is closed (i.e., when wslaservice exits or crashes).
+    // when the job handle is closed (i.e., when wslservice exits or crashes).
     std::call_once(m_jobObjectInitFlag, [this] {
         m_sessionJobObject.reset(CreateJobObjectW(nullptr, nullptr));
         THROW_LAST_ERROR_IF(!m_sessionJobObject);

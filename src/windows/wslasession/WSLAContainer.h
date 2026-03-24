@@ -23,11 +23,29 @@ Abstract:
 #include "COMImplClass.h"
 #include "wsla_schema.h"
 #include "WSLAContainerMetadata.h"
+#include "WSLAVhdVolume.h"
+#include <unordered_map>
 
 namespace wsl::windows::service::wsla {
 
 class WSLAContainer;
 class WSLASession;
+
+struct ContainerPortMapping
+{
+    NON_COPYABLE(ContainerPortMapping);
+
+    ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort);
+    ContainerPortMapping(ContainerPortMapping&& Other);
+
+    ContainerPortMapping& operator=(ContainerPortMapping&& Other);
+    const char* ProtocolString() const;
+
+    WSLAPortMapping Serialize() const;
+
+    VMPortMapping VmMapping;
+    uint16_t ContainerPort{};
+};
 
 class WSLAContainerImpl
 {
@@ -41,8 +59,9 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
+        WSLAContainerNetworkType NetworkMode,
         std::vector<WSLAVolumeMount>&& volumes,
-        std::vector<WSLAPortMapping>&& ports,
+        std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
@@ -80,11 +99,6 @@ public:
 
     const std::string& ID() const noexcept;
 
-    // Called when the container stop event is observed so the
-    // implementation can update its internal state and notify
-    // any exec processes.
-    void OnStopped();
-
     // Returns the container flags used to decide whether to
     // auto-delete the container on stop.
     WSLAContainerFlags Flags() const noexcept
@@ -96,6 +110,7 @@ public:
         const WSLAContainerOptions& Options,
         WSLASession& wslaSession,
         WSLAVirtualMachine& virtualMachine,
+        const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& SessionVolumes,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -105,6 +120,7 @@ public:
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLASession& wslaSession,
         WSLAVirtualMachine& virtualMachine,
+        const std::unordered_map<std::string, std::unique_ptr<WSLAVhdVolumeImpl>>& SessionVolumes,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -113,12 +129,18 @@ public:
 private:
     __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld(WSLADeleteFlags Flags);
 
+    void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
+    __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
+    __requires_exclusive_lock_held(m_lock) void DisconnectComWrapper();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
+
+    void MapPorts();
+    void UnmapPorts();
 
     mutable wil::srwlock m_lock;
     std::string m_name;
@@ -138,13 +160,14 @@ private:
     WSLAContainerState m_state = WslaContainerStateInvalid;
     WSLASession& m_wslaSession;
     WSLAVirtualMachine& m_virtualMachine;
-    std::vector<WSLAPortMapping> m_mappedPorts;
+    std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
+    WSLAContainerNetworkType m_networkingMode{};
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer

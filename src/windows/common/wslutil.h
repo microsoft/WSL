@@ -104,13 +104,28 @@ struct PruneResult
     }
 };
 
+class StopWatch
+{
+    NON_COPYABLE(StopWatch);
+    NON_MOVABLE(StopWatch);
+
+public:
+    StopWatch() = default;
+
+    uint64_t ElapsedMilliseconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_startTime).count();
+    }
+
+private:
+    std::chrono::steady_clock::time_point m_startTime = std::chrono::steady_clock::now();
+};
+
 template <typename T>
 void AssertValidPrintfArg()
 {
     static_assert(std::is_fundamental_v<T> || std::is_same_v<wchar_t*, T> || std::is_same_v<char*, T> || std::is_same_v<HRESULT, T>);
 }
-
-int CallMsiPackage();
 
 template <typename TInterface>
 wil::com_ptr<TInterface> CoGetCallContext();
@@ -199,13 +214,17 @@ bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
 
-void MsiMessageCallback(INSTALLMESSAGE type, LPCWSTR message);
-
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 
 wil::unique_handle OpenCallingProcess(_In_ DWORD access);
 
+void ParseIpv4Address(const char* Address, in_addr& Result);
+
+void ParseIpv6Address(const char* Address, in_addr6& Result);
+
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
+
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input);
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
@@ -244,17 +263,7 @@ void SetCrtEncoding(int Mode);
 
 void SetThreadDescription(LPCWSTR Name);
 
-wil::unique_hfile ValidateFileSignature(LPCWSTR Path);
-
 wil::unique_hlocal_string SidToString(_In_ PSID Sid);
-
-int UpdatePackage(bool PreRelease, bool Repair);
-
-UINT UpgradeViaMsi(_In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
-
-UINT UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
-
-void WriteInstallLog(const std::string& Content);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 

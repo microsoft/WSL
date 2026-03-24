@@ -17,7 +17,6 @@ Abstract:
 #include "ContainerModel.h"
 #include "ContainerService.h"
 #include "ContainerTasks.h"
-#include "PullImageCallback.h"
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TablePrinter.h"
@@ -43,9 +42,8 @@ void CreateContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
-    PullImageCallback callback;
     auto result = ContainerService::Create(
-        context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>(), &callback);
+        context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>());
     PrintMessage(MultiByteToWide(result.Id));
 }
 
@@ -176,9 +174,8 @@ void RunContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
-    PullImageCallback callback;
     context.ExitCode = ContainerService::Run(
-        context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>(), &callback);
+        context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>());
 }
 
 void SetContainerOptionsFromArgs(CLIExecutionContext& context)
@@ -203,6 +200,26 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Interactive))
     {
         options.Interactive = true;
+    }
+
+    if (context.Args.Contains(ArgType::Publish))
+    {
+        auto ports = context.Args.GetAll<ArgType::Publish>();
+        options.Ports.reserve(options.Ports.size() + ports.size());
+        for (const auto& port : ports)
+        {
+            options.Ports.emplace_back(WideToMultiByte(port));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Volume))
+    {
+        auto volumes = context.Args.GetAll<ArgType::Volume>();
+        options.Volumes.reserve(options.Volumes.size() + volumes.size());
+        for (const auto& volume : volumes)
+        {
+            options.Volumes.emplace_back(volume);
+        }
     }
 
     if (context.Args.Contains(ArgType::Remove))
@@ -233,7 +250,7 @@ void StartContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    ContainerService::Start(context.Data.Get<Data::Session>(), id);
+    ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
 }
 
 void StopContainers(CLIExecutionContext& context)

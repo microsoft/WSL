@@ -90,9 +90,22 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 {
 }
 
-void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family)
+void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family, int Protocol, const std::optional<std::string>& BindingAddress)
 {
-    m_ports.emplace_back(WSLAPortMapping{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
+    THROW_HR_IF(E_INVALIDARG, Family != AF_INET && Family != AF_INET6);
+
+    auto& inserted = m_bindingAddressStorage.emplace_back(BindingAddress.value_or(Family == AF_INET ? "127.0.0.1" : "::1"));
+    m_ports.emplace_back(WSLAPortMapping{
+        .HostPort = WindowsPort,
+        .ContainerPort = ContainerPort,
+        .Family = Family,
+        .Protocol = Protocol,
+        .BindingAddress = inserted.c_str()});
+}
+
+void WSLAContainerLauncher::SetName(std::string&& Name)
+{
+    m_name = std::move(Name);
 }
 
 void WSLAContainerLauncher::SetDefaultStopSignal(WSLASignal Signal)
@@ -147,6 +160,19 @@ void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& 
     vol.ReadOnly = ReadOnly ? TRUE : FALSE;
 
     m_volumes.push_back(vol);
+}
+
+void wsl::windows::common::WSLAContainerLauncher::AddNamedVolume(const std::string& Name, const std::string& ContainerPath, bool ReadOnly)
+{
+    const auto& name = m_volumeNames.emplace_back(Name);
+    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
+
+    WSLANamedVolume volume{};
+    volume.Name = name.c_str();
+    volume.ContainerPath = containerPath.c_str();
+    volume.ReadOnly = ReadOnly ? TRUE : FALSE;
+
+    m_namedVolumes.push_back(volume);
 }
 
 void wsl::windows::common::WSLAContainerLauncher::AddLabel(const std::string& Key, const std::string& Value)
@@ -268,6 +294,9 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 
     options.VolumesCount = static_cast<ULONG>(m_volumes.size());
     options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
+
+    options.NamedVolumesCount = static_cast<ULONG>(m_namedVolumes.size());
+    options.NamedVolumes = m_namedVolumes.size() > 0 ? m_namedVolumes.data() : nullptr;
 
     options.LabelsCount = static_cast<ULONG>(m_labels.size());
     options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;

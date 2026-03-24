@@ -24,7 +24,6 @@ Abstract:
 #include <gslhelpers.h>
 #include "registry.hpp"
 #include "versionhelpers.h"
-#include "hcs.hpp"
 #include <regstr.h>
 
 // Version numbers for various functionality that was backported.
@@ -454,14 +453,6 @@ std::string wsl::windows::common::helpers::GetWindowsVersionString()
 std::filesystem::path wsl::windows::common::helpers::GetWslConfigPath(_In_opt_ HANDLE userToken)
 {
     return wsl::windows::common::helpers::GetUserProfilePath(userToken) / L".wslconfig";
-}
-
-bool wsl::windows::common::helpers::IsDisableVgpuSettingsSupported()
-{
-    static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
-
-    // See if the Windows version has the required platform change.
-    return ((wsl::windows::common::hcs::GetSchemaVersion() >= c_schemaVersionNickel) && (GetWindowsVersion().BuildNumber >= 22545));
 }
 
 bool wsl::windows::common::helpers::IsPackageInstalled(_In_ LPCWSTR PackageFamilyName)
