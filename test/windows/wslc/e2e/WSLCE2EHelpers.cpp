@@ -138,6 +138,22 @@ wsla_schema::InspectImage InspectImage(const std::wstring& imageName)
     return inspectData[0];
 }
 
+namespace VT {
+    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste)
+    {
+        const auto containerId = InspectContainer(containerNameOrId).Id;
+        const auto shortId = GetHashId(containerId);
+        return BuildContainerPrompt(shortId, withBracketedPaste);
+    }
+
+    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId)
+    {
+        const auto containerId = InspectContainer(containerNameOrId).Id;
+        const auto shortId = GetHashId(containerId);
+        return BuildContainerAttachPrompt(shortId);
+    }
+} // namespace VT
+
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     auto listResult = RunWslc(L"container list --all");
@@ -154,7 +170,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
                 result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             }
 
-            auto result = RunWslc(std::format(L"container remove {}", containerName));
+            auto result = RunWslc(std::format(L"container remove --force {}", containerName));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             break;
         }
@@ -171,7 +187,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     {
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
-            auto deleteResult = RunWslc(std::format(L"image delete {}", image.NameAndTag()));
+            auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }

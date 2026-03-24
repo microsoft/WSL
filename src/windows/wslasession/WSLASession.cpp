@@ -28,20 +28,7 @@ constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
-{
-    size_t separator = Input.find_last_of(':');
-    if (separator == std::string::npos)
-    {
-        return {Input, {}};
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), separator >= Input.size() - 1 || separator == 0);
-
-    return {Input.substr(0, separator), Input.substr(separator + 1)};
-}
-
-void ValidateContainerName(LPCSTR Name)
+void ValidateName(LPCSTR Name)
 {
     const auto& locale = std::locale::classic();
     size_t i = 0;
@@ -50,11 +37,11 @@ void ValidateContainerName(LPCSTR Name)
     {
         if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslaInvalidName(Name));
         }
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
 }
 
 wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
@@ -156,6 +143,7 @@ try
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
     // Recover any existing containers from storage.
+    RecoverExistingVolumes();
     RecoverExistingContainers();
 
     errorCleanup.release();
@@ -232,7 +220,7 @@ void WSLASession::ConfigureStorage(const WSLASessionInitSettings& Settings, PSID
         std::tie(diskLun, diskDevice) = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false);
 
         // Then format it.
-        Ext4Format(diskDevice);
+        m_virtualMachine->Ext4Format(diskDevice);
     }
 
     // Mount the device to /root.
@@ -304,20 +292,26 @@ void WSLASession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
 
-HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WslaRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::PullImage(LPCSTR Image, const WslaRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
 
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF_NULL(E_POINTER, ImageUri);
-
-    auto [repo, tag] = ParseImage(ImageUri);
+    RETURN_HR_IF_NULL(E_POINTER, Image);
 
     auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->PullImage(repo, tag);
+    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+
+    if (!tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
+    auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest);
 
     auto io = CreateIOContext();
 
@@ -339,7 +333,7 @@ try
         }
 
         std::string contentString{Content.begin(), Content.end()};
-        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
+        WSL_LOG("ImagePullProgress", TraceLoggingValue(Image, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
 
         if (ProgressCallback == nullptr)
         {
@@ -574,15 +568,15 @@ try
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
-    auto [repo, tag] = ParseImage(ImageName);
+    auto [repo, tagOrDigest] = wslutil::ParseImage(ImageName);
 
-    THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
+    THROW_HR_IF_MSG(E_INVALIDARG, !tagOrDigest.has_value(), "Expected tag for image import: %hs", ImageName);
 
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tag.value(), ContentSize);
+    auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;
@@ -867,8 +861,7 @@ try
 
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
-                auto repoName = ParseImage(tag).first;
-                size_t colonPos = tag.find(':');
+                auto repoName = wslutil::ParseImage(tag).first;
                 auto it = repoToDigest.find(repoName);
                 if (it != repoToDigest.end())
                 {
@@ -1058,11 +1051,13 @@ try
     auto lock = m_lock.lock_shared();
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_eventTracker);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr)
     {
-        ValidateContainerName(containerOptions->Name);
+        ValidateName(containerOptions->Name);
     }
 
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
@@ -1071,11 +1066,13 @@ try
 
     try
     {
-        std::lock_guard containersLock{m_containersLock};
+        std::scoped_lock lock(m_containersLock, m_volumesLock);
+
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
             *this,
             m_virtualMachine.value(),
+            m_volumes,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -1105,7 +1102,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    ValidateContainerName(Id);
+    ValidateName(Id);
 
     // Look for an exact ID match first.
     auto lock = m_lock.lock_shared();
@@ -1342,15 +1339,6 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::Ext4Format(const std::string& Device)
-{
-    constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
-    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
-    auto result = launcher.Launch(*m_virtualMachine).WaitAndCaptureOutput();
-
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
-}
-
 HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
 try
 {
@@ -1368,17 +1356,69 @@ try
     auto detachDisk = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, lun]() { m_virtualMachine->DetachDisk(lun); });
 
     // Format it to ext4.
-    Ext4Format(device);
+    m_virtualMachine->Ext4Format(device);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-WSLAContainerState WSLAContainerImpl::State() const noexcept
+HRESULT WSLASession::CreateVolume(const WSLAVolumeOptions* Options)
+try
 {
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Name);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Type);
+
+    std::string name = Options->Name;
+    std::string type = Options->Type;
+
+    ValidateName(name.c_str());
+
     auto lock = m_lock.lock_shared();
-    return m_state;
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard volumesLock(m_volumesLock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidVolumeType(type), type != "vhd");
+
+    auto volume = WSLAVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), m_virtualMachine.value(), m_dockerClient.value());
+    auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
+    WI_VERIFY(inserted);
+
+    WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"));
+
+    return S_OK;
 }
+CATCH_RETURN();
+
+HRESULT WSLASession::DeleteVolume(LPCSTR Name)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Name);
+    std::string name = Name;
+    ValidateName(name.c_str());
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard volumesLock(m_volumesLock);
+
+    auto it = m_volumes.find(name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLA_E_VOLUME_NOT_FOUND, Localization::MessageWslaVolumeNotFound(name), it == m_volumes.end());
+
+    it->second->Delete();
+    m_volumes.erase(it);
+    WSL_LOG("VolumeDeleted", TraceLoggingValue(name.c_str(), "VolumeName"));
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLASession::Terminate()
 try
@@ -1390,9 +1430,10 @@ try
     // Acquire an exclusive lock to ensure that no operation is running.
     auto lock = m_lock.lock_exclusive();
     std::lock_guard containersLock(m_containersLock);
+    std::lock_guard volumesLock(m_volumesLock);
 
-    // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
+    m_volumes.clear();
 
     // Stop the IO relay.
     // This stops:
@@ -1611,6 +1652,7 @@ void WSLASession::RecoverExistingContainers()
                 dockerContainer,
                 *this,
                 m_virtualMachine.value(),
+                m_volumes,
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
@@ -1629,6 +1671,39 @@ void WSLASession::RecoverExistingContainers()
         "ContainersRecovered",
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_containers.size(), "ContainerCount"));
+}
+
+void WSLASession::RecoverExistingVolumes()
+{
+    WI_ASSERT(m_dockerClient.has_value());
+    WI_ASSERT(m_virtualMachine.has_value());
+
+    auto volumes = m_dockerClient->ListVolumes();
+
+    std::lock_guard volumesLock(m_volumesLock);
+
+    for (const auto& volume : volumes)
+    {
+        if (!volume.Labels.contains(WSLAVolumeMetadataLabel))
+        {
+            continue;
+        }
+
+        try
+        {
+            WI_ASSERT(!m_volumes.contains(volume.Name));
+
+            auto vhdVolume = WSLAVhdVolumeImpl::Open(volume, m_virtualMachine.value(), m_dockerClient.value());
+            auto [_, inserted] = m_volumes.insert({volume.Name, std::move(vhdVolume)});
+            WI_VERIFY(inserted);
+        }
+        CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());
+    }
+
+    WSL_LOG(
+        "VolumesRecovered",
+        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+        TraceLoggingValue(m_volumes.size(), "VolumeCount"));
 }
 
 } // namespace wsl::windows::service::wsla
