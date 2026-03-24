@@ -8,7 +8,7 @@
 #>
 
 [CmdletBinding()]
-Param ($Base)
+Param ($Base, [string]$Platform)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -32,10 +32,18 @@ function RunInDistro {
     }
 }
 
+if ([string]::IsNullOrEmpty($Platform)) {
+    if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
+        $Platform = "arm64"
+    } else {
+        $Platform = "x64"
+    }
+}
+
 $git_version = (git describe --tags).split('-')
 $version = "$($git_version[0])-$($git_version[1])"
 
-echo "Building test_distro version: $version"
+echo "Building test_distro version: $version for $Platform"
 
 Run { wsl.exe --install $Base --name test_distro --version 2 --no-launch }
 
@@ -50,7 +58,7 @@ RunInDistro("rm -rf /etc/wsl-distribution.conf /etc/wsl.conf /usr/share/doc/* /v
 RunInDistro('rm -rf -- $(ls /usr/share/locale ^| grep -vE "en|locale.alias")')
 RunInDistro("rm /usr/lib/systemd/user/{systemd-tmpfiles-setup.service,systemd-tmpfiles-clean.timer,systemd-tmpfiles-clean.service}")
 RunInDistro("rm /usr/lib/systemd/system/{systemd-tmpfiles-setup-dev.service,systemd-tmpfiles-setup.service,systemd-tmpfiles-clean.timer,systemd-tmpfiles-clean.service} /lib/systemd/system/{kmod-static-nodes.service,kmod.service,sysinit.target.wants/kmod-static-nodes.service}")
-Run { wsl.exe --export test_distro "test_distro.tar" }
-Run { wsl.exe xz -e9 "test_distro.tar" }
+New-Item -ItemType Directory -Path $Platform -Force
+Run { wsl.exe --export --format tar.xz test_distro "$Platform\test_distro.tar.xz" }
 
 & "$PSScriptRoot/../../_deps/nuget.exe" pack Microsoft.WSL.TestDistro.nuspec -Properties  version=$version
