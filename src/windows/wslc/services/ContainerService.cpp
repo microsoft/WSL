@@ -260,9 +260,9 @@ std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
-std::wstring ContainerService::FormatPorts(const std::vector<PortInformation>& ports)
+std::wstring ContainerService::FormatPorts(WSLAContainerState state, const std::vector<PortInformation>& ports)
 {
-    if (ports.empty())
+    if (state != WslaContainerStateRunning || ports.empty())
     {
         return L"";
     }
@@ -273,6 +273,11 @@ std::wstring ContainerService::FormatPorts(const std::vector<PortInformation>& p
         const auto& port = ports[i];
 
         std::wstring hostIp = wsl::shared::string::MultiByteToWide(port.BindingAddress);
+        if (hostIp.empty())
+        {
+            hostIp = L"0.0.0.0";
+        }
+
         std::wstring protocol = (port.Protocol == IPPROTO_TCP)   ? L"tcp"
                                 : (port.Protocol == IPPROTO_UDP) ? L"udp"
                                                                  : std::format(L"{}", port.Protocol);
@@ -368,18 +373,20 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
 
+        // Ensure nested ports allocations are freed even if extraction throws.
+        auto portsCleanup = wil::scope_exit([&current]() {
+            for (ULONG i = 0; i < current.PortsCount; ++i)
+            {
+                CoTaskMemFree(const_cast<LPSTR>(current.Ports[i].BindingAddress));
+            }
+            CoTaskMemFree(current.Ports);
+        });
+
         // Extract ports
         for (ULONG i = 0; i < current.PortsCount; ++i)
         {
             entry.Ports.push_back(PortInformationFromWSLAPortMapping(current.Ports[i]));
         }
-
-        // Free nested ports array
-        for (ULONG i = 0; i < current.PortsCount; ++i)
-        {
-            CoTaskMemFree(const_cast<LPSTR>(current.Ports[i].BindingAddress));
-        }
-        CoTaskMemFree(current.Ports);
 
         result.emplace_back(std::move(entry));
     }

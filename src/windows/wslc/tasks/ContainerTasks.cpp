@@ -146,7 +146,7 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(container.Image),
                 ContainerService::FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
-                ContainerService::FormatPorts(container.Ports),
+                ContainerService::FormatPorts(container.State, container.Ports),
             });
         }
 
