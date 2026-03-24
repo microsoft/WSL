@@ -36,7 +36,7 @@ void AttachToSession(CLIExecutionContext& context)
     }
     else
     {
-        sessionId = SessionOptions::c_defaultDisplayName;
+        sessionId = SessionOptions::s_defaultSessionName;
     }
 
     context.ExitCode = SessionService::Attach(sessionId);
@@ -48,9 +48,10 @@ void CreateSession(CLIExecutionContext& context)
     {
         // If provided session name is not the default CLI session, open that one.
         const auto& sessionName = context.Args.Get<ArgType::Session>();
-        if (!wsl::shared::string::IsEqual(sessionName, SessionOptions::c_defaultDisplayName))
+        if (!wsl::shared::string::IsEqual(sessionName, SessionOptions::s_defaultSessionName))
         {
             context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
+            return;
         }
     }
 

@@ -35,7 +35,7 @@ private:
 class SessionOptions
 {
 public:
-    static constexpr const wchar_t c_defaultDisplayName[] = L"wslc-cli";
+    static constexpr const wchar_t s_defaultSessionName[] = L"wslc-cli";
     static constexpr uint32_t c_defaultCpuCount = 4;
     static constexpr uint32_t c_defaultMemoryMb = 2048;
     static constexpr uint32_t c_defaultBootTimeoutMs = 30000;

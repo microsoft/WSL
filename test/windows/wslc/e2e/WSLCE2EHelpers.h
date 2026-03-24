@@ -112,7 +112,7 @@ struct TestSession
         return m_name;
     }
 
-    const std::wstring& StoragePath() const
+    const std::filesystem::path& StoragePath() const
     {
         return m_storagePath;
     }

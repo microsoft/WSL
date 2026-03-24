@@ -25,8 +25,16 @@ using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
 namespace {
-    const std::filesystem::path s_sessionStorageBasePath =
-        std::filesystem::absolute(std::filesystem::path(g_testDataPath) / L"wslc-cli-test-sessions");
+    // Lazily compute the session storage base path after g_testDataPath is initialized.
+    struct SessionStorageBasePathAccessor
+    {
+        operator const std::filesystem::path&() const
+        {
+            static const std::filesystem::path basePath =
+                std::filesystem::absolute(std::filesystem::path(g_testDataPath) / L"wslc-cli-test-sessions");
+            return basePath;
+        }
+    };
 
     static wil::com_ptr<IWSLASessionManager> OpenSessionManager()
     {
@@ -116,7 +124,8 @@ const TestImage& InvalidTestImage()
 
 TestSession TestSession::Create(const std::wstring& displayName, WSLANetworkingMode networkingMode)
 {
-    auto storagePath = s_sessionStorageBasePath / displayName;
+    const std::filesystem::path& basePath = SessionStorageBasePathAccessor();
+    auto storagePath = basePath / displayName;
     auto session = CreateCustomSession(displayName, storagePath.wstring(), networkingMode);
     return TestSession{displayName, storagePath.wstring(), std::move(session)};
 }
