@@ -1180,7 +1180,6 @@ try
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
-
         const auto& ports = e->GetPorts();
         if (!ports.empty())
         {
