@@ -134,6 +134,7 @@ private:
         output << GetWslcHeader()        //
                << GetDescription()       //
                << GetUsage()             //
+               << GetAvailableCommandAliases() //
                << GetAvailableCommands() //
                << GetAvailableOptions();
         return output.str();
@@ -141,12 +142,17 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Deletes images.\r\n\r\n";
+        return L"Removes images.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
     {
-        return L"Usage: wslc image delete [<options>] <image>\r\n\r\n";
+        return L"Usage: wslc image remove [<options>] <image>\r\n\r\n";
+    }
+
+    std::wstring GetAvailableCommandAliases() const
+    {
+        return L"The following command aliases are available: delete rm\r\n\r\n";
     }
 
     std::wstring GetAvailableCommands() const

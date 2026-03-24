@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ImageDeleteCommand.cpp
+    ImageRemoveCommand.cpp
 
 Abstract:
 
@@ -23,8 +23,8 @@ using namespace wsl::windows::wslc::task;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
-// Image Delete Command
-std::vector<Argument> ImageDeleteCommand::GetArguments() const
+// Image Remove Command
+std::vector<Argument> ImageRemoveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
@@ -34,17 +34,17 @@ std::vector<Argument> ImageDeleteCommand::GetArguments() const
     };
 }
 
-std::wstring ImageDeleteCommand::ShortDescription() const
+std::wstring ImageRemoveCommand::ShortDescription() const
 {
-    return {L"Delete images."};
+    return {L"Remove images."};
 }
 
-std::wstring ImageDeleteCommand::LongDescription() const
+std::wstring ImageRemoveCommand::LongDescription() const
 {
-    return {L"Deletes images."};
+    return {L"Removes images."};
 }
 
-void ImageDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ImageRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context              //
         << CreateSession //
