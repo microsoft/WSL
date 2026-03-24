@@ -424,6 +424,11 @@ class WSLATests
         // Validat that PullImage() returns the appropriate error if the session is terminated.
         {
             VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+            auto cleanup = wil::scope_exit([&]() {
+                ResetTestSession(); // Reopen the test session since the session was terminated.
+            });
+
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
