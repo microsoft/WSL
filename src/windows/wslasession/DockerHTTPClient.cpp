@@ -118,14 +118,16 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 {
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& Tag)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest)
 {
     auto url = URL::Create("/images/create");
+
+    // TODO: Support pulling from other registries.
     url.SetParameter("fromImage", std::format("library/{}", Repo));
 
-    if (Tag.has_value())
+    if (tagOrDigest.has_value())
     {
-        url.SetParameter("tag", Tag.value());
+        url.SetParameter("tag", tagOrDigest.value());
     }
 
     return SendRequestImpl(verb::post, url, {}, {});
