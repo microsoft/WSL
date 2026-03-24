@@ -71,7 +71,7 @@ class WSLCE2EGlobalTests
             std::wstring::npos,
             L"Session name 'wslc-test-session' not found in session list output");
 
-        // Run container list a valid image in the test session which should succeed if the session is valid.
+        // Run container list in the test session, which should succeed if the session is valid.
         result = RunWslc(std::format(L"container list --session {}", session.Name()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
