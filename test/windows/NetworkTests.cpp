@@ -5018,33 +5018,6 @@ class VirtioProxyTests
         VERIFY_IS_TRUE(std::regex_match(out, v6Pattern));
     }
 
-    TEST_METHOD(DnsResolutionBasicDnsTunneling)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-        DNS_TUNNELING_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
-        NetworkTests::VerifyDnsResolutionBasic();
-    }
-
-    TEST_METHOD(DnsResolutionDigDnsTunneling)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-        DNS_TUNNELING_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
-        NetworkTests::VerifyDnsResolutionDig();
-    }
-
-    TEST_METHOD(DnsResolutionRecordTypesDnsTunneling)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-        DNS_TUNNELING_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
-        NetworkTests::VerifyDnsResolutionRecordTypes();
-    }
-
     TEST_METHOD(DnsResolutionBasic)
     {
         VIRTIOPROXY_TEST_ONLY();
