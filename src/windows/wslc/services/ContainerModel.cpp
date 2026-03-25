@@ -190,14 +190,9 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     return vm;
 }
 
-static inline bool IsSpace(wchar_t ch)
-{
-    return std::iswspace(ch) != 0;
-}
-
 std::optional<std::wstring> EnvironmentVariable::Parse(const std::wstring& entry)
 {
-    if (entry.empty() || std::all_of(entry.begin(), entry.end(), IsSpace))
+    if (entry.empty() || std::all_of(entry.begin(), entry.end(), std::iswspace))
     {
         return std::nullopt;
     }
@@ -221,21 +216,21 @@ std::optional<std::wstring> EnvironmentVariable::Parse(const std::wstring& entry
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Environment variable key cannot be empty");
     }
 
-    if (std::any_of(key.begin(), key.end(), IsSpace))
+    if (std::any_of(key.begin(), key.end(), std::iswspace))
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment variable key '{}' cannot contain whitespace", key));
     }
 
     if (!value.has_value())
     {
-        wil::unique_hglobal_string envValue;
+        std::wstring envValue;
         auto hr = wil::GetEnvironmentVariableW(key.c_str(), envValue);
-        if (FAILED(hr) || envValue.get() == nullptr)
+        if (FAILED(hr))
         {
             return std::nullopt;
         }
 
-        value = std::wstring(envValue.get());
+        value = envValue;
     }
 
     return std::format(L"{}={}", key, value.value());

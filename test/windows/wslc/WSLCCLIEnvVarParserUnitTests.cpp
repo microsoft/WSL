@@ -26,7 +26,7 @@ namespace WSLCCLIEnvVarParserUnitTests {
 
 class WSLCCLIEnvVarParserUnitTests
 {
-    WSL_TEST_CLASS(WSLCCLIEnvVarParserUnitTests)
+    WSLA_TEST_CLASS(WSLCCLIEnvVarParserUnitTests)
 
     TEST_METHOD_SETUP(TestMethodSetup)
     {
@@ -71,10 +71,26 @@ class WSLCCLIEnvVarParserUnitTests
 
     TEST_METHOD(WSLCCLIEnvVarParser_InvalidKeysThrow)
     {
-        VERIFY_THROWS(models::EnvironmentVariable::Parse(L"=value"), std::exception);
-        VERIFY_THROWS(models::EnvironmentVariable::Parse(L"BAD KEY=value"), std::exception);
-        VERIFY_THROWS(models::EnvironmentVariable::Parse(L"BAD\tKEY=value"), std::exception);
-        VERIFY_THROWS(models::EnvironmentVariable::Parse(L"BAD\nKEY=value"), std::exception);
+        auto verifyThrowsWithMessage = [](const std::wstring& input, const std::wstring& expectedSubstring) {
+            try
+            {
+                (void)models::EnvironmentVariable::Parse(input);
+                VERIFY_FAIL(L"Expected exception");
+            }
+            catch (const wil::ResultException& ex)
+            {
+                VERIFY_ARE_EQUAL(E_INVALIDARG, ex.GetErrorCode());
+
+                const auto raw = ex.GetFailureInfo().pszMessage;
+                std::wstring message = raw ? raw : L"";
+                VERIFY_ARE_EQUAL(expectedSubstring, message);
+            }
+        };
+
+        verifyThrowsWithMessage(L"=value", L"Environment variable key cannot be empty");
+        verifyThrowsWithMessage(L"BAD KEY=value", L"Environment variable key 'BAD KEY' cannot contain whitespace");
+        verifyThrowsWithMessage(L"BAD\tKEY=value", L"Environment variable key 'BAD\tKEY' cannot contain whitespace");
+        verifyThrowsWithMessage(L"BAD\nKEY=value", L"Environment variable key 'BAD\nKEY' cannot contain whitespace");
     }
 
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileParsesAndSkipsExpectedLines)
@@ -104,7 +120,19 @@ class WSLCCLIEnvVarParserUnitTests
 
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileThrowsWhenMissing)
     {
-        VERIFY_THROWS(models::EnvironmentVariable::ParseFile(L"ENV_FILE_NOT_FOUND"), std::exception);
+        try
+        {
+            (void)models::EnvironmentVariable::ParseFile(L"ENV_FILE_NOT_FOUND");
+            VERIFY_FAIL(L"Expected exception");
+        }
+        catch (const wil::ResultException& ex)
+        {
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ex.GetErrorCode());
+
+            const auto raw = ex.GetFailureInfo().pszMessage;
+            std::wstring message = raw ? raw : L"";
+            VERIFY_ARE_EQUAL(L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading", message);
+        }
     }
 
     TEST_METHOD(WSLCCLIEnvVarParser_ExplicitEmptyValueIsValid)
@@ -154,12 +182,24 @@ class WSLCCLIEnvVarParserUnitTests
 
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileThrowsOnInvalidLine)
     {
-        std::ofstream file(EnvTestFile);
-        VERIFY_IS_TRUE(file.is_open());
-        file << "BAD KEY=value\n";
-        file.close();
+        try
+        {
+            std::ofstream file(EnvTestFile);
+            VERIFY_IS_TRUE(file.is_open());
+            file << "BAD KEY=value\n";
+            file.close();
 
-        VERIFY_THROWS(models::EnvironmentVariable::ParseFile(EnvTestFile.wstring()), std::exception);
+            (void)models::EnvironmentVariable::ParseFile(EnvTestFile.wstring());
+            VERIFY_FAIL(L"Expected exception");
+        }
+        catch (const wil::ResultException& ex)
+        {
+            VERIFY_ARE_EQUAL(E_INVALIDARG, ex.GetErrorCode());
+
+            const auto raw = ex.GetFailureInfo().pszMessage;
+            std::wstring message = raw ? raw : L"";
+            VERIFY_ARE_EQUAL(L"Environment variable key 'BAD KEY' cannot contain whitespace", message);
+        }
     }
 
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileEmptyFileReturnsEmpty)
