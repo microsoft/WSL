@@ -18,6 +18,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "WSLAVolumeMetadata.h"
 #include "WslCoreFilesystem.h"
+#include "wsla_schema.h"
 
 using namespace wsl::windows::common;
 using wsl::shared::Localization;
@@ -28,7 +29,7 @@ namespace {
     std::string SerializeVhdVolumeMetadata(const std::filesystem::path& HostPath, ULONGLONG SizeBytes)
     {
         WSLAVolumeMetadata metadata{};
-        metadata.Type = "vhd";
+        metadata.Type = WSLAVhdVolumeType;
 
         WSLAVhdVolumeMetadata vhdMetadata{};
         vhdMetadata.V1 = WSLAVhdVolumeMetadataV1{HostPath.wstring(), SizeBytes};
@@ -132,7 +133,7 @@ std::unique_ptr<WSLAVhdVolumeImpl> WSLAVhdVolumeImpl::Open(
     THROW_HR_IF(E_INVALIDARG, metadataIt == Volume.Labels.end());
 
     auto metadata = wsl::shared::FromJson<WSLAVolumeMetadata>(metadataIt->second.c_str());
-    THROW_HR_IF(E_INVALIDARG, metadata.Type != "vhd");
+    THROW_HR_IF(E_INVALIDARG, metadata.Type != WSLAVhdVolumeType);
     THROW_HR_IF(E_INVALIDARG, !metadata.VhdVolumeMetadata.has_value() || !metadata.VhdVolumeMetadata->V1.has_value());
 
     const auto& vhdMetadata = metadata.VhdVolumeMetadata->V1.value();
@@ -177,6 +178,19 @@ void WSLAVhdVolumeImpl::Delete()
 
     Detach();
     LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_hostPath.c_str()));
+}
+
+std::string WSLAVhdVolumeImpl::Inspect() const
+{
+    wsla_schema::InspectVolume inspect{};
+    inspect.Name = m_name;
+    inspect.Type = WSLAVhdVolumeType;
+    inspect.VhdVolume = wsla_schema::InspectVhdVolume{
+        m_hostPath.string(),
+        m_sizeBytes,
+    };
+
+    return wsl::shared::ToJson(inspect);
 }
 
 void WSLAVhdVolumeImpl::Detach()

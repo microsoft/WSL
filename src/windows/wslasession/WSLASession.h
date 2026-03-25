@@ -79,6 +79,8 @@ public:
     // Volume management.
     IFACEMETHOD(CreateVolume)(_In_ const WSLAVolumeOptions* Options) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
+    IFACEMETHOD(ListVolumes)(_Out_ WSLAVolumeInformation** Volumes, _Out_ ULONG* Count) override;
+    IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
     IFACEMETHOD(Terminate()) override;
 
