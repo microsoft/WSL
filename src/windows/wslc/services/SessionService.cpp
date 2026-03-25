@@ -56,7 +56,7 @@ int SessionService::Attach(const std::wstring& sessionName)
 
     // Launch with terminal fds (PTY).
     wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin};
-    launcher.SetTtySize(windowSize.X, windowSize.Y);
+    launcher.SetTtySize(windowSize.Y, windowSize.X);
     auto process = launcher.Launch(*session);
     auto tty = process.GetStdHandle(WSLAFDTty);
     auto updateTerminalSize = [&]() {

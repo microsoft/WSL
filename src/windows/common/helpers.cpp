@@ -689,3 +689,21 @@ bool wsl::windows::common::helpers::TryAttachConsole()
 
     return ReopenStdHandles();
 }
+
+void wsl::windows::common::helpers::RegisterWithDcat(_In_ bool IncludeVersionNumber)
+try
+{
+    std::wstring registeredVersion;
+    if (IncludeVersionNumber)
+    {
+        registeredVersion.assign(TEXT(WSL_PACKAGE_VERSION));
+    }
+    else
+    {
+        registeredVersion.assign(L"0.0.0.0");
+    }
+
+    wil::unique_hkey dcatKey = wsl::windows::common::registry::CreateKey(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_SET_VALUE);
+    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, L"Version", registeredVersion.c_str());
+}
+CATCH_LOG()
