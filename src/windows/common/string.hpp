@@ -48,6 +48,9 @@ std::string WideToMultiByte(_In_opt_ LPCWSTR Source, _In_ size_t CharacterCount 
 
 std::string WideToMultiByte(_In_ std::wstring_view Source);
 
+std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
+std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
+
 struct PhysicalMacAddress
 {
     BYTE Address[MAX_ADAPTER_ADDRESS_LENGTH]{};

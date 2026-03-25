@@ -16,7 +16,7 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "SessionTasks.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include "Task.h"
 
 using namespace wsl::shared;
@@ -57,16 +57,18 @@ void ListSessions(CLIExecutionContext& context)
         wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
     }
 
-    utils::TablePrinter tablePrinter(
+    wsl::windows::wslc::TableOutput<3> table(
         {Localization::MessageWslaHeaderId(), Localization::MessageWslaHeaderCreatorPid(), Localization::MessageWslaHeaderDisplayName()});
+
     for (const auto& session : sessions)
     {
-        tablePrinter.AddRow({
+        table.OutputLine({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
             session.DisplayName,
         });
     }
-    tablePrinter.Print();
+
+    table.Complete();
 }
 } // namespace wsl::windows::wslc::task
