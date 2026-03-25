@@ -261,7 +261,7 @@ HRESULT OnDistroStarted(const WSLSessionInformation* Session, const WSLDistribut
 
         // Validate that the process actually ran inside the distro.
         auto output = ReadFromSocket(socket.get());
-        const auto expected = "Debian GNU/Linux 12\n";
+        const auto expected = "Debian GNU/Linux 13\n";
         if (std::string(output.begin(), output.end()) != expected)
         {
             g_logfile << "Got unexpected output from bash: " << std::string(output.begin(), output.end())

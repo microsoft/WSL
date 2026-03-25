@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "WslInstaller.h"
 
 extern wil::unique_event g_stopEvent;
@@ -75,7 +76,7 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
         }
     };
 
-    auto result = wsl::windows::common::wslutil::UpgradeViaMsi(
+    auto result = wsl::windows::common::install::UpgradeViaMsi(
         GetMsiPackagePath().c_str(), L"SKIPMSIX=1", logFile.has_value() ? logFile->c_str() : nullptr, messageCallback);
 
     WSL_LOG("MSIUpgradeResult", TraceLoggingValue(result, "result"), TraceLoggingValue(errors.c_str(), "errorMessage"));
@@ -140,7 +141,7 @@ std::shared_ptr<InstallContext> LaunchInstall()
         return {};
     }
 
-    wsl::windows::common::wslutil::WriteInstallLog(std::format("Starting upgrade via WslInstaller. Previous version: {}", existingVersion));
+    wsl::windows::common::install::WriteInstallLog(std::format("Starting upgrade via WslInstaller. Previous version: {}", existingVersion));
 
     // Return an existing install if any
     if (auto ptr = weak_context.lock(); ptr != nullptr)
