@@ -435,21 +435,21 @@ private:
 
             THROW_HR_MSG(
                 E_UNEXPECTED,
-                "Protocol error: Received message size: %u, sequence: %u, type: %u. Expected type: %u, "
+                "Protocol error: Received message size: %u, type: %u, sequence: %u. Expected type: %u, "
                 "channel: %hs",
                 header.MessageSize,
-                header.SequenceNumber,
                 header.MessageType,
+                header.SequenceNumber,
                 expected,
                 m_name);
 #else
 
             LOG_ERROR(
-                "Protocol error: Received message size: {}, sequence: {}, type: {}. Expected type: {}, "
+                "Protocol error: Received message size: {}, type: {}, sequence: {}. Expected type: {}, "
                 "channel: {}",
                 header.MessageSize,
-                header.SequenceNumber,
                 header.MessageType,
+                header.SequenceNumber,
                 expected,
                 m_name);
 
