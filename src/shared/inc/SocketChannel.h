@@ -438,8 +438,8 @@ private:
                 "Protocol error: Received message size: %u, sequence: %u, type: %u. Expected type: %u, "
                 "channel: %hs",
                 header.MessageSize,
-                header.MessageType,
                 header.SequenceNumber,
+                header.MessageType,
                 expected,
                 m_name);
 #else
@@ -448,8 +448,8 @@ private:
                 "Protocol error: Received message size: {}, sequence: {}, type: {}. Expected type: {}, "
                 "channel: {}",
                 header.MessageSize,
-                header.MessageType,
                 header.SequenceNumber,
+                header.MessageType,
                 expected,
                 m_name);
 
