@@ -531,7 +531,7 @@ interface IWSLASession : IUnknown
     HRESULT GetState([out] WSLASessionState* State);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const  WslaRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] const  WslaRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT BuildImage([in] const WSLABuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
