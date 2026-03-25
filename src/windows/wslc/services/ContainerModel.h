@@ -77,7 +77,7 @@ struct ContainerInformation
     ULONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
 };
 
 struct PublishPort
