@@ -1732,9 +1732,7 @@ class WslcSdkTests
         auto ioCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID c) {
             static_cast<Context*>(c)->callbackCount.fetch_add(1);
         };
-        auto exitCb = [](INT32, PVOID c) {
-            static_cast<Context*>(c)->exitFired.store(true);
-        };
+        auto exitCb = [](INT32, PVOID c) { static_cast<Context*>(c)->exitFired.store(true); };
 
         // Continuous writer: emits one line every 50 ms indefinitely.
         WslcProcessSettings execProcSettings;
