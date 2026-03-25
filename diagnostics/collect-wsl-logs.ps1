@@ -328,8 +328,15 @@ if ($Dump)
     }
 }
 
-$logArchive = "$(Resolve-Path $folder).zip"
-Compress-Archive -Path $folder -DestinationPath $logArchive
-Remove-Item $folder -Recurse
-
-Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+$logArchive = "$(Resolve-Path $folder).tar.gz"
+tar.exe -czf $logArchive $folder
+if ($LASTEXITCODE -eq 0)
+{
+    Remove-Item $folder -Recurse
+    Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+}
+else
+{
+    Remove-Item $logArchive -ErrorAction Ignore
+    Write-Host -ForegroundColor Red "Failed to compress logs. They are available in: $(Resolve-Path $folder)"
+}
