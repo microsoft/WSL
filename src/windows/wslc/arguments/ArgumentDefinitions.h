@@ -79,5 +79,5 @@ _(User,           "user",                L"u",              Kind::Value,       L
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details") \
 _(Version,        "version",             L"v",              Kind::Flag,        L"Show version information for this tool") \
 _(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container") \
-_(Volume,         "volume",              NO_ALIAS,          Kind::Value,       L"Bind mount a volume to the container") \
+_(Volume,         "volume",              L"v",              Kind::Value,       L"Bind mount a volume to the container") \
 // clang-format on

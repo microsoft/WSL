@@ -16,6 +16,7 @@ Abstract:
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "ImageService.h"
+#include "PullImageCallback.h"
 #include <wslutil.h>
 #include <WSLAProcessLauncher.h>
 #include <CommandLine.h>
@@ -75,8 +76,7 @@ static void SetContainerArguments(WSLAProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLAContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
+static wsl::windows::common::RunningWSLAContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
 {
     auto processFlags = WSLAProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
@@ -131,9 +131,13 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
-        PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
-        ImageService imageService;
-        imageService.Pull(session, image, callback);
+        {
+            // Attempt to pull the image if not found
+            PullImageCallback callback;
+            PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
+            ImageService imageService;
+            imageService.Pull(session, image, &callback);
+        }
         return containerLauncher.Create(*session.Get());
     }
 
@@ -246,10 +250,10 @@ std::wstring ContainerService::ContainerStateToString(WSLAContainerState state, 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
-int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
+int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions, callback);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
 
@@ -271,9 +275,9 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     return 0;
 }
 
-CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
+CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
-    auto runningContainer = CreateInternal(session, image, runOptions, callback);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLAContainerId id{};
