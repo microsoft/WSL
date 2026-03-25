@@ -1496,6 +1496,7 @@ HRESULT WSLAContainer::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, UL
 HRESULT WSLAContainer::GetState(WSLAContainerState* Result)
 {
     COMServiceExecutionContext context;
+    RETURN_HR_IF_NULL(E_POINTER, Result);
 
     {
         auto cacheLock = m_cacheLock.lock_shared();
@@ -1520,7 +1521,7 @@ HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
         auto cacheLock = m_cacheLock.lock_shared();
         if (m_cachedInitProcess)
         {
-            return m_cachedInitProcess.CopyTo(Process);
+            return m_cachedInitProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process);
         }
     }
 
@@ -1634,6 +1635,7 @@ try
 {
     COMServiceExecutionContext context;
 
+    RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
 
     {
