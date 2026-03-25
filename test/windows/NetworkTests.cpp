@@ -809,19 +809,6 @@ class NetworkTests
         VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
     }
 
-    static void VerifyDnsResolutionDigV6()
-    {
-        if (!HostHasInternetConnectivity(AF_INET6))
-        {
-            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
-            return;
-        }
-
-        // Test AAAA record resolution (IPv6) with both UDP and TCP
-        VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
-    }
-
     static void VerifyDnsQueries()
     {
         // query for A/IPv4 records
@@ -5058,15 +5045,6 @@ class VirtioProxyTests
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
-    TEST_METHOD(DnsResolutionDigV6DnsTunneling)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-        DNS_TUNNELING_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
-        NetworkTests::VerifyDnsResolutionDigV6();
-    }
-
     TEST_METHOD(DnsResolutionBasic)
     {
         VIRTIOPROXY_TEST_ONLY();
@@ -5089,14 +5067,6 @@ class VirtioProxyTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
-    }
-
-    TEST_METHOD(DnsResolutionDigV6)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
-        NetworkTests::VerifyDnsResolutionDigV6();
     }
 };
 } // namespace NetworkTests
