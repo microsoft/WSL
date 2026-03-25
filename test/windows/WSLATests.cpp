@@ -3409,8 +3409,10 @@ class WSLATests
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
 
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -3422,7 +3424,6 @@ class WSLATests
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
                 VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
                 VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
-                VERIFY_ARE_EQUAL(0, containers[i].PortsCount);
             }
         };
 
@@ -3454,7 +3455,9 @@ class WSLATests
             ULONGLONG runningCreatedAt{};
             {
                 wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
                 VERIFY_ARE_EQUAL(containers.size(), 1);
                 runningStateChangedAt = containers[0].StateChangedAt;
                 runningCreatedAt = containers[0].CreatedAt;
@@ -3481,7 +3484,9 @@ class WSLATests
             // Verify that StateChangedAt was updated after the state transition.
             {
                 wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
                 VERIFY_ARE_EQUAL(containers.size(), 1);
 
                 auto now = static_cast<ULONGLONG>(time(nullptr));
@@ -3677,8 +3682,10 @@ class WSLATests
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
 
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -3690,7 +3697,6 @@ class WSLATests
                 VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
                 VERIFY_IS_TRUE(containers[i].StateChangedAt > 0);
                 VERIFY_IS_TRUE(containers[i].CreatedAt > 0);
-                VERIFY_ARE_EQUAL(0, containers[i].PortsCount);
             }
         };
 
@@ -4137,40 +4143,40 @@ class WSLATests
             // Verify that ListContainers returns the port data.
             {
                 wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>()));
+                wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
-                auto freeNestedPorts = wil::scope_exit([&]() noexcept {
-                    for (const auto& entry : containers)
-                    {
-                        for (ULONG j = 0; j < entry.PortsCount; ++j)
-                        {
-                            CoTaskMemFree(const_cast<LPSTR>(entry.Ports[j].BindingAddress));
-                        }
-                        CoTaskMemFree(entry.Ports);
-                    }
-                });
-
-                bool found = false;
+                // Find the container ID for "test-ports"
+                std::string testPortsId;
                 for (const auto& entry : containers)
                 {
                     if (std::string(entry.Name) == "test-ports")
                     {
-                        found = true;
-                        VERIFY_IS_NOT_NULL(entry.Ports);
-                        VERIFY_ARE_EQUAL(2, entry.PortsCount);
-                        VERIFY_ARE_EQUAL(1234, entry.Ports[0].HostPort);
-                        VERIFY_ARE_EQUAL(8000, entry.Ports[0].ContainerPort);
-                        VERIFY_ARE_EQUAL(AF_INET, entry.Ports[0].Family);
-                        VERIFY_ARE_EQUAL(1234, entry.Ports[1].HostPort);
-                        VERIFY_ARE_EQUAL(8000, entry.Ports[1].ContainerPort);
-                        VERIFY_ARE_EQUAL(AF_INET6, entry.Ports[1].Family);
-                        VERIFY_ARE_EQUAL(IPPROTO_TCP, entry.Ports[0].Protocol);
-                        VERIFY_ARE_EQUAL(IPPROTO_TCP, entry.Ports[1].Protocol);
+                        testPortsId = entry.Id;
                         break;
                     }
                 }
+                VERIFY_IS_FALSE(testPortsId.empty());
 
-                VERIFY_IS_TRUE(found);
+                // Filter ports for this container
+                std::vector<WSLAPortMapping> containerPorts;
+                for (const auto& port : ports)
+                {
+                    if (testPortsId == port.Id)
+                    {
+                        containerPorts.push_back(port.PortMapping);
+                    }
+                }
+
+                VERIFY_ARE_EQUAL(2, containerPorts.size());
+                VERIFY_ARE_EQUAL(1234, containerPorts[0].HostPort);
+                VERIFY_ARE_EQUAL(8000, containerPorts[0].ContainerPort);
+                VERIFY_ARE_EQUAL(AF_INET, containerPorts[0].Family);
+                VERIFY_ARE_EQUAL(1234, containerPorts[1].HostPort);
+                VERIFY_ARE_EQUAL(8000, containerPorts[1].ContainerPort);
+                VERIFY_ARE_EQUAL(AF_INET6, containerPorts[1].Family);
+                VERIFY_ARE_EQUAL(IPPROTO_TCP, containerPorts[0].Protocol);
+                VERIFY_ARE_EQUAL(IPPROTO_TCP, containerPorts[1].Protocol);
             }
 
             // Validate that the port cannot be reused while the container is running.
@@ -4275,7 +4281,7 @@ class WSLATests
             // Invalid address family (launched manually because AddPort() throws on unsupported family).
             {
                 WSLAPortMapping port{};
-                port.BindingAddress = "127.0.0.1";
+                strcpy_s(port.BindingAddress, "127.0.0.1");
                 port.HostPort = 1234;
                 port.ContainerPort = 1234;
                 port.Protocol = IPPROTO_TCP;
@@ -4783,7 +4789,8 @@ class WSLATests
 
             // Capture StateChangedAt and CreatedAt before the session is destroyed.
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
             originalStateChangedAt = containers[0].StateChangedAt;
             originalCreatedAt = containers[0].CreatedAt;
@@ -4800,7 +4807,8 @@ class WSLATests
 
             // Verify that StateChangedAt was correctly restored from the Docker timestamp.
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
             VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
             VERIFY_ARE_EQUAL(containers[0].CreatedAt, originalCreatedAt);
@@ -5554,7 +5562,9 @@ class WSLATests
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 0);
         }
     }
@@ -5660,7 +5670,9 @@ class WSLATests
 
         {
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
             if (containers.size() > 0)
             {

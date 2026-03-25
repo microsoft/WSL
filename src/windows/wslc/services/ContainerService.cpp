@@ -152,7 +152,7 @@ static PortInformation PortInformationFromWSLAPortMapping(const WSLAPortMapping&
         .HostPort = mapping.HostPort,
         .ContainerPort = mapping.ContainerPort,
         .Protocol = static_cast<int>(mapping.Protocol),
-        .BindingAddress = mapping.BindingAddress ? mapping.BindingAddress : "",
+        .BindingAddress = mapping.BindingAddress,
     };
 }
 
@@ -277,10 +277,6 @@ std::wstring ContainerService::FormatPorts(WSLAContainerState state, const std::
         const auto& port = ports[i];
 
         std::wstring hostIp = wsl::shared::string::MultiByteToWide(port.BindingAddress);
-        if (hostIp.empty())
-        {
-            hostIp = L"0.0.0.0";
-        }
 
         std::wstring protocol = (port.Protocol == IPPROTO_TCP)   ? L"tcp"
                                 : (port.Protocol == IPPROTO_UDP) ? L"udp"
@@ -366,7 +362,9 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
+    wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
     for (const auto& current : containers)
     {
         ContainerInformation entry;
@@ -377,19 +375,12 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
 
-        // Ensure nested ports allocations are freed even if extraction throws.
-        auto portsCleanup = wil::scope_exit([&current]() {
-            for (ULONG i = 0; i < current.PortsCount; ++i)
-            {
-                CoTaskMemFree(const_cast<LPSTR>(current.Ports[i].BindingAddress));
-            }
-            CoTaskMemFree(current.Ports);
-        });
-
-        // Extract ports
-        for (ULONG i = 0; i < current.PortsCount; ++i)
+        for (const auto& port : ports)
         {
-            entry.Ports.push_back(PortInformationFromWSLAPortMapping(current.Ports[i]));
+            if (strcmp(port.Id, current.Id) == 0)
+            {
+                entry.Ports.push_back(PortInformationFromWSLAPortMapping(port.PortMapping));
+            }
         }
 
         result.emplace_back(std::move(entry));

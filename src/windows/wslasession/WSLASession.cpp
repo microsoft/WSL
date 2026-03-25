@@ -1144,13 +1144,15 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::ListContainers(WSLAContainerEntry** Containers, ULONG* Count)
+HRESULT WSLASession::ListContainers(WSLAContainerEntry** Containers, ULONG* Count, WSLAContainerPortMapping** Ports, ULONG* PortsCount)
 try
 {
     COMServiceExecutionContext context;
 
     *Count = 0;
     *Containers = nullptr;
+    *Ports = nullptr;
+    *PortsCount = 0;
 
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock{m_containersLock};
@@ -1159,19 +1161,9 @@ try
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
 
     auto output = wil::make_unique_cotaskmem<WSLAContainerEntry[]>(m_containers.size());
+    std::vector<WSLAContainerPortMapping> allPorts;
 
     size_t index = 0;
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        for (size_t i = 0; i < index; ++i)
-        {
-            for (ULONG j = 0; j < output[i].PortsCount; ++j)
-            {
-                CoTaskMemFree(const_cast<LPSTR>(output[i].Ports[j].BindingAddress));
-            }
-            CoTaskMemFree(output[i].Ports);
-        }
-    });
-
     for (const auto& e : m_containers)
     {
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
@@ -1180,46 +1172,34 @@ try
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
+
         const auto& ports = e->GetPorts();
-        if (!ports.empty())
+        for (const auto& port : ports)
         {
-            auto portsArray = wil::make_unique_cotaskmem<::WSLAPortMapping[]>(ports.size());
-            size_t portsBuilt = 0;
-            auto portsCleanup = wil::scope_exit([&]() {
-                for (size_t j = 0; j < portsBuilt; ++j)
-                {
-                    CoTaskMemFree(const_cast<LPSTR>(portsArray[j].BindingAddress));
-                }
-            });
-
-            for (size_t i = 0; i < ports.size(); ++i)
-            {
-                portsArray[i].HostPort = ports[i].VmMapping.HostPort();
-                portsArray[i].ContainerPort = ports[i].ContainerPort;
-                portsArray[i].Family = ports[i].VmMapping.BindAddress.si_family;
-                portsArray[i].Protocol = ports[i].VmMapping.Protocol;
-                portsArray[i].BindingAddress =
-                    wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(ports[i].VmMapping.BindingAddressString().c_str())
-                        .release();
-                portsBuilt++;
-            }
-
-            output[index].Ports = portsArray.release();
-            output[index].PortsCount = static_cast<ULONG>(ports.size());
-            portsCleanup.release();
-        }
-        else
-        {
-            output[index].Ports = nullptr;
-            output[index].PortsCount = 0;
+            WSLAContainerPortMapping mapping{};
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.Id, e->ID().c_str()) != 0);
+            mapping.PortMapping.HostPort = port.VmMapping.HostPort();
+            mapping.PortMapping.ContainerPort = port.ContainerPort;
+            mapping.PortMapping.Family = port.VmMapping.BindAddress.si_family;
+            mapping.PortMapping.Protocol = port.VmMapping.Protocol;
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.PortMapping.BindingAddress, port.VmMapping.BindingAddressString().c_str()) != 0);
+            allPorts.push_back(mapping);
         }
 
         index++;
     }
 
-    errorCleanup.release();
     *Count = static_cast<ULONG>(m_containers.size());
     *Containers = output.release();
+
+    if (!allPorts.empty())
+    {
+        auto portsOutput = wil::make_unique_cotaskmem<WSLAContainerPortMapping[]>(allPorts.size());
+        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLAContainerPortMapping));
+        *PortsCount = static_cast<ULONG>(allPorts.size());
+        *Ports = portsOutput.release();
+    }
+
     return S_OK;
 }
 CATCH_RETURN();

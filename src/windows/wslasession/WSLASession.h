@@ -66,7 +66,7 @@ public:
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLAContainerOptions* Options, _Out_ IWSLAContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLAContainer** Container) override;
-    IFACEMETHOD(ListContainers)(_Out_ WSLAContainerEntry** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(ListContainers)(_Out_ WSLAContainerEntry** Images, _Out_ ULONG* Count, _Out_ WSLAContainerPortMapping** Ports, _Out_ ULONG* PortsCount) override;
     IFACEMETHOD(PruneContainers)(_In_opt_ WSLAContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLAPruneContainersResults* Result) override;
 
     // VM management.
