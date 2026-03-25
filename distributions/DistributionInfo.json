@@ -26,6 +26,32 @@
                     "Url": "https://cdimages.ubuntu.com/releases/24.04.4/release/ubuntu-24.04.4-wsl-arm64.wsl",
                     "Sha256": "6b244d89f412a68f51e58f396fab65bed3b5896a25c045a99bef9c78a07df507"
                 }
+            },
+            {
+                "Name": "Ubuntu-22.04",
+                "FriendlyName": "Ubuntu 22.04 LTS",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://releases.ubuntu.com/jammy/ubuntu-22.04.5-wsl-amd64.wsl",
+                    "Sha256": "4499c4fe257f2fc83145b429ce211a0a43fd590e70d6261ede616210947d9f8f"
+                },
+                "Arm64Url": {
+                    "Url": "https://cdimage.ubuntu.com/ubuntu/releases/jammy/release/ubuntu-22.04.5-wsl-arm64.wsl",
+                    "Sha256": "3e2d77b92cf9dad1095eaebcad96feba2781007f5f52431cd4fe6fff63b201e5"
+                }
+            },
+            {
+                "Name": "Ubuntu-20.04",
+                "FriendlyName": "Ubuntu 20.04 LTS",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://releases.ubuntu.com/focal/ubuntu-20.04.6-wsl-amd64.wsl",
+                    "Sha256": "a9073f3726aab9661076506603706eadf284b80a791dec3adfde8e1989906fa4"
+                },
+                "Arm64Url": {
+                    "Url": "https://cdimage.ubuntu.com/ubuntu/releases/focal/release/ubuntu-20.04.6-wsl-arm64.wsl",
+                    "Sha256": "16174012f9a3f6fb10729e648fd8c7dfa205d039d76902e4c28de746f85bf3c8"
+                }
             }
         ],
         "openSUSE": [
@@ -242,36 +268,6 @@
             "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/KaliLinux_1.13.1.0.AppxBundle",
             "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/KaliLinux_1.13.1.0.AppxBundle",
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
-        },
-        {
-            "Name": "Ubuntu-20.04",
-            "FriendlyName": "Ubuntu 20.04 LTS",
-            "StoreAppId": "9MTTCL66CPXJ",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2004-230608_x64.appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2004-230608_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu20.04LTS_79rhkp1fndgsc"
-        },
-        {
-            "Name": "Ubuntu-22.04",
-            "FriendlyName": "Ubuntu 22.04 LTS",
-            "StoreAppId": "9PN20MSR04DW",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204LTS-230518_x64.appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204LTS-230518_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc"
-        },
-        {
-            "Name": "Ubuntu-24.04",
-            "FriendlyName": "Ubuntu 24.04 LTS",
-            "StoreAppId": "9NZ3KLHXDJP5",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-240425.AppxBundle",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-240425.AppxBundle",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu24.04LTS_79rhkp1fndgsc"
         },
         {
             "Name": "OracleLinux_7_9",
