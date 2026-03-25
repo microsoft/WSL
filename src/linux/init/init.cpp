@@ -419,6 +419,11 @@ Options=nosuid,nodev,noexec
                 THROW_LAST_ERROR_IF(WriteToFile(std::format("{}/override.conf", overrideFolder).c_str(), mountOverrideContent) < 0);
             }
         }
+        else
+        {
+            // Clean up stale binfmt config if the feature was previously enabled.
+            unlink("/run/binfmt.d/WSLInterop.conf");
+        }
 
         return 0;
     }
