@@ -70,7 +70,7 @@ private:
         std::wstringstream commands;
         commands << L"The following sub-commands are available:\r\n"
                  << L"  build    Build an image from a Dockerfile.\r\n"
-                 << L"  delete   Delete images.\r\n"
+                 << L"  remove   Remove images.\r\n"
                  << L"  inspect  Inspect images.\r\n"
                  << L"  list     List images.\r\n"
                  << L"  load     Load images.\r\n"

@@ -188,7 +188,7 @@ private:
 
     std::wstring GetAvailableCommandAliases() const
     {
-        return L"The following command aliases are available: rm\r\n\r\n";
+        return L"The following command aliases are available: delete rm\r\n\r\n";
     }
 
     std::wstring GetAvailableCommands() const
