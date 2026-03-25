@@ -1903,41 +1903,45 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
     <value>Visual Studio-integrasjon</value>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
-    <value>wslc – WSL-beholder-CLI
-Bruk:
+    <value>wslc - WSL Container CLI
+Usage:
   wslc --help</value>
     <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaSessionNotFound" xml:space="preserve">
-    <value>Finner ikke økt. {}</value>
+    <value>Session not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidIp" xml:space="preserve">
+    <value>Invalid IP address '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
-    <value>OpenSessionByName({}) mislyktes</value>
+    <value>OpenSessionByName('{}') failed</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>Finner ingen WSLA-økter.</value>
+    <value>No WSLA sessions found.</value>
   </data>
   <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>Fant {} WSLA-økt{}:</value>
+    <value>Found {} WSLA session{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaShellExited" xml:space="preserve">
-    <value>{} avsluttet med: {}</value>
+    <value>{} exited with: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaHeaderId" xml:space="preserve">
     <value>ID</value>
   </data>
   <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
-    <value>Oppretter-PID</value>
+    <value>Creator PID</value>
   </data>
   <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
-    <value>Visningsnavn</value>
+    <value>Display Name</value>
   </data>
   <data name="MessageWslaUnknownCommand" xml:space="preserve">
-    <value>Ukjent kommando: {}</value>
+    <value>Unknown command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
@@ -1953,40 +1957,40 @@ Bruk:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
-    <value>Viser hjelp om den valgte kommandoen</value>
+    <value>Shows help about the selected command</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
     <value>Multiple mutually exclusive arguments provided: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
-    <value>Argumentet {} kan bare brukes med {}</value>
+    <value>Argument {} can only be used with {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Bruk: {} {}</value>
+    <value>Usage: {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
-    <value>kommando</value>
+    <value>command</value>
   </data>
   <data name="WSLCCLI_Options" xml:space="preserve">
-    <value>alternativer</value>
+    <value>options</value>
   </data>
   <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
     <value>The following command aliases are available:</value>
   </data>
   <data name="WSLCCLI_AvailableCommands" xml:space="preserve">
-    <value>Følgende kommandoer er tilgjengelige:</value>
+    <value>The following commands are available:</value>
   </data>
   <data name="WSLCCLI_AvailableSubcommands" xml:space="preserve">
-    <value>Følgende underkommandoer er tilgjengelige:</value>
+    <value>The following sub-commands are available:</value>
   </data>
   <data name="WSLCCLI_AvailableOptions" xml:space="preserve">
-    <value>Følgende alternativer er tilgjengelige:</value>
+    <value>The following options are available:</value>
   </data>
   <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
-    <value>Følgende argumenter er tilgjengelige:</value>
+    <value>The following arguments are available:</value>
   </data>
   <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
     <value>For more details on a specific command, pass it the help argument.</value>
@@ -1996,10 +2000,10 @@ Bruk:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
-    <value>Administratorrettigheter kreves for å kjøre denne kommandoen.</value>
+    <value>This command requires administrator privileges to execute.</value>
   </data>
   <data name="WSLCCLI_SessionIdArgDescription" xml:space="preserve">
-    <value>Angi økten som skal brukes</value>
+    <value>Specify the session to use</value>
   </data>
   <data name="WSLCCLI_AttachArgDescription" xml:space="preserve">
     <value>Attach to stdout/stderr of the container</value>
@@ -2008,10 +2012,10 @@ Bruk:
     <value>Attach to stdin and keep it open</value>
   </data>
   <data name="WSLCCLI_PortArgDescription" xml:space="preserve">
-    <value>Angi porten som skal brukes</value>
+    <value>Specify the port to use</value>
   </data>
   <data name="WSLCCLI_ContainerIdArgDescription" xml:space="preserve">
-    <value>Beholder-ID</value>
+    <value>Container ID</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
     <value>Missing argument value: '{}'</value>
@@ -2067,15 +2071,31 @@ For privacy information about this product please visit https://aka.ms/privacy.<
      <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
-    <value>Ugyldig avbildning: {}</value>
+    <value>Invalid image: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidContainerName" xml:space="preserve">
-    <value>Ugyldig beholdernavn: {}</value>
+  <data name="MessageWslaInvalidName" xml:space="preserve">
+    <value>Invalid name: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
-    <value>Banen er ikke absolutt: {}</value>
+    <value>Path is not absolute: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaVolumeNotFound" xml:space="preserve">
+    <value>Volume not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidVolumeOptions" xml:space="preserve">
+    <value>Invalid volume options: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidVolumeType" xml:space="preserve">
+    <value>Unsupported volume type: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaVolumeInUse" xml:space="preserve">
+    <value>Volume '{}' is in use.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
