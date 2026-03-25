@@ -142,7 +142,7 @@ protected:
 struct ContainerRemoveCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"remove";
-    ContainerRemoveCommand(const std::wstring& parent) : Command(CommandName, {L"rm"}, parent)
+    ContainerRemoveCommand(const std::wstring& parent) : Command(CommandName, {L"delete", L"rm"}, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
