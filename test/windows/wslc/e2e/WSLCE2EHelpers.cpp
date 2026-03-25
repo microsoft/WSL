@@ -71,7 +71,8 @@ namespace {
         return settings;
     }
 
-    wil::com_ptr<IWSLASession> CreateCustomSession(const std::wstring& sessionName, const std::filesystem::path& storagePath, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
+    wil::com_ptr<IWSLASession> CreateCustomSession(
+        const std::wstring& sessionName, const std::filesystem::path& storagePath, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
     {
         WSLASessionSettings sessionSettings = GetDefaultSessionSettings(sessionName.c_str(), storagePath.c_str(), networkingMode);
         return CreateSession(sessionSettings);
@@ -81,7 +82,7 @@ namespace {
     {
         if (session)
         {
-            session->Terminate();
+            LOG_IF_FAILED(session->Terminate());
         }
 
         session.reset();

@@ -53,8 +53,15 @@ class WSLCE2EGlobalTests
     {
         WSL2_TEST_ONLY();
 
+        // Generate a unique session name to avoid conflicts with previous runs or concurrent tests.
+        // Use only a short portion of the GUID to avoid MAX_PATH issues.
+        GUID sessionGuid;
+        VERIFY_SUCCEEDED(CoCreateGuid(&sessionGuid));
+        auto guidStr = wsl::shared::string::GuidToString<wchar_t>(sessionGuid, wsl::shared::string::GuidToStringFlags::None);
+        const auto sessionName = std::format(L"wslc-test-{}", guidStr.substr(0, 8));
+
         // Create a test session with VirtioProxy mode so it can pull images and create containers.
-        auto session = TestSession::Create(L"wslc-test-session", WSLANetworkingModeVirtioProxy);
+        auto session = TestSession::Create(sessionName, WSLANetworkingModeVirtioProxy);
 
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"container list --session INVALID_SESSION_NAME");
@@ -67,7 +74,7 @@ class WSLCE2EGlobalTests
         // Verify there is a session with the name of the test session in the session list output.
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_ARE_NOT_EQUAL(
-            result.Stdout->find(L"wslc-test-session"),
+            result.Stdout->find(session.Name()),
             std::wstring::npos,
             L"Session name 'wslc-test-session' not found in session list output");
 
