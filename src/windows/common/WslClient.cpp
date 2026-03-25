@@ -1751,6 +1751,15 @@ int WslMain(_In_ std::wstring_view commandLine)
         }
         else if (argument == WSL_UNINSTALL_ARG)
         {
+            commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
+            argument = wsl::windows::common::helpers::ParseArgument(commandLine);
+            if (!argument.empty())
+            {
+                wsl::windows::common::wslutil::PrintMessage(
+                    Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG), stdout);
+                return exitCode;
+            }
+
             return Uninstall();
         }
         else
