@@ -1912,6 +1912,10 @@ Użycie:
     <value>Nie znaleziono sesji: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidIp" xml:space="preserve">
+    <value>Nieprawidłowy adres IP „{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
     <value>Operacja OpenSessionByName('{}') nie powiodła się</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2062,20 +2066,36 @@ Użycie:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
-     <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.</value>
+     <value>Copyright (c) Microsoft Corporation. Wszelkie prawa zastrzeżone.
+Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stronę HTTP://aka.ms/privacy.</value>
      <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
     <value>Nieprawidłowy obraz: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidContainerName" xml:space="preserve">
-    <value>Nieprawidłowa nazwa kontenera: „{}”</value>
+  <data name="MessageWslaInvalidName" xml:space="preserve">
+    <value>Invalid name: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Ścieżka nie jest bezwzględna: „{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaVolumeNotFound" xml:space="preserve">
+    <value>Volume not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidVolumeOptions" xml:space="preserve">
+    <value>Invalid volume options: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidVolumeType" xml:space="preserve">
+    <value>Unsupported volume type: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaVolumeInUse" xml:space="preserve">
+    <value>Volume '{}' is in use.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
