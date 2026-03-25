@@ -115,19 +115,19 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_NUMERICSERV;
         auto status = getaddrinfo(hostname, port, &hints, &servinfo);
-        if (status != 0)
+
+        if (status != 0) 
         {
-            if (status == EAI_NODATA || status == EAI_NONAME) // Check for both as EAI_NODATA is deprecated on newer linux versions
+            if (status == EAI_NODATA || status == EAI_NONAME) 
             {
-                // EAI_NODATA means the domain exists but lacks records for the requested
-                // address family (A for IPv4, AAAA for IPv6). This is expected behavior
-                // for domains that are IPv4-only or IPv6-only.
-                // This is not treated as an error; we simply skip this address family and
-                // continue testing the other protocols.
                 *connCheckStatus = ConnCheckStatus::NoRecordsForFamily;
+                return unique_socket{}; 
             }
             throw std::runtime_error(std::format("CheckConnection: getaddrinfo() failed: {}", status));
         }
+
+        *connCheckStatus = ConnCheckStatus::FailureConfig;
+        sock = ConnCheckConfigureSocket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
 
         // next configure the socket
         *connCheckStatus = ConnCheckStatus::FailureConfig;
