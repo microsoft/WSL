@@ -56,11 +56,21 @@ IOCallback::IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallba
             if (runResult && m_process && m_callbackOptions && m_callbackOptions->onExit)
             {
                 WSLAProcessState state{};
-                int exitCode = -2;
+                int exitCode = -1;
 
                 // Prefer to make the callback even if we don't properly retrieve the exit code.
-                LOG_IF_FAILED(m_process->GetState(&state, &exitCode));
+                if (FAILED_LOG(m_process->GetState(&state, &exitCode)))
+                {
+                    // Reset to our known value in case GetState stomped it while failing.
+                    exitCode = -1;
+                }
+                else
+                {
+                    WI_ASSERT(state == WslaProcessStateExited);
+                }
 
+                // Regardless of our ability to get the proper exit code, inform the caller that the process
+                // has exited and they will not be getting any additional IO callbacks.
                 m_callbackOptions->onExit(exitCode, m_callbackOptions->callbackContext);
             }
         }

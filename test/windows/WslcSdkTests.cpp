@@ -1697,17 +1697,90 @@ class WslcSdkTests
         }
     }
 
+    TEST_METHOD(ProcessIoCallbackCancelOnRelease)
+    {
+        WSL2_TEST_ONLY();
+
+        // Verify that releasing the process handle while an exec'd process is still running
+        // and writing IO cancels the IOCallback pump:
+        //   - No IO callbacks arrive after the handle is released.
+        //   - onExit is never invoked (cancellation returns runResult=false, suppressing it).
+        //
+        // A secondary (exec'd) process is used so that the long-lived init process keeps the
+        // container alive, allowing UniqueContainer to clean up normally at scope exit.
+
+        // Start a long-running init process to keep the container alive.
+        WslcProcessSettings initProcSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&initProcSettings));
+        const char* initArgv[] = {"/bin/sleep", "999"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&initProcSettings, initArgv, ARRAYSIZE(initArgv)));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &initProcSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        struct Context
+        {
+            std::atomic<int> callbackCount{0};
+            std::atomic<bool> exitFired{false};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID c) {
+            static_cast<Context*>(c)->callbackCount.fetch_add(1);
+        };
+        auto exitCb = [](INT32, PVOID c) {
+            static_cast<Context*>(c)->exitFired.store(true);
+        };
+
+        // Continuous writer: emits one line every 50 ms indefinitely.
+        WslcProcessSettings execProcSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&execProcSettings));
+        const char* execArgv[] = {"/bin/sh", "-c", "while true; do echo LINE; sleep 0.05; done"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&execProcSettings, execArgv, ARRAYSIZE(execArgv)));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        callbacks.onExit = exitCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&execProcSettings, &callbacks, &ctx));
+
+        UniqueProcess execProcess;
+        VERIFY_SUCCEEDED(WslcCreateContainerProcess(container.get(), &execProcSettings, &execProcess, nullptr));
+
+        // Wait long enough for at least several callbacks to arrive.
+        Sleep(500);
+        VERIFY_IS_TRUE(ctx.callbackCount.load() > 0);
+
+        // Release the exec process handle while the process is still running and writing.
+        // This destructs WslcProcessImpl → cancels the IOCallback → joins its thread.
+        // By the time execProcess.reset() returns, the pump thread has exited.
+        execProcess.reset();
+
+        // Snapshot the count now that the thread is confirmed stopped.
+        int countAtRelease = ctx.callbackCount.load();
+
+        // onExit must not have fired: cancellation sets runResult=false, suppressing the call.
+        VERIFY_IS_FALSE(ctx.exitFired.load());
+
+        // Wait another interval — no further callbacks can arrive after the thread has joined.
+        Sleep(200);
+        VERIFY_ARE_EQUAL(ctx.callbackCount.load(), countAtRelease);
+        VERIFY_IS_FALSE(ctx.exitFired.load());
+    }
+
     TEST_METHOD(ProcessIoCallbackLargeOutput)
     {
         WSL2_TEST_ONLY();
 
         // Generate ~1 MiB of stdout via: dd if=/dev/zero bs=1024 count=1024 | base64
-        // 1,048,576 zero bytes → base64 output is 1,398,104 bytes (ceil(1048576/3)*4 + newlines).
-        // We verify the accumulated size is at least 1,398,000 bytes to allow minor variance.
-        static constexpr size_t c_expectedMinBytes = 1'398'000;
+        // 1,048,576 zero bytes → base64 output is 1,398,104 bytes (ceil(1048576/3)*4).
+        static constexpr size_t c_expectedBytes = 1'398'104;
 
         std::string stdoutData;
-        stdoutData.reserve(c_expectedMinBytes + 4096);
+        stdoutData.reserve(c_expectedBytes + 4096);
 
         auto ioCb = [](WslcProcessIOHandle, const BYTE* data, uint32_t size, PVOID ctx) {
             static_cast<std::string*>(ctx)->append(reinterpret_cast<const char*>(data), size);
@@ -1715,7 +1788,7 @@ class WslcSdkTests
 
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-        const char* argv[] = {"/bin/sh", "-c", "dd if=/dev/zero bs=1024 count=1024 2>/dev/null | base64"};
+        const char* argv[] = {"/bin/sh", "-c", "dd if=/dev/zero bs=1024 count=1024 2>/dev/null | base64 -w 0"};
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
 
         WslcProcessCallbacks callbacks{};
@@ -1741,7 +1814,7 @@ class WslcSdkTests
         process.reset();
         container.reset();
 
-        VERIFY_IS_TRUE(stdoutData.size() >= c_expectedMinBytes);
+        VERIFY_ARE_EQUAL(stdoutData.size(), c_expectedBytes);
     }
 
     // -----------------------------------------------------------------------
