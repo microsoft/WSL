@@ -1446,21 +1446,26 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcGetVersion(nullptr), E_POINTER);
     }
 
+    TEST_METHOD(CanRun)
+    {
+        WSL2_TEST_ONLY();
+
+        BOOL canRun = FALSE;
+        WslcComponentFlags missing{};
+        VERIFY_SUCCEEDED(WslcCanRun(&canRun, &missing));
+
+        // Presumably anywhere that we run the tests we should get these results.
+        // The levels of OS state modification required to test beyond this are beyond the scope of these tests.
+        VERIFY_ARE_EQUAL(canRun, TRUE);
+        VERIFY_ARE_EQUAL(missing, WSLC_COMPONENT_FLAG_NONE);
+    }
+
     // -----------------------------------------------------------------------
     // Stub tests for unimplemented (E_NOTIMPL) functions.
     // Each of these confirms the current state of the SDK; once the underlying
     // function is implemented the assertion below will catch it and the test
     // should be updated to exercise the real behaviour.
     // -----------------------------------------------------------------------
-
-    TEST_METHOD(CanRunNotImplemented)
-    {
-        WSL2_TEST_ONLY();
-
-        BOOL canRun = FALSE;
-        WslcComponentFlags missing{};
-        VERIFY_ARE_EQUAL(WslcCanRun(&canRun, &missing), E_NOTIMPL);
-    }
 
     TEST_METHOD(ContainerInspectNotImplemented)
     {
