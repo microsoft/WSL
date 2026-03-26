@@ -91,10 +91,10 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(SettingsMap_GetOrDefault_ReturnsBuiltInWhenAbsent)
     {
         SettingsMap map;
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionCpuCount>(), 4u);
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionMemoryMb>(), 2048u);
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionStorageSizeMb>(), 10000u);
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionStoragePath>(), std::wstring{});
+        VERIFY_ARE_EQUAL(4u, map.GetOrDefault<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(2048u, map.GetOrDefault<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(10000u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(std::wstring{}, map.GetOrDefault<Setting::SessionStoragePath>());
     }
 
     // After inserting a value, GetOrDefault must return it rather than the default.
@@ -102,8 +102,8 @@ class WSLCCLISettingsUnitTests
     {
         SettingsMap map;
         map.Add<Setting::SessionCpuCount>(16u);
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionCpuCount>(), 16u);
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionMemoryMb>(), 2048u);
+        VERIFY_ARE_EQUAL(16u, map.GetOrDefault<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(2048u, map.GetOrDefault<Setting::SessionMemoryMb>());
     }
 
     // -----------------------------------------------------------------------
@@ -116,12 +116,12 @@ class WSLCCLISettingsUnitTests
     {
         UserSettingsTest s{UniqueTempDir()};
 
-        VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Default));
-        VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 2048u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 10000u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring{});
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(10000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
     }
 
     // -----------------------------------------------------------------------
@@ -142,13 +142,13 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Standard));
-        VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 8u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 4096u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 20000u);
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(8u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(4096u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(20000u, s.Get<Setting::SessionStorageSizeMb>());
         // Unspecified setting falls back to built-in default.
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring{});
+        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
     }
 
     // An empty primary file is valid YAML (null document); all settings use
@@ -160,10 +160,10 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 2048u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 10000u);
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(10000u, s.Get<Setting::SessionStorageSizeMb>());
     }
 
     // -----------------------------------------------------------------------
@@ -180,9 +180,9 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Backup));
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Backup), static_cast<int>(s.GetType()));
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 2u);
+        VERIFY_ARE_EQUAL(2u, s.Get<Setting::SessionCpuCount>());
     }
 
     // When the primary is absent and only the backup exists, the type is Backup.
@@ -193,9 +193,9 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Backup));
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Backup), static_cast<int>(s.GetType()));
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 1024u);
+        VERIFY_ARE_EQUAL(1024u, s.Get<Setting::SessionMemoryMb>());
     }
 
     // When both files fail to parse, the type is Default and at least one
@@ -208,9 +208,9 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Default));
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 2u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
     }
 
     // -----------------------------------------------------------------------
@@ -225,7 +225,7 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
         VERIFY_IS_FALSE(s.GetWarnings().front().SettingPath.empty());
     }
@@ -238,7 +238,7 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 2048u);
+        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
@@ -250,7 +250,7 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 10000u);
+        VERIFY_ARE_EQUAL(10000u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
@@ -263,7 +263,7 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
@@ -275,8 +275,8 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring(L"C:\\TestFolder"));
-        VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
+        VERIFY_ARE_EQUAL(std::wstring(L"C:\\TestFolder"), s.Get<Setting::SessionStoragePath>());
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
     }
 
     // An empty defaultStoragePath string is valid.
@@ -287,8 +287,8 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring{});
-        VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
+        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
     }
 
     // Absent keys must silently use defaults — no warnings emitted.
@@ -299,11 +299,11 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 2048u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 10000u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring{});
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(10000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
     }
 
     // Extra unknown keys at any level must not cause errors or warnings.
@@ -320,9 +320,9 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Standard));
-        VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
     }
 };
 
