@@ -277,9 +277,13 @@ bool NeedsWslOptionalFeatureInstalled()
            !wsl::windows::common::helpers::IsServicePresent(L"lxssmanager");
 }
 
+// TODO: Update to 2.8 when the minor version is moved forward for upcoming release
+#define WSLC_API_MIN_VERSION_SUPPORTED 2, 7, 0
+#define WSLC_API_MIN_VERSION_SUPPORTED_STRING "2.7.0"
+
 bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
 {
-    constexpr auto minimalPackageVersion = std::tuple<uint32_t, uint32_t, uint32_t>{2, 7, 0};
+    constexpr auto minimalPackageVersion = std::tuple<uint32_t, uint32_t, uint32_t>{WSLC_API_MIN_VERSION_SUPPORTED};
     return version.has_value() && version >= minimalPackageVersion;
 }
 
@@ -299,9 +303,12 @@ WslRuntimeState CheckWslRuntimeState()
 {
     auto version = wsl::windows::common::wslutil::GetInstalledPackageVersion();
 
-    return version.has_value() ? (DoesWslRuntimeVersionSupportWslc(version) ? WslRuntimeState::InstalledWithWslcSupport
-                                                                            : WslRuntimeState::InstalledWithoutWslcSupport)
-                               : WslRuntimeState::NotInstalled;
+    if (!version.has_value())
+    {
+        return WslRuntimeState::NotInstalled;
+    }
+
+    return DoesWslRuntimeVersionSupportWslc(version) ? WslRuntimeState::InstalledWithWslcSupport : WslRuntimeState::InstalledWithoutWslcSupport;
 }
 
 wil::com_ptr<IWSLASessionManager> CreateSessionManager()
@@ -315,12 +322,12 @@ wil::com_ptr<IWSLASessionManager> CreateSessionManager()
         THROW_WIN32_IF_MSG(
             ERROR_NOT_SUPPORTED,
             currentState == WslRuntimeState::InstalledWithoutWslcSupport,
-            "The currently installed WSL version does not support WSLC; upgrade to 2.7 or later.");
+            "The currently installed WSL version does not support WSLC; upgrade to " WSLC_API_MIN_VERSION_SUPPORTED_STRING
+            " or later.");
         THROW_HR_IF_MSG(
             hr,
             currentState == WslRuntimeState::InstalledWithWslcSupport,
             "The WSL install appears to be corrupted; session manager class was not registered.");
-        THROW_HR(hr);
     }
 
     THROW_IF_FAILED(hr);
