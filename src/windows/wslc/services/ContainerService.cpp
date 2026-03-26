@@ -86,7 +86,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(Session& sessio
     WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
 
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeBridged, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLAContainerNetworkTypeBridged, processFlags);
 
     // Set port options if provided
     for (const auto& port : options.Ports)
@@ -349,7 +349,7 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
 
     ConsoleService consoleService;
     return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, {}, execFlags).Launch(*container));
+        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)

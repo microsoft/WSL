@@ -30,6 +30,7 @@ enum class FormatType
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
+    std::vector<std::string> EnvironmentVariables;
     bool Detach = false;
     bool Interactive = false;
     std::string Name;
@@ -67,6 +68,12 @@ struct ContainerInformation
     ULONGLONG CreatedAt{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
+};
+
+struct EnvironmentVariable
+{
+    static std::optional<std::wstring> Parse(const std::wstring& entry);
+    static std::vector<std::wstring> ParseFile(const std::wstring& filePath);
 };
 
 struct PublishPort
