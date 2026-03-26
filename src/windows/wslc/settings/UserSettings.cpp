@@ -168,17 +168,6 @@ namespace {
             wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\settings";
         return dir;
     }
-
-    std::filesystem::path PrimaryFilePath()
-    {
-        return SettingsDir() / L"UserSettings.yaml";
-    }
-
-    std::filesystem::path BackupFilePath()
-    {
-        return SettingsDir() / L"UserSettings.yaml.bak";
-    }
-
 } // namespace
 
 UserSettings const& UserSettings::Instance()
@@ -187,13 +176,17 @@ UserSettings const& UserSettings::Instance()
     return instance;
 }
 
-UserSettings::UserSettings()
+UserSettings::UserSettings() : UserSettings(SettingsDir())
 {
-    const auto primaryPath = PrimaryFilePath();
-    const auto backupPath = BackupFilePath();
+}
+
+UserSettings::UserSettings(const std::filesystem::path& settingsDir)
+{
+    m_primaryPath = settingsDir / L"UserSettings.yaml";
+    m_backupPath = settingsDir / L"UserSettings.yaml.bak";
 
     // Try the primary file first.
-    auto root = TryLoadYaml(primaryPath, m_warnings);
+    auto root = TryLoadYaml(m_primaryPath, m_warnings);
     if (root.has_value())
     {
         m_type = UserSettingsType::Standard;
@@ -201,7 +194,7 @@ UserSettings::UserSettings()
     else
     {
         // Primary missing or failed — try the backup.
-        root = TryLoadYaml(backupPath, m_warnings);
+        root = TryLoadYaml(m_backupPath, m_warnings);
         if (root.has_value())
         {
             m_type = UserSettingsType::Backup;
@@ -218,11 +211,10 @@ UserSettings::UserSettings()
     }
 }
 
-void UserSettings::Reset()
+void UserSettings::Reset() const
 {
-    const auto primaryPath = PrimaryFilePath();
-    std::filesystem::create_directories(primaryPath.parent_path());
-    std::ofstream file(primaryPath);
+    std::filesystem::create_directories(m_primaryPath.parent_path());
+    std::ofstream file(m_primaryPath);
     THROW_HR_IF_MSG(E_UNEXPECTED, !file.is_open(), "Failed to create settings file");
     file << s_DefaultSettingsTemplate;
     file.flush();
@@ -234,7 +226,7 @@ void UserSettings::PrepareToShellExecuteFile() const
     if (m_type == UserSettingsType::Standard)
     {
         // Valid settings loaded — back them up before the user edits.
-        std::filesystem::copy_file(PrimaryFilePath(), BackupFilePath(), std::filesystem::copy_options::overwrite_existing);
+        std::filesystem::copy_file(m_primaryPath, m_backupPath, std::filesystem::copy_options::overwrite_existing);
     }
     else if (m_type == UserSettingsType::Default)
     {
@@ -243,9 +235,9 @@ void UserSettings::PrepareToShellExecuteFile() const
     }
 }
 
-std::filesystem::path UserSettings::SettingsFilePath()
+std::filesystem::path UserSettings::SettingsFilePath() const
 {
-    return PrimaryFilePath();
+    return m_primaryPath;
 }
 
 } // namespace wsl::windows::wslc::settings

@@ -141,18 +141,25 @@ public:
     // - If type is Default:  creates the primary file from the commented-out defaults template.
     void PrepareToShellExecuteFile() const;
 
-    static std::filesystem::path SettingsFilePath();
+    std::filesystem::path SettingsFilePath() const;
 
     // Overwrites the primary settings file with the commented-out defaults template.
-    static void Reset();
+    void Reset() const;
+
+protected:
+    // Loads settings from an explicit directory. Used by the singleton (via
+    // the private zero-arg constructor) and by test subclasses.
+    explicit UserSettings(const std::filesystem::path& settingsDir);
+    ~UserSettings() = default;
 
 private:
     UserSettings();
-    ~UserSettings() = default;
 
     SettingsMap m_settings;
     std::vector<Warning> m_warnings;
     UserSettingsType m_type = UserSettingsType::Default;
+    std::filesystem::path m_primaryPath;
+    std::filesystem::path m_backupPath;
 };
 
 // Convenience free function — returns the singleton instance.
