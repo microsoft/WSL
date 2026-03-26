@@ -340,7 +340,6 @@ try
     WSLASessionSettings runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
-    // TODO: Is this the intended use for vhdRequirements.sizeInBytes?
     runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeInBytes / _1MB;
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
@@ -353,16 +352,6 @@ try
         runtimeSettings.TerminationCallback = terminationCallback.get();
     }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
-
-    // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
-    // runtimeSettings.DmesgOutput;
-
-    // TODO: VHD overrides; I'm not sure if we intend these to be provided.
-    // runtimeSettings.RootVhdOverride = internalType->vhdRequirements.path;
-    // TODO: I don't think that this VHD type override can be reused from the VHD requirements type
-    //       Tracking the code suggests that this is the `filesystemtype` to the linux `mount` function.
-    //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
-    // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session))))
     {
@@ -405,10 +394,25 @@ CATCH_RETURN();
 STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    UNREFERENCED_PARAMETER(errorMessage);
-    return E_NOTIMPL;
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
+    RETURN_HR_IF(E_INVALIDARG, options->sizeInBytes == 0);
+    RETURN_HR_IF(E_NOTIMPL, options->type == WSLC_VHD_TYPE_FIXED);
+
+    WSLAVolumeOptions volumeOptions{};
+    volumeOptions.Name = options->name;
+    // Only supported value currently
+    volumeOptions.Type = "vhd";
+
+    auto dynamicOptions = std::format(R"({{ "SizeBytes": {} }})", options->sizeInBytes);
+    volumeOptions.Options = dynamicOptions.c_str();
+
+    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions));
 }
 CATCH_RETURN();
 
@@ -419,6 +423,9 @@ try
 
     if (vhdRequirements)
     {
+        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeInBytes == 0);
+        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type == WSLC_VHD_TYPE_FIXED);
+
         internalType->vhdRequirements = *vhdRequirements;
     }
     else

@@ -21,7 +21,7 @@ Abstract:
 EXTERN_C_START
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 72
+#define WSLC_SESSION_OPTIONS_SIZE 80
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -66,6 +66,8 @@ typedef enum WslcVhdType
 
 typedef struct WslcVhdRequirements
 {
+    // Required for WslcCreateSessionVhd
+    _In_opt_ PCSTR name;
     _In_ uint64_t sizeInBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
 } WslcVhdRequirements;
