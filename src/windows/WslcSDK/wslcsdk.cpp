@@ -751,9 +751,7 @@ try
 CATCH_RETURN();
 
 STDAPI WslcSetContainerSettingsNamedVolumes(
-    _In_ WslcContainerSettings* containerSettings,
-    _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
-    _In_ uint32_t namedVolumeCount)
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes, _In_ uint32_t namedVolumeCount)
 try
 {
     auto internalType = CheckAndGetInternalType(containerSettings);

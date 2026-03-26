@@ -1895,7 +1895,7 @@ class WslcSdkTests
             {
                 LogError("Failed to remove VHD test storage %ws: %hs", vhdSessionStorage.c_str(), error.message().c_str());
             }
-            });
+        });
 
         // Create a dedicated session so that volume creation does not affect the shared default session.
         WslcSessionSettings sessionSettings;
