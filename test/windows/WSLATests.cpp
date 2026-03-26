@@ -5987,6 +5987,7 @@ class WSLATests
         ValidateImageParsing("pytorch/pytorch", "pytorch/pytorch", {});
 
         // Invalid inputs
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":debian:latest"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian:latest@"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
@@ -6006,5 +6007,18 @@ class WSLATests
         };
 
         ValidateRepoParsing("ubuntu", {}, "ubuntu");
+        ValidateRepoParsing("microsoft.com/ubuntu", {"microsoft.com"}, "ubuntu");
+        ValidateRepoParsing("microsoft.com:80/ubuntu", {"microsoft.com:80"}, "ubuntu");
+        ValidateRepoParsing("microsoft.com:80/ubuntu/foo/bar", {"microsoft.com:80"}, "ubuntu/foo/bar");
+        ValidateRepoParsing("127.0.0.1:80/ubuntu/foo/bar", {"127.0.0.1:80"}, "ubuntu/foo/bar");
+        ValidateRepoParsing("pytorch/pytorch", {}, "pytorch/pytorch");
+        ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334/path", {"2001:0db8:85a3:0000:0000:8a2e:0370:7334"}, "pytorch/pytorch");
+        ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", {"2001:0db8:85a3:0000:0000:8a2e:0370:7334:80"}, "pytorch/pytorch");
+
+
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseRepo(""); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseRepo(":"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseRepo("foo:bar"); }), E_INVALIDARG);
+
     }
 };

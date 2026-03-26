@@ -260,6 +260,11 @@ std::string Capture(const auto& exp)
     return std::format("({})", exp);
 }
 
+std::string Group(const auto& exp)
+{
+    return std::format("(?:{})", exp);
+}
+
 std::string Optional(const auto& exp)
 {
     return Group(exp) + "?";
@@ -270,12 +275,7 @@ std::string Repeated(const auto& exp)
     return Group(exp) + "+";
 }
 
-std::string Group(const auto& exp)
-{
-    return std::format("(?:{})", exp);
-}
-
-std::string BuildRepoRegex(bool captureDomain)
+std::string BuildRepoRegex()
 {
     std::string alphaNum = "[a-z0-9]+";
     std::string separator = "(?:[._]|__|[-]*)";
@@ -283,7 +283,7 @@ std::string BuildRepoRegex(bool captureDomain)
 
     auto nameComponent = alphaNum + Optional(Repeated(separator + alphaNum));
     auto domain = Optional(domainComponent + Optional(Repeated("\\." + domainComponent)) + Optional(":[0-9]+") + "\\/");
-    auto namePat = (captureDomain ? Capture(domain) : domain) + nameComponent + Optional(Repeated("\\/" + nameComponent));
+    auto namePat = Capture(domain) + Capture(nameComponent + Optional(Repeated("\\/" + nameComponent)));
 
     return namePat;
 }
@@ -295,7 +295,7 @@ std::regex BuildImageReferenceRegex()
     std::string tag = "[\\w][\\w.-]{0,127}";
     std::string digest = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
 
-    return std::regex("^" + Capture(BuildRepoRegex(false)) + Optional(":" + Capture(tag)) + Optional("@" + Capture(digest)) + "$");
+    return std::regex("^" + Capture(BuildRepoRegex()) + Optional(":" + Capture(tag)) + Optional("@" + Capture(digest)) + "$");
 }
 
 } // namespace
@@ -1218,8 +1218,8 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
     }
 
     const auto& repo = match[1];
-    const auto& tag = match[2];
-    const auto& digest = match[3];
+    const auto& tag = match[3];
+    const auto& digest = match[5];
 
     THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
 
@@ -1237,29 +1237,17 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
     }
 }
 
-std::pair<std::optional<std::string>, std::string> wsl::windows::common::wslutil::ParseRepo(const std::string& Input)
+std::pair<std::string, std::string> wsl::windows::common::wslutil::CanonicalizeImageReference(const std::string& Input)
 {
-    static const auto regex = std::regex(BuildRepoRegex(true));
+    constexpr auto defaultRegistry = "docker.io";
 
-    std::smatch match;
-    if (!std::regex_match(Input, match, regex))
+    auto firstSlash = Input.find('/');
+    if (firstSlash == std::string::npos)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslaInvalidImageRepo(Input.c_str()));
+        return {defaultRegistry, Input};
     }
 
-    const auto& server = match[1];
-    const auto& path = match[2];
-
-    THROW_HR_IF_MSG(E_UNEXPECTED, !path.matched, "Unexpected regex match. Input: %hs", Input.c_str());
-
-    if (server.matched)
-    {
-        return {server.str(), path.str()};
-    }
-    else
-    {
-        return {std::nullopt, path.str()};
-    }
+    auto registry = Input.substr(0, firstSlash);
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
