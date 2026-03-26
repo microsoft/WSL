@@ -9,10 +9,9 @@ Module Name:
 Abstract:
 
     This file contains the ContainerModel implementation
-
 --*/
 
-#include <precomp.h>
+#include "precomp.h"
 #include "ContainerModel.h"
 
 namespace wsl::windows::wslc::models {
@@ -189,5 +188,83 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
 
     vm.m_hostPath = value.substr(0, splitColon);
     return vm;
+}
+
+std::optional<std::wstring> EnvironmentVariable::Parse(const std::wstring& entry)
+{
+    if (entry.empty() || std::all_of(entry.begin(), entry.end(), std::iswspace))
+    {
+        return std::nullopt;
+    }
+
+    std::wstring key;
+    std::optional<std::wstring> value;
+
+    auto delimiterPos = entry.find('=');
+    if (delimiterPos == std::wstring::npos)
+    {
+        key = entry;
+    }
+    else
+    {
+        key = entry.substr(0, delimiterPos);
+        value = entry.substr(delimiterPos + 1);
+    }
+
+    if (key.empty())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Environment variable key cannot be empty");
+    }
+
+    if (std::any_of(key.begin(), key.end(), std::iswspace))
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment variable key '{}' cannot contain whitespace", key));
+    }
+
+    if (!value.has_value())
+    {
+        std::wstring envValue;
+        auto hr = wil::GetEnvironmentVariableW(key.c_str(), envValue);
+        if (FAILED(hr))
+        {
+            return std::nullopt;
+        }
+
+        value = envValue;
+    }
+
+    return std::format(L"{}={}", key, value.value());
+}
+
+std::vector<std::wstring> EnvironmentVariable::ParseFile(const std::wstring& filePath)
+{
+    std::ifstream file(filePath);
+    if (!file.is_open() || !file.good())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment file '{}' cannot be opened for reading", filePath));
+    }
+
+    // Read the file line by line
+    std::vector<std::wstring> envVars;
+    std::string line;
+    while (std::getline(file, line))
+    {
+        // Remove leading whitespace
+        line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#')
+        {
+            continue;
+        }
+
+        auto envVar = Parse(wsl::shared::string::MultiByteToWide(line));
+        if (envVar.has_value())
+        {
+            envVars.push_back(std::move(envVar.value()));
+        }
+    }
+
+    return envVars;
 }
 } // namespace wsl::windows::wslc::models

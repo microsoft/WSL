@@ -504,7 +504,8 @@ public:
     {
         None = 0,
         CancelOnCompleted = 1,
-        IgnoreErrors = 2
+        IgnoreErrors = 2,
+        NeedNotComplete = 4,
     };
 
     MultiHandleWait() = default;

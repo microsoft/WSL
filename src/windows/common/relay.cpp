@@ -1010,6 +1010,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         }
 
         // Remove completed handles from m_handles.
+        bool hasHandleToWaitFor = false;
         for (auto it = m_handles.begin(); it != m_handles.end();)
         {
             if (!it->second)
@@ -1027,11 +1028,16 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             }
             else
             {
+                // If only NeedNotComplete handles are left, we want to exit Run.
+                if (WI_IsFlagClear(it->first, Flags::NeedNotComplete))
+                {
+                    hasHandleToWaitFor = true;
+                }
                 ++it;
             }
         }
 
-        if (m_handles.empty() || m_cancel)
+        if (!hasHandleToWaitFor || m_cancel)
         {
             break;
         }

@@ -86,7 +86,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(Session& sessio
     WI_SetFlagIf(containerFlags, WSLAContainerFlagsRm, options.Remove);
 
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
-        image, options.Name, options.Arguments, {}, WSLAContainerNetworkTypeBridged, processFlags);
+        image, options.Name, options.Arguments, options.EnvironmentVariables, WSLAContainerNetworkTypeBridged, processFlags);
 
     // Set port options if provided
     for (const auto& port : options.Ports)
@@ -165,18 +165,22 @@ std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 
     if (elapsed < SecondsPerMinute)
     {
-        return std::format(L"{} seconds ago", elapsed);
+        const auto seconds = elapsed;
+        return std::format(L"{} {} ago", seconds, (seconds == 1 ? L"second" : L"seconds"));
     }
     else if (elapsed < SecondsPerHour)
     {
-        return std::format(L"{} minutes ago", elapsed / SecondsPerMinute);
+        const auto minutes = elapsed / SecondsPerMinute;
+        return std::format(L"{} {} ago", minutes, (minutes == 1 ? L"minute" : L"minutes"));
     }
     else if (elapsed < SecondsPerDay)
     {
-        return std::format(L"{} hours ago", elapsed / SecondsPerHour);
+        const auto hours = elapsed / SecondsPerHour;
+        return std::format(L"{} {} ago", hours, (hours == 1 ? L"hour" : L"hours"));
     }
 
-    return std::format(L"{} days ago", elapsed / SecondsPerDay);
+    const auto days = elapsed / SecondsPerDay;
+    return std::format(L"{} {} ago", days, (days == 1 ? L"day" : L"days"));
 }
 
 int ContainerService::Attach(Session& session, const std::string& id)
@@ -345,7 +349,7 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
 
     ConsoleService consoleService;
     return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, {}, execFlags).Launch(*container));
+        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
