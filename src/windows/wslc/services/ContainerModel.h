@@ -64,7 +64,7 @@ struct PortInformation
     int Protocol{}; // IP protocol number (e.g., IPPROTO_TCP or IPPROTO_UDP)
     std::string BindingAddress;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(PortInformation, HostPort, ContainerPort, Protocol, BindingAddress);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(PortInformation, HostPort, ContainerPort, Protocol, BindingAddress);
 };
 
 struct ContainerInformation
@@ -77,7 +77,7 @@ struct ContainerInformation
     ULONGLONG CreatedAt{};
     std::vector<PortInformation> Ports;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
 };
 
 struct PublishPort
