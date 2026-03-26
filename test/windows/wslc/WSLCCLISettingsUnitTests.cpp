@@ -48,8 +48,8 @@ static std::atomic<int> s_dirCounter{0};
 
 static std::filesystem::path UniqueTempDir()
 {
-    auto dir = std::filesystem::temp_directory_path() / L"WSLCSettingsTests" /
-               std::to_wstring(GetCurrentProcessId()) / std::to_wstring(++s_dirCounter);
+    auto dir = std::filesystem::temp_directory_path() / L"WSLCSettingsTests" / std::to_wstring(GetCurrentProcessId()) /
+               std::to_wstring(++s_dirCounter);
     std::filesystem::create_directories(dir);
     return dir;
 }
@@ -78,8 +78,7 @@ class WSLCCLISettingsUnitTests
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
         std::error_code ec;
-        std::filesystem::remove_all(
-            std::filesystem::temp_directory_path() / L"WSLCSettingsTests", ec);
+        std::filesystem::remove_all(std::filesystem::temp_directory_path() / L"WSLCSettingsTests", ec);
         return true;
     }
 
@@ -92,10 +91,10 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(SettingsMap_GetOrDefault_ReturnsBuiltInWhenAbsent)
     {
         SettingsMap map;
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionCpuCount>(),      4u);
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionMemoryMb>(),      2048u);
+        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionMemoryMb>(), 2048u);
         VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionStorageSizeMb>(), 10000u);
-        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionStoragePath>(),   std::wstring{});
+        VERIFY_ARE_EQUAL(map.GetOrDefault<Setting::SessionStoragePath>(), std::wstring{});
     }
 
     // After inserting a value, GetOrDefault must return it rather than the default.
@@ -119,10 +118,10 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Default));
         VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(),      4u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(),      2048u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 2048u);
         VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 10000u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(),   std::wstring{});
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring{});
     }
 
     // -----------------------------------------------------------------------
@@ -134,18 +133,19 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(LoadSettings_ValidPrimary_YieldsStandardTypeAndValues)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml",
-                  "session:\n"
-                  "  cpuCount: 8\n"
-                  "  memorySizeMb: 4096\n"
-                  "  maxStorageSizeMb: 20000\n");
+        WriteFile(
+            dir / L"UserSettings.yaml",
+            "session:\n"
+            "  cpuCount: 8\n"
+            "  memorySizeMb: 4096\n"
+            "  maxStorageSizeMb: 20000\n");
 
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(static_cast<int>(s.GetType()), static_cast<int>(UserSettingsType::Standard));
         VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(),      8u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(),      4096u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 8u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 4096u);
         VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 20000u);
         // Unspecified setting falls back to built-in default.
         VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring{});
@@ -161,8 +161,8 @@ class WSLCCLISettingsUnitTests
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(),      4u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(),      2048u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 2048u);
         VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 10000u);
     }
 
@@ -175,7 +175,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(LoadSettings_InvalidPrimary_ValidBackup_YieldsBackupType)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml",     "session: [\n"); // broken YAML
+        WriteFile(dir / L"UserSettings.yaml", "session: [\n"); // broken YAML
         WriteFile(dir / L"UserSettings.yaml.bak", "session:\n  cpuCount: 2\n");
 
         UserSettingsTest s{dir};
@@ -203,7 +203,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(LoadSettings_BothInvalid_YieldsDefaultTypeWithWarnings)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml",     ": bad: [\n");    // broken YAML (unclosed flow seq)
+        WriteFile(dir / L"UserSettings.yaml", ": bad: [\n");       // broken YAML (unclosed flow seq)
         WriteFile(dir / L"UserSettings.yaml.bak", "session: [\n"); // broken YAML (unclosed flow seq)
 
         UserSettingsTest s{dir};
@@ -271,8 +271,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_StoragePath_NonEmpty_RoundTrips)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml",
-                  "session:\n  defaultStoragePath: \"/mnt/data/storage\"\n");
+        WriteFile(dir / L"UserSettings.yaml", "session:\n  defaultStoragePath: \"/mnt/data/storage\"\n");
 
         UserSettingsTest s{dir};
 
@@ -284,8 +283,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_StoragePath_Empty_IsValid)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml",
-                  "session:\n  defaultStoragePath: \"\"\n");
+        WriteFile(dir / L"UserSettings.yaml", "session:\n  defaultStoragePath: \"\"\n");
 
         UserSettingsTest s{dir};
 
@@ -302,22 +300,23 @@ class WSLCCLISettingsUnitTests
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(),      4u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(),      2048u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionCpuCount>(), 4u);
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionMemoryMb>(), 2048u);
         VERIFY_ARE_EQUAL(s.Get<Setting::SessionStorageSizeMb>(), 10000u);
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(),   std::wstring{});
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring{});
     }
 
     // Extra unknown keys at any level must not cause errors or warnings.
     TEST_METHOD(Validation_UnknownKeys_NoErrorsOrWarnings)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml",
-                  "session:\n"
-                  "  cpuCount: 4\n"
-                  "  unknownSetting: 99\n"
-                  "unknownSection:\n"
-                  "  foo: bar\n");
+        WriteFile(
+            dir / L"UserSettings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "  unknownSetting: 99\n"
+            "unknownSection:\n"
+            "  foo: bar\n");
 
         UserSettingsTest s{dir};
 
