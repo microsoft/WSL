@@ -5994,4 +5994,17 @@ class WSLATests
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("a:"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":b"); }), E_INVALIDARG);
     }
+
+    TEST_METHOD(RepoParsing)
+    {
+        using wsl::windows::common::wslutil::ParseRepo;
+
+        auto ValidateRepoParsing = [](const std::string& input, const std::optional<std::string>& expectedServer, const std::string& expectedPath) {
+            auto [server, path] = ParseRepo(input);
+            VERIFY_ARE_EQUAL(server.value_or("<empty>"), expectedServer.value_or("<empty>"));
+            VERIFY_ARE_EQUAL(path, expectedPath);
+        };
+
+        ValidateRepoParsing("ubuntu", {}, "ubuntu");
+    }
 };

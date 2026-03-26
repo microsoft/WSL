@@ -255,26 +255,47 @@ constexpr GUID EndianSwap(GUID value)
     return value;
 }
 
+std::string Capture(const auto& exp)
+{
+    return std::format("({})", exp);
+}
+
+std::string Optional(const auto& exp)
+{
+    return Group(exp) + "?";
+}
+
+std::string Repeated(const auto& exp)
+{
+    return Group(exp) + "+";
+}
+
+std::string Group(const auto& exp)
+{
+    return std::format("(?:{})", exp);
+}
+
+std::string BuildRepoRegex(bool captureDomain)
+{
+    std::string alphaNum = "[a-z0-9]+";
+    std::string separator = "(?:[._]|__|[-]*)";
+    std::string domainComponent = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
+
+    auto nameComponent = alphaNum + Optional(Repeated(separator + alphaNum));
+    auto domain = Optional(domainComponent + Optional(Repeated("\\." + domainComponent)) + Optional(":[0-9]+") + "\\/");
+    auto namePat = (captureDomain ? Capture(domain) : domain) + nameComponent + Optional(Repeated("\\/" + nameComponent));
+
+    return namePat;
+}
+
 std::regex BuildImageReferenceRegex()
 {
     // See: https://github.com/containers/image/blob/main/docker/reference/regexp.go
 
-    std::string alphaNum = "[a-z0-9]+";
-    std::string separator = "(?:[._]|__|[-]*)";
-    std::string domainComponent = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
     std::string tag = "[\\w][\\w.-]{0,127}";
     std::string digest = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
 
-    auto group = [](const auto& exp) { return std::format("(?:{})", exp); };
-    auto optional = [&group](const auto& exp) { return group(exp) + "?"; };
-    auto repeated = [&group](const auto& exp) { return group(exp) + "+"; };
-    auto capture = [](const auto& exp) { return std::format("({})", exp); };
-
-    auto nameComponent = alphaNum + optional(repeated(separator + alphaNum));
-    auto domain = domainComponent + optional(repeated("\\." + domainComponent)) + optional(":[0-9]+");
-    auto namePat = optional(domain + "\\/") + nameComponent + optional(repeated("\\/" + nameComponent));
-
-    return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
+    return std::regex("^" + Capture(BuildRepoRegex(false)) + Optional(":" + Capture(tag)) + Optional("@" + Capture(digest)) + "$");
 }
 
 } // namespace
@@ -1213,6 +1234,31 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
     else
     {
         return {repo.str(), std::nullopt};
+    }
+}
+
+std::pair<std::optional<std::string>, std::string> wsl::windows::common::wslutil::ParseRepo(const std::string& Input)
+{
+    static const auto regex = std::regex(BuildRepoRegex(true));
+
+    std::smatch match;
+    if (!std::regex_match(Input, match, regex))
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslaInvalidImageRepo(Input.c_str()));
+    }
+
+    const auto& server = match[1];
+    const auto& path = match[2];
+
+    THROW_HR_IF_MSG(E_UNEXPECTED, !path.matched, "Unexpected regex match. Input: %hs", Input.c_str());
+
+    if (server.matched)
+    {
+        return {server.str(), path.str()};
+    }
+    else
+    {
+        return {std::nullopt, path.str()};
     }
 }
 

@@ -225,6 +225,7 @@ void ParseIpv6Address(const char* Address, in_addr6& Result);
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
 
 std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input);
+std::pair<std::optional<std::string>, std::string> ParseRepo(const std::string& Input);
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 

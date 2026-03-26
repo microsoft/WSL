@@ -2074,6 +2074,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Invalid image: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslaInvalidImageRepo" xml:space = "preserve" >
+    <value>Invalid image repo: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslaInvalidName" xml:space = "preserve" >
     <value>Invalid name: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
