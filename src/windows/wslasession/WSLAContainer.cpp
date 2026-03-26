@@ -601,10 +601,19 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
 
     // Set up a waitable stop state so OnEvent() can pass the Docker timestamp
     // back to Stop() without needing to take m_lock.
+    std::future<std::uint64_t> stopFuture;
     {
         std::lock_guard stopLock{m_stopStateLock};
         m_stopState.emplace();
+        stopFuture = m_stopState->get_future();
     }
+
+    // Ensure m_stopState is cleared on all exit paths so OnEvent() doesn't
+    // take the promise path after a failed Stop().
+    auto resetStopState = wil::scope_exit([this]() {
+        std::lock_guard stopLock{m_stopStateLock};
+        m_stopState.reset();
+    });
 
     try
     {
@@ -634,18 +643,23 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
     // Wait for the stop event to get the Docker timestamp.
     // Safe while holding m_lock since OnEvent() uses m_stopStateLock on this path.
     std::optional<std::uint64_t> stopTimestamp;
-    auto stopFuture = m_stopState->get_future();
     if (stopFuture.wait_for(60s) == std::future_status::ready)
     {
         stopTimestamp = stopFuture.get();
     }
 
-    {
-        std::lock_guard stopLock{m_stopStateLock};
-        m_stopState.reset();
-    }
-
     Transition(WslaContainerStateExited, stopTimestamp);
+
+    {
+        std::lock_guard processesLock{m_processesLock};
+
+        for (auto& process : m_processes)
+        {
+            process->OnContainerReleased();
+        }
+
+        m_processes.clear();
+    }
 
     ReleaseRuntimeResources();
 
