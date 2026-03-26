@@ -20,6 +20,7 @@ Abstract:
 #include "RootCommand.h"
 #include "ContainerCommand.h"
 #include "SessionCommand.h"
+#include "VersionCommand.h"
 
 using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
@@ -94,6 +95,46 @@ class WSLCCLICommandUnitTests
         {
             VERIFY_IS_NOT_NULL(subcmd.get());
         }
+    }
+
+    // Test: Verify VersionCommand has the correct name
+    TEST_METHOD(VersionCommand_HasCorrectName)
+    {
+        auto cmd = VersionCommand(L"wslc");
+        VERIFY_ARE_EQUAL(std::wstring_view(L"version"), cmd.Name());
+    }
+
+    // Test: Verify VersionCommand has no subcommands
+    TEST_METHOD(VersionCommand_HasNoSubcommands)
+    {
+        auto cmd = VersionCommand(L"wslc");
+        VERIFY_ARE_EQUAL(0u, cmd.GetCommands().size());
+    }
+
+    // Test: Verify VersionCommand has no arguments (only the auto-added --help)
+    TEST_METHOD(VersionCommand_HasNoArguments)
+    {
+        auto cmd = VersionCommand(L"wslc");
+        VERIFY_ARE_EQUAL(0u, cmd.GetArguments().size());
+    }
+
+    // Test: Verify RootCommand contains VersionCommand as a subcommand
+    TEST_METHOD(RootCommand_ContainsVersionCommand)
+    {
+        auto root = RootCommand();
+        auto subcommands = root.GetCommands();
+
+        bool found = false;
+        for (const auto& subcmd : subcommands)
+        {
+            if (subcmd->Name() == VersionCommand::CommandName)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
     }
 };
 

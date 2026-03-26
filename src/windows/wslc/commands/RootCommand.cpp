@@ -17,6 +17,7 @@ Abstract:
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
 #include "SessionCommand.h"
+#include "VersionCommand.h"
 
 using namespace wsl::windows::wslc::execution;
 
@@ -43,6 +44,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
+    commands.push_back(std::make_unique<VersionCommand>(FullName()));
     return commands;
 }
 

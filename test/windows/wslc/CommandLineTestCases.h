@@ -111,6 +111,11 @@ COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
 
+// Version command tests
+COMMAND_LINE_TEST_CASE(L"version", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version --help", L"version", true)
+COMMAND_LINE_TEST_CASE(L"version extraarg", L"version", false)
+
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
 COMMAND_LINE_TEST_CASE(L"CONTAINER list", L"list", false)               // We are intentionally case-sensitive
