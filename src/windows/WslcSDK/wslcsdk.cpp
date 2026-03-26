@@ -773,12 +773,21 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PCSTR* inspectData)
+STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR* inspectData)
 try
 {
-    UNREFERENCED_PARAMETER(container);
-    UNREFERENCED_PARAMETER(inspectData);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    RETURN_HR_IF_NULL(E_POINTER, inspectData);
+
+    *inspectData = nullptr;
+
+    wil::unique_cotaskmem_ansistring result;
+    RETURN_IF_FAILED(internalType->container->Inspect(&result));
+
+    *inspectData = result.release();
+
+    return S_OK;
 }
 CATCH_RETURN();
 

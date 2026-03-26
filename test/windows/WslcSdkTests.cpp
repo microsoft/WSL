@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "wslcsdk.h"
+#include "wsla_schema.h"
 #include <optional>
 
 extern std::wstring g_testDataPath;
@@ -1891,7 +1892,7 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcCanRun(&canRun, &missing), E_NOTIMPL);
     }
 
-    TEST_METHOD(ContainerInspectNotImplemented)
+    TEST_METHOD(ContainerInspect)
     {
         WSL2_TEST_ONLY();
 
@@ -1900,10 +1901,17 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
 
-        PCSTR inspectData = nullptr;
-        VERIFY_ARE_EQUAL(WslcInspectContainer(container.get(), &inspectData), E_NOTIMPL);
+        wil::unique_cotaskmem_ansistring inspectData;
+        VERIFY_SUCCEEDED(WslcInspectContainer(container.get(), &inspectData));
 
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
+        VERIFY_IS_NOT_NULL(inspectData);
+
+        auto inspectObject = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectContainer>(inspectData.get());
+
+        CHAR containerId[WSLC_CONTAINER_ID_LENGTH];
+        VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
+
+        VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
     }
 
     TEST_METHOD(SessionCreateVhdNotImplemented)

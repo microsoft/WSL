@@ -213,7 +213,7 @@ STDAPI WslcGetContainerInitProcess(_In_ WslcContainer container, _Out_ WslcProce
 // Notes:
 //   - The caller must pass a non-null pointer to a PCSTR variable.
 //   - The returned string is immutable and must not be modified by the caller.
-STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PCSTR* inspectData);
+STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR* inspectData);
 
 typedef enum WslcContainerState
 {
