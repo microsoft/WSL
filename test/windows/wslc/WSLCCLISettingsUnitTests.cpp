@@ -271,11 +271,11 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_StoragePath_NonEmpty_RoundTrips)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  defaultStoragePath: \"/mnt/data/storage\"\n");
+        WriteFile(dir / L"UserSettings.yaml", "session:\n  defaultStoragePath: \"C:\\\\TestFolder\"\n");
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring(L"/mnt/data/storage"));
+        VERIFY_ARE_EQUAL(s.Get<Setting::SessionStoragePath>(), std::wstring(L"C:\\TestFolder"));
         VERIFY_ARE_EQUAL(s.GetWarnings().size(), 0u);
     }
 

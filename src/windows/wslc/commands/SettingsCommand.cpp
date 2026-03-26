@@ -78,9 +78,7 @@ std::wstring SettingsResetCommand::ShortDescription() const
 
 std::wstring SettingsResetCommand::LongDescription() const
 {
-    return {
-        L"Overwrites the settings file with a commented-out defaults template.\n"
-        L"Use --force / -f to skip the confirmation prompt."};
+    return {L"Overwrites the settings file with a commented-out defaults template."};
 }
 
 void SettingsResetCommand::ExecuteInternal(CLIExecutionContext& context) const

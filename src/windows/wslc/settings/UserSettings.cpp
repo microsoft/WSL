@@ -41,7 +41,7 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size in megabytes (default: 10000)\n"
     "  # maxStorageSizeMb: 10000\n"
     "\n"
-    "  # Default path for container storage (default: %LocalAppData%\\wslc\\storage)\n"
+    "  # Default path for container storage (default: %LocalAppData%\\wslc\\defaultstorage)\n"
     "  # defaultStoragePath: \"\"\n";
 
 // Validate individual setting specializations
@@ -155,6 +155,14 @@ namespace {
         std::ifstream stream(path);
         if (!stream.is_open())
         {
+            // If the file exists but cannot be opened (permissions, sharing violation, etc.),
+            // emit a warning so the user understands why settings were ignored.
+            if (std::filesystem::exists(path))
+            {
+                warnings.push_back(
+                    {std::format(L"Warning: '{}' exists but could not be opened. Settings will be ignored.", path.filename().wstring()), {}});
+            }
+
             return std::nullopt;
         }
 
@@ -240,6 +248,15 @@ void UserSettings::PrepareToShellExecuteFile() const
     {
         // First run — create the directory and write the commented-out defaults template.
         Reset();
+    }
+    else if (m_type == UserSettingsType::Backup)
+    {
+        // Reset to defaults only when primary file does not exist. Otherwise, give
+        // user the chance to continue working on their incomplete settings.
+        if (!std::filesystem::exists(m_primaryPath))
+        {
+            Reset();
+        }
     }
 }
 
