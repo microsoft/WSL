@@ -232,6 +232,32 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
     }
 
+    if (context.Args.Contains(ArgType::EnvFile))
+    {
+        auto const& envFiles = context.Args.GetAll<ArgType::EnvFile>();
+        for (const auto& envFile : envFiles)
+        {
+            auto parsedEnvVars = EnvironmentVariable::ParseFile(envFile);
+            for (const auto& envVar : parsedEnvVars)
+            {
+                options.EnvironmentVariables.push_back(wsl::shared::string::WideToMultiByte(envVar));
+            }
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Env))
+    {
+        auto const& envArgs = context.Args.GetAll<ArgType::Env>();
+        for (const auto& arg : envArgs)
+        {
+            auto envVar = EnvironmentVariable::Parse(arg);
+            if (envVar)
+            {
+                options.EnvironmentVariables.push_back(wsl::shared::string::WideToMultiByte(*envVar));
+            }
+        }
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();
