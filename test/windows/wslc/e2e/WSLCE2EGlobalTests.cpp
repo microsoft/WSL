@@ -137,6 +137,7 @@ private:
                  << L"  logs       View container logs.\r\n"
                  << L"  pull       Pull images.\r\n"
                  << L"  remove     Remove containers.\r\n"
+                 << L"  rmi        Remove images.\r\n"
                  << L"  run        Run a container.\r\n"
                  << L"  start      Start a container.\r\n"
                  << L"  stop       Stop containers.\r\n"

@@ -193,6 +193,9 @@ try
     });
 
     EvaluateWslPolicy();
+
+    wsl::windows::common::helpers::RegisterWithDcat();
+
     return S_OK;
 }
 CATCH_RETURN()

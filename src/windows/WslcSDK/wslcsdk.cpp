@@ -578,6 +578,12 @@ try
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
+
+        if (IOCallback::HasIOCallback(internalContainerSettings->initProcessOptions))
+        {
+            result->ioCallbackOptions = internalContainerSettings->initProcessOptions->ioCallbacks;
+        }
+
         *container = reinterpret_cast<WslcContainer>(result.release());
     }
 
@@ -592,7 +598,23 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    return errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr));
+    bool hasIOCallback = IOCallback::HasIOCallback(internalType->ioCallbackOptions);
+    // If callbacks were provided, ATTACH must be used.
+    // TODO: Consider if we should just override flags when callbacks were provided instead.
+    RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
+    {
+        if (hasIOCallback)
+        {
+            wil::com_ptr<IWSLAProcess> process;
+            RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
+            internalType->ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+        }
+    }
+
+    return errorInfoWrapper;
 }
 CATCH_RETURN();
 
@@ -723,6 +745,12 @@ try
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalContainer->container->Exec(&runtimeOptions, nullptr, &result->process))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+
+        if (IOCallback::HasIOCallback(internalProcessSettings))
+        {
+            result->ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
+        }
+
         *newProcess = reinterpret_cast<WslcProcess>(result.release());
     }
 
@@ -767,6 +795,9 @@ try
     RETURN_IF_FAILED(internalType->container->GetInitProcess(&result->process));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+
+    result->ioCallbacks = internalType->ioCallbacks.load();
+
     *initProcess = reinterpret_cast<WslcProcess>(result.release());
 
     return S_OK;
@@ -957,19 +988,31 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetProcessSettingsIoCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context)
+STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context)
 try
 {
-    UNREFERENCED_PARAMETER(processSettings);
-    UNREFERENCED_PARAMETER(ioHandle);
-    UNREFERENCED_PARAMETER(stdIOCallback);
-    UNREFERENCED_PARAMETER(context);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(processSettings);
+    RETURN_HR_IF(E_INVALIDARG, callbacks == nullptr && context != nullptr);
+
+    static_assert(std::is_trivial_v<WslcProcessCallbacks>, "WslcProcessCallbacks must be trivial.");
+
+    WslcProcessCallbacks* internalCallbacks = &internalType->ioCallbacks;
+
+    if (callbacks)
+    {
+        *internalCallbacks = *callbacks;
+        internalType->ioCallbacks.callbackContext = context;
+    }
+    else
+    {
+        *internalCallbacks = {};
+    }
+
+    return S_OK;
 }
 CATCH_RETURN();
 
-STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIoHandle ioHandle, _Out_ HANDLE* handle)
+STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIOHandle ioHandle, _Out_ HANDLE* handle)
 try
 {
     auto internalType = CheckAndGetInternalType(process);
@@ -978,17 +1021,10 @@ try
 
     *handle = nullptr;
 
-    ULONG ulongHandle = 0;
+    auto result = IOCallback::GetIOHandle(internalType->process.get(), ioHandle);
+    *handle = result.release();
 
-    HRESULT hr = internalType->process->GetStdHandle(
-        static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIoHandle>>(ioHandle)), &ulongHandle);
-
-    if (SUCCEEDED_LOG(hr))
-    {
-        *handle = ULongToHandle(ulongHandle);
-    }
-
-    return hr;
+    return S_OK;
 }
 CATCH_RETURN();
 
