@@ -409,7 +409,7 @@ try
     // Only supported value currently
     volumeOptions.Type = "vhd";
 
-    auto dynamicOptions = std::format(R"({{ "SizeBytes": {} }})", options->sizeInBytes);
+    auto dynamicOptions = std::format(R"({{ "SizeBytes": "{}" }})", options->sizeInBytes);
     volumeOptions.Options = dynamicOptions.c_str();
 
     return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions));
@@ -548,6 +548,23 @@ try
         }
         containerOptions.Volumes = convertedVolumes.get();
         containerOptions.VolumesCount = static_cast<ULONG>(internalContainerSettings->volumesCount);
+    }
+
+    std::unique_ptr<WSLANamedVolume[]> convertedNamedVolumes;
+    if (internalContainerSettings->namedVolumes && internalContainerSettings->namedVolumesCount)
+    {
+        convertedNamedVolumes = std::make_unique<WSLANamedVolume[]>(internalContainerSettings->namedVolumesCount);
+        for (uint32_t i = 0; i < internalContainerSettings->namedVolumesCount; ++i)
+        {
+            const WslcContainerNamedVolume& internalVolume = internalContainerSettings->namedVolumes[i];
+            WSLANamedVolume& convertedVolume = convertedNamedVolumes[i];
+
+            convertedVolume.Name = internalVolume.name;
+            convertedVolume.ContainerPath = internalVolume.containerPath;
+            convertedVolume.ReadOnly = internalVolume.readOnly;
+        }
+        containerOptions.NamedVolumes = convertedNamedVolumes.get();
+        containerOptions.NamedVolumesCount = static_cast<ULONG>(internalContainerSettings->namedVolumesCount);
     }
 
     std::unique_ptr<WSLAPortMapping[]> convertedPorts;
@@ -728,6 +745,29 @@ try
 
     internalType->volumes = volumes;
     internalType->volumesCount = volumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsNamedVolumes(
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
+    _In_ uint32_t namedVolumeCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(E_INVALIDARG, (namedVolumes == nullptr && namedVolumeCount != 0) || (namedVolumes != nullptr && namedVolumeCount == 0));
+
+    for (uint32_t i = 0; i < namedVolumeCount; ++i)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, namedVolumes[i].name);
+        RETURN_HR_IF_NULL(E_INVALIDARG, namedVolumes[i].containerPath);
+        EnsureAbsolutePath(namedVolumes[i].containerPath, true);
+    }
+
+    internalType->namedVolumes = namedVolumes;
+    internalType->namedVolumesCount = namedVolumeCount;
 
     return S_OK;
 }

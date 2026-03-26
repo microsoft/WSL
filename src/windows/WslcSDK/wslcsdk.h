@@ -32,7 +32,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 80
+#define WSLC_CONTAINER_OPTIONS_SIZE 96
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -134,6 +134,13 @@ typedef struct WslcContainerVolume
     _In_ BOOL readOnly;
 } WslcContainerVolume;
 
+typedef struct WslcContainerNamedVolume
+{
+    _In_z_ PCSTR name;          // Name of the session volume (from WslcVhdRequirements.name)
+    _In_z_ PCSTR containerPath; // Absolute path inside the container
+    _In_ BOOL readOnly;
+} WslcContainerNamedVolume;
+
 typedef enum WslcContainerFlags
 {
     WSLC_CONTAINER_FLAG_NONE = 0x00000000,
@@ -181,6 +188,12 @@ STDAPI WslcSetContainerSettingsPortMappings(
 // Add the container volumes to the volumes array
 STDAPI WslcSetContainerSettingsVolumes(
     _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
+
+// Add named session volumes (created via WslcCreateSessionVhd) to the container settings
+STDAPI WslcSetContainerSettingsNamedVolumes(
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
+    _In_ uint32_t namedVolumeCount);
 
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);
