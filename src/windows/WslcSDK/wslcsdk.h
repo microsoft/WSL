@@ -66,8 +66,8 @@ typedef enum WslcVhdType
 
 typedef struct WslcVhdRequirements
 {
-    // Required for WslcCreateSessionVhd
-    _In_opt_ PCSTR name;
+    // Ignored by WslcSetSessionSettingsVHD
+    _In_z_ PCSTR name;
     _In_ uint64_t sizeInBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
 } WslcVhdRequirements;
@@ -224,10 +224,6 @@ STDAPI WslcGetContainerInitProcess(_In_ WslcContainer container, _Out_ WslcProce
 //
 // Return Value:
 //   S_OK on success. Otherwise, an HRESULT error code indicating the failure.
-//
-// Notes:
-//   - The caller must pass a non-null pointer to a PCSTR variable.
-//   - The returned string is immutable and must not be modified by the caller.
 STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR* inspectData);
 
 typedef enum WslcContainerState
