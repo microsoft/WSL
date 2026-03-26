@@ -49,7 +49,7 @@ set(SOURCES
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
-    notifications.cpp)
+    )
 
 set(HEADERS
     ../../../generated/Localization.h
