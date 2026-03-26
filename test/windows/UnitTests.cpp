@@ -339,6 +339,9 @@ class UnitTests
     {
         WSL2_TEST_ONLY();
 
+        // The X11 socket is only created when gui applications are enabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+
         // ensures that we don't leave state on exit
         auto cleanup = EnableSystemd("initTimeout=0");
 
