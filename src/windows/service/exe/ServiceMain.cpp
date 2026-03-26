@@ -18,6 +18,7 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "LxssIpTables.h"
 #include "LxssUserSessionFactory.h"
+#include "WSLASessionManagerFactory.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -30,6 +31,9 @@ wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
+
+// Declare the WSLASessionManager COM class.
+CoCreatableClassWrlCreatorMapInclude(WSLASessionManager);
 
 struct WslServiceSecurityPolicy
 {
@@ -189,6 +193,9 @@ try
     });
 
     EvaluateWslPolicy();
+
+    wsl::windows::common::helpers::RegisterWithDcat();
+
     return S_OK;
 }
 CATCH_RETURN()
@@ -239,6 +246,9 @@ void WslService::ServiceStopped()
 
     // Terminate all user sessions.
     ClearSessionsAndBlockNewInstances();
+
+    // Also tear down WSLA sessions.
+    wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances();
 
     // Disconnect from the LxCore driver.
     if (g_lxcoreInitialized)

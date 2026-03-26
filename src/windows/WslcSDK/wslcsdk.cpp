@@ -223,6 +223,47 @@ bool CopyProcessSettingsToRuntime(WSLAProcessOptions& runtimeOptions, const Wslc
         return false;
     }
 }
+
+// Normalizes file inputs to HANDLE+length.
+struct ImageFileResolver
+{
+    ImageFileResolver(PCWSTR path) : m_fileHandle(INVALID_HANDLE_VALUE)
+    {
+        THROW_HR_IF_NULL(E_POINTER, path);
+
+        wil::unique_handle imageFileHandle{
+            CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!imageFileHandle);
+
+        LARGE_INTEGER fileSize{};
+        THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(imageFileHandle.get(), &fileSize));
+
+        m_fileHandle = std::move(imageFileHandle);
+        m_length = static_cast<ULONGLONG>(fileSize.QuadPart);
+    }
+
+    ImageFileResolver(HANDLE imageContent, uint64_t imageContentLength) : m_fileHandle(imageContent)
+    {
+        THROW_HR_IF(E_INVALIDARG, imageContent == nullptr || imageContent == INVALID_HANDLE_VALUE);
+        THROW_HR_IF(E_INVALIDARG, imageContentLength == 0);
+
+        m_length = imageContentLength;
+    }
+
+    HANDLE Handle() const
+    {
+        return m_fileHandle.Get();
+    }
+
+    ULONGLONG Length() const
+    {
+        return m_length;
+    }
+
+private:
+    wsl::windows::common::relay::HandleWrapper m_fileHandle;
+    ULONGLONG m_length;
+};
 } // namespace
 
 // SESSION DEFINITIONS
@@ -513,11 +554,13 @@ try
 
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
-            // TODO: Only other supported value right now is AF_INET6; no user access.
+
+            // TODO: Ipv6 & custom binding address support.
             convertedPort.Family = AF_INET;
 
-            // TODO: Unused protocol?
-            // TODO: Unused windowsAddress?
+            // TODO: Consider using standard protocol numbers instead of our own enum.
+            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
+            convertedPort.BindingAddress = "127.0.0.1";
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
@@ -535,6 +578,12 @@ try
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, &result->container))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
+
+        if (IOCallback::HasIOCallback(internalContainerSettings->initProcessOptions))
+        {
+            result->ioCallbackOptions = internalContainerSettings->initProcessOptions->ioCallbacks;
+        }
+
         *container = reinterpret_cast<WslcContainer>(result.release());
     }
 
@@ -549,7 +598,23 @@ try
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    return errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr));
+    bool hasIOCallback = IOCallback::HasIOCallback(internalType->ioCallbackOptions);
+    // If callbacks were provided, ATTACH must be used.
+    // TODO: Consider if we should just override flags when callbacks were provided instead.
+    RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
+    {
+        if (hasIOCallback)
+        {
+            wil::com_ptr<IWSLAProcess> process;
+            RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
+            internalType->ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+        }
+    }
+
+    return errorInfoWrapper;
 }
 CATCH_RETURN();
 
@@ -680,6 +745,12 @@ try
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalContainer->container->Exec(&runtimeOptions, nullptr, &result->process))))
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+
+        if (IOCallback::HasIOCallback(internalProcessSettings))
+        {
+            result->ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
+        }
+
         *newProcess = reinterpret_cast<WslcProcess>(result.release());
     }
 
@@ -724,6 +795,9 @@ try
     RETURN_IF_FAILED(internalType->container->GetInitProcess(&result->process));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
+
+    result->ioCallbacks = internalType->ioCallbacks.load();
+
     *initProcess = reinterpret_cast<WslcProcess>(result.release());
 
     return S_OK;
@@ -914,19 +988,31 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetProcessSettingsIoCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context)
+STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context)
 try
 {
-    UNREFERENCED_PARAMETER(processSettings);
-    UNREFERENCED_PARAMETER(ioHandle);
-    UNREFERENCED_PARAMETER(stdIOCallback);
-    UNREFERENCED_PARAMETER(context);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(processSettings);
+    RETURN_HR_IF(E_INVALIDARG, callbacks == nullptr && context != nullptr);
+
+    static_assert(std::is_trivial_v<WslcProcessCallbacks>, "WslcProcessCallbacks must be trivial.");
+
+    WslcProcessCallbacks* internalCallbacks = &internalType->ioCallbacks;
+
+    if (callbacks)
+    {
+        *internalCallbacks = *callbacks;
+        internalType->ioCallbacks.callbackContext = context;
+    }
+    else
+    {
+        *internalCallbacks = {};
+    }
+
+    return S_OK;
 }
 CATCH_RETURN();
 
-STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIoHandle ioHandle, _Out_ HANDLE* handle)
+STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIOHandle ioHandle, _Out_ HANDLE* handle)
 try
 {
     auto internalType = CheckAndGetInternalType(process);
@@ -935,17 +1021,10 @@ try
 
     *handle = nullptr;
 
-    ULONG ulongHandle = 0;
+    auto result = IOCallback::GetIOHandle(internalType->process.get(), ioHandle);
+    *handle = result.release();
 
-    HRESULT hr = internalType->process->GetStdHandle(
-        static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIoHandle>>(ioHandle)), &ulongHandle);
-
-    if (SUCCEEDED_LOG(hr))
-    {
-        *handle = ULongToHandle(ulongHandle);
-    }
-
-    return hr;
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -966,30 +1045,75 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
-try
+static HRESULT WslcImportSessionImageImpl(
+    WslcSessionImpl* internalSession, PCSTR imageName, const WslcImportImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    UNREFERENCED_PARAMETER(errorMessage);
-    return E_NOTIMPL;
-}
-CATCH_RETURN();
+    auto progressCallback = ProgressCallback::CreateIf(options);
 
-STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+    return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
+        HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+}
+
+STDAPI WslcImportSessionImage(
+    _In_ WslcSession session,
+    _In_z_ PCSTR imageName,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcImportImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
-    RETURN_HR_IF_NULL(E_POINTER, options);
-    RETURN_HR_IF(E_INVALIDARG, options->ImageHandle == nullptr || options->ImageHandle == INVALID_HANDLE_VALUE);
-    RETURN_HR_IF(E_INVALIDARG, options->ContentLength == 0);
+    THROW_HR_IF_NULL(E_POINTER, imageName);
+    return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {imageContent, imageContentLength});
+}
+CATCH_RETURN();
 
+STDAPI WslcImportSessionImageFromFile(
+    _In_ WslcSession session, _In_z_ PCSTR imageName, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    THROW_HR_IF_NULL(E_POINTER, imageName);
+    return WslcImportSessionImageImpl(internalType, imageName, options, errorInfoWrapper, {path});
+}
+CATCH_RETURN();
+
+static HRESULT WslcLoadSessionImageImpl(
+    WslcSessionImpl* internalSession, const WslcLoadImageOptions* options, ErrorInfoWrapper& errorInfoWrapper, const ImageFileResolver& imageFile)
+{
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalType->session->LoadImage(HandleToULong(options->ImageHandle), progressCallback.get(), options->ContentLength));
+        internalSession->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+}
+
+STDAPI WslcLoadSessionImage(
+    _In_ WslcSession session,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcLoadImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    return WslcLoadSessionImageImpl(internalType, options, errorInfoWrapper, {imageContent, imageContentLength});
+}
+CATCH_RETURN();
+
+STDAPI WslcLoadSessionImageFromFile(_In_ WslcSession session, _In_z_ PCWSTR path, _In_opt_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    return WslcLoadSessionImageImpl(internalType, options, errorInfoWrapper, {path});
 }
 CATCH_RETURN();
 

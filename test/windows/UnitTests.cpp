@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 
 #include "Common.h"
+#include "install.h"
 #include <AclAPI.h>
 #include <fstream>
 #include <filesystem>
@@ -271,6 +272,7 @@ class UnitTests
         };
 
         // Validate user sessions state with gui apps disabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = false}));
         {
             validateUserSession();
 
@@ -284,7 +286,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps enabled.
         {
-            WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+            config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
             validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
@@ -353,7 +355,7 @@ class UnitTests
         WSL2_TEST_ONLY();
 
         // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
 
         auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
@@ -2349,7 +2351,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             {
                 LogInfo("Validating signature for: %ls", e.path().c_str());
 
-                wsl::windows::common::wslutil::ValidateFileSignature(e.path().c_str());
+                wsl::windows::common::install::ValidateFileSignature(e.path().c_str());
                 signedFiles++;
             }
         }
@@ -3805,7 +3807,7 @@ localhostForwarding=true
         validateUidChange(L"root", 0, L"The operation completed successfully. \r\n", L"", 0);
 
         const std::wstring invalidUser = L"Nonexistent";
-        validateUidChange(invalidUser, 0, L"", L"/usr/bin/id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
+        validateUidChange(invalidUser, 0, L"", L"id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
@@ -3929,7 +3931,7 @@ localhostForwarding=true
             VERIFY_ARE_EQUAL(ExpectedVersion, version);
         };
 
-        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"12");
+        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"13");
 
         constexpr auto testTar = L"exported-distro.tar";
         constexpr auto tmpDistroName = L"tmpdistro";
@@ -4029,10 +4031,10 @@ VERSION_ID="Invalid|Format"
         // Verify that importing a distribution with an os-release as then converting works as well
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--import {} . {} --version {}", tmpDistroName, g_testDistroPath, convertVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--set-version {} {}", tmpDistroName, currentVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
     }
 
     TEST_METHOD(DistributionId)
@@ -6409,8 +6411,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     // See https://github.com/microsoft/WSL/issues/13173.
     TEST_METHOD(SetSidNoWarning)
     {
-        auto [out, err] =
-            LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,stderr");
 
         VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
         VERIFY_ARE_EQUAL(err, L"");

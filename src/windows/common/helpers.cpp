@@ -24,7 +24,6 @@ Abstract:
 #include <gslhelpers.h>
 #include "registry.hpp"
 #include "versionhelpers.h"
-#include "hcs.hpp"
 #include <regstr.h>
 
 // Version numbers for various functionality that was backported.
@@ -456,14 +455,6 @@ std::filesystem::path wsl::windows::common::helpers::GetWslConfigPath(_In_opt_ H
     return wsl::windows::common::helpers::GetUserProfilePath(userToken) / L".wslconfig";
 }
 
-bool wsl::windows::common::helpers::IsDisableVgpuSettingsSupported()
-{
-    static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
-
-    // See if the Windows version has the required platform change.
-    return ((wsl::windows::common::hcs::GetSchemaVersion() >= c_schemaVersionNickel) && (GetWindowsVersion().BuildNumber >= 22545));
-}
-
 bool wsl::windows::common::helpers::IsPackageInstalled(_In_ LPCWSTR PackageFamilyName)
 {
     UINT32 packageCount = 0;
@@ -698,3 +689,21 @@ bool wsl::windows::common::helpers::TryAttachConsole()
 
     return ReopenStdHandles();
 }
+
+void wsl::windows::common::helpers::RegisterWithDcat(_In_ bool IncludeVersionNumber)
+try
+{
+    std::wstring registeredVersion;
+    if (IncludeVersionNumber)
+    {
+        registeredVersion.assign(TEXT(WSL_PACKAGE_VERSION));
+    }
+    else
+    {
+        registeredVersion.assign(L"0.0.0.0");
+    }
+
+    wil::unique_hkey dcatKey = wsl::windows::common::registry::CreateKey(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_SET_VALUE);
+    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, L"Version", registeredVersion.c_str());
+}
+CATCH_LOG()

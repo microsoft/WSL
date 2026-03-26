@@ -16,10 +16,8 @@ endif()
 
 if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "arm64" OR "${TARGET_PLATFORM}" STREQUAL "arm64")
     set(TARGET_PLATFORM "arm64")
-    set(TEST_DISTRO_PLATFORM "arm64")
 elseif("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64|amd64" OR "${TARGET_PLATFORM}" MATCHES "x64|amd64")
     set(TARGET_PLATFORM "x64")
-    set(TEST_DISTRO_PLATFORM "amd64")
 else()
     message(FATAL_ERROR "Unsupported platform: ${CMAKE_GENERATOR_PLATFORM}")
 endif()
@@ -100,7 +98,7 @@ find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
-find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /build/native/bin/${TARGET_PLATFORM})
+find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
@@ -251,7 +249,8 @@ add_compile_definitions(UNICODE
                         WSL_PACKAGE_VERSION_MAJOR=${PACKAGE_VERSION_MAJOR}
                         WSL_PACKAGE_VERSION_MINOR=${PACKAGE_VERSION_MINOR}
                         WSL_PACKAGE_VERSION_REVISION=${PACKAGE_VERSION_REVISION}
-                        WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS})
+                        WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS}
+                        DCAT_REGISTRATION_KEY=R"\(${DCAT_REGISTRATION_KEY}\)")
 
 if (${OFFICIAL_BUILD})
     add_compile_definitions(WSL_OFFICIAL_BUILD)
@@ -287,13 +286,19 @@ set(COMMON_LINK_LIBRARIES
     Shlwapi.lib
     synchronization.lib
     Bcrypt.lib
-    Iphlpapi.lib
-    icu.lib
+    icu.lib)
+
+set(MSI_LINK_LIBRARIES
+    Wintrust.lib
+    msi.lib)
+
+set(HCS_LINK_LIBRARIES
     computecore.lib
     computenetwork.lib
+    Iphlpapi.lib)
+
+set(SERVICE_LINK_LIBRARIES
     MI.lib
-    Wintrust.lib
-    msi.lib
     wsldeps.lib)
 
 # Linux
@@ -448,7 +453,6 @@ include_directories(${WSLDEPS_SOURCE_DIR}/include/lxcore)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/inc)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslaservice/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/linux/init/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common)
@@ -474,7 +478,6 @@ add_subdirectory(msipackage)
 add_subdirectory(msixinstaller)
 add_subdirectory(src/windows/common)
 add_subdirectory(src/windows/service)
-add_subdirectory(src/windows/wslaservice)
 add_subdirectory(src/windows/wslasession)
 add_subdirectory(src/windows/wslinstaller/inc)
 add_subdirectory(src/windows/wslinstaller/stub)

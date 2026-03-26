@@ -43,7 +43,7 @@ typedef struct WslcContainerSettings
 DECLARE_HANDLE(WslcContainer);
 
 // Process values
-#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 40
+#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 72
 #define WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT 8
 typedef struct WslcProcessSettings
 {
@@ -117,7 +117,6 @@ typedef enum WslcPortProtocol
 
 typedef struct WslcContainerPortMapping
 {
-
     _In_ uint16_t windowsPort;      // Port on Windows host
     _In_ uint16_t containerPort;    // Port inside container
     _In_ WslcPortProtocol protocol; // TCP or UDP
@@ -261,10 +260,21 @@ STDAPI WslcSetProcessSettingsCmdLine(_In_ WslcProcessSettings* processSettings, 
 
 STDAPI WslcSetProcessSettingsEnvVariables(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* key_value, size_t argc);
 
+typedef enum WslcProcessIOHandle
+{
+    WSLC_PROCESS_IO_HANDLE_STDIN = 0,
+    WSLC_PROCESS_IO_HANDLE_STDOUT = 1,
+    WSLC_PROCESS_IO_HANDLE_STDERR = 2
+} WslcProcessIOHandle;
+
 // Callback invoked when stdout or stderr data is available from a running
 // WSLC process.
 //
 // Parameters:
+//   ioHandle
+//       The WslcProcessIOHandle that the IO callback is for.
+//       Only STDOUT and STDERR will recieve callbacks.
+//
 //   data
 //       Pointer to a buffer containing the bytes read. The buffer is owned
 //       by WSLC and is valid only for the duration of the callback.
@@ -286,17 +296,34 @@ STDAPI WslcSetProcessSettingsEnvVariables(_In_ WslcProcessSettings* processSetti
 //     WSLC's internal I/O processing.
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
-typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
-typedef enum WslcProcessIoHandle
-{
-    WSLC_PROCESS_IO_HANDLE_STDIN = 0,
-    WSLC_PROCESS_IO_HANDLE_STDOUT = 1,
-    WSLC_PROCESS_IO_HANDLE_STDERR = 2
-} WslcProcessIoHandle;
+typedef __callback void(CALLBACK* WslcStdIOCallback)(
+    WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
 
-// Pass in Null for WslcStdIOCallback to clear the callback for the given handle
-STDAPI WslcSetProcessSettingsIoCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
+// Callback invoked when a WSLC process has exited AND any remaining IO has been flushed.
+//
+// Parameters:
+//   exitCode
+//       The exit code of the process.
+//
+//   context
+//       Caller-supplied context pointer that was provided when the callback
+//       was registered.
+//
+// Notes:
+//   - Once this callback is invoked, any registered IO callbacks will no longer be called.
+//
+typedef __callback void(CALLBACK* WslcProcessExitCallback)(INT32 exitCode, _In_opt_ PVOID context);
+
+// Using any callbacks will consume the IO handles, preventing acquisition through WslcGetProcessIOHandle.
+// If using IO callbacks, also use the exit callback to prevent a race between process exit and IO buffer flushing.
+typedef struct WslcProcessCallbacks
+{
+    WslcStdIOCallback onStdOut;
+    WslcStdIOCallback onStdErr;
+    WslcProcessExitCallback onExit;
+} WslcProcessCallbacks;
+
+STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
 
 // PROCESS MANAGEMENT
 
@@ -318,7 +345,7 @@ STDAPI WslcGetProcessExitCode(_In_ WslcProcess process, _Out_ PINT32 exitCode);
 
 STDAPI WslcSignalProcess(_In_ WslcProcess process, _In_ WslcSignal signal);
 
-STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIoHandle ioHandle, _Out_ HANDLE* handle);
+STDAPI WslcGetProcessIOHandle(_In_ WslcProcess process, _In_ WslcProcessIOHandle ioHandle, _Out_ HANDLE* handle);
 
 STDAPI WslcReleaseProcess(_In_ WslcProcess process);
 
@@ -370,22 +397,36 @@ STDAPI WslcPullSessionImage(_In_ WslcSession session, _In_ const WslcPullImageOp
 
 typedef struct WslcImportImageOptions
 {
-    _In_z_ PCWSTR imagePath;
     _In_opt_ WslcContainerImageProgressCallback progressCallback;
     _In_opt_ PVOID progressCallbackContext;
 } WslcImportImageOptions;
 
-STDAPI WslcImportSessionImage(_In_ WslcSession session, _In_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcImportSessionImage(
+    _In_ WslcSession session,
+    _In_z_ PCSTR imageName,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcImportImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcImportSessionImageFromFile(
+    _In_ WslcSession session, _In_z_ PCSTR imageName, _In_z_ PCWSTR path, _In_opt_ const WslcImportImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcLoadImageOptions
 {
-    HANDLE ImageHandle;
-    uint64_t ContentLength;
-    WslcContainerImageProgressCallback progressCallback;
-    PVOID progressCallbackContext;
+    _In_opt_ WslcContainerImageProgressCallback progressCallback;
+    _In_opt_ PVOID progressCallbackContext;
 } WslcLoadImageOptions;
 
-STDAPI WslcLoadSessionImage(_In_ WslcSession session, _In_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcLoadSessionImage(
+    _In_ WslcSession session,
+    _In_ HANDLE imageContent,
+    _In_ uint64_t imageContentLength,
+    _In_opt_ const WslcLoadImageOptions* options,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+STDAPI WslcLoadSessionImageFromFile(
+    _In_ WslcSession session, _In_z_ PCWSTR path, _In_opt_ const WslcLoadImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 #define WSLC_IMAGE_NAME_LENGTH 256 // 255 chars + null
 

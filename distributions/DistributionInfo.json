@@ -26,6 +26,32 @@
                     "Url": "https://cdimages.ubuntu.com/releases/24.04.4/release/ubuntu-24.04.4-wsl-arm64.wsl",
                     "Sha256": "6b244d89f412a68f51e58f396fab65bed3b5896a25c045a99bef9c78a07df507"
                 }
+            },
+            {
+                "Name": "Ubuntu-22.04",
+                "FriendlyName": "Ubuntu 22.04 LTS",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://releases.ubuntu.com/jammy/ubuntu-22.04.5-wsl-amd64.wsl",
+                    "Sha256": "4499c4fe257f2fc83145b429ce211a0a43fd590e70d6261ede616210947d9f8f"
+                },
+                "Arm64Url": {
+                    "Url": "https://cdimage.ubuntu.com/ubuntu/releases/jammy/release/ubuntu-22.04.5-wsl-arm64.wsl",
+                    "Sha256": "3e2d77b92cf9dad1095eaebcad96feba2781007f5f52431cd4fe6fff63b201e5"
+                }
+            },
+            {
+                "Name": "Ubuntu-20.04",
+                "FriendlyName": "Ubuntu 20.04 LTS",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://releases.ubuntu.com/focal/ubuntu-20.04.6-wsl-amd64.wsl",
+                    "Sha256": "a9073f3726aab9661076506603706eadf284b80a791dec3adfde8e1989906fa4"
+                },
+                "Arm64Url": {
+                    "Url": "https://cdimage.ubuntu.com/ubuntu/releases/focal/release/ubuntu-20.04.6-wsl-arm64.wsl",
+                    "Sha256": "16174012f9a3f6fb10729e648fd8c7dfa205d039d76902e4c28de746f85bf3c8"
+                }
             }
         ],
         "openSUSE": [
@@ -112,12 +138,12 @@
                 "FriendlyName": "AlmaLinux OS 8",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v8.10.20250415.0/AlmaLinux-8.10_x64_20250415.0.wsl",
-                    "Sha256": "34c3bc6d3ac693968737c65db52b67f68b8c1a6f8b024450819841a967f59a3d"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v8.10.20260311.0/AlmaLinux-8.10_x64_20260311.0.wsl",
+                    "Sha256": "77a662e2947a1482087e3edf22595d62121ad8011385152f9209734adac87941"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v8.10.20250415.0/AlmaLinux-8.10_ARM64_20250415.0.wsl",
-                    "Sha256": "bd34f64b4822f6f115058f79cdbba85a1560360efbec14c3d699695023f8ca19"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v8.10.20260311.0/AlmaLinux-8.10_ARM64_20260311.0.wsl",
+                    "Sha256": "7fb2e5d25cbba9bfeef1f9e1420fa4e30b671264aa92a015adf8f2901cdfb97f"
                 }
             },
             {
@@ -125,12 +151,12 @@
                 "FriendlyName": "AlmaLinux OS 9",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20251119.0/AlmaLinux-9.7_x64_20251119.0.wsl",
-                    "Sha256": "0a6588f4f723fcb3edbc37dd3e3e13be8ffe0a5027e47513e3d4d2a4451794e7"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20260311.0/AlmaLinux-9.7_x64_20260311.0.wsl",
+                    "Sha256": "c7d9c8f9bbe8f52a34d920988d6cea913f0251c457aef55f5ed66cce90561f92"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20251119.0/AlmaLinux-9.7_ARM64_20251119.0.wsl",
-                    "Sha256": "b3e2632efe029a81db1ae7a914ea3b7e9e6e20d8c71c158270c331e6fea39bf8"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20260311.0/AlmaLinux-9.7_ARM64_20260311.0.wsl",
+                    "Sha256": "e9b5e184aa04e6f72574e2c29cda919d4aaed0c7408dcb81905f6c9391516c7f"
                 }
             },
             {
@@ -138,12 +164,12 @@
                 "FriendlyName": "AlmaLinux OS Kitten 10",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20251030.0/AlmaLinux-Kitten-10_x64_20251030.0.wsl",
-                    "Sha256": "d765d65076b041f3a67ba60edc37d056eeab2a260aed8e077684e05b78ecd9f5"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20260311.0/AlmaLinux-Kitten-10_x64_20260311.0.wsl",
+                    "Sha256": "b04ab8ae277ca4bbeb70a15381124609ca7f97b8f7c275930b3fd91195c385ad"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20251030.0/AlmaLinux-Kitten-10_ARM64_20251030.0.wsl",
-                    "Sha256": "90c30b0adbf8d414c4b0a02eaeb6a5d8e488a2187a67dbaf11f4a3e843baae53"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20260311.0/AlmaLinux-Kitten-10_ARM64_20260311.0.wsl",
+                    "Sha256": "d502ab27654fa326888940ebce573dbe5abf7e44f709e67b53030da49572a92f"
                 }
             },
             {
@@ -151,12 +177,12 @@
                 "FriendlyName": "AlmaLinux OS 10",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20251124.0/AlmaLinux-10.1_x64_20251124.0.wsl",
-                    "Sha256": "24e8fa286a4081979d97e83a227fb89f332bcf731fe4b422679a3b455ab0be37"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20260311.0/AlmaLinux-10.1_x64_20260311.0.wsl",
+                    "Sha256": "6bc470081100ec507d933ee58b467f1903acc07da719ad37532b942439fc16c4"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20251124.0/AlmaLinux-10.1_ARM64_20251124.0.wsl",
-                    "Sha256": "20700a4467214074f8a1a3d4e0e1cad25af36b8127d047ab6d5b4a1355e998b8"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20260311.0/AlmaLinux-10.1_ARM64_20260311.0.wsl",
+                    "Sha256": "2aedea16c5bdbc83b61d78634cc2f6b839435ad9066df1ea1a0bba7ad2fbdc39"
                 }
             }
         ],
@@ -242,36 +268,6 @@
             "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/KaliLinux_1.13.1.0.AppxBundle",
             "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/KaliLinux_1.13.1.0.AppxBundle",
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
-        },
-        {
-            "Name": "Ubuntu-20.04",
-            "FriendlyName": "Ubuntu 20.04 LTS",
-            "StoreAppId": "9MTTCL66CPXJ",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2004-230608_x64.appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2004-230608_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu20.04LTS_79rhkp1fndgsc"
-        },
-        {
-            "Name": "Ubuntu-22.04",
-            "FriendlyName": "Ubuntu 22.04 LTS",
-            "StoreAppId": "9PN20MSR04DW",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204LTS-230518_x64.appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204LTS-230518_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc"
-        },
-        {
-            "Name": "Ubuntu-24.04",
-            "FriendlyName": "Ubuntu 24.04 LTS",
-            "StoreAppId": "9NZ3KLHXDJP5",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-240425.AppxBundle",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-240425.AppxBundle",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu24.04LTS_79rhkp1fndgsc"
         },
         {
             "Name": "OracleLinux_7_9",

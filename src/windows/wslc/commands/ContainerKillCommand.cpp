@@ -26,7 +26,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerKillCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
+        Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
         Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGKILL)"),
     };

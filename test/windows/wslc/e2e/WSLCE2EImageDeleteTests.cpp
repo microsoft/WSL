@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EImageDeleteTests
 {
-    WSL_TEST_CLASS(WSLCE2EImageDeleteTests)
+    WSLA_TEST_CLASS(WSLCE2EImageDeleteTests)
 
     TEST_METHOD_SETUP(MethodSetup)
     {
@@ -131,22 +131,28 @@ private:
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
+        output << GetWslcHeader()              //
+               << GetDescription()             //
+               << GetUsage()                   //
+               << GetAvailableCommandAliases() //
+               << GetAvailableCommands()       //
                << GetAvailableOptions();
         return output.str();
     }
 
     std::wstring GetDescription() const
     {
-        return L"Deletes images.\r\n\r\n";
+        return L"Removes images.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
     {
-        return L"Usage: wslc image delete [<options>] <image>\r\n\r\n";
+        return L"Usage: wslc image remove [<options>] <image>\r\n\r\n";
+    }
+
+    std::wstring GetAvailableCommandAliases() const
+    {
+        return L"The following command aliases are available: delete rm\r\n\r\n";
     }
 
     std::wstring GetAvailableCommands() const

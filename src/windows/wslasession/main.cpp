@@ -59,7 +59,7 @@ try
     wsl::windows::common::EnableContextualizedErrors(true);
 
     // Initialize telemetry
-    WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
+    WslTraceLoggingInitialize(WslcTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanup = wil::scope_exit([] { WslTraceLoggingUninitialize(); });
 
     // Don't kill the process on unknown C++ exceptions

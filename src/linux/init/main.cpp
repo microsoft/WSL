@@ -1528,14 +1528,8 @@ Return Value:
     // Create a tmpfs mount for the cross-distro shared mount.
     //
 
-    if (UtilMount(nullptr, CROSS_DISTRO_SHARE_PATH, "tmpfs", 0, nullptr) < 0)
+    if (UtilMount(nullptr, CROSS_DISTRO_SHARE_PATH, "tmpfs", MS_SHARED, nullptr) < 0)
     {
-        return -1;
-    }
-
-    if (mount(nullptr, CROSS_DISTRO_SHARE_PATH, nullptr, MS_SHARED, nullptr) < 0)
-    {
-        LOG_ERROR("mount({}, MS_SHARED) failed {}", CROSS_DISTRO_SHARE_PATH, errno);
         return -1;
     }
 
@@ -2524,9 +2518,7 @@ void ProcessLaunchInitMessage(
                 // Create a tmpfs mount for a shared folder between user and system distro.
                 //
 
-                THROW_LAST_ERROR_IF(UtilMount(nullptr, WSLG_PATH, "tmpfs", 0, nullptr) < 0);
-
-                THROW_LAST_ERROR_IF(mount(nullptr, WSLG_PATH, nullptr, MS_SHARED, nullptr) < 0);
+                THROW_LAST_ERROR_IF(UtilMount(nullptr, WSLG_PATH, "tmpfs", MS_SHARED, nullptr) < 0);
 
                 //
                 // Create a directory to store x11 sockets.
