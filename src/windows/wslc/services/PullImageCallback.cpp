@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "PullImageCallback.h"
 #include "ImageService.h"
-#include "TablePrinter.h"
 #include <format>
 
 namespace wsl::windows::wslc::services {

@@ -287,8 +287,7 @@ std::string wsl::windows::common::string::WideToMultiByte(_In_ std::wstring_view
 }
 
 // Algorithm inspired from Moby for consistency in presentation of shortened IDs.
-// Always returns strips the algorithm prefix (e.g., "sha256:") if present, optionally
-// shortens the length to 12 characters.
+// Always strips the algorithm prefix (e.g., "sha256:") if present, and optionally shortens to 12 characters.
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
 {
     constexpr size_t shortLen = 12;

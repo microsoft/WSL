@@ -13,16 +13,19 @@ Abstract:
 --*/
 #pragma once
 
+#include <algorithm>
 #include <array>
-#include <string>
-#include <vector>
+#include <cwchar>
 #include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 #include <wslutil.h>
 
 namespace wsl::windows::wslc {
-// Helper function to get display width of a wide string
+// Helper function to get display width of a string
 // For now, uses simple length (can be enhanced with proper Unicode width calculation)
-inline size_t UTF8ColumnWidth(const wchar_t* str)
+inline size_t GetStringColumnWidth(const wchar_t* str)
 {
     if (!str)
     {
@@ -32,7 +35,7 @@ inline size_t UTF8ColumnWidth(const wchar_t* str)
 }
 
 // Helper function to trim string to a specific column width
-inline std::wstring UTF8TrimRightToColumnWidth(const wchar_t* str, size_t maxWidth, size_t& actualWidth)
+inline std::wstring TrimStringToColumnWidth(const wchar_t* str, size_t maxWidth, size_t& actualWidth)
 {
     if (!str)
     {
@@ -126,7 +129,9 @@ struct TableOutput
     {
         m_empty = false;
 
-        if (m_buffer.size() < m_sizingBuffer)
+        // When width limiting is disabled, buffer all rows to ensure accurate column sizing
+        // and prevent truncation (e.g., for --no-trunc flag)
+        if (!m_limitColumnWidths || m_buffer.size() < m_sizingBuffer)
         {
             m_buffer.emplace_back(std::move(line));
         }
@@ -176,7 +181,7 @@ private:
         for (size_t i = 0; i < FieldCount; ++i)
         {
             m_columns[i].Name = std::move(header[i]);
-            m_columns[i].MinLength = UTF8ColumnWidth(m_columns[i].Name.c_str());
+            m_columns[i].MinLength = GetStringColumnWidth(m_columns[i].Name.c_str());
             m_columns[i].MaxLength = 0;
 
             // Apply configured max width if limiting is enabled
@@ -219,7 +224,7 @@ private:
         {
             for (size_t i = 0; i < FieldCount; ++i)
             {
-                size_t columnWidth = UTF8ColumnWidth(line[i].c_str());
+                size_t columnWidth = GetStringColumnWidth(line[i].c_str());
 
                 // Apply configured max width if limiting is enabled
                 if (m_limitColumnWidths && m_columns[i].ConfiguredMaxLength != ColumnWidthConfig::NoLimit)
@@ -345,13 +350,12 @@ private:
 
             if (col.MaxLength)
             {
-                size_t valueLength = UTF8ColumnWidth(line[i].c_str());
+                size_t valueLength = GetStringColumnWidth(line[i].c_str());
 
                 if (valueLength > col.MaxLength)
                 {
                     size_t actualWidth;
-                    m_stream << UTF8TrimRightToColumnWidth(line[i].c_str(), col.MaxLength - 1, actualWidth)
-                             << L"\u2026"; // Unicode ellipsis character
+                    m_stream << TrimStringToColumnWidth(line[i].c_str(), col.MaxLength - 1, actualWidth) << L"\u2026"; // Unicode ellipsis character
 
                     // Some characters take 2 unit space, the trimmed string length might be 1 less than the expected length.
                     if (actualWidth != col.MaxLength - 1)
