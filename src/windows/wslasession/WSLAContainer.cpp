@@ -522,6 +522,18 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         m_stoppedNotifiedEvent.SetEvent();
 
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
+
+        // If a Stop() call is in progress, provide the timestamp via the promise
+        // and let Stop() handle the state transition.
+        {
+            std::lock_guard stopLock{m_stopStateLock};
+            if (m_stopState.has_value())
+            {
+                m_stopState->set_value(eventTime);
+                return;
+            }
+        }
+
         auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
 
@@ -587,6 +599,13 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
             m_state);
     }
 
+    // Set up a waitable stop state so OnEvent() can pass the Docker timestamp
+    // back to Stop() without needing to take m_lock.
+    {
+        std::lock_guard stopLock{m_stopStateLock};
+        m_stopState.emplace();
+    }
+
     try
     {
         std::optional<WSLASignal> SignalArg;
@@ -612,7 +631,21 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
         }
     }
 
-    Transition(WslaContainerStateExited, GetDockerFinishedAt());
+    // Wait for the stop event to get the Docker timestamp.
+    // Safe while holding m_lock since OnEvent() uses m_stopStateLock on this path.
+    std::optional<std::uint64_t> stopTimestamp;
+    auto stopFuture = m_stopState->get_future();
+    if (stopFuture.wait_for(60s) == std::future_status::ready)
+    {
+        stopTimestamp = stopFuture.get();
+    }
+
+    {
+        std::lock_guard stopLock{m_stopStateLock};
+        m_stopState.reset();
+    }
+
+    Transition(WslaContainerStateExited, stopTimestamp);
 
     ReleaseRuntimeResources();
 
@@ -1397,21 +1430,6 @@ __requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DisconnectComWrap
         m_comWrapper->Disconnect();
         m_comWrapper.Reset();
     }
-}
-
-std::optional<std::uint64_t> WSLAContainerImpl::GetDockerFinishedAt() noexcept
-{
-    try
-    {
-        auto inspectData = m_dockerClient.InspectContainer(m_id);
-        if (!inspectData.State.FinishedAt.empty())
-        {
-            return ParseDockerTimestamp(inspectData.State.FinishedAt);
-        }
-    }
-    CATCH_LOG();
-
-    return std::nullopt;
 }
 
 __requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLAContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept

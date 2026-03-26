@@ -132,7 +132,6 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void DisconnectComWrapper();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
-    std::optional<std::uint64_t> GetDockerFinishedAt() noexcept;
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
 
@@ -151,6 +150,8 @@ private:
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
     wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
+    std::mutex m_stopStateLock;
+    std::optional<std::promise<std::uint64_t>> m_stopState;
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{static_cast<std::uint64_t>(std::time(nullptr))};
