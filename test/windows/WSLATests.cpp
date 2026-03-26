@@ -5520,6 +5520,8 @@ class WSLATests
 
     TEST_METHOD(ContainerAutoRemoveReadStdout)
     {
+        WSL2_TEST_ONLY();
+        
         WSLAContainerLauncher launcher("debian:latest", "test-auto-remove-stdout", {"echo", "Hello World"});
         launcher.SetContainerFlags(WSLAContainerFlagsRm);
 
