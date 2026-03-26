@@ -89,7 +89,15 @@ namespace {
         {
             if (current.IsDefined() && current.IsMap())
             {
-                current = current[subPath];
+                // Use the const operator[] to avoid yaml-cpp's AssignNode/set_ref side-effect,
+                // which mutates the shared detail::node and corrupts subsequent lookups.
+                // Then use reset() to rebind 'current' without triggering set_ref.
+                auto child = static_cast<const YAML::Node&>(current)[subPath];
+                if (!child.IsDefined())
+                {
+                    return std::nullopt;
+                }
+                current.reset(child);
             }
             else
             {

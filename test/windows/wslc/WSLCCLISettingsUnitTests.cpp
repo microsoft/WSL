@@ -203,8 +203,8 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(LoadSettings_BothInvalid_YieldsDefaultTypeWithWarnings)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml",     ": bad: [\n");
-        WriteFile(dir / L"UserSettings.yaml.bak", ": also: bad [\n");
+        WriteFile(dir / L"UserSettings.yaml",     ": bad: [\n");    // broken YAML (unclosed flow seq)
+        WriteFile(dir / L"UserSettings.yaml.bak", "session: [\n"); // broken YAML (unclosed flow seq)
 
         UserSettingsTest s{dir};
 
