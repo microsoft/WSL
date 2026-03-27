@@ -339,6 +339,9 @@ class UnitTests
     {
         WSL2_TEST_ONLY();
 
+        // The X11 socket is only created when gui applications are enabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+
         // ensures that we don't leave state on exit
         auto cleanup = EnableSystemd("initTimeout=0");
 
@@ -6559,6 +6562,14 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto result = process.RunAndCaptureOutput(60 * 1000);
         VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
         VERIFY_ARE_EQUAL(result.ExitCode, 0);
+    }
+
+    TEST_METHOD(UninstallRejectsArguments)
+    {
+        VerifyOutput(
+            L"--uninstall Distro",
+            wsl::shared::Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG) + L"\r\n",
+            -1);
     }
 
 }; // namespace UnitTests

@@ -250,9 +250,9 @@ Return Value:
     {
         THROW_HR_MSG(
             E_UNEXPECTED,
-            "Command \"%ls\""
+            "Command \"%ls\" "
             "returned unexpected exit code (%lu != %i). "
-            "Stdout: '%ls'"
+            "Stdout: '%ls' "
             "Stderr: '%ls'",
             Cmd,
             ExitCode,
@@ -1450,6 +1450,8 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         return value;
     };
 
+    // TODO: Reset guiApplications to true by default once the virtio hang is solved.
+
     std::wstring newConfig =
         L"[wsl2]\n"
         L"crashDumpFolder=" +
@@ -1462,7 +1464,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         EscapePath(kernelLogs) +
         L"\n"
         L"telemetry=false\n" +
-        boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
+        boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, false) +
         L"earlyBootLogging=false\n" + networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
 
     if (Default.kernel.has_value())
