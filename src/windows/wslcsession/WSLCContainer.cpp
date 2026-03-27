@@ -613,12 +613,12 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
-void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
+void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
     // Acquire an exclusive lock since this method modifies m_state.
     auto lock = m_lock.lock_exclusive();
 
-    if (m_state == WslcContainerStateExited)
+    if (m_state == WslcContainerStateExited && !Kill)
     {
         return;
     }
@@ -632,28 +632,35 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
             m_state);
     }
 
+    std::optional<WSLCSignal> SignalArg;
+    if (Signal != WSLCSignalNone)
+    {
+        SignalArg = Signal;
+    }
+
     try
     {
-        std::optional<WSLCSignal> SignalArg;
-        if (Signal != WSLCSignalNone)
+        if (Kill)
         {
-            SignalArg = Signal;
+            m_dockerClient.SignalContainer(m_id, SignalArg);
         }
-
-        std::optional<ULONG> TimeoutArg;
-        if (TimeoutSeconds >= 0)
+        else
         {
-            TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
-        }
+            std::optional<ULONG> TimeoutArg;
+            if (TimeoutSeconds >= 0)
+            {
+                TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
+            }
 
-        m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
+            m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
+        }
     }
     catch (const DockerHTTPException& e)
     {
         // HTTP 304 is returned when the container is already stopped.
-        if (e.StatusCode() != 304)
+        if (Kill || e.StatusCode() != 304)
         {
-            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to stop container '%hs'", m_id.c_str());
+            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to %hs container '%hs'", Kill ? "kill" : "stop", m_id.c_str());
         }
     }
 
@@ -1515,7 +1522,14 @@ HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds);
+    return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds, false);
+}
+
+HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
+{
+    COMServiceExecutionContext context;
+
+    return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)

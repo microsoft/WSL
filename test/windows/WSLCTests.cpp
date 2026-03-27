@@ -3502,8 +3502,7 @@ class WSLCTests
         // Test StopContainer
         {
             // Create a container
-            WSLCContainerLauncher launcher(
-                "debian:latest", "test-container-2", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeHost);
+            WSLCContainerLauncher launcher("debian:latest", "test-container-2", {"sleep", "99999"});
 
             auto container = launcher.Create(*m_defaultSession);
 
@@ -3516,14 +3515,36 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGTERM, 0));
 
-            // TODO: Once 'container run' is split into 'container create' + 'container start',
-            // validate that Stop() on a container in 'Created' state returns ERROR_INVALID_STATE.
             expectContainerList({{"test-container-2", "debian:latest", WslcContainerStateExited}});
 
             // Verify that the container is in exited state.
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+            expectContainerList({});
+        }
+
+        // Validate that Kill() works as expected
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-kill", {"sleep", "99999"}, {});
+
+            auto container = launcher.Create(*m_defaultSession);
+
+            // Validate that a created container cannot be killed.
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalNone));
+
+            // Verify that the container is in exited state.
+            expectContainerList({{"test-container-kill", "debian:latest", WslcContainerStateExited}});
+
+            // Validate that killing a non-running container fails (unlike Stop())
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Verify that deleting a container stopped via Kill() works.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
             expectContainerList({});
         }
@@ -5457,6 +5478,25 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that a container with the Rm flag is automatically deleted when the container is killed.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-auto-remove-kill", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+            // Prevent container from being deleted when handle is closed so we can verify auto-remove behavior.
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            process.Wait();
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-kill", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         }
 
         // Test that the container autoremove flag is applied when the container exits on its own.

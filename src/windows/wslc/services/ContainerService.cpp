@@ -309,7 +309,8 @@ void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal 
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    StopInternal(*container, signal);
+
+    THROW_IF_FAILED(container->Kill(signal));
 }
 
 void ContainerService::Delete(Session& session, const std::string& id, bool force)
