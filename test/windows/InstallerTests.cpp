@@ -1081,7 +1081,7 @@ class InstallerTests
 
     /*
      TODO: Uncomment when the functionality is implemented in the SDK.
-    TEST_METHOD(WSLAInstall)
+    TEST_METHOD(WSLCInstall)
     {
         auto expectComponents = [](WslInstallComponent expected) {
             WslInstallComponent components{};
@@ -1144,7 +1144,7 @@ class InstallerTests
     }
 
     // This test case requires a machine without the OC's enabled.
-    TEST_METHOD(WSLAInstallManual)
+    TEST_METHOD(WSLCInstallManual)
     {
         WslInstallComponent components{};
         VERIFY_SUCCEEDED(WslQueryMissingComponents(&components));
