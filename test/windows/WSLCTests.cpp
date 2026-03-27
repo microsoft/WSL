@@ -487,7 +487,7 @@ class WSLCTests
         validatePull("pytorch/pytorch", "pytorch/pytorch:latest");
         validatePull("registry.k8s.io/pause:3.2", "registry.k8s.io/pause:3.2");
 
-        // Validate that PullImage() fails appropriately when the sessio runs out of space.
+        // Validate that PullImage() fails appropriately when the session runs out of space.
         {
             auto settings = GetDefaultSessionSettings(L"wslc-pull-image-out-of-space", false);
             settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
