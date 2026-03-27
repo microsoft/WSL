@@ -25,7 +25,7 @@ using namespace WEX::Logging;
 
 class WSLCE2EContainerCreateTests
 {
-    WSLA_TEST_CLASS(WSLCE2EContainerCreateTests)
+    WSLC_TEST_CLASS(WSLCE2EContainerCreateTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {
@@ -101,7 +101,7 @@ class WSLCE2EContainerCreateTests
         expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
                       << L"pull access denied for library/"
                       << InvalidImage.Name << L", repository does not exist or may require 'docker login': denied: requested access to the resource is denied\r\n"
-                      << L"Error code: WSLA_E_IMAGE_NOT_FOUND\r\n";
+                      << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
 
@@ -951,7 +951,7 @@ class WSLCE2EContainerCreateTests
         }
         {
             // Session shell should attach to the wslc by name also.
-            auto session = RunWslcInteractive(L"session shell wsla-cli");
+            auto session = RunWslcInteractive(L"session shell wslc-cli");
             VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
             session.ExpectStdout(VT::SESSION_PROMPT);
