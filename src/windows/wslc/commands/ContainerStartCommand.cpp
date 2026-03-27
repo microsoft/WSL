@@ -50,10 +50,5 @@ void ContainerStartCommand::ExecuteInternal(CLIExecutionContext& context) const
     context              //
         << CreateSession //
         << StartContainer;
-
-    if (context.Args.Contains(ArgType::Attach))
-    {
-        context << AttachContainer(context.Args.Get<ArgType::ContainerId>());
-    }
 }
 } // namespace wsl::windows::wslc

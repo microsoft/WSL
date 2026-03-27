@@ -302,6 +302,16 @@ void ContainerService::Start(Session& session, const std::string& id, bool attac
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
     THROW_IF_FAILED(container->Start(flags, nullptr));
+
+    if (attach)
+    {
+        wil::com_ptr<IWSLCProcess> process;
+        THROW_IF_FAILED(container->GetInitProcess(&process));
+
+        ConsoleService consoleService;
+        consoleService.AttachToCurrentConsole(
+            wsl::windows::common::ClientRunningWSLCProcess(std::move(process), {}));
+    }
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
