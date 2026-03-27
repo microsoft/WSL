@@ -20,6 +20,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "RootCommand.h"
+#include "UserSettings.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
