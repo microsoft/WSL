@@ -14,7 +14,8 @@ Abstract:
 #pragma once
 #include <windows.h>
 #include "wslcsdk.h"
-#include "wslaservice.h"
+#include "wslc.h"
+#include "IOCallback.h"
 #include <stdint.h>
 #include <wil/com.h> // COM helpers
 // #include <wil/resource.h> // handle wrappers
@@ -45,6 +46,11 @@ static_assert(std::is_trivial_v<WslcSessionOptionsInternal>, "WSLC_SESSION_OPTIO
 
 WslcSessionOptionsInternal* GetInternalType(WslcSessionSettings* settings);
 
+struct WslcContainerProcessIOCallbackOptions : public WslcProcessCallbacks
+{
+    PVOID callbackContext;
+};
+
 // PROCESS DEFINITIONS
 typedef struct WslcContainerProcessOptionsInternal
 {
@@ -53,11 +59,12 @@ typedef struct WslcContainerProcessOptionsInternal
     PCSTR const* environment;
     uint32_t environmentCount;
     PCSTR currentDirectory;
+    WslcContainerProcessIOCallbackOptions ioCallbacks;
 } WslcContainerProcessOptionsInternal;
 
 static_assert(
     sizeof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
-    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 48 bytes");
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 72 bytes");
 static_assert(
     __alignof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
@@ -78,7 +85,7 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerVolume* volumes;
     uint32_t volumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
-    WSLAContainerNetworkType networking;
+    WSLCContainerNetworkType networking;
     WslcContainerFlags containerFlags;
 
 } WslcContainerOptionsInternal;
@@ -97,7 +104,7 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLASession> session;
+    wil::com_ptr<IWSLCSession> session;
     wil::com_ptr<ITerminationCallback> terminationCallback;
 };
 
@@ -105,14 +112,17 @@ WslcSessionImpl* GetInternalType(WslcSession handle);
 
 struct WslcContainerImpl
 {
-    wil::com_ptr<IWSLAContainer> container;
+    wil::com_ptr<IWSLCContainer> container;
+    WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
+    std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };
 
 WslcContainerImpl* GetInternalType(WslcContainer handle);
 
 struct WslcProcessImpl
 {
-    wil::com_ptr<IWSLAProcess> process;
+    wil::com_ptr<IWSLCProcess> process;
+    std::shared_ptr<IOCallback> ioCallbacks;
 };
 
 WslcProcessImpl* GetInternalType(WslcProcess handle);

@@ -1,3 +1,3 @@
-# WSL for Apps
+# WSL Containers
 
-This package contains the `WSLAApi.h` header which defines the WSL for Apps interface.
+This package contains the `WSLCApi.h` header which defines the WSL Containers interface.

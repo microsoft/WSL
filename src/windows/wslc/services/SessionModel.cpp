@@ -19,7 +19,7 @@ namespace wsl::windows::wslc::models {
 SessionOptions SessionOptions::Default()
 {
     // Use a function-local static to defer path initialization until first use.
-    static const std::filesystem::path defaultPath = {wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / "wsla"};
+    static const std::filesystem::path defaultPath = {wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / "wslc"};
 
     // TODO: Have a configuration file for those.
     SessionOptions options{};
@@ -29,11 +29,11 @@ SessionOptions SessionOptions::Default()
     options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
     options.m_sessionSettings.StoragePath = defaultPath.c_str();
     options.m_sessionSettings.MaximumStorageSizeMb = 10000; // 10GB.
-    options.m_sessionSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
+    options.m_sessionSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
     return options;
 }
 
-const WSLASessionSettings* SessionOptions::Get() const
+const WSLCSessionSettings* SessionOptions::Get() const
 {
     return &m_sessionSettings;
 }

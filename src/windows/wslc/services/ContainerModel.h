@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 
 #include <wslservice.h>
-#include <wslaservice.h>
+#include <wslc.h>
 #include <string>
 
 namespace wsl::windows::wslc::models {
@@ -30,6 +30,7 @@ enum class FormatType
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
+    std::vector<std::string> EnvironmentVariables;
     bool Detach = false;
     bool Interactive = false;
     std::string Name;
@@ -48,13 +49,13 @@ struct StopContainerOptions
 {
     static constexpr LONG DefaultTimeout = -1;
 
-    WSLASignal Signal = WSLASignalSIGTERM;
+    WSLCSignal Signal = WSLCSignalSIGTERM;
     LONG Timeout = DefaultTimeout;
 };
 
 struct KillContainerOptions
 {
-    int Signal = WSLASignalSIGKILL;
+    int Signal = WSLCSignalSIGKILL;
 };
 
 struct ContainerInformation
@@ -62,11 +63,17 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
-    WSLAContainerState State;
+    WSLCContainerState State;
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
+};
+
+struct EnvironmentVariable
+{
+    static std::optional<std::wstring> Parse(const std::wstring& entry);
+    static std::vector<std::wstring> ParseFile(const std::wstring& filePath);
 };
 
 struct PublishPort

@@ -19,7 +19,7 @@ Abstract:
 #include "SubProcess.h"
 #include <winrt/windows.management.deployment.h>
 #include "JsonUtils.h"
-#include "wslaservice.h"
+#include "wslc.h"
 
 namespace wsl::windows::common {
 struct Error;
@@ -46,7 +46,7 @@ inline auto c_msixPackageFamilyName = L"MicrosoftCorporationII.WindowsSubsystemF
 inline auto c_githubUrlOverrideRegistryValue = L"GitHubUrlOverride";
 inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
-inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLA: Does this apply to WSLA ?
+inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLC: Does this apply to WSLC ?
 
 struct GitHubReleaseAsset
 {
@@ -75,7 +75,7 @@ struct COMErrorInfo
 struct PruneResult
 {
     NON_COPYABLE(PruneResult);
-    WSLAPruneContainersResults result{};
+    WSLCPruneContainersResults result{};
 
     PruneResult() = default;
 
@@ -223,6 +223,8 @@ void ParseIpv4Address(const char* Address, in_addr& Result);
 void ParseIpv6Address(const char* Address, in_addr6& Result);
 
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
+
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input);
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
