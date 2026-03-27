@@ -34,12 +34,12 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcWriteSingleTlog"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSources=%(WslcImage.Sources);_WslcOutput=%(WslcImage.Output);_WslcTlogDir=$(TLogLocation)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSourceDir=%(WslcImage.Sources);_WslcOutput=%(WslcImage.OutputDir);_WslcTlogDir=$(TLogLocation)" />
     </Target>
 
     <Target Name="_WslcWriteSingleTlog">
         <ItemGroup>
-            <_WslcTlogInputs Include="$(_WslcDockerfile);$(_WslcSources)" />
+            <_WslcTlogInputs Include="$(_WslcDockerfile);$(_WslcSourceDir)\**\*" />
         </ItemGroup>
 
         <PropertyGroup>

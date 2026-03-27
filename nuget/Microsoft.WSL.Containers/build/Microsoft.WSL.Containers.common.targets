@@ -15,6 +15,7 @@
     <!-- Default properties -->
     <PropertyGroup>
         <WslcImageOutputDir Condition="'$(WslcImageOutputDir)' == ''">$(OutDir)</WslcImageOutputDir>
+        <WslcCliPath Condition="'$(WslcCliPath)' == '' AND Exists('$(ProgramW6432)\WSL\wslc.exe')">$(ProgramW6432)\WSL\wslc.exe</WslcCliPath>
         <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
     </PropertyGroup>
 
@@ -22,7 +23,7 @@
     <ItemDefinitionGroup>
         <WslcImage>
             <Tag>latest</Tag>
-            <Output>$(WslcImageOutputDir)</Output>
+            <OutputDir>$(WslcImageOutputDir)</OutputDir>
         </WslcImage>
     </ItemDefinitionGroup>
 
@@ -31,7 +32,7 @@
             BeforeTargets="WslcBuildAllImages"
             Condition="'@(WslcImage)' != ''">
 
-        <Exec Command="$(WslcCliPath) --version"
+        <Exec Command="&quot;$(WslcCliPath)&quot; --version"
               IgnoreExitCode="true"
               ConsoleToMSBuild="true"
               StandardOutputImportance="low"
@@ -52,13 +53,17 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSources=%(WslcImage.Sources);_WslcOutput=%(WslcImage.Output)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=%(WslcImage.Sources);_WslcOutput=%(WslcImage.OutputDir)" />
     </Target>
 
-    <!-- Collect source files for incremental check (wildcards only expand in ItemGroup Include) -->
+    <!--
+        Collect source files for incremental check.
+        Wildcards are expanded here in ItemGroup Include (not in Inputs attribute or MSBuild task Properties,
+        where they get escaped). The Sources metadata is treated as a directory path; **\* is appended here.
+    -->
     <Target Name="_WslcCollectSources" BeforeTargets="_WslcBuildSingleImage">
         <ItemGroup>
-            <_WslcSourceFiles Include="$(_WslcDockerfile);$(_WslcSources)" />
+            <_WslcSourceFiles Include="$(_WslcDockerfile);$(_WslcSourceDir)\**\*" />
         </ItemGroup>
     </Target>
 
@@ -73,23 +78,18 @@
         <Message Importance="high"
                  Text="WSLC: Building image '$(_WslcName):$(_WslcTag)'..." />
 
-        <Exec Command="$(WslcCliPath) image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
-        <Message Importance="high"
-                 Text="WSLC: Saving image '$(_WslcName):$(_WslcTag)' to $(_WslcOutput)\$(_WslcName).tar..." />
-
-        <Exec Command="$(WslcCliPath) image save &quot;$(_WslcName):$(_WslcTag)&quot; -o &quot;$(_WslcOutput)\$(_WslcName).tar&quot;"
-              ConsoleToMSBuild="true" />
-
-        <!-- Save image ID for efficient check-then-load at runtime -->
-        <Exec Command="$(WslcCliPath) image inspect &quot;$(_WslcName):$(_WslcTag)&quot; --format {{.Id}} &gt; &quot;$(_WslcOutput)\$(_WslcName).id&quot;"
-              IgnoreStandardErrorWarningFormat="true" />
+        <!--
+            TODO: Export image to tar when wslc image save is available.
+            TODO: Save image ID for check then load when wslc image inspect supports format flag.
+        -->
 
         <Touch Files="$(IntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
 
         <Message Importance="high"
-                 Text="WSLC: [$(_WslcName)] Image built and saved successfully." />
+                 Text="WSLC: [$(_WslcName)] Image '$(_WslcName):$(_WslcTag)' built successfully." />
     </Target>
 
     <!-- Clean container artifacts -->
@@ -97,8 +97,8 @@
             AfterTargets="Clean"
             Condition="'@(WslcImage)' != ''">
 
-        <Delete Files="%(WslcImage.Output)\%(WslcImage.Identity).tar" />
-        <Delete Files="%(WslcImage.Output)\%(WslcImage.Identity).id" />
+        <Delete Files="%(WslcImage.OutputDir)\%(WslcImage.Identity).tar" />
+        <Delete Files="%(WslcImage.OutputDir)\%(WslcImage.Identity).id" />
         <Delete Files="$(IntDir)wslc_%(WslcImage.Identity).marker" />
     </Target>
 
