@@ -26,7 +26,7 @@
             Condition="'$(UsingMicrosoftNETSdk)' == 'true' AND '@(WslcImage)' != ''">
         <ItemGroup>
             <_WslcUpToDateDirs Include="%(WslcImage.Sources)" Separator=";" />
-            <UpToDateCheckInput Include="%(_WslcUpToDateDirs.Identity)\**\*" />
+            <UpToDateCheckInput Include="%(_WslcUpToDateDirs.Identity)\**\*" Condition="'%(_WslcUpToDateDirs.Identity)' != ''" />
         </ItemGroup>
     </Target>
 

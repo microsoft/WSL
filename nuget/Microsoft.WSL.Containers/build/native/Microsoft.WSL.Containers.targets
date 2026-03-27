@@ -34,7 +34,7 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcWriteSingleTlog"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSourceDir=%(WslcImage.Sources);_WslcTlogDir=$(TLogLocation)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSourceDir=%(WslcImage.Sources);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
     <Target Name="_WslcWriteSingleTlog">

@@ -81,7 +81,7 @@
         <ItemGroup>
             <_WslcSourceDirs Include="$(_WslcSourceDir.Split(';'))" />
             <_WslcSourceFiles Include="$(_WslcDockerfile)" />
-            <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" />
+            <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" Condition="'%(_WslcSourceDirs.Identity)' != ''" />
         </ItemGroup>
     </Target>
 
