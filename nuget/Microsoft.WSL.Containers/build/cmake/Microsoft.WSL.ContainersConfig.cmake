@@ -2,6 +2,10 @@ if(TARGET Microsoft.WSL.Containers::sdk)
     return()
 endif()
 
+if(NOT WIN32)
+    message(FATAL_ERROR "Microsoft.WSL.Containers: This package only supports Windows.")
+endif()
+
 # Determine target architecture
 if(CMAKE_GENERATOR_PLATFORM)
     string(TOLOWER "${CMAKE_GENERATOR_PLATFORM}" _wslcsdk_platform)
@@ -27,15 +31,6 @@ endif()
 get_filename_component(_wslcsdk_root "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 set(_wslcsdk_include_dir "${_wslcsdk_root}/include")
 set(_wslcsdk_lib_dir "${_wslcsdk_root}/runtimes/win-${_wslcsdk_arch}")
-
-# Validate that expected files exist
-if(NOT EXISTS "${_wslcsdk_include_dir}/wslcsdk.h")
-    message(FATAL_ERROR "Microsoft.WSL.Containers: Cannot find wslcsdk.h in '${_wslcsdk_include_dir}'")
-endif()
-
-if(NOT EXISTS "${_wslcsdk_lib_dir}/wslcsdk.lib")
-    message(FATAL_ERROR "Microsoft.WSL.Containers: Cannot find wslcsdk.lib in '${_wslcsdk_lib_dir}'")
-endif()
 
 # Create imported target
 add_library(Microsoft.WSL.Containers::sdk SHARED IMPORTED GLOBAL)
