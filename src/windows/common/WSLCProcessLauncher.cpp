@@ -219,6 +219,36 @@ ClientRunningWSLCProcess::ClientRunningWSLCProcess(wil::com_ptr<IWSLCProcess>&& 
 {
 }
 
+WSLCProcessFlags ClientRunningWSLCProcess::GetProcessFlags(IWSLCProcess& process)
+{
+    auto hasHandle = [&](int index) {
+        ULONG handle = 0;
+        const auto result = process.GetStdHandle(index, &handle);
+        if (result == HRESULT_FROM_WIN32(ERROR_INVALID_STATE))
+        {
+            return false;
+        }
+
+        THROW_IF_FAILED(result);
+        wil::unique_handle ownedHandle(ULongToHandle(handle));
+        return ownedHandle.is_valid();
+    };
+
+    WSLCProcessFlags flags = WSLCProcessFlagsNone;
+    if (hasHandle(WSLCFDTty))
+    {
+        WI_SetFlag(flags, WSLCProcessFlagsTty);
+        return flags;
+    }
+
+    if (hasHandle(WSLCFDStdin))
+    {
+        WI_SetFlag(flags, WSLCProcessFlagsStdin);
+    }
+
+    return flags;
+}
+
 wil::unique_handle ClientRunningWSLCProcess::GetStdHandle(int Index)
 {
     ULONG handle{};

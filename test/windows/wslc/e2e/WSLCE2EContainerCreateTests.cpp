@@ -928,12 +928,15 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        auto result = RunWslc(
-            std::format(L"container create --name {} {} echo \"lifecycle works\"", WslcContainerName, AlpineImage.NameAndTag()));
+        constexpr auto ExpectedExitCode = 37;
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
+
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"lifecycle works\r\n", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"lifecycle works\r\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
     TEST_METHOD(WSLCE2E_Session_Shell)
