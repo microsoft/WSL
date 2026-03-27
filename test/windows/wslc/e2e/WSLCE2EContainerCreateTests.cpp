@@ -923,6 +923,19 @@ class WSLCE2EContainerCreateTests
         session.VerifyNoErrors();
     }
 
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_ShortRunningInitProcess)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        auto result = RunWslc(
+            std::format(L"container create --name {} {} echo \"lifecycle works\"", WslcContainerName, AlpineImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"lifecycle works\r\n", .Stderr = L"", .ExitCode = S_OK});
+    }
+
     TEST_METHOD(WSLCE2E_Session_Shell)
     {
         WSL2_TEST_ONLY();
