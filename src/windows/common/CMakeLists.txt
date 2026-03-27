@@ -34,9 +34,9 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
-    WSLAContainerLauncher.cpp
+    WSLCContainerLauncher.cpp
     VirtioNetworking.cpp
-    WSLAProcessLauncher.cpp
+    WSLCProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -54,7 +54,7 @@ set(SOURCES
 set(HEADERS
     ../../../generated/Localization.h
     ../inc/docker_schema.h
-    ../inc/wsla_schema.h
+    ../inc/wslc_schema.h
     ../inc/lxssbusclient.h
     ../inc/lxssclient.h
     ../inc/LxssDynamicFunction.h
@@ -115,9 +115,9 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
-    WSLAContainerLauncher.h
+    WSLCContainerLauncher.h
     VirtioNetworking.h
-    WSLAProcessLauncher.h
+    WSLCProcessLauncher.h
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h
@@ -133,7 +133,7 @@ set(HEADERS
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl wslaserviceidl localization wslservicemc wslinstalleridl)
+add_dependencies(common wslserviceidl wslcidl localization wslservicemc wslinstalleridl)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
