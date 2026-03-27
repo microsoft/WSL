@@ -39,6 +39,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRemoveCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageRemoveCommand>(FullName(), true));
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
