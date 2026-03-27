@@ -93,7 +93,7 @@ class WSLCCLISettingsUnitTests
         SettingsMap map;
         VERIFY_ARE_EQUAL(4u, map.GetOrDefault<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(2048u, map.GetOrDefault<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(100000u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(102400u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(std::wstring{}, map.GetOrDefault<Setting::SessionStoragePath>());
     }
 
@@ -120,7 +120,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(100000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
     }
 
@@ -163,7 +163,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(100000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
     }
 
     // When the settings file fails to parse, the type is Default and a warning is emitted.
@@ -196,11 +196,11 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_FALSE(s.GetWarnings().front().SettingPath.empty());
     }
 
-    // memorySizeMb: 0 must be rejected; the default (2048) is used.
+    // memorySize: 0 must be rejected; the default (2048) is used.
     TEST_METHOD(Validation_MemoryMb_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  memorySizeMb: 0\n");
+        WriteFile(dir / L"UserSettings.yaml", "session:\n  memorySize: 0\n");
 
         UserSettingsTest s{dir};
 
@@ -212,7 +212,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_StorageSizeMb_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  maxStorageSizeMb: 0\n");
+        WriteFile(dir / L"UserSettings.yaml", "session:\n  maxStorageSize: 0\n");
 
         UserSettingsTest s{dir};
 
@@ -268,7 +268,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(100000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
     }
 

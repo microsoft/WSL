@@ -66,10 +66,10 @@ namespace details {
         static std::optional<value_t> Validate(const yaml_t& value);               \
     };
 
-    DEFINE_SETTING_MAPPING(SessionCpuCount,      uint32_t,    uint32_t,     4,       "session.cpuCount")
-    DEFINE_SETTING_MAPPING(SessionMemoryMb,      std::string, uint32_t,     "2GB",   "session.memorySize")
-    DEFINE_SETTING_MAPPING(SessionStorageSizeMb, std::string, uint32_t,     "100GB", "session.maxStorageSize")
-    DEFINE_SETTING_MAPPING(SessionStoragePath,   std::string, std::wstring, {},      "session.defaultStoragePath")
+    DEFINE_SETTING_MAPPING(SessionCpuCount,      uint32_t,    uint32_t,     4,      "session.cpuCount")
+    DEFINE_SETTING_MAPPING(SessionMemoryMb,      std::string, uint32_t,     2048,   "session.memorySize")
+    DEFINE_SETTING_MAPPING(SessionStorageSizeMb, std::string, uint32_t,     102400, "session.maxStorageSize")
+    DEFINE_SETTING_MAPPING(SessionStoragePath,   std::string, std::wstring, {},     "session.defaultStoragePath")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on
