@@ -1,4 +1,4 @@
-if(TARGET Microsoft.WSL.Containers::sdk)
+if(TARGET Microsoft.WSL.Containers::SDK)
     return()
 endif()
 
@@ -14,17 +14,27 @@ if(CMAKE_GENERATOR_PLATFORM)
     elseif(_wslcsdk_platform STREQUAL "arm64")
         set(_wslcsdk_arch "arm64")
     else()
-        message(FATAL_ERROR "Microsoft.WSL.Containers: Unsupported platform '${CMAKE_GENERATOR_PLATFORM}'. Supported: x64, ARM64.")
+        message(FATAL_ERROR
+            "Microsoft.WSL.Containers: Unsupported platform '${CMAKE_GENERATOR_PLATFORM}'."
+            " Supported: x64, ARM64.")
     endif()
     unset(_wslcsdk_platform)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Mm][Dd]64|[Xx]86_64|[Xx]64")
-    set(_wslcsdk_arch "x64")
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64|[Aa]arch64")
-    set(_wslcsdk_arch "arm64")
+elseif(CMAKE_SYSTEM_PROCESSOR)
+    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _wslcsdk_platform)
+    if(_wslcsdk_platform MATCHES "amd64|x86_64|x64")
+        set(_wslcsdk_arch "x64")
+    elseif(_wslcsdk_platform MATCHES "arm64|aarch64")
+        set(_wslcsdk_arch "arm64")
+    else()
+        message(FATAL_ERROR
+            "Microsoft.WSL.Containers: Unsupported architecture '${CMAKE_SYSTEM_PROCESSOR}'."
+            " Supported: x64, ARM64.")
+    endif()
+    unset(_wslcsdk_platform)
 else()
     message(FATAL_ERROR
-        "Microsoft.WSL.Containers: Unsupported architecture '${CMAKE_SYSTEM_PROCESSOR}'. "
-        "Supported: x64, ARM64.")
+        "Microsoft.WSL.Containers: Could not determine target architecture."
+        " Set CMAKE_GENERATOR_PLATFORM or CMAKE_SYSTEM_PROCESSOR.")
 endif()
 
 # Compute paths relative to package root (<root>/build/cmake/ -> <root>/)
@@ -33,17 +43,12 @@ set(_wslcsdk_include_dir "${_wslcsdk_root}/include")
 set(_wslcsdk_lib_dir "${_wslcsdk_root}/runtimes/win-${_wslcsdk_arch}")
 
 # Create imported target
-add_library(Microsoft.WSL.Containers::sdk SHARED IMPORTED GLOBAL)
-set_target_properties(Microsoft.WSL.Containers::sdk PROPERTIES
+add_library(Microsoft.WSL.Containers::SDK SHARED IMPORTED GLOBAL)
+set_target_properties(Microsoft.WSL.Containers::SDK PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${_wslcsdk_include_dir}"
     IMPORTED_IMPLIB "${_wslcsdk_lib_dir}/wslcsdk.lib"
     IMPORTED_LOCATION "${_wslcsdk_lib_dir}/wslcsdk.dll"
 )
-
-# Standard find_package output variables
-set(Microsoft.WSL.Containers_FOUND TRUE)
-set(Microsoft.WSL.Containers_INCLUDE_DIRS "${_wslcsdk_include_dir}")
-set(Microsoft.WSL.Containers_LIBRARIES Microsoft.WSL.Containers::sdk)
 
 # Clean up temporary variables
 unset(_wslcsdk_arch)
