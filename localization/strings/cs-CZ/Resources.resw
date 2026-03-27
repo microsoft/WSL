@@ -960,6 +960,10 @@ Návrat k sítím NAT.</value>
     <value>Aktualizace se nezdařila (ukončovací kód: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} nepřijímá žádné argumenty. Pokud chcete zrušit registraci distribuce, použijte místo toho {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Odinstalování se nezdařilo (ukončovací kód: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
