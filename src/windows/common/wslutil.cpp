@@ -255,47 +255,26 @@ constexpr GUID EndianSwap(GUID value)
     return value;
 }
 
-std::string Capture(const auto& exp)
-{
-    return std::format("({})", exp);
-}
-
-std::string Group(const auto& exp)
-{
-    return std::format("(?:{})", exp);
-}
-
-std::string Optional(const auto& exp)
-{
-    return Group(exp) + "?";
-}
-
-std::string Repeated(const auto& exp)
-{
-    return Group(exp) + "+";
-}
-
-std::string BuildRepoRegex()
-{
-    std::string alphaNum = "[a-z0-9]+";
-    std::string separator = "(?:[._]|__|[-]*)";
-    std::string domainComponent = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
-
-    auto nameComponent = alphaNum + Optional(Repeated(separator + alphaNum));
-    auto domain = Optional(domainComponent + Optional(Repeated("\\." + domainComponent)) + Optional(":[0-9]+") + "\\/");
-    auto namePat = Capture(domain) + Capture(nameComponent + Optional(Repeated("\\/" + nameComponent)));
-
-    return namePat;
-}
-
 std::regex BuildImageReferenceRegex()
 {
     // See: https://github.com/containers/image/blob/main/docker/reference/regexp.go
 
+    std::string alphaNum = "[a-z0-9]+";
+    std::string separator = "(?:[._]|__|[-]*)";
+    std::string domainComponent = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
     std::string tag = "[\\w][\\w.-]{0,127}";
     std::string digest = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
 
-    return std::regex("^" + Capture(BuildRepoRegex()) + Optional(":" + Capture(tag)) + Optional("@" + Capture(digest)) + "$");
+    auto group = [](const auto& exp) { return std::format("(?:{})", exp); };
+    auto optional = [&group](const auto& exp) { return group(exp) + "?"; };
+    auto repeated = [&group](const auto& exp) { return group(exp) + "+"; };
+    auto capture = [](const auto& exp) { return std::format("({})", exp); };
+
+    auto nameComponent = alphaNum + optional(repeated(separator + alphaNum));
+    auto domain = domainComponent + optional(repeated("\\." + domainComponent)) + optional(":[0-9]+");
+    auto namePat = optional(domain + "\\/") + nameComponent + optional(repeated("\\/" + nameComponent));
+
+    return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
 }
 
 } // namespace
@@ -1094,6 +1073,38 @@ std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
     return pids;
 }
 
+std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo(const std::string& Input)
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
+
+    constexpr auto defaultDomain = "docker.io";
+    constexpr auto officialPrefix = "library/";
+    constexpr auto legacyDomain = "index.docker.io";
+    constexpr auto localhost = "localhost";
+
+    auto slash = Input.find('/');
+    if (slash == std::string::npos)
+    {
+        return {defaultDomain, officialPrefix + Input};
+    }
+
+    auto domain = Input.substr(0, slash);
+    auto path = Input.substr(slash + 1);
+
+    if (domain != localhost && domain != legacyDomain && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, isupper))
+    {
+        domain = defaultDomain;
+        path = Input;
+    }
+
+    if (domain == defaultDomain && path.find('/') == std::string::npos)
+    {
+        path = "library/" + path;
+    }
+
+    return {domain, path};
+}
+
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
 {
     // Default to 4096 byte buffer, just like CreatePipe().
@@ -1218,8 +1229,8 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
     }
 
     const auto& repo = match[1];
-    const auto& tag = match[3];
-    const auto& digest = match[5];
+    const auto& tag = match[2];
+    const auto& digest = match[3];
 
     THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
 
@@ -1235,19 +1246,6 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
     {
         return {repo.str(), std::nullopt};
     }
-}
-
-std::pair<std::string, std::string> wsl::windows::common::wslutil::CanonicalizeImageReference(const std::string& Input)
-{
-    constexpr auto defaultRegistry = "docker.io";
-
-    auto firstSlash = Input.find('/');
-    if (firstSlash == std::string::npos)
-    {
-        return {defaultRegistry, Input};
-    }
-
-    auto registry = Input.substr(0, firstSlash);
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)

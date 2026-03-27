@@ -315,17 +315,18 @@ try
 
     auto io = CreateIOContext();
 
-    std::optional<boost::beast::http::status> pullResult;
+    std::optional<boost::beast::http::message<false, boost::beast::http::buffer_body>> pullResponse;
 
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("PullHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
-        pullResult = response.result();
+        pullResponse = response;
     };
 
     std::string errorJson;
+    std::optional<std::string> reportedError;
     auto onChunk = [&](const gsl::span<char>& Content) {
-        if (pullResult.has_value() && pullResult.value() != boost::beast::http::status::ok)
+        if (pullResponse.has_value() && pullResponse->result() != boost::beast::http::status::ok)
         {
             // If the status code is an error, then this is an error message, not a progress update.
             errorJson.append(Content.data(), Content.size());
@@ -335,15 +336,28 @@ try
         std::string contentString{Content.begin(), Content.end()};
         WSL_LOG("ImagePullProgress", TraceLoggingValue(Image, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
 
-        if (ProgressCallback == nullptr)
+        auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
+
+        if (parsed.errorDetail.has_value())
         {
+            if (reportedError.has_value())
+            {
+                LOG_HR_MSG(
+                    E_UNEXPECTED,
+                    "Received multiple error messages during image pull. Previous: %hs, New: %hs",
+                    reportedError->c_str(),
+                    parsed.errorDetail->message.c_str());
+            }
+
+            reportedError = parsed.errorDetail->message;
             return;
         }
 
-        auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
-
-        THROW_IF_FAILED(ProgressCallback->OnProgress(
-            parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
+        if (ProgressCallback != nullptr)
+        {
+            THROW_IF_FAILED(ProgressCallback->OnProgress(
+                parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
+        }
     };
 
     auto onCompleted = [&]() { io.Cancel(); };
@@ -353,22 +367,23 @@ try
 
     io.Run({});
 
-    THROW_HR_IF(E_UNEXPECTED, !pullResult.has_value());
+    THROW_HR_IF(E_UNEXPECTED, !pullResponse.has_value());
 
-    if (pullResult.value() != boost::beast::http::status::ok)
+    if (pullResponse->result() != boost::beast::http::status::ok)
     {
         std::string errorMessage;
-        if (static_cast<int>(pullResult.value()) >= 400 && static_cast<int>(pullResult.value()) < 500)
+        auto it = pullResponse->find(boost::beast::http::field::content_type);
+        if (it != pullResponse->end() && it->value().starts_with("application/json"))
         {
             // pull failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
         }
 
-        if (pullResult.value() == boost::beast::http::status::not_found)
+        if (pullResponse->result() == boost::beast::http::status::not_found)
         {
             THROW_HR_WITH_USER_ERROR(WSLA_E_IMAGE_NOT_FOUND, errorMessage);
         }
-        else if (pullResult.value() == boost::beast::http::status::bad_request)
+        else if (pullResponse->result() == boost::beast::http::status::bad_request)
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
         }
@@ -376,6 +391,11 @@ try
         {
             THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
         }
+    }
+    else if (reportedError.has_value())
+    {
+        // Can happen if an error is returned during progress after receiving an OK status.
+        THROW_HR_WITH_USER_ERROR(E_FAIL, reportedError.value().c_str());
     }
 
     return S_OK;

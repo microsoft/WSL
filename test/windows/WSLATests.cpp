@@ -120,7 +120,7 @@ class WSLATests
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
-        settings.MaximumStorageSizeMb = 4096; // 4GB.
+        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB.
         settings.NetworkingMode = networkingMode;
 
         return settings;
@@ -438,7 +438,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // TODO: Enable once custom registries are supported, to avoid hitting public registry rate limits.
-        SKIP_TEST_UNSTABLE();
+        // SKIP_TEST_UNSTABLE();
 
         auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
             VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
@@ -452,7 +452,6 @@ class WSLATests
 
             if (!ExpectedTag.has_value())
             {
-
                 wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
@@ -483,11 +482,10 @@ class WSLATests
         };
 
         validatePull("ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30", {});
-
         validatePull("ubuntu", "ubuntu:latest");
         validatePull("debian:bookworm", "debian:bookworm");
-
-        // TODO: Add test coverage with custom registries once supported.
+        validatePull("pytorch/pytorch", "pytorch/pytorch:latest");
+        validatePull("registry.k8s.io/pause:3.2", "registry.k8s.io/pause:3.2");
     }
 
     TEST_METHOD(ListImages)
@@ -5998,27 +5996,22 @@ class WSLATests
 
     TEST_METHOD(RepoParsing)
     {
-        using wsl::windows::common::wslutil::ParseRepo;
+        using wsl::windows::common::wslutil::NormalizeRepo;
 
-        auto ValidateRepoParsing = [](const std::string& input, const std::optional<std::string>& expectedServer, const std::string& expectedPath) {
-            auto [server, path] = ParseRepo(input);
-            VERIFY_ARE_EQUAL(server.value_or("<empty>"), expectedServer.value_or("<empty>"));
+        auto ValidateRepoParsing = [](const std::string& input, const std::string& expectedServer, const std::string& expectedPath) {
+            auto [server, path] = NormalizeRepo(input);
+            VERIFY_ARE_EQUAL(server, expectedServer);
             VERIFY_ARE_EQUAL(path, expectedPath);
         };
 
-        ValidateRepoParsing("ubuntu", {}, "ubuntu");
-        ValidateRepoParsing("microsoft.com/ubuntu", {"microsoft.com"}, "ubuntu");
-        ValidateRepoParsing("microsoft.com:80/ubuntu", {"microsoft.com:80"}, "ubuntu");
-        ValidateRepoParsing("microsoft.com:80/ubuntu/foo/bar", {"microsoft.com:80"}, "ubuntu/foo/bar");
-        ValidateRepoParsing("127.0.0.1:80/ubuntu/foo/bar", {"127.0.0.1:80"}, "ubuntu/foo/bar");
-        ValidateRepoParsing("pytorch/pytorch", {}, "pytorch/pytorch");
-        ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334/path", {"2001:0db8:85a3:0000:0000:8a2e:0370:7334"}, "pytorch/pytorch");
-        ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", {"2001:0db8:85a3:0000:0000:8a2e:0370:7334:80"}, "pytorch/pytorch");
-
-
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseRepo(""); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseRepo(":"); }), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseRepo("foo:bar"); }), E_INVALIDARG);
-
+        ValidateRepoParsing("ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("microsoft.com/ubuntu", "microsoft.com", "ubuntu");
+        ValidateRepoParsing("microsoft.com:80/ubuntu", "microsoft.com:80", "ubuntu");
+        ValidateRepoParsing("microsoft.com:80/ubuntu/foo/bar", "microsoft.com:80", "ubuntu/foo/bar");
+        ValidateRepoParsing("127.0.0.1:80/ubuntu/foo/bar", "127.0.0.1:80", "ubuntu/foo/bar");
+        ValidateRepoParsing("pytorch/pytorch", "docker.io", "pytorch/pytorch");
+        ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "path");
+        ValidateRepoParsing(
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80", "path");
     }
 };
