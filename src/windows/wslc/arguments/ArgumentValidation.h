@@ -19,7 +19,7 @@ Abstract:
 #include <vector>
 #include <charconv>
 #include <format>
-#include <wslaservice.h>
+#include <wslc.h>
 #include <string.hpp>
 
 using namespace wsl::windows::wslc::models;
@@ -54,8 +54,8 @@ T GetIntegerFromString(const std::wstring& value, const std::wstring& argName = 
     return convertedValue;
 }
 
-void ValidateWSLASignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
-WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring& argName = {});
+void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
+WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});

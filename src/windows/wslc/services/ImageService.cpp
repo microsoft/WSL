@@ -18,7 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
-using wsl::windows::common::wsla_schema::InspectImage;
+using wsl::windows::common::wslc_schema::InspectImage;
 
 void ImageService::Build(
     wsl::windows::wslc::models::Session& session,
@@ -67,7 +67,7 @@ void ImageService::Build(
     toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
 
     auto contextPathStr = absolutePath.wstring();
-    WSLABuildImageOptions options{
+    WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
         .DockerfileHandle = HandleToULong(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
@@ -80,14 +80,14 @@ void ImageService::Build(
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
 {
-    wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+    wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
     ULONG count = 0;
     THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, &count));
 
     std::vector<ImageInformation> result;
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
     {
-        const WSLAImageInformation& image = *ptr;
+        const WSLCImageInformation& image = *ptr;
         ImageInformation info{};
         info.Name = image.Image;
         info.Size = image.Size;
@@ -109,20 +109,20 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
-    WSLADeleteImageOptions options{};
+    WSLCDeleteImageOptions options{};
     options.Image = image.c_str();
 
     if (force)
     {
-        options.Flags |= WSLADeleteImageFlagsForce;
+        options.Flags |= WSLCDeleteImageFlagsForce;
     }
 
     if (noPrune)
     {
-        options.Flags |= WSLADeleteImageFlagsNoPrune;
+        options.Flags |= WSLCDeleteImageFlagsNoPrune;
     }
 
-    wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
     THROW_IF_FAILED(session.Get()->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 }
 

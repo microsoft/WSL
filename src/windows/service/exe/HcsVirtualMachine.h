@@ -8,14 +8,14 @@ Module Name:
 
 Abstract:
 
-    Implementation of IWSLAVirtualMachine - represents a single HCS-based VM instance.
+    Implementation of IWSLCVirtualMachine - represents a single HCS-based VM instance.
     This class encapsulates a VM and all operations on it.
 
 --*/
 
 #pragma once
 
-#include "wslaservice.h"
+#include "wslc.h"
 #include "hcs.hpp"
 #include "GuestDeviceManager.h"
 #include "Dmesg.h"
@@ -25,16 +25,16 @@ Abstract:
 
 #define MAX_VHD_COUNT 254
 
-namespace wsl::windows::service::wsla {
+namespace wsl::windows::service::wslc {
 
 class HcsVirtualMachine
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLAVirtualMachine, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
 {
 public:
-    HcsVirtualMachine(_In_ const WSLASessionSettings* Settings);
+    HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings);
     ~HcsVirtualMachine();
 
-    // IWSLAVirtualMachine implementation
+    // IWSLCVirtualMachine implementation
     IFACEMETHOD(GetId)(_Out_ GUID* VmId) override;
     IFACEMETHOD(AcceptConnection)(_Out_ HANDLE* Socket) override;
     IFACEMETHOD(ConfigureNetworking)(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket) override;
@@ -50,7 +50,7 @@ private:
         bool AccessGranted = false;
     };
 
-    bool FeatureEnabled(WSLAFeatureFlags Value) const;
+    bool FeatureEnabled(WSLCFeatureFlags Value) const;
     static void CALLBACK OnVmExitCallback(HCS_EVENT* Event, void* Context);
     void OnExit(const HCS_EVENT* Event);
     void OnCrash(const HCS_EVENT* Event);
@@ -73,8 +73,8 @@ private:
     wil::shared_handle m_userToken;
     GUID m_virtioFsClassId{};
 
-    WSLAFeatureFlags m_featureFlags{};
-    WSLANetworkingMode m_networkingMode{};
+    WSLCFeatureFlags m_featureFlags{};
+    WSLCNetworkingMode m_networkingMode{};
 
     wil::unique_socket m_listenSocket;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
@@ -97,4 +97,4 @@ private:
     wil::com_ptr<ITerminationCallback> m_terminationCallback;
 };
 
-} // namespace wsl::windows::service::wsla
+} // namespace wsl::windows::service::wslc

@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 
 #include "SessionModel.h"
-#include <wslaservice.h>
+#include <wslc.h>
 
 namespace wsl::windows::wslc::services {
 struct SessionInformation

@@ -34,7 +34,7 @@ namespace WSLCCLIParserUnitTests {
 
 class WSLCCLIParserUnitTests
 {
-    WSLA_TEST_CLASS(WSLCCLIParserUnitTests)
+    WSLC_TEST_CLASS(WSLCCLIParserUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

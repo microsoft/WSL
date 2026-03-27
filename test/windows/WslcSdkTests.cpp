@@ -164,7 +164,7 @@ ProcessOutput RunContainerAndCapture(
 
 class WslcSdkTests
 {
-    WSLA_TEST_CLASS(WslcSdkTests)
+    WSLC_TEST_CLASS(WslcSdkTests)
 
     wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
@@ -183,7 +183,7 @@ class WslcSdkTests
         THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
-        // Use the same storage path as WSLA runtime tests to reduce pull overhead.
+        // Use the same storage path as WSLC runtime tests to reduce pull overhead.
         m_storagePath = std::filesystem::current_path() / "test-storage";
 
         // Build session settings using the WSLC SDK.
@@ -365,7 +365,7 @@ class WslcSdkTests
             WslcPullImageOptions opts{};
             opts.uri = "does-not:exist";
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), WSLA_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), WSLC_E_IMAGE_NOT_FOUND);
 
             // An error message should be present.
             VERIFY_IS_NOT_NULL(errorMsg.get());
@@ -640,7 +640,7 @@ class WslcSdkTests
 
             WslcContainer container = nullptr;
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container, &errorMsg), WSLA_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container, &errorMsg), WSLC_E_IMAGE_NOT_FOUND);
             VERIFY_IS_NULL(container);
         }
 
@@ -673,9 +673,9 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
 
         // Positive: ID is returned and is the expected length of hex characters.
-        CHAR id[WSLC_CONTAINER_ID_LENGTH]{};
+        CHAR id[WSLC_CONTAINER_ID_BUFFER_SIZE]{};
         VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), id));
-        VERIFY_ARE_EQUAL(strnlen(id, WSLC_CONTAINER_ID_LENGTH), static_cast<size_t>(WSLC_CONTAINER_ID_LENGTH - 1));
+        VERIFY_ARE_EQUAL(strnlen(id, WSLC_CONTAINER_ID_BUFFER_SIZE), static_cast<size_t>(WSLC_CONTAINER_ID_BUFFER_SIZE - 1));
 
         // Negative: null ID buffer must fail.
         VERIFY_ARE_EQUAL(WslcGetContainerID(container.get(), nullptr), E_POINTER);
