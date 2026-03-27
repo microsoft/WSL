@@ -90,6 +90,7 @@ private:
                  << L"  run        Run a container.\r\n"
                  << L"  start      Start a container.\r\n"
                  << L"  stop       Stop containers.\r\n"
+                 << L"  version    Show version information.\r\n"
                  << L"\r\n"
                  << L"For more details on a specific command, pass it the help argument. [-h]\r\n\r\n";
         return commands.str();
