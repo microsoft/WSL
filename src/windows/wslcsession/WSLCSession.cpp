@@ -128,6 +128,7 @@ void UserHandle::Reset()
         WI_ASSERT(m_session != nullptr);
 
         m_session->ReleaseUserHandle(m_handle.get());
+        m_handle.reset();
     }
 }
 

@@ -1853,7 +1853,8 @@ class WSLCTests
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
 
         // Write 4 bytes to validate that the service has started reading from the pipe (since the pipe buffer is 2).
-        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, nullptr, nullptr));
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
 
         testCompleted.SetEvent();
 
