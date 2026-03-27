@@ -15,12 +15,21 @@
 #       TAG         latest
 #       OUTPUT      ${CMAKE_BINARY_DIR}/images
 #   )
+#
+#   # With explicit image registry/name (IMAGE defaults to NAME if omitted):
+#   wslc_add_image(
+#       NAME        my-server
+#       IMAGE       ghcr.io/myorg/my-server
+#       TAG         v1.2.3
+#       DOCKERFILE  container/Dockerfile
+#       CONTEXT     container/
+#   )
 
 function(wslc_add_image)
     cmake_parse_arguments(
         PARSE_ARGV 0 ARG
         ""                                      # options (none)
-        "NAME;TAG;DOCKERFILE;CONTEXT;OUTPUT"     # one-value keywords
+        "NAME;IMAGE;TAG;DOCKERFILE;CONTEXT;OUTPUT" # one-value keywords
         "SOURCES"                                # multi-value keywords
     )
 
@@ -36,6 +45,9 @@ function(wslc_add_image)
     endif()
 
     # Defaults
+    if(NOT ARG_IMAGE)
+        set(ARG_IMAGE "${ARG_NAME}")
+    endif()
     if(NOT ARG_TAG)
         set(ARG_TAG "latest")
     endif()
@@ -51,12 +63,12 @@ function(wslc_add_image)
         endif()
     endif()
 
-    set(_image_ref "${ARG_NAME}:${ARG_TAG}")
+    set(_image_ref "${ARG_IMAGE}:${ARG_TAG}")
     set(_marker "${CMAKE_CURRENT_BINARY_DIR}/wslc_${ARG_NAME}.marker")
     # TODO: set(_tar_output "${ARG_OUTPUT}/${ARG_NAME}.tar") when wslc image save is available
 
     # Resolve source globs to file lists
-    file(GLOB_RECURSE _resolved_sources ${ARG_SOURCES})
+    file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS ${ARG_SOURCES})
 
     add_custom_command(
         OUTPUT "${_marker}"
