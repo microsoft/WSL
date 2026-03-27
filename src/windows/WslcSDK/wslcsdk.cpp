@@ -404,7 +404,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, options->sizeInBytes == 0);
     RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
 
-    WSLAVolumeOptions volumeOptions{};
+    WSLCVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
     // Only supported value currently
     volumeOptions.Type = "vhd";
@@ -570,7 +570,7 @@ try
         for (uint32_t i = 0; i < internalContainerSettings->namedVolumesCount; ++i)
         {
             const WslcContainerNamedVolume& internalVolume = internalContainerSettings->namedVolumes[i];
-            WSLANamedVolume& convertedVolume = convertedNamedVolumes[i];
+            WSLCNamedVolume& convertedVolume = convertedNamedVolumes[i];
 
             convertedVolume.Name = internalVolume.name;
             convertedVolume.ContainerPath = internalVolume.containerPath;

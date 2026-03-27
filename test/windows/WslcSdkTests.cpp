@@ -15,7 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "wslcsdk.h"
-#include "wsla_schema.h"
+#include "wslc_schema.h"
 #include <optional>
 
 extern std::wstring g_testDataPath;
@@ -2040,9 +2040,9 @@ class WslcSdkTests
 
         VERIFY_IS_NOT_NULL(inspectData);
 
-        auto inspectObject = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectContainer>(inspectData.get());
+        auto inspectObject = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectData.get());
 
-        CHAR containerId[WSLC_CONTAINER_ID_LENGTH];
+        CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE];
         VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
 
         VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
