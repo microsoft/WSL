@@ -7,4 +7,99 @@
     <ItemGroup>
         <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\runtimes\win-$(WSLCSDK_Platform)\wslcsdk.dll" />
     </ItemGroup>
+
+    <!-- ================================================================== -->
+    <!-- Container Image Build Targets                                      -->
+    <!-- ================================================================== -->
+
+    <!-- Default properties -->
+    <PropertyGroup>
+        <WslcImageOutputDir Condition="'$(WslcImageOutputDir)' == ''">$(OutDir)</WslcImageOutputDir>
+        <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
+    </PropertyGroup>
+
+    <!-- Default metadata for WslcImage items -->
+    <ItemDefinitionGroup>
+        <WslcImage>
+            <Tag>latest</Tag>
+            <Output>$(WslcImageOutputDir)</Output>
+        </WslcImage>
+    </ItemDefinitionGroup>
+
+    <!-- Check that wslc CLI is installed -->
+    <Target Name="WslcCheckDependencies"
+            BeforeTargets="WslcBuildAllImages"
+            Condition="'@(WslcImage)' != ''">
+
+        <Exec Command="$(WslcCliPath) --version"
+              IgnoreExitCode="true"
+              ConsoleToMSBuild="true"
+              StandardOutputImportance="low"
+              StandardErrorImportance="low">
+            <Output TaskParameter="ExitCode" PropertyName="_WslcExitCode" />
+        </Exec>
+
+        <Error Condition="'$(_WslcExitCode)' != '0'"
+               Code="WSLC0001"
+               Text="The WSLC runtime was not found. Install WSL by running: wsl --install --no-distribution" />
+    </Target>
+
+    <!-- Outer target: dispatch each WslcImage to inner target via MSBuild task -->
+    <Target Name="WslcBuildAllImages"
+            AfterTargets="Build"
+            DependsOnTargets="WslcCheckDependencies"
+            Condition="'@(WslcImage)' != ''">
+
+        <MSBuild Projects="$(MSBuildProjectFullPath)"
+                 Targets="_WslcBuildSingleImage"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSources=%(WslcImage.Sources);_WslcOutput=%(WslcImage.Output)" />
+    </Target>
+
+    <!-- Collect source files for incremental check (wildcards only expand in ItemGroup Include) -->
+    <Target Name="_WslcCollectSources" BeforeTargets="_WslcBuildSingleImage">
+        <ItemGroup>
+            <_WslcSourceFiles Include="$(_WslcDockerfile);$(_WslcSources)" />
+        </ItemGroup>
+    </Target>
+
+    <!-- Inner target: build a single image with incremental check -->
+    <Target Name="_WslcBuildSingleImage"
+            DependsOnTargets="_WslcCollectSources"
+            Inputs="@(_WslcSourceFiles)"
+            Outputs="$(IntDir)wslc_$(_WslcName).marker">
+
+        <MakeDir Directories="$(IntDir);$(_WslcOutput)" />
+
+        <Message Importance="high"
+                 Text="WSLC: Building image '$(_WslcName):$(_WslcTag)'..." />
+
+        <Exec Command="$(WslcCliPath) image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+              ConsoleToMSBuild="true" />
+
+        <Message Importance="high"
+                 Text="WSLC: Saving image '$(_WslcName):$(_WslcTag)' to $(_WslcOutput)\$(_WslcName).tar..." />
+
+        <Exec Command="$(WslcCliPath) image save &quot;$(_WslcName):$(_WslcTag)&quot; -o &quot;$(_WslcOutput)\$(_WslcName).tar&quot;"
+              ConsoleToMSBuild="true" />
+
+        <!-- Save image ID for efficient check-then-load at runtime -->
+        <Exec Command="$(WslcCliPath) image inspect &quot;$(_WslcName):$(_WslcTag)&quot; --format {{.Id}} &gt; &quot;$(_WslcOutput)\$(_WslcName).id&quot;"
+              IgnoreStandardErrorWarningFormat="true" />
+
+        <Touch Files="$(IntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
+
+        <Message Importance="high"
+                 Text="WSLC: [$(_WslcName)] Image built and saved successfully." />
+    </Target>
+
+    <!-- Clean container artifacts -->
+    <Target Name="WslcClean"
+            AfterTargets="Clean"
+            Condition="'@(WslcImage)' != ''">
+
+        <Delete Files="%(WslcImage.Output)\%(WslcImage.Identity).tar" />
+        <Delete Files="%(WslcImage.Output)\%(WslcImage.Identity).id" />
+        <Delete Files="$(IntDir)wslc_%(WslcImage.Identity).marker" />
+    </Target>
+
 </Project>
