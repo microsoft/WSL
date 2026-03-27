@@ -20,39 +20,42 @@ Usage:
 find_program(WSLC_EXECUTABLE wslc)
 
 function(wslc_add_image)
-    cmake_parse_arguments(PARSE_ARGV 0 WSLC "" "NAME;DOCKERFILE;CONTEXT;TAG" "DEPENDS")
+    cmake_parse_arguments(PARSE_ARGV 0 _WSLC "" "NAME;DOCKERFILE;CONTEXT;TAG" "DEPENDS")
 
-    if(NOT WSLC_NAME)
+    if(NOT _WSLC_NAME)
         message(FATAL_ERROR "wslc_add_image: NAME is required")
     endif()
 
-    if(NOT WSLC_DOCKERFILE)
+    if(NOT _WSLC_DOCKERFILE)
         message(FATAL_ERROR "wslc_add_image: DOCKERFILE is required")
     endif()
 
     if(NOT WSLC_EXECUTABLE)
-        message(FATAL_ERROR "wslc_add_image: wslc executable not found. Install wslc or set WSLC_EXECUTABLE.")
+        message(WARNING "wslc_add_image: wslc not found on PATH. "
+                "Container image targets will be created but may fail at build time. "
+                "Set WSLC_EXECUTABLE to the wslc path to resolve.")
+        set(WSLC_EXECUTABLE "wslc")
     endif()
 
-    if(NOT WSLC_CONTEXT)
-        cmake_path(GET WSLC_DOCKERFILE PARENT_PATH WSLC_CONTEXT)
+    if(NOT _WSLC_CONTEXT)
+        cmake_path(GET _WSLC_DOCKERFILE PARENT_PATH _WSLC_CONTEXT)
     endif()
 
-    if(NOT WSLC_TAG)
-        set(WSLC_TAG "latest")
+    if(NOT _WSLC_TAG)
+        set(_WSLC_TAG "latest")
     endif()
 
-    set(TARGET_NAME "wslc_image_${WSLC_NAME}")
+    set(TARGET_NAME "wslc_image_${_WSLC_NAME}")
 
     add_custom_target(${TARGET_NAME}
-        COMMAND ${WSLC_EXECUTABLE} build ${WSLC_CONTEXT} -f ${WSLC_DOCKERFILE} -t ${WSLC_NAME}:${WSLC_TAG}
+        COMMAND ${WSLC_EXECUTABLE} build ${_WSLC_CONTEXT} -f ${_WSLC_DOCKERFILE} -t ${_WSLC_NAME}:${_WSLC_TAG}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Building WSLC container image: ${WSLC_NAME}"
+        COMMENT "Building WSLC container image: ${_WSLC_NAME}"
         VERBATIM
     )
 
     # Wire up dependencies: ensure DEPENDS targets build before the container image
-    if(WSLC_DEPENDS)
-        add_dependencies(${TARGET_NAME} ${WSLC_DEPENDS})
+    if(_WSLC_DEPENDS)
+        add_dependencies(${TARGET_NAME} ${_WSLC_DEPENDS})
     endif()
 endfunction()
