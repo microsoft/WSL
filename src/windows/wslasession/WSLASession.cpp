@@ -378,6 +378,11 @@ try
             // pull failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
         }
+        else
+        {
+            // If no error message was explicitely returned, use the response body, if any.
+            errorMessage = errorJson;
+        }
 
         if (pullResponse->result() == boost::beast::http::status::not_found)
         {

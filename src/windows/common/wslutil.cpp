@@ -1091,7 +1091,8 @@ std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo
     auto domain = Input.substr(0, slash);
     auto path = Input.substr(slash + 1);
 
-    if (domain != localhost && domain != legacyDomain && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, isupper))
+    if (domain != localhost && domain != legacyDomain && domain.find_first_of(".:") == std::string::npos &&
+        !std::ranges::any_of(domain, [](unsigned char e) { return std::isupper(e); }))
     {
         domain = defaultDomain;
         path = Input;
