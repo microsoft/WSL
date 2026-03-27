@@ -418,9 +418,16 @@ const std::string& WSLAContainerImpl::Name() const noexcept
     return m_name;
 }
 
-const std::vector<ContainerPortMapping>& WSLAContainerImpl::GetPorts() const noexcept
+std::vector<WSLAPortMapping> WSLAContainerImpl::GetPorts() const
 {
-    return m_mappedPorts;
+    auto lock = m_lock.lock_shared();
+    std::vector<WSLAPortMapping> result;
+    result.reserve(m_mappedPorts.size());
+    for (const auto& port : m_mappedPorts)
+    {
+        result.push_back(port.Serialize());
+    }
+    return result;
 }
 
 void WSLAContainerImpl::GetStateChangedAt(ULONGLONG* Result)

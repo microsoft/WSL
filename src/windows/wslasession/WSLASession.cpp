@@ -1173,16 +1173,21 @@ try
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
 
-        const auto& ports = e->GetPorts();
-        for (const auto& port : ports)
+        if (output[index].State != WslaContainerStateRunning)
+        {
+            index++;
+            continue;
+        }
+
+        for (const auto& port : e->GetPorts())
         {
             WSLAContainerPortMapping mapping{};
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.Id, e->ID().c_str()) != 0);
-            mapping.PortMapping.HostPort = port.VmMapping.HostPort();
+            mapping.PortMapping.HostPort = port.HostPort;
             mapping.PortMapping.ContainerPort = port.ContainerPort;
-            mapping.PortMapping.Family = port.VmMapping.BindAddress.si_family;
-            mapping.PortMapping.Protocol = port.VmMapping.Protocol;
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.PortMapping.BindingAddress, port.VmMapping.BindingAddressString().c_str()) != 0);
+            mapping.PortMapping.Family = port.Family;
+            mapping.PortMapping.Protocol = port.Protocol;
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.PortMapping.BindingAddress, port.BindingAddress.c_str()) != 0);
             allPorts.push_back(mapping);
         }
 

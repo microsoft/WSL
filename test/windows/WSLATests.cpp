@@ -4140,7 +4140,7 @@ class WSLATests
 
             ExpectHttpResponse(L"http://[::1]:1234", 200);
 
-            // Verify that ListContainers returns the port data.
+            // Verify that ListContainers returns the port data for a running container.
             {
                 wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
                 wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
@@ -4179,6 +4179,27 @@ class WSLATests
                 VERIFY_ARE_EQUAL(IPPROTO_TCP, containerPorts[1].Protocol);
             }
 
+            // Verify that a created (not yet started) container returns no ports.
+            {
+                WSLAContainerLauncher createdLauncher("debian:latest", "test-ports-created", {"echo", "OK"}, {}, containerNetworkType);
+                createdLauncher.AddPort(1235, 8000, AF_INET);
+
+                auto createdContainer = createdLauncher.Create(session);
+
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+                std::string createdId = createdContainer.Id();
+                for (const auto& port : ports)
+                {
+                    VERIFY_ARE_NOT_EQUAL(createdId, std::string(port.Id));
+                }
+
+                VERIFY_SUCCEEDED(createdContainer.Get().Delete(WSLADeleteFlagsNone));
+                createdContainer.Reset();
+            }
+
             // Validate that the port cannot be reused while the container is running.
             WSLAContainerLauncher subLauncher(
                 "python:3.12-alpine", "test-ports-2", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
@@ -4188,9 +4209,21 @@ class WSLATests
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(session);
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
+            // Verify that a stopped container returns no ports.
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
+            {
+                wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
+                wil::unique_cotaskmem_array_ptr<WSLAContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
+                std::string stoppedId = container.Id();
+                for (const auto& port : ports)
+                {
+                    VERIFY_ARE_NOT_EQUAL(stoppedId, std::string(port.Id));
+                }
+            }
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLADeleteFlagsNone));
             container.Reset(); // TODO: Re-think container lifetime management.
 
             // Validate that the port can be reused now that the container is stopped.
