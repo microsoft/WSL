@@ -154,7 +154,7 @@ void InspectImages(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto imageIds = context.Args.GetAll<ArgType::ImageId>();
 
-    std::vector<wsl::windows::common::wsla_schema::InspectImage> result;
+    std::vector<wsl::windows::common::wslc_schema::InspectImage> result;
     for (const auto& id : imageIds)
     {
         auto inspectData = ImageService::Inspect(session, WideToMultiByte(id));
