@@ -7,4 +7,62 @@
     <ItemGroup>
         <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\runtimes\win-$(WSLCSDK_Platform)\wslcsdk.dll" />
     </ItemGroup>
+
+    <!-- ============================================================
+         WslcImage container-build integration
+         ============================================================ -->
+
+    <!-- Validate that the wslc CLI is available -->
+    <Target Name="_WslcValidate"
+            BeforeTargets="_WslcBuild"
+            Condition="'$(BuildWslcImages)' == 'true' And '@(WslcImage)' != ''">
+        <Exec Command="$(WslcPath) --version"
+              ConsoleToMSBuild="true"
+              IgnoreExitCode="true"
+              StandardOutputImportance="Low">
+            <Output TaskParameter="ExitCode" PropertyName="_WslcExitCode" />
+            <Output TaskParameter="ConsoleOutput" PropertyName="_WslcVersion" />
+        </Exec>
+        <Error Condition="'$(_WslcExitCode)' != '0'"
+               Text="wslc CLI not found. Install WSL Containers or set the WslcPath property. See https://aka.ms/wslc" />
+        <Message Text="wslc version: $(_WslcVersion)" Importance="low" />
+    </Target>
+
+    <!-- Resolve default metadata for each WslcImage item -->
+    <Target Name="_WslcResolveDefaults"
+            BeforeTargets="_WslcBuild"
+            DependsOnTargets="_WslcValidate"
+            Condition="'$(BuildWslcImages)' == 'true' And '@(WslcImage)' != ''">
+        <MakeDir Directories="$(_WslcStampDir)" />
+        <ItemGroup>
+            <WslcImage Condition="'%(WslcImage.Context)' == ''">
+                <Context>$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetFullPath('%(WslcImage.Dockerfile)'))))</Context>
+            </WslcImage>
+            <WslcImage>
+                <StampFile>$(_WslcStampDir)%(WslcImage.Identity).stamp</StampFile>
+            </WslcImage>
+        </ItemGroup>
+    </Target>
+
+    <!-- Build container images (with incremental build support via stamp files) -->
+    <Target Name="_WslcBuild"
+            BeforeTargets="Build"
+            DependsOnTargets="_WslcResolveDefaults"
+            Condition="'$(BuildWslcImages)' == 'true' And '@(WslcImage)' != ''"
+            Inputs="%(WslcImage.Dockerfile);%(WslcImage.Sources)"
+            Outputs="$(_WslcStampDir)%(WslcImage.Identity).stamp">
+        <PropertyGroup>
+            <_WslcVerboseFlag Condition="'$(WslcBuildVerbose)' == 'true'"> -v</_WslcVerboseFlag>
+        </PropertyGroup>
+        <Message Text="Building container image: %(WslcImage.Identity):%(WslcImage.Tag)" Importance="high" />
+        <Exec Command="$(WslcPath) build &quot;%(WslcImage.Context)&quot; -f &quot;%(WslcImage.Dockerfile)&quot; -t %(WslcImage.Identity):%(WslcImage.Tag)$(_WslcVerboseFlag)" />
+        <Touch Files="$(_WslcStampDir)%(WslcImage.Identity).stamp" AlwaysCreate="true" />
+    </Target>
+
+    <!-- Clean stamp files when the project is cleaned -->
+    <Target Name="_WslcClean"
+            AfterTargets="Clean">
+        <RemoveDir Directories="$(_WslcStampDir)" />
+    </Target>
+
 </Project>

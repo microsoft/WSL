@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microsoft.WSL.Containers.props — Imported early by NuGet (before user code) -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Global defaults (overridable by the user) -->
+  <PropertyGroup>
+    <!-- Path to wslc CLI — auto-detected from PATH if not set -->
+    <WslcPath Condition="'$(WslcPath)' == ''">wslc</WslcPath>
+
+    <!-- Set to false to skip container builds (e.g., quick inner-loop iteration) -->
+    <BuildWslcImages Condition="'$(BuildWslcImages)' == ''">true</BuildWslcImages>
+
+    <!-- Set to true to see wslc build output in the build log -->
+    <WslcBuildVerbose Condition="'$(WslcBuildVerbose)' == ''">false</WslcBuildVerbose>
+
+    <!-- Stamp directory for incremental builds — works for both .NET and C++ projects -->
+    <_WslcStampDir Condition="'$(_WslcStampDir)' == '' And '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)wslc\</_WslcStampDir>
+    <_WslcStampDir Condition="'$(_WslcStampDir)' == '' And '$(IntDir)' != ''">$(IntDir)wslc\</_WslcStampDir>
+    <_WslcStampDir Condition="'$(_WslcStampDir)' == ''">$(MSBuildProjectDirectory)\obj\wslc\</_WslcStampDir>
+  </PropertyGroup>
+
+  <!-- ItemDefinitionGroup declares default metadata for <WslcImage> items -->
+  <ItemDefinitionGroup>
+    <WslcImage>
+      <!-- Path to the Dockerfile (required) -->
+      <Dockerfile>Dockerfile</Dockerfile>
+
+      <!-- Build context directory — defaults to Dockerfile's parent directory -->
+      <Context></Context>
+
+      <!-- Image tag — defaults to 'latest' -->
+      <Tag>latest</Tag>
+
+      <!-- Source files for incremental builds (semicolon-separated paths, not globs) -->
+      <Sources></Sources>
+
+      <!-- Export path — when set, exports the image as a .tar file -->
+      <ExportPath></ExportPath>
+    </WslcImage>
+  </ItemDefinitionGroup>
+
+</Project>
