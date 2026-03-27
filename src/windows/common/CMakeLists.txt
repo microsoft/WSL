@@ -48,6 +48,7 @@ set(SOURCES
     WslSecurity.cpp
     WslTelemetry.cpp
     wslutil.cpp
+    install.cpp
     )
 
 set(HEADERS

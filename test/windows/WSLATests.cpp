@@ -34,9 +34,9 @@ extern bool g_fastTestRun;
 
 class WSLATests
 {
-    WSL_TEST_CLASS(WSLATests)
+    WSLA_TEST_CLASS(WSLATests)
 
-    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
+    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WSLASessionSettings m_defaultSessionSettings{};
@@ -58,6 +58,7 @@ class WSLATests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
+        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         // The WSLC SDK tests use this same storage to reduce pull overhead.
@@ -419,6 +420,74 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(expectedError, comError->Message.get());
         }
+
+        // Validate that PullImage() returns the appropriate error if the session is terminated.
+        {
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+            auto cleanup = wil::scope_exit([&]() {
+                ResetTestSession(); // Reopen the test session since the session was terminated.
+            });
+
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+    }
+
+    TEST_METHOD(PullImageAdvanced)
+    {
+        WSL2_TEST_ONLY();
+
+        // TODO: Enable once custom registries are supported, to avoid hitting public registry rate limits.
+        SKIP_TEST_UNSTABLE();
+
+        auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
+
+            auto cleanup = wil::scope_exit([&]() {
+                WSLADeleteImageOptions options{.Flags = WSLADeleteImageFlagsForce};
+                options.Image = ExpectedTag.has_value() ? ExpectedTag->c_str() : Image.c_str();
+                wil::unique_cotaskmem_array_ptr<WSLADeletedImageInformation> deletedImages;
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            });
+
+            if (!ExpectedTag.has_value())
+            {
+
+                wil::unique_cotaskmem_array_ptr<WSLAImageInformation> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+                for (const auto& e : images)
+                {
+                    wil::unique_cotaskmem_ansistring json;
+                    VERIFY_SUCCEEDED(m_defaultSession->InspectImage(e.Hash, &json));
+
+                    auto parsed = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(json.get());
+
+                    for (const auto& repoTag : parsed.RepoDigests.value_or({}))
+                    {
+                        if (Image == repoTag)
+                        {
+                            return;
+                        }
+                    }
+                }
+
+                LogError("Expected digest '%hs' not found ", Image.c_str());
+
+                VERIFY_FAIL();
+            }
+            else
+            {
+                ExpectImagePresent(*m_defaultSession, ExpectedTag->c_str());
+            }
+        };
+
+        validatePull("ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30", {});
+
+        validatePull("ubuntu", "ubuntu:latest");
+        validatePull("debian:bookworm", "debian:bookworm");
+
+        // TODO: Add test coverage with custom registries once supported.
     }
 
     TEST_METHOD(ListImages)
@@ -1851,6 +1920,7 @@ class WSLATests
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
 
         auto createVmWithDmesg = [this](bool earlyBootLogging) {
             auto [read, write] = CreateSubprocessPipe(false, false);
@@ -2599,7 +2669,6 @@ class WSLATests
     TEST_METHOD(NamedVolumesTest)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         const std::string volumeName = "wsla-test-named-volume";
         const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
@@ -2682,7 +2751,6 @@ class WSLATests
     TEST_METHOD(NamedVolumesSessionRecovery)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         const std::string volumeName = "wsla-test-named-volume";
         const std::string containerName = "wsla-test-container";
@@ -2762,7 +2830,6 @@ class WSLATests
     TEST_METHOD(NamedVolumeOptionsParseTest)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         const std::string volumeName = "wsla-volume-name";
 
@@ -2879,7 +2946,6 @@ class WSLATests
     TEST_METHOD(CreateContainer)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Test a simple container start.
         {
@@ -3405,7 +3471,6 @@ class WSLATests
     TEST_METHOD(ContainerState)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
@@ -3672,7 +3737,6 @@ class WSLATests
     TEST_METHOD(ContainerNetwork)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLAContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLAContainerEntry> containers;
@@ -3778,7 +3842,6 @@ class WSLATests
     TEST_METHOD(ContainerInspect)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Helper to verify port mappings.
         auto expectPorts = [&](const auto& actualPorts, const std::map<std::string, std::set<std::string>>& expectedPorts) {
@@ -3922,7 +3985,6 @@ class WSLATests
     TEST_METHOD(Exec)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Create a container.
         WSLAContainerLauncher launcher(
@@ -4069,7 +4131,6 @@ class WSLATests
     TEST_METHOD(ExecContainerDelete)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         WSLAContainerLauncher launcher("debian:latest", "test-exec-dtor", {"sleep", "99999"}, {}, WSLAContainerNetworkType::WSLAContainerNetworkTypeNone);
 
@@ -4086,45 +4147,6 @@ class WSLATests
         // The exec process exit event must be signaled within a reasonable timeout.
         VERIFY_IS_TRUE(exitEvent.wait(30 * 1000));
         VERIFY_ARE_EQUAL(process.GetExitCode(), 128 + WSLASignalSIGKILL);
-    }
-
-    void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
-    {
-        const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
-        filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
-
-        const winrt::Windows::Web::Http::HttpClient client(filter);
-
-        try
-        {
-            auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
-            auto content = response.Content().ReadAsStringAsync().get();
-
-            if (expectedCode.has_value())
-            {
-                VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
-            }
-            else
-            {
-                LogError("Unexpected reply for: %ls", Url);
-                VERIFY_FAIL();
-            }
-        }
-        catch (...)
-        {
-            auto result = wil::ResultFromCaughtException();
-
-            if (!expectedCode.has_value())
-            {
-                // We currently reset the connection if connect() fails inside the VM. Consider failing the Windows connect() instead.
-                VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
-            }
-            else
-            {
-                LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
-                VERIFY_FAIL();
-            }
-        }
     }
 
     void RunPortMappingsTest(IWSLASession& session, WSLAContainerNetworkType containerNetworkType)
@@ -4352,7 +4374,6 @@ class WSLATests
     void ValidateContainerVolumes(bool enableVirtioFs)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession();
         auto hostFolder = std::filesystem::current_path() / "test-volume";
@@ -4428,7 +4449,6 @@ class WSLATests
     void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto hostFolder = std::filesystem::current_path() / "test-volume";
         auto storage = std::filesystem::current_path() / "storage";
@@ -4755,7 +4775,6 @@ class WSLATests
     TEST_METHOD(ContainerRecoveryFromStorage)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession(); // Required to access the storage folder.
 
@@ -4823,7 +4842,6 @@ class WSLATests
     TEST_METHOD(ContainerVolumeAndPortRecoveryFromStorage)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession();
 
@@ -5169,7 +5187,6 @@ class WSLATests
     TEST_METHOD(ContainerLabels)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
         std::map<std::string, std::string> labels = {{"key1", "value1"}, {"key2", std::string(10000, 'a')}};
@@ -5436,28 +5453,29 @@ class WSLATests
         std::string longName(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
         expectInvalidArg(longName);
 
-        auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
+        auto expectInvalidPull = [&](const char* name) {
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr), E_INVALIDARG);
 
             auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
             VERIFY_IS_TRUE(comError.has_value());
 
-            VerifyPatternMatch(wsl::shared::string::WideToMultiByte(comError->Message.get()), errorPattern);
+            VERIFY_ARE_EQUAL(comError->Message.get(), std::format(L"Invalid image: '{}'", name));
         };
 
-        expectInvalidPull("?foo&bar/url\n:name", "invalid reference format");
-        expectInvalidPull("?:&", "invalid reference format");
-        expectInvalidPull("/:/", "invalid reference format");
-        expectInvalidPull("\n: ", "invalid reference format");
-        expectInvalidPull("invalid\nrepo:valid-image", "invalid reference format");
-        expectInvalidPull("bad!repo:valid-image", "invalid reference format");
-        expectInvalidPull("repo:badimage!name", "invalid tag format");
-        expectInvalidPull("bad+image", "invalid reference format");
+        expectInvalidPull("?foo&bar/url\n:name");
+        expectInvalidPull("?:&");
+        expectInvalidPull("/:/");
+        expectInvalidPull("\n: ");
+        expectInvalidPull("invalid\nrepo:valid-image");
+        expectInvalidPull("bad!repo:valid-image");
+        expectInvalidPull("repo:badimage!name");
+        expectInvalidPull("bad+image");
     }
 
     TEST_METHOD(PageReporting)
     {
         WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
 
         // Determine expected page reporting order based on Windows version.
         // On Germanium or later: 5 (128k), otherwise: 9 (2MB).
@@ -5474,7 +5492,6 @@ class WSLATests
     TEST_METHOD(ContainerAutoRemove)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Test that a container with the Rm flag is automatically deleted on Stop().
         {
@@ -5581,7 +5598,6 @@ class WSLATests
     TEST_METHOD(DeferredPortAndVolumeMappingOnStart)
     {
         WSL2_TEST_ONLY();
-        SKIP_TEST_ARM64();
 
         // Verify port mapping.
         // Two containers created with the same host port, only the first Start() succeeds.
@@ -5992,5 +6008,59 @@ class WSLATests
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
+    }
+
+    TEST_METHOD(ImageParsing)
+    {
+        using wsl::windows::common::wslutil::ParseImage;
+
+        auto ValidateImageParsing = [](const std::string& input, const std::string& expectedRepo, const std::optional<std::string>& expectedTag) {
+            auto [repo, tag] = ParseImage(input);
+            VERIFY_ARE_EQUAL(repo, expectedRepo);
+            VERIFY_ARE_EQUAL(tag.value_or("<empty>"), expectedTag.value_or("<empty>"));
+        };
+
+        ValidateImageParsing("ubuntu:22.04", "ubuntu", "22.04");
+        ValidateImageParsing("ubuntu", "ubuntu", {});
+        ValidateImageParsing("library/ubuntu:latest", "library/ubuntu", "latest");
+        ValidateImageParsing("myregistry.io:5000/myimage:v1", "myregistry.io:5000/myimage", "v1");
+        ValidateImageParsing("myregistry.io:5000/myimage", "myregistry.io:5000/myimage", {});
+
+        ValidateImageParsing(
+            "registry.example.com:8080/org/project/image:stable", "registry.example.com:8080/org/project/image", "stable");
+
+        ValidateImageParsing("localhost:5000/myimage:latest", "localhost:5000/myimage", "latest");
+        ValidateImageParsing("ghcr.io/owner/repo:sha-abc123", "ghcr.io/owner/repo", "sha-abc123");
+
+        ValidateImageParsing(
+            "ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "ubuntu",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        // Validate that the digest takes precedence over the tag.
+        ValidateImageParsing(
+            "ubuntu:latest@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "ubuntu",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        ValidateImageParsing(
+            "myregistry.io:5000/myimage@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "myregistry.io:5000/myimage",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        ValidateImageParsing(
+            "ubuntu:22.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+            "ubuntu",
+            "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30");
+
+        ValidateImageParsing("pytorch/pytorch", "pytorch/pytorch", {});
+
+        // Invalid inputs
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":debian:latest"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian:latest@"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("a:"); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":b"); }), E_INVALIDARG);
     }
 };

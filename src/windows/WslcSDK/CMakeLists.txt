@@ -1,10 +1,12 @@
 set(SOURCES
+    IOCallback.cpp
     ProgressCallback.cpp
     TerminationCallback.cpp
     wslcsdk.cpp
     WslcsdkPrivate.cpp
 )
 set(HEADERS
+    IOCallback.h
     ProgressCallback.h
     TerminationCallback.h
     wslcsdk.h

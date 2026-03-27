@@ -57,7 +57,7 @@ public:
 
     void Delete();
     std::string Inspect() const;
-
+    
     const std::string& Name() const noexcept
     {
         return m_name;
