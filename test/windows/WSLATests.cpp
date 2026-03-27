@@ -2807,7 +2807,7 @@ class WSLATests
         validateInvalidOptionsFailure("", WSL_E_INVALID_JSON);
     }
 
-    TEST_METHOD(ListAndInspectVolumes)
+    TEST_METHOD(ListAndInspectNamedVolumesTest)
     {
         WSL2_TEST_ONLY();
 
