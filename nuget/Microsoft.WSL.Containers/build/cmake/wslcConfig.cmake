@@ -52,9 +52,8 @@ function(wslc_add_image)
     endif()
 
     set(_image_ref "${ARG_NAME}:${ARG_TAG}")
-    set(_tar_output "${ARG_OUTPUT}/${ARG_NAME}.tar")
-    set(_id_output "${ARG_OUTPUT}/${ARG_NAME}.id")
     set(_marker "${CMAKE_CURRENT_BINARY_DIR}/wslc_${ARG_NAME}.marker")
+    # TODO: set(_tar_output "${ARG_OUTPUT}/${ARG_NAME}.tar") when wslc image save is available
 
     # Resolve source globs to file lists
     file(GLOB_RECURSE _resolved_sources ${ARG_SOURCES})
