@@ -162,7 +162,23 @@
                 </behaviors:NavigationViewHeaderBehavior>
             </i:Interaction.Behaviors>
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Frame x:Name="NavigationFrame" />
+                <InfoBar x:Name="PendingChangesInfoBar"
+                         x:Uid="Settings_PendingChangesInfoBar"
+                         Grid.Row="1"
+                         IsOpen="{x:Bind HasPendingChanges, Mode=OneWay}"
+                         IsClosable="False"
+                         Severity="Informational">
+                    <InfoBar.ActionButton>
+                        <Button x:Uid="Settings_ApplyChangesButton"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="ApplyChanges_Click"/>
+                    </InfoBar.ActionButton>
+                </InfoBar>
             </Grid>
         </NavigationView>
     </Grid>
