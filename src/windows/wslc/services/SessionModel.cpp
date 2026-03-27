@@ -22,7 +22,7 @@ SessionOptions SessionOptions::Default()
     // Use a function-local static to defer path initialization until first use.
     static const std::filesystem::path storagePath =
         settings::User().Get<settings::Setting::SessionStoragePath>().empty()
-            ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\defaultstorage"}
+            ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\storage"}
             : settings::User().Get<settings::Setting::SessionStoragePath>().c_str();
 
     SessionOptions options{};

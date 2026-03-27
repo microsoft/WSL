@@ -56,13 +56,6 @@ try
 
     try
     {
-        // Emit any settings load warnings.
-        for (const auto& warning : settings::User().GetWarnings())
-        {
-            // Todo: print as warning after reporter support, or maybe move to output warnings only in settings commands.
-            wslutil::PrintMessage(warning.Message);
-        }
-
         std::vector<std::wstring> args;
         for (int i = 1; i < argc; ++i)
         {

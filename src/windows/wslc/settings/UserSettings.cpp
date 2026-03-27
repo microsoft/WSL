@@ -14,6 +14,7 @@ Abstract:
 #include "UserSettings.h"
 #include "filesystem.hpp"
 #include "string.hpp"
+#include "wslutil.h"
 #include <yaml-cpp/yaml.h>
 #include <algorithm>
 #include <format>
@@ -38,10 +39,10 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Memory limit for the session in megabytes (default: 2048)\n"
     "  # memorySizeMb: 2048\n"
     "\n"
-    "  # Maximum disk image size in megabytes (default: 10000)\n"
-    "  # maxStorageSizeMb: 10000\n"
+    "  # Maximum disk image size in megabytes (default: 100000)\n"
+    "  # maxStorageSizeMb: 100000\n"
     "\n"
-    "  # Default path for container storage (default: %LocalAppData%\\wslc\\defaultstorage)\n"
+    "  # Default path for container storage (default: %LocalAppData%\\wslc\\storage)\n"
     "  # defaultStoragePath: \"\"\n";
 
 // Validate individual setting specializations
@@ -230,6 +231,12 @@ UserSettings::UserSettings(const std::filesystem::path& settingsDir)
 
         // TODO: Iterate through all nodes and warn about unknown keys?
     }
+
+    // Emit any settings load warnings.
+    for (const auto& warning : m_warnings)
+    {
+        wsl::windows::common::wslutil::PrintMessage(warning.Message, stderr);
+    }
 }
 
 void UserSettings::Reset() const
@@ -238,8 +245,6 @@ void UserSettings::Reset() const
     std::ofstream file(m_primaryPath);
     THROW_HR_IF_MSG(E_UNEXPECTED, !file.is_open(), "Failed to create settings file");
     file << s_DefaultSettingsTemplate;
-    file.flush();
-    file.close();
 }
 
 void UserSettings::PrepareToShellExecuteFile() const

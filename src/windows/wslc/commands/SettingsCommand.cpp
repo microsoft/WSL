@@ -44,8 +44,7 @@ std::wstring SettingsCommand::LongDescription() const
 {
     return {
         L"Opens the wslc user settings file in the system default editor for .yaml files.\n"
-        L"On first run, creates the file with all settings commented out at their defaults.\n"
-        L"A backup of the current settings is saved before the editor opens."};
+        L"On first run, creates the file with all settings commented out at their defaults."};
 }
 
 void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
@@ -61,8 +60,9 @@ void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         // User doesn't have file type association. Default to notepad
         // Quote the path so that Notepad treats it as a single argument even if it contains spaces.
+        std::filesystem::path notepadPath = std::filesystem::path{wil::GetSystemDirectoryW().get()} / L"notepad.exe";
         std::wstring quotedPath = L"\"" + path.wstring() + L"\"";
-        ShellExecuteW(nullptr, nullptr, L"notepad", quotedPath.c_str(), nullptr, SW_SHOW);
+        ShellExecuteW(nullptr, nullptr, notepadPath.c_str(), quotedPath.c_str(), nullptr, SW_SHOW);
     }
 }
 
@@ -84,7 +84,7 @@ std::wstring SettingsResetCommand::LongDescription() const
 
 void SettingsResetCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    // Todo: do we need prompt support?
+    // TODO: do we need prompt support?
     settings::User().Reset();
     PrintMessage(L"Settings reset to defaults.");
 }
