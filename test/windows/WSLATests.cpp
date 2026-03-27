@@ -6005,6 +6005,10 @@ class WSLATests
         };
 
         ValidateRepoParsing("ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("docker.io/ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("index.docker.io/ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("index.docker.io/library/ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("docker.io/library/ubuntu", "docker.io", "library/ubuntu");
         ValidateRepoParsing("microsoft.com/ubuntu", "microsoft.com", "ubuntu");
         ValidateRepoParsing("microsoft.com:80/ubuntu", "microsoft.com:80", "ubuntu");
         ValidateRepoParsing("microsoft.com:80/ubuntu/foo/bar", "microsoft.com:80", "ubuntu/foo/bar");
