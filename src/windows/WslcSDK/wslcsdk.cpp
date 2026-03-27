@@ -271,12 +271,6 @@ bool NeedsVirtualMachineServicesInstalled()
     return !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled();
 }
 
-bool NeedsWslOptionalFeatureInstalled()
-{
-    return !wsl::windows::common::helpers::IsWindows11OrAbove() &&
-           !wsl::windows::common::helpers::IsServicePresent(L"lxssmanager");
-}
-
 // TODO: Update to 2.8 when the minor version is moved forward for upcoming release
 #define WSLC_API_MIN_VERSION_SUPPORTED 2, 7, 0
 #define WSLC_API_MIN_VERSION_SUPPORTED_STRING "2.7.0"
@@ -1233,8 +1227,7 @@ try
 
     WslcComponentFlags componentCheck = WSLC_COMPONENT_FLAG_NONE;
 
-    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_SERVICES, NeedsVirtualMachineServicesInstalled());
-    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_OPTIONAL_FEATURE, NeedsWslOptionalFeatureInstalled());
+    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, NeedsVirtualMachineServicesInstalled());
     WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE, NeedsWslRuntimeInstalled());
 
     *canRun = componentCheck == WSLC_COMPONENT_FLAG_NONE ? TRUE : FALSE;

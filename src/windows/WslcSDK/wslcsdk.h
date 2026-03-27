@@ -451,12 +451,9 @@ typedef enum WslcComponentFlags
     WSLC_COMPONENT_FLAG_NONE = 0,
     // Services provided by the Virtual Machine Platform optional feature (other optional features may provide these services as
     // well). Installing this component will require a reboot.
-    WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_SERVICES = 1,
-    // The Windows Subsystem for Linux optional feature (required before Windows 11).
-    // Installing this component will require a reboot.
-    WSLC_COMPONENT_FLAG_WSL_OPTIONAL_FEATURE = 2,
+    WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM = 1,
     // The WSL runtime package, at an appropriate version to provide support for WSLC.
-    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 4,
+    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 2,
 } WslcComponentFlags;
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcComponentFlags);
