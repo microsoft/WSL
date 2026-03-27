@@ -43,6 +43,14 @@ function(wslc_add_image)
         set(ARG_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}")
     endif()
 
+    # Find wslc CLI
+    if(NOT WSLC_CLI_PATH)
+        find_program(WSLC_CLI_PATH wslc PATHS "$ENV{ProgramW6432}/WSL" "$ENV{ProgramFiles}/WSL")
+        if(NOT WSLC_CLI_PATH)
+            message(FATAL_ERROR "wslc CLI not found. Install WSL by running: wsl --install --no-distribution")
+        endif()
+    endif()
+
     set(_image_ref "${ARG_NAME}:${ARG_TAG}")
     set(_tar_output "${ARG_OUTPUT}/${ARG_NAME}.tar")
     set(_id_output "${ARG_OUTPUT}/${ARG_NAME}.id")
@@ -53,8 +61,7 @@ function(wslc_add_image)
 
     add_custom_command(
         OUTPUT "${_marker}"
-        COMMAND wslc image build -t "${_image_ref}" -f "${ARG_DOCKERFILE}" "${ARG_CONTEXT}"
-        COMMAND wslc image save "${_image_ref}" -o "${_tar_output}"
+        COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${ARG_DOCKERFILE}" "${ARG_CONTEXT}"
         COMMAND ${CMAKE_COMMAND} -E touch "${_marker}"
         DEPENDS ${_resolved_sources} "${ARG_DOCKERFILE}"
         COMMENT "WSLC: Building image '${_image_ref}'..."
