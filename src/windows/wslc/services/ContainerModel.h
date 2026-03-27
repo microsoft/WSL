@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 
 #include <wslservice.h>
-#include <wslaservice.h>
+#include <wslc.h>
 #include <string>
 
 namespace wsl::windows::wslc::models {
@@ -49,13 +49,13 @@ struct StopContainerOptions
 {
     static constexpr LONG DefaultTimeout = -1;
 
-    WSLASignal Signal = WSLASignalSIGTERM;
+    WSLCSignal Signal = WSLCSignalSIGTERM;
     LONG Timeout = DefaultTimeout;
 };
 
 struct KillContainerOptions
 {
-    int Signal = WSLASignalSIGKILL;
+    int Signal = WSLCSignalSIGKILL;
 };
 
 struct ContainerInformation
@@ -63,7 +63,7 @@ struct ContainerInformation
     std::string Id;
     std::string Name;
     std::string Image;
-    WSLAContainerState State;
+    WSLCContainerState State;
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
 

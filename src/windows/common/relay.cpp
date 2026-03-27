@@ -1397,7 +1397,7 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
                 PendingBuffer.c_str());
             PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CR.
 
-#ifdef WSLA_HTTP_DEBUG
+#ifdef WSLC_HTTP_DEBUG
 
             WSL_LOG("HTTPChunkHeader", TraceLoggingValue(PendingBuffer.c_str(), "Size"));
 
@@ -1430,7 +1430,7 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
             if (PendingChunkSize == 0)
             {
 
-#ifdef WSLA_HTTP_DEBUG
+#ifdef WSLC_HTTP_DEBUG
 
                 WSL_LOG("HTTPChunk", TraceLoggingValue(PendingBuffer.c_str(), "Content"));
 

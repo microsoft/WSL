@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EContainerStopTests
 {
-    WSLA_TEST_CLASS(WSLCE2EContainerStopTests)
+    WSLC_TEST_CLASS(WSLCE2EContainerStopTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {
