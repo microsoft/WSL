@@ -35,7 +35,7 @@ include(FetchContent)
 
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/_deps/${TARGET_PLATFORM})
 
-# N.B. Changes to any of the below dependencies must be reflected in cgmanifest.json
+# N.B. Changes to any of the FetchContent dependencies below (GSL, nlohmannjson) must be reflected in cgmanifest.json
 
 FetchContent_Declare(GSL
                      URL https://github.com/microsoft/GSL/archive/refs/tags/v4.0.0.tar.gz
