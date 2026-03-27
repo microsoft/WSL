@@ -15,7 +15,6 @@ Abstract:
 #include "SettingsCommand.h"
 #include "UserSettings.h"
 #include "wslutil.h"
-#include <iostream>
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
@@ -53,7 +52,7 @@ void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     settings::User().PrepareToShellExecuteFile();
 
-    const auto path = settings::User().SettingsFilePath();
+    const auto& path = settings::User().SettingsFilePath();
 
     // Some versions of windows will fail if no file extension association exists, other will pop up the dialog
     // to make the user pick their default.
@@ -61,7 +60,9 @@ void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
     if (static_cast<int>(reinterpret_cast<uintptr_t>(res)) <= 32)
     {
         // User doesn't have file type association. Default to notepad
-        ShellExecuteW(nullptr, nullptr, L"notepad", path.c_str(), nullptr, SW_SHOW);
+        // Quote the path so that Notepad treats it as a single argument even if it contains spaces.
+        std::wstring quotedPath = L"\"" + path.wstring() + L"\"";
+        ShellExecuteW(nullptr, nullptr, L"notepad", quotedPath.c_str(), nullptr, SW_SHOW);
     }
 }
 

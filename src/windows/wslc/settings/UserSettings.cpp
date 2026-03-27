@@ -134,7 +134,7 @@ namespace {
                 warnings.push_back({std::format(L"Warning: Invalid value for setting '{}'. Using default.", widePath), widePath});
             }
         }
-        catch (const YAML::Exception&)
+        catch (...)
         {
             const auto widePath = MultiByteToWide(path);
             warnings.push_back({std::format(L"Warning: Invalid type for setting '{}'. Using default.", widePath), widePath});
@@ -174,6 +174,11 @@ namespace {
         {
             warnings.push_back(
                 {std::format(L"Warning: '{}' could not be parsed: {}.", path.filename().wstring(), MultiByteToWide(e.what())), {}});
+            return std::nullopt;
+        }
+        catch (...)
+        {
+            warnings.push_back({std::format(L"Warning: '{}' could not be parsed.", path.filename().wstring()), {}});
             return std::nullopt;
         }
     }
