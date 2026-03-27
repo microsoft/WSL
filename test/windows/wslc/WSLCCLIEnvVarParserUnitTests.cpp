@@ -26,7 +26,7 @@ namespace WSLCCLIEnvVarParserUnitTests {
 
 class WSLCCLIEnvVarParserUnitTests
 {
-    WSLA_TEST_CLASS(WSLCCLIEnvVarParserUnitTests)
+    WSLC_TEST_CLASS(WSLCCLIEnvVarParserUnitTests)
 
     TEST_METHOD_SETUP(TestMethodSetup)
     {

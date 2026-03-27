@@ -32,11 +32,11 @@ SessionOptions SessionOptions::Default()
     options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
     options.m_sessionSettings.StoragePath = storagePath.c_str();
     options.m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
-    options.m_sessionSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
+    options.m_sessionSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
     return options;
 }
 
-const WSLASessionSettings* SessionOptions::Get() const
+const WSLCSessionSettings* SessionOptions::Get() const
 {
     return &m_sessionSettings;
 }

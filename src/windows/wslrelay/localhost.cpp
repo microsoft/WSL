@@ -506,9 +506,9 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
     }
 }
 
-std::optional<WSLA_MAP_PORT> ReceiveServiceMessage()
+std::optional<WSLC_MAP_PORT> ReceiveServiceMessage()
 {
-    WSLA_MAP_PORT message{};
+    WSLC_MAP_PORT message{};
 
     DWORD bytesRead{};
     if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), &message, sizeof(message), &bytesRead, nullptr))
@@ -522,11 +522,11 @@ std::optional<WSLA_MAP_PORT> ReceiveServiceMessage()
     }
 
     WI_ASSERT(message.Header.MessageSize == sizeof(message));
-    WI_ASSERT(message.Header.MessageType == LxMessageWSLAMapPort);
+    WI_ASSERT(message.Header.MessageType == LxMessageWSLCMapPort);
     return message;
 }
 
-void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
+void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
 {
     std::map<std::tuple<uint16_t, uint32_t>, std::shared_ptr<PortRelay>> ports;
 
