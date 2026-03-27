@@ -1165,6 +1165,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto result =
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
+    // Clean up the Docker container if anything below fails.
+    auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        try
+        {
+            DockerClient.DeleteContainer(result.Id, true);
+        }
+        CATCH_LOG();
+    });
+
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);
 
@@ -1187,6 +1196,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
+    deleteOnFailure.release();
     return container;
 }
 
