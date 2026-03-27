@@ -27,6 +27,21 @@
         </WslcImage>
     </ItemDefinitionGroup>
 
+    <!-- Auto-detection fallback: if no WslcImage declared, detect container/Dockerfile -->
+    <ItemGroup Condition="'@(WslcImage)' == '' AND Exists('$(ProjectDir)container\Dockerfile')">
+        <WslcImage Include="$(MSBuildProjectName)"
+                   Dockerfile="$(ProjectDir)container\Dockerfile"
+                   Context="$(ProjectDir)container"
+                   Sources="$(ProjectDir)container" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'@(WslcImage)' == '' AND Exists('$(ProjectDir)docker\Dockerfile')">
+        <WslcImage Include="$(MSBuildProjectName)"
+                   Dockerfile="$(ProjectDir)docker\Dockerfile"
+                   Context="$(ProjectDir)docker"
+                   Sources="$(ProjectDir)docker" />
+    </ItemGroup>
+
     <!-- Check that wslc CLI is installed -->
     <Target Name="WslcCheckDependencies"
             BeforeTargets="WslcBuildAllImages"
@@ -59,11 +74,14 @@
     <!--
         Collect source files for incremental check.
         Wildcards are expanded here in ItemGroup Include (not in Inputs attribute or MSBuild task Properties,
-        where they get escaped). The Sources metadata is treated as a directory path; **\* is appended here.
+        where they get escaped). Sources can be semicolon separated directory paths;
+        each is expanded with **\* to collect all files recursively.
     -->
     <Target Name="_WslcCollectSources" BeforeTargets="_WslcBuildSingleImage">
         <ItemGroup>
-            <_WslcSourceFiles Include="$(_WslcDockerfile);$(_WslcSourceDir)\**\*" />
+            <_WslcSourceDirs Include="$(_WslcSourceDir.Split(';'))" />
+            <_WslcSourceFiles Include="$(_WslcDockerfile)" />
+            <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" />
         </ItemGroup>
     </Target>
 
@@ -73,7 +91,7 @@
             Inputs="@(_WslcSourceFiles)"
             Outputs="$(IntDir)wslc_$(_WslcName).marker">
 
-        <MakeDir Directories="$(IntDir);$(_WslcOutput)" />
+        <MakeDir Directories="$(IntDir)" />
 
         <Message Importance="high"
                  Text="WSLC: Building image '$(_WslcName):$(_WslcTag)'..." />
@@ -97,9 +115,10 @@
             AfterTargets="Clean"
             Condition="'@(WslcImage)' != ''">
 
-        <Delete Files="%(WslcImage.OutputDir)\%(WslcImage.Identity).tar" />
-        <Delete Files="%(WslcImage.OutputDir)\%(WslcImage.Identity).id" />
         <Delete Files="$(IntDir)wslc_%(WslcImage.Identity).marker" />
+        <!--
+            TODO: Also clean tar and id files when wslc image save is available.
+        -->
     </Target>
 
 </Project>
