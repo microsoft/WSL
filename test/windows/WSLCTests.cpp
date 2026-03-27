@@ -1009,7 +1009,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "CMD [\"echo\", \"Hello from a WSL container!\"]\n";
         }
 
@@ -1037,7 +1037,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "COPY message.txt /message.txt\n";
             dockerfile << "CMD [\"cat\", \"/message.txt\"]\n";
         }
@@ -1082,7 +1082,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "COPY files/ /files/\n";
             // Verify every file is present and contains the expected content.
             // Only mismatches are printed; on success just the sentinel.
@@ -1127,7 +1127,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "COPY large.bin /large.bin\n";
             dockerfile << std::format(
                 "CMD [\"sh\", \"-c\", \"test $(stat -c %s /large.bin) -eq {} && echo size_ok\"]\n",
@@ -1178,13 +1178,13 @@ class WSLCTests
             std::ofstream dockerfile(contextDir / "Dockerfile");
             // Two independent stages that can build in parallel, each producing
             // part of the final output.  The last stage combines them.
-            dockerfile << "FROM alpine AS greeting\n";
+            dockerfile << "FROM debian:latest AS greeting\n";
             dockerfile << "RUN echo -n 'WSL containers' > /part.txt\n";
             dockerfile << "\n";
-            dockerfile << "FROM alpine AS description\n";
+            dockerfile << "FROM debian:latest AS description\n";
             dockerfile << "RUN echo -n 'support multi-stage builds' > /part.txt\n";
             dockerfile << "\n";
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "COPY --from=greeting /part.txt /greeting.txt\n";
             dockerfile << "COPY --from=description /part.txt /description.txt\n";
             dockerfile << "CMD [\"sh\", \"-c\", "
@@ -1228,7 +1228,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "COPY . /ctx/\n";
             dockerfile << "CMD [\"sh\", \"-c\", "
                        << "\"test -f /ctx/keep.txt "
@@ -1285,7 +1285,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "dockerfiles" / "Dockerfile.custom");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "CMD [\"echo\", \"custom-dockerfile-ok\"]\n";
         }
 
@@ -1311,7 +1311,7 @@ class WSLCTests
             std::filesystem::remove_all(contextDir, ec);
         });
 
-        auto dockerfileContent = "FROM alpine\nCMD [\"echo\", \"stdin-dockerfile-ok\"]\n";
+        auto dockerfileContent = "FROM debian:latest\nCMD [\"echo\", \"stdin-dockerfile-ok\"]\n";
 
         wil::unique_hfile readHandle;
         wil::unique_hfile writeHandle;
@@ -1357,7 +1357,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "ARG TEST_VALUE\n";
             dockerfile << "ENV TEST_VALUE=${TEST_VALUE}\n";
             dockerfile << "CMD echo \"build-arg-value=${TEST_VALUE}\"\n";
@@ -1396,7 +1396,7 @@ class WSLCTests
 
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
-            dockerfile << "FROM alpine\n";
+            dockerfile << "FROM debian:latest\n";
             dockerfile << "CMD [\"echo\", \"multi-tag-ok\"]\n";
         }
         WSLCBuildImageOptions options{.Tags = {tags, 2}};
