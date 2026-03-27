@@ -105,9 +105,10 @@ try
         // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
         result = wil::ResultFromCaughtException();
 
-        // If the user pressed Ctrl-C, exit silently instead of printing an error.
+        // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
         if (context.CancelEvent.is_signaled())
         {
+            fwprintf(stderr, L"\nCancelled.\n");
             return 1;
         }
 

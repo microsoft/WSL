@@ -561,7 +561,14 @@ try
         catch (...)
         {
             LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL));
-            buildProcess.Wait();
+            try
+            {
+                buildProcess.Wait(10 * 1000);
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION_MSG("Build process did not exit after SIGKILL");
+            }
         }
         throw;
     }
