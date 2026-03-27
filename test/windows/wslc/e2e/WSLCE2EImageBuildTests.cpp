@@ -32,8 +32,8 @@ class WSLCE2EImageBuildTests
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsDeleted(DebianTestImage());
         DeleteAllBuiltImages();
+        EnsureImageIsDeleted(DebianTestImage());
         return true;
     }
 
