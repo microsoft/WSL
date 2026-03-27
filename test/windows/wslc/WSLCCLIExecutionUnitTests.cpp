@@ -20,6 +20,8 @@ Abstract:
 
 #include "Command.h"
 #include "RootCommand.h"
+#include "ContainerCommand.h"
+#include "ContainerTasks.h"
 
 using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
@@ -114,6 +116,62 @@ class WSLCCLIExecutionUnitTests
 
         // Other more complex EnumVariantMap tests are in the Args unit tests.
         // This one will just verify all the data types in the Data Map work as expected.
+    }
+
+    // Test: SetContainerOptionsFromArgs sets WorkingDirectory when --workdir is provided
+    TEST_METHOD(SetContainerOptionsFromArgs_WithWorkDir_SetsWorkingDirectory)
+    {
+        CLIExecutionContext context;
+        context.Args.Add<ArgType::WorkDir>(std::wstring{L"/app"});
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
+    }
+
+    // Test: SetContainerOptionsFromArgs leaves WorkingDirectory empty when --workdir is not provided
+    TEST_METHOD(SetContainerOptionsFromArgs_WithoutWorkDir_WorkingDirectoryIsEmpty)
+    {
+        CLIExecutionContext context;
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.WorkingDirectory.empty());
+    }
+
+    // Test: Full parse of 'exec --workdir /path cont1 cmd' sets WorkingDirectory
+    TEST_METHOD(ExecCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
+    {
+        // Simulate the args that reach ContainerExecCommand after routing consumed "exec"
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir /tmp/mydir cont1 sh");
+
+        ContainerExecCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/tmp/mydir"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'exec -w /path cont1 cmd' (short alias) sets WorkingDirectory
+    TEST_METHOD(ExecCommand_ParseWorkDirShortOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc -w /app cont1 sh");
+
+        ContainerExecCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
     }
 
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h

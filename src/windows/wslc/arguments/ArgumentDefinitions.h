@@ -78,6 +78,7 @@ _(TTY,            "tty",                 L"t",              Kind::Flag,        L
 _(User,           "user",                L"u",              Kind::Value,       L"User ID for the process (name|uid|uid:gid)") \
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details") \
 _(Version,        "version",             L"v",              Kind::Flag,        L"Show version information for this tool") \
+_(WorkDir,        "workdir",             L"w",              Kind::Value,       L"Working directory inside the container") \
 _(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container") \
 _(Volume,         "volume",              L"v",              Kind::Value,       L"Bind mount a volume to the container") \
 // clang-format on
