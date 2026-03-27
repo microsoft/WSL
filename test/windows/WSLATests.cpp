@@ -5521,6 +5521,7 @@ class WSLATests
             std::chrono::seconds{30});
 
         VERIFY_ARE_EQUAL(WslaContainerStateDeleted, container.State());
+        VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
         // Ensure we can still get the init process and read stdout.
         auto process = container.GetInitProcess();
@@ -5528,8 +5529,6 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_ARE_EQUAL(std::string("Hello World\n"), result.Output[1]);
-
-        VERIFY_ARE_EQUAL(container.Get().Delete(WSLADeleteFlagsNone), RPC_E_DISCONNECTED);
 
         // Validate that the container is not found if we try to open it by name or id, or found in the container list.
         wil::com_ptr<IWSLAContainer> notFound;
