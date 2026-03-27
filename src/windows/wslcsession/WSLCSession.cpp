@@ -1200,6 +1200,7 @@ try
             mapping.PortMapping.ContainerPort = port.ContainerPort;
             mapping.PortMapping.Family = port.Family;
             mapping.PortMapping.Protocol = port.Protocol;
+            THROW_HR_IF(E_UNEXPECTED, port.BindingAddress.size() > WSLC_MAX_BINDING_ADDRESS_LENGTH);
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.PortMapping.BindingAddress, port.BindingAddress.c_str()) != 0);
             allPorts.push_back(mapping);
         }

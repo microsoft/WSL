@@ -103,11 +103,14 @@ void WSLCContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort
 
     if (BindingAddress.has_value())
     {
+        THROW_HR_IF(E_INVALIDARG, BindingAddress->size() > WSLC_MAX_BINDING_ADDRESS_LENGTH);
         THROW_HR_IF_MSG(
             E_INVALIDARG, strcpy_s(port.BindingAddress, BindingAddress->c_str()) != 0, "Invalid address: %hs", BindingAddress->c_str());
     }
     else
     {
+        static_assert(sizeof("127.0.0.1") <= WSLC_MAX_BINDING_ADDRESS_LENGTH, "Default IPv4 binding address too long");
+        static_assert(sizeof("::1") <= WSLC_MAX_BINDING_ADDRESS_LENGTH, "Default IPv6 binding address too long");
         THROW_HR_IF(E_INVALIDARG, strcpy_s(port.BindingAddress, Family == AF_INET ? "127.0.0.1" : "::1") != 0);
     }
 
