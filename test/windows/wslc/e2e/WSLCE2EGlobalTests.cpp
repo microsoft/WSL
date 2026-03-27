@@ -73,10 +73,8 @@ class WSLCE2EGlobalTests
 
         // Verify there is a session with the name of the test session in the session list output.
         VERIFY_IS_TRUE(result.Stdout.has_value());
-        VERIFY_ARE_NOT_EQUAL(
-            result.Stdout->find(session.Name()),
-            std::wstring::npos,
-            L"Session name 'wslc-test-session' not found in session list output");
+        auto findResult = result.Stdout->find(session.Name());
+        VERIFY_ARE_NOT_EQUAL(findResult, std::wstring::npos);
 
         // Run container list in the test session, which should succeed if the session is valid.
         result = RunWslc(std::format(L"container list --session {}", session.Name()));

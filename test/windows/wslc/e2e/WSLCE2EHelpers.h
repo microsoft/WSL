@@ -108,7 +108,7 @@ struct TestSession
     ~TestSession();
 
     NON_COPYABLE(TestSession);
-    DEFAULT_MOVABLE(TestSession);
+    NON_MOVABLE(TestSession);
 
     const std::wstring& Name() const
     {
