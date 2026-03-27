@@ -486,6 +486,27 @@ class WSLCTests
         validatePull("debian:bookworm", "debian:bookworm");
         validatePull("pytorch/pytorch", "pytorch/pytorch:latest");
         validatePull("registry.k8s.io/pause:3.2", "registry.k8s.io/pause:3.2");
+
+        // Validate that PullImage() fails appropriately when the sessio runs out of space.
+        {
+            auto settings = GetDefaultSessionSettings(L"wslc-pull-image-out-of-space", false);
+            settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+            settings.MemoryMb = 1024;
+            auto session = CreateSession(settings);
+
+            VERIFY_ARE_EQUAL(session->PullImage("pytorch/pytorch", nullptr, nullptr), E_FAIL);
+
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+
+            // The error message can't be compared directly because it contains an unpredicable path:
+            // "write /var/lib/docker/tmp/GetImageBlob1760660623: no space left on device"
+            if (StrStrW(comError->Message.get(), L"no space left on device") == nullptr)
+            {
+                LogError("Unexpected error message: %ls", comError->Message.get());
+                VERIFY_FAIL();
+            }
+        }
     }
 
     TEST_METHOD(ListImages)

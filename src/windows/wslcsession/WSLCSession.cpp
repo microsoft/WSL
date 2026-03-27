@@ -328,18 +328,25 @@ try
 
     auto io = CreateIOContext();
 
-    std::optional<boost::beast::http::message<false, boost::beast::http::buffer_body>> pullResponse;
+    struct Response
+    {
+        boost::beast::http::status result;
+        bool isJson = false;
+    };
+
+    std::optional<Response> pullResponse;
 
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("PullHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
-        pullResponse = response;
+        auto it = response.find(boost::beast::http::field::content_type);
+        pullResponse.emplace(response.result(), it != response.end() && it->value().starts_with("application/json"));
     };
 
     std::string errorJson;
     std::optional<std::string> reportedError;
     auto onChunk = [&](const gsl::span<char>& Content) {
-        if (pullResponse.has_value() && pullResponse->result() != boost::beast::http::status::ok)
+        if (pullResponse.has_value() && pullResponse->result != boost::beast::http::status::ok)
         {
             // If the status code is an error, then this is an error message, not a progress update.
             errorJson.append(Content.data(), Content.size());
@@ -382,26 +389,25 @@ try
 
     THROW_HR_IF(E_UNEXPECTED, !pullResponse.has_value());
 
-    if (pullResponse->result() != boost::beast::http::status::ok)
+    if (pullResponse->result != boost::beast::http::status::ok)
     {
         std::string errorMessage;
-        auto it = pullResponse->find(boost::beast::http::field::content_type);
-        if (it != pullResponse->end() && it->value().starts_with("application/json"))
+        if (pullResponse->isJson)
         {
             // pull failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
         }
         else
         {
-            // If no error message was explicitely returned, use the response body, if any.
+            // If no error message was explicitly returned, use the response body, if any.
             errorMessage = errorJson;
         }
 
-        if (pullResponse->result() == boost::beast::http::status::not_found)
+        if (pullResponse->result == boost::beast::http::status::not_found)
         {
             THROW_HR_WITH_USER_ERROR(WSLC_E_IMAGE_NOT_FOUND, errorMessage);
         }
-        else if (pullResponse->result() == boost::beast::http::status::bad_request)
+        else if (pullResponse->result == boost::beast::http::status::bad_request)
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
         }
