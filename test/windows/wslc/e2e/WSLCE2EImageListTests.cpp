@@ -23,7 +23,7 @@ using namespace wsl::windows::wslc::models;
 
 class WSLCE2EImageListTests
 {
-    WSLA_TEST_CLASS(WSLCE2EImageListTests)
+    WSLC_TEST_CLASS(WSLCE2EImageListTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {

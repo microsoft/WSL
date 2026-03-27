@@ -3855,7 +3855,7 @@ Return Value:
 
 int WslEntryPoint(int Argc, char* Argv[]);
 
-extern int WSLAEntryPoint(int Argc, char* Argv[]);
+extern int WSLCEntryPoint(int Argc, char* Argv[]);
 
 void EnableDebugMode(const std::string& Mode)
 {
@@ -3932,14 +3932,14 @@ int main(int Argc, char* Argv[])
     // Determine which entrypoint should be used.
     //
 
-    if (getenv(WSLA_ROOT_INIT_ENV))
+    if (getenv(WSLC_ROOT_INIT_ENV))
     {
-        if (unsetenv(WSLA_ROOT_INIT_ENV))
+        if (unsetenv(WSLC_ROOT_INIT_ENV))
         {
             LOG_ERROR("unsetenv failed {}", errno);
         }
 
-        return WSLAEntryPoint(Argc, Argv);
+        return WSLCEntryPoint(Argc, Argv);
     }
 
     if (getpid() != 1 || !getenv(WSL_ROOT_INIT_ENV))

@@ -833,7 +833,7 @@ void CreateWerReports()
         L"wslg.exe",
         L"vmcompute.exe",
         L"vmwp.exe",
-        L"wslasession.exe",
+        L"wslcsession.exe",
         L"wslc.exe"};
 
     auto PrivilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
