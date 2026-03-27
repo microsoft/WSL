@@ -1521,11 +1521,11 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
         auto cacheLock = m_cacheLock.lock_shared();
         if (m_cachedInitProcess)
         {
-            return m_cachedInitProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process);
+            return m_cachedInitProcess.CopyTo(__uuidof(IWSLCProcess), (void**)Process);
         }
     }
 
-    return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
+    return CallImpl(&WSLCContainerImpl::GetInitProcess, Process);
 }
 
 HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
@@ -1576,7 +1576,7 @@ try
 }
 CATCH_RETURN();
 
-void WSLAContainer::CacheState(const std::string& id, const std::string& name, WSLAContainerState state, const Microsoft::WRL::ComPtr<WSLAProcess>& initProcess) noexcept
+void WSLCContainer::CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
 try
 {
     auto cacheLock = m_cacheLock.lock_exclusive();
@@ -1618,7 +1618,7 @@ try
         auto cacheLock = m_cacheLock.lock_shared();
         if (m_cachedId.has_value())
         {
-            WI_VERIFY(strcpy_s(Id, std::size<char>(WSLAContainerId{}), m_cachedId->c_str()) == 0);
+            WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), m_cachedId->c_str()) == 0);
             return S_OK;
         }
     }
