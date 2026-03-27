@@ -15,13 +15,13 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include <wsla_schema.h>
+#include <wslc_schema.h>
 
 namespace WSLCE2ETests {
 
 class WSLCE2EImageInspectTests
 {
-    WSLA_TEST_CLASS(WSLCE2EImageInspectTests)
+    WSLC_TEST_CLASS(WSLCE2EImageInspectTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {
@@ -56,7 +56,7 @@ class WSLCE2EImageInspectTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"image inspect {}", InvalidImage.NameAndTag()));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
+        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -67,7 +67,7 @@ class WSLCE2EImageInspectTests
         auto result = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto jsonOutput = result.GetStdoutOneLine();
-        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wsla_schema::InspectImage>>(jsonOutput.c_str());
+        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectImage>>(jsonOutput.c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         VERIFY_IS_TRUE(inspectData[0].RepoTags.has_value());
         VERIFY_ARE_EQUAL(1u, inspectData[0].RepoTags.value().size());
