@@ -18,7 +18,7 @@ WslcSetSessionSettingsTerminationCallback
 WslcSetSessionSettingsCpuCount
 WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout
-WslcSetSessionSettingsVHD
+WslcSetSessionSettingsVhd
  
 WslcTerminateSession
 WslcPullSessionImage
@@ -28,7 +28,8 @@ WslcLoadSessionImage
 WslcLoadSessionImageFromFile
 WslcDeleteSessionImage
 WslcListSessionImages
-WslcCreateSessionVhd
+WslcCreateSessionVhdVolume
+WslcDeleteSessionVhdVolume
 
 WslcSetContainerSettingsDomainName
 WslcSetContainerSettingsName

@@ -196,7 +196,7 @@ class WslcSdkTests
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 4096ull * 1024 * 1024; // 4 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &m_defaultSession, nullptr));
 
@@ -251,7 +251,7 @@ class WslcSdkTests
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 1024ull * 1024 * 1024; // 1 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
         UniqueSession session;
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
@@ -1904,7 +1904,7 @@ class WslcSdkTests
         WslcVhdRequirements sessionVhd{};
         sessionVhd.sizeInBytes = 4 * _1GB;
         sessionVhd.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &sessionVhd));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &sessionVhd));
 
         UniqueSession session;
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
@@ -1920,7 +1920,7 @@ class WslcSdkTests
             vhd.sizeInBytes = c_vhdSizeBytes;
             vhd.type = WSLC_VHD_TYPE_DYNAMIC;
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_SUCCEEDED(WslcCreateSessionVhd(session.get(), &vhd, &errorMsg));
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
 
             // The backing VHD file must exist on disk.
             std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
@@ -1969,8 +1969,18 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(output.stdoutOutput, "wslc-vhd-test\n");
         }
 
+        // Positive: delete the volume.
+        {
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_volumeName, &errorMsg));
+
+            // The backing VHD file must not exist on disk.
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
+            VERIFY_IS_FALSE(std::filesystem::exists(expectedVhdPath));
+        }
+
         // Negative: null options pointer must fail.
-        VERIFY_ARE_EQUAL(WslcCreateSessionVhd(session.get(), nullptr, nullptr), E_POINTER);
+        VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), nullptr, nullptr), E_POINTER);
 
         // Negative: null name must fail.
         {
@@ -1978,7 +1988,7 @@ class WslcSdkTests
             vhd.name = nullptr;
             vhd.sizeInBytes = c_vhdSizeBytes;
             vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhd(session.get(), &vhd, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
 
         // Negative: zero sizeInBytes must fail.
@@ -1987,7 +1997,7 @@ class WslcSdkTests
             vhd.name = c_volumeName;
             vhd.sizeInBytes = 0;
             vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhd(session.get(), &vhd, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
 
         // Negative: fixed VHD type is not yet supported.
@@ -1996,7 +2006,7 @@ class WslcSdkTests
             vhd.name = c_volumeName;
             vhd.sizeInBytes = c_vhdSizeBytes;
             vhd.type = WSLC_VHD_TYPE_FIXED;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhd(session.get(), &vhd, nullptr), E_NOTIMPL);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_NOTIMPL);
         }
     }
 

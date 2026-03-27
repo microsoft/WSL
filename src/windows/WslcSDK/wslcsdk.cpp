@@ -391,7 +391,7 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
@@ -402,7 +402,7 @@ try
 
     RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
     RETURN_HR_IF(E_INVALIDARG, options->sizeInBytes == 0);
-    RETURN_HR_IF(E_NOTIMPL, options->type == WSLC_VHD_TYPE_FIXED);
+    RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
 
     WSLAVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
@@ -416,7 +416,20 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetSessionSettingsVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
+STDAPI WslcDeleteSessionVhdVolume(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, name);
+
+    return errorInfoWrapper.CaptureResult(internalType->session->DeleteVolume(name));
+}
+CATCH_RETURN();
+
+STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
@@ -424,7 +437,7 @@ try
     if (vhdRequirements)
     {
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeInBytes == 0);
-        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type == WSLC_VHD_TYPE_FIXED);
+        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
 
         internalType->vhdRequirements = *vhdRequirements;
     }
