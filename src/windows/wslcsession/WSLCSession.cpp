@@ -98,8 +98,7 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
 
 namespace wsl::windows::service::wslc {
 
-<<<<<<< HEAD:src/windows/wslasession/WSLASession.cpp
-UserHandle::UserHandle(WSLASession& Session, wil::unique_handle&& handle) : m_session(&Session), m_handle(std::move(handle))
+UserHandle::UserHandle(WSLCSession& Session, wil::unique_handle&& handle) : m_session(&Session), m_handle(std::move(handle))
 {
     WI_ASSERT(!!m_handle);
 }
@@ -142,10 +141,7 @@ HANDLE UserHandle::Get() const noexcept
     return m_handle.get();
 }
 
-HRESULT WSLASession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
-=======
 HRESULT WSLCSession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
->>>>>>> origin/feature/wsl-for-apps:src/windows/wslcsession/WSLCSession.cpp
 try
 {
     RETURN_HR_IF(E_POINTER, ProcessHandle == nullptr);
@@ -505,12 +501,7 @@ try
     if (dockerfileFileHandle)
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-<<<<<<< HEAD:src/windows/wslasession/WSLASession.cpp
-            common::relay::HandleWrapper{dockerfileFileHandle->Get()}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLAFDStdin)}));
-=======
-            common::relay::HandleWrapper{std::move(dockerfileFileHandle)},
-            common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
->>>>>>> origin/feature/wsl-for-apps:src/windows/wslcsession/WSLCSession.cpp
+            common::relay::HandleWrapper{dockerfileFileHandle->Get()}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
     }
 
     bool verbose = Options->Verbose;
@@ -1661,8 +1652,7 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
     return io;
 }
 
-<<<<<<< HEAD:src/windows/wslasession/WSLASession.cpp
-UserHandle WSLASession::OpenUserHandle(ULONG Handle, DWORD Access)
+UserHandle WSLCSession::OpenUserHandle(ULONG Handle, DWORD Access)
 {
     std::lock_guard lock(m_userHandlesLock);
 
@@ -1679,7 +1669,7 @@ UserHandle WSLASession::OpenUserHandle(ULONG Handle, DWORD Access)
     return UserHandle{*this, std::move(duplicatedHandle)};
 }
 
-void WSLASession::ReleaseUserHandle(HANDLE Handle)
+void WSLCSession::ReleaseUserHandle(HANDLE Handle)
 {
     std::lock_guard lock(m_userHandlesLock);
 
@@ -1689,7 +1679,7 @@ void WSLASession::ReleaseUserHandle(HANDLE Handle)
     m_userHandles.erase(it);
 }
 
-void WSLASession::CancelUserHandleIO()
+void WSLCSession::CancelUserHandleIO()
 {
     for (auto handle : m_userHandles)
     {
@@ -1702,10 +1692,7 @@ void WSLASession::CancelUserHandleIO()
     }
 }
 
-void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
-=======
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
->>>>>>> origin/feature/wsl-for-apps:src/windows/wslcsession/WSLCSession.cpp
 {
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock(m_containersLock);

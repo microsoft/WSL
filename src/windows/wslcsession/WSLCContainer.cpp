@@ -731,7 +731,7 @@ void WSLCContainerImpl::Export(ULONG OutHandle) const
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     SocketCodePair = m_dockerClient.ExportContainer(m_id);
 
-    auto userHandle = m_wslaSession.OpenUserHandle(OutHandle, GENERIC_WRITE | SYNCHRONIZE);
+    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle, GENERIC_WRITE | SYNCHRONIZE);
 
     wsl::windows::common::relay::MultiHandleWait io = m_wslcSession.CreateIOContext();
 

@@ -33,7 +33,7 @@ class UserHandle
     NON_COPYABLE(UserHandle);
 
 public:
-    UserHandle(WSLASession& Session, wil::unique_handle&& handle);
+    UserHandle(WSLCSession& Session, wil::unique_handle&& handle);
     UserHandle(UserHandle&& Other);
 
     ~UserHandle();
@@ -44,7 +44,7 @@ public:
     void Reset();
 
 private:
-    WSLASession* m_session{};
+    WSLCSession* m_session{};
     wil::unique_handle m_handle;
 };
 
