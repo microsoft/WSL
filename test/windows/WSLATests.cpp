@@ -438,7 +438,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // TODO: Enable once custom registries are supported, to avoid hitting public registry rate limits.
-        // SKIP_TEST_UNSTABLE();
+        SKIP_TEST_UNSTABLE();
 
         auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
             VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
