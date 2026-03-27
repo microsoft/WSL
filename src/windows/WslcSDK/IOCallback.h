@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "wslaservice.h"
+#include "wslc.h"
 #include "relay.hpp"
 #include <thread>
 
@@ -21,7 +21,7 @@ struct WslcContainerProcessOptionsInternal;
 
 struct IOCallback
 {
-    IOCallback(IWSLAProcess* process, const WslcContainerProcessIOCallbackOptions& options);
+    IOCallback(IWSLCProcess* process, const WslcContainerProcessIOCallbackOptions& options);
     ~IOCallback();
 
     void Cancel();
@@ -29,10 +29,10 @@ struct IOCallback
     static bool HasIOCallback(const WslcContainerProcessOptionsInternal* options);
     static bool HasIOCallback(const WslcContainerProcessIOCallbackOptions& options);
 
-    static wil::unique_handle GetIOHandle(IWSLAProcess* process, WslcProcessIOHandle ioHandle);
+    static wil::unique_handle GetIOHandle(IWSLCProcess* process, WslcProcessIOHandle ioHandle);
 
 private:
-    wil::com_ptr<IWSLAProcess> m_process;
+    wil::com_ptr<IWSLCProcess> m_process;
     std::unique_ptr<WslcContainerProcessIOCallbackOptions> m_callbackOptions;
     std::thread m_thread;
     wsl::windows::common::relay::MultiHandleWait m_io;

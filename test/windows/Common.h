@@ -108,17 +108,17 @@ using namespace std::chrono_literals;
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
-    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslasession.exe")
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslcsession.exe")
 
 #define WSL_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
         WSL_TEST_CLASS_PROPERTIES \
     END_TEST_CLASS()
 
-#define WSLA_TEST_CLASS(_name) \
+#define WSLC_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
         WSL_TEST_CLASS_PROPERTIES \
-        TEST_CLASS_PROPERTY(L"TestCategory", L"WSLA") \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"WSLC") \
     END_TEST_CLASS()
 
 //

@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "wslaservice.h"
+#include "wslc.h"
 #include "wslcsdkprivate.h"
 #include <winrt/base.h>
 
