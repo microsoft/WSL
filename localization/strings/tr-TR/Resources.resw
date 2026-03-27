@@ -960,6 +960,10 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>Güncelleştirme başarısız (çıkış kodu: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} bağımsız değişken almaz. Dağıtımın kaydını silmek için bunun yerine {} kullanın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Kaldırma başarısız oldu (çıkış kodu: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
