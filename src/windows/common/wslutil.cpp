@@ -411,13 +411,14 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     return newHandle;
 }
 
-[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle)
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess)
 {
     const wil::unique_handle caller = OpenCallingProcess(PROCESS_DUP_HANDLE);
     THROW_LAST_ERROR_IF(!caller);
 
     HANDLE newHandle;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(caller.get(), Handle, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(
+        caller.get(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return newHandle;
 }

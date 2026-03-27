@@ -1828,6 +1828,51 @@ class WSLCTests
             operation.Complete();
         }
     }
+
+    TEST_METHOD(SynchronousIoCancellation)
+    {
+        WSL2_TEST_ONLY();
+
+        // Create a blocked operation that will cause the service to get stuck on a ReadFile() call.
+        // Because the pipe handle that we're passing in doesn't support overlapped IO, the service will get stuck in a
+        // synchronous ReadFile() call. Validate that terminating the session correctly cancels the IO.
+
+        wil::unique_handle pipeRead;
+        wil::unique_handle pipeWrite;
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+        std::promise<HRESULT> result;
+
+        wil::unique_event testCompleted{wil::EventOptions::ManualReset};
+        std::thread operationThread([&]() {
+            result.set_value(m_defaultSession->ImportImage(HandleToULong(pipeRead.get()), "dummy:latest", nullptr, 1024 * 1024));
+
+            WI_ASSERT(testCompleted.is_signaled()); // Sanity check.
+        });
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+        // Write 4 bytes to validate that the service has started reading from the pipe (since the pipe buffer is 2).
+        DWORD bytesWritten{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+        testCompleted.SetEvent();
+
+        // N.B. It's not possible to deterministically wait for the service to be stuck in the ReadFile() call.
+        // It's possible that the service will check the session termination event before calling ReadFile() on the pipe
+        // but that's OK since we can also accept that error code here (E_ABORT).
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+        auto reset = ResetTestSession();
+
+        auto hr = result.get_future().get();
+        if (hr != E_ABORT && hr != HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED))
+        {
+            LogError("Unexpected result: 0x%08X", hr);
+            VERIFY_FAIL();
+        }
+    }
+
     TEST_METHOD(ExportContainer)
     {
         WSL2_TEST_ONLY();
