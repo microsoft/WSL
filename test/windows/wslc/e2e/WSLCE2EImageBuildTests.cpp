@@ -26,12 +26,13 @@ class WSLCE2EImageBuildTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         DeleteAllBuiltImages();
+        EnsureImageIsLoaded(DebianTestImage());
         return true;
     }
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
-        EnsureImageIsLoaded(DebianTestImage());
+        EnsureImageIsDeleted(DebianTestImage());
         DeleteAllBuiltImages();
         return true;
     }
@@ -45,7 +46,6 @@ class WSLCE2EImageBuildTests
     TEST_METHOD_CLEANUP(MethodCleanup)
     {
         DeleteAllBuiltImages();
-        EnsureImageIsDeleted(DebianTestImage());
         return true;
     }
 
@@ -62,7 +62,7 @@ class WSLCE2EImageBuildTests
         THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
 
         auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest:latest\nCMD [\"echo\", \"wslc-e2e-build-ok\"]\n");
+        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"wslc-e2e-build-ok\"]\n");
 
         auto buildResult = RunWslc(
             std::format(L"build \"{}\" -f \"{}\" -t {}", contextDir.wstring(), dockerfilePath.wstring(), BuiltImage.NameAndTag()));
