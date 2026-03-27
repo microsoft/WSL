@@ -563,7 +563,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             {
                 try
                 {
-                    RemainingContentLength = std::stoul(contentLength->value());
+                    RemainingContentLength = std::stoull(contentLength->value());
                 }
                 catch (const std::exception&)
                 {
