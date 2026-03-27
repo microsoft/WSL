@@ -540,8 +540,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_initProcessControl = nullptr;
     });
 
-    m_stoppedNotifiedEvent.ResetEvent();
-
     auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
 
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
@@ -564,8 +562,6 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 {
     if (event == ContainerEvent::Stop)
     {
-        m_stoppedNotifiedEvent.SetEvent();
-
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
 
         // If a Stop() call is in progress, provide the timestamp via the promise
@@ -575,6 +571,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             if (m_stopState.has_value())
             {
                 m_stopState->set_value(eventTime);
+                m_stopState.reset();
                 return;
             }
         }
@@ -582,18 +579,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
 
-        {
-            std::lock_guard processesLock{m_processesLock};
-
-            // Notify all processes that the container has exited.
-            // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
-            for (auto& process : m_processes)
-            {
-                process->OnContainerReleased();
-            }
-
-            m_processes.clear();
-        }
+        ReleaseProcesses();
 
         // Don't run the deletion logic if the container is already in a stopped / deleted state.
         // This can happen if Delete() is called by the user.
@@ -695,33 +681,13 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
 
     Transition(WslcContainerStateExited, stopTimestamp);
 
-    {
-        std::lock_guard processesLock{m_processesLock};
-
-        for (auto& process : m_processes)
-        {
-            process->OnContainerReleased();
-        }
-
-        m_processes.clear();
-    }
+    ReleaseProcesses();
 
     ReleaseRuntimeResources();
 
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
         DeleteExclusiveLockHeld(WSLCDeleteFlagsForce);
-    }
-    else
-    {
-        // Wait for the stop notification to arrive before returning.
-        // This is required so that a caller that Stops() and immediately calls Start() again doesn't see the container
-        // switch back to 'stopped' state due to the delayed event notification.
-
-        auto io = m_wslcSession.CreateIOContext();
-        io.AddHandle(std::make_unique<EventHandle>(m_stoppedNotifiedEvent.get()), MultiHandleWait::CancelOnCompleted);
-
-        io.Run({60s});
     }
 }
 
@@ -1467,6 +1433,20 @@ void WSLCContainerImpl::UnmapPorts()
         }
         CATCH_LOG();
     }
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseProcesses()
+{
+    std::lock_guard processesLock{m_processesLock};
+
+    // Notify all processes that the container has exited.
+    // The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
+    for (auto& process : m_processes)
+    {
+        process->OnContainerReleased();
+    }
+
+    m_processes.clear();
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeResources()
