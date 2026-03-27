@@ -352,6 +352,31 @@ class NetworkTests
         VERIFY_ARE_EQUAL(v6State.DefaultRoute->Device, L"eth0");
     }
 
+    TEST_METHOD(DefaultOnlinkRoutes)
+    {
+        wsl::shared::hns::Route defaultRouteV4;
+        defaultRouteV4.NextHop = L"0.0.0.0";
+        defaultRouteV4.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+        defaultRouteV4.Family = AF_INET;
+        defaultRouteV4.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        wsl::shared::hns::Route defaultRouteV6;
+        defaultRouteV6.NextHop = L"::";
+        defaultRouteV6.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
+        defaultRouteV6.Family = AF_INET6;
+        defaultRouteV6.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteExists =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
+        const bool defaultV6RouteExists =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
+
+        VERIFY_IS_TRUE(defaultV4RouteExists);
+        VERIFY_IS_TRUE(defaultV6RouteExists);
+    }
+
     TEST_METHOD(SetInterfaceDownAndUp)
     {
         WSL2_TEST_ONLY();

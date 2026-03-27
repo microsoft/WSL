@@ -278,7 +278,8 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
+            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
+            route.via.value().Addr().c_str(),
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
