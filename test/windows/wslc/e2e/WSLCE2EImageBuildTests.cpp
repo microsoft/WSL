@@ -21,7 +21,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EImageBuildTests
 {
-    WSLA_TEST_CLASS(WSLCE2EImageBuildTests)
+    WSLC_TEST_CLASS(WSLCE2EImageBuildTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {

@@ -960,6 +960,10 @@ Návrat k sítím NAT.</value>
     <value>Aktualizace se nezdařila (ukončovací kód: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} does not take any arguments. To unregister a distribution, use {} instead.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Odinstalování se nezdařilo (ukončovací kód: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1912,6 +1916,10 @@ Využití:
     <value>Relace nebyla nalezena: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageInvalidIp" xml:space="preserve">
+    <value>Neplatná IP adresa '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') selhalo</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1941,22 +1949,22 @@ Využití:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
-    <value>Unrecognized command: '{}'</value>
+    <value>Nerozpoznaný příkaz: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
-    <value>Required argument not provided: '{}'</value>
+    <value>Nebyl zadán požadovaný argument: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
-    <value>Argument provided more times than allowed: '{}'</value>
+    <value>Argument byl zadán víckrát, než je povoleno: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Zobrazí nápovědu k vybranému příkazu</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
-    <value>Multiple mutually exclusive arguments provided: '{}'</value>
+    <value>Bylo poskytnuto několik vzájemně se vylučujících argumentů: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
@@ -1964,7 +1972,7 @@ Využití:
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Usage" xml:space="preserve">
-    <value>Usage: {} {}</value>
+    <value>Využití: {} {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_Command" xml:space="preserve">
@@ -1992,17 +2000,17 @@ Využití:
     <value>Pokud chcete získat podrobnosti o konkrétním příkazu, předejte ho do argumentu help.</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Argument name was not recognized for the current command: '{}'</value>
+    <value>Nebyl rozpoznán název argumentu pro aktuální příkaz: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
     <value>K provedení tohoto příkazu je třeba mít oprávnění správce.</value>
   </data>
   <data name="WSLCCLI_SessionIdArgDescription" xml:space="preserve">
-    <value>Specify the session to use</value>
+    <value>Zadejte relaci, která se má použít</value>
   </data>
   <data name="WSLCCLI_AttachArgDescription" xml:space="preserve">
-    <value>Attach to stdout/stderr of the container</value>
+    <value>Připojení ke stdout/stderr kontejneru</value>
   </data>
   <data name="WSLCCLI_InteractiveArgDescription" xml:space="preserve">
     <value>Připojit ke stdin a ponechat jej otevřený</value>
@@ -2014,43 +2022,43 @@ Využití:
     <value>ID kontejneru</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
-    <value>Missing argument value: '{}'</value>
+    <value>Chybí hodnota argumentu: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Argument alias was not recognized for the current command: '{}'</value>
+    <value>Nebyl rozpoznán alias argumentu pro aktuální příkaz: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
-     <value>Invalid argument specifier: '{}'</value>
+     <value>Neplatný specifikátor argumentu: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
-     <value>Adjoined flag alias not found: '{}'</value>
+     <value>Nenašel se sousedící alias typu příznak: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
-     <value>Adjoined alias is not a flag: '{}'</value>
+     <value>Sousedící alias není příznak: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
-     <value>Invalid argument specifier: '{}'</value>
+     <value>Neplatný specifikátor argumentu: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
-     <value>Flag argument cannot contain adjoined value: '{}'</value>
+     <value>Argument příznaku nemůže obsahovat sousedící hodnotu: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
-     <value>Found a positional argument when none was expected: '{}'</value>
+     <value>Našel se poziční argument, i když nebyl očekáván: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Missing argument name at: '{}'</value>
+     <value>Chybí název argumentu v: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
-     <value>Failed to resolve forwarded arguments starting at argument: '{}'</value>
+     <value>Nepodařilo se vyřešit přesměrované argumenty počínaje argumentem: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
@@ -2062,20 +2070,36 @@ Využití:
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
-     <value>Copyright (c) Microsoft Corporation. All rights reserved.
-For privacy information about this product please visit https://aka.ms/privacy.</value>
+     <value>Copyright (c) Microsoft Corporation. Všechna práva vyhrazena.
+Informace o ochraně osobních údajů k tomuto produktu najdete na stránce https://aka.ms/privacy.</value>
      <comment>Copyright notice and privacy link</comment>
   </data>
   <data name="MessageWslaInvalidImage" xml:space="preserve">
     <value>Neplatný obrázek: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidContainerName" xml:space="preserve">
-    <value>Neplatný název kontejneru: '{}'</value>
+  <data name="MessageWslaInvalidName" xml:space="preserve">
+    <value>Invalid name: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Cesta není absolutní: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaVolumeNotFound" xml:space="preserve">
+    <value>Volume not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidVolumeOptions" xml:space="preserve">
+    <value>Invalid volume options: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidVolumeType" xml:space="preserve">
+    <value>Unsupported volume type: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaVolumeInUse" xml:space="preserve">
+    <value>Volume '{}' is in use.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

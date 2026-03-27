@@ -19,7 +19,7 @@ Abstract:
 #include <charconv>
 #include <format>
 #include <unordered_map>
-#include <wslaservice.h>
+#include <wslc.h>
 
 using namespace wsl::windows::common;
 using namespace wsl::shared::string;
@@ -35,7 +35,7 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
 
     case ArgType::Signal:
-        validation::ValidateWSLASignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
+        validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
 
     case ArgType::Time:
@@ -54,26 +54,26 @@ void Argument::Validate(const ArgMap& execArgs) const
 
 namespace wsl::windows::wslc::validation {
 
-// Map of signal names to WSLASignal enum values
-static const std::unordered_map<std::wstring, WSLASignal> SignalMap = {
-    {L"SIGHUP", WSLASignalSIGHUP},   {L"SIGINT", WSLASignalSIGINT},     {L"SIGQUIT", WSLASignalSIGQUIT},
-    {L"SIGILL", WSLASignalSIGILL},   {L"SIGTRAP", WSLASignalSIGTRAP},   {L"SIGABRT", WSLASignalSIGABRT},
-    {L"SIGIOT", WSLASignalSIGIOT},   {L"SIGBUS", WSLASignalSIGBUS},     {L"SIGFPE", WSLASignalSIGFPE},
-    {L"SIGKILL", WSLASignalSIGKILL}, {L"SIGUSR1", WSLASignalSIGUSR1},   {L"SIGSEGV", WSLASignalSIGSEGV},
-    {L"SIGUSR2", WSLASignalSIGUSR2}, {L"SIGPIPE", WSLASignalSIGPIPE},   {L"SIGALRM", WSLASignalSIGALRM},
-    {L"SIGTERM", WSLASignalSIGTERM}, {L"SIGTKFLT", WSLASignalSIGTKFLT}, {L"SIGCHLD", WSLASignalSIGCHLD},
-    {L"SIGCONT", WSLASignalSIGCONT}, {L"SIGSTOP", WSLASignalSIGSTOP},   {L"SIGTSTP", WSLASignalSIGTSTP},
-    {L"SIGTTIN", WSLASignalSIGTTIN}, {L"SIGTTOU", WSLASignalSIGTTOU},   {L"SIGURG", WSLASignalSIGURG},
-    {L"SIGXCPU", WSLASignalSIGXCPU}, {L"SIGXFSZ", WSLASignalSIGXFSZ},   {L"SIGVTALRM", WSLASignalSIGVTALRM},
-    {L"SIGPROF", WSLASignalSIGPROF}, {L"SIGWINCH", WSLASignalSIGWINCH}, {L"SIGIO", WSLASignalSIGIO},
-    {L"SIGPOLL", WSLASignalSIGPOLL}, {L"SIGPWR", WSLASignalSIGPWR},     {L"SIGSYS", WSLASignalSIGSYS},
+// Map of signal names to WSLCSignal enum values
+static const std::unordered_map<std::wstring, WSLCSignal> SignalMap = {
+    {L"SIGHUP", WSLCSignalSIGHUP},   {L"SIGINT", WSLCSignalSIGINT},     {L"SIGQUIT", WSLCSignalSIGQUIT},
+    {L"SIGILL", WSLCSignalSIGILL},   {L"SIGTRAP", WSLCSignalSIGTRAP},   {L"SIGABRT", WSLCSignalSIGABRT},
+    {L"SIGIOT", WSLCSignalSIGIOT},   {L"SIGBUS", WSLCSignalSIGBUS},     {L"SIGFPE", WSLCSignalSIGFPE},
+    {L"SIGKILL", WSLCSignalSIGKILL}, {L"SIGUSR1", WSLCSignalSIGUSR1},   {L"SIGSEGV", WSLCSignalSIGSEGV},
+    {L"SIGUSR2", WSLCSignalSIGUSR2}, {L"SIGPIPE", WSLCSignalSIGPIPE},   {L"SIGALRM", WSLCSignalSIGALRM},
+    {L"SIGTERM", WSLCSignalSIGTERM}, {L"SIGTKFLT", WSLCSignalSIGTKFLT}, {L"SIGCHLD", WSLCSignalSIGCHLD},
+    {L"SIGCONT", WSLCSignalSIGCONT}, {L"SIGSTOP", WSLCSignalSIGSTOP},   {L"SIGTSTP", WSLCSignalSIGTSTP},
+    {L"SIGTTIN", WSLCSignalSIGTTIN}, {L"SIGTTOU", WSLCSignalSIGTTOU},   {L"SIGURG", WSLCSignalSIGURG},
+    {L"SIGXCPU", WSLCSignalSIGXCPU}, {L"SIGXFSZ", WSLCSignalSIGXFSZ},   {L"SIGVTALRM", WSLCSignalSIGVTALRM},
+    {L"SIGPROF", WSLCSignalSIGPROF}, {L"SIGWINCH", WSLCSignalSIGWINCH}, {L"SIGIO", WSLCSignalSIGIO},
+    {L"SIGPOLL", WSLCSignalSIGPOLL}, {L"SIGPWR", WSLCSignalSIGPWR},     {L"SIGSYS", WSLCSignalSIGSYS},
 };
 
-void ValidateWSLASignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
+void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
 {
     for (const auto& value : values)
     {
-        std::ignore = GetWSLASignalFromString(value, argName);
+        std::ignore = GetWSLCSignalFromString(value, argName);
     }
 }
 
@@ -85,11 +85,11 @@ void ValidateVolumeMount(const std::vector<std::wstring>& values)
     }
 }
 
-// Convert string to WSLASignal enum - accepts either signal name (e.g., "SIGKILL") or number (e.g., "9")
-WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring& argName)
+// Convert string to WSLCSignal enum - accepts either signal name (e.g., "SIGKILL") or number (e.g., "9")
+WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName)
 {
-    constexpr int MIN_SIGNAL = WSLASignalSIGHUP;
-    constexpr int MAX_SIGNAL = WSLASignalSIGSYS;
+    constexpr int MIN_SIGNAL = WSLCSignalSIGHUP;
+    constexpr int MAX_SIGNAL = WSLCSignalSIGSYS;
     constexpr std::wstring_view sigPrefix = L"SIG";
 
     // Normalize input: ensure it has "SIG" prefix for map lookup
@@ -130,7 +130,7 @@ WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring
         throw ArgumentException(std::format(L"Invalid {} value: {} is out of valid range ({}-{}).", argName, input, MIN_SIGNAL, MAX_SIGNAL));
     }
 
-    return static_cast<WSLASignal>(signalValue);
+    return static_cast<WSLCSignal>(signalValue);
 }
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
