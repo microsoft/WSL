@@ -537,7 +537,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
         // Create hvsocket connection for DNS tunneling if enabled.
         wil::unique_socket dnsTunnelingSocket;
-        if (m_vmConfig.EnableDnsTunneling)
+        if (message->EnableDnsTunneling)
         {
             dnsTunnelingSocket = AcceptConnection(m_vmConfig.KernelBootTimeout);
         }
@@ -1555,8 +1555,8 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
-    // If using virtio-9p, enable SWIOTLB as a perf optimization (will cause VM to consume 64MB more memory).
-    if (m_vmConfig.EnableVirtio9p)
+    // If using virtio features, enable SWIOTLB as a perf optimization (will cause VM to consume 64MB more memory).
+    if (m_vmConfig.EnableVirtio9p || m_vmConfig.EnableVirtioFs || m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
     {
         kernelCmdLine += L" swiotlb=force";
     }
@@ -1931,9 +1931,7 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
 
 bool WslCoreVm::IsDnsTunnelingSupported() const
 {
-    WI_ASSERT(
-        m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored ||
-        m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy);
+    WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored);
 
     return SUCCEEDED_LOG(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
 }
