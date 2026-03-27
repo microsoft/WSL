@@ -206,7 +206,7 @@ UserSettings::UserSettings() : UserSettings(SettingsDir())
 
 UserSettings::UserSettings(const std::filesystem::path& settingsDir)
 {
-    m_settingsPath = settingsDir / L"UserSettings.yaml";
+    m_settingsPath = settingsDir / L"settings.yaml";
 
     auto root = TryLoadYaml(m_settingsPath, m_warnings);
     if (root.has_value())

@@ -95,7 +95,7 @@ struct SettingsMap : wsl::windows::wslc::EnumBasedVariantMap<Setting, details::S
 enum class UserSettingsType
 {
     Default,  // Settings file did not exist or failed to parse; built-in defaults are used.
-    Standard, // Settings file (UserSettings.yaml) loaded successfully.
+    Standard, // Settings file (settings.yaml) loaded successfully.
 };
 
 struct Warning
@@ -106,7 +106,7 @@ struct Warning
 
 // Singleton that owns the parsed settings for the current process lifetime.
 // Load order:
-//   1. UserSettings.yaml  (Standard)
+//   1. settings.yaml  (Standard)
 //   2. Built-in defaults  (Default, if the file is absent or fails to parse)
 class UserSettings
 {

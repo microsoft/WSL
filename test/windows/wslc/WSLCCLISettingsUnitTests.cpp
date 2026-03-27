@@ -134,7 +134,7 @@ class WSLCCLISettingsUnitTests
     {
         auto dir = UniqueTempDir();
         WriteFile(
-            dir / L"UserSettings.yaml",
+            dir / L"settings.yaml",
             "session:\n"
             "  cpuCount: 8\n"
             "  memorySize: 4GB\n"
@@ -156,7 +156,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(LoadSettings_EmptySettings_AllDefaultsNoWarnings)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "");
+        WriteFile(dir / L"settings.yaml", "");
 
         UserSettingsTest s{dir};
 
@@ -170,7 +170,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(LoadSettings_InvalidSettings_YieldsDefaultTypeWithWarning)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session: [\n"); // broken YAML (unclosed flow seq)
+        WriteFile(dir / L"settings.yaml", "session: [\n"); // broken YAML (unclosed flow seq)
 
         UserSettingsTest s{dir};
 
@@ -187,7 +187,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_CpuCount_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  cpuCount: 0\n");
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: 0\n");
 
         UserSettingsTest s{dir};
 
@@ -200,7 +200,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_MemoryMb_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  memorySize: 0\n");
+        WriteFile(dir / L"settings.yaml", "session:\n  memorySize: 0\n");
 
         UserSettingsTest s{dir};
 
@@ -212,7 +212,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_StorageSizeMb_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  maxStorageSize: 0\n");
+        WriteFile(dir / L"settings.yaml", "session:\n  maxStorageSize: 0\n");
 
         UserSettingsTest s{dir};
 
@@ -225,7 +225,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_WrongType_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  cpuCount: \"not-a-number\"\n");
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: \"not-a-number\"\n");
 
         UserSettingsTest s{dir};
 
@@ -237,7 +237,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_StoragePath_NonEmpty_RoundTrips)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  defaultStoragePath: \"C:\\\\TestFolder\"\n");
+        WriteFile(dir / L"settings.yaml", "session:\n  defaultStoragePath: \"C:\\\\TestFolder\"\n");
 
         UserSettingsTest s{dir};
 
@@ -249,7 +249,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_StoragePath_Empty_IsValid)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n  defaultStoragePath: \"\"\n");
+        WriteFile(dir / L"settings.yaml", "session:\n  defaultStoragePath: \"\"\n");
 
         UserSettingsTest s{dir};
 
@@ -261,7 +261,7 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(Validation_AbsentKeys_NoWarningsAndDefaults)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session:\n");
+        WriteFile(dir / L"settings.yaml", "session:\n");
 
         UserSettingsTest s{dir};
 
@@ -277,7 +277,7 @@ class WSLCCLISettingsUnitTests
     {
         auto dir = UniqueTempDir();
         WriteFile(
-            dir / L"UserSettings.yaml",
+            dir / L"settings.yaml",
             "session:\n"
             "  cpuCount: 4\n"
             "  unknownSetting: 99\n"
