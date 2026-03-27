@@ -23,4 +23,49 @@
     </ItemDefinitionGroup>
 
     <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
+
+    <!-- ================================================================== -->
+    <!-- C++ specific: Write .tlog files for VS Fast Up-to-Date Check       -->
+    <!-- ================================================================== -->
+
+    <Target Name="_WslcWriteAllTlogs"
+            AfterTargets="WslcBuildAllImages"
+            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != ''">
+
+        <MSBuild Projects="$(MSBuildProjectFullPath)"
+                 Targets="_WslcWriteSingleTlog"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSources=%(WslcImage.Sources);_WslcOutput=%(WslcImage.Output);_WslcTlogDir=$(TLogLocation)" />
+    </Target>
+
+    <Target Name="_WslcWriteSingleTlog">
+        <ItemGroup>
+            <_WslcTlogInputs Include="$(_WslcDockerfile);$(_WslcSources)" />
+        </ItemGroup>
+
+        <PropertyGroup>
+            <_WslcDockerfileFullPath>$([System.IO.Path]::GetFullPath('$(_WslcDockerfile)'))</_WslcDockerfileFullPath>
+            <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(IntDir)wslc_$(_WslcName).marker'))</_WslcMarkerFullPath>
+        </PropertyGroup>
+
+        <WriteLinesToFile
+            File="$(_WslcTlogDir)wslc.$(_WslcName).read.1.tlog"
+            Lines="^$(_WslcDockerfileFullPath);@(_WslcTlogInputs->'%(FullPath)')"
+            Overwrite="true"
+            Encoding="Unicode" />
+
+        <WriteLinesToFile
+            File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
+            Lines="^$(_WslcDockerfileFullPath);$(_WslcMarkerFullPath)"
+            Overwrite="true"
+            Encoding="Unicode" />
+    </Target>
+
+    <!-- Clean tlog files -->
+    <Target Name="_WslcCleanTlogs"
+            AfterTargets="WslcClean"
+            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != ''">
+        <Delete Files="$(TLogLocation)wslc.%(WslcImage.Identity).read.1.tlog" />
+        <Delete Files="$(TLogLocation)wslc.%(WslcImage.Identity).write.1.tlog" />
+    </Target>
+
 </Project>

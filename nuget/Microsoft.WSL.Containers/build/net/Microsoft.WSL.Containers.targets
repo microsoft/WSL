@@ -11,4 +11,13 @@
 
     <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
 
+    <!-- ================================================================== -->
+    <!-- C# specific: CPS Up-to-Date Check for container source files       -->
+    <!-- ================================================================== -->
+
+    <ItemGroup Condition="'$(UsingMicrosoftNETSdk)' == 'true'">
+        <UpToDateCheckInput Include="%(WslcImage.Sources)" />
+        <UpToDateCheckBuilt Include="$(IntDir)wslc_%(WslcImage.Identity).marker" />
+    </ItemGroup>
+
 </Project>
