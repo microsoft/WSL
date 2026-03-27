@@ -30,7 +30,7 @@ using namespace WEX::TestExecution;
 namespace WSLCCLICommandUnitTests {
 class WSLCCLICommandUnitTests
 {
-    WSL_TEST_CLASS(WSLCCLICommandUnitTests)
+    WSLA_TEST_CLASS(WSLCCLICommandUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

@@ -33,7 +33,7 @@ using namespace WEX::TestExecution;
 namespace WSLCCLIArgumentUnitTests {
 class WSLCCLIArgumentUnitTests
 {
-    WSL_TEST_CLASS(WSLCCLIArgumentUnitTests)
+    WSLA_TEST_CLASS(WSLCCLIArgumentUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {

@@ -280,8 +280,12 @@ void WSLAVirtualMachine::Initialize()
     // Configure networking
     ConfigureNetworking();
 
-    // Configure initial mounts
-    ConfigureInitialMounts();
+    // Mount VHDs
+    const auto rootDevice = GetVhdDevicePath(0);
+    Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);
+
+    const auto modulesDevice = GetVhdDevicePath(1);
+    Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     // Configure GPU mounts if enabled
     MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
@@ -326,28 +330,6 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     {
         e->OnVmTerminated();
     }
-}
-
-void WSLAVirtualMachine::ConfigureInitialMounts()
-{
-    // Determine device paths from guest
-    const auto rootDevice = GetVhdDevicePath(0);
-    const auto modulesDevice = GetVhdDevicePath(1);
-
-    // Mount root filesystem with overlay
-    Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);
-
-    // Mount standard filesystems
-    Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
-    Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
-    Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
-    Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
-
-    // Mount kernel modules
-    Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
-
-    // Mount cgroup
-    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
 }
 
 void WSLAVirtualMachine::ConfigureNetworking()
@@ -489,6 +471,15 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     detachOnFailure.release();
 
     return {Lun, Device};
+}
+
+void WSLAVirtualMachine::Ext4Format(const std::string& Device)
+{
+    constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
+    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
+    auto result = launcher.Launch(*this).WaitAndCaptureOutput();
+
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 }
 
 void WSLAVirtualMachine::Unmount(_In_ const char* Path)
