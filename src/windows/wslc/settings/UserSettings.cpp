@@ -36,17 +36,24 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Number of virtual CPUs allocated to the session (default: 4)\n"
     "  # cpuCount: 4\n"
     "\n"
-    "  # Memory limit for the session in megabytes (default: 2048)\n"
-    "  # memorySizeMb: 2048\n"
+    "  # Memory limit for the session in megabytes (default: 2GB)\n"
+    "  # memorySize: 2GB\n"
     "\n"
-    "  # Maximum disk image size in megabytes (default: 100000)\n"
-    "  # maxStorageSizeMb: 100000\n"
+    "  # Maximum disk image size in megabytes (default: 100GB)\n"
+    "  # maxStorageSize: 100GB\n"
     "\n"
     "  # Default path for container storage (default: %LocalAppData%\\wslc\\storage)\n"
     "  # defaultStoragePath: \"\"\n";
 
 // Validate individual setting specializations
 namespace details {
+
+    std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
+    {
+        auto parsed = wsl::shared::string::ParseMemorySize(value.c_str());
+        auto converted = parsed.has_value() ? *parsed / 1048576 : 0; // To Mb, and anything less than 1Mb is considered invalid.
+        return converted > 0 ? std::optional{static_cast<uint32_t>(converted)} : std::nullopt;
+    }
 
 #define WSLC_VALIDATE_SETTING(_setting_) \
     std::optional<SettingMapping<Setting::_setting_>::value_t> SettingMapping<Setting::_setting_>::Validate( \
@@ -59,12 +66,12 @@ namespace details {
 
     WSLC_VALIDATE_SETTING(SessionMemoryMb)
     {
-        return value > 0 ? std::optional{value} : std::nullopt;
+        return ParseSettingsMemoryValue(value);
     }
 
     WSLC_VALIDATE_SETTING(SessionStorageSizeMb)
     {
-        return value > 0 ? std::optional{value} : std::nullopt;
+        return ParseSettingsMemoryValue(value);
     }
 
     // yaml_t = std::string (UTF-8 from yaml-cpp), value_t = std::wstring
@@ -156,12 +163,13 @@ namespace {
         std::ifstream stream(path);
         if (!stream.is_open())
         {
+            auto err = errno;
             // If the file exists but cannot be opened (permissions, sharing violation, etc.),
             // emit a warning so the user understands why settings were ignored.
-            if (std::filesystem::exists(path))
+            if (err != ENOENT)
             {
                 warnings.push_back(
-                    {std::format(L"Warning: '{}' exists but could not be opened. Settings will be ignored.", path.filename().wstring()), {}});
+                    {std::format(L"Warning: Failed to open '{}', errno: {}. Using default settings.", path.filename().wstring(), err), {}});
             }
 
             return std::nullopt;
@@ -171,23 +179,17 @@ namespace {
         {
             return YAML::Load(stream);
         }
-        catch (const YAML::Exception& e)
+        catch (const std::exception& e)
         {
             warnings.push_back(
                 {std::format(L"Warning: '{}' could not be parsed: {}.", path.filename().wstring(), MultiByteToWide(e.what())), {}});
-            return std::nullopt;
-        }
-        catch (...)
-        {
-            warnings.push_back({std::format(L"Warning: '{}' could not be parsed.", path.filename().wstring()), {}});
             return std::nullopt;
         }
     }
 
     const std::filesystem::path& SettingsDir()
     {
-        static const std::filesystem::path dir =
-            wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\settings";
+        static const std::filesystem::path dir = wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc";
         return dir;
     }
 } // namespace

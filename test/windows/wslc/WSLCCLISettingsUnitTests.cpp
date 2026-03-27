@@ -137,8 +137,8 @@ class WSLCCLISettingsUnitTests
             dir / L"UserSettings.yaml",
             "session:\n"
             "  cpuCount: 8\n"
-            "  memorySizeMb: 4096\n"
-            "  maxStorageSizeMb: 20000\n");
+            "  memorySize: 4GB\n"
+            "  maxStorageSize: 20000MB\n");
 
         UserSettingsTest s{dir};
 
@@ -208,7 +208,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
-    // maxStorageSizeMb: 0 must be rejected; the default (100000) is used.
+    // maxStorageSize: 0 must be rejected; the default (100GB) is used.
     TEST_METHOD(Validation_StorageSizeMb_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
@@ -216,7 +216,7 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(100000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
