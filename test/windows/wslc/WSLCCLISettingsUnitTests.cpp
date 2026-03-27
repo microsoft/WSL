@@ -107,10 +107,10 @@ class WSLCCLISettingsUnitTests
     }
 
     // -----------------------------------------------------------------------
-    // Default (neither file exists)
+    // Default (setting file missing)
     // -----------------------------------------------------------------------
 
-    // When neither primary nor backup exists the type must be Default, there
+    // When settings file missing, the type must be Default, there
     // must be no warnings, and all values must be at their built-in defaults.
     TEST_METHOD(LoadSettings_NoFiles_YieldsDefaultTypeAndNoWarnings)
     {
@@ -125,12 +125,12 @@ class WSLCCLISettingsUnitTests
     }
 
     // -----------------------------------------------------------------------
-    // Standard (valid primary)
+    // Standard (valid settings)
     // -----------------------------------------------------------------------
 
-    // A well-formed primary file must set the type to Standard with no
+    // A well-formed settings file must set the type to Standard with no
     // warnings and the specified values loaded.
-    TEST_METHOD(LoadSettings_ValidPrimary_YieldsStandardTypeAndValues)
+    TEST_METHOD(LoadSettings_ValidSettings_YieldsStandardTypeAndValues)
     {
         auto dir = UniqueTempDir();
         WriteFile(
@@ -151,9 +151,9 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
     }
 
-    // An empty primary file is valid YAML (null document); all settings use
+    // An empty settings file is valid YAML (null document); all settings use
     // their defaults with no warnings.
-    TEST_METHOD(LoadSettings_EmptyPrimary_AllDefaultsNoWarnings)
+    TEST_METHOD(LoadSettings_EmptySettings_AllDefaultsNoWarnings)
     {
         auto dir = UniqueTempDir();
         WriteFile(dir / L"UserSettings.yaml", "");
@@ -166,50 +166,16 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(100000u, s.Get<Setting::SessionStorageSizeMb>());
     }
 
-    // -----------------------------------------------------------------------
-    // Backup fallback
-    // -----------------------------------------------------------------------
-
-    // When the primary exists but fails to parse, the backup file is used and
-    // the type is Backup.
-    TEST_METHOD(LoadSettings_InvalidPrimary_ValidBackup_YieldsBackupType)
+    // When the settings file fails to parse, the type is Default and a warning is emitted.
+    TEST_METHOD(LoadSettings_InvalidSettings_YieldsDefaultTypeWithWarning)
     {
         auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", "session: [\n"); // broken YAML
-        WriteFile(dir / L"UserSettings.yaml.bak", "session:\n  cpuCount: 2\n");
-
-        UserSettingsTest s{dir};
-
-        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Backup), static_cast<int>(s.GetType()));
-        VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
-        VERIFY_ARE_EQUAL(2u, s.Get<Setting::SessionCpuCount>());
-    }
-
-    // When the primary is absent and only the backup exists, the type is Backup.
-    TEST_METHOD(LoadSettings_NoPrimary_ValidBackup_YieldsBackupType)
-    {
-        auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml.bak", "session:\n  memorySizeMb: 1024\n");
-
-        UserSettingsTest s{dir};
-
-        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Backup), static_cast<int>(s.GetType()));
-        VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
-        VERIFY_ARE_EQUAL(1024u, s.Get<Setting::SessionMemoryMb>());
-    }
-
-    // When both files fail to parse, the type is Default and at least one
-    // warning is emitted per parse failure.
-    TEST_METHOD(LoadSettings_BothInvalid_YieldsDefaultTypeWithWarnings)
-    {
-        auto dir = UniqueTempDir();
-        WriteFile(dir / L"UserSettings.yaml", ": bad: [\n");       // broken YAML (unclosed flow seq)
-        WriteFile(dir / L"UserSettings.yaml.bak", "session: [\n"); // broken YAML (unclosed flow seq)
+        WriteFile(dir / L"UserSettings.yaml", "session: [\n"); // broken YAML (unclosed flow seq)
 
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
-        VERIFY_IS_TRUE(s.GetWarnings().size() >= 2u);
+        VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
         VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
     }
 

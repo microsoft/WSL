@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Implementation of UserSettings — YAML loading, validation, and fallback logic.
+    Implementation of UserSettings — YAML loading and validation.
 
 --*/
 #include "UserSettings.h"
@@ -204,24 +204,12 @@ UserSettings::UserSettings() : UserSettings(SettingsDir())
 
 UserSettings::UserSettings(const std::filesystem::path& settingsDir)
 {
-    m_primaryPath = settingsDir / L"UserSettings.yaml";
-    m_backupPath = settingsDir / L"UserSettings.yaml.bak";
+    m_settingsPath = settingsDir / L"UserSettings.yaml";
 
-    // Try the primary file first.
-    auto root = TryLoadYaml(m_primaryPath, m_warnings);
+    auto root = TryLoadYaml(m_settingsPath, m_warnings);
     if (root.has_value())
     {
         m_type = UserSettingsType::Standard;
-    }
-    else
-    {
-        // Primary missing or failed — try the backup.
-        root = TryLoadYaml(m_backupPath, m_warnings);
-        if (root.has_value())
-        {
-            m_type = UserSettingsType::Backup;
-            m_warnings.push_back({L"Warning: UserSettings.yaml could not be loaded. Using backup settings.", {}});
-        }
     }
 
     if (root.has_value())
@@ -241,38 +229,24 @@ UserSettings::UserSettings(const std::filesystem::path& settingsDir)
 
 void UserSettings::Reset() const
 {
-    std::filesystem::create_directories(m_primaryPath.parent_path());
-    std::ofstream file(m_primaryPath);
+    std::filesystem::create_directories(m_settingsPath.parent_path());
+    std::ofstream file(m_settingsPath);
     THROW_HR_IF_MSG(E_UNEXPECTED, !file.is_open(), "Failed to create settings file");
     file << s_DefaultSettingsTemplate;
 }
 
 void UserSettings::PrepareToShellExecuteFile() const
 {
-    if (m_type == UserSettingsType::Standard)
-    {
-        // Valid settings loaded — back them up before the user edits.
-        std::filesystem::copy_file(m_primaryPath, m_backupPath, std::filesystem::copy_options::overwrite_existing);
-    }
-    else if (m_type == UserSettingsType::Default)
+    if (m_type == UserSettingsType::Default)
     {
         // First run — create the directory and write the commented-out defaults template.
         Reset();
-    }
-    else if (m_type == UserSettingsType::Backup)
-    {
-        // Reset to defaults only when primary file does not exist. Otherwise, give
-        // user the chance to continue working on their incomplete settings.
-        if (!std::filesystem::exists(m_primaryPath))
-        {
-            Reset();
-        }
     }
 }
 
 std::filesystem::path UserSettings::SettingsFilePath() const
 {
-    return m_primaryPath;
+    return m_settingsPath;
 }
 
 } // namespace wsl::windows::wslc::settings

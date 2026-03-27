@@ -94,9 +94,8 @@ struct SettingsMap : wsl::windows::wslc::EnumBasedVariantMap<Setting, details::S
 // Indicates which source the settings were loaded from.
 enum class UserSettingsType
 {
-    Default,  // Neither settings file existed (first run); built-in defaults are used.
-    Standard, // Primary file (UserSettings.yaml) loaded successfully.
-    Backup,   // Primary file failed to parse; backup file (UserSettings.yaml.bak) was used.
+    Default,  // Settings file did not exist or failed to parse; built-in defaults are used.
+    Standard, // Settings file (UserSettings.yaml) loaded successfully.
 };
 
 struct Warning
@@ -108,8 +107,7 @@ struct Warning
 // Singleton that owns the parsed settings for the current process lifetime.
 // Load order:
 //   1. UserSettings.yaml  (Standard)
-//   2. UserSettings.yaml.bak  (Backup, if primary fails)
-//   3. Built-in defaults  (Default, if both fail; no warning if neither file exists)
+//   2. Built-in defaults  (Default, if the file is absent or fails to parse)
 class UserSettings
 {
 public:
@@ -137,13 +135,12 @@ public:
     }
 
     // Called before opening the settings file in an editor.
-    // - If type is Standard: copies the primary file to the backup path.
-    // - If type is Default:  creates the primary file from the commented-out defaults template.
+    // If type is Default, creates the file from the commented-out defaults template.
     void PrepareToShellExecuteFile() const;
 
     std::filesystem::path SettingsFilePath() const;
 
-    // Overwrites the primary settings file with the commented-out defaults template.
+    // Overwrites the settings file with the commented-out defaults template.
     void Reset() const;
 
 protected:
@@ -158,8 +155,7 @@ private:
     SettingsMap m_settings;
     std::vector<Warning> m_warnings;
     UserSettingsType m_type = UserSettingsType::Default;
-    std::filesystem::path m_primaryPath;
-    std::filesystem::path m_backupPath;
+    std::filesystem::path m_settingsPath;
 };
 
 // Convenience free function — returns the singleton instance.
