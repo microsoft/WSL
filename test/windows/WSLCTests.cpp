@@ -4669,6 +4669,66 @@ class WSLCTests
         runTest({"3\r\nfoo\r\n3\r\nbar\r\n0", "\r\n\r\n"}, {"foo", "bar"});
     }
 
+    TEST_METHOD(WriteHandleContent)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that writing to a pipe works as expected.
+        {
+            const std::string expectedData = "Pipe-test";
+            std::vector<char> writeBuffer{expectedData.begin(), expectedData.end()};
+
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            std::string readData;
+            wsl::windows::common::relay::MultiHandleWait io;
+
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
+                std::move(readPipe), [&](const gsl::span<char>& buffer) { readData.append(buffer.data(), buffer.size()); }));
+
+            io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), writeBuffer));
+
+            io.Run({});
+
+            VERIFY_ARE_EQUAL(expectedData, readData);
+        }
+
+        // Validate that writing to files work as expected.
+        // Use a large buffer to make sure that overlapped writes correctly handle offsets.
+        {
+            constexpr size_t fileSize = 50 * 1024 * 1024;
+
+            std::vector<char> writeBuffer(fileSize);
+            for (size_t i = 0; i < fileSize; i++)
+            {
+                writeBuffer[i] = static_cast<char>(i % 251);
+            }
+
+            auto outputFile = wil::create_new_file(L"write-handle-test", GENERIC_WRITE | GENERIC_READ, 0, nullptr);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                outputFile.reset();
+                std::filesystem::remove("write-handle-test");
+            });
+
+            wsl::windows::common::relay::MultiHandleWait io;
+            io.AddHandle(std::make_unique<WriteHandle>(outputFile.get(), writeBuffer));
+            io.Run({});
+
+            VERIFY_ARE_NOT_EQUAL(SetFilePointer(outputFile.get(), 0, nullptr, FILE_BEGIN), INVALID_SET_FILE_POINTER);
+
+            LARGE_INTEGER size{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetFileSizeEx(outputFile.get(), &size));
+            VERIFY_ARE_EQUAL(static_cast<long long>(fileSize), size.QuadPart);
+
+            std::vector<char> readBuffer(fileSize);
+            DWORD bytesRead = 0;
+            VERIFY_IS_TRUE(ReadFile(outputFile.get(), readBuffer.data(), static_cast<DWORD>(fileSize), &bytesRead, nullptr));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(fileSize), bytesRead);
+            VERIFY_IS_TRUE(readBuffer == writeBuffer);
+        }
+    }
+
     TEST_METHOD(DockerIORelay)
     {
         using namespace wsl::windows::common::relay;
