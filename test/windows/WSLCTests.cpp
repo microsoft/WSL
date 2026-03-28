@@ -4683,8 +4683,12 @@ class WSLCTests
             std::string readData;
             wsl::windows::common::relay::MultiHandleWait io;
 
-            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(
-                std::move(readPipe), [&](const gsl::span<char>& buffer) { readData.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadHandle>(std::move(readPipe), [&](const gsl::span<char>& buffer) {
+                if (!buffer.empty())
+                {
+                    readData.append(buffer.data(), buffer.size());
+                }
+            }));
 
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), writeBuffer));
 
@@ -4704,7 +4708,7 @@ class WSLCTests
                 writeBuffer[i] = static_cast<char>(i % 251);
             }
 
-            auto outputFile = wil::create_new_file(L"write-handle-test", GENERIC_WRITE | GENERIC_READ, 0, nullptr);
+            auto outputFile = wil::open_or_create_file(L"write-handle-test", GENERIC_WRITE | GENERIC_READ, 0, nullptr);
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 outputFile.reset();
