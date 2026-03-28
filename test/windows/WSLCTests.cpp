@@ -120,7 +120,7 @@ class WSLCTests
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
-        settings.MaximumStorageSizeMb = 4096; // 4GB.
+        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB.
         settings.NetworkingMode = networkingMode;
 
         return settings;
@@ -452,7 +452,6 @@ class WSLCTests
 
             if (!ExpectedTag.has_value())
             {
-
                 wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
@@ -483,11 +482,31 @@ class WSLCTests
         };
 
         validatePull("ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30", {});
-
         validatePull("ubuntu", "ubuntu:latest");
         validatePull("debian:bookworm", "debian:bookworm");
+        validatePull("pytorch/pytorch", "pytorch/pytorch:latest");
+        validatePull("registry.k8s.io/pause:3.2", "registry.k8s.io/pause:3.2");
 
-        // TODO: Add test coverage with custom registries once supported.
+        // Validate that PullImage() fails appropriately when the session runs out of space.
+        {
+            auto settings = GetDefaultSessionSettings(L"wslc-pull-image-out-of-space", false);
+            settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+            settings.MemoryMb = 1024;
+            auto session = CreateSession(settings);
+
+            VERIFY_ARE_EQUAL(session->PullImage("pytorch/pytorch", nullptr, nullptr), E_FAIL);
+
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+
+            // The error message can't be compared directly because it contains an unpredicable path:
+            // "write /var/lib/docker/tmp/GetImageBlob1760660623: no space left on device"
+            if (StrStrW(comError->Message.get(), L"no space left on device") == nullptr)
+            {
+                LogError("Unexpected error message: %ls", comError->Message.get());
+                VERIFY_FAIL();
+            }
+        }
     }
 
     TEST_METHOD(ListImages)
@@ -6032,11 +6051,37 @@ class WSLCTests
         ValidateImageParsing("pytorch/pytorch", "pytorch/pytorch", {});
 
         // Invalid inputs
+        VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":debian:latest"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("debian:latest@"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(""); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage("a:"); }), E_INVALIDARG);
         VERIFY_ARE_EQUAL(wil::ResultFromException([]() { ParseImage(":b"); }), E_INVALIDARG);
+    }
+
+    TEST_METHOD(RepoParsing)
+    {
+        using wsl::windows::common::wslutil::NormalizeRepo;
+
+        auto ValidateRepoParsing = [](const std::string& input, const std::string& expectedServer, const std::string& expectedPath) {
+            auto [server, path] = NormalizeRepo(input);
+            VERIFY_ARE_EQUAL(server, expectedServer);
+            VERIFY_ARE_EQUAL(path, expectedPath);
+        };
+
+        ValidateRepoParsing("ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("docker.io/ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("index.docker.io/ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("index.docker.io/library/ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("docker.io/library/ubuntu", "docker.io", "library/ubuntu");
+        ValidateRepoParsing("microsoft.com/ubuntu", "microsoft.com", "ubuntu");
+        ValidateRepoParsing("microsoft.com:80/ubuntu", "microsoft.com:80", "ubuntu");
+        ValidateRepoParsing("microsoft.com:80/ubuntu/foo/bar", "microsoft.com:80", "ubuntu/foo/bar");
+        ValidateRepoParsing("127.0.0.1:80/ubuntu/foo/bar", "127.0.0.1:80", "ubuntu/foo/bar");
+        ValidateRepoParsing("pytorch/pytorch", "docker.io", "pytorch/pytorch");
+        ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "path");
+        ValidateRepoParsing(
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80", "path");
     }
 };

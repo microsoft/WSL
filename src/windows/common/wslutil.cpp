@@ -1074,6 +1074,44 @@ std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
     return pids;
 }
 
+std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo(const std::string& Input)
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
+
+    constexpr auto defaultDomain = "docker.io";
+    constexpr auto officialPrefix = "library/";
+    constexpr auto legacyDomain = "index.docker.io";
+    constexpr auto localhost = "localhost";
+
+    auto slash = Input.find('/');
+    if (slash == std::string::npos)
+    {
+        return {defaultDomain, officialPrefix + Input};
+    }
+
+    auto domain = Input.substr(0, slash);
+    auto path = Input.substr(slash + 1);
+
+    if (domain == legacyDomain)
+    {
+        domain = defaultDomain;
+    }
+    else if (domain != localhost && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, [](unsigned char e) {
+                 return std::isupper(e);
+             }))
+    {
+        domain = defaultDomain;
+        path = Input;
+    }
+
+    if (domain == defaultDomain && path.find('/') == std::string::npos)
+    {
+        path = "library/" + path;
+    }
+
+    return {domain, path};
+}
+
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
 {
     // Default to 4096 byte buffer, just like CreatePipe().
