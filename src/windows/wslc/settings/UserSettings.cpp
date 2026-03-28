@@ -51,7 +51,7 @@ namespace details {
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
     {
         auto parsed = wsl::shared::string::ParseMemorySize(value.c_str());
-        auto converted = parsed.has_value() ? *parsed / 1048576 : 0; // To Mb, and anything less than 1Mb is considered invalid.
+        auto converted = parsed.has_value() ? *parsed / _1MB : 0; // To Mb, and anything less than 1Mb is considered invalid.
         return converted > 0 ? std::optional{static_cast<uint32_t>(converted)} : std::nullopt;
     }
 
@@ -239,7 +239,7 @@ void UserSettings::Reset() const
 
 void UserSettings::PrepareToShellExecuteFile() const
 {
-    if (m_type == UserSettingsType::Default)
+    if (m_type == UserSettingsType::Default && !std::filesystem::exists(m_settingsPath))
     {
         // First run — create the directory and write the commented-out defaults template.
         Reset();
