@@ -7,19 +7,18 @@ public interface IWslConfigService
     IWslConfigSetting GetWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting = false);
 
     /// <summary>
-    /// Sets a WSL config value in the in-memory working snapshot. Pending state is computed by diffing that working snapshot
-    /// against a baseline captured at startup/last commit; values are only written to disk on <see cref="CommitPendingChanges"/>.
+    /// Stages a config value change in memory. The value is only written to disk when
+    /// <see cref="CommitPendingChanges"/> is called.
     /// </summary>
     uint SetWslConfigSetting(IWslConfigSetting setting);
 
     /// <summary>
-    /// Indicates whether the working snapshot differs from the baseline snapshot (i.e., whether there are pending changes).
+    /// True when there are in-app changes that have not yet been committed to disk.
     /// </summary>
     bool HasPendingChanges { get; }
 
     /// <summary>
-    /// Returns the diff (baseline vs working) for all entries that differ.
-    /// Throws if snapshots are not fully hydrated (fail-fast rather than silently skipping).
+    /// Returns pending changes as (entry, new value) pairs for UI display.
     /// </summary>
     IReadOnlyList<WslConfigPendingChange> GetPendingChanges();
     uint CommitPendingChanges();
@@ -32,8 +31,7 @@ public interface IWslConfigService
 public sealed class WslConfigPendingChange
 {
     public WslConfigEntry ConfigEntry { get; init; }
-    public required IWslConfigSetting CurrentSetting { get; init; }
-    public required IWslConfigSetting PendingSetting { get; init; }
+    public required object PendingValue { get; init; }
 }
 
 public interface IWslConfigSetting

@@ -1,6 +1,5 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
-using System.Linq;
 using WslSettings.Contracts.Services;
 using static WslSettings.Contracts.Services.IWslConfigService;
 
@@ -13,10 +12,9 @@ public class WslConfigService : IWslConfigService
     private readonly object? _wslCoreConfigInterfaceLockObj = null;
     private FileSystemWatcher? _wslConfigFileSystemWatcher = null;
 
-    // We keep two copies of every config value: _baselineSnapshot has what's on disk,
-    // _workingSnapshot has the user's in-app edits. Comparing the two tells us what changed.
-    private readonly Dictionary<WslConfigEntry, WslConfigSettingManaged> _baselineSnapshot = new();
-    private readonly Dictionary<WslConfigEntry, WslConfigSettingManaged> _workingSnapshot = new();
+    // Pending changes: stores only entries the user has changed in-app but not yet committed.
+    // Values are plain managed objects (bool, int, ulong, string, or enum) — no native clones needed.
+    private readonly Dictionary<WslConfigEntry, object> _pendingValues = new();
 
     public WslConfigService()
     {
@@ -33,25 +31,16 @@ public class WslConfigService : IWslConfigService
         _wslConfigFileSystemWatcher.Renamed += OnWslConfigFileChanged;
 
         _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
-
-        // Read all current config values into both snapshots so they start in sync
-        lock (_wslCoreConfigInterfaceLockObj!)
-        {
-            RefreshSnapshots_NoLock();
-        }
     }
 
     ~WslConfigService()
     {
-        DisposeSnapshot(_baselineSnapshot);
-        DisposeSnapshot(_workingSnapshot);
         WslCoreConfigInterface.FreeWslConfig(_wslConfig);
         WslCoreConfigInterface.FreeWslConfig(_wslConfigDefaults);
     }
 
     public IWslConfigSetting GetWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting)
     {
-        // Default settings (for reset buttons) come straight from the native defaults config
         if (defaultSetting)
         {
             return GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: true);
@@ -59,8 +48,15 @@ public class WslConfigService : IWslConfigService
 
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            var workingSettingValue = GetConfigSettingValueFromSnapshot(_workingSnapshot, wslConfigEntry, nameof(_workingSnapshot));
-            return workingSettingValue.Clone();
+            if (_pendingValues.TryGetValue(wslConfigEntry, out var pendingValue))
+            {
+                // Build a native setting from the pending managed value for the caller
+                var setting = GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: false);
+                setting.SetValueDirect(pendingValue);
+                return setting;
+            }
+
+            return GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: false);
         }
     }
 
@@ -72,24 +68,39 @@ public class WslConfigService : IWslConfigService
             throw new ArgumentNullException(nameof(wslConfigSetting));
         }
 
-        bool pendingChanged;
+        bool pendingStateChanged;
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            // Track whether pending state toggles so we can show/hide the Apply button
-            var hadPendingBefore = HasPendingChanges_NoLock();
+            var hadPendingBefore = _pendingValues.Count > 0;
 
-            // Replace the old value in the working snapshot with the new one.
-            // We clone to avoid sharing the same native object with the caller.
-            if (_workingSnapshot.TryGetValue(settingManaged.ConfigEntry, out var existingSettingValue))
+            var persisted = GetPersistedWslConfigSetting(settingManaged.ConfigEntry, defaultSetting: false);
+            try
             {
-                existingSettingValue.ConfigSetting.Dispose();
-            }
-            _workingSnapshot[settingManaged.ConfigEntry] = settingManaged.Clone();
+                bool isChanged = !persisted.Equals(settingManaged.GetValueAsObject());
 
-            pendingChanged = hadPendingBefore != HasPendingChanges_NoLock();
+                if (isChanged)
+                {
+                    _pendingValues[settingManaged.ConfigEntry] = settingManaged.GetValueAsObject();
+                }
+                else
+                {
+                    _pendingValues.Remove(settingManaged.ConfigEntry);
+                }
+            }
+            finally
+            {
+                persisted.ConfigSetting.Dispose();
+            }
+
+            var hasPendingAfter = _pendingValues.Count > 0;
+            pendingStateChanged = hadPendingBefore != hasPendingAfter;
         }
 
-        OnPendingChangesChanged(pendingChanged);
+        if (pendingStateChanged)
+        {
+            _onPendingChangesChangedHandler?.Invoke();
+        }
+
         return 0;
     }
 
@@ -99,7 +110,7 @@ public class WslConfigService : IWslConfigService
         {
             lock (_wslCoreConfigInterfaceLockObj!)
             {
-                return HasPendingChanges_NoLock();
+                return _pendingValues.Count > 0;
             }
         }
     }
@@ -108,71 +119,78 @@ public class WslConfigService : IWslConfigService
     {
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            return EnumeratePendingChanges_NoLock().ToList();
+            var changes = new List<WslConfigPendingChange>(_pendingValues.Count);
+            foreach (var (entry, value) in _pendingValues)
+            {
+                changes.Add(new WslConfigPendingChange
+                {
+                    ConfigEntry = entry,
+                    PendingValue = value,
+                });
+            }
+            return changes;
         }
     }
 
     public uint CommitPendingChanges()
     {
         uint result = 0;
-        bool pendingStateChanged = false;
 
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            var pendingChanges = EnumeratePendingChanges_NoLock().ToList();
-            if (pendingChanges.Count == 0)
+            if (_pendingValues.Count == 0)
             {
                 return 0;
             }
 
-            var hadPendingBefore = HasPendingChanges_NoLock();
             _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
             try
             {
-                foreach (var change in pendingChanges)
+                var committed = new List<WslConfigEntry>();
+                foreach (var (entry, value) in _pendingValues)
                 {
-                    result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, ((WslConfigSettingManaged)change.PendingSetting).ConfigSetting);
+                    var setting = GetPersistedWslConfigSetting(entry, defaultSetting: false);
+                    try
+                    {
+                        setting.SetValueDirect(value);
+                        result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, setting.ConfigSetting);
+                    }
+                    finally
+                    {
+                        setting.ConfigSetting.Dispose();
+                    }
+
                     if (result != 0)
                     {
                         break;
                     }
+
+                    committed.Add(entry);
                 }
 
                 ReloadConfig_NoLock();
+
                 if (result == 0)
                 {
-                    // Full success - reset both snapshots from disk
-                    RefreshSnapshots_NoLock();
+                    _pendingValues.Clear();
                 }
                 else
                 {
-                    // Partial failure - only refresh baseline so successfully-applied
-                    // entries drop out of pending, but unapplied entries remain.
-                    RefreshBaselineSnapshot_NoLock();
+                    // Partial failure - only remove successfully-committed entries
+                    // so unapplied entries remain pending.
+                    foreach (var entry in committed)
+                    {
+                        _pendingValues.Remove(entry);
+                    }
                 }
-
-                var hasPendingAfter = HasPendingChanges_NoLock();
-                // This controls whether the Apply button appears or disappears in the UI
-                pendingStateChanged = hadPendingBefore != hasPendingAfter;
             }
             finally
             {
-                foreach (var change in pendingChanges)
-                {
-                    ((WslConfigSettingManaged)change.CurrentSetting).ConfigSetting.Dispose();
-                    ((WslConfigSettingManaged)change.PendingSetting).ConfigSetting.Dispose();
-                }
-
                 _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
             }
         }
 
-        if (pendingStateChanged)
-        {
-            _onPendingChangesChangedHandler?.Invoke();
-        }
-
-        // Always raise config-changed when we write to disk (even partial)
+        _onPendingChangesChangedHandler?.Invoke();
         _onWslConfigChangedHandler?.Invoke();
         return result;
     }
@@ -205,28 +223,23 @@ public class WslConfigService : IWslConfigService
 
     private void OnWslConfigFileChanged(object sender, FileSystemEventArgs e)
     {
-        bool pendingStateChanged;
+        bool hadPending;
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            // Someone edited .wslconfig outside the app — reload and reset both snapshots.
-            // Any in-app pending changes are dropped.
-            var hadPendingBefore = HasPendingChanges_NoLock();
+            hadPending = _pendingValues.Count > 0;
             _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
             try
             {
                 ReloadConfig_NoLock();
-                RefreshSnapshots_NoLock();
+                _pendingValues.Clear();
             }
             finally
             {
                 _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
             }
-
-            var hasPendingAfter = HasPendingChanges_NoLock();
-            pendingStateChanged = hadPendingBefore != hasPendingAfter;
         }
 
-        if (pendingStateChanged)
+        if (hadPending)
         {
             _onPendingChangesChangedHandler?.Invoke();
         }
@@ -239,108 +252,6 @@ public class WslConfigService : IWslConfigService
         return new WslConfigSettingManaged(WslCoreConfigInterface.GetWslConfigSetting(defaultSetting ? _wslConfigDefaults : _wslConfig, wslConfigEntry));
     }
 
-    // Fire the PendingChangesChanged event only when the pending state actually toggled.
-    private void OnPendingChangesChanged(bool raiseEvent)
-    {
-        if (raiseEvent)
-        {
-            _onPendingChangesChangedHandler?.Invoke();
-        }
-    }
-
-    // Every WslConfigEntry value (excluding the sentinel NoEntry), cached once so we don't re-enumerate the enum each time.
-    private static readonly IReadOnlyList<WslConfigEntry> AllConfigEntries =
-        Enum.GetValues(typeof(WslConfigEntry))
-            .Cast<WslConfigEntry>()
-            .Where(entry => entry != WslConfigEntry.NoEntry)
-            .ToList();
-
-    // Free the native memory behind each setting in a snapshot and clear the dictionary.
-    private static void DisposeSnapshot(IDictionary<WslConfigEntry, WslConfigSettingManaged> snapshot)
-    {
-        foreach (var setting in snapshot.Values)
-        {
-            setting?.ConfigSetting?.Dispose();
-        }
-        snapshot.Clear();
-    }
-
-    // Look up an entry in a snapshot. Both snapshots are populated with every entry at startup,
-    // so a missing key means something went wrong during initialization.
-    private static WslConfigSettingManaged GetConfigSettingValueFromSnapshot(IDictionary<WslConfigEntry, WslConfigSettingManaged> snapshot, WslConfigEntry entry, string snapshotName)
-    {
-        if (!snapshot.TryGetValue(entry, out var setting) || setting is null)
-        {
-            throw new InvalidOperationException($"Snapshot '{snapshotName}' missing entry '{entry}'. This should never happen — snapshots are populated for every entry at startup.");
-        }
-        return setting;
-    }
-
-    // Re-read every config value from disk into both snapshots.
-    // After this, baseline == working, so there are no pending changes.
-    private void RefreshSnapshots_NoLock()
-    {
-        DisposeSnapshot(_baselineSnapshot);
-        DisposeSnapshot(_workingSnapshot);
-        foreach (var entry in AllConfigEntries)
-        {
-            var persisted = GetPersistedWslConfigSetting(entry, defaultSetting: false);
-            _baselineSnapshot[entry] = persisted;
-            _workingSnapshot[entry] = persisted.Clone();
-        }
-    }
-
-    // Re-read only the baseline snapshot from disk, leaving the working snapshot intact.
-    // Used on partial commit failure so successfully-applied entries drop out of pending
-    // while unapplied entries remain.
-    private void RefreshBaselineSnapshot_NoLock()
-    {
-        DisposeSnapshot(_baselineSnapshot);
-        foreach (var entry in AllConfigEntries)
-        {
-            _baselineSnapshot[entry] = GetPersistedWslConfigSetting(entry, defaultSetting: false);
-        }
-    }
-
-    // Walk every entry and check if the user's in-app value differs from what's on disk.
-    private bool HasPendingChanges_NoLock()
-    {
-        foreach (var entry in AllConfigEntries)
-        {
-            var baseline = GetConfigSettingValueFromSnapshot(_baselineSnapshot, entry, nameof(_baselineSnapshot));
-            var working = GetConfigSettingValueFromSnapshot(_workingSnapshot, entry, nameof(_workingSnapshot));
-
-            if (!baseline.Equals(working))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    // Same as HasPendingChanges_NoLock but returns the actual before/after values for each changed entry.
-    // Used to build the list shown in the Apply dialog.
-    private IEnumerable<WslConfigPendingChange> EnumeratePendingChanges_NoLock()
-    {
-        foreach (var entry in AllConfigEntries)
-        {
-            var baseline = GetConfigSettingValueFromSnapshot(_baselineSnapshot, entry, nameof(_baselineSnapshot));
-            var working = GetConfigSettingValueFromSnapshot(_workingSnapshot, entry, nameof(_workingSnapshot));
-
-            if (!baseline.Equals(working))
-            {
-                    yield return new WslConfigPendingChange
-                    {
-                        ConfigEntry = entry,
-                        CurrentSetting = baseline.Clone(),
-                        PendingSetting = working.Clone(),
-                    };
-            }
-        }
-    }
-
-    // Re-read .wslconfig from disk. Called before RefreshSnapshots_NoLock to pick up external edits.
     private void ReloadConfig_NoLock()
     {
         WslCoreConfigInterface.FreeWslConfig(_wslConfig);
@@ -369,58 +280,7 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
     public NetworkingConfiguration NetworkingConfigurationValue { get { return ConfigSetting.NetworkingConfigurationValue; } }
     public MemoryReclaimMode MemoryReclaimModeValue { get { return ConfigSetting.MemoryReclaimModeValue; } }
 
-    public WslConfigSettingManaged Clone()
-    {
-        var nativeInternal = new WslConfigSetting.__Internal();
-        nativeInternal.ConfigEntry = ConfigSetting.ConfigEntry;
-        switch (ConfigSetting.ConfigEntry.GetValueKind())
-        {
-        case WslConfigValueKind.String:
-            // Create via the managed clone constructor so string memory is owned
-            var clone = WslConfigSetting.__CreateInstance(nativeInternal);
-            var stringValue = ConfigSetting.StringValue;
-            if (stringValue is not null)
-            {
-                clone.StringValue = stringValue;
-            }
-            return new WslConfigSettingManaged(clone);
-        case WslConfigValueKind.Int32:
-            nativeInternal.Int32Value = ConfigSetting.Int32Value;
-            break;
-        case WslConfigValueKind.UInt64:
-            nativeInternal.UInt64Value = ConfigSetting.UInt64Value;
-            break;
-        case WslConfigValueKind.NetworkingConfiguration:
-            nativeInternal.NetworkingConfigurationValue = ConfigSetting.NetworkingConfigurationValue;
-            break;
-        case WslConfigValueKind.MemoryReclaimMode:
-            nativeInternal.MemoryReclaimModeValue = ConfigSetting.MemoryReclaimModeValue;
-            break;
-        default:
-            nativeInternal.BoolValue = (byte)(ConfigSetting.BoolValue ? 1 : 0);
-            break;
-        }
-
-        return new WslConfigSettingManaged(WslConfigSetting.__CreateInstance(nativeInternal));
-    }
-
-    // Exact value comparison used by snapshot diffing (HasPendingChanges / EnumeratePendingChanges).
-    public bool Equals(WslConfigSettingManaged other)
-    {
-        if (other is null)
-        {
-            return false;
-        }
-
-        if (ConfigSetting.ConfigEntry != other.ConfigSetting.ConfigEntry)
-        {
-            return false;
-        }
-
-        return Equals(other.GetValueAsObject());
-    }
-
-    private object GetValueAsObject()
+    public object GetValueAsObject()
     {
         switch (ConfigSetting.ConfigEntry.GetValueKind())
         {
@@ -436,6 +296,32 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
                 return ConfigSetting.MemoryReclaimModeValue;
             default:
                 return ConfigSetting.BoolValue;
+        }
+    }
+
+    // Apply a plain managed value to the native setting without going through the service.
+    public void SetValueDirect(object value)
+    {
+        switch (ConfigSetting.ConfigEntry.GetValueKind())
+        {
+            case WslConfigValueKind.String:
+                ConfigSetting.StringValue = (string)value;
+                break;
+            case WslConfigValueKind.Int32:
+                ConfigSetting.Int32Value = (int)value;
+                break;
+            case WslConfigValueKind.UInt64:
+                ConfigSetting.UInt64Value = (ulong)value;
+                break;
+            case WslConfigValueKind.NetworkingConfiguration:
+                ConfigSetting.NetworkingConfigurationValue = (NetworkingConfiguration)value;
+                break;
+            case WslConfigValueKind.MemoryReclaimMode:
+                ConfigSetting.MemoryReclaimModeValue = (MemoryReclaimMode)value;
+                break;
+            default:
+                ConfigSetting.BoolValue = (bool)value;
+                break;
         }
     }
 

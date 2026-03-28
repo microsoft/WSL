@@ -24,7 +24,7 @@ internal static class SettingsApplyHelper
         var changeLines = new List<string>(pendingChanges.Count);
         foreach (var change in pendingChanges)
         {
-            changeLines.Add($"- {GetSettingDisplayName(change.ConfigEntry)}: {FormatSettingValue(change.PendingSetting)}");
+            changeLines.Add($"- {GetSettingDisplayName(change.ConfigEntry)}: {FormatValue(change.ConfigEntry, change.PendingValue)}");
         }
 
         var contentText = string.Join(Environment.NewLine, changeLines);
@@ -163,31 +163,29 @@ internal static class SettingsApplyHelper
             { WslConfigEntry.KernelModulesPath, "Settings_CustomKernelModulesPath/Header" },
         };
 
-    private static string FormatSettingValue(IWslConfigSetting setting)
+    private static string FormatValue(WslConfigEntry entry, object value)
     {
-        switch (setting.ConfigEntry.GetValueKind())
+        switch (entry.GetValueKind())
         {
             case WslConfigValueKind.UInt64:
-                return string.Format("Settings_MegabyteStringFormat".GetLocalized(), setting.UInt64Value / Constants.MB);
+                return string.Format("Settings_MegabyteStringFormat".GetLocalized(), (ulong)value / Constants.MB);
             case WslConfigValueKind.Int32:
-                switch (setting.ConfigEntry)
+                switch (entry)
                 {
-                    case WslConfigEntry.ProcessorCount:
-                        return setting.Int32Value.ToString();
                     case WslConfigEntry.InitialAutoProxyTimeout:
                     case WslConfigEntry.VMIdleTimeout:
-                        return string.Format("Settings_MillisecondsStringFormat".GetLocalized(), setting.Int32Value);
+                        return string.Format("Settings_MillisecondsStringFormat".GetLocalized(), (int)value);
                     default:
-                        return setting.Int32Value.ToString();
+                        return ((int)value).ToString();
                 }
             case WslConfigValueKind.String:
-                return setting.StringValue ?? string.Empty;
+                return (string?)value ?? string.Empty;
             case WslConfigValueKind.NetworkingConfiguration:
-                return FormatEnum(setting.NetworkingConfigurationValue);
+                return FormatEnum((NetworkingConfiguration)value);
             case WslConfigValueKind.MemoryReclaimMode:
-                return FormatEnum(setting.MemoryReclaimModeValue);
+                return FormatEnum((MemoryReclaimMode)value);
             default:
-                return FormatBool(setting.BoolValue);
+                return FormatBool((bool)value);
         }
     }
 
