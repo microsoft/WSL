@@ -80,6 +80,24 @@ namespace details {
         return MultiByteToWide(value);
     }
 
+    WSLC_VALIDATE_SETTING(SessionNetworkingMode)
+    {
+        if (value == "none")
+        {
+            return WSLCNetworkingModeNone;
+        }
+        else if (value == "nat")
+        {
+            return WSLCNetworkingModeNAT;
+        }
+        else if (value == "virtionet")
+        {
+            return WSLCNetworkingModeVirtioProxy;
+        }
+
+        return std::nullopt;
+    }
+
 #undef WSLC_VALIDATE_SETTING
 
 } // namespace details
