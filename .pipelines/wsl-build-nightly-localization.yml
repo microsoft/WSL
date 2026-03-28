@@ -18,7 +18,7 @@ schedules:
   always: true
 
 variables:
-  targetBranch: ${{ variables['Build.SourceBranchName'] }}
+  targetBranch: $(Build.SourceBranchName)
 
 pool:
   vmImage: 'windows-latest'
