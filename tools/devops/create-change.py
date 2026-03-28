@@ -45,9 +45,7 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
             'base': target_branch
         }
 
-        print(f'PR request body: {json.dumps(body)}')
         response = requests.post(f'https://api.github.com/repos/{REPO}/pulls', headers=headers, data=json.dumps(body), timeout=30)
-        print(f'GitHub API response ({response.status_code}): {response.text}')
         response.raise_for_status()
 
         print(f'Created pull request: {response.json()["html_url"]}')
