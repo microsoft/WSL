@@ -707,13 +707,12 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
 
     try
     {
-        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteImageFlagsForce));
+        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
-    ReleaseResources();
-
     Transition(WslcContainerStateDeleted);
+    ReleaseResources();
 }
 
 void WSLCContainerImpl::Export(ULONG OutHandle) const
@@ -1457,6 +1456,13 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DisconnectComWrap
 {
     if (m_comWrapper)
     {
+        // Cache read-only properties in the COM wrapper before disconnecting,
+        // so callers can still query state/process after the impl is gone.
+        {
+            std::lock_guard processesLock{m_processesLock};
+            m_comWrapper->CacheState(m_id, m_name, m_state, m_initProcess);
+        }
+
         m_comWrapper->Disconnect();
         m_comWrapper.Reset();
     }
@@ -1496,6 +1502,16 @@ HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, UL
 HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 {
     COMServiceExecutionContext context;
+    RETURN_HR_IF_NULL(E_POINTER, Result);
+
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedState.has_value())
+        {
+            *Result = m_cachedState.value();
+            return S_OK;
+        }
+    }
 
     *Result = WslcContainerStateInvalid;
     return CallImpl(&WSLCContainerImpl::GetState, Result);
@@ -1506,6 +1522,15 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
     COMServiceExecutionContext context;
 
     *Process = nullptr;
+
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedInitProcess)
+        {
+            return m_cachedInitProcess.CopyTo(__uuidof(IWSLCProcess), (void**)Process);
+        }
+    }
+
     return CallImpl(&WSLCContainerImpl::GetInitProcess, Process);
 }
 
@@ -1557,6 +1582,21 @@ try
 }
 CATCH_RETURN();
 
+void WSLCContainer::CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
+try
+{
+    auto cacheLock = m_cacheLock.lock_exclusive();
+
+    // CacheState must only be called once, during DisconnectComWrapper().
+    WI_ASSERT(!m_cachedState.has_value());
+
+    m_cachedId = id;
+    m_cachedName = name;
+    m_cachedState = state;
+    m_cachedInitProcess = initProcess;
+}
+CATCH_LOG();
+
 HRESULT WSLCContainer::Export(ULONG OutHandle)
 {
     COMServiceExecutionContext context;
@@ -1580,6 +1620,15 @@ try
 {
     COMServiceExecutionContext context;
 
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedId.has_value())
+        {
+            WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), m_cachedId->c_str()) == 0);
+            return S_OK;
+        }
+    }
+
     auto [lock, impl] = LockImpl();
     WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), impl->ID().c_str()) == 0);
 
@@ -1592,7 +1641,17 @@ try
 {
     COMServiceExecutionContext context;
 
+    RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
+
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedName.has_value())
+        {
+            *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
+            return S_OK;
+        }
+    }
 
     auto [lock, impl] = LockImpl();
 
