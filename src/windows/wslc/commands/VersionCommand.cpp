@@ -28,6 +28,7 @@ std::wstring VersionCommand::LongDescription() const
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
+    UNREFERENCED_PARAMETER(context);
     wsl::windows::common::wslutil::PrintMessage(std::format(L"{} v{}", s_ExecutableName, WSL_PACKAGE_VERSION));
 }
 } // namespace wsl::windows::wslc
