@@ -15,7 +15,7 @@ Abstract:
 
 #include "SessionModel.h"
 #include "ImageModel.h"
-#include <wsla_schema.h>
+#include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
 class ImageService
@@ -32,7 +32,7 @@ public:
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
-    static wsl::windows::common::wsla_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
+    static wsl::windows::common::wslc_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     void Push();
     void Save();

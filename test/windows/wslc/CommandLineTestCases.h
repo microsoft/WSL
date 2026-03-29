@@ -115,6 +115,9 @@ COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"version", L"version", true)
 COMMAND_LINE_TEST_CASE(L"version --help", L"version", true)
 COMMAND_LINE_TEST_CASE(L"version extraarg", L"version", false)
+// Settings command
+COMMAND_LINE_TEST_CASE(L"settings", L"settings", true)
+COMMAND_LINE_TEST_CASE(L"settings reset", L"reset", true)
 
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
