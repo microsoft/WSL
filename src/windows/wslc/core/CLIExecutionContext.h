@@ -39,8 +39,16 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     // instead of the HRESULT, enabling `wslc run ... && echo success` patterns.
     std::optional<int> ExitCode;
 
-    // Event signaled when the user presses Ctrl-C. Long-running operations can pass
-    // this to COM APIs that accept a CancelEvent handle.
-    wil::unique_event CancelEvent{wil::EventOptions::ManualReset};
+    // Event signaled when the user presses Ctrl-C. Starts null; long-running operations
+    // that support cancellation create it via CreateCancelEvent() before passing it to
+    // COM APIs that accept a CancelEvent handle.
+    wil::unique_event CancelEvent;
+
+    HANDLE CreateCancelEvent()
+    {
+        WI_ASSERT(!CancelEvent);
+        CancelEvent.create(wil::EventOptions::ManualReset);
+        return CancelEvent.get();
+    }
 };
 } // namespace wsl::windows::wslc::execution

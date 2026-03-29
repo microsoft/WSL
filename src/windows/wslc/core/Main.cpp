@@ -50,13 +50,17 @@ try
 
     // Register a console control handler so Ctrl-C signals the cancel event.
     // This allows long-running operations (e.g. image build) to be cancelled.
-    // The static is required because SetConsoleCtrlHandler only accepts function pointers.
-    static HANDLE s_cancelEvent = context.CancelEvent.get();
+    // The static pointer is required because SetConsoleCtrlHandler only accepts function pointers.
+    // CancelEvent starts null; when a task creates it, the handler picks it up automatically.
+    static auto& s_cancelEvent = context.CancelEvent;
     auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
         if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT)
         {
-            SetEvent(s_cancelEvent);
-            return TRUE;
+            if (s_cancelEvent && !s_cancelEvent.is_signaled())
+            {
+                s_cancelEvent.SetEvent();
+                return TRUE;
+            }
         }
         return FALSE;
     };
@@ -107,7 +111,7 @@ try
         result = wil::ResultFromCaughtException();
 
         // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
-        if (context.CancelEvent.is_signaled())
+        if (context.CancelEvent && context.CancelEvent.is_signaled())
         {
             fwprintf(stderr, L"\nCancelled.\n");
             return 1;

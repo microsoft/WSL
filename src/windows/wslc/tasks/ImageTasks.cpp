@@ -51,7 +51,7 @@ void BuildImage(CLIExecutionContext& context)
     bool verbose = context.Args.Contains(ArgType::Verbose);
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CancelEvent.get());
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
