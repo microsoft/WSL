@@ -44,6 +44,12 @@ class WSLCE2EGlobalTests
         RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_VersionCommand)
+    {
+        WSL2_TEST_ONLY();
+        RunWslcAndVerify(L"version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
 private:
     std::wstring GetHelpMessage() const
     {
@@ -54,6 +60,11 @@ private:
                << GetAvailableCommands() //
                << GetAvailableOptions();
         return output.str();
+    }
+
+    std::wstring GetVersionMessage() const
+    {
+        return std::format(L"wslc v{}\r\n", WSL_PACKAGE_VERSION);
     }
 
     std::wstring GetDescription() const

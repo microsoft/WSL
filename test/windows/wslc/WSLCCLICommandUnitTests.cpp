@@ -116,6 +116,8 @@ class WSLCCLICommandUnitTests
     {
         auto cmd = VersionCommand(L"wslc");
         VERIFY_ARE_EQUAL(0u, cmd.GetArguments().size());
+        // Test out that auto added help command is the only one
+        VERIFY_ARE_EQUAL(1u, cmd.GetAllArguments().size());
     }
 
     // Test: Verify RootCommand contains VersionCommand as a subcommand
