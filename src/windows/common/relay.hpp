@@ -361,6 +361,7 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer;
+    LARGE_INTEGER Offset{};
 };
 
 template <typename TRead = ReadHandle>
