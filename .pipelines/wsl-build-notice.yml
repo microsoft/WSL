@@ -4,7 +4,7 @@ trigger:
     - master
 
 variables:
-  targetBranch: ${{ variables['Build.SourceBranchName'] }}
+  targetBranch: $[ replace(variables['Build.SourceBranch'], 'refs/heads/', '') ]
 
 pool:
     vmImage: 'windows-latest'
