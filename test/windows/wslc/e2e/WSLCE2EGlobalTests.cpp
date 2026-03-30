@@ -60,8 +60,10 @@ class WSLCE2EGlobalTests
         auto guidStr = wsl::shared::string::GuidToString<wchar_t>(sessionGuid, wsl::shared::string::GuidToStringFlags::None);
         const auto sessionName = std::format(L"wslc-test-{}", guidStr.substr(0, 8));
 
-        // Create a test session with VirtioProxy mode so it can pull images and create containers.
-        auto session = TestSession::Create(sessionName, WSLCNetworkingModeVirtioProxy);
+        auto session = TestSession::Create(sessionName);
+
+        // Load the Debian image into the test session to avoid hitting Docker Hub rate limits.
+        EnsureImageIsLoaded(DebianTestImage(), session.Name());
 
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"container list --session INVALID_SESSION_NAME");

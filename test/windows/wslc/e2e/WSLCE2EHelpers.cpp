@@ -311,9 +311,15 @@ void EnsureImageIsDeleted(const TestImage& image)
     }
 }
 
-void EnsureImageIsLoaded(const TestImage& image)
+void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    auto result = RunWslc(L"image list");
+    std::wstring listCommand = L"image list";
+    if (!sessionName.empty())
+    {
+        listCommand = std::format(L"image list --session \"{}\"", sessionName);
+    }
+
+    auto result = RunWslc(listCommand);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -326,7 +332,13 @@ void EnsureImageIsLoaded(const TestImage& image)
     }
 
     // Image not found, load it
-    auto loadResult = RunWslc(std::format(L"image load --input {}", image.Path.wstring()));
+    std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
+    if (!sessionName.empty())
+    {
+        loadCommand = std::format(L"image load --input \"{}\" --session \"{}\"", image.Path.wstring(), sessionName);
+    }
+
+    auto loadResult = RunWslc(loadCommand);
     loadResult.Verify({.Stderr = L"", .ExitCode = 0});
 }
 } // namespace WSLCE2ETests

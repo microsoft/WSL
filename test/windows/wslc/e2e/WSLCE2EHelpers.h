@@ -137,7 +137,7 @@ wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring&
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
-void EnsureImageIsLoaded(const TestImage& image);
+void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 
