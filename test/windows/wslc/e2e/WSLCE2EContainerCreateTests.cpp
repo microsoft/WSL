@@ -868,16 +868,12 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        // The container attach prompt is different for the first prompt.
-        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
         const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
 
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // The container attach prompt appears twice.
-        session.ExpectStdout(expectedAttachPrompt);
-        session.ExpectStdout(expectedAttachPrompt);
+        session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
         session.ExpectCommandEcho("echo hello");
