@@ -21,7 +21,7 @@ set(SOURCES
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
     main.rc
-    ${CMAKE_CURRENT_BINARY_DIR}/../mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wsleventschema.rc
+    ${CMAKE_CURRENT_BINARY_DIR}/../mc/${TARGET_PLATFORM}/wsleventschema.rc
     application.manifest)
 
 set(HEADERS

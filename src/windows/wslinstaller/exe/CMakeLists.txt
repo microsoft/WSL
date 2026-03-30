@@ -8,7 +8,7 @@ set (HEADERS
      WslInstallerFactory.h
      WslInstaller.h)
 
-include_directories(${CMAKE_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+include_directories(${CMAKE_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM})
 
 add_executable(wslinstaller ${SOURCES} ${HEADERS})
 add_dependencies(wslinstaller wslinstalleridl)

@@ -1,9 +1,9 @@
 function(build_linux_objects sources headers)
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM})
 
     foreach(e ${sources})
         cmake_path(GET e FILENAME object_name)
-        set(object "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/${object_name}.o")
+        set(object "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${object_name}.o")
         set(objects ${objects} ${object})
 
         if("${e}" MATCHES "^.*\.c$")
@@ -28,7 +28,7 @@ function(build_linux_objects sources headers)
 endfunction()
 
 function(add_linux_library_impl target sources headers add_sources)
-    set(ar_output "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/${target}.a")
+    set(ar_output "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/${target}.a")
 
     build_linux_objects("${sources}" "${headers}")
 
@@ -60,8 +60,8 @@ endfunction()
 
 
 function(add_linux_executable target sources headers libraries)
-    set(output "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/${target}")
-    set(output_unstripped "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/${target}.unstripped")
+    set(output "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/${target}")
+    set(output_unstripped "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/${target}.unstripped")
 
     build_linux_objects("${sources}" "${headers}")
 
@@ -73,12 +73,12 @@ function(add_linux_executable target sources headers libraries)
         # Executables need to depend on both the target and the underlying library file, so that
         # the libraries target get analyzed for changes, and the executable gets linked again if the .a files changed.
         list(APPEND lib_targets "lib${e}")
-        list(APPEND lib_files "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/lib${e}.a")
+        list(APPEND lib_files "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/lib${e}.a")
     endforeach()
 
     if (NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set(stripped_output "${output}")
-        set(output "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/${target}.debug")
+        set(output "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/${target}.debug")
         add_custom_command(
             OUTPUT ${stripped_output}
             COMMAND ${LLVM_INSTALL_DIR}/llvm-strip.exe "${output}" -o "${stripped_output}"

@@ -1,5 +1,5 @@
 function(add_idl target idl_files_with_proxy idl_files_no_proxy)
-    set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+    set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_PLATFORM})
     file(MAKE_DIRECTORY ${OUTPUT_DIR})
     set(TARGET_OUTPUTS)
 

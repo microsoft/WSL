@@ -2,7 +2,7 @@ function(add_mc target mc_file)
 
     cmake_path(GET mc_file STEM MC_NAME)
 
-    set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}\\${TARGET_PLATFORM}\\${CMAKE_BUILD_TYPE})
+    set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}\\${TARGET_PLATFORM})
     set(RC_FILE ${OUTPUT_DIR}/${MC_NAME}.rc)
     set(HEADER_FILE ${OUTPUT_DIR}/${MC_NAME}.h)
 

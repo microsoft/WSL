@@ -8,7 +8,7 @@ endif()
 add_appx_target(msixinstallerpackage
                 "${DEPENDENCIES}"
                 "${CMAKE_CURRENT_LIST_DIR}/AppxManifest.in"
-                "${BIN}/installer.msix"
+                "${BIN_OUTPUT}/installer.msix"
                 "wsl;wslinstaller;msipackage;wslinstallerproxystub")
 
 set(ARM64_BUNDLE_PATH ${CMAKE_SOURCE_DIR}/bin/arm64/${CMAKE_BUILD_TYPE}/installer.msix)

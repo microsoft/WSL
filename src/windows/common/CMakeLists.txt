@@ -128,4 +128,4 @@ add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
-target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM})

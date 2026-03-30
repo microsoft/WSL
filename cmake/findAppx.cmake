@@ -30,7 +30,7 @@ function(add_appx_target target binaries manifest_in output_package dependencies
     file(CREATE_LINK ${PROJECT_SOURCE_DIR}/localization/strings ${PACKAGE_LAYOUT}/Strings SYMBOLIC)
 
     foreach(binary ${binaries})
-    set(BINARY_SRC "${BIN}/${binary}")
+    set(BINARY_SRC "${BIN_OUTPUT}/${binary}")
     set(BINARY_DEST "${PACKAGE_LAYOUT}/${binary}")
     add_custom_command(
         OUTPUT ${BINARY_DEST}

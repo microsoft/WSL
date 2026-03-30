@@ -110,8 +110,8 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
-# Only generate the build configuration that CMake is configured for
-set(CMAKE_CONFIGURATION_TYPES "${CMAKE_BUILD_TYPE}" CACHE STRING "" FORCE)
+# Generate both Debug and Release configurations for multi-config generators (Visual Studio)
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 
 find_commit_hash(COMMIT_HASH)
 
@@ -143,6 +143,17 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(BIN ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE})
 file(MAKE_DIRECTORY ${BIN})
 
+# BIN_OUTPUT uses $<CONFIG> for correct output in multi-config custom commands
+set(BIN_OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>)
+
+# Set up the alternate configuration output directory for multi-config VS builds
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    set(ALT_BIN ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release)
+else()
+    set(ALT_BIN ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug)
+endif()
+file(MAKE_DIRECTORY ${ALT_BIN})
+
 set (GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
@@ -150,6 +161,10 @@ set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
 file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll ${BIN}/wsldevicehost.dll)
 file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
+
+file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll ${ALT_BIN}/wsldevicehost.dll)
+file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${ALT_BIN}/${WSLG_TS_PLUGIN_DLL})
+file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${ALT_BIN}/wsldeps.dll)
 
 if (${SKIP_PACKAGE_SIGNING})
     set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
@@ -164,17 +179,21 @@ else()
 endif()
 
 
-# Generate local test script
+# Generate local test script for both configurations
 configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
+set(_SAVED_CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE})
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    set(CMAKE_BUILD_TYPE "Release")
+else()
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/test/test.bat.in  ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/test.bat)
+set(CMAKE_BUILD_TYPE ${_SAVED_CMAKE_BUILD_TYPE})
 
 # Common build flags
 set(CMAKE_CXX_STANDARD 20)
 
-if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDebug)
-else()
-    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
-endif()
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 if (${TARGET_PLATFORM} STREQUAL "x64")
     add_compile_definitions(_AMD64_)
@@ -211,13 +230,17 @@ if (${OFFICIAL_BUILD})
 endif()
 
 if (${WSL_BUILD_THIN_PACKAGE})
-    add_compile_definitions(WSL_DEV_THIN_MSI_PACKAGE="${BIN}/wsl.msi")
+    add_compile_definitions(WSL_DEV_THIN_MSI_PACKAGE="${BIN_OUTPUT}/wsl.msi")
 endif ()
 
 string(REPLACE "/Zi" "" CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})  # make sure /Zi is removed from the debug flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj /W3 /WX /ZH:SHA_256")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Z7 -DDEBUG -DDBG")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /guard:cf /Qspectre")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /guard:cf")
+
+if (${OFFICIAL_BUILD})
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Qspectre")
+endif()
 
 # Linker flags
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
@@ -338,12 +361,14 @@ endif()
 set(LINUX_CXXFLAGS ${LINUX_COMMON_FLAGS} -std=c++20)
 set(LINUX_CFLAGS ${LINUX_COMMON_FLAGS} -std=c99)
 
-string(TOLOWER ${CMAKE_BUILD_TYPE} build_type)
-if (build_type STREQUAL debug)
-    set(LINUX_BUILD_TYPE_FLAGS -g3 -fno-inline-functions -DDEBUG -DDBG)
-else()
-    set(LINUX_BUILD_TYPE_FLAGS -g -O2 -DNDEBUG)
-endif()
+set(LINUX_BUILD_TYPE_FLAGS
+    "$<$<CONFIG:Debug>:-g3>"
+    "$<$<CONFIG:Debug>:-fno-inline-functions>"
+    "$<$<CONFIG:Debug>:-DDEBUG>"
+    "$<$<CONFIG:Debug>:-DDBG>"
+    "$<$<NOT:$<CONFIG:Debug>>:-g>"
+    "$<$<NOT:$<CONFIG:Debug>>:-O2>"
+    "$<$<NOT:$<CONFIG:Debug>>:-DNDEBUG>")
 
 set(LINUX_LDFLAGS -target ${LLVM_TARGET}
                   --gcc-toolchain=${LINUXSDK_PATH}
@@ -354,7 +379,7 @@ set(LINUX_LDFLAGS -target ${LLVM_TARGET}
                   -fuse-ld=lld.exe
                   -L${LINUXSDK_PATH}/lib
                   -L${LINUXSDK_PATH}/lib/linux
-                  -L${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}
+                  -L${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>
                   -lclang_rt.builtins-${LLVM_ARCH}
                   -l:libc.a
                   -static)
@@ -381,8 +406,8 @@ include_directories(${WSLDEPS_SOURCE_DIR}/include/schemas)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/lxcore)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/inc)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET_PLATFORM})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/linux/init/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/configfile)
