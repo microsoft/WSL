@@ -109,7 +109,7 @@ void ListImages(CLIExecutionContext& context)
                 MultiByteToWide(image.Repository),
                 MultiByteToWide(image.Tag),
                 MultiByteToWide(id),
-                ContainerService::FormatRelativeTime(static_cast<ULONGLONG>(image.Created)),
+                ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
                 std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
             });
         }
