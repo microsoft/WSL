@@ -2365,6 +2365,24 @@ class WSLCTests
         }
 
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
+
+        // Validate the 63-port limit.
+        // TODO: Remove the 63-port limit by switching the relay's AcceptThread from
+        // WaitForMultipleObjects to IO completion ports or similar.
+        constexpr int c_maxPorts = 63;
+        for (int i = 0; i < c_maxPorts; i++)
+        {
+            VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, static_cast<uint16_t>(20000 + i), static_cast<uint16_t>(80 + i)));
+        }
+
+        VERIFY_ARE_EQUAL(
+            session->MapVmPort(AF_INET, static_cast<uint16_t>(20000 + c_maxPorts), static_cast<uint16_t>(80 + c_maxPorts)),
+            HRESULT_FROM_WIN32(ERROR_TOO_MANY_OPEN_FILES));
+
+        for (int i = 0; i < c_maxPorts; i++)
+        {
+            VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, static_cast<uint16_t>(20000 + i), static_cast<uint16_t>(80 + i)));
+        }
     }
 
     TEST_METHOD(PortMappingNat)
