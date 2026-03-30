@@ -3628,7 +3628,6 @@ class WSLCTests
 
             // Verify that the container is in exited state.
             expectContainerList({{"test-container-kill-2", "debian:latest", WslcContainerStateExited}});
-
         }
 
         // Verify that trying to open a non existing container fails.
