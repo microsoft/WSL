@@ -3733,9 +3733,9 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container->State(), WslcContainerStateExited);
 
             VERIFY_SUCCEEDED(container->Get().Delete(WSLCDeleteFlagsNone));
+            VERIFY_ARE_EQUAL(container->State(), WslcContainerStateDeleted);
 
-            WSLCContainerState state{};
-            VERIFY_ARE_EQUAL(container->Get().GetState(&state), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container->Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
         }
 
         // Validate that containers behave correctly if they outlive their session.
@@ -5692,6 +5692,40 @@ class WSLCTests
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 0);
         }
+    }
+
+    TEST_METHOD(ContainerAutoRemoveReadStdout)
+    {
+        WSL2_TEST_ONLY();
+
+        WSLCContainerLauncher launcher("debian:latest", "test-auto-remove-stdout", {"echo", "Hello World"});
+        launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+        auto container = launcher.Launch(*m_defaultSession);
+
+        // Wait for the container to exit and verify it gets deleted automatically.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_WIN32_IF(ERROR_RETRY, container.State() != WslcContainerStateDeleted); },
+            std::chrono::milliseconds{100},
+            std::chrono::seconds{30});
+
+        VERIFY_ARE_EQUAL(WslcContainerStateDeleted, container.State());
+        VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
+
+        // Ensure we can still get the init process and read stdout.
+        auto process = container.GetInitProcess();
+        auto result = process.WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_ARE_EQUAL(std::string("Hello World\n"), result.Output[1]);
+
+        // Validate that the container is not found if we try to open it by name or id, or found in the container list.
+        wil::com_ptr<IWSLCContainer> notFound;
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(containers.size(), 0);
     }
 
     TEST_METHOD(ContainerNameGeneration)
