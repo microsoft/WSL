@@ -214,6 +214,8 @@ bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
 
+std::pair<std::string, std::string> NormalizeRepo(const std::string& Input);
+
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 
 wil::unique_handle OpenCallingProcess(_In_ DWORD access);
