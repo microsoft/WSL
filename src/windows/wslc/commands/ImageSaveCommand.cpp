@@ -34,12 +34,12 @@ std::vector<Argument> ImageSaveCommand::GetArguments() const
 
 std::wstring ImageSaveCommand::ShortDescription() const
 {
-    return {L"Saves image."};
+    return {L"Save images."};
 }
 
 std::wstring ImageSaveCommand::LongDescription() const
 {
-    return {L"Saves image."};
+    return {L"Saves images."};
 }
 
 void ImageSaveCommand::ExecuteInternal(CLIExecutionContext& context) const

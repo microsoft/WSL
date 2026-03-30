@@ -125,7 +125,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Saves image.\r\n\r\n";
+        return L"Saves images.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
