@@ -544,92 +544,6 @@ try
     }
 
     std::unique_ptr<WSLCPortMapping[]> convertedPorts;
-    if (internalContainerSettings->ports && internalContainerSettings->portsCount)
-    {
-        convertedPorts = std::make_unique<WSLCPortMapping[]>(internalContainerSettings->portsCount);
-        for (uint32_t i = 0; i < internalContainerSettings->portsCount; ++i)
-        {
-            const WslcContainerPortMapping& internalPort = internalContainerSettings->ports[i];
-            WSLCPortMapping& convertedPort = convertedPorts[i];
-
-            convertedPort.HostPort = internalPort.windowsPort;
-            convertedPort.ContainerPort = internalPort.containerPort;
-
-            // TODO: Ipv6 & custom binding address support.
-            convertedPort.Family = AF_INET;
-
-            // TODO: Consider using standard protocol numbers instead of our own enum.
-            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
-            convertedPort.BindingAddress = "127.0.0.1";
-        }
-        containerOptions.Ports = convertedPorts.get();
-        containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
-    }
-
-    containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
-
-    // TODO: No user access
-    // containerOptions.Entrypoint;
-    // containerOptions.Labels;
-    // containerOptions.LabelsCount;
-    // containerOptions.StopSignal;
-    // containerOptions.ShmSize;
-
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->session->CreateContainer(&containerOptions, &result->container))))
-    {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
-
-        if (IOCallback::HasIOCallback(internalContainerSettings->initProcessOptions))
-        {
-            result->ioCallbackOptions = internalContainerSettings->initProcessOptions->ioCallbacks;
-        }
-
-        *container = reinterpret_cast<WslcContainer>(result.release());
-    }
-
-    return errorInfoWrapper;
-}
-CATCH_RETURN();
-
-STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
-try
-{
-    RETURN_HR_IF_NULL(E_POINTER, container);
-    *container = nullptr;
-    ErrorInfoWrapper errorInfoWrapper{errorMessage};
-    auto internalSession = CheckAndGetInternalType(session);
-    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
-    auto internalContainerSettings = CheckAndGetInternalType(containerSettings);
-
-    auto result = std::make_unique<WslcContainerImpl>();
-
-    WSLCContainerOptions containerOptions{};
-    containerOptions.Image = internalContainerSettings->image;
-    containerOptions.Name = internalContainerSettings->runtimeName;
-    containerOptions.HostName = internalContainerSettings->HostName;
-    containerOptions.DomainName = internalContainerSettings->DomainName;
-    containerOptions.Flags = ConvertFlags(internalContainerSettings->containerFlags);
-
-    CopyProcessSettingsToRuntime(containerOptions.InitProcessOptions, internalContainerSettings->initProcessOptions);
-
-    std::unique_ptr<WSLCVolume[]> convertedVolumes;
-    if (internalContainerSettings->volumes && internalContainerSettings->volumesCount)
-    {
-        convertedVolumes = std::make_unique<WSLCVolume[]>(internalContainerSettings->volumesCount);
-        for (uint32_t i = 0; i < internalContainerSettings->volumesCount; ++i)
-        {
-            const WslcContainerVolume& internalVolume = internalContainerSettings->volumes[i];
-            WSLCVolume& convertedVolume = convertedVolumes[i];
-
-            convertedVolume.HostPath = internalVolume.windowsPath;
-            convertedVolume.ContainerPath = internalVolume.containerPath;
-            convertedVolume.ReadOnly = internalVolume.readOnly;
-        }
-        containerOptions.Volumes = convertedVolumes.get();
-        containerOptions.VolumesCount = static_cast<ULONG>(internalContainerSettings->volumesCount);
-    }
-
-    std::unique_ptr<WSLCPortMapping[]> convertedPorts;
     std::vector<std::string> bindingAddressStrings;
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
@@ -693,6 +607,33 @@ try
         }
 
         *container = reinterpret_cast<WslcContainer>(result.release());
+    }
+
+    return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+
+    bool hasIOCallback = IOCallback::HasIOCallback(internalType->ioCallbackOptions);
+    // If callbacks were provided, ATTACH must be used.
+    // TODO: Consider if we should just override flags when callbacks were provided instead.
+    RETURN_HR_IF(E_INVALIDARG, WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_ATTACH) && hasIOCallback);
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalType->container->Start(ConvertFlags(flags), nullptr))))
+    {
+        if (hasIOCallback)
+        {
+            wil::com_ptr<IWSLCProcess> process;
+            RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
+            internalType->ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+        }
     }
 
     return errorInfoWrapper;
