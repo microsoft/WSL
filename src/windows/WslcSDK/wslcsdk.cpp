@@ -271,9 +271,8 @@ bool NeedsVirtualMachineServicesInstalled()
     return !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled();
 }
 
-// TODO: Update to 2.8 when the minor version is moved forward for upcoming release
-#define WSLC_API_MIN_VERSION_SUPPORTED 2, 7, 0
-#define WSLC_API_MIN_VERSION_SUPPORTED_STRING "2.7.0"
+#define WSLC_API_MIN_VERSION_SUPPORTED 2, 8, 0
+#define WSLC_API_MIN_VERSION_SUPPORTED_STRING "2.8.0"
 
 bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
 {
