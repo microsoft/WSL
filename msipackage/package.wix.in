@@ -239,7 +239,7 @@
                      which would fail the install. -->
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
 
-                <!-- WSLA COM app - activated through WSLService -->
+                <!-- WSLC COM app - activated through WSLService -->
                 <RegistryKey Root="HKCR" Key="AppID\{E9B79997-57E3-4201-AECC-6A464E530DD2}">
                     <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
                     <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
@@ -247,51 +247,51 @@
                     <RegistryValue Name="LocalService" Value="WSLService" Type="string" />
                 </RegistryKey>
 
-                <!-- WSLAContainer -->
+                <!-- WSLCContainer -->
                 <RegistryKey Root="HKCR" Key="CLSID\{B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
-                    <RegistryValue Value="WSLAContainer" Type="string" />
+                    <RegistryValue Value="WSLCContainer" Type="string" />
                 </RegistryKey>
 
-                <!-- WSLAProcess -->
+                <!-- WSLCProcess -->
                 <RegistryKey Root="HKCR" Key="CLSID\{AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
-                    <RegistryValue Value="WSLAProcess" Type="string" />
+                    <RegistryValue Value="WSLCProcess" Type="string" />
                 </RegistryKey>
 
-                <!-- WSLASessionManager -->
+                <!-- WSLCSessionManager -->
                 <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
-                    <RegistryValue Value="WSLASessionManager" Type="string" />
+                    <RegistryValue Value="WSLCSessionManager" Type="string" />
                 </RegistryKey>
 
-                <!-- WSLASessionFactory - COM server in per-user process -->
+                <!-- WSLCSessionFactory - COM server in per-user process -->
                 <RegistryKey Root="HKCR" Key="CLSID\{9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3}">
-                    <RegistryValue Value="WSLASessionFactory" Type="string" />
+                    <RegistryValue Value="WSLCSessionFactory" Type="string" />
                     <RegistryKey Key="LocalServer32">
-                        <RegistryValue Value='"[INSTALLDIR]wslasession.exe"' Type="string" />
+                        <RegistryValue Value='"[INSTALLDIR]wslcsession.exe"' Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLASessionManager-->
+                <!-- IWSLCSessionManager-->
                 <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8760}">
-                    <RegistryValue Value="IWSLASessionManager" Type="string" />
+                    <RegistryValue Value="IWSLCSessionManager" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLAContainer-->
+                <!-- IWSLCContainer-->
                 <RegistryKey Root="HKCR" Key="Interface\{7577FE8D-DE85-471E-B870-11669986F332}">
-                    <RegistryValue Value="IWSLAContainer" Type="string" />
+                    <RegistryValue Value="IWSLCContainer" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLAProcess-->
+                <!-- IWSLCProcess-->
                 <RegistryKey Root="HKCR" Key="Interface\{1AD163CD-393D-4B33-83A2-8A3F3F23E608}">
-                    <RegistryValue Value="IWSLAProcess" Type="string" />
+                    <RegistryValue Value="IWSLCProcess" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
@@ -313,39 +313,39 @@
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLASession-->
+                <!-- IWSLCSession-->
                 <RegistryKey Root="HKCR" Key="Interface\{EF0661E4-6364-40EA-B433-E2FDF11F3519}">
-                    <RegistryValue Value="IWSLASession" Type="string" />
+                    <RegistryValue Value="IWSLCSession" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLASessionReference-->
+                <!-- IWSLCSessionReference-->
                 <RegistryKey Root="HKCR" Key="Interface\{B3A72F48-9D15-4E8A-A621-7C3E84F09B52}">
-                    <RegistryValue Value="IWSLASessionReference" Type="string" />
+                    <RegistryValue Value="IWSLCSessionReference" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLASessionFactory-->
+                <!-- IWSLCSessionFactory-->
                 <RegistryKey Root="HKCR" Key="Interface\{C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91}">
-                    <RegistryValue Value="IWSLASessionFactory" Type="string" />
+                    <RegistryValue Value="IWSLCSessionFactory" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <!-- IWSLAVirtualMachine-->
+                <!-- IWSLCVirtualMachine-->
                 <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
-                    <RegistryValue Value="IWSLAVirtualMachine" Type="string" />
+                    <RegistryValue Value="IWSLCVirtualMachine" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 
-                <File Id="wslasession.exe" Source="${BIN}/wslasession.exe" />
+                <File Id="wslcsession.exe" Source="${BIN}/wslcsession.exe" />
             </Component>
             <Component Id="wslg" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134731" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>

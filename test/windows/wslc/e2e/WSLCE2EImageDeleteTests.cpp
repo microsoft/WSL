@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EImageDeleteTests
 {
-    WSLA_TEST_CLASS(WSLCE2EImageDeleteTests)
+    WSLC_TEST_CLASS(WSLCE2EImageDeleteTests)
 
     TEST_METHOD_SETUP(MethodSetup)
     {
@@ -49,7 +49,7 @@ class WSLCE2EImageDeleteTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
+        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 

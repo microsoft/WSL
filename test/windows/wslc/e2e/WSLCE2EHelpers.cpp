@@ -118,22 +118,22 @@ std::string GetHashId(const std::string& id, bool fullId)
     return id.substr(0, shortIdLength);
 }
 
-wsla_schema::InspectContainer InspectContainer(const std::wstring& containerName)
+wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName)
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wsla_schema::InspectContainer>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
 
-wsla_schema::InspectImage InspectImage(const std::wstring& imageName)
+wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wsla_schema::InspectImage>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(jsonOutput.c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -177,6 +177,28 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     }
 }
 
+std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers()
+{
+    auto result = RunWslc(L"container list --all --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto jsonOutput = result.GetStdoutOneLine();
+    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(jsonOutput.c_str());
+}
+
+void EnsureImageContainersAreDeleted(const TestImage& image)
+{
+    auto containers = ListAllContainers();
+    for (const auto& container : containers)
+    {
+        auto nameAndTag = wsl::shared::string::WideToMultiByte(image.NameAndTag());
+        if (container.Image.find(nameAndTag) != std::string::npos)
+        {
+            auto result = RunWslc(std::format(L"container remove --force {}", container.Id));
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        }
+    }
+}
+
 void EnsureImageIsDeleted(const TestImage& image)
 {
     auto result = RunWslc(L"image list");
@@ -187,6 +209,7 @@ void EnsureImageIsDeleted(const TestImage& image)
     {
         if (line.find(image.NameAndTag()) != std::wstring::npos)
         {
+            EnsureImageContainersAreDeleted(image);
             auto deleteResult = RunWslc(std::format(L"image delete --force {}", image.NameAndTag()));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;

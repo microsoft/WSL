@@ -14,32 +14,32 @@ Abstract:
 #pragma once
 
 #include <wslservice.h>
-#include <wslaservice.h>
+#include <wslc.h>
 
 namespace wsl::windows::wslc::models {
 
-inline constexpr wchar_t s_DefaultSessionName[] = L"wsla-cli";
+inline constexpr wchar_t s_DefaultSessionName[] = L"wslc-cli";
 
 struct Session
 {
-    explicit Session(wil::com_ptr<IWSLASession> session) : m_session(std::move(session))
+    explicit Session(wil::com_ptr<IWSLCSession> session) : m_session(std::move(session))
     {
     }
-    IWSLASession* Get() const noexcept
+    IWSLCSession* Get() const noexcept
     {
         return m_session.get();
     }
 
 private:
-    wil::com_ptr<IWSLASession> m_session;
+    wil::com_ptr<IWSLCSession> m_session;
 };
 
 struct SessionOptions
 {
     static SessionOptions Default();
-    const WSLASessionSettings* Get() const;
+    const WSLCSessionSettings* Get() const;
 
 private:
-    WSLASessionSettings m_sessionSettings{};
+    WSLCSessionSettings m_sessionSettings{};
 };
 } // namespace wsl::windows::wslc::models
