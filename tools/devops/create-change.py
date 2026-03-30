@@ -12,8 +12,9 @@ REPO = 'microsoft/wsl'
 @click.argument('committer', required=True)
 @click.argument('message', required=True)
 @click.argument('branch', required=True)
+@click.argument('target_branch', required=True)
 @click.option('--debug', default=False, is_flag=True)
-def main(repo_path: str, token: str, committer: str, message: str, branch: str, debug: bool):
+def main(repo_path: str, token: str, committer: str, message: str, branch: str, target_branch: str, debug: bool):
     try:
         repo = Repo(repo_path)
 
@@ -41,7 +42,7 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
             'title': message,
             'description': 'Automated change',
             'head': branch,
-            'base': 'master'
+            'base': target_branch
         }
 
         response = requests.post(f'https://api.github.com/repos/{REPO}/pulls', headers=headers, data=json.dumps(body), timeout=30)

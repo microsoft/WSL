@@ -21,7 +21,7 @@ Abstract:
 #include "SessionService.h"
 #include "TableOutput.h"
 #include <wil/result_macros.h>
-#include <wsla_schema.h>
+#include <wslc_schema.h>
 
 using namespace wsl::shared;
 using namespace wsl::shared::string;
@@ -69,7 +69,7 @@ void InspectContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    std::vector<wsl::windows::common::wsla_schema::InspectContainer> result;
+    std::vector<wsl::windows::common::wslc_schema::InspectContainer> result;
     for (const auto& id : containerIds)
     {
         auto inspectData = ContainerService::Inspect(session, WideToMultiByte(id));
@@ -85,10 +85,10 @@ void KillContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    WSLASignal signal = WSLASignalSIGKILL;
+    WSLCSignal signal = WSLCSignalSIGKILL;
     if (context.Args.Contains(ArgType::Signal))
     {
-        signal = validation::GetWSLASignalFromString(context.Args.Get<ArgType::Signal>());
+        signal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::Signal>());
     }
 
     for (const auto& id : containerIds)
@@ -106,7 +106,7 @@ void ListContainers(CLIExecutionContext& context)
     if (!context.Args.Contains(ArgType::All))
     {
         auto shouldRemove = [](const ContainerInformation& container) {
-            return container.State != WSLAContainerState::WslaContainerStateRunning;
+            return container.State != WSLCContainerState::WslcContainerStateRunning;
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
     }
@@ -245,6 +245,37 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
     }
 
+    if (context.Args.Contains(ArgType::EnvFile))
+    {
+        auto const& envFiles = context.Args.GetAll<ArgType::EnvFile>();
+        for (const auto& envFile : envFiles)
+        {
+            auto parsedEnvVars = EnvironmentVariable::ParseFile(envFile);
+            for (const auto& envVar : parsedEnvVars)
+            {
+                options.EnvironmentVariables.push_back(wsl::shared::string::WideToMultiByte(envVar));
+            }
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Env))
+    {
+        auto const& envArgs = context.Args.GetAll<ArgType::Env>();
+        for (const auto& arg : envArgs)
+        {
+            auto envVar = EnvironmentVariable::Parse(arg);
+            if (envVar)
+            {
+                options.EnvironmentVariables.push_back(wsl::shared::string::WideToMultiByte(*envVar));
+            }
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Entrypoint))
+    {
+        options.Entrypoint.push_back(WideToMultiByte(context.Args.Get<ArgType::Entrypoint>()));
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();
@@ -274,7 +305,7 @@ void StopContainers(CLIExecutionContext& context)
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
-        options.Signal = validation::GetWSLASignalFromString(context.Args.Get<ArgType::Signal>());
+        options.Signal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::Signal>());
     }
 
     if (context.Args.Contains(ArgType::Time))

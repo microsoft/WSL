@@ -14,26 +14,29 @@ Abstract:
 
 #include <precomp.h>
 #include "SessionModel.h"
+#include "UserSettings.h"
 
 namespace wsl::windows::wslc::models {
 SessionOptions SessionOptions::Default()
 {
     // Use a function-local static to defer path initialization until first use.
-    static const std::filesystem::path defaultPath = {wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / "wsla"};
+    static const std::filesystem::path storagePath =
+        settings::User().Get<settings::Setting::SessionStoragePath>().empty()
+            ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\storage"}
+            : settings::User().Get<settings::Setting::SessionStoragePath>().c_str();
 
-    // TODO: Have a configuration file for those.
     SessionOptions options{};
     options.m_sessionSettings.DisplayName = s_DefaultSessionName;
-    options.m_sessionSettings.CpuCount = 4;
-    options.m_sessionSettings.MemoryMb = 2048;
+    options.m_sessionSettings.CpuCount = settings::User().Get<settings::Setting::SessionCpuCount>();
+    options.m_sessionSettings.MemoryMb = settings::User().Get<settings::Setting::SessionMemoryMb>();
     options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
-    options.m_sessionSettings.StoragePath = defaultPath.c_str();
-    options.m_sessionSettings.MaximumStorageSizeMb = 10000; // 10GB.
-    options.m_sessionSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
+    options.m_sessionSettings.StoragePath = storagePath.c_str();
+    options.m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
+    options.m_sessionSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
     return options;
 }
 
-const WSLASessionSettings* SessionOptions::Get() const
+const WSLCSessionSettings* SessionOptions::Get() const
 {
     return &m_sessionSettings;
 }

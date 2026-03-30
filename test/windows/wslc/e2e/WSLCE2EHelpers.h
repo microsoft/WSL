@@ -16,7 +16,8 @@ Abstract:
 #include "WSLCExecutor.h"
 #include <docker_schema.h>
 #include <chrono>
-#include <wsla_schema.h>
+#include <wslc_schema.h>
+#include <ContainerModel.h>
 
 namespace WSLCE2ETests {
 
@@ -101,12 +102,14 @@ void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
-wsl::windows::common::wsla_schema::InspectContainer InspectContainer(const std::wstring& containerName);
-wsl::windows::common::wsla_schema::InspectImage InspectImage(const std::wstring& imageName);
+wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
+wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
+std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image);
 void EnsureImageIsDeleted(const TestImage& image);
+void EnsureImageContainersAreDeleted(const TestImage& image);
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>

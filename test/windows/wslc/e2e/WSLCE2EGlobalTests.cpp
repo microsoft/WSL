@@ -20,7 +20,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EGlobalTests
 {
-    WSLA_TEST_CLASS(WSLCE2EGlobalTests)
+    WSLC_TEST_CLASS(WSLCE2EGlobalTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -74,6 +74,7 @@ private:
                  << L"  container  Container command.\r\n"
                  << L"  image      Image command.\r\n"
                  << L"  session    Session command.\r\n"
+                 << L"  settings   Open the settings file in the default editor.\r\n"
                  << L"  attach     Attach to a container.\r\n"
                  << L"  build      Build an image from a Dockerfile.\r\n"
                  << L"  create     Create a container.\r\n"

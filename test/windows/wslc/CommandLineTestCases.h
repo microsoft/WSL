@@ -113,6 +113,10 @@ COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)
 
+// Settings command
+COMMAND_LINE_TEST_CASE(L"settings", L"settings", true)
+COMMAND_LINE_TEST_CASE(L"settings reset", L"reset", true)
+
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
 COMMAND_LINE_TEST_CASE(L"CONTAINER list", L"list", false)               // We are intentionally case-sensitive

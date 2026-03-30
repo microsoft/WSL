@@ -253,9 +253,9 @@ Return Value:
     {
         THROW_HR_MSG(
             E_UNEXPECTED,
-            "Command \"%ls\""
+            "Command \"%ls\" "
             "returned unexpected exit code (%lu != %i). "
-            "Stdout: '%ls'"
+            "Stdout: '%ls' "
             "Stderr: '%ls'",
             Cmd,
             ExitCode,
@@ -833,7 +833,7 @@ void CreateWerReports()
         L"wslg.exe",
         L"vmcompute.exe",
         L"vmwp.exe",
-        L"wslasession.exe",
+        L"wslcsession.exe",
         L"wslc.exe"};
 
     auto PrivilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
