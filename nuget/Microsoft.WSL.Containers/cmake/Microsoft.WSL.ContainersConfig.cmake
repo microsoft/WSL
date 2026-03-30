@@ -37,8 +37,8 @@ else()
         " Set CMAKE_GENERATOR_PLATFORM or CMAKE_SYSTEM_PROCESSOR.")
 endif()
 
-# Compute paths relative to package root (<root>/build/cmake/ -> <root>/)
-get_filename_component(_wslcsdk_root "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+# Compute paths relative to package root (<root>/cmake/ -> <root>/)
+get_filename_component(_wslcsdk_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(_wslcsdk_include_dir "${_wslcsdk_root}/include")
 set(_wslcsdk_lib_dir "${_wslcsdk_root}/runtimes/win-${_wslcsdk_arch}")
 
