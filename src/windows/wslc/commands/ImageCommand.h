@@ -160,4 +160,4 @@ struct ImageSaveCommand final : public Command
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
-}// namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc

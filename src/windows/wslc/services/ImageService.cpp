@@ -144,7 +144,8 @@ void ImageService::Push()
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output)
 {
-    wil::unique_hfile outputFile{CreateFileW(output.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    wil::unique_hfile outputFile{CreateFileW(
+        output.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!outputFile);
 
     // TODO Handle Ctrl-C and progress callback
