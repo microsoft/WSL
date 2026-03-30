@@ -1528,17 +1528,36 @@ HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
     COMServiceExecutionContext context;
     RETURN_HR_IF_NULL(E_POINTER, Result);
 
-    {
+    auto getCachedState = [&]() -> std::optional<WSLCContainerState> {
         auto cacheLock = m_cacheLock.lock_shared();
-        if (m_cachedState.has_value())
-        {
-            *Result = m_cachedState.value();
-            return S_OK;
-        }
+        return m_cachedState;
+    };
+
+    // Fast path: return cached state if the impl has already been disconnected.
+    auto state = getCachedState();
+    if (state)
+    {
+        *Result = state.value();
+        return S_OK;
     }
 
     *Result = WslcContainerStateInvalid;
-    return CallImpl(&WSLCContainerImpl::GetState, Result);
+    HRESULT hr = CallImpl(&WSLCContainerImpl::GetState, Result);
+    if (SUCCEEDED(hr))
+    {
+        return S_OK;
+    }
+
+    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
+    state = getCachedState();
+    if (WI_VERIFY(state.has_value()))
+    {
+        *Result = state.value();
+        hr = S_OK;
+    }
+
+    return hr;
 }
 
 HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
