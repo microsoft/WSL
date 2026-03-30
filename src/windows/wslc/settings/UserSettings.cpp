@@ -86,11 +86,11 @@ namespace details {
         {
             return WSLCNetworkingModeNone;
         }
-        else if (value == "nat")
+        if (value == "nat")
         {
             return WSLCNetworkingModeNAT;
         }
-        else if (value == "virtionet")
+        if (value == "virtioproxy")
         {
             return WSLCNetworkingModeVirtioProxy;
         }
