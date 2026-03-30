@@ -65,8 +65,8 @@ COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
-COMMAND_LINE_TEST_CASE(L"exec cont1 --workdir /app echo Hello", L"exec", true)
-COMMAND_LINE_TEST_CASE(L"exec cont1 -w /app echo Hello", L"exec", true)
+COMMAND_LINE_TEST_CASE(L"exec --workdir /app cont1 echo Hello", L"exec", true)
+COMMAND_LINE_TEST_CASE(L"exec -w /app cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"container exec --workdir /app cont1 sh", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1 --workdir", L"exec", false) // Missing value for --workdir
 COMMAND_LINE_TEST_CASE(L"kill cont1 --signal sigkill", L"kill", true)
