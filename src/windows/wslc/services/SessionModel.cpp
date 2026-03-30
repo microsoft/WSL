@@ -32,7 +32,7 @@ SessionOptions SessionOptions::Default()
     options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
     options.m_sessionSettings.StoragePath = storagePath.c_str();
     options.m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
-    options.m_sessionSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+    options.m_sessionSettings.NetworkingMode = settings::User().Get<settings::Setting::SessionNetworkingMode>();
     return options;
 }
 
