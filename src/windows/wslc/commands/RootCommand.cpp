@@ -17,6 +17,7 @@ Abstract:
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
 #include "SessionCommand.h"
+#include "SettingsCommand.h"
 
 using namespace wsl::windows::wslc::execution;
 
@@ -27,6 +28,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
+    commands.push_back(std::make_unique<SettingsCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));

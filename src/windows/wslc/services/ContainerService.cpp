@@ -129,6 +129,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
 
     containerLauncher.SetContainerFlags(containerFlags);
 
+    if (!options.Entrypoint.empty())
+    {
+        auto entrypoints = options.Entrypoint;
+        containerLauncher.SetEntrypoint(std::move(entrypoints));
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {

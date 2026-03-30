@@ -444,10 +444,11 @@ struct CreateImageProgress
 {
     std::string status;
     std::string id;
+    std::optional<ErrorResponse> errorDetail;
 
     CreateImageProgressDetails progressDetail;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail, errorDetail);
 };
 
 } // namespace wsl::windows::common::docker_schema

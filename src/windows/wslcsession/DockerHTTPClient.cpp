@@ -122,8 +122,9 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
 {
     auto url = URL::Create("/images/create");
 
-    // TODO: Support pulling from other registries.
-    url.SetParameter("fromImage", std::format("library/{}", Repo));
+    // Normalize the repo server & path
+    auto [server, path] = wslutil::NormalizeRepo(Repo);
+    url.SetParameter("fromImage", std::format("{}/{}", server, path));
 
     if (tagOrDigest.has_value())
     {
@@ -566,7 +567,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             {
                 try
                 {
-                    RemainingContentLength = std::stoul(contentLength->value());
+                    RemainingContentLength = std::stoull(contentLength->value());
                 }
                 catch (const std::exception&)
                 {
