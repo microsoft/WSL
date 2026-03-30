@@ -41,7 +41,7 @@
         <ItemGroup>
             <_WslcTlogSourceDirs Include="$(_WslcSourceDir.Split(';'))" />
             <_WslcTlogInputs Include="$(_WslcDockerfile)" />
-            <_WslcTlogInputs Include="%(_WslcTlogSourceDirs.Identity)\**\*" />
+            <_WslcTlogInputs Condition="'%(_WslcTlogSourceDirs.Identity)' != ''" Include="%(_WslcTlogSourceDirs.Identity)\**\*" />
         </ItemGroup>
 
         <PropertyGroup>
