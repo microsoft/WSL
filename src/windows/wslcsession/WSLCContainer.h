@@ -68,6 +68,7 @@ public:
         DockerHTTPClient& DockerClient,
         IORelay& Relay,
         WSLCContainerState InitialState,
+        std::uint64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags);
 
@@ -159,7 +160,7 @@ private:
     std::optional<std::promise<std::uint64_t>> m_stopState;
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
-    std::uint64_t m_createdAt{static_cast<std::uint64_t>(std::time(nullptr))};
+    std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
     WSLCVirtualMachine& m_virtualMachine;
