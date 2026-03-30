@@ -25,11 +25,11 @@ Abstract:
 namespace wsl::windows::wslc {
 
 namespace detail {
-// This function outputs a table line.
-inline void PrintTableLine(const std::wstring& line, FILE* stream)
-{
-    ::wsl::windows::common::wslutil::PrintMessage(line, stream);
-}
+    // This function outputs a table line.
+    inline void PrintTableLine(const std::wstring& line, FILE* stream)
+    {
+        ::wsl::windows::common::wslutil::PrintMessage(line, stream);
+    }
 } // namespace detail
 
 // Helper function to get display width of a string
