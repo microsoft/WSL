@@ -1166,13 +1166,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
     // Clean up the Docker container if anything below fails.
-    auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        try
-        {
-            DockerClient.DeleteContainer(result.Id, true);
-        }
-        CATCH_LOG();
-    });
+    // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
+    auto deleteOnFailure = wil::scope_exit_log(
+        WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() { DockerClient.DeleteContainer(containerId, true); });
 
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);
@@ -1181,8 +1177,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         wslcSession,
         virtualMachine,
         std::move(result.Id),
-        std::move(containerOptions.Name == nullptr ? CleanContainerName(inspectData.Name) : std::string(containerOptions.Name)),
-        std::move(std::string(containerOptions.Image)),
+        CleanContainerName(inspectData.Name),
+        std::string(containerOptions.Image),
         containerOptions.ContainerNetwork.ContainerNetworkType,
         std::move(volumes),
         std::move(ports),
