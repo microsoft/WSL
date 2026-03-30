@@ -355,7 +355,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_eventTracker(EventTracker),
     m_ioRelay(Relay),
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2))),
+        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))),
     m_state(InitialState),
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags)
@@ -461,7 +461,9 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, U
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
     {
-        *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(ioHandle.get())));
+        *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(
+            reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE));
+
         return;
     }
 
@@ -485,9 +487,14 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, U
 
     m_ioRelay.AddHandles(std::move(handles));
 
-    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get())));
-    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get())));
-    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get())));
+    *Stdin = HandleToULong(
+        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE));
+
+    *Stdout = HandleToULong(
+        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE));
+
+    *Stderr = HandleToULong(
+        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE));
 }
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
@@ -540,8 +547,6 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         m_initProcessControl = nullptr;
     });
 
-    m_stoppedNotifiedEvent.ResetEvent();
-
     auto volumeCleanup = MountVolumes(m_mountedVolumes, m_virtualMachine);
 
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
@@ -560,34 +565,34 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     cleanup.release();
 }
 
-void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode)
+void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime)
 {
     if (event == ContainerEvent::Stop)
     {
-        m_stoppedNotifiedEvent.SetEvent();
-
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
+
+        // If a Stop() call is in progress, provide the timestamp via the promise
+        // and let Stop() handle the state transition.
+        {
+            std::lock_guard stopLock{m_stopStateLock};
+            if (m_stopState.has_value())
+            {
+                m_stopState->set_value(eventTime);
+                m_stopState.reset();
+                return;
+            }
+        }
+
         auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
 
-        {
-            std::lock_guard processesLock{m_processesLock};
-
-            // Notify all processes that the container has exited.
-            // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
-            for (auto& process : m_processes)
-            {
-                process->OnContainerReleased();
-            }
-
-            m_processes.clear();
-        }
+        ReleaseProcesses();
 
         // Don't run the deletion logic if the container is already in a stopped / deleted state.
         // This can happen if Delete() is called by the user.
         if (previousState == WslcContainerStateRunning)
         {
-            Transition(WslcContainerStateExited);
+            Transition(WslcContainerStateExited, eventTime);
 
             ReleaseRuntimeResources();
 
@@ -632,6 +637,22 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
             m_state);
     }
 
+    // Set up a waitable stop state so OnEvent() can pass the Docker timestamp
+    // back to Stop() without needing to take m_lock.
+    std::future<std::uint64_t> stopFuture;
+    {
+        std::lock_guard stopLock{m_stopStateLock};
+        m_stopState.emplace();
+        stopFuture = m_stopState->get_future();
+    }
+
+    // Ensure m_stopState is cleared on all exit paths so OnEvent() doesn't
+    // take the promise path after a failed Stop().
+    auto resetStopState = wil::scope_exit([this]() {
+        std::lock_guard stopLock{m_stopStateLock};
+        m_stopState.reset();
+    });
+
     try
     {
         std::optional<WSLCSignal> SignalArg;
@@ -657,24 +678,23 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
         }
     }
 
-    Transition(WslcContainerStateExited);
+    // Wait for the stop event to get the Docker timestamp.
+    // Safe while holding m_lock since OnEvent() uses m_stopStateLock on this path.
+    std::optional<std::uint64_t> stopTimestamp;
+    if (stopFuture.wait_for(60s) == std::future_status::ready)
+    {
+        stopTimestamp = stopFuture.get();
+    }
+
+    Transition(WslcContainerStateExited, stopTimestamp);
+
+    ReleaseProcesses();
 
     ReleaseRuntimeResources();
 
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
         DeleteExclusiveLockHeld(WSLCDeleteFlagsForce);
-    }
-    else
-    {
-        // Wait for the stop notification to arrive before returning.
-        // This is required so that a caller that Stops() and immediately calls Start() again doesn't see the container
-        // switch back to 'stopped' state due to the delayed event notification.
-
-        auto io = m_wslcSession.CreateIOContext();
-        io.AddHandle(std::make_unique<EventHandle>(m_stoppedNotifiedEvent.get()), MultiHandleWait::CancelOnCompleted);
-
-        io.Run({60s});
     }
 }
 
@@ -700,13 +720,12 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
 
     try
     {
-        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteImageFlagsForce));
+        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
-    ReleaseResources();
-
     Transition(WslcContainerStateDeleted);
+    ReleaseResources();
 }
 
 void WSLCContainerImpl::Export(ULONG OutHandle) const
@@ -724,7 +743,7 @@ void WSLCContainerImpl::Export(ULONG OutHandle) const
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     SocketCodePair = m_dockerClient.ExportContainer(m_id);
 
-    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutHandle))};
+    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle, GENERIC_WRITE | SYNCHRONIZE);
 
     wsl::windows::common::relay::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
@@ -741,8 +760,7 @@ void WSLCContainerImpl::Export(ULONG OutHandle) const
     else
     {
         io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
-                HandleWrapper{std::move(SocketCodePair.second)}, HandleWrapper{std::move(containerFileHandle)}),
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted);
     }
 
@@ -1305,7 +1323,7 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get()));
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get(), GENERIC_READ | SYNCHRONIZE));
     }
     else
     {
@@ -1318,8 +1336,8 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
 
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get()));
-        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get()));
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE));
+        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get(), GENERIC_READ | SYNCHRONIZE));
     }
 }
 
@@ -1422,6 +1440,20 @@ void WSLCContainerImpl::UnmapPorts()
     }
 }
 
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseProcesses()
+{
+    std::lock_guard processesLock{m_processesLock};
+
+    // Notify all processes that the container has exited.
+    // The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
+    for (auto& process : m_processes)
+    {
+        process->OnContainerReleased();
+    }
+
+    m_processes.clear();
+}
+
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeResources()
 {
     WSL_LOG("ReleaseRuntimeResources", TraceLoggingValue(m_id.c_str(), "ID"));
@@ -1451,12 +1483,19 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DisconnectComWrap
 {
     if (m_comWrapper)
     {
+        // Cache read-only properties in the COM wrapper before disconnecting,
+        // so callers can still query state/process after the impl is gone.
+        {
+            std::lock_guard processesLock{m_processesLock};
+            m_comWrapper->CacheState(m_id, m_name, m_state, m_initProcess);
+        }
+
         m_comWrapper->Disconnect();
         m_comWrapper.Reset();
     }
 }
 
-__requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerState State) noexcept
+__requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept
 {
     // N.B. A deleted container cannot transition back to any other state.
     WI_ASSERT(m_state != WslcContainerStateDeleted);
@@ -1468,7 +1507,7 @@ __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerSta
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
-    m_stateChangedAt = static_cast<std::uint64_t>(std::time(nullptr));
+    m_stateChangedAt = stateChangedAt.value_or(static_cast<std::uint64_t>(std::time(nullptr)));
 }
 
 WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, std::function<void(const WSLCContainerImpl*)>&& OnDeleted) :
@@ -1490,6 +1529,16 @@ HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, UL
 HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 {
     COMServiceExecutionContext context;
+    RETURN_HR_IF_NULL(E_POINTER, Result);
+
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedState.has_value())
+        {
+            *Result = m_cachedState.value();
+            return S_OK;
+        }
+    }
 
     *Result = WslcContainerStateInvalid;
     return CallImpl(&WSLCContainerImpl::GetState, Result);
@@ -1500,6 +1549,15 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
     COMServiceExecutionContext context;
 
     *Process = nullptr;
+
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedInitProcess)
+        {
+            return m_cachedInitProcess.CopyTo(__uuidof(IWSLCProcess), (void**)Process);
+        }
+    }
+
     return CallImpl(&WSLCContainerImpl::GetInitProcess, Process);
 }
 
@@ -1551,6 +1609,21 @@ try
 }
 CATCH_RETURN();
 
+void WSLCContainer::CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
+try
+{
+    auto cacheLock = m_cacheLock.lock_exclusive();
+
+    // CacheState must only be called once, during DisconnectComWrapper().
+    WI_ASSERT(!m_cachedState.has_value());
+
+    m_cachedId = id;
+    m_cachedName = name;
+    m_cachedState = state;
+    m_cachedInitProcess = initProcess;
+}
+CATCH_LOG();
+
 HRESULT WSLCContainer::Export(ULONG OutHandle)
 {
     COMServiceExecutionContext context;
@@ -1574,6 +1647,15 @@ try
 {
     COMServiceExecutionContext context;
 
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedId.has_value())
+        {
+            WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), m_cachedId->c_str()) == 0);
+            return S_OK;
+        }
+    }
+
     auto [lock, impl] = LockImpl();
     WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), impl->ID().c_str()) == 0);
 
@@ -1586,7 +1668,17 @@ try
 {
     COMServiceExecutionContext context;
 
+    RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
+
+    {
+        auto cacheLock = m_cacheLock.lock_shared();
+        if (m_cachedName.has_value())
+        {
+            *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
+            return S_OK;
+        }
+    }
 
     auto [lock, impl] = LockImpl();
 

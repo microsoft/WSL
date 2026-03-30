@@ -54,7 +54,7 @@ public:
         ContainerEventTracker* m_tracker = nullptr;
     };
 
-    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>)>;
+    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::uint64_t)>;
 
     ContainerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay);
     ~ContainerEventTracker();

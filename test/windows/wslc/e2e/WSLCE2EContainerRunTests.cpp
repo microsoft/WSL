@@ -31,6 +31,7 @@ class WSLCE2EContainerRunTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -59,6 +60,43 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"echo_from_container\n", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(WslcContainerName, L"exited");
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm --entrypoint /bin/whoami {}", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"root\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_And_Arguments)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(
+            std::format(L"container run --rm --entrypoint /bin/echo {} hello from entrypoint with args", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"hello from entrypoint with args\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_Invalid_Path)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm --entrypoint /bin/does-not-exist {}", DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stdout = L"", .Stderr = L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: exec: \"/bin/does-not-exist\": stat /bin/does-not-exist: no such file or directory: unknown\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_Detach_Lifecycle)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container run --name {} -d --entrypoint /bin/sleep {} infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsListed(WslcContainerName, L"running");
     }
 
 private:
