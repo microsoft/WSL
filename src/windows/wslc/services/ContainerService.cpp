@@ -198,7 +198,9 @@ int ContainerService::Attach(Session& session, const std::string& id)
     wil::com_ptr<IWSLCProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
-    auto processFlags = ClientRunningWSLCProcess::GetProcessFlags(*process);
+    WSLCProcessFlags processFlags{};
+    THROW_IF_FAILED(process->GetFlags(&processFlags));
+
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
     ULONG stdinLogsHandle = 0;
@@ -312,7 +314,8 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     wil::com_ptr<IWSLCProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
-    auto processFlags = ClientRunningWSLCProcess::GetProcessFlags(*process);
+    WSLCProcessFlags processFlags{};
+    THROW_IF_FAILED(process->GetFlags(&processFlags));
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
     ConsoleService consoleService;

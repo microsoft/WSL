@@ -936,7 +936,7 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"lifecycle works\r\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
+        result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
     TEST_METHOD(WSLCE2E_Session_Shell)

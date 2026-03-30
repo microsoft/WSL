@@ -57,7 +57,6 @@ public:
     DEFAULT_MOVABLE(ClientRunningWSLCProcess);
 
     ClientRunningWSLCProcess(wil::com_ptr<IWSLCProcess>&& process, WSLCProcessFlags Flags);
-    static WSLCProcessFlags GetProcessFlags(IWSLCProcess& process);
     wil::unique_handle GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
     IWSLCProcess& Get();

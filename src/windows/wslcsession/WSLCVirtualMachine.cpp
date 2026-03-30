@@ -715,7 +715,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
         m_trackedProcesses.emplace_back(control.get());
     }
 
-    auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io));
+    auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options.Flags);
 
     setErrno(0);
 

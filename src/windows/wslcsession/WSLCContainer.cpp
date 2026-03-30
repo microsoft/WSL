@@ -540,7 +540,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     std::lock_guard processesLock{m_processesLock};
     m_initProcessControl = control.get();
 
-    m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io));
+    m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable {
         m_initProcess.Reset();
@@ -895,7 +895,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
 
         } while (!control->GetExitEvent().wait(100));
 
-        auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io));
+        auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options->Flags);
         THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLCProcess), (void**)Process));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to exec process in container %hs", m_id.c_str());
