@@ -25,13 +25,13 @@ using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
 namespace {
-    // Lazily compute the session storage base path after g_testDataPath is initialized.
+    // Lazily compute the session storage base path.
     struct SessionStorageBasePathAccessor
     {
         operator const std::filesystem::path&() const
         {
             static const std::filesystem::path basePath =
-                std::filesystem::absolute(std::filesystem::path(g_testDataPath) / L"wslc-cli-test-sessions");
+                std::filesystem::absolute(std::filesystem::current_path() / L"wslc-cli-test-sessions");
             return basePath;
         }
     };
