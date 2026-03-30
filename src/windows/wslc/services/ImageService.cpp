@@ -89,7 +89,11 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
     {
         const WSLCImageInformation& image = *ptr;
         ImageInformation info{};
-        info.Name = image.Image;
+        auto parsed = wsl::windows::common::wslutil::ParseImage(image.Image);
+        info.Repository = parsed.first;
+        info.Tag = parsed.second.value_or("latest");
+        info.Id = image.Hash;
+        info.Created = image.Created;
         info.Size = image.Size;
         result.push_back(info);
     }

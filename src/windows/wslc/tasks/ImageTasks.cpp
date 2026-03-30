@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
 #include "ImageTasks.h"
@@ -72,7 +73,7 @@ void ListImages(CLIExecutionContext& context)
         // Print only the image names.
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Name));
+            PrintMessage(MultiByteToWide(image.Repository + ":" + image.Tag));
         }
 
         return;
@@ -94,10 +95,23 @@ void ListImages(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+        utils::TablePrinter tablePrinter({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
         for (const auto& image : images)
         {
-            tablePrinter.AddRow({MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
+            // Truncate sha256:abc... to first 12 chars after prefix
+            auto id = image.Id;
+            if (id.starts_with("sha256:"))
+            {
+                id = id.substr(7, 12);
+            }
+
+            tablePrinter.AddRow({
+                MultiByteToWide(image.Repository),
+                MultiByteToWide(image.Tag),
+                MultiByteToWide(id),
+                ContainerService::FormatRelativeTime(static_cast<ULONGLONG>(image.Created)),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
+            });
         }
 
         tablePrinter.Print();
