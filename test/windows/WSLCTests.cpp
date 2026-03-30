@@ -3613,6 +3613,24 @@ class WSLCTests
             expectContainerList({});
         }
 
+        // Validate that Kill() works with non-sigkill signals.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-kill-2", {"sleep", "99999"}, {});
+            launcher.SetContainerFlags(WSLCContainerFlagsInit);
+
+            auto container = launcher.Create(*m_defaultSession);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGTERM));
+
+            VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(120 * 1000), WSLCSignalSIGTERM + 128);
+
+            // Verify that the container is in exited state.
+            expectContainerList({{"test-container-kill-2", "debian:latest", WslcContainerStateExited}});
+
+        }
+
         // Verify that trying to open a non existing container fails.
         {
             wil::com_ptr<IWSLCContainer> sameContainer;
