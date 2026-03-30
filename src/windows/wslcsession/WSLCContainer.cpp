@@ -1550,11 +1550,14 @@ HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 
     // DisconnectComWrapper() populates the cache before setting m_impl to null,
     // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
-    state = getCachedState();
-    if (WI_VERIFY(state.has_value()))
+    if (hr == RPC_E_DISCONNECTED)
     {
-        *Result = state.value();
-        hr = S_OK;
+        state = getCachedState();
+        if (WI_VERIFY(state.has_value()))
+        {
+            *Result = state.value();
+            return S_OK;
+        }
     }
 
     return hr;
