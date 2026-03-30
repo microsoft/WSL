@@ -24,7 +24,6 @@ Abstract:
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
-using namespace wsl::shared::string;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;

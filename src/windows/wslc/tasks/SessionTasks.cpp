@@ -20,7 +20,9 @@ Abstract:
 #include "Task.h"
 
 using namespace wsl::shared;
-using namespace wsl::windows::common;
+using namespace wsl::shared::string;
+using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::services;
 using wsl::windows::wslc::models::SessionOptions;
@@ -54,11 +56,11 @@ void ListSessions(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Verbose))
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
+        PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
     }
 
-    wsl::windows::wslc::TableOutput<3> table(
-        {Localization::MessageWslaHeaderId(), Localization::MessageWslaHeaderCreatorPid(), Localization::MessageWslaHeaderDisplayName()});
+    TableOutput<3> table(
+        {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
 
     for (const auto& session : sessions)
     {
@@ -71,4 +73,5 @@ void ListSessions(CLIExecutionContext& context)
 
     table.Complete();
 }
+
 } // namespace wsl::windows::wslc::task

@@ -23,6 +23,15 @@ Abstract:
 #include <wslutil.h>
 
 namespace wsl::windows::wslc {
+
+namespace detail {
+// This function outputs a table line.
+inline void PrintTableLine(const std::wstring& line, FILE* stream)
+{
+    ::wsl::windows::common::wslutil::PrintMessage(line, stream);
+}
+} // namespace detail
+
 // Helper function to get display width of a string
 // For now, uses simple length (can be enhanced with proper Unicode width calculation)
 inline size_t GetStringColumnWidth(const wchar_t* str)
@@ -380,9 +389,10 @@ private:
             }
         }
 
-        wsl::windows::common::wslutil::PrintMessage(m_stream.str(), stdout);
+        detail::PrintTableLine(m_stream.str(), stdout);
         m_stream.str(L"");
         m_stream.clear();
     }
 };
+
 } // namespace wsl::windows::wslc
