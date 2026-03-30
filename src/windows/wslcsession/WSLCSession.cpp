@@ -1186,12 +1186,6 @@ try
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
 
-        if (output[index].State != WslcContainerStateRunning)
-        {
-            index++;
-            continue;
-        }
-
         for (const auto& port : e->GetPorts())
         {
             WSLCContainerPortMapping mapping{};

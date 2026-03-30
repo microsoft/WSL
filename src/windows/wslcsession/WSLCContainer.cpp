@@ -421,6 +421,11 @@ const std::string& WSLCContainerImpl::Name() const noexcept
 std::vector<WSLCPortMapping> WSLCContainerImpl::GetPorts() const
 {
     auto lock = m_lock.lock_shared();
+    if (m_state != WslcContainerStateRunning)
+    {
+        return {};
+    }
+
     std::vector<WSLCPortMapping> result;
     result.reserve(m_mappedPorts.size());
     for (const auto& port : m_mappedPorts)
