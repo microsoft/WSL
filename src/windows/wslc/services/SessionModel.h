@@ -37,7 +37,6 @@ public:
     static constexpr const wchar_t s_defaultSessionName[] = L"wslc-cli";
     static constexpr const wchar_t s_defaultStorageSubPath[] = L"wslc\\storage";
     static constexpr uint32_t s_defaultBootTimeoutMs = 30 * 1000;
-    static constexpr WSLCNetworkingMode s_defaultNetworkingMode = WSLCNetworkingModeVirtioProxy;
 
     static SessionOptions Default()
     {
@@ -49,17 +48,6 @@ public:
     const WSLCSessionSettings* Get() const
     {
         return &m_sessionSettings;
-    }
-
-    // Accessor methods for settings not available in UserSettings
-    void SetBootTimeoutMs(uint32_t bootTimeoutMs)
-    {
-        m_sessionSettings.BootTimeoutMs = bootTimeoutMs;
-    }
-
-    void SetNetworkingMode(WSLCNetworkingMode networkingMode)
-    {
-        m_sessionSettings.NetworkingMode = networkingMode;
     }
 
 private:

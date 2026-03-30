@@ -35,7 +35,7 @@ SessionOptions::SessionOptions()
     m_sessionSettings.MemoryMb = settings::User().Get<settings::Setting::SessionMemoryMb>();
     m_sessionSettings.BootTimeoutMs = s_defaultBootTimeoutMs;
     m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
-    m_sessionSettings.NetworkingMode = s_defaultNetworkingMode;
+    m_sessionSettings.NetworkingMode = settings::User().Get<settings::Setting::SessionNetworkingMode>();
 }
 
 } // namespace wsl::windows::wslc::models
