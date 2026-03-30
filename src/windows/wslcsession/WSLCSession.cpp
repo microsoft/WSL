@@ -528,7 +528,7 @@ try
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, dockerfileFileHandle ? WSLCProcessFlagsStdin : WSLCProcessFlagsNone);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
-    auto io = CreateIOContext(CancelEvent);
+    auto io = CreateIOContext();
 
     if (dockerfileFileHandle)
     {
@@ -620,16 +620,37 @@ try
 
     io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
+    // Handle cancellation within the IO loop (NeedNotComplete) so pipes keep draining.
+    bool cancelled = false;
+    wil::unique_handle killTimer;
+    if (CancelEvent != nullptr)
+    {
+        killTimer.reset(CreateWaitableTimer(nullptr, TRUE, nullptr));
+        THROW_LAST_ERROR_IF_NULL(killTimer);
+
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(
+                CancelEvent,
+                [&]() {
+                    cancelled = true;
+                    LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
+                    LARGE_INTEGER dueTime{.QuadPart = -10LL * 10 * 1000 * 1000}; // 10 seconds
+                    THROW_IF_WIN32_BOOL_FALSE(SetWaitableTimer(killTimer.get(), &dueTime, 0, nullptr, nullptr, FALSE));
+                }),
+            relay::MultiHandleWait::NeedNotComplete);
+
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(
+                killTimer.get(), [&]() { LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL)); }),
+            relay::MultiHandleWait::NeedNotComplete);
+    }
+
     try
     {
         io.Run({});
     }
     catch (...)
     {
-        // If the IO loop was aborted (e.g. due to cancellation), terminate the build process and wait
-        // for it to exit before propagating the exception. SIGTERM lets the docker build client
-        // cancel the BuildKit build through the daemon's gRPC API, ensuring running build steps are
-        // torn down. If it doesn't exit within 10 seconds, SIGKILL forces termination.
         LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
         try
         {
@@ -637,18 +658,23 @@ try
         }
         catch (...)
         {
-            LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL));
-            try
+            if (wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_TIMEOUT))
             {
-                buildProcess.Wait(10 * 1000);
-            }
-            catch (...)
-            {
-                LOG_CAUGHT_EXCEPTION_MSG("Build process did not exit after SIGKILL");
+                LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL));
+                try
+                {
+                    buildProcess.Wait(10 * 1000);
+                }
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION_MSG("Build process did not exit after SIGKILL");
+                }
             }
         }
         throw;
     }
+
+    THROW_HR_IF_MSG(E_ABORT, cancelled, "Cancellation handle was signaled");
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
