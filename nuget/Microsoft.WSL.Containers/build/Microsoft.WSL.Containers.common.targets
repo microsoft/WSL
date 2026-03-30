@@ -100,8 +100,10 @@
               ConsoleToMSBuild="true" />
 
         <!--
-            TODO: Export image to tar when wslc image save is available.
-            TODO: Save image ID for check then load when wslc image inspect supports format flag.
+            Uncomment when wslc image save is available:
+        <MakeDir Directories="$(_WslcOutput)" />
+        <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcOutput)\$(_WslcName).tar&quot; &quot;$(_WslcName):$(_WslcTag)&quot;"
+              ConsoleToMSBuild="true" />
         -->
 
         <Touch Files="$(IntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
@@ -117,7 +119,8 @@
 
         <Delete Files="$(IntDir)wslc_%(WslcImage.Identity).marker" />
         <!--
-            TODO: Also clean tar and id files when wslc image save is available.
+            Uncomment when wslc image save is available:
+        <Delete Files="%(WslcImage.OutputDir)\%(WslcImage.Identity).tar" />
         -->
     </Target>
 

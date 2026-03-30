@@ -47,6 +47,10 @@
         <PropertyGroup>
             <_WslcDockerfileFullPath>$([System.IO.Path]::GetFullPath('$(_WslcDockerfile)'))</_WslcDockerfileFullPath>
             <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(IntDir)wslc_$(_WslcName).marker'))</_WslcMarkerFullPath>
+            <!--
+                Uncomment when wslc image save is available:
+            <_WslcTarFullPath>$([System.IO.Path]::GetFullPath('$(WslcImageOutputDir)$(_WslcName).tar'))</_WslcTarFullPath>
+            -->
         </PropertyGroup>
 
         <WriteLinesToFile
@@ -55,6 +59,14 @@
             Overwrite="true"
             Encoding="Unicode" />
 
+        <!--
+            Uncomment when wslc image save is available, to track tar output:
+        <WriteLinesToFile
+            File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
+            Lines="^$(_WslcDockerfileFullPath);$(_WslcMarkerFullPath);$(_WslcTarFullPath)"
+            Overwrite="true"
+            Encoding="Unicode" />
+        -->
         <WriteLinesToFile
             File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
             Lines="^$(_WslcDockerfileFullPath);$(_WslcMarkerFullPath)"
