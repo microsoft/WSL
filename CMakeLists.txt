@@ -56,9 +56,9 @@ set(YAML_CPP_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TOOLS   OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
 set(YAML_MSVC_SHARED_RT    OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING          OFF CACHE BOOL "" FORCE) # Prevents yaml-cpp from generating CTest* targets
 
 FetchContent_MakeAvailable(yaml-cpp)
-FetchContent_GetProperties(yaml-cpp SOURCE_DIR YAML_CPP_SOURCE_DIR)
 
 set(BOOST_VERSION "1.90.0")
 set(BOOST_TARBALL "boost_${BOOST_VERSION}")
