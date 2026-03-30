@@ -12,16 +12,16 @@ Abstract:
 
 --*/
 #include <precomp.h>
-#include <WSLAProcessLauncher.h>
+#include <WSLCProcessLauncher.h>
 #include "ConsoleService.h"
 
 namespace wsl::windows::wslc::services {
 
-using wsl::windows::common::ClientRunningWSLAProcess;
+using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 
-bool ConsoleService::RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh)
+bool ConsoleService::RelayInteractiveTty(ClientRunningWSLCProcess& Process, HANDLE Tty, bool triggerRefresh)
 {
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
@@ -87,25 +87,19 @@ void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_
 
     if (Stdin.is_valid())
     {
-        // Required because ReadFile() blocks if stdin is a tty.
-        if (wsl::windows::common::wslutil::IsInteractiveConsole())
-        {
-            // TODO: Will output CR instead of LF's which can confuse the linux app.
-            // Consider a custom relay logic to fix this.
-            inputThread = std::thread{[&]() {
-                try
-                {
-                    wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
-                }
-                CATCH_LOG();
+        // Required because ReadFile() blocks if stdin doesn't support overlapped IO.
+        // This can create pipe deadlocks if we get blocked reading stdin while data is available on stdout / stderr.
+        // TODO: Will output CR instead of LF's which can confuse the linux app.
+        // Consider a custom relay logic to fix this.
+        inputThread = std::thread{[&]() {
+            try
+            {
+                wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
+            }
+            CATCH_LOG();
 
-                Stdin.reset();
-            }};
-        }
-        else
-        {
-            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), std::move(Stdin)));
-        }
+            Stdin.reset();
+        }};
     }
 
     io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
@@ -114,11 +108,11 @@ void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_
     io.Run({});
 }
 
-int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWSLAProcess&& process)
+int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWSLCProcess&& process)
 {
-    if (WI_IsFlagSet(process.Flags(), WSLAProcessFlagsTty))
+    if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsTty))
     {
-        if (!RelayInteractiveTty(process, process.GetStdHandle(WSLAFDTty).get()))
+        if (!RelayInteractiveTty(process, process.GetStdHandle(WSLCFDTty).get()))
         {
             wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
             return 0;
@@ -127,12 +121,12 @@ int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWS
     else
     {
         wil::unique_handle stdinHandle;
-        if (WI_IsFlagSet(process.Flags(), WSLAProcessFlagsStdin))
+        if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsStdin))
         {
-            stdinHandle = process.GetStdHandle(WSLAFDStdin);
+            stdinHandle = process.GetStdHandle(WSLCFDStdin);
         }
 
-        RelayNonTtyProcess(std::move(stdinHandle), process.GetStdHandle(WSLAFDStdout), process.GetStdHandle(WSLAFDStderr));
+        RelayNonTtyProcess(std::move(stdinHandle), process.GetStdHandle(WSLCFDStdout), process.GetStdHandle(WSLCFDStderr));
     }
 
     return process.Wait();

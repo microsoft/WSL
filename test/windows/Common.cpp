@@ -253,9 +253,9 @@ Return Value:
     {
         THROW_HR_MSG(
             E_UNEXPECTED,
-            "Command \"%ls\""
+            "Command \"%ls\" "
             "returned unexpected exit code (%lu != %i). "
-            "Stdout: '%ls'"
+            "Stdout: '%ls' "
             "Stderr: '%ls'",
             Cmd,
             ExitCode,
@@ -833,7 +833,7 @@ void CreateWerReports()
         L"wslg.exe",
         L"vmcompute.exe",
         L"vmwp.exe",
-        L"wslasession.exe",
+        L"wslcsession.exe",
         L"wslc.exe"};
 
     auto PrivilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
@@ -2636,7 +2636,7 @@ std::string EscapeString(const std::string& Input)
 {
     std::string Output;
 
-    for (auto e : Input)
+    for (const auto& e : Input)
     {
         if (e == '\n')
         {
@@ -2653,6 +2653,10 @@ std::string EscapeString(const std::string& Input)
         else if (e == '\t')
         {
             Output += "\\t";
+        }
+        else if (e == '\x1b') // ESC character - start of VT sequence
+        {
+            Output += "\\x1b";
         }
         else
         {
@@ -2693,11 +2697,48 @@ std::string PartialHandleRead::ReadBytes(size_t Length)
     return m_data.substr(0, Length);
 }
 
+std::string PartialHandleRead::ConsumeBytes(size_t Length)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&]() {
+            std::lock_guard lock{m_mutex};
+
+            THROW_HR_IF(E_ABORT, m_data.size() < Length);
+        },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(60));
+
+    std::lock_guard lock{m_mutex};
+    std::string result = m_data.substr(0, Length);
+    m_data.erase(0, Length);
+    return result;
+}
+
+std::string PartialHandleRead::GetData() const
+{
+    std::lock_guard lock{m_mutex};
+    return m_data;
+}
+
 void PartialHandleRead::Expect(const std::string& Expected)
 {
     auto content = ReadBytes(Expected.size());
 
     VERIFY_ARE_EQUAL(content, Expected);
+}
+
+void PartialHandleRead::ExpectConsume(const std::string& Expected)
+{
+    auto content = ConsumeBytes(Expected.size());
+
+    if (content != Expected)
+    {
+        VERIFY_FAIL(std::format(
+                        L"Expected: '{}' but got: '{}'",
+                        wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
+                        wsl::shared::string::MultiByteToWide(EscapeString(content)))
+                        .c_str());
+    }
 }
 
 void PartialHandleRead::ExpectClosed(DWORD Timeout)

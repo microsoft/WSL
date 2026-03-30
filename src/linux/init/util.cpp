@@ -615,7 +615,7 @@ Return Value:
     return SocketFd;
 }
 
-int UtilCreateProcessAndWait(const char* const File, const char* const Argv[], int* Status, const std::map<std::string, std::string>& Env)
+int UtilCreateProcessAndWait(const char* const File, const char* const Argv[], int* Status, const std::map<std::string, std::string>& Env, bool DetachTerminal)
 
 /*++
 
@@ -631,6 +631,9 @@ Arguments:
 
     Status - Supplies an optional pointer that receives the exit status of the
         process.
+
+    DetachTerminal - Supplies a boolean that, when true, calls setsid() in the
+        child process to detach it from the controlling terminal.
 
 Return Value:
 
@@ -666,7 +669,7 @@ Return Value:
 
         if (UtilSetSignalHandlers(g_SavedSignalActions, false) < 0 || UtilRestoreBlockedSignals() < 0)
         {
-            exit(-1);
+            _exit(-1);
         }
 
         //
@@ -679,6 +682,19 @@ Return Value:
         }
 
         //
+        // Detach from the controlling terminal if requested.
+        //
+
+        if (DetachTerminal)
+        {
+            if (setsid() == -1)
+            {
+                LOG_ERROR("setsid failed {}", errno);
+                _exit(-1);
+            }
+        }
+
+        //
         // Invoke the executable.
         //
 
@@ -688,7 +704,7 @@ Return Value:
         // with std::string anyway.
         execv(File, const_cast<char* const*>(Argv));
         LOG_ERROR("execv({}) failed with {}", File, errno);
-        exit(-1);
+        _exit(-1);
     }
 
     if (Status == nullptr)
@@ -1756,13 +1772,18 @@ Return Value:
     //      - For Plan9 (9p): device is busy or not found
     //      - For VirtioFS: invalid tag (device not ready)
     //
+    // N.B. MS_SHARED must be applied in a separate mount() call, so it is
+    //      stripped from the initial mount flags and applied after the mount.
+    //
+
+    const unsigned long initialFlags = MountFlags & ~MS_SHARED;
 
     try
     {
         if (TimeoutSeconds.has_value())
         {
             wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() { THROW_LAST_ERROR_IF(mount(Source, Target, Type, MountFlags, Options) < 0); },
+                [&]() { THROW_LAST_ERROR_IF(mount(Source, Target, Type, initialFlags, Options) < 0); },
                 c_defaultRetryPeriod,
                 TimeoutSeconds.value(),
                 [&]() {
@@ -1788,7 +1809,7 @@ Return Value:
         }
         else
         {
-            THROW_LAST_ERROR_IF(mount(Source, Target, Type, MountFlags, Options) < 0);
+            THROW_LAST_ERROR_IF(mount(Source, Target, Type, initialFlags, Options) < 0);
         }
     }
     catch (...)
@@ -1796,6 +1817,16 @@ Return Value:
         errno = wil::ResultFromCaughtException();
         LOG_ERROR("mount({}, {}, {}, {:#x}, {}) failed {}", Source, Target, Type, MountFlags, Options, errno);
         return -errno;
+    }
+
+    // N.B. The shared flag must be applied in a separate mount() call.
+    if (WI_IsFlagSet(MountFlags, MS_SHARED))
+    {
+        if (mount(nullptr, Target, nullptr, MS_SHARED, nullptr) < 0)
+        {
+            LOG_ERROR("Failed to make shared mount {} {}", Target, errno);
+            return -errno;
+        }
     }
 
     return 0;

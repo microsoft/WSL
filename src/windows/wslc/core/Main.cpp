@@ -20,6 +20,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "RootCommand.h"
+#include "UserSettings.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -36,7 +37,7 @@ try
     wslutil::ConfigureCrt();
     wslutil::InitializeWil();
 
-    WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
+    WslTraceLoggingInitialize(WslcTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
 
     wslutil::SetCrtEncoding(_O_U8TEXT);

@@ -16,7 +16,7 @@ Abstract:
 #include "wslutil.h"
 #include "WslPluginApi.h"
 #include "wslinstallerservice.h"
-#include "wslaservice.h"
+#include "wslc.h"
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
@@ -87,7 +87,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
-    X(WSLA_E_CONTAINER_PREFIX_AMBIGUOUS),
+    X(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS),
     X(E_ACCESSDENIED),
     X_WIN32(ERROR_NOT_FOUND),
     X_WIN32(ERROR_VERSION_PARSE_ERROR),
@@ -148,8 +148,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WININET_E_TIMEOUT),
     X_WIN32(ERROR_INVALID_SID),
     X_WIN32(ERROR_INVALID_STATE),
-    X(WSLA_E_IMAGE_NOT_FOUND),
-    X(WSLA_E_CONTAINER_NOT_FOUND),
+    X(WSLC_E_IMAGE_NOT_FOUND),
+    X(WSLC_E_CONTAINER_NOT_FOUND),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED)};
 
@@ -253,6 +253,28 @@ constexpr GUID EndianSwap(GUID value)
     value.Data2 = EndianSwap(value.Data2);
     value.Data3 = EndianSwap(value.Data3);
     return value;
+}
+
+std::regex BuildImageReferenceRegex()
+{
+    // See: https://github.com/containers/image/blob/main/docker/reference/regexp.go
+
+    std::string alphaNum = "[a-z0-9]+";
+    std::string separator = "(?:[._]|__|[-]*)";
+    std::string domainComponent = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])";
+    std::string tag = "[\\w][\\w.-]{0,127}";
+    std::string digest = "[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}";
+
+    auto group = [](const auto& exp) { return std::format("(?:{})", exp); };
+    auto optional = [&group](const auto& exp) { return group(exp) + "?"; };
+    auto repeated = [&group](const auto& exp) { return group(exp) + "+"; };
+    auto capture = [](const auto& exp) { return std::format("({})", exp); };
+
+    auto nameComponent = alphaNum + optional(repeated(separator + alphaNum));
+    auto domain = domainComponent + optional(repeated("\\." + domainComponent)) + optional(":[0-9]+");
+    auto namePat = optional(domain + "\\/") + nameComponent + optional(repeated("\\/" + nameComponent));
+
+    return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
 }
 
 } // namespace
@@ -389,13 +411,14 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     return newHandle;
 }
 
-[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle)
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess)
 {
     const wil::unique_handle caller = OpenCallingProcess(PROCESS_DUP_HANDLE);
     THROW_LAST_ERROR_IF(!caller);
 
     HANDLE newHandle;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(caller.get(), Handle, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(
+        caller.get(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return newHandle;
 }
@@ -1051,6 +1074,44 @@ std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
     return pids;
 }
 
+std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo(const std::string& Input)
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
+
+    constexpr auto defaultDomain = "docker.io";
+    constexpr auto officialPrefix = "library/";
+    constexpr auto legacyDomain = "index.docker.io";
+    constexpr auto localhost = "localhost";
+
+    auto slash = Input.find('/');
+    if (slash == std::string::npos)
+    {
+        return {defaultDomain, officialPrefix + Input};
+    }
+
+    auto domain = Input.substr(0, slash);
+    auto path = Input.substr(slash + 1);
+
+    if (domain == legacyDomain)
+    {
+        domain = defaultDomain;
+    }
+    else if (domain != localhost && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, [](unsigned char e) {
+                 return std::isupper(e);
+             }))
+    {
+        domain = defaultDomain;
+        path = Input;
+    }
+
+    if (domain == defaultDomain && path.find('/') == std::string::npos)
+    {
+        path = "library/" + path;
+    }
+
+    return {domain, path};
+}
+
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
 {
     // Default to 4096 byte buffer, just like CreatePipe().
@@ -1162,6 +1223,35 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     catch (const std::exception& e)
     {
         THROW_HR_MSG(E_UNEXPECTED, "Failed to parse WSL package version: '%ls', %hs", Version.c_str(), e.what());
+    }
+}
+
+std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input)
+{
+    static const auto regex = BuildImageReferenceRegex();
+    std::smatch match;
+    if (!std::regex_match(Input, match, regex))
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(Input.c_str()));
+    }
+
+    const auto& repo = match[1];
+    const auto& tag = match[2];
+    const auto& digest = match[3];
+
+    THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
+
+    if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
+    {
+        return {repo.str(), digest.str()};
+    }
+    else if (tag.matched) // <repo>:<tag>
+    {
+        return {repo.str(), tag.str()}; // <repo>
+    }
+    else
+    {
+        return {repo.str(), std::nullopt};
     }
 }
 

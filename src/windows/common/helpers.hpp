@@ -197,4 +197,6 @@ void SetHandleInheritable(_In_ HANDLE Handle, _In_ bool Inheritable = true);
 
 bool TryAttachConsole();
 
+void RegisterWithDcat(_In_ bool IncludeVersionNumber = true);
+
 } // namespace wsl::windows::common::helpers
