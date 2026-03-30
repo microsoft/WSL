@@ -50,7 +50,7 @@ _(Env,            "env",                 L"e",              Kind::Value,       L
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       L"File containing key=value pairs of env variables") \
 _(File,           "file",                L"f",              Kind::Value,       L"Path to the Dockerfile (use \"-\" to read from stdin)") \
 _(Follow,         "follow",              L"f",              Kind::Flag,        L"Follow log output") \
-_(Format,         "format",              NO_ALIAS,          Kind::Value,       L"Output formatting (json or table) (Default:table)") \
+_(Format,         "format",              L"f",              Kind::Value,       L"Output formatting (json or table) (Default:table)") \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L"Arguments to pass to container's init process") \
 _(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       L"Group Id for the process") \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
@@ -80,4 +80,6 @@ _(Verbose,        "verbose",             L"v",              Kind::Flag,        L
 _(Version,        "version",             L"v",              Kind::Flag,        L"Show version information for this tool") \
 _(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container") \
 _(Volume,         "volume",              L"v",              Kind::Value,       L"Bind mount a volume to the container") \
+_(Workdir,        "workdir",             L"w",              Kind::Value,       L"Working directory inside the container") \
+_(Type,           "type",                NO_ALIAS,          Kind::Value,       L"Return JSON for specified type") \
 // clang-format on

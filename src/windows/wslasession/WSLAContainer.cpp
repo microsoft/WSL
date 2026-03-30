@@ -913,6 +913,9 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
 
     wslaInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
 
+    // Map Config from the Docker inspect data.
+    wslaInspect.Config.Image = dockerInspect.Config.Image;
+
     // Map WSLA port mappings (Windows host ports only). HostIp is not set here and will use
     // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
     for (const auto& e : m_mappedPorts)
@@ -923,7 +926,8 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
         wsla_schema::InspectPortBinding portBinding{};
         portBinding.HostPort = std::to_string(e.VmMapping.HostPort());
 
-        wslaInspect.Ports[portKey].push_back(std::move(portBinding));
+        wslaInspect.Ports[portKey].push_back(portBinding);
+        wslaInspect.NetworkSettings.Ports[portKey].push_back(std::move(portBinding));
     }
 
     // Map volume mounts using WSLA's host-side data.

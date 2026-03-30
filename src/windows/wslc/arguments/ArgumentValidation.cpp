@@ -143,7 +143,7 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
 
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    if (IsEqual(input, L"json"))
+    if (IsEqual(input, L"json") || IsEqual(input, L"{{json .}}"))
     {
         return FormatType::Json;
     }

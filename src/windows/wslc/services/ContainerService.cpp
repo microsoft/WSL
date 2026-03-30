@@ -347,9 +347,15 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLAProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(execFlags, WSLAProcessFlagsTty, options.TTY);
 
+    auto launcher = wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+
+    if (!options.WorkingDir.empty())
+    {
+        launcher.SetWorkingDirectory(std::move(options.WorkingDir));
+    }
+
     ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
+    return consoleService.AttachToCurrentConsole(launcher.Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
