@@ -60,7 +60,7 @@ public:
     }
 
 private:
-    std::wstring m_storagePath;
+    static const std::wstring& GetStoragePath();
     WSLASessionSettings m_sessionSettings{};
 };
 } // namespace wsl::windows::wslc::models
