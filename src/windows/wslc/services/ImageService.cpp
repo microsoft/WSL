@@ -18,6 +18,7 @@ Abstract:
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
+using namespace wsl::shared;
 using wsl::windows::common::wslc_schema::InspectImage;
 
 void ImageService::Build(
@@ -46,6 +47,48 @@ void ImageService::Build(
     {
         dockerfile.reset(CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
         THROW_LAST_ERROR_IF_MSG(!dockerfile, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
+        dockerfileHandle = dockerfile.get();
+    }
+    else
+    {
+        auto containerfilePath = absolutePath / L"Containerfile";
+        auto containerfileStatus = wil::try_open_file(containerfilePath.c_str());
+
+        auto dockerfilePath = absolutePath / L"Dockerfile";
+        auto dockerfileStatus = wil::try_open_file(containerfilePath.c_str());
+
+        // N.B. It's theoretically possible for both files to exist but for one of them to fail to open due to permissions errors.
+        // Handling that case would add a lot of complexity, so leaving this out for now since this is an unlikely scenario.
+        if (containerfileStatus.last_error != ERROR_NOT_FOUND && dockerfileStatus.last_error != ERROR_NOT_FOUND)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBothDockerAndContainerFileFound())
+        }
+
+        if (containerfileStatus.last_error != ERROR_NOT_FOUND)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(containerfileStatus.last_error),
+                Localization::MessageWslcFailedToOpenFile(
+                    containerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(containerfileStatus.last_error))),
+                !containerfileStatus.file.is_valid());
+
+            dockerfile = std::move(containerfileStatus.file);
+        }
+        else if (dockerfileStatus.last_error != ERROR_NOT_FOUND)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(dockerfileStatus.last_error),
+                Localization::MessageWslcFailedToOpenFile(
+                    dockerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(dockerfileStatus.last_error))),
+                !dockerfileStatus.file.is_valid());
+
+            dockerfile = std::move(dockerfileStatus.file);
+        }
+        else
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcContainerfileNotFound(absolutePath));
+        }
+
         dockerfileHandle = dockerfile.get();
     }
 
