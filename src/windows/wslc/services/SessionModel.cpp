@@ -14,25 +14,28 @@ Abstract:
 
 #include <precomp.h>
 #include "SessionModel.h"
+#include "UserSettings.h"
 
 namespace wsl::windows::wslc::models {
 
-const std::wstring& SessionOptions::GetStoragePath()
+const std::filesystem::path& SessionOptions::GetStoragePath()
 {
-    // Storage path is determined once at runtime and remains static thereafter.
-    static const std::wstring storagePath =
-        (wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::s_defaultSessionName).wstring();
+    static const std::filesystem::path storagePath =
+        settings::User().Get<settings::Setting::SessionStoragePath>().empty()
+            ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::s_defaultStorageSubPath}
+            : settings::User().Get<settings::Setting::SessionStoragePath>().c_str();
     return storagePath;
 }
 
-SessionOptions::SessionOptions(uint32_t cpuCount, uint32_t memoryMb, uint32_t bootTimeoutMs, uint64_t maximumStorageSizeMb, WSLANetworkingMode networkingMode)
+SessionOptions::SessionOptions()
 {
     m_sessionSettings.DisplayName = s_defaultSessionName;
     m_sessionSettings.StoragePath = GetStoragePath().c_str();
-    m_sessionSettings.CpuCount = cpuCount;
-    m_sessionSettings.MemoryMb = memoryMb;
-    m_sessionSettings.BootTimeoutMs = bootTimeoutMs;
-    m_sessionSettings.MaximumStorageSizeMb = maximumStorageSizeMb;
-    m_sessionSettings.NetworkingMode = networkingMode;
+    m_sessionSettings.CpuCount = settings::User().Get<settings::Setting::SessionCpuCount>();
+    m_sessionSettings.MemoryMb = settings::User().Get<settings::Setting::SessionMemoryMb>();
+    m_sessionSettings.BootTimeoutMs = s_defaultBootTimeoutMs;
+    m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
+    m_sessionSettings.NetworkingMode = s_defaultNetworkingMode;
 }
+
 } // namespace wsl::windows::wslc::models

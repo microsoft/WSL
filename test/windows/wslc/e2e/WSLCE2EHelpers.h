@@ -16,7 +16,8 @@ Abstract:
 #include "WSLCExecutor.h"
 #include <docker_schema.h>
 #include <chrono>
-#include <wsla_schema.h>
+#include <wslc_schema.h>
+#include <ContainerModel.h>
 
 namespace WSLCE2ETests {
 
@@ -98,9 +99,9 @@ const TestImage& InvalidTestImage();
 
 struct TestSession
 {
-    static TestSession Create(const std::wstring& displayName, WSLANetworkingMode networkingMode = WSLANetworkingModeNone);
+    static TestSession Create(const std::wstring& displayName, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone);
 
-    TestSession(std::wstring name, std::filesystem::path storagePath, wil::com_ptr<IWSLASession> session) :
+    TestSession(std::wstring name, std::filesystem::path storagePath, wil::com_ptr<IWSLCSession> session) :
         m_name(std::move(name)), m_storagePath(std::move(storagePath)), m_session(std::move(session))
     {
     }
@@ -123,7 +124,7 @@ struct TestSession
 private:
     std::wstring m_name;
     std::filesystem::path m_storagePath;
-    wil::com_ptr<IWSLASession> m_session;
+    wil::com_ptr<IWSLCSession> m_session;
 };
 
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
@@ -131,12 +132,14 @@ void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
-wsl::windows::common::wsla_schema::InspectContainer InspectContainer(const std::wstring& containerName);
-wsl::windows::common::wsla_schema::InspectImage InspectImage(const std::wstring& imageName);
+wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
+wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
+std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
 void EnsureImageIsLoaded(const TestImage& image);
 void EnsureImageIsDeleted(const TestImage& image);
+void EnsureImageContainersAreDeleted(const TestImage& image);
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>

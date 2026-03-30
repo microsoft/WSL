@@ -23,7 +23,7 @@ namespace WSLCE2ETests {
 
 class WSLCE2EGlobalTests
 {
-    WSLA_TEST_CLASS(WSLCE2EGlobalTests)
+    WSLC_TEST_CLASS(WSLCE2EGlobalTests)
 
     wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
 
@@ -61,7 +61,7 @@ class WSLCE2EGlobalTests
         const auto sessionName = std::format(L"wslc-test-{}", guidStr.substr(0, 8));
 
         // Create a test session with VirtioProxy mode so it can pull images and create containers.
-        auto session = TestSession::Create(sessionName, WSLANetworkingModeVirtioProxy);
+        auto session = TestSession::Create(sessionName, WSLCNetworkingModeVirtioProxy);
 
         // Verify targeting a non-existent session fails.
         auto result = RunWslc(L"container list --session INVALID_SESSION_NAME");
@@ -123,6 +123,7 @@ private:
                  << L"  container  Container command.\r\n"
                  << L"  image      Image command.\r\n"
                  << L"  session    Session command.\r\n"
+                 << L"  settings   Open the settings file in the default editor.\r\n"
                  << L"  attach     Attach to a container.\r\n"
                  << L"  build      Build an image from a Dockerfile.\r\n"
                  << L"  create     Create a container.\r\n"

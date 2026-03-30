@@ -25,7 +25,7 @@ using namespace WEX::Logging;
 
 class WSLCE2EContainerCreateTests
 {
-    WSLA_TEST_CLASS(WSLCE2EContainerCreateTests)
+    WSLC_TEST_CLASS(WSLCE2EContainerCreateTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {
@@ -99,9 +99,9 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
         std::wstringstream expectedError;
         expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
-                      << L"pull access denied for library/"
-                      << InvalidImage.Name << L", repository does not exist or may require 'docker login': denied: requested access to the resource is denied\r\n"
-                      << L"Error code: WSLA_E_IMAGE_NOT_FOUND\r\n";
+                      << L"manifest for " << InvalidImage.NameAndTag()
+                      << L" not found: manifest unknown: manifest tagged by \"latest\" is not found\r\n"
+                      << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
 

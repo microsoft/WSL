@@ -70,7 +70,7 @@ void ListSessions(CLIExecutionContext& context)
     }
 
     utils::TablePrinter tablePrinter(
-        {Localization::MessageWslaHeaderId(), Localization::MessageWslaHeaderCreatorPid(), Localization::MessageWslaHeaderDisplayName()});
+        {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
     for (const auto& session : sessions)
     {
         tablePrinter.AddRow({

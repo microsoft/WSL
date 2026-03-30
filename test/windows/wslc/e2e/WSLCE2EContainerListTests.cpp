@@ -23,7 +23,7 @@ using namespace wsl::windows::wslc::models;
 
 class WSLCE2EContainerListTests
 {
-    WSLA_TEST_CLASS(WSLCE2EContainerListTests)
+    WSLC_TEST_CLASS(WSLCE2EContainerListTests)
 
     TEST_CLASS_SETUP(ClassSetup)
     {

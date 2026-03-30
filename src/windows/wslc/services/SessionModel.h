@@ -13,54 +13,58 @@ Abstract:
 --*/
 #pragma once
 
-#include <wslservice.h>
-#include <wslaservice.h>
+#include <wslc.h>
 
 namespace wsl::windows::wslc::models {
 
 struct Session
 {
-    explicit Session(wil::com_ptr<IWSLASession> session) : m_session(std::move(session))
+    explicit Session(wil::com_ptr<IWSLCSession> session) : m_session(std::move(session))
     {
     }
-    IWSLASession* Get() const noexcept
+    IWSLCSession* Get() const noexcept
     {
         return m_session.get();
     }
 
 private:
-    wil::com_ptr<IWSLASession> m_session;
+    wil::com_ptr<IWSLCSession> m_session;
 };
 
 class SessionOptions
 {
 public:
     static constexpr const wchar_t s_defaultSessionName[] = L"wslc-cli";
-    static constexpr uint32_t c_defaultCpuCount = 4;
-    static constexpr uint32_t c_defaultMemoryMb = 2048;
-    static constexpr uint32_t c_defaultBootTimeoutMs = 30000;
-    static constexpr uint64_t c_defaultMaximumStorageSizeMb = 10000; // 10GB
-    static constexpr WSLANetworkingMode c_defaultNetworkingMode = WSLANetworkingModeVirtioProxy;
+    static constexpr const wchar_t s_defaultStorageSubPath[] = L"wslc\\storage";
+    static constexpr uint32_t s_defaultBootTimeoutMs = 30 * 1000;
+    static constexpr WSLCNetworkingMode s_defaultNetworkingMode = WSLCNetworkingModeVirtioProxy;
 
     static SessionOptions Default()
     {
         return SessionOptions();
     }
 
-    explicit SessionOptions(
-        uint32_t cpuCount = c_defaultCpuCount,
-        uint32_t memoryMb = c_defaultMemoryMb,
-        uint32_t bootTimeoutMs = c_defaultBootTimeoutMs,
-        uint64_t maximumStorageSizeMb = c_defaultMaximumStorageSizeMb,
-        WSLANetworkingMode networkingMode = c_defaultNetworkingMode);
+    SessionOptions();
 
-    const WSLASessionSettings* Get() const
+    const WSLCSessionSettings* Get() const
     {
         return &m_sessionSettings;
     }
 
+    // Accessor methods for settings not available in UserSettings
+    void SetBootTimeoutMs(uint32_t bootTimeoutMs)
+    {
+        m_sessionSettings.BootTimeoutMs = bootTimeoutMs;
+    }
+
+    void SetNetworkingMode(WSLCNetworkingMode networkingMode)
+    {
+        m_sessionSettings.NetworkingMode = networkingMode;
+    }
+
 private:
-    static const std::wstring& GetStoragePath();
-    WSLASessionSettings m_sessionSettings{};
+    static const std::filesystem::path& GetStoragePath();
+    WSLCSessionSettings m_sessionSettings{};
 };
+
 } // namespace wsl::windows::wslc::models

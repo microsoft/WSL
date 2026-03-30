@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 #include <windows.h>
 #include "wslcsdk.h"
-#include "wslaservice.h"
+#include "wslc.h"
 #include "IOCallback.h"
 #include <stdint.h>
 #include <wil/com.h> // COM helpers
@@ -85,7 +85,7 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerVolume* volumes;
     uint32_t volumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
-    WSLAContainerNetworkType networking;
+    WSLCContainerNetworkType networking;
     WslcContainerFlags containerFlags;
 
 } WslcContainerOptionsInternal;
@@ -104,7 +104,7 @@ const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings*
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLASession> session;
+    wil::com_ptr<IWSLCSession> session;
     wil::com_ptr<ITerminationCallback> terminationCallback;
 };
 
@@ -112,7 +112,7 @@ WslcSessionImpl* GetInternalType(WslcSession handle);
 
 struct WslcContainerImpl
 {
-    wil::com_ptr<IWSLAContainer> container;
+    wil::com_ptr<IWSLCContainer> container;
     WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
     std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };
@@ -121,7 +121,7 @@ WslcContainerImpl* GetInternalType(WslcContainer handle);
 
 struct WslcProcessImpl
 {
-    wil::com_ptr<IWSLAProcess> process;
+    wil::com_ptr<IWSLCProcess> process;
     std::shared_ptr<IOCallback> ioCallbacks;
 };
 
