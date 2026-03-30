@@ -50,11 +50,11 @@ class WSLCE2EImageListTests
     {
         WSL2_TEST_ONLY();
 
-        const auto result = RunWslc(L"image list");
+        const auto result = RunWslc(L"image list -q");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : result.GetStdoutLines())
         {
-            if (line.find(DebianImage.Name) != std::wstring::npos)
+            if (line.find(DebianImage.NameAndTag()) != std::wstring::npos)
             {
                 return;
             }
