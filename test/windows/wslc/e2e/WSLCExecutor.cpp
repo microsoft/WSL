@@ -26,7 +26,7 @@ using namespace wsl::windows::common;
 namespace {
     wil::unique_handle GetNonElevatedPrimaryToken()
     {
-        // This method is necessary becuase GetNonElevatedToken(TokenPrimary) does
+        // This method is necessary because GetNonElevatedToken(TokenPrimary) does
         // not actually give a de-elevated token when called from an elevated process.
         // By getting impersonation token first this de-elevates the token, and then
         // converts it to a primary token.

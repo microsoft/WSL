@@ -72,16 +72,15 @@ struct WSLCInteractiveSession
     void ExpectStderr(const std::string& expected);
     void ExpectCommandEcho(const std::string& command);
 
-    void WaitForExit(DWORD timeoutMs = DefaultWaitTimeoutMs);
-    int Wait(DWORD timeoutMs = DefaultWaitTimeoutMs);
-    bool Terminate(UINT exitCode);
-    void VerifyNoErrors();
-    int Exit(DWORD timeoutMs = DefaultWaitTimeoutMs);
-    int ExitAndVerifyNoErrors(DWORD timeoutMs = DefaultWaitTimeoutMs);
-
     bool IsRunning() const;
     void CloseStdin();
     std::optional<int> GetExitCode() const;
+    void WaitForExit(DWORD timeoutMs = DefaultWaitTimeoutMs);
+    int Wait(DWORD timeoutMs = DefaultWaitTimeoutMs);
+    bool Terminate(UINT exitCode = 1);
+    void VerifyNoErrors();
+    int Exit(DWORD timeoutMs = DefaultWaitTimeoutMs);
+    int ExitAndVerifyNoErrors(DWORD timeoutMs = DefaultWaitTimeoutMs);
 
 private:
     wil::unique_hfile m_stdinWrite;
