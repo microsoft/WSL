@@ -868,16 +868,12 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        // The container attach prompt is different for the first prompt.
-        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
         const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
 
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // The container attach prompt appears twice.
-        session.ExpectStdout(expectedAttachPrompt);
-        session.ExpectStdout(expectedAttachPrompt);
+        session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
         session.ExpectCommandEcho("echo hello");
@@ -921,6 +917,22 @@ class WSLCE2EContainerCreateTests
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
         session.VerifyNoErrors();
+    }
+
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_ShortRunningInitProcess)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        constexpr auto ExpectedExitCode = 37;
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
+
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
     TEST_METHOD(WSLCE2E_Session_Shell)
