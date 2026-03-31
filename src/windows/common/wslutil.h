@@ -170,6 +170,8 @@ std::wstring ErrorCodeToString(HRESULT Error);
 
 ErrorStrings ErrorToString(const Error& error);
 
+HANDLE FromCOMInputHandle(WSLCHandle Handle);
+
 std::filesystem::path GetBasePath();
 
 std::optional<COMErrorInfo> GetCOMErrorInfo();
@@ -266,6 +268,8 @@ void SetCrtEncoding(int Mode);
 void SetThreadDescription(LPCWSTR Name);
 
 wil::unique_hlocal_string SidToString(_In_ PSID Sid);
+
+WSLCHandle ToCOMInputHandle(HANDLE Handle, DWORD Access = GENERIC_READ | SYNCHRONIZE);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 

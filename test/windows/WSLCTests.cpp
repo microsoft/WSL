@@ -27,7 +27,7 @@ using wsl::windows::common::WSLCContainerLauncher;
 using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
-using wsl::windows::common::wslutil::PruneResult;
+using namespace wsl::windows::common::wslutil;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -53,7 +53,7 @@ class WSLCTests
         LARGE_INTEGER fileSize{};
         THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-        THROW_IF_FAILED(m_defaultSession->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+        THROW_IF_FAILED(m_defaultSession->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
     }
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -844,7 +844,7 @@ class WSLCTests
         LARGE_INTEGER fileSize{};
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+        VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "hello-world:latest");
@@ -861,7 +861,7 @@ class WSLCTests
             auto currentExecutableHandle = wil::open_file(wil::GetModuleFileNameW<std::wstring>().c_str());
             VERIFY_IS_TRUE(GetFileSizeEx(currentExecutableHandle.get(), &fileSize));
 
-            VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(HandleToULong(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
+            VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(ToCOMInputHandle(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
         }
@@ -880,7 +880,7 @@ class WSLCTests
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
         VERIFY_SUCCEEDED(
-            m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
+            m_defaultSession->ImportImage(ToCOMInputHandle(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
 
         ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
@@ -896,7 +896,7 @@ class WSLCTests
         // Validate that ImportImage fails if no tag is passed
         {
             VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+                m_defaultSession->ImportImage(ToCOMInputHandle(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
         }
 
         // Validate that invalid tars fail with proper error message and code.
@@ -907,7 +907,7 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(
                 m_defaultSession->ImportImage(
-                    HandleToULong(currentExecutableHandle.get()), "invalid-image:test", nullptr, fileSize.QuadPart),
+                    ToCOMInputHandle(currentExecutableHandle.get()), "invalid-image:test", nullptr, fileSize.QuadPart),
                 E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
@@ -1806,7 +1806,7 @@ class WSLCTests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             // Load the image from a saved tar
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:latest");
             WSLCContainerLauncher launcher("hello-world:latest", "wslc-hello-world-container");
@@ -1841,7 +1841,7 @@ class WSLCTests
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 // Load the image from a saved tar
-                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "hello-world:latest");
                 WSLCContainerLauncher launcher("hello-world:latest", "wslc-hello-world-container");
@@ -1901,7 +1901,7 @@ class WSLCTests
 
         wil::unique_event testCompleted{wil::EventOptions::ManualReset};
         std::thread operationThread([&]() {
-            result.set_value(m_defaultSession->ImportImage(HandleToULong(pipeRead.get()), "dummy:latest", nullptr, 1024 * 1024));
+            result.set_value(m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "dummy:latest", nullptr, 1024 * 1024));
 
             WI_ASSERT(testCompleted.is_signaled()); // Sanity check.
         });
@@ -1950,7 +1950,7 @@ class WSLCTests
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "hello-world:latest");
                 WSLCContainerLauncher launcher("hello-world:latest", "wslc-hello-world-container");
@@ -1985,7 +1985,7 @@ class WSLCTests
                 });
 
                 VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
-                    HandleToULong(containerTarFileHandle.get()), "test-imported-container:latest", nullptr, fileSize.QuadPart));
+                    ToCOMInputHandle(containerTarFileHandle.get()), "test-imported-container:latest", nullptr, fileSize.QuadPart));
 
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "test-imported-container:latest");

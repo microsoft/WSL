@@ -529,6 +529,21 @@ wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(
     return errorStrings;
 }
 
+HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(const WSLCHandle Handle)
+{
+    switch (Handle.Type)
+    {
+    case WSLCHandleTypeFile:
+        return Handle.Handle.File;
+    case WSLCHandleTypePipe:
+        return Handle.Handle.Pipe;
+    case WSLCHandleTypeSocket:
+        return Handle.Handle.Socket;
+    default:
+        THROW_HR_MSG(E_UNEXPECTED, "Unsupported handle type: %d", Handle.Type);
+    }
+}
+
 std::wstring wsl::windows::common::wslutil::ConstructPipePath(std::wstring_view PipeName)
 {
     return c_pipePrefix + std::wstring(PipeName);
@@ -1309,6 +1324,35 @@ wil::unique_hlocal_string wsl::windows::common::wslutil::SidToString(_In_ PSID U
     THROW_LAST_ERROR_IF(!ConvertSidToStringSid(UserSid, &sid));
 
     return sid;
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle, DWORD Access)
+{
+    auto handleWithPermissions = wil::unique_handle{DuplicateHandle(Handle, Access, FALSE)};
+
+    auto type = GetFileType(Handle);
+    if (type == FILE_TYPE_PIPE)
+    {
+        int socketType{};
+        int len = sizeof(socketType);
+
+        if (getsockopt(reinterpret_cast<SOCKET>(Handle), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &len) == 0)
+        {
+            return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = handleWithPermissions.get()}};
+        }
+        else
+        {
+            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = handleWithPermissions.get()}};
+        }
+    }
+    else if (type == FILE_TYPE_DISK)
+    {
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = handleWithPermissions.get()}};
+    }
+    else
+    {
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", type);
+    }
 }
 
 winrt::Windows::Management::Deployment::PackageVolume wsl::windows::common::wslutil::GetSystemVolume()

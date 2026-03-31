@@ -673,7 +673,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLCSession::LoadImage(const WSLCHandle ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -691,7 +691,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLCSession::ImportImage(const WSLCHandle ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -716,9 +716,11 @@ try
 }
 CATCH_RETURN();
 
-void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
+void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
 {
-    auto userHandle = OpenUserHandle(InputHandle, GENERIC_READ | SYNCHRONIZE);
+    // auto userHandle = OpenUserHandle(InputHandle, GENERIC_READ | SYNCHRONIZE);
+
+    auto userHandle = common::wslutil::FromCOMInputHandle(ImageHandle);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -778,7 +780,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     };
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        userHandle.Get(), common::relay::HandleWrapper{Request.stream.native_handle()}));
+        userHandle, common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),

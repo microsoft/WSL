@@ -296,6 +296,35 @@ typedef struct _WSLCContainerEntry
     WSLCContainerState State;
 } WSLCContainerEntry;
 
+typedef [system_handle(sh_file)] HANDLE FILE_HANDLE;
+typedef [system_handle(sh_pipe)] HANDLE PIPE_HANDLE;
+typedef [system_handle(sh_socket)] HANDLE SOCKET_HANDLE;
+
+typedef [v1_enum] enum _WSLCHandleType
+{
+    WSLCHandleTypeUnknown = 0,
+    WSLCHandleTypeFile = 1,
+    WSLCHandleTypePipe = 2,
+    WSLCHandleTypeSocket = 3
+} WSLCHandleType;
+
+typedef struct _WSLCHandle
+{
+    WSLCHandleType Type;
+
+    [switch_type(WSLCHandleType), switch_is(Type)]
+    union
+    {
+        [case(WSLCHandleTypeFile)]
+        FILE_HANDLE File;
+        [case(WSLCHandleTypePipe)]
+        PIPE_HANDLE Pipe;
+        [case(WSLCHandleTypeSocket)]
+        SOCKET_HANDLE Socket;
+        [default];
+    } Handle;
+} WSLCHandle;
+
 typedef enum _WSLCProcessState
 {
     WslcProcessStateUnknown = 0,
@@ -535,8 +564,8 @@ interface IWSLCSession : IUnknown
     // Image management.
     HRESULT PullImage([in] LPCSTR Image, [in, unique] const  WslcRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
-    HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImageOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);

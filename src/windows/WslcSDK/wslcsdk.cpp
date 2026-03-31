@@ -1051,8 +1051,9 @@ static HRESULT WslcImportSessionImageImpl(
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+    return S_OK;
+    ///return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
+    //    HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1089,8 +1090,9 @@ static HRESULT WslcLoadSessionImageImpl(
 {
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+    return S_OK;
+    //return errorInfoWrapper.CaptureResult(
+      //  internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcLoadSessionImage(
