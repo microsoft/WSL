@@ -45,7 +45,8 @@ SessionOptions::SessionOptions()
 
 bool SessionOptions::IsElevated()
 {
-    auto token = wil::open_current_access_token(TOKEN_QUERY);
+    wil::unique_handle token;
+    THROW_IF_WIN32_BOOL_FALSE(::OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token));
 
     // IsTokenElevated checks if the integrity level is exactly HIGH.
     // We must also check for local system because it is above HIGH.
