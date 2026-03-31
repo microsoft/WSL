@@ -140,6 +140,7 @@ private:
                  << L"  remove     Remove containers.\r\n"
                  << L"  rmi        Remove images.\r\n"
                  << L"  run        Run a container.\r\n"
+                 << L"  save       Save images.\r\n"
                  << L"  start      Start a container.\r\n"
                  << L"  stop       Stop containers.\r\n"
                  << L"\r\n"
