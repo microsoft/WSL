@@ -8,7 +8,8 @@ set(SOURCES
     Common.cpp
     PluginTests.cpp
     PolicyTests.cpp
-    InstallerTests.cpp)
+    InstallerTests.cpp
+    DiagnosticsTests.cpp)
 
 set(HEADERS
     Common.h

@@ -14,29 +14,9 @@ Abstract:
 
 #include "precomp.h"
 #include "WslCoreInstance.h"
+#include "DiagnosticsHelpers.h"
 
-namespace {
-std::wstring CreateInstanceStepDescription(_In_ LX_MINI_CREATE_INSTANCE_STEP step)
-{
-    switch (step)
-    {
-    case LxInitCreateInstanceStepFormatDisk:
-        return wsl::shared::Localization::MessageCreateInstanceStepFormatDisk();
-
-    case LxInitCreateInstanceStepMountDisk:
-        return wsl::shared::Localization::MessageCreateInstanceStepMountDisk();
-
-    case LxInitCreateInstanceStepLaunchSystemDistro:
-        return wsl::shared::Localization::MessageCreateInstanceStepLaunchDistribution();
-
-    case LxInitCreateInstanceStepRunTar:
-        return wsl::shared::Localization::MessageCreateInstanceStepRunTar();
-
-    default:
-        return wsl::shared::Localization::MessageCreateInstanceStepUnknown();
-    }
-}
-} // namespace
+using wsl::windows::service::diagnostics::CreateInstanceStepDescription;
 
 WslCoreInstance::WslCoreInstance(
     _In_ HANDLE UserToken,
