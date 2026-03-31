@@ -138,28 +138,28 @@ stages:
                 UseMSIAuthentication: true
                 EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
                 inlineOperation: |
-                [
-                      {
-                          "KeyCode": "CP-230012",
-                          "OperationCode": "SigntoolSign",
-                          "Parameters" : {
-                                "OpusName" : "Microsoft",
-                                "OpusInfo" : "http://www.microsoft.com",
-                                "FileDigest" : "/fd \"SHA256\"",
-                                "PageHash" : "/NPH",
-                                "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
-                            },
-                            "ToolName" : "sign",
-                            "ToolVersion" : "1.0"
-                        },
+                  [
                         {
-                            "KeyCode" : "CP-230012",
-                            "OperationCode" : "SigntoolVerify",
-                            "Parameters" : {},
-                            "ToolName" : "sign",
-                            "ToolVersion" : "1.0"
-                        }
-                  ]
+                            "KeyCode": "CP-230012",
+                            "OperationCode": "SigntoolSign",
+                            "Parameters" : {
+                                  "OpusName" : "Microsoft",
+                                  "OpusInfo" : "http://www.microsoft.com",
+                                  "FileDigest" : "/fd \"SHA256\"",
+                                  "PageHash" : "/NPH",
+                                  "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                              },
+                              "ToolName" : "sign",
+                              "ToolVersion" : "1.0"
+                          },
+                          {
+                              "KeyCode" : "CP-230012",
+                              "OperationCode" : "SigntoolVerify",
+                              "Parameters" : {},
+                              "ToolName" : "sign",
+                              "ToolVersion" : "1.0"
+                          }
+                    ]
 
           - ${{ if not(eq(parameters.isRelease, true)) }}:
             - powershell: |

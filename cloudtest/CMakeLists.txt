@@ -22,7 +22,7 @@ if (OFFICIAL_BUILD)
     set(ALLOW_UNSIGNED_PACKAGE "0")
     # Release builds test the real signed bundle from the package stage
     set(TEST_PACKAGE_PROVIDER "[package]")
-    set(TEST_PACKAGE_PATH "bundle/Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle")
+    set(TEST_PACKAGE_PATH "bundle\\Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle")
     set(TEST_PACKAGE_FILE "Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle")
     set(PACKAGE_PROVIDER_BLOCK "    <Provider Type=\"PipelineArtifacts\">
       <Properties>
@@ -35,7 +35,7 @@ else()
     set(ALLOW_UNSIGNED_PACKAGE "1")
     # PR builds test the installer.msix directly from the build artifact (no bundle needed)
     set(TEST_PACKAGE_PROVIDER "[drop]")
-    set(TEST_PACKAGE_PATH "testbin/x64/release/installer.msix")
+    set(TEST_PACKAGE_PATH "testbin\\x64\\release\\installer.msix")
     set(TEST_PACKAGE_FILE "installer.msix")
     set(PACKAGE_PROVIDER_BLOCK "")
 endif()
