@@ -149,8 +149,9 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
     wil::unique_hfile outputFile{
         CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!outputFile);
-    
-    wsl::windows::common::HandleConsoleProgressBar progressBar(outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+
+    wsl::windows::common::HandleConsoleProgressBar progressBar(
+        outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
     THROW_IF_FAILED(session.Get()->SaveImage(HandleToULong(outputFile.get()), image.c_str(), nullptr, cancelEvent));
 }
 
