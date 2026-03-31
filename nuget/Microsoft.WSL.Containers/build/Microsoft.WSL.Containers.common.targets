@@ -99,17 +99,15 @@
         <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
-        <!--
-            Uncomment when wslc image save is available:
         <MakeDir Directories="$(_WslcOutput)" />
+
         <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcOutput)\$(_WslcName).tar&quot; &quot;$(_WslcName):$(_WslcTag)&quot;"
               ConsoleToMSBuild="true" />
-        -->
 
         <Touch Files="$(IntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
 
         <Message Importance="high"
-                 Text="WSLC: [$(_WslcName)] Image '$(_WslcName):$(_WslcTag)' built successfully." />
+                 Text="WSLC: [$(_WslcName)] Image '$(_WslcName):$(_WslcTag)' saved to '$(_WslcOutput)\$(_WslcName).tar'." />
     </Target>
 
     <!-- Clean container artifacts -->
@@ -118,10 +116,7 @@
             Condition="'@(WslcImage)' != ''">
 
         <Delete Files="$(IntDir)wslc_%(WslcImage.Identity).marker" />
-        <!--
-            Uncomment when wslc image save is available:
         <Delete Files="%(WslcImage.OutputDir)\%(WslcImage.Identity).tar" />
-        -->
     </Target>
 
 </Project>
