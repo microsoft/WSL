@@ -5248,6 +5248,7 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "logs-test-3", {"/bin/bash", "-c", "echo -n OK"});
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK"}});
 
             wil::unique_handle stdoutLogs;
             wil::unique_handle stderrLogs;
