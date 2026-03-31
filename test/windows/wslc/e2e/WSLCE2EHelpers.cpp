@@ -50,7 +50,7 @@ const TestImage& InvalidTestImage()
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
-    auto result = RunWslc(L"container list --all");
+    auto result = RunWslc(L"container list --no-trunc --all");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -87,7 +87,7 @@ void VerifyImageIsUsed(const TestImage& image)
 
 void VerifyImageIsNotUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"container list -a");
+    auto result = RunWslc(L"container list --no-trunc --all");
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -101,21 +101,7 @@ void VerifyImageIsNotUsed(const TestImage& image)
 
 std::string GetHashId(const std::string& id, bool fullId)
 {
-    const int shortIdLength = 12;
-    VERIFY_IS_GREATER_THAN_OR_EQUAL(id.length(), shortIdLength);
-    if (fullId)
-    {
-        return id;
-    }
-
-    // Remove the "sha256:" prefix if it exists and return the first 12 characters
-    const std::string prefix = "sha256:";
-    if (id.rfind(prefix, 0) == 0)
-    {
-        return id.substr(prefix.length(), shortIdLength);
-    }
-
-    return id.substr(0, shortIdLength);
+    return wsl::windows::common::string::TruncateId(id, !fullId);
 }
 
 wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName)
@@ -156,7 +142,7 @@ namespace VT {
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
-    auto listResult = RunWslc(L"container list --all");
+    auto listResult = RunWslc(L"container list --no-trunc --all");
     listResult.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto stdoutLines = listResult.GetStdoutLines();

@@ -94,6 +94,13 @@ std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
 std::wstring WSLCExecutionResult::GetStdoutOneLine() const
 {
     auto stdoutLines = GetStdoutLines();
+
+    // Remove empty trailing lines (common when output ends with \n)
+    while (!stdoutLines.empty() && stdoutLines.back().empty())
+    {
+        stdoutLines.pop_back();
+    }
+
     VERIFY_ARE_EQUAL(1u, stdoutLines.size());
     return stdoutLines[0];
 }

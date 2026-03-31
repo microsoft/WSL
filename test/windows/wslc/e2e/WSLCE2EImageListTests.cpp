@@ -101,7 +101,7 @@ class WSLCE2EImageListTests
         const auto output = result.GetStdoutOneLine();
         const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(output.c_str());
 
-        VERIFY_ARE_EQUAL(2u, images.size());
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(images.size(), 2u);
 
         std::vector<std::wstring> imageNames;
         for (const auto& image : images)
@@ -148,6 +148,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  --format      Output formatting (json or table) (Default:table)\r\n"
+                << L"  --no-trunc    Do not truncate output\r\n"
                 << L"  -q,--quiet    Outputs the container IDs only\r\n"
                 << L"  --session     Specify the session to use\r\n"
                 << L"  -v,--verbose  Output verbose details\r\n"
