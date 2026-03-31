@@ -51,44 +51,7 @@ void ImageService::Build(
     }
     else
     {
-        auto containerfilePath = absolutePath / L"Containerfile";
-        auto containerfileStatus = wil::try_open_file(containerfilePath.c_str());
-
-        auto dockerfilePath = absolutePath / L"Dockerfile";
-        auto dockerfileStatus = wil::try_open_file(containerfilePath.c_str());
-
-        // N.B. It's theoretically possible for both files to exist but for one of them to fail to open due to permissions errors.
-        // Handling that case would add a lot of complexity, so leaving this out for now since this is an unlikely scenario.
-        if (containerfileStatus.last_error != ERROR_NOT_FOUND && dockerfileStatus.last_error != ERROR_NOT_FOUND)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBothDockerAndContainerFileFound())
-        }
-
-        if (containerfileStatus.last_error != ERROR_NOT_FOUND)
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(containerfileStatus.last_error),
-                Localization::MessageWslcFailedToOpenFile(
-                    containerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(containerfileStatus.last_error))),
-                !containerfileStatus.file.is_valid());
-
-            dockerfile = std::move(containerfileStatus.file);
-        }
-        else if (dockerfileStatus.last_error != ERROR_NOT_FOUND)
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(dockerfileStatus.last_error),
-                Localization::MessageWslcFailedToOpenFile(
-                    dockerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(dockerfileStatus.last_error))),
-                !dockerfileStatus.file.is_valid());
-
-            dockerfile = std::move(dockerfileStatus.file);
-        }
-        else
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcContainerfileNotFound(absolutePath));
-        }
-
+        dockerfile = ResolveDockerfile(absolutePath);
         dockerfileHandle = dockerfile.get();
     }
 
@@ -119,6 +82,45 @@ void ImageService::Build(
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));
+}
+
+wil::unique_hfile ImageService::ResolveDockerfile(const std::filesystem::path& contextPath)
+{
+    auto containerfilePath = contextPath / L"Containerfile";
+    auto containerfileStatus = wil::try_open_file(containerfilePath.c_str());
+
+    auto dockerfilePath = contextPath / L"Dockerfile";
+    auto dockerfileStatus = wil::try_open_file(dockerfilePath.c_str());
+
+    if ((containerfileStatus.last_error != ERROR_FILE_NOT_FOUND && dockerfileStatus.file) ||
+        (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND && containerfileStatus.file))
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBothDockerAndContainerFileFound())
+    }
+
+    if (containerfileStatus.last_error != ERROR_FILE_NOT_FOUND)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(containerfileStatus.last_error),
+            Localization::MessageWslcFailedToOpenFile(
+                containerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(containerfileStatus.last_error))),
+            !containerfileStatus.file.is_valid());
+
+        return std::move(containerfileStatus.file);
+    }
+
+    if (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(dockerfileStatus.last_error),
+            Localization::MessageWslcFailedToOpenFile(
+                dockerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(dockerfileStatus.last_error))),
+            !dockerfileStatus.file.is_valid());
+
+        return std::move(dockerfileStatus.file);
+    }
+
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcContainerfileNotFound(contextPath));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
