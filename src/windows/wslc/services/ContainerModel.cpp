@@ -187,6 +187,14 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     }
 
     vm.m_hostPath = value.substr(0, splitColon);
+
+    if (vm.m_hostPath.empty())
+    {
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG,
+            std::format(L"Invalid volume specifications: '{}'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]", value));
+    }
+
     return vm;
 }
 
