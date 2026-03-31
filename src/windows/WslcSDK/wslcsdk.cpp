@@ -331,7 +331,7 @@ wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
 
 bool NeedsWslRuntimeInstalled()
 {
-    auto [result, hr] = CreateSessionManagerRaw();
+    auto hr = CreateSessionManagerRaw().second;
 
     if (SUCCEEDED(hr))
     {
