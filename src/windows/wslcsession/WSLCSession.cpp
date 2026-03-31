@@ -98,7 +98,7 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
 
 namespace wsl::windows::service::wslc {
 
-UserHandle::UserHandle(WSLCSession& Session, wil::unique_handle&& handle) : m_session(&Session), m_handle(std::move(handle))
+UserHandle::UserHandle(WSLCSession& Session, HANDLE handle) : m_session(&Session), m_handle(handle)
 {
     WI_ASSERT(!!m_handle);
 }
@@ -114,8 +114,9 @@ UserHandle& UserHandle::operator=(UserHandle&& Other)
     {
         Reset();
         m_session = Other.m_session;
-        m_handle = std::move(Other.m_handle);
+        m_handle = Other.m_handle;
 
+        Other.m_handle = nullptr;
         Other.m_session = nullptr;
     }
     return *this;
@@ -123,12 +124,12 @@ UserHandle& UserHandle::operator=(UserHandle&& Other)
 
 void UserHandle::Reset()
 {
-    if (m_handle)
+    if (m_handle != nullptr)
     {
         WI_ASSERT(m_session != nullptr);
 
-        m_session->ReleaseUserHandle(m_handle.get());
-        m_handle.reset();
+        m_session->ReleaseUserHandle(m_handle);
+        m_handle = nullptr;
     }
 }
 
@@ -139,7 +140,7 @@ UserHandle::~UserHandle()
 
 HANDLE UserHandle::Get() const noexcept
 {
-    return m_handle.get();
+    return m_handle;
 }
 
 HRESULT WSLCSession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
@@ -482,7 +483,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
-    auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle, GENERIC_READ | SYNCHRONIZE);
+    auto buildFileHandle = common::wslutil::FromCOMInputHandle(Options->DockerfileHandle);
 
     auto lock = m_lock.lock_shared();
 
@@ -523,7 +524,7 @@ try
     auto io = CreateIOContext();
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{buildFileHandle.Get()}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+        common::relay::HandleWrapper{buildFileHandle}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = Options->Verbose;
     std::string allOutput;
@@ -718,9 +719,7 @@ CATCH_RETURN();
 
 void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle)
 {
-    // auto userHandle = OpenUserHandle(InputHandle, GENERIC_READ | SYNCHRONIZE);
-
-    auto userHandle = common::wslutil::FromCOMInputHandle(ImageHandle);
+    auto userHandle = OpenUserHandle(ImageHandle);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -780,7 +779,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     };
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        userHandle, common::relay::HandleWrapper{Request.stream.native_handle()}));
+        userHandle.Get(), common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -800,7 +799,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
 }
 
-HRESULT WSLCSession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
+HRESULT WSLCSession::SaveImage(WSLCHandle OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -819,9 +818,9 @@ try
 }
 CATCH_RETURN();
 
-void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, HANDLE CancelEvent)
+void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent)
 {
-    auto userHandle = OpenUserHandle(OutputHandle, GENERIC_WRITE | SYNCHRONIZE);
+    auto userHandle = common::wslutil::FromCOMInputHandle(OutputHandle);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -844,7 +843,7 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         io.AddHandle(
             std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
+                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, userHandle),
             MultiHandleWait::CancelOnCompleted);
     }
 
@@ -1729,7 +1728,7 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
     return io;
 }
 
-UserHandle WSLCSession::OpenUserHandle(ULONG Handle, DWORD Access)
+UserHandle WSLCSession::OpenUserHandle(WSLCHandle Handle)
 {
     std::lock_guard lock(m_userHandlesLock);
 
@@ -1739,11 +1738,11 @@ UserHandle WSLCSession::OpenUserHandle(ULONG Handle, DWORD Access)
     THROW_HR_IF_MSG(
         E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to open a user handle while the session is terminating.");
 
-    wil::unique_handle duplicatedHandle{common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Handle), Access)};
+    auto userHandle = common::wslutil::FromCOMInputHandle(Handle);
 
-    m_userHandles.emplace_back(duplicatedHandle.get());
+    m_userHandles.emplace_back(userHandle);
 
-    return UserHandle{*this, std::move(duplicatedHandle)};
+    return UserHandle{*this, userHandle};
 }
 
 void WSLCSession::ReleaseUserHandle(HANDLE Handle)

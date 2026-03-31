@@ -104,9 +104,9 @@ bool IOCallback::HasIOCallback(const WslcContainerProcessIOCallbackOptions& opti
 
 wil::unique_handle IOCallback::GetIOHandle(IWSLCProcess* process, WslcProcessIOHandle ioHandle)
 {
-    WSLCHandle ulongHandle{};
+    wsl::windows::common::wslutil::COMOutputHandle handle;
 
-    THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &ulongHandle));
+    THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
 
-    return wsl::windows::common::wslutil::FromCOMOutputHandle(ulongHandle);
+    return handle.MoveHandle();
 }

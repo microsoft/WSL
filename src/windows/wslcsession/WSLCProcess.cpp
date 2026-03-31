@@ -50,8 +50,8 @@ try
 
     DWORD Access = SYNCHRONIZE;
 
-    WI_SetFlagIf(Access, GENERIC_READ, Fd == WSLCFDTty || Fd == WSLCFDStdin);
-    WI_SetFlagIf(Access, GENERIC_WRITE, Fd == WSLCFDStdout || Fd == WSLCFDStderr);
+    WI_SetFlagIf(Access, GENERIC_WRITE, Fd == WSLCFDTty || Fd == WSLCFDStdin);
+    WI_SetFlagIf(Access, GENERIC_READ, Fd == WSLCFDStdout || Fd == WSLCFDStderr || Fd == WSLCFDTty);
 
     *Handle = common::wslutil::ToCOMOutputHandle(handle.get(), Access);
 

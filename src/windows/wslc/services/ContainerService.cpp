@@ -27,6 +27,7 @@ namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
+using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
 
@@ -198,26 +199,22 @@ int ContainerService::Attach(Session& session, const std::string& id)
 
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
-    ULONG stdinLogsHandle = 0;
-    ULONG stdoutLogsHandle = 0;
-    ULONG stderrLogsHandle = 0;
-    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogsHandle, &stdoutLogsHandle, &stderrLogsHandle));
+    COMOutputHandle stdinLogs{};
+    COMOutputHandle stdoutLogs{};
+    COMOutputHandle stderrLogs{};
+    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogs, &stdoutLogs, &stderrLogs));
 
-    wil::unique_handle stdinLogs(ULongToHandle(stdinLogsHandle));
-    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
-    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
-
-    if (stdoutLogs)
+    if (!stdoutLogs.Empty())
     {
         // Non-TTY process - relay separate stdout/stderr streams
-        WI_ASSERT(!!stderrLogs);
-        ConsoleService::RelayNonTtyProcess(std::move(stdinLogs), std::move(stdoutLogs), std::move(stderrLogs));
+        WI_ASSERT(!stderrLogs.Empty());
+        ConsoleService::RelayNonTtyProcess(stdinLogs.MoveHandle(), stdoutLogs.MoveHandle(), stderrLogs.MoveHandle());
     }
     else
     {
         // TTY process - relay using interactive TTY handling
-        WI_ASSERT(!stderrLogs);
-        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.get(), true))
+        WI_ASSERT(stderrLogs.Empty());
+        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.MoveHandle().get(), true))
         {
             wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
             return 0; // Exit early if user detached
@@ -386,22 +383,21 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    ULONG stdoutLogsHandle = 0;
-    ULONG stderrLogsHandle = 0;
+    COMOutputHandle stdoutHandle;
+    COMOutputHandle stderrHandle;
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutLogsHandle, &stderrLogsHandle, 0, 0, 0));
-    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
-    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, 0));
 
     wsl::windows::common::relay::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-        std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
-    if (stderrLogs) // This handle is only used for non-tty processes.
+        stdoutHandle.MoveHandle(), GetStdHandle(STD_OUTPUT_HANDLE)));
+
+    if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
         io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-            std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+            stderrHandle.MoveHandle(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.

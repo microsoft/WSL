@@ -544,21 +544,6 @@ HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(WSLCHandle Handle)
     }
 }
 
-wil::unique_handle wsl::windows::common::wslutil::FromCOMOutputHandle(WSLCHandle Handle)
-{
-    switch (Handle.Type)
-    {
-    case WSLCHandleTypeFile:
-        return wil::unique_handle{Handle.Handle.File};
-    case WSLCHandleTypePipe:
-        return wil::unique_handle{Handle.Handle.Pipe};
-    case WSLCHandleTypeSocket:
-        return wil::unique_handle{Handle.Handle.Socket};
-    default:
-        THROW_HR_MSG(E_UNEXPECTED, "Unsupported handle type: %d", Handle.Type);
-    }
-}
-
 std::wstring wsl::windows::common::wslutil::ConstructPipePath(std::wstring_view PipeName)
 {
     return c_pipePrefix + std::wstring(PipeName);

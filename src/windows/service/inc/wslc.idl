@@ -452,16 +452,16 @@ typedef enum _WSLCDeleteFlags
 ]
 interface IWSLCContainer : IUnknown
 {
-    HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
+    HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] WSLCHandle* StdIn, [out] WSLCHandle* StdOut, [out] WSLCHandle* StdErr);
     HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
     HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
     HRESULT Delete([in] WSLCDeleteFlags Flags);
-    HRESULT Export([in] ULONG TarHandle);
+    HRESULT Export([in] WSLCHandle TarHandle);
     HRESULT GetState([out] WSLCContainerState* State);
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
     HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] LPCSTR DetachKeys, [out] IWSLCProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT Logs([in] WSLCLogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
@@ -497,7 +497,7 @@ typedef struct _WSLCDeleteImageOptions
 typedef struct _WSLCBuildImageOptions
 {
     LPCWSTR ContextPath;
-    ULONG DockerfileHandle;
+    WSLCHandle DockerfileHandle;
     WSLCStringArray Tags;
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
     BOOL Verbose; // Show all build progress including internal steps and all statuses.
@@ -566,7 +566,7 @@ interface IWSLCSession : IUnknown
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
+    HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImageOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);

@@ -72,6 +72,47 @@ struct COMErrorInfo
     wil::unique_bstr Source;
 };
 
+static_assert(sizeof(WSLCHandle::Handle) == sizeof(HANDLE));
+
+struct COMOutputHandle : public WSLCHandle
+{
+    NON_COPYABLE(COMOutputHandle);
+    NON_MOVABLE(COMOutputHandle);
+    COMOutputHandle() = default;
+
+    ~COMOutputHandle()
+    {
+        Reset();
+    }
+
+    void Reset() noexcept
+    {
+        if (!Empty())
+        {
+            LOG_IF_WIN32_BOOL_FALSE(CloseHandle(Handle.File));
+            Handle.File = nullptr;
+        }
+    }
+
+    wil::unique_handle MoveHandle() noexcept
+    {
+        wil::unique_handle handle(Handle.File);
+        Handle.File = nullptr;
+
+        return handle;
+    }
+
+    HANDLE Get() const noexcept
+    {
+        return Handle.File;
+    }
+
+    bool Empty() const noexcept
+    {
+        return Handle.File == nullptr || Handle.File == INVALID_HANDLE_VALUE;
+    }
+};
+
 struct PruneResult
 {
     NON_COPYABLE(PruneResult);
@@ -171,7 +212,6 @@ std::wstring ErrorCodeToString(HRESULT Error);
 ErrorStrings ErrorToString(const Error& error);
 
 HANDLE FromCOMInputHandle(WSLCHandle Handle);
-wil::unique_handle FromCOMOutputHandle(WSLCHandle Handle);
 
 std::filesystem::path GetBasePath();
 

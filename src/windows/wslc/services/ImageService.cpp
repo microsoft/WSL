@@ -124,7 +124,7 @@ void ImageService::Build(
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
-        .DockerfileHandle = HandleToULong(dockerfileHandle),
+        .DockerfileHandle = wsl::windows::common::wslutil::ToCOMInputHandle(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Verbose = verbose,
@@ -211,7 +211,7 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
 
     wsl::windows::common::HandleConsoleProgressBar progressBar(
         outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
-    THROW_IF_FAILED(session.Get()->SaveImage(HandleToULong(outputFile.get()), image.c_str(), nullptr, cancelEvent));
+    THROW_IF_FAILED(session.Get()->SaveImage(wsl::windows::common::wslutil::ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
 }
 
 void ImageService::Tag()
