@@ -339,6 +339,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     DockerHTTPClient& DockerClient,
     IORelay& Relay,
     WSLCContainerState InitialState,
+    std::uint64_t CreatedAt,
     WSLCProcessFlags InitProcessFlags,
     WSLCContainerFlags ContainerFlags) :
     m_wslcSession(wslcSession),
@@ -357,6 +358,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
         m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))),
     m_state(InitialState),
+    m_createdAt(CreatedAt),
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags)
 {
@@ -1163,19 +1165,20 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto result =
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
-    // If no name was passed, inspect the container to fetch its generated name.
-    common::docker_schema::InspectContainer inspectData;
-    if (containerOptions.Name == nullptr)
-    {
-        inspectData = DockerClient.InspectContainer(result.Id);
-    }
+    // Clean up the Docker container if anything below fails.
+    // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
+    auto deleteOnFailure = wil::scope_exit_log(
+        WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() { DockerClient.DeleteContainer(containerId, true); });
+
+    // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
+    auto inspectData = DockerClient.InspectContainer(result.Id);
 
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
         std::move(result.Id),
-        std::move(containerOptions.Name == nullptr ? CleanContainerName(inspectData.Name) : std::string(containerOptions.Name)),
-        std::move(std::string(containerOptions.Image)),
+        CleanContainerName(inspectData.Name),
+        std::string(containerOptions.Image),
         containerOptions.ContainerNetwork.ContainerNetworkType,
         std::move(volumes),
         std::move(ports),
@@ -1185,9 +1188,11 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         DockerClient,
         IoRelay,
         WslcContainerStateCreated,
+        ParseDockerTimestamp(inspectData.Created),
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
+    deleteOnFailure.release();
     return container;
 }
 
@@ -1257,11 +1262,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         DockerClient,
         ioRelay,
         DockerStateToWSLCState(dockerContainer.State),
+        static_cast<std::uint64_t>(dockerContainer.Created),
         metadata.InitProcessFlags,
         metadata.Flags);
-
-    // Restore the creation timestamp from Docker list API data.
-    container->m_createdAt = static_cast<std::uint64_t>(dockerContainer.Created);
 
     // Restore the state change timestamp from Docker inspect data.
     try

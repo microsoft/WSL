@@ -23,30 +23,35 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
-void WSLCExecutionResult::Dump() const
+void WSLCExecutionResult::Dump(bool escapeStrings) const
 {
-    static auto DumpHex = [](const std::wstring& s) {
-        std::wstringstream ss;
-        ss << L"len=" << s.size() << L" [";
-        for (size_t i = 0; i < s.size(); ++i)
-        {
-            ss << L"0x" << std::hex << std::setw(4) << std::setfill(L'0') << static_cast<unsigned int>(static_cast<wchar_t>(s[i])) << L' ';
-        }
-        ss << L"]";
-        return ss.str();
-    };
-
     Log::Comment((L"Command Line: \"" + CommandLine + L"\"").c_str());
     if (Stdout)
     {
-        Log::Comment((L"Stdout: \"" + *Stdout + L"\"").c_str());
-        Log::Comment((L"Stdout (hex): " + DumpHex(*Stdout)).c_str());
+        if (escapeStrings)
+        {
+            std::string stdoutStr = wsl::windows::common::string::WideToMultiByte(*Stdout);
+            std::string escapedStdout = EscapeString(stdoutStr);
+            Log::Comment(std::format(L"Stdout: \"{}\"", wsl::shared::string::MultiByteToWide(escapedStdout)).c_str());
+        }
+        else
+        {
+            Log::Comment((L"Stdout: \"" + *Stdout + L"\"").c_str());
+        }
     }
 
     if (Stderr)
     {
-        Log::Comment((L"Stderr: \"" + *Stderr + L"\"").c_str());
-        Log::Comment((L"Stderr (hex): " + DumpHex(*Stderr)).c_str());
+        if (escapeStrings)
+        {
+            std::string stderrStr = wsl::windows::common::string::WideToMultiByte(*Stderr);
+            std::string escapedStderr = EscapeString(stderrStr);
+            Log::Comment(std::format(L"Stderr (escaped): \"{}\"", wsl::shared::string::MultiByteToWide(escapedStderr)).c_str());
+        }
+        else
+        {
+            Log::Comment((L"Stderr: \"" + *Stderr + L"\"").c_str());
+        }
     }
 
     if (ExitCode)

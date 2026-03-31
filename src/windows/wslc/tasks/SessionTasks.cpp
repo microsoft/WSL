@@ -38,7 +38,7 @@ void AttachToSession(CLIExecutionContext& context)
     }
     else
     {
-        sessionId = models::s_DefaultSessionName;
+        sessionId = SessionOptions::s_defaultSessionName;
     }
 
     context.ExitCode = SessionService::Attach(sessionId);
@@ -46,7 +46,19 @@ void AttachToSession(CLIExecutionContext& context)
 
 void CreateSession(CLIExecutionContext& context)
 {
-    std::optional<SessionOptions> options = std::nullopt;
+    if (context.Args.Contains(ArgType::Session))
+    {
+        // If provided session name is not the default CLI session, open that one.
+        const auto& sessionName = context.Args.Get<ArgType::Session>();
+        if (!wsl::shared::string::IsEqual(sessionName, SessionOptions::s_defaultSessionName))
+        {
+            context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
+            return;
+        }
+    }
+
+    // Create/open the CLI session.
+    SessionOptions options = SessionOptions::Default();
     context.Data.Add<Data::Session>(SessionService::CreateSession(options));
 }
 
