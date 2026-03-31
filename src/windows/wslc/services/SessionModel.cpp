@@ -48,8 +48,8 @@ bool SessionOptions::IsElevated()
     auto token = wil::open_current_access_token(TOKEN_QUERY);
 
     // IsTokenElevated checks if the integrity level is exactly HIGH.
-    // We must also check for local system which will not be true for because it is
-    // higher than HIGH. TODO: Consider fixing this in WSL security library.
+    // We must also check for local system because it is above HIGH.
+    // TODO: Consider fixing this in WSL security library.
     return security::IsTokenElevated(token.get()) || security::IsTokenLocalSystem(token.get());
 }
 

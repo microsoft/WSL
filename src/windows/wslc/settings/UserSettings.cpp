@@ -46,8 +46,9 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli        (standard sessions)\n"
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin (elevated sessions)\n"
 
-// Validate individual setting specializations
-namespace details {
+    // Validate individual setting specializations
+    namespace details
+{
 
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
     {
