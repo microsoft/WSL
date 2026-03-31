@@ -250,12 +250,15 @@ private:
 
     static void SetReadAccess(const std::filesystem::path& path, ACCESS_MODE Mode)
     {
+        auto [everyoneSid, everyoneSidBuffer] =
+            wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
+
         EXPLICIT_ACCESSW ea{};
         ea.grfAccessPermissions = FILE_GENERIC_READ;
         ea.grfAccessMode = Mode;
         ea.grfInheritance = NO_INHERITANCE;
-        ea.Trustee.TrusteeForm = TRUSTEE_IS_NAME;
-        ea.Trustee.ptstrName = const_cast<LPWSTR>(L"EVERYONE");
+        ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        ea.Trustee.ptstrName = static_cast<LPWSTR>(everyoneSid);
 
         PACL acl = nullptr;
         wil::unique_hlocal descriptor;

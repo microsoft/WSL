@@ -1390,6 +1390,15 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "wslc-test-multitag:v2");
     }
 
+    TEST_METHOD(BuildImageNullHandle)
+    {
+        WSL2_TEST_ONLY();
+
+        WSLCBuildImageOptions options{.ContextPath = L"C:\\", .DockerfileHandle = 0, .Tags = {nullptr, 0}};
+
+        VERIFY_ARE_EQUAL(m_defaultSession->BuildImage(&options, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE));
+    }
+
     TEST_METHOD(BuildImageCancel)
     {
         WSL2_TEST_ONLY();
@@ -1434,21 +1443,22 @@ class WSLCTests
         auto callback = Microsoft::WRL::Make<TestProgressCallback>(progressEvent);
 
         auto contextPathStr = contextDir.wstring();
+        auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
+
         LPCSTR tag = "wslc-test-build-cancel:latest";
         WSLCBuildImageOptions options{
-            .ContextPath = contextPathStr.c_str(),
-            .Tags = {&tag, 1},
-        };
+            .ContextPath = contextPathStr.c_str(), .DockerfileHandle = HandleToULong(dockerfileHandle.get()), .Tags = {&tag, 1}};
 
         std::promise<HRESULT> result;
         std::thread buildThread(
             [&]() { result.set_value(m_defaultSession->BuildImage(&options, callback.Get(), cancelEvent.get())); });
 
+        auto joinThread = wil::scope_exit([&]() { buildThread.join(); });
+
         VERIFY_IS_TRUE(progressEvent.wait(60 * 1000));
         cancelEvent.SetEvent();
 
         VERIFY_ARE_EQUAL(E_ABORT, result.get_future().get());
-        buildThread.join();
     }
 
     TEST_METHOD(TagImage)

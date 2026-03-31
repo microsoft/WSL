@@ -28,7 +28,7 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
     auto dockerfileStatus = wil::try_open_file(dockerfilePath.c_str());
 
     // Fail if both Containerfile and Dockerfile exist.
-    // Assume that both exist if one opens successfuly and the other returns anything other than ERROR_FILE_NOT_FOUND to cover the case where one of them exists, but fails to open.
+    // Assume that both exist if one opens successfully and the other returns anything other than ERROR_FILE_NOT_FOUND to cover the case where one of them exists, but fails to open.
     // If both exist but fail to open, the logic after this block will report the appropriate error.
     if ((containerfileStatus.last_error != ERROR_FILE_NOT_FOUND && dockerfileStatus.file) ||
         (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND && containerfileStatus.file))
