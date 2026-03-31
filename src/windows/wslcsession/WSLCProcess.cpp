@@ -18,7 +18,7 @@ Abstract:
 
 using wsl::windows::service::wslc::WSLCProcess;
 
-WSLCProcess::WSLCProcess(std::unique_ptr<WSLCProcessControl>&& Control, std::unique_ptr<WSLCProcessIO>&& Io) :
+WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io) :
     m_control(std::move(Control)), m_io(std::move(Io))
 {
 }
