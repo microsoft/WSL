@@ -46,4 +46,3 @@ jobs:
           TestTimeout: "0.05:00:00"
           parserProperties: "worker:VsTestVersion=V150;session:HoldTrigger=Failure;VstsTestResultAttachmentUploadBehavior=Always"
           notificationSubscribers: $(Build.RequestedForEmail)
-          scheduleBuildRequesterAlias: "lowdev"
