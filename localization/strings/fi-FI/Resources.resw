@@ -961,7 +961,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallNoArguments" xml:space="preserve">
-    <value>{} does not take any arguments. To unregister a distribution, use {} instead.</value>
+    <value>{} ei ota vastaan argumentteja. Jakelun rekisteröinnin poistamiseen käytä sen sijaan {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
@@ -1912,7 +1912,7 @@ Käyttö:
   wslc --help</value>
     <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaSessionNotFound" xml:space="preserve">
+  <data name="MessageWslcSessionNotFound" xml:space="preserve">
     <value>Istuntoa ei löydy. '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1920,31 +1920,31 @@ Käyttö:
     <value>Virheellinen IP-osoite {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
+  <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') epäonnistui</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>WSLA-istuntoja ei löytynyt.</value>
+  <data name="MessageWslcNoSessionsFound" xml:space="preserve">
+    <value>No WSLC sessions found.</value>
   </data>
-  <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>Löytyi {} WSLA-istunto{}:</value>
+  <data name="MessageWslcSessionsFound" xml:space="preserve">
+    <value>Found {} WSLC session{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaShellExited" xml:space="preserve">
+  <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} päättyi arvoon: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaHeaderId" xml:space="preserve">
+  <data name="MessageWslcHeaderId" xml:space="preserve">
     <value>Tunnus</value>
   </data>
-  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
+  <data name="MessageWslcHeaderCreatorPid" xml:space="preserve">
     <value>Tekijän prosessin tunnus</value>
   </data>
-  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
+  <data name="MessageWslcHeaderDisplayName" xml:space="preserve">
     <value>Näyttönimi</value>
   </data>
-  <data name="MessageWslaUnknownCommand" xml:space="preserve">
+  <data name="MessageWslcUnknownCommand" xml:space="preserve">
     <value>Tuntematon komento: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -2074,32 +2074,32 @@ Käyttö:
 Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
      <comment>Copyright notice and privacy link</comment>
   </data>
-  <data name="MessageWslaInvalidImage" xml:space="preserve">
+  <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Virheellinen kuva: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidName" xml:space="preserve">
-    <value>Invalid name: '{}'</value>
+  <data name="MessageWslcInvalidName" xml:space="preserve">
+    <value>Virheellinen nimi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Polku ei ole absoluuttinen: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeNotFound" xml:space="preserve">
-    <value>Volume not found: '{}'</value>
+  <data name="MessageWslcVolumeNotFound" xml:space="preserve">
+    <value>Asemaa ei löydy: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeOptions" xml:space="preserve">
-    <value>Invalid volume options: '{}'</value>
+  <data name="MessageWslcInvalidVolumeOptions" xml:space="preserve">
+    <value>Virheelliset aseman asetukset: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeType" xml:space="preserve">
-    <value>Unsupported volume type: '{}'</value>
+  <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
+    <value>Aseman tyyppiä ei tueta: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeInUse" xml:space="preserve">
-    <value>Volume '{}' is in use.</value>
+  <data name="MessageWslcVolumeInUse" xml:space="preserve">
+    <value>Asema {} on käytössä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

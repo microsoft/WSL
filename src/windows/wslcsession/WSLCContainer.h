@@ -68,6 +68,7 @@ public:
         DockerHTTPClient& DockerClient,
         IORelay& Relay,
         WSLCContainerState InitialState,
+        std::uint64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags);
 
@@ -75,7 +76,7 @@ public:
 
     void Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys);
     void Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
-    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
+    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Delete(WSLCDeleteFlags Flags);
     void Export(ULONG TarHandle) const;
     void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
@@ -159,7 +160,7 @@ private:
     std::optional<std::promise<std::uint64_t>> m_stopState;
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
-    std::uint64_t m_createdAt{static_cast<std::uint64_t>(std::time(nullptr))};
+    std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
     WSLCVirtualMachine& m_virtualMachine;
@@ -183,6 +184,7 @@ public:
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
+    IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;

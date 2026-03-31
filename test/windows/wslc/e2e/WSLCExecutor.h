@@ -33,7 +33,7 @@ struct WSLCExecutionResult
     std::optional<std::wstring> Stdout{};
     std::optional<std::wstring> Stderr{};
     std::optional<DWORD> ExitCode{};
-    void Dump() const;
+    void Dump(bool escapeStrings = false) const;
     void Verify(const WSLCExecutionResult& expected) const;
     std::vector<std::wstring> GetStdoutLines() const;
     std::wstring GetStdoutOneLine() const;

@@ -99,10 +99,9 @@ int SessionService::Attach(const std::wstring& sessionName)
     return static_cast<int>(exitCode);
 }
 
-Session SessionService::CreateSession(const std::optional<SessionOptions>& options)
+Session SessionService::CreateSession(const SessionOptions& options)
 {
-    SessionOptions sessionOptions = options.has_value() ? options.value() : SessionOptions::Default();
-    const WSLCSessionSettings* settings = sessionOptions.Get();
+    const WSLCSessionSettings* settings = options.Get();
     wil::com_ptr<IWSLCSessionManager> sessionManager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
@@ -133,5 +132,17 @@ std::vector<SessionInformation> SessionService::List()
     }
 
     return result;
+}
+
+Session SessionService::OpenSession(const std::wstring& displayName)
+{
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(sessionManager->OpenSessionByName(displayName.c_str(), &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+    return Session(std::move(session));
 }
 } // namespace wsl::windows::wslc::services
