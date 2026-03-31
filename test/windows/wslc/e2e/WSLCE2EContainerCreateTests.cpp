@@ -99,8 +99,8 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
         std::wstringstream expectedError;
         expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
-                      << L"pull access denied for library/"
-                      << InvalidImage.Name << L", repository does not exist or may require 'docker login': denied: requested access to the resource is denied\r\n"
+                      << L"manifest for " << InvalidImage.NameAndTag()
+                      << L" not found: manifest unknown: manifest tagged by \"latest\" is not found\r\n"
                       << L"Error code: WSLC_E_IMAGE_NOT_FOUND\r\n";
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
@@ -255,7 +255,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume :/containerPath {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: ':/containerPath'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -269,7 +269,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume :/containerPath:ro {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: ':/containerPath:ro'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -351,7 +351,7 @@ class WSLCE2EContainerCreateTests
 
         {
             auto result = RunWslc(std::format(L"container run --name {} --volume \":\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Unspecified error \r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: ':'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -868,16 +868,12 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        // The container attach prompt is different for the first prompt.
-        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
         const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
 
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // The container attach prompt appears twice.
-        session.ExpectStdout(expectedAttachPrompt);
-        session.ExpectStdout(expectedAttachPrompt);
+        session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
         session.ExpectCommandEcho("echo hello");
@@ -921,6 +917,22 @@ class WSLCE2EContainerCreateTests
         auto exitCode = session.Wait(10000);
         VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
         session.VerifyNoErrors();
+    }
+
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_ShortRunningInitProcess)
+    {
+        WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
+
+        constexpr auto ExpectedExitCode = 37;
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
+
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
     TEST_METHOD(WSLCE2E_Session_Shell)
@@ -1138,28 +1150,16 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  --cidfile         Write the container ID to the provided path.\r\n"
-                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
-                << L"  --dns-domain      Set the default DNS Domain\r\n"
-                << L"  --dns-option      Set DNS options\r\n"
-                << L"  --dns-search      Set DNS search domains\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
-                << L"  --groupid         Group Id for the process\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
-                << L"  --no-dns          No configuration of DNS in the container\r\n"
-                << L"  --progress        Progress type (format: none|ansi) (default: ansi)\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
-                << L"  --scheme          Use this scheme for registry connection\r\n"
                 << L"  --session         Specify the session to use\r\n"
-                << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
-                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
-                << L"  --virtualization  Expose virtualization capabilities to the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n\r\n";
         return options.str();
     }

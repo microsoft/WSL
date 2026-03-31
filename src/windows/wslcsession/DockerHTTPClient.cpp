@@ -122,8 +122,9 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
 {
     auto url = URL::Create("/images/create");
 
-    // TODO: Support pulling from other registries.
-    url.SetParameter("fromImage", std::format("library/{}", Repo));
+    // Normalize the repo server & path
+    auto [server, path] = wslutil::NormalizeRepo(Repo);
+    url.SetParameter("fromImage", std::format("{}/{}", server, path));
 
     if (tagOrDigest.has_value())
     {
@@ -281,10 +282,13 @@ void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSi
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
+void DockerHTTPClient::SignalContainer(const std::string& Id, std::optional<WSLCSignal> Signal)
 {
     auto url = URL::Create("/containers/{}/kill", Id);
-    url.SetParameter("signal", std::to_string(Signal));
+    if (Signal.has_value())
+    {
+        url.SetParameter("signal", std::to_string(static_cast<int>(Signal.value())));
+    }
 
     Transaction(verb::post, url);
 }
@@ -563,7 +567,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             {
                 try
                 {
-                    RemainingContentLength = std::stoul(contentLength->value());
+                    RemainingContentLength = std::stoull(contentLength->value());
                 }
                 catch (const std::exception&)
                 {

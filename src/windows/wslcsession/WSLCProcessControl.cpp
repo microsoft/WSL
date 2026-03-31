@@ -45,7 +45,8 @@ DockerContainerProcessControl::DockerContainerProcessControl(WSLCContainerImpl& 
     m_container(&Container),
     m_client(DockerClient),
     m_trackingReference(EventTracker.RegisterContainerStateUpdates(
-        Container.ID(), std::bind(&DockerContainerProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2)))
+        Container.ID(),
+        std::bind(&DockerContainerProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
 }
 
@@ -58,7 +59,7 @@ void DockerContainerProcessControl::Signal(int Signal)
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_container == nullptr || m_exitEvent.is_signaled());
 
-    m_client.SignalContainer(m_container->ID(), Signal);
+    m_client.SignalContainer(m_container->ID(), static_cast<WSLCSignal>(Signal));
 }
 
 void DockerContainerProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
@@ -69,7 +70,7 @@ void DockerContainerProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
     m_client.ResizeContainerTty(m_container->ID(), Rows, Columns);
 }
 
-void DockerContainerProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode)
+void DockerContainerProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t /*eventTime*/)
 {
     if (Event == ContainerEvent::Stop)
     {
@@ -118,7 +119,7 @@ DockerExecProcessControl::DockerExecProcessControl(
     m_id(Id),
     m_client(DockerClient),
     m_trackingReference(EventTracker.RegisterExecStateUpdates(
-        Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2)))
+        Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
 }
 
@@ -173,7 +174,7 @@ void DockerExecProcessControl::SetExitCode(int ExitCode)
     }
 }
 
-void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode)
+void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t /*eventTime*/)
 {
     if (Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
     {

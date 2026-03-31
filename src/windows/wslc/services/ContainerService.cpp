@@ -153,11 +153,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLCContainer& container, WSLCSignal signal = WSLCSignalNone, LONG timeout = -1)
-{
-    THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
-}
-
 std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
@@ -198,7 +193,10 @@ int ContainerService::Attach(Session& session, const std::string& id)
     wil::com_ptr<IWSLCProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
-    wsl::windows::common::ClientRunningWSLCProcess runningProcess(std::move(process), {});
+    WSLCProcessFlags processFlags{};
+    THROW_IF_FAILED(process->GetFlags(&processFlags));
+
+    ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
     ULONG stdinLogsHandle = 0;
     ULONG stdoutLogsHandle = 0;
@@ -296,26 +294,41 @@ CreateContainerResult ContainerService::Create(Session& session, const std::stri
     return {.Id = id};
 }
 
-void ContainerService::Start(Session& session, const std::string& id, bool attach)
+int ContainerService::Start(Session& session, const std::string& id, bool attach)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
     THROW_IF_FAILED(container->Start(flags, nullptr));
+
+    if (!attach)
+    {
+        return 0;
+    }
+
+    wil::com_ptr<IWSLCProcess> process;
+    THROW_IF_FAILED(container->GetInitProcess(&process));
+
+    WSLCProcessFlags processFlags{};
+    THROW_IF_FAILED(process->GetFlags(&processFlags));
+    ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
+
+    ConsoleService consoleService;
+    return consoleService.AttachToCurrentConsole(std::move(runningProcess));
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    StopInternal(*container, options.Signal, options.Timeout);
+    THROW_IF_FAILED(container->Stop(options.Signal, options.Timeout));
 }
 
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    StopInternal(*container, signal);
+    THROW_IF_FAILED(container->Kill(signal));
 }
 
 void ContainerService::Delete(Session& session, const std::string& id, bool force)

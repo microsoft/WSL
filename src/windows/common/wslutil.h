@@ -160,7 +160,7 @@ std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, cons
 
 [[nodiscard]] HANDLE DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = std::nullopt, _In_ BOOL InheritHandle = FALSE);
 
-[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE Handle);
+[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = {});
 
 [[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = {});
 
@@ -213,6 +213,8 @@ bool IsVhdFile(_In_ const std::filesystem::path& path);
 bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
+
+std::pair<std::string, std::string> NormalizeRepo(const std::string& Input);
 
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 

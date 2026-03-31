@@ -28,6 +28,26 @@ namespace wsl::windows::service::wslc {
 
 class WSLCSession;
 
+class UserHandle
+{
+    NON_COPYABLE(UserHandle);
+
+public:
+    UserHandle(WSLCSession& Session, wil::unique_handle&& handle);
+    UserHandle(UserHandle&& Other);
+
+    ~UserHandle();
+
+    UserHandle& operator=(UserHandle&& Other);
+
+    HANDLE Get() const noexcept;
+    void Reset();
+
+private:
+    WSLCSession* m_session{};
+    wil::unique_handle m_handle;
+};
+
 //
 // WSLCSession - Implements IWSLCSession for container management.
 // Runs in a per-user COM server process for security isolation.
@@ -53,8 +73,8 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLCSessionState* State) override;
 
     // Image management.
-    IFACEMETHOD(PullImage)(_In_ LPCSTR Image, _In_opt_ const WslcRegistryAuthInformation* RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(PullImage)(_In_ LPCSTR Image, _In_opt_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
@@ -93,9 +113,13 @@ public:
 
     common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
+    UserHandle OpenUserHandle(ULONG Handle, DWORD Access);
+    void ReleaseUserHandle(HANDLE Handle);
+
 private:
     ULONG m_id = 0;
 
+    __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
@@ -129,6 +153,10 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminated{false};
+
+    // User-provided handles that the session is currently doing IO on.
+    std::mutex m_userHandlesLock;
+    __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;

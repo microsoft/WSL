@@ -21,6 +21,7 @@ Abstract:
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
 using wsl::shared::Localization;
+using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
@@ -96,6 +97,50 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
 } // namespace
 
 namespace wsl::windows::service::wslc {
+
+UserHandle::UserHandle(WSLCSession& Session, wil::unique_handle&& handle) : m_session(&Session), m_handle(std::move(handle))
+{
+    WI_ASSERT(!!m_handle);
+}
+
+UserHandle::UserHandle(UserHandle&& Other)
+{
+    *this = std::move(Other);
+}
+
+UserHandle& UserHandle::operator=(UserHandle&& Other)
+{
+    if (this != &Other)
+    {
+        Reset();
+        m_session = Other.m_session;
+        m_handle = std::move(Other.m_handle);
+
+        Other.m_session = nullptr;
+    }
+    return *this;
+}
+
+void UserHandle::Reset()
+{
+    if (m_handle)
+    {
+        WI_ASSERT(m_session != nullptr);
+
+        m_session->ReleaseUserHandle(m_handle.get());
+        m_handle.reset();
+    }
+}
+
+UserHandle::~UserHandle()
+{
+    Reset();
+}
+
+HANDLE UserHandle::Get() const noexcept
+{
+    return m_handle.get();
+}
 
 HRESULT WSLCSession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try
@@ -305,14 +350,13 @@ void WSLCSession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLCSession::OnDockerdExited, this)));
 }
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, const WslcRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
-    UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
-
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
+    RETURN_HR_IF(E_NOTIMPL, RegistryAuthenticationInformation != nullptr && *RegistryAuthenticationInformation != '\0');
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -328,17 +372,25 @@ try
 
     auto io = CreateIOContext();
 
-    std::optional<boost::beast::http::status> pullResult;
+    struct Response
+    {
+        boost::beast::http::status result;
+        bool isJson = false;
+    };
+
+    std::optional<Response> pullResponse;
 
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
         WSL_LOG("PullHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
-        pullResult = response.result();
+        auto it = response.find(boost::beast::http::field::content_type);
+        pullResponse.emplace(response.result(), it != response.end() && it->value().starts_with("application/json"));
     };
 
     std::string errorJson;
+    std::optional<std::string> reportedError;
     auto onChunk = [&](const gsl::span<char>& Content) {
-        if (pullResult.has_value() && pullResult.value() != boost::beast::http::status::ok)
+        if (pullResponse.has_value() && pullResponse->result != boost::beast::http::status::ok)
         {
             // If the status code is an error, then this is an error message, not a progress update.
             errorJson.append(Content.data(), Content.size());
@@ -348,15 +400,28 @@ try
         std::string contentString{Content.begin(), Content.end()};
         WSL_LOG("ImagePullProgress", TraceLoggingValue(Image, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
 
-        if (ProgressCallback == nullptr)
+        auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
+
+        if (parsed.errorDetail.has_value())
         {
+            if (reportedError.has_value())
+            {
+                LOG_HR_MSG(
+                    E_UNEXPECTED,
+                    "Received multiple error messages during image pull. Previous: %hs, New: %hs",
+                    reportedError->c_str(),
+                    parsed.errorDetail->message.c_str());
+            }
+
+            reportedError = parsed.errorDetail->message;
             return;
         }
 
-        auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
-
-        THROW_IF_FAILED(ProgressCallback->OnProgress(
-            parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
+        if (ProgressCallback != nullptr)
+        {
+            THROW_IF_FAILED(ProgressCallback->OnProgress(
+                parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
+        }
     };
 
     auto onCompleted = [&]() { io.Cancel(); };
@@ -366,22 +431,27 @@ try
 
     io.Run({});
 
-    THROW_HR_IF(E_UNEXPECTED, !pullResult.has_value());
+    THROW_HR_IF(E_UNEXPECTED, !pullResponse.has_value());
 
-    if (pullResult.value() != boost::beast::http::status::ok)
+    if (pullResponse->result != boost::beast::http::status::ok)
     {
         std::string errorMessage;
-        if (static_cast<int>(pullResult.value()) >= 400 && static_cast<int>(pullResult.value()) < 500)
+        if (pullResponse->isJson)
         {
             // pull failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
         }
+        else
+        {
+            // If no error message was explicitly returned, use the response body, if any.
+            errorMessage = errorJson;
+        }
 
-        if (pullResult.value() == boost::beast::http::status::not_found)
+        if (pullResponse->result == boost::beast::http::status::not_found)
         {
             THROW_HR_WITH_USER_ERROR(WSLC_E_IMAGE_NOT_FOUND, errorMessage);
         }
-        else if (pullResult.value() == boost::beast::http::status::bad_request)
+        else if (pullResponse->result == boost::beast::http::status::bad_request)
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
         }
@@ -390,12 +460,17 @@ try
             THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
         }
     }
+    else if (reportedError.has_value())
+    {
+        // Can happen if an error is returned during progress after receiving an OK status.
+        THROW_HR_WITH_USER_ERROR(E_FAIL, reportedError.value().c_str());
+    }
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
     COMServiceExecutionContext context;
@@ -406,11 +481,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
-    wil::unique_handle dockerfileFileHandle;
-    if (Options->DockerfileHandle != 0 && Options->DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
-    {
-        dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Options->DockerfileHandle)));
-    }
+    auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle, GENERIC_READ | SYNCHRONIZE);
 
     auto lock = m_lock.lock_shared();
 
@@ -438,26 +509,20 @@ try
         buildArgs.push_back("--build-arg");
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
-    if (dockerfileFileHandle)
-    {
-        buildArgs.push_back("-f");
-        buildArgs.push_back("-");
-    }
+
+    buildArgs.push_back("-f");
+    buildArgs.push_back("-");
     buildArgs.push_back(mountPath);
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
-    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, dockerfileFileHandle ? WSLCProcessFlagsStdin : WSLCProcessFlagsNone);
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     auto io = CreateIOContext();
 
-    if (dockerfileFileHandle)
-    {
-        io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-            common::relay::HandleWrapper{std::move(dockerfileFileHandle)},
-            common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
-    }
+    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
+        common::relay::HandleWrapper{buildFileHandle.Get()}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = Options->Verbose;
     std::string allOutput;
@@ -543,7 +608,61 @@ try
 
     io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
-    io.Run({});
+    // Handle cancellation within the IO loop (NeedNotComplete) so pipes keep draining.
+    bool cancelled = false;
+    wil::unique_handle killTimer;
+    if (CancelEvent != nullptr)
+    {
+        killTimer.reset(CreateWaitableTimer(nullptr, TRUE, nullptr));
+        THROW_LAST_ERROR_IF_NULL(killTimer);
+
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(
+                CancelEvent,
+                [&]() {
+                    cancelled = true;
+                    LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
+                    LARGE_INTEGER dueTime{.QuadPart = -10LL * 10 * 1000 * 1000}; // 10 seconds
+                    THROW_IF_WIN32_BOOL_FALSE(SetWaitableTimer(killTimer.get(), &dueTime, 0, nullptr, nullptr, FALSE));
+                }),
+            relay::MultiHandleWait::NeedNotComplete);
+
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(
+                killTimer.get(), [&]() { LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL)); }),
+            relay::MultiHandleWait::NeedNotComplete);
+    }
+
+    try
+    {
+        io.Run({});
+    }
+    catch (...)
+    {
+        LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
+        try
+        {
+            buildProcess.Wait(10 * 1000);
+        }
+        catch (...)
+        {
+            if (wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_TIMEOUT))
+            {
+                LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL));
+                try
+                {
+                    buildProcess.Wait(10 * 1000);
+                }
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION_MSG("Build process did not exit after SIGKILL");
+                }
+            }
+        }
+        throw;
+    }
+
+    THROW_HR_IF_MSG(E_ABORT, cancelled, "Cancellation handle was signaled");
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
@@ -598,7 +717,7 @@ CATCH_RETURN();
 
 void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(InputHandle))};
+    auto userHandle = OpenUserHandle(InputHandle, GENERIC_READ | SYNCHRONIZE);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -658,7 +777,7 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     };
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
+        userHandle.Get(), common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -699,7 +818,7 @@ CATCH_RETURN();
 
 void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, HANDLE CancelEvent)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
+    auto userHandle = OpenUserHandle(OutputHandle, GENERIC_WRITE | SYNCHRONIZE);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -722,7 +841,7 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         io.AddHandle(
             std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, common::relay::HandleWrapper{std::move(imageFileHandle)}),
+                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             MultiHandleWait::CancelOnCompleted);
     }
 
@@ -1398,9 +1517,19 @@ CATCH_RETURN();
 HRESULT WSLCSession::Terminate()
 try
 {
-    // m_sessionTerminatingEvent is always valid, so it can be signalled with the lock.
-    // This allows a session to be unblocked if a stuck operation is holding the lock.
-    m_sessionTerminatingEvent.SetEvent();
+
+    {
+        std::lock_guard lock(m_userHandlesLock);
+
+        // m_sessionTerminatingEvent is always valid, so it can be signalled without holding m_lock.
+        // This allows a session to be unblocked if a stuck operation is holding m_lock.
+        // N.B. This must happen under m_userHandlesLock to synchronize with potentially running operations.
+        m_sessionTerminatingEvent.SetEvent();
+
+        // Cancel any pending IO on user-provided handles to unblock operations
+        // in case the handles don't support overlapped IO.
+        CancelUserHandleIO();
+    }
 
     // Acquire an exclusive lock to ensure that no operation is running.
     auto lock = m_lock.lock_exclusive();
@@ -1595,6 +1724,46 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
     }
 
     return io;
+}
+
+UserHandle WSLCSession::OpenUserHandle(ULONG Handle, DWORD Access)
+{
+    std::lock_guard lock(m_userHandlesLock);
+
+    // Don't allow new handles to be added to the list if the session is terminating.
+    // N.B. This check must happen under m_userHandlesLock to synchronize with Terminate().
+
+    THROW_HR_IF_MSG(
+        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to open a user handle while the session is terminating.");
+
+    wil::unique_handle duplicatedHandle{common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Handle), Access)};
+
+    m_userHandles.emplace_back(duplicatedHandle.get());
+
+    return UserHandle{*this, std::move(duplicatedHandle)};
+}
+
+void WSLCSession::ReleaseUserHandle(HANDLE Handle)
+{
+    std::lock_guard lock(m_userHandlesLock);
+
+    auto it = std::ranges::find(m_userHandles, Handle);
+    WI_ASSERT(it != m_userHandles.end());
+
+    m_userHandles.erase(it);
+}
+
+void WSLCSession::CancelUserHandleIO()
+{
+    for (auto handle : m_userHandles)
+    {
+        // Cancel all IO on the handle.
+        // N.B. This only cancels IO happening in this process.
+        if (!CancelIoEx(handle, nullptr))
+        {
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        }
+    }
 }
 
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)

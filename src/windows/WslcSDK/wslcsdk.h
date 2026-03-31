@@ -489,9 +489,11 @@ STDAPI WslcDeleteSessionVhdVolume(_In_ WslcSession session, _In_z_ PCSTR name, _
 typedef enum WslcComponentFlags
 {
     WSLC_COMPONENT_FLAG_NONE = 0,
-    WSLC_COMPONENT_FLAG_VMPOC = 1,
-    WSLC_COMPONENT_FLAG_WSL_OC = 2,
-    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 4,
+    // Services provided by the Virtual Machine Platform optional feature (other optional features may provide these services as
+    // well). Installing this component will require a reboot.
+    WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM = 1,
+    // The WSL runtime package, at an appropriate version to provide support for WSLC.
+    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 2,
 } WslcComponentFlags;
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcComponentFlags);

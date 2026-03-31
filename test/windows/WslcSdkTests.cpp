@@ -1063,6 +1063,28 @@ class WslcSdkTests
         }
     }
 
+    TEST_METHOD(ContainerInspect)
+    {
+        WSL2_TEST_ONLY();
+
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+
+        wil::unique_cotaskmem_ansistring inspectData;
+        VERIFY_SUCCEEDED(WslcInspectContainer(container.get(), &inspectData));
+
+        VERIFY_IS_NOT_NULL(inspectData);
+
+        auto inspectObject = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectData.get());
+
+        CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE];
+        VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
+
+        VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
+    }
+
     TEST_METHOD(ContainerExec)
     {
         WSL2_TEST_ONLY();
@@ -1446,6 +1468,20 @@ class WslcSdkTests
 
         // Negative: null pointer must fail.
         VERIFY_ARE_EQUAL(WslcGetVersion(nullptr), E_POINTER);
+    }
+
+    TEST_METHOD(CanRun)
+    {
+        WSL2_TEST_ONLY();
+
+        BOOL canRun = FALSE;
+        WslcComponentFlags missing{};
+        VERIFY_SUCCEEDED(WslcCanRun(&canRun, &missing));
+
+        // Presumably anywhere that we run the tests we should get these results.
+        // The levels of OS state modification required to test beyond this are beyond the scope of these tests.
+        VERIFY_ARE_EQUAL(canRun, TRUE);
+        VERIFY_ARE_EQUAL(missing, WSLC_COMPONENT_FLAG_NONE);
     }
 
     // -----------------------------------------------------------------------
@@ -2016,37 +2052,6 @@ class WslcSdkTests
     // function is implemented the assertion below will catch it and the test
     // should be updated to exercise the real behaviour.
     // -----------------------------------------------------------------------
-
-    TEST_METHOD(CanRunNotImplemented)
-    {
-        WSL2_TEST_ONLY();
-
-        BOOL canRun = FALSE;
-        WslcComponentFlags missing{};
-        VERIFY_ARE_EQUAL(WslcCanRun(&canRun, &missing), E_NOTIMPL);
-    }
-
-    TEST_METHOD(ContainerInspect)
-    {
-        WSL2_TEST_ONLY();
-
-        UniqueContainer container;
-        WslcContainerSettings containerSettings;
-        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
-        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-
-        wil::unique_cotaskmem_ansistring inspectData;
-        VERIFY_SUCCEEDED(WslcInspectContainer(container.get(), &inspectData));
-
-        VERIFY_IS_NOT_NULL(inspectData);
-
-        auto inspectObject = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectData.get());
-
-        CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE];
-        VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
-
-        VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
-    }
 
     TEST_METHOD(InstallWithDependenciesNotImplemented)
     {
