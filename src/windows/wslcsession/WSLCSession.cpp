@@ -350,7 +350,7 @@ void WSLCSession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLCSession::OnDockerdExited, this)));
 }
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, const WslcRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
