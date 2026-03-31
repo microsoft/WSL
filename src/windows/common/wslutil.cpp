@@ -529,7 +529,7 @@ wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(
     return errorStrings;
 }
 
-HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(const WSLCHandle Handle)
+HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(WSLCHandle Handle)
 {
     switch (Handle.Type)
     {
@@ -539,6 +539,21 @@ HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(const WSLCHandle Handle
         return Handle.Handle.Pipe;
     case WSLCHandleTypeSocket:
         return Handle.Handle.Socket;
+    default:
+        THROW_HR_MSG(E_UNEXPECTED, "Unsupported handle type: %d", Handle.Type);
+    }
+}
+
+wil::unique_handle wsl::windows::common::wslutil::FromCOMOutputHandle(WSLCHandle Handle)
+{
+    switch (Handle.Type)
+    {
+    case WSLCHandleTypeFile:
+        return wil::unique_handle{Handle.Handle.File};
+    case WSLCHandleTypePipe:
+        return wil::unique_handle{Handle.Handle.Pipe};
+    case WSLCHandleTypeSocket:
+        return wil::unique_handle{Handle.Handle.Socket};
     default:
         THROW_HR_MSG(E_UNEXPECTED, "Unsupported handle type: %d", Handle.Type);
     }
@@ -1326,10 +1341,19 @@ wil::unique_hlocal_string wsl::windows::common::wslutil::SidToString(_In_ PSID U
     return sid;
 }
 
-WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle, DWORD Access)
+WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD Access)
 {
-    auto handleWithPermissions = wil::unique_handle{DuplicateHandle(Handle, Access, FALSE)};
+    wil::unique_handle duplicatedHandle{DuplicateHandle(Handle, Access)};
 
+    auto comHandle = ToCOMInputHandle(duplicatedHandle.get());
+
+    // N.B. COM closes the handle when returning an out parameter.
+    duplicatedHandle.release();
+    return comHandle;
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle)
+{
     auto type = GetFileType(Handle);
     if (type == FILE_TYPE_PIPE)
     {
@@ -1338,16 +1362,16 @@ WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle, DWORD 
 
         if (getsockopt(reinterpret_cast<SOCKET>(Handle), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &len) == 0)
         {
-            return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = handleWithPermissions.get()}};
+            return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = Handle}};
         }
         else
         {
-            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = handleWithPermissions.get()}};
+            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = Handle}};
         }
     }
     else if (type == FILE_TYPE_DISK)
     {
-        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = handleWithPermissions.get()}};
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = Handle}};
     }
     else
     {

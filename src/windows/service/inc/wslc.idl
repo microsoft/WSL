@@ -342,7 +342,7 @@ interface IWSLCProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
     HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
-    HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
+    HRESULT GetStdHandle([in] WSLCFD Fd, [out] WSLCHandle* Handle);
     HRESULT GetFlags([out] WSLCProcessFlags* Flags);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] WSLCProcessState* State, [out] int* Code);

@@ -39,22 +39,26 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcess::GetStdHandle(ULONG Index, ULONG* Handle)
+HRESULT WSLCProcess::GetStdHandle(WSLCFD Fd, WSLCHandle* Handle)
 try
 {
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_io, "Process IO not attached");
 
-    auto handle = m_io->OpenFd(Index);
+    auto handle = m_io->OpenFd(Fd);
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !handle.is_valid());
 
-    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(handle.get()));
+    DWORD Access = SYNCHRONIZE;
+
+    WI_SetFlagIf(Access, GENERIC_READ, Fd == WSLCFDTty || Fd == WSLCFDStdin);
+    WI_SetFlagIf(Access, GENERIC_WRITE, Fd == WSLCFDStdout || Fd == WSLCFDStderr);
+
+    *Handle = common::wslutil::ToCOMOutputHandle(handle.get(), Access);
 
     WSL_LOG(
         "GetStdHandle",
-        TraceLoggingValue(Index, "fd"),
-        TraceLoggingValue(handle.get(), "handle"),
-        TraceLoggingValue(*Handle, "remoteHandle"));
+        TraceLoggingValue(static_cast<int>(Fd), "fd"),
+        TraceLoggingValue(handle.get(), "handle"));
 
     return S_OK;
 }
