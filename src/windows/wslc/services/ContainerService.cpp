@@ -153,11 +153,6 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLCContainer& container, WSLCSignal signal = WSLCSignalNone, LONG timeout = -1)
-{
-    THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
-}
-
 std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
@@ -308,14 +303,14 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    StopInternal(*container, options.Signal, options.Timeout);
+    THROW_IF_FAILED(container->Stop(options.Signal, options.Timeout));
 }
 
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    StopInternal(*container, signal);
+    THROW_IF_FAILED(container->Kill(signal));
 }
 
 void ContainerService::Delete(Session& session, const std::string& id, bool force)

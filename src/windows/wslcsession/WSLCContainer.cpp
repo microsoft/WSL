@@ -620,12 +620,12 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
-void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
+void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
     // Acquire an exclusive lock since this method modifies m_state.
     auto lock = m_lock.lock_exclusive();
 
-    if (m_state == WslcContainerStateExited)
+    if (m_state == WslcContainerStateExited && !Kill)
     {
         return;
     }
@@ -639,9 +639,20 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
             m_state);
     }
 
+    std::optional<WSLCSignal> SignalArg;
+    if (Signal != WSLCSignalNone)
+    {
+        SignalArg = Signal;
+    }
+
+    // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
+    // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
+    bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
+
     // Set up a waitable stop state so OnEvent() can pass the Docker timestamp
     // back to Stop() without needing to take m_lock.
     std::future<std::uint64_t> stopFuture;
+    if (waitForStop)
     {
         std::lock_guard stopLock{m_stopStateLock};
         m_stopState.emplace();
@@ -650,33 +661,42 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds)
 
     // Ensure m_stopState is cleared on all exit paths so OnEvent() doesn't
     // take the promise path after a failed Stop().
-    auto resetStopState = wil::scope_exit([this]() {
-        std::lock_guard stopLock{m_stopStateLock};
-        m_stopState.reset();
+    auto resetStopState = wil::scope_exit([this, waitForStop]() {
+        if (waitForStop)
+        {
+            std::lock_guard stopLock{m_stopStateLock};
+            m_stopState.reset();
+        }
     });
 
     try
     {
-        std::optional<WSLCSignal> SignalArg;
-        if (Signal != WSLCSignalNone)
+        if (Kill)
         {
-            SignalArg = Signal;
-        }
+            m_dockerClient.SignalContainer(m_id, SignalArg);
 
-        std::optional<ULONG> TimeoutArg;
-        if (TimeoutSeconds >= 0)
+            if (!waitForStop)
+            {
+                return;
+            }
+        }
+        else
         {
-            TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
-        }
+            std::optional<ULONG> TimeoutArg;
+            if (TimeoutSeconds >= 0)
+            {
+                TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
+            }
 
-        m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
+            m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
+        }
     }
     catch (const DockerHTTPException& e)
     {
         // HTTP 304 is returned when the container is already stopped.
-        if (e.StatusCode() != 304)
+        if (Kill || e.StatusCode() != 304)
         {
-            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to stop container '%hs'", m_id.c_str());
+            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to %hs container '%hs'", Kill ? "kill" : "stop", m_id.c_str());
         }
     }
 
@@ -1594,7 +1614,14 @@ HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds);
+    return CallImpl(&WSLCContainerImpl::Stop, Signal, TimeoutSeconds, false);
+}
+
+HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
+{
+    COMServiceExecutionContext context;
+
+    return CallImpl(&WSLCContainerImpl::Stop, Signal, {}, true);
 }
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
