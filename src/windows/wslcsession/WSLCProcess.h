@@ -25,7 +25,7 @@ class DECLSPEC_UUID("AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B") WSLCProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCProcess, IFastRundown>
 {
 public:
-    WSLCProcess(std::unique_ptr<WSLCProcessControl>&& Control, std::unique_ptr<WSLCProcessIO>&& Io);
+    WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io);
     WSLCProcess(const WSLCProcess&) = delete;
     WSLCProcess& operator=(const WSLCProcess&) = delete;
 
@@ -41,7 +41,7 @@ public:
     int GetPid() const;
 
 private:
-    std::unique_ptr<WSLCProcessControl> m_control;
+    std::shared_ptr<WSLCProcessControl> m_control;
     std::unique_ptr<WSLCProcessIO> m_io;
 };
 } // namespace wsl::windows::service::wslc
