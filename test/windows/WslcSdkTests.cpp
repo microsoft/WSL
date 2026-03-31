@@ -1451,13 +1451,6 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        using VersionType = decltype(wsl::shared::PackageVersion);
-        if (wsl::shared::PackageVersion < VersionType{2, 8, 0})
-        {
-            LogSkipped("This test requires the build to be 2.8+ in order to work.");
-            return;
-        }
-
         BOOL canRun = FALSE;
         WslcComponentFlags missing{};
         VERIFY_SUCCEEDED(WslcCanRun(&canRun, &missing));

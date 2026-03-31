@@ -280,11 +280,6 @@ bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, u
     return version.has_value() && version >= minimalPackageVersion;
 }
 
-bool NeedsWslRuntimeInstalled()
-{
-    return !DoesWslRuntimeVersionSupportWslc(wsl::windows::common::wslutil::GetInstalledPackageVersion());
-}
-
 enum class WslRuntimeState
 {
     NotInstalled,
@@ -304,10 +299,16 @@ WslRuntimeState CheckWslRuntimeState()
     return DoesWslRuntimeVersionSupportWslc(version) ? WslRuntimeState::InstalledWithWslcSupport : WslRuntimeState::InstalledWithoutWslcSupport;
 }
 
-wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
+std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
 {
     wil::com_ptr<IWSLCSessionManager> result;
     HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&result));
+    return {result, hr};
+}
+
+wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
+{
+    auto [result, hr] = CreateSessionManagerRaw();
 
     if (hr == REGDB_E_CLASSNOTREG)
     {
@@ -328,6 +329,21 @@ wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
     wsl::windows::common::security::ConfigureForCOMImpersonation(result.get());
 
     return result;
+}
+
+bool NeedsWslRuntimeInstalled()
+{
+    auto [result, hr] = CreateSessionManagerRaw();
+
+    if (SUCCEEDED(hr))
+    {
+        return false;
+    }
+    else if (hr == REGDB_E_CLASSNOTREG)
+    {
+        return true;
+    }
+    THROW_HR(hr);
 }
 } // namespace
 
