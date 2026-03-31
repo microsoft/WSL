@@ -162,7 +162,14 @@
                 </behaviors:NavigationViewHeaderBehavior>
             </i:Interaction.Behaviors>
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Frame x:Name="NavigationFrame" />
+                <Button x:Uid="Settings_ApplyChangesButton" Grid.Row="1" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right" Margin="0,8,16,8"
+                    Visibility="{x:Bind HasPendingChanges, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    Click="ApplyChanges_Click"/>
             </Grid>
         </NavigationView>
     </Grid>

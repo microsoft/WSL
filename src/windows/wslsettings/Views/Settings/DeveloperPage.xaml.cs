@@ -42,7 +42,6 @@ public sealed partial class DeveloperPage : Page
     override protected void OnNavigatedFrom(NavigationEventArgs e)
     {
         App.GetService<IWslConfigService>().WslConfigChanged -= ViewModel.OnConfigChanged;
-        App.GetService<IWslConfigService>().PendingChangesChanged -= ViewModel.OnPendingChangesChanged;
     }
 
     public async void CustomKernelPath_Click(object sender, RoutedEventArgs e)
@@ -73,10 +72,5 @@ public sealed partial class DeveloperPage : Page
         {
             ViewModel.CustomSystemDistroPath = file.Path;
         }
-    }
-
-    private async void ApplyChanges_Click(object sender, RoutedEventArgs e)
-    {
-        await SettingsApplyHelper.ShowApplyChangesDialogAsync(XamlRoot);
     }
 }

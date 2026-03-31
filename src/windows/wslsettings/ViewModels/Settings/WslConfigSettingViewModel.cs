@@ -15,7 +15,6 @@ namespace WslSettings.ViewModels.Settings
         protected WslConfigSettingViewModel()
         {
             App.GetService<IWslConfigService>().WslConfigChanged += OnConfigChanged;
-            App.GetService<IWslConfigService>().PendingChangesChanged += OnPendingChangesChanged;
         }
 
         public void OnConfigChanged()
@@ -26,16 +25,6 @@ namespace WslSettings.ViewModels.Settings
                 OnPropertyChanged(String.Empty);
             });
         }
-
-        public void OnPendingChangesChanged()
-        {
-            _dispatcherQueue.TryEnqueue(() =>
-            {
-                OnPropertyChanged(nameof(HasPendingChanges));
-            });
-        }
-
-        public bool HasPendingChanges => App.GetService<IWslConfigService>().HasPendingChanges;
 
         abstract protected void InitializeConfigSettings();
 
