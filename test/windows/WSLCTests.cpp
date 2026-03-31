@@ -5765,7 +5765,8 @@ class WSLCTests
         VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+        wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(containers.size(), 0);
     }
 
