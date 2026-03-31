@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Unit tests for distribution start failure diagnostics introduced in PR #14442.
+    Unit tests for distribution start failure diagnostics.
     Validates CreateInstanceStepDescription mapping, error message formatting,
     and backward-compatibility of the new 3-parameter error messages.
 
