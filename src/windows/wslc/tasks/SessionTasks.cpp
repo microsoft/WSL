@@ -86,4 +86,20 @@ void ListSessions(CLIExecutionContext& context)
     }
     tablePrinter.Print();
 }
+
+void TerminateSession(CLIExecutionContext& context)
+{
+    std::wstring sessionId;
+    if (context.Args.Contains(ArgType::SessionId))
+    {
+        sessionId = context.Args.Get<ArgType::SessionId>();
+    }
+    else
+    {
+        sessionId = SessionOptions::GetDefaultSessionName();
+    }
+
+    context.ExitCode = SessionService::TerminateSession(sessionId);
+}
+
 } // namespace wsl::windows::wslc::task

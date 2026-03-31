@@ -18,8 +18,6 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-using namespace wsl::windows::common;
-
 const wchar_t* SessionOptions::GetDefaultSessionName()
 {
     return IsElevated() ? s_defaultAdminSessionName : s_defaultSessionName;
@@ -49,8 +47,9 @@ bool SessionOptions::IsElevated()
 
     // IsTokenElevated checks if the integrity level is exactly HIGH.
     // We must also check for local system because it is above HIGH.
-    // TODO: Consider fixing this in WSL security library.
-    return security::IsTokenElevated(token.get()) || security::IsTokenLocalSystem(token.get());
+    // However, IsTokenLocalSystem() does not work correctly and fails.
+    // TODO: Add proper handling for system user callers.
+    return wsl::windows::common::security::IsTokenElevated(token.get());
 }
 
 const std::filesystem::path& SessionOptions::GetStoragePath()
