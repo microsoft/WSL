@@ -45,4 +45,4 @@ jobs:
           cancelTimeoutInMinutes: 420
           TestTimeout: "0.05:00:00"
           parserProperties: "worker:VsTestVersion=V150;session:HoldTrigger=Failure;VstsTestResultAttachmentUploadBehavior=Always"
-          notificationSubscribers: $(Build.RequestedForEmail)
+          notificationSubscribers: ${{ github.event.pull_request.user.id }}+${{ github.event.pull_request.user.login }}@users.noreply.github.com
