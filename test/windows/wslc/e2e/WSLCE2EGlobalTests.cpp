@@ -49,6 +49,70 @@ class WSLCE2EGlobalTests
         RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Session_DefaultElevated)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run container list to create the default elevated session
+        auto result = RunWslc(L"container list", ElevationType::Elevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify session list shows the admin session name
+        result = RunWslc(L"session list", ElevationType::Elevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
+    }
+
+    TEST_METHOD(WSLCE2E_Session_DefaultNonElevated)
+    {
+        WSL2_TEST_ONLY();
+
+        // Run container list non-elevated to create the default non-elevated session
+        auto result = RunWslc(L"container list", ElevationType::NonElevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify session list shows the non-admin session name
+        result = RunWslc(L"session list", ElevationType::NonElevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+
+        // The space after cli is important to differentiate from the admin session which is wslc-cli-admin.
+        VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli ") != std::wstring::npos);
+    }
+
+    TEST_METHOD(WSLCE2E_Session_NonElevatedCannotAccessAdminSession)
+    {
+        WSL2_TEST_ONLY();
+
+        // First ensure admin session is created by running container list.
+        auto result = RunWslc(L"container list", ElevationType::Elevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Try to explicitly target the admin session from non-elevated process
+        result = RunWslc(L"container list --session wslc-cli-admin", ElevationType::NonElevated);
+
+        // Should fail with access denied.
+        result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Session_ElevatedCanAccessNonElevatedSession)
+    {
+        WSL2_TEST_ONLY();
+
+        // First ensure non-elevated session is created by running container list.
+        auto result = RunWslc(L"container list", ElevationType::NonElevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Elevated user should be able to explicitly target the non-admin session
+        result = RunWslc(L"container list --session wslc-cli", ElevationType::Elevated);
+
+        // This should work - elevated users can access non-elevated sessions
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+    }
+
     TEST_METHOD(WSLCE2E_Session_Targeting)
     {
         WSL2_TEST_ONLY();
@@ -93,6 +157,91 @@ class WSLCE2EGlobalTests
 
         // Verify container does not exist in the default CLI session.
         VerifyContainerIsNotListed(L"test-cont");
+    }
+
+    TEST_METHOD(WSLCE2E_Session_Shell)
+    {
+        WSL2_TEST_ONLY();
+
+        // Ensure sessions are created by running container list elevated and non-elevated.
+        auto result = RunWslc(L"container list", ElevationType::NonElevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result = RunWslc(L"container list", ElevationType::Elevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        {
+            Log::Comment(L"Testing elevated interactive session");
+            // Session shell should attach to the correct default session.
+            // Test should be elevated, therefore this should be the admin session.
+            auto session = RunWslcInteractive(L"session shell");
+            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
+
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("echo hello");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("echo hello");
+            session.ExpectStdout("hello\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("whoami");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("whoami");
+            session.ExpectStdout("root\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.ExitAndVerifyNoErrors();
+            auto exitCode = session.Wait();
+            VERIFY_ARE_EQUAL(0, exitCode);
+        }
+        {
+            Log::Comment(L"Testing non-elevated interactive session with explicit session name");
+            // Non-Elevated session shell should attach to the wslc by name also.
+            auto session = RunWslcInteractive(L"session shell wslc-cli", ElevationType::NonElevated);
+            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
+
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("echo hello");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("echo hello");
+            session.ExpectStdout("hello\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("whoami");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("whoami");
+            session.ExpectStdout("root\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.ExitAndVerifyNoErrors();
+            auto exitCode = session.Wait();
+            VERIFY_ARE_EQUAL(0, exitCode);
+        }
+        {
+            Log::Comment(L"Testing elevated interactive session with explicit admin session name");
+            // Elevated session shell should attach to the wslc by name also.
+            auto session = RunWslcInteractive(L"session shell wslc-cli-admin", ElevationType::Elevated);
+            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
+
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("echo hello");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("echo hello");
+            session.ExpectStdout("hello\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.WriteLine("whoami");
+            session.ExpectStdout(VT::RESET);
+            session.ExpectCommandEcho("whoami");
+            session.ExpectStdout("root\r\n");
+            session.ExpectStdout(VT::SESSION_PROMPT);
+
+            session.ExitAndVerifyNoErrors();
+            auto exitCode = session.Wait();
+            VERIFY_ARE_EQUAL(0, exitCode);
+        }
     }
 
 private:
