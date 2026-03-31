@@ -193,7 +193,10 @@ int ContainerService::Attach(Session& session, const std::string& id)
     wil::com_ptr<IWSLCProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
-    wsl::windows::common::ClientRunningWSLCProcess runningProcess(std::move(process), {});
+    WSLCProcessFlags processFlags{};
+    THROW_IF_FAILED(process->GetFlags(&processFlags));
+
+    ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
     ULONG stdinLogsHandle = 0;
     ULONG stdoutLogsHandle = 0;
@@ -291,12 +294,27 @@ CreateContainerResult ContainerService::Create(Session& session, const std::stri
     return {.Id = id};
 }
 
-void ContainerService::Start(Session& session, const std::string& id, bool attach)
+int ContainerService::Start(Session& session, const std::string& id, bool attach)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
     THROW_IF_FAILED(container->Start(flags, nullptr));
+
+    if (!attach)
+    {
+        return 0;
+    }
+
+    wil::com_ptr<IWSLCProcess> process;
+    THROW_IF_FAILED(container->GetInitProcess(&process));
+
+    WSLCProcessFlags processFlags{};
+    THROW_IF_FAILED(process->GetFlags(&processFlags));
+    ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
+
+    ConsoleService consoleService;
+    return consoleService.AttachToCurrentConsole(std::move(runningProcess));
 }
 
 void ContainerService::Stop(Session& session, const std::string& id, StopContainerOptions options)
