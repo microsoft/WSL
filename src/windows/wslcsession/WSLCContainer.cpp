@@ -1534,17 +1534,26 @@ HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
     COMServiceExecutionContext context;
     RETURN_HR_IF_NULL(E_POINTER, Result);
 
+    *Result = WslcContainerStateInvalid;
+    HRESULT hr = CallImpl(&WSLCContainerImpl::GetState, Result);
+    if (SUCCEEDED(hr))
+    {
+        return S_OK;
+    }
+
+    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
+    if (hr == RPC_E_DISCONNECTED)
     {
         auto cacheLock = m_cacheLock.lock_shared();
-        if (m_cachedState.has_value())
+        if (WI_VERIFY(m_cachedState.has_value()))
         {
             *Result = m_cachedState.value();
             return S_OK;
         }
     }
 
-    *Result = WslcContainerStateInvalid;
-    return CallImpl(&WSLCContainerImpl::GetState, Result);
+    return hr;
 }
 
 HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
@@ -1553,6 +1562,15 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
 
     *Process = nullptr;
 
+    HRESULT hr = CallImpl(&WSLCContainerImpl::GetInitProcess, Process);
+    if (SUCCEEDED(hr))
+    {
+        return S_OK;
+    }
+
+    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
+    if (hr == RPC_E_DISCONNECTED)
     {
         auto cacheLock = m_cacheLock.lock_shared();
         if (m_cachedInitProcess)
@@ -1561,7 +1579,7 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
         }
     }
 
-    return CallImpl(&WSLCContainerImpl::GetInitProcess, Process);
+    return hr;
 }
 
 HRESULT WSLCContainer::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKeys, IWSLCProcess** Process)
@@ -1650,19 +1668,23 @@ try
 {
     COMServiceExecutionContext context;
 
+    const auto hr = wil::ResultFromException([&] {
+        auto [lock, impl] = LockImpl();
+        WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), impl->ID().c_str()) == 0);
+    });
+
+    RETURN_HR_IF(hr, hr != RPC_E_DISCONNECTED);
+
+    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // so if LockImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
+    auto cacheLock = m_cacheLock.lock_shared();
+    if (WI_VERIFY(m_cachedId.has_value()))
     {
-        auto cacheLock = m_cacheLock.lock_shared();
-        if (m_cachedId.has_value())
-        {
-            WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), m_cachedId->c_str()) == 0);
-            return S_OK;
-        }
+        WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), m_cachedId->c_str()) == 0);
+        return S_OK;
     }
 
-    auto [lock, impl] = LockImpl();
-    WI_VERIFY(strcpy_s(Id, std::size<char>(WSLCContainerId{}), impl->ID().c_str()) == 0);
-
-    return S_OK;
+    return hr;
 }
 CATCH_RETURN();
 
@@ -1674,20 +1696,23 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
 
+    const auto hr = wil::ResultFromException([&] {
+        auto [lock, impl] = LockImpl();
+        *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
+    });
+
+    RETURN_HR_IF(hr, hr != RPC_E_DISCONNECTED);
+
+    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // so if LockImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
+    auto cacheLock = m_cacheLock.lock_shared();
+    if (WI_VERIFY(m_cachedName.has_value()))
     {
-        auto cacheLock = m_cacheLock.lock_shared();
-        if (m_cachedName.has_value())
-        {
-            *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
-            return S_OK;
-        }
+        *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedName->c_str()).release();
+        return S_OK;
     }
 
-    auto [lock, impl] = LockImpl();
-
-    *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
-
-    return S_OK;
+    return hr;
 }
 CATCH_RETURN();
 
