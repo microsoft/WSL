@@ -45,10 +45,10 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Default path for session storage. By default, storage is per-session under:\n"
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli        (standard sessions)\n"
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin (elevated sessions)\n"
+    "  # defaultStoragePath: \"\"\n";
 
-    // Validate individual setting specializations
-    namespace details
-{
+// Validate individual setting specializations
+namespace details {
 
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
     {
