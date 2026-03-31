@@ -250,8 +250,7 @@ private:
 
     static void SetReadAccess(const std::filesystem::path& path, ACCESS_MODE Mode)
     {
-        auto [everyoneSid, everyoneSidBuffer] =
-            wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
+        auto [everyoneSid, everyoneSidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
 
         EXPLICIT_ACCESSW ea{};
         ea.grfAccessPermissions = FILE_GENERIC_READ;
