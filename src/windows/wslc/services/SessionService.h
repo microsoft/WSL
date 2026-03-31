@@ -27,7 +27,8 @@ struct SessionInformation
 struct SessionService
 {
     static int Attach(const std::wstring& name);
-    static wsl::windows::wslc::models::Session CreateSession(const std::optional<wsl::windows::wslc::models::SessionOptions>& options = std::nullopt);
+    static wsl::windows::wslc::models::Session CreateSession(const wsl::windows::wslc::models::SessionOptions& options);
     static std::vector<SessionInformation> List();
+    static wsl::windows::wslc::models::Session OpenSession(const std::wstring& displayName);
 };
 } // namespace wsl::windows::wslc::services

@@ -31,6 +31,7 @@ class WSLCE2EContainerRunTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -59,6 +60,43 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"echo_from_container\n", .Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(WslcContainerName, L"exited");
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm --entrypoint /bin/whoami {}", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"root\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_And_Arguments)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(
+            std::format(L"container run --rm --entrypoint /bin/echo {} hello from entrypoint with args", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"hello from entrypoint with args\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_Invalid_Path)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm --entrypoint /bin/does-not-exist {}", DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stdout = L"", .Stderr = L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: exec: \"/bin/does-not-exist\": stat /bin/does-not-exist: no such file or directory: unknown\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Entrypoint_Detach_Lifecycle)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container run --name {} -d --entrypoint /bin/sleep {} infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VerifyContainerIsListed(WslcContainerName, L"running");
     }
 
 private:
@@ -102,29 +140,17 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --cidfile         Write the container ID to the provided path.\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
-                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
-                << L"  --dns-domain      Set the default DNS Domain\r\n"
-                << L"  --dns-option      Set DNS options\r\n"
-                << L"  --dns-search      Set DNS search domains\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
-                << L"  --no-dns          No configuration of DNS in the container\r\n"
-                << L"  --progress        Progress type (format: none|ansi) (default: ansi)\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
-                << L"  --pull            Image pull policy (always|missing|never) (default:never)\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
-                << L"  --scheme          Use this scheme for registry connection\r\n"
                 << L"  --session         Specify the session to use\r\n"
-                << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
-                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
-                << L"  --virtualization  Expose virtualization capabilities to the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();

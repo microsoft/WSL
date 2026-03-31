@@ -17,6 +17,7 @@ Abstract:
 #include <docker_schema.h>
 #include <chrono>
 #include <wslc_schema.h>
+#include <ContainerModel.h>
 
 namespace WSLCE2ETests {
 
@@ -96,17 +97,49 @@ const TestImage& DebianTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
-void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
+struct TestSession
+{
+    static TestSession Create(const std::wstring& displayName, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone);
+
+    TestSession(std::wstring name, std::filesystem::path storagePath, wil::com_ptr<IWSLCSession> session) :
+        m_name(std::move(name)), m_storagePath(std::move(storagePath)), m_session(std::move(session))
+    {
+    }
+
+    ~TestSession();
+
+    NON_COPYABLE(TestSession);
+    NON_MOVABLE(TestSession);
+
+    const std::wstring& Name() const
+    {
+        return m_name;
+    }
+
+    const std::filesystem::path& StoragePath() const
+    {
+        return m_storagePath;
+    }
+
+private:
+    std::wstring m_name;
+    std::filesystem::path m_storagePath;
+    wil::com_ptr<IWSLCSession> m_session;
+};
+
+void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
 wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
+std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
-void EnsureImageIsLoaded(const TestImage& image);
+void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
+void EnsureImageContainersAreDeleted(const TestImage& image);
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>

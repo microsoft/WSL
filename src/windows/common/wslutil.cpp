@@ -411,13 +411,14 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     return newHandle;
 }
 
-[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle)
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess)
 {
     const wil::unique_handle caller = OpenCallingProcess(PROCESS_DUP_HANDLE);
     THROW_LAST_ERROR_IF(!caller);
 
     HANDLE newHandle;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(caller.get(), Handle, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(
+        caller.get(), Handle, GetCurrentProcess(), &newHandle, DesiredAccess.value_or(0), FALSE, DesiredAccess.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return newHandle;
 }
@@ -1071,6 +1072,44 @@ std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
     pids.resize(bytesReturned / sizeof(DWORD));
 
     return pids;
+}
+
+std::pair<std::string, std::string> wsl::windows::common::wslutil::NormalizeRepo(const std::string& Input)
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
+
+    constexpr auto defaultDomain = "docker.io";
+    constexpr auto officialPrefix = "library/";
+    constexpr auto legacyDomain = "index.docker.io";
+    constexpr auto localhost = "localhost";
+
+    auto slash = Input.find('/');
+    if (slash == std::string::npos)
+    {
+        return {defaultDomain, officialPrefix + Input};
+    }
+
+    auto domain = Input.substr(0, slash);
+    auto path = Input.substr(slash + 1);
+
+    if (domain == legacyDomain)
+    {
+        domain = defaultDomain;
+    }
+    else if (domain != localhost && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, [](unsigned char e) {
+                 return std::isupper(e);
+             }))
+    {
+        domain = defaultDomain;
+        path = Input;
+    }
+
+    if (domain == defaultDomain && path.find('/') == std::string::npos)
+    {
+        path = "library/" + path;
+    }
+
+    return {domain, path};
 }
 
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)

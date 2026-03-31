@@ -315,8 +315,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_TTY_RELAY
                 if (bytesWritten < 0)
                 {
                     //
-                    // If writing on stdin's pipe would block, mark the write as pending an continue.
-                    // This is required blocking on the write() could lead to a deadlock if the child process
+                    // If writing on stdin's pipe would block, mark the write as pending and continue.
+                    // This is required because blocking on the write() could lead to a deadlock if the child process
                     // is blocking trying to write on stderr / stdout while the relay tries to write stdin.
                     //
 
@@ -330,6 +330,11 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_TTY_RELAY
                         LOG_ERROR("write failed {}", errno);
                         break;
                     }
+                }
+                else if (bytesWritten < bytesRead)
+                {
+                    // Partial write — buffer the remaining bytes for the next iteration.
+                    pendingStdin.assign(buffer.begin() + bytesWritten, buffer.begin() + bytesRead);
                 }
             }
         }
