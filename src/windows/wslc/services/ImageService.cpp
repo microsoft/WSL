@@ -92,10 +92,13 @@ wil::unique_hfile ImageService::ResolveBuildFile(const std::filesystem::path& co
     auto dockerfilePath = contextPath / L"Dockerfile";
     auto dockerfileStatus = wil::try_open_file(dockerfilePath.c_str());
 
+    // Fail if both Containerfile and Dockerfile exist.
+    // Assume that both exist if one opens successfuly and the other returns ERROR_FILE_NOT_FOUND to cover the case where one of them exists, but fails to open.
+    // If both exist, but fail to open, the logic after this block will report the appropriate error.
     if ((containerfileStatus.last_error != ERROR_FILE_NOT_FOUND && dockerfileStatus.file) ||
         (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND && containerfileStatus.file))
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBothDockerAndContainerFileFound())
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBothDockerAndContainerFileFound());
     }
 
     if (containerfileStatus.last_error != ERROR_FILE_NOT_FOUND)
@@ -120,7 +123,7 @@ wil::unique_hfile ImageService::ResolveBuildFile(const std::filesystem::path& co
         return std::move(dockerfileStatus.file);
     }
 
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcContainerfileNotFound(contextPath));
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBuildFileNotFound(contextPath));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)

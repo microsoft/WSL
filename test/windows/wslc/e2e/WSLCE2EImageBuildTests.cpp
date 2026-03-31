@@ -201,7 +201,7 @@ private:
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
-        auto testRoot = std::filesystem::current_path() / (L"wslc-e2e-build-" + image.Name);
+        auto testRoot = std::filesystem::current_path() / image.Name;
         auto cleanup = SetupTestDirectory(testRoot);
 
         WriteTestFile(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
