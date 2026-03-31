@@ -40,6 +40,5 @@ public:
     void Save();
     void Tag();
     void Prune();
-
 };
 } // namespace wsl::windows::wslc::services
