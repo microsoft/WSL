@@ -272,7 +272,6 @@ bool NeedsVirtualMachineServicesInstalled()
 }
 
 #define WSLC_API_MIN_VERSION_SUPPORTED 2, 8, 0
-#define WSLC_API_MIN_VERSION_SUPPORTED_STRING "2.8.0"
 
 bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
 {
@@ -316,8 +315,7 @@ wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
         THROW_WIN32_IF_MSG(
             ERROR_NOT_SUPPORTED,
             currentState == WslRuntimeState::InstalledWithoutWslcSupport,
-            "The currently installed WSL version does not support WSLC; upgrade to " WSLC_API_MIN_VERSION_SUPPORTED_STRING
-            " or later.");
+            "The currently installed WSL version does not support WSLC.");
         THROW_HR_IF_MSG(
             hr,
             currentState == WslRuntimeState::InstalledWithWslcSupport,
