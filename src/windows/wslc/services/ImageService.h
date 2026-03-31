@@ -28,10 +28,8 @@ public:
         const std::vector<std::wstring>& buildArgs,
         const std::wstring& dockerfilePath,
         bool verbose,
-        IProgressCallback* callback);
-
-    // Resolves a Dockerfile or Containerfile from the given context directory.
-    static wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath);
+        IProgressCallback* callback,
+        HANDLE cancelEvent = nullptr);
 
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
@@ -42,5 +40,6 @@ public:
     void Save();
     void Tag();
     void Prune();
+
 };
 } // namespace wsl::windows::wslc::services

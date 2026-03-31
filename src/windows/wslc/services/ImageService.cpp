@@ -15,10 +15,57 @@ Abstract:
 #include "SessionService.h"
 #include <wslutil.h>
 
+using namespace wsl::shared;
+
+namespace {
+
+wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
+{
+    auto containerfilePath = contextPath / L"Containerfile";
+    auto containerfileStatus = wil::try_open_file(containerfilePath.c_str());
+
+    auto dockerfilePath = contextPath / L"Dockerfile";
+    auto dockerfileStatus = wil::try_open_file(dockerfilePath.c_str());
+
+    // Fail if both Containerfile and Dockerfile exist.
+    // Assume that both exist if one opens successfuly and the other returns anything other than ERROR_FILE_NOT_FOUND to cover the case where one of them exists, but fails to open.
+    // If both exist but fail to open, the logic after this block will report the appropriate error.
+    if ((containerfileStatus.last_error != ERROR_FILE_NOT_FOUND && dockerfileStatus.file) ||
+        (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND && containerfileStatus.file))
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBothDockerAndContainerFileFound());
+    }
+
+    if (containerfileStatus.last_error != ERROR_FILE_NOT_FOUND)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(containerfileStatus.last_error),
+            Localization::MessageWslcFailedToOpenFile(
+                containerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(containerfileStatus.last_error))),
+            !containerfileStatus.file.is_valid());
+
+        return std::move(containerfileStatus.file);
+    }
+
+    if (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(dockerfileStatus.last_error),
+            Localization::MessageWslcFailedToOpenFile(
+                dockerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(dockerfileStatus.last_error))),
+            !dockerfileStatus.file.is_valid());
+
+        return std::move(dockerfileStatus.file);
+    }
+
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBuildFileNotFound(contextPath));
+}
+
+} // namespace
+
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::models;
-using namespace wsl::shared;
 using wsl::windows::common::wslc_schema::InspectImage;
 
 void ImageService::Build(
@@ -28,7 +75,8 @@ void ImageService::Build(
     const std::vector<std::wstring>& buildArgs,
     const std::wstring& dockerfilePath,
     bool verbose,
-    IProgressCallback* callback)
+    IProgressCallback* callback,
+    HANDLE cancelEvent)
 {
     auto absolutePath = std::filesystem::absolute(contextPath);
     THROW_HR_IF_MSG(
@@ -81,49 +129,7 @@ void ImageService::Build(
         .Verbose = verbose,
     };
 
-    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));
-}
-
-wil::unique_hfile ImageService::ResolveBuildFile(const std::filesystem::path& contextPath)
-{
-    auto containerfilePath = contextPath / L"Containerfile";
-    auto containerfileStatus = wil::try_open_file(containerfilePath.c_str());
-
-    auto dockerfilePath = contextPath / L"Dockerfile";
-    auto dockerfileStatus = wil::try_open_file(dockerfilePath.c_str());
-
-    // Fail if both Containerfile and Dockerfile exist.
-    // Assume that both exist if one opens successfuly and the other returns ERROR_FILE_NOT_FOUND to cover the case where one of them exists, but fails to open.
-    // If both exist, but fail to open, the logic after this block will report the appropriate error.
-    if ((containerfileStatus.last_error != ERROR_FILE_NOT_FOUND && dockerfileStatus.file) ||
-        (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND && containerfileStatus.file))
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBothDockerAndContainerFileFound());
-    }
-
-    if (containerfileStatus.last_error != ERROR_FILE_NOT_FOUND)
-    {
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(containerfileStatus.last_error),
-            Localization::MessageWslcFailedToOpenFile(
-                containerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(containerfileStatus.last_error))),
-            !containerfileStatus.file.is_valid());
-
-        return std::move(containerfileStatus.file);
-    }
-
-    if (dockerfileStatus.last_error != ERROR_FILE_NOT_FOUND)
-    {
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(dockerfileStatus.last_error),
-            Localization::MessageWslcFailedToOpenFile(
-                dockerfilePath, wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(dockerfileStatus.last_error))),
-            !dockerfileStatus.file.is_valid());
-
-        return std::move(dockerfileStatus.file);
-    }
-
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBuildFileNotFound(contextPath));
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
