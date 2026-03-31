@@ -30,6 +30,7 @@ public:
         bool verbose,
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);
+
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
