@@ -62,6 +62,7 @@ _(Name,           "name",                NO_ALIAS,          Kind::Value,       L
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container")*/ \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        L"Do not delete untagged parents") \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        L"Do not truncate output") \
+_(Output,         "output",              L"o",              Kind::Value,       L"Path for the saved image") \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  L"Path to the build context directory") \
 /*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       L"Progress type (format: none|ansi) (default: ansi)")*/ \
 _(Publish,        "publish",             L"p",              Kind::Value,       L"Publish a port from a container to host") \
