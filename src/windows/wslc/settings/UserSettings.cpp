@@ -42,7 +42,7 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size in megabytes (default: 100GB)\n"
     "  # maxStorageSize: 100GB\n"
     "\n"
-    "  # Default path for container storage (default: %LocalAppData%\\wslc\\storage)\n"
+    "  # Default path for container storage (default: %LocalAppData%\\wslc\\sessions)\n"
     "  # defaultStoragePath: \"\"\n";
 
 // Validate individual setting specializations
