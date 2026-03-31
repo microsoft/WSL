@@ -126,9 +126,6 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
             throw std::runtime_error(std::format("CheckConnection: getaddrinfo() failed: {}", status));
         }
 
-        *connCheckStatus = ConnCheckStatus::FailureConfig;
-        sock = ConnCheckConfigureSocket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
-
         // next configure the socket
         *connCheckStatus = ConnCheckStatus::FailureConfig;
         sock = ConnCheckConfigureSocket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
