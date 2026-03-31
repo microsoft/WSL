@@ -124,8 +124,7 @@ function(wslc_add_image)
 
     set(_image_ref "${ARG_IMAGE}:${ARG_TAG}")
     set(_marker "${CMAKE_CURRENT_BINARY_DIR}/wslc_${ARG_NAME}.marker")
-    # Uncomment when wslc image save is available:
-    # set(_tar_output "${ARG_OUTPUT}/${ARG_NAME}.tar")
+    set(_tar_output "${ARG_OUTPUT}/${ARG_NAME}.tar")
 
     # Resolve source globs to file lists
     file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS ${ARG_SOURCES})
@@ -133,12 +132,11 @@ function(wslc_add_image)
     add_custom_command(
         OUTPUT "${_marker}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${ARG_DOCKERFILE}" "${ARG_CONTEXT}"
-        # Uncomment when wslc image save is available:
-        # COMMAND ${CMAKE_COMMAND} -E make_directory "${ARG_OUTPUT}"
-        # COMMAND "${WSLC_CLI_PATH}" image save -o "${_tar_output}" "${_image_ref}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${ARG_OUTPUT}"
+        COMMAND "${WSLC_CLI_PATH}" image save -o "${_tar_output}" "${_image_ref}"
         COMMAND ${CMAKE_COMMAND} -E touch "${_marker}"
         DEPENDS ${_resolved_sources} "${ARG_DOCKERFILE}"
-        COMMENT "WSLC: Building image '${_image_ref}'..."
+        COMMENT "WSLC: Building and saving image '${_image_ref}' to '${_tar_output}'..."
         VERBATIM
     )
 
