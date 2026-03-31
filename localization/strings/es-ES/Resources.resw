@@ -966,6 +966,10 @@ Revirtiendo a las redes NAT.</value>
     <value>Error de actualización (código de salida: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} no toma ningún argumento. Para anular el registro de una distribución, use {} en su lugar.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Error de desinstalación (código de salida: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

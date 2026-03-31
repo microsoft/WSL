@@ -960,6 +960,10 @@ Palataan nat-verkkopalveluun.</value>
     <value>Päivitys epäonnistui (lopetuskoodi: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} ei ota vastaan argumentteja. Jakelun rekisteröinnin poistamiseen käytä sen sijaan {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Asennuksen poistaminen epäonnistui (lopetuskoodi: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

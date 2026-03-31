@@ -960,6 +960,10 @@ Går tilbage til NAT-netværk.</value>
     <value>Opdateringen mislykkedes (afslutningskode: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} kan ikke bruge argumenter. Hvis du vil fjerne registreringen af en distribution, skal du bruge {} i stedet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Fjernelsen mislykkedes (udgangskode: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
