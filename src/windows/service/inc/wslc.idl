@@ -322,6 +322,7 @@ interface IWSLCProcess : IUnknown
     HRESULT Signal([in] int Signal);
     HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
     HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
+    HRESULT GetFlags([out] WSLCProcessFlags* Flags);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] WSLCProcessState* State, [out] int* Code);
     HRESULT ResizeTty([in] ULONG Rows, [in] ULONG Columns);
@@ -443,6 +444,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
+    HRESULT Kill([in] WSLCSignal Signal);
 }
 
 typedef enum _WSLCDeletedImageType
@@ -540,7 +542,7 @@ interface IWSLCSession : IUnknown
 
     // Image management.
     HRESULT PullImage([in] LPCSTR Image, [in, unique] const  WslcRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);

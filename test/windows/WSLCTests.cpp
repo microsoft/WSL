@@ -981,22 +981,16 @@ class WSLCTests
         }
     }
 
-    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options, const char* dockerfilePath = nullptr)
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options)
     {
-        wil::unique_hfile dockerfileHandle;
-        if (dockerfilePath != nullptr)
-        {
-            dockerfileHandle.reset(CreateFileW(
-                (contextDir / dockerfilePath).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-            THROW_LAST_ERROR_IF(!dockerfileHandle);
-        }
+        auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
 
         auto contextPathStr = contextDir.wstring();
         WSLCBuildImageOptions optionsCopy = *options;
         optionsCopy.ContextPath = contextPathStr.c_str();
         optionsCopy.DockerfileHandle = HandleToULong(dockerfileHandle.get());
 
-        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, nullptr);
+        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, nullptr, nullptr);
 
         if (FAILED(buildResult))
         {
@@ -1006,13 +1000,13 @@ class WSLCTests
         return buildResult;
     }
 
-    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag)
     {
         LPCSTR tag = imageTag;
         WSLCBuildImageOptions options{
             .Tags = {&tag, 1},
         };
-        return BuildImageFromContext(contextDir, &options, dockerfilePath);
+        return BuildImageFromContext(contextDir, &options);
     }
 
     TEST_METHOD(BuildImage)
@@ -1291,34 +1285,6 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-failure:latest", false);
     }
 
-    TEST_METHOD(BuildImageCustomDockerfile)
-    {
-        WSL2_TEST_ONLY();
-
-        auto contextDir = std::filesystem::current_path() / "build-context-custom";
-        std::filesystem::create_directories(contextDir / "dockerfiles");
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            std::error_code ec;
-            std::filesystem::remove_all(contextDir, ec);
-        });
-
-        {
-            std::ofstream dockerfile(contextDir / "dockerfiles" / "Dockerfile.custom");
-            dockerfile << "FROM debian:latest\n";
-            dockerfile << "CMD [\"echo\", \"custom-dockerfile-ok\"]\n";
-        }
-
-        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build-custom:latest", "dockerfiles/Dockerfile.custom"));
-        ExpectImagePresent(*m_defaultSession, "wslc-test-build-custom:latest");
-
-        WSLCContainerLauncher launcher("wslc-test-build-custom:latest", "wslc-build-custom-container");
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
-
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("custom-dockerfile-ok") != std::string::npos);
-    }
-
     TEST_METHOD(BuildImageStdinDockerfile)
     {
         WSL2_TEST_ONLY();
@@ -1348,7 +1314,7 @@ class WSLCTests
             .DockerfileHandle = HandleToULong(readHandle.get()),
             .Tags = {&tag, 1},
         };
-        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr, nullptr));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-stdin:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-stdin:latest", "wslc-build-stdin-container");
@@ -1422,6 +1388,77 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options));
         ExpectImagePresent(*m_defaultSession, "wslc-test-multitag:v1");
         ExpectImagePresent(*m_defaultSession, "wslc-test-multitag:v2");
+    }
+
+    TEST_METHOD(BuildImageNullHandle)
+    {
+        WSL2_TEST_ONLY();
+
+        WSLCBuildImageOptions options{.ContextPath = L"C:\\", .DockerfileHandle = 0, .Tags = {nullptr, 0}};
+
+        VERIFY_ARE_EQUAL(m_defaultSession->BuildImage(&options, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE));
+    }
+
+    TEST_METHOD(BuildImageCancel)
+    {
+        WSL2_TEST_ONLY();
+
+        class TestProgressCallback
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+        {
+        public:
+            TestProgressCallback(wil::unique_event& event) : m_event(event)
+            {
+            }
+
+            HRESULT OnProgress(LPCSTR, LPCSTR, ULONGLONG, ULONGLONG) override
+            {
+                m_event.SetEvent();
+                return S_OK;
+            }
+
+        private:
+            wil::unique_event& m_event;
+        };
+
+        auto contextDir = std::filesystem::current_path() / "build-context-cancel";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        // Use a Dockerfile that takes a long time to build so we can cancel it mid-build.
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN sleep 120\n";
+        }
+
+        wil::unique_event cancelEvent{wil::EventOptions::ManualReset};
+        wil::unique_event progressEvent{wil::EventOptions::ManualReset};
+
+        // Use a progress callback to detect when the build is actively running
+        // before signaling cancellation, avoiding a racy Sleep().
+        auto callback = Microsoft::WRL::Make<TestProgressCallback>(progressEvent);
+
+        auto contextPathStr = contextDir.wstring();
+        auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
+
+        LPCSTR tag = "wslc-test-build-cancel:latest";
+        WSLCBuildImageOptions options{
+            .ContextPath = contextPathStr.c_str(), .DockerfileHandle = HandleToULong(dockerfileHandle.get()), .Tags = {&tag, 1}};
+
+        std::promise<HRESULT> result;
+        std::thread buildThread(
+            [&]() { result.set_value(m_defaultSession->BuildImage(&options, callback.Get(), cancelEvent.get())); });
+
+        auto joinThread = wil::scope_exit([&]() { buildThread.join(); });
+
+        VERIFY_IS_TRUE(progressEvent.wait(60 * 1000));
+        cancelEvent.SetEvent();
+
+        VERIFY_ARE_EQUAL(E_ABORT, result.get_future().get());
     }
 
     TEST_METHOD(TagImage)
@@ -3590,8 +3627,7 @@ class WSLCTests
         // Test StopContainer
         {
             // Create a container
-            WSLCContainerLauncher launcher(
-                "debian:latest", "test-container-2", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeHost);
+            WSLCContainerLauncher launcher("debian:latest", "test-container-2", {"sleep", "99999"});
 
             auto container = launcher.Create(*m_defaultSession);
 
@@ -3604,8 +3640,6 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGTERM, 0));
 
-            // TODO: Once 'container run' is split into 'container create' + 'container start',
-            // validate that Stop() on a container in 'Created' state returns ERROR_INVALID_STATE.
             expectContainerList({{"test-container-2", "debian:latest", WslcContainerStateExited}});
 
             // Verify that the container is in exited state.
@@ -3614,6 +3648,47 @@ class WSLCTests
             // Verify that deleting a container stopped via Stop() works.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
             expectContainerList({});
+        }
+
+        // Validate that Kill() works as expected
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-kill", {"sleep", "99999"}, {});
+
+            auto container = launcher.Create(*m_defaultSession);
+
+            // Validate that a created container cannot be killed.
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalNone));
+
+            // Verify that the container is in exited state.
+            expectContainerList({{"test-container-kill", "debian:latest", WslcContainerStateExited}});
+
+            // Validate that killing a non-running container fails (unlike Stop())
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Verify that deleting a container stopped via Kill() works.
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+            expectContainerList({});
+        }
+
+        // Validate that Kill() works with non-sigkill signals.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-kill-2", {"sleep", "99999"}, {});
+            launcher.SetContainerFlags(WSLCContainerFlagsInit);
+
+            auto container = launcher.Create(*m_defaultSession);
+
+            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGTERM));
+
+            VERIFY_ARE_EQUAL(container.GetInitProcess().Wait(120 * 1000), WSLCSignalSIGTERM + 128);
+
+            // Verify that the container is in exited state.
+            expectContainerList({{"test-container-kill-2", "debian:latest", WslcContainerStateExited}});
         }
 
         // Verify that trying to open a non existing container fails.
@@ -5685,6 +5760,25 @@ class WSLCTests
 
             wil::com_ptr<IWSLCContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that a container with the Rm flag is automatically deleted when the container is killed.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-auto-remove-kill", {"/bin/cat"}, {}, {}, WSLCProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+            // Prevent container from being deleted when handle is closed so we can verify auto-remove behavior.
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            process.Wait();
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLCContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-kill", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         }
 
         // Test that the container autoremove flag is applied when the container exits on its own.

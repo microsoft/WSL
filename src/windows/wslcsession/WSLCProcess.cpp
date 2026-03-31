@@ -18,8 +18,8 @@ Abstract:
 
 using wsl::windows::service::wslc::WSLCProcess;
 
-WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io) :
-    m_control(std::move(Control)), m_io(std::move(Io))
+WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags) :
+    m_control(std::move(Control)), m_io(std::move(Io)), m_flags(Flags)
 {
 }
 
@@ -56,6 +56,14 @@ try
         TraceLoggingValue(handle.get(), "handle"),
         TraceLoggingValue(*Handle, "remoteHandle"));
 
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCProcess::GetFlags(WSLCProcessFlags* Flags)
+try
+{
+    *Flags = m_flags;
     return S_OK;
 }
 CATCH_RETURN();

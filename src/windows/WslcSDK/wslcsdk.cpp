@@ -353,6 +353,7 @@ try
         runtimeSettings.TerminationCallback = terminationCallback.get();
     }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
+    WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
 
     // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
     // runtimeSettings.DmesgOutput;
