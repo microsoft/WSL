@@ -164,4 +164,15 @@ void InspectImages(CLIExecutionContext& context)
     auto json = ToJson(result);
     PrintMessage(MultiByteToWide(json));
 }
+
+void SaveImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    WI_ASSERT(context.Args.Contains(ArgType::Output));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto& output = context.Args.Get<ArgType::Output>();
+    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+}
 } // namespace wsl::windows::wslc::task
