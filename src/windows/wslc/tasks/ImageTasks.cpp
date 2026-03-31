@@ -173,6 +173,6 @@ void SaveImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
     auto& output = context.Args.Get<ArgType::Output>();
-    services::ImageService::Save(session, WideToMultiByte(imageId), output);
+    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
 }
 } // namespace wsl::windows::wslc::task
