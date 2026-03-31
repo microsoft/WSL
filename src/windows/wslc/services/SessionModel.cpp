@@ -43,8 +43,7 @@ SessionOptions::SessionOptions()
 
 bool SessionOptions::IsElevated()
 {
-    wil::unique_handle token;
-    THROW_IF_WIN32_BOOL_FALSE(::OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token));
+    auto token = wil::open_current_access_token(TOKEN_QUERY);
     return wsl::windows::common::security::IsTokenElevated(token.get());
 }
 
