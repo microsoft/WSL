@@ -88,7 +88,7 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(images);
+        auto json = ToJson(images, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }
@@ -161,7 +161,7 @@ void InspectImages(CLIExecutionContext& context)
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
 }
 } // namespace wsl::windows::wslc::task
