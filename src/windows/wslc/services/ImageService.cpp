@@ -27,7 +27,8 @@ void ImageService::Build(
     const std::vector<std::wstring>& buildArgs,
     const std::wstring& dockerfilePath,
     bool verbose,
-    IProgressCallback* callback)
+    IProgressCallback* callback,
+    HANDLE cancelEvent)
 {
     auto absolutePath = std::filesystem::absolute(contextPath);
     THROW_HR_IF_MSG(
@@ -75,7 +76,7 @@ void ImageService::Build(
         .Verbose = verbose,
     };
 
-    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
