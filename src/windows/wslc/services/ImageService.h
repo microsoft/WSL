@@ -32,7 +32,7 @@ public:
 
     // Resolves a Dockerfile or Containerfile from the given context directory.
     // Prefers Containerfile if only one exists; throws if both or neither are found.
-    static wil::unique_hfile ResolveDockerfile(const std::filesystem::path& contextPath);
+    static wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath);
 
     static std::vector<wsl::windows::wslc::models::ImageInformation> List(wsl::windows::wslc::models::Session& session);
     static void Load(wsl::windows::wslc::models::Session& session, const std::wstring& input);

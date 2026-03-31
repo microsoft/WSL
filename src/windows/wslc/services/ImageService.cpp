@@ -51,7 +51,7 @@ void ImageService::Build(
     }
     else
     {
-        dockerfile = ResolveDockerfile(absolutePath);
+        dockerfile = ResolveBuildFile(absolutePath);
         dockerfileHandle = dockerfile.get();
     }
 
@@ -84,7 +84,7 @@ void ImageService::Build(
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));
 }
 
-wil::unique_hfile ImageService::ResolveDockerfile(const std::filesystem::path& contextPath)
+wil::unique_hfile ImageService::ResolveBuildFile(const std::filesystem::path& contextPath)
 {
     auto containerfilePath = contextPath / L"Containerfile";
     auto containerfileStatus = wil::try_open_file(containerfilePath.c_str());
