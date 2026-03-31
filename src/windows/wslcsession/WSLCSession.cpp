@@ -471,7 +471,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, HANDLE DockerfileHandle, IProgressCallback* ProgressCallback)
 try
 {
     COMServiceExecutionContext context;
@@ -483,9 +483,9 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
     std::optional<UserHandle> dockerfileFileHandle;
-    if (Options->DockerfileHandle != 0 && Options->DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
+    if (DockerfileHandle != nullptr && DockerfileHandle != INVALID_HANDLE_VALUE)
     {
-        dockerfileFileHandle = OpenUserHandle(Options->DockerfileHandle, GENERIC_READ | SYNCHRONIZE);
+        dockerfileFileHandle = OpenUserHandle(DockerfileHandle);
     }
 
     auto lock = m_lock.lock_shared();
@@ -630,12 +630,15 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLCSession::LoadImage(HANDLE ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
     COMServiceExecutionContext context;
+
+    // Take immediate ownership of the COM-transferred handle to prevent leaks on early error paths.
+    wil::unique_handle ownedImageHandle{ImageHandle};
 
     auto lock = m_lock.lock_shared();
 
@@ -643,17 +646,20 @@ try
 
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    ImportImageImpl(*requestContext, ownedImageHandle.release());
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLCSession::ImportImage(HANDLE ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
     COMServiceExecutionContext context;
+
+    // Take immediate ownership of the COM-transferred handle to prevent leaks on early error paths.
+    wil::unique_handle ownedImageHandle{ImageHandle};
 
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLC_MAX_IMAGE_NAME_LENGTH);
@@ -668,14 +674,14 @@ try
 
     auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
 
-    ImportImageImpl(*requestContext, ImageHandle);
+    ImportImageImpl(*requestContext, ownedImageHandle.release());
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
+void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, HANDLE InputHandle)
 {
-    auto userHandle = OpenUserHandle(InputHandle, GENERIC_READ | SYNCHRONIZE);
+    auto userHandle = OpenUserHandle(InputHandle);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -755,12 +761,15 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, errorMessage.value(), errorMessage.has_value());
 }
 
-HRESULT WSLCSession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
+HRESULT WSLCSession::SaveImage(HANDLE OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
     COMServiceExecutionContext context;
+
+    // Take immediate ownership of the COM-transferred handle to prevent leaks on early error paths.
+    wil::unique_handle ownedOutHandle{OutHandle};
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
     RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrID) > WSLC_MAX_IMAGE_NAME_LENGTH);
@@ -769,14 +778,14 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto retVal = m_dockerClient->SaveImage(ImageNameOrID);
-    SaveImageImpl(retVal, OutHandle, CancelEvent);
+    SaveImageImpl(retVal, ownedOutHandle.release(), CancelEvent);
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, HANDLE CancelEvent)
+void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, HANDLE OutputHandle, HANDLE CancelEvent)
 {
-    auto userHandle = OpenUserHandle(OutputHandle, GENERIC_WRITE | SYNCHRONIZE);
+    auto userHandle = OpenUserHandle(OutputHandle);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -1684,7 +1693,7 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
     return io;
 }
 
-UserHandle WSLCSession::OpenUserHandle(ULONG Handle, DWORD Access)
+UserHandle WSLCSession::OpenUserHandle(HANDLE Handle)
 {
     std::lock_guard lock(m_userHandlesLock);
 
@@ -1694,11 +1703,12 @@ UserHandle WSLCSession::OpenUserHandle(ULONG Handle, DWORD Access)
     THROW_HR_IF_MSG(
         E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to open a user handle while the session is terminating.");
 
-    wil::unique_handle duplicatedHandle{common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Handle), Access)};
+    // The handle was transferred to us by COM via system_handle marshaling.
+    wil::unique_handle ownedHandle{Handle};
 
-    m_userHandles.emplace_back(duplicatedHandle.get());
+    m_userHandles.emplace_back(ownedHandle.get());
 
-    return UserHandle{*this, std::move(duplicatedHandle)};
+    return UserHandle{*this, std::move(ownedHandle)};
 }
 
 void WSLCSession::ReleaseUserHandle(HANDLE Handle)

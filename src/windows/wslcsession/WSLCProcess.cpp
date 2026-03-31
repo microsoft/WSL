@@ -39,7 +39,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcess::GetStdHandle(ULONG Index, ULONG* Handle)
+HRESULT WSLCProcess::GetStdHandle(ULONG Index, HANDLE* PipeHandle, HANDLE* SocketHandle)
 try
 {
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_io, "Process IO not attached");
@@ -48,13 +48,22 @@ try
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !handle.is_valid());
 
-    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(handle.get()));
+    // Route to the correct out param based on the underlying handle type.
+    // RelayedProcessIO (container) uses pipes; TTYProcessIO and VMProcessIO use sockets.
+    if (m_io->IsSocketBased())
+    {
+        *SocketHandle = handle.release();
+    }
+    else
+    {
+        *PipeHandle = handle.release();
+    }
 
     WSL_LOG(
         "GetStdHandle",
         TraceLoggingValue(Index, "fd"),
-        TraceLoggingValue(handle.get(), "handle"),
-        TraceLoggingValue(*Handle, "remoteHandle"));
+        TraceLoggingValue(m_io->IsSocketBased(), "isSocket"),
+        TraceLoggingValue(*PipeHandle ? *PipeHandle : *SocketHandle, "handle"));
 
     return S_OK;
 }

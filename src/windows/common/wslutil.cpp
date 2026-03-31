@@ -1183,7 +1183,26 @@ wil::unique_handle wsl::windows::common::wslutil::OpenCallingProcess(_In_ DWORD 
     const auto context = wsl::windows::common::wslutil::CoGetCallContext<ICallingProcessInfo>();
     if (context)
     {
-        THROW_IF_FAILED(context->OpenCallerProcessHandle(access, &caller));
+        const auto hr = context->OpenCallerProcessHandle(access, &caller);
+        if (hr == E_ACCESSDENIED)
+        {
+            // The caller may be elevated while this process is not. Get the caller's PID
+            // using PROCESS_QUERY_LIMITED_INFORMATION (available cross-elevation), then
+            // impersonate the caller to open the process with the requested access rights.
+            wil::unique_handle queryHandle;
+            THROW_IF_FAILED(context->OpenCallerProcessHandle(PROCESS_QUERY_LIMITED_INFORMATION, &queryHandle));
+            const auto pid = GetProcessId(queryHandle.get());
+            THROW_LAST_ERROR_IF(pid == 0);
+            queryHandle.reset();
+
+            auto impersonate = wil::CoImpersonateClient();
+            caller.reset(::OpenProcess(access, FALSE, pid));
+            THROW_LAST_ERROR_IF(!caller);
+        }
+        else
+        {
+            THROW_IF_FAILED(hr);
+        }
     }
 
     return caller;

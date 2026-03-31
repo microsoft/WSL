@@ -69,13 +69,12 @@ void ImageService::Build(
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
-        .DockerfileHandle = HandleToULong(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Verbose = verbose,
     };
 
-    THROW_IF_FAILED(session.Get()->BuildImage(&options, callback));
+    THROW_IF_FAILED(session.Get()->BuildImage(&options, dockerfileHandle, callback));
 }
 
 std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
@@ -104,7 +103,7 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
 
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
-    THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+    THROW_IF_FAILED(session.Get()->LoadImage(imageFile.get(), nullptr, fileSize.QuadPart));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)

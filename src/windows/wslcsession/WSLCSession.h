@@ -74,10 +74,10 @@ public:
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCSTR Image, _In_opt_ const WslcRegistryAuthInformation* RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_opt_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
+    IFACEMETHOD(BuildImage)(_In_ const WSLCBuildImageOptions* Options, _In_ HANDLE DockerfileHandle, _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(LoadImage)(_In_ HANDLE ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
+    IFACEMETHOD(ImportImage)(_In_ HANDLE ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
+    IFACEMETHOD(SaveImage)(_In_ HANDLE OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _In_opt_ HANDLE CancelEvent) override;
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImageOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLCDeleteImageOptions* Options, _Out_ WSLCDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCTagImageOptions* Options) override;
@@ -113,7 +113,7 @@ public:
 
     common::relay::MultiHandleWait CreateIOContext(HANDLE CancelHandle = nullptr);
 
-    UserHandle OpenUserHandle(ULONG Handle, DWORD Access);
+    UserHandle OpenUserHandle(HANDLE Handle);
     void ReleaseUserHandle(HANDLE Handle);
 
 private:
@@ -126,11 +126,11 @@ private:
     void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();
     void StartDockerd();
-    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
+    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, HANDLE InputHandle);
     void RecoverExistingContainers();
     void RecoverExistingVolumes();
 
-    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle, HANDLE CancelEvent);
+    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, HANDLE OutputHandle, HANDLE CancelEvent);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;

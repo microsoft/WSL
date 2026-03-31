@@ -200,30 +200,25 @@ int ContainerService::Attach(Session& session, const std::string& id)
 
     wsl::windows::common::ClientRunningWSLCProcess runningProcess(std::move(process), {});
 
-    ULONG stdinLogsHandle = 0;
-    ULONG stdoutLogsHandle = 0;
-    ULONG stderrLogsHandle = 0;
-    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogsHandle, &stdoutLogsHandle, &stderrLogsHandle));
+    wil::unique_handle ttySocket;
+    wil::unique_handle stdinHandle;
+    wil::unique_handle stdoutHandle;
+    wil::unique_handle stderrHandle;
+    THROW_IF_FAILED(container->Attach(nullptr, &ttySocket, &stdinHandle, &stdoutHandle, &stderrHandle));
 
-    wil::unique_handle stdinLogs(ULongToHandle(stdinLogsHandle));
-    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
-    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
-
-    if (stdoutLogs)
+    if (ttySocket)
     {
-        // Non-TTY process - relay separate stdout/stderr streams
-        WI_ASSERT(!!stderrLogs);
-        ConsoleService::RelayNonTtyProcess(std::move(stdinLogs), std::move(stdoutLogs), std::move(stderrLogs));
+        WI_ASSERT(!stdinHandle && !stdoutHandle && !stderrHandle);
+
+        if (!ConsoleService::RelayInteractiveTty(runningProcess, ttySocket.get(), true))
+        {
+            wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
+            return 0;
+        }
     }
     else
     {
-        // TTY process - relay using interactive TTY handling
-        WI_ASSERT(!stderrLogs);
-        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.get(), true))
-        {
-            wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
-            return 0; // Exit early if user detached
-        }
+        ConsoleService::RelayNonTtyProcess(std::move(stdinHandle), std::move(stdoutHandle), std::move(stderrHandle));
     }
 
     // Wait for the container process to exit
@@ -373,14 +368,12 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    ULONG stdoutLogsHandle = 0;
-    ULONG stderrLogsHandle = 0;
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutLogsHandle, &stderrLogsHandle, 0, 0, 0));
-    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
-    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
+    wil::unique_handle stdoutLogs;
+    wil::unique_handle stderrLogs;
+    THROW_IF_FAILED(container->Logs(flags, &stdoutLogs, &stderrLogs, 0, 0, 0));
 
     wsl::windows::common::relay::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(

@@ -221,10 +221,12 @@ ClientRunningWSLCProcess::ClientRunningWSLCProcess(wil::com_ptr<IWSLCProcess>&& 
 
 wil::unique_handle ClientRunningWSLCProcess::GetStdHandle(int Index)
 {
-    ULONG handle{};
-    THROW_IF_FAILED_MSG(m_process->GetStdHandle(Index, &handle), "Failed to get handle: %i", Index);
+    wil::unique_handle pipeHandle;
+    HANDLE rawSocket = nullptr;
+    THROW_IF_FAILED_MSG(m_process->GetStdHandle(Index, &pipeHandle, &rawSocket), "Failed to get handle: %i", Index);
 
-    return wil::unique_handle{ULongToHandle(handle)};
+    // Server returns either a pipe or a socket depending on the process type.
+    return pipeHandle ? std::move(pipeHandle) : wil::unique_handle{rawSocket};
 }
 
 wil::unique_event ClientRunningWSLCProcess::GetExitEvent()

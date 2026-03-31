@@ -104,9 +104,11 @@ bool IOCallback::HasIOCallback(const WslcContainerProcessIOCallbackOptions& opti
 
 wil::unique_handle IOCallback::GetIOHandle(IWSLCProcess* process, WslcProcessIOHandle ioHandle)
 {
-    ULONG ulongHandle = 0;
+    wil::unique_handle pipeHandle;
+    HANDLE rawSocket = nullptr;
 
-    THROW_IF_FAILED(process->GetStdHandle(static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &ulongHandle));
+    THROW_IF_FAILED(process->GetStdHandle(
+        static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &pipeHandle, &rawSocket));
 
-    return wil::unique_handle{ULongToHandle(ulongHandle)};
+    return pipeHandle ? std::move(pipeHandle) : wil::unique_handle{rawSocket};
 }
