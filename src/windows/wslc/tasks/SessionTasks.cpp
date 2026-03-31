@@ -36,7 +36,7 @@ void AttachToSession(CLIExecutionContext& context)
     }
     else
     {
-        sessionId = SessionOptions::s_defaultSessionName;
+        sessionId = SessionOptions::GetDefaultSessionName();
     }
 
     context.ExitCode = SessionService::Attach(sessionId);
@@ -46,17 +46,22 @@ void CreateSession(CLIExecutionContext& context)
 {
     if (context.Args.Contains(ArgType::Session))
     {
-        // If provided session name is not the default CLI session, open that one.
+        // If provided session name is not the default CLI session use open only.
+        // This also ensures that mixed elevation types will only attempt to open
+        // a session and not create it. Example: Admin process attempting to open
+        // a non-admin session will fail to create but succeed to open, preventing
+        // accidental creation of a non-admin session with admin permissions.
         const auto& sessionName = context.Args.Get<ArgType::Session>();
-        if (!wsl::shared::string::IsEqual(sessionName, SessionOptions::s_defaultSessionName))
+        if (!SessionOptions::IsDefaultSessionName(sessionName))
         {
             context.Data.Add<Data::Session>(SessionService::OpenSession(sessionName));
             return;
         }
     }
 
-    // Create/open the CLI session.
-    SessionOptions options = SessionOptions::Default();
+    // Create/open the default session. Create is only called with default session
+    // settings so we ensure the CLI sessions are created with correct permissions.
+    SessionOptions options{};
     context.Data.Add<Data::Session>(SessionService::CreateSession(options));
 }
 

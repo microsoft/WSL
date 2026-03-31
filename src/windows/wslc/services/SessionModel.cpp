@@ -18,18 +18,20 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-const std::filesystem::path& SessionOptions::GetStoragePath()
+const wchar_t* SessionOptions::GetDefaultSessionName()
 {
-    static const std::filesystem::path storagePath =
-        settings::User().Get<settings::Setting::SessionStoragePath>().empty()
-            ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::s_defaultStorageSubPath}
-            : settings::User().Get<settings::Setting::SessionStoragePath>().c_str();
-    return storagePath;
+    return IsElevated() ? s_defaultAdminSessionName : s_defaultSessionName;
+}
+
+bool SessionOptions::IsDefaultSessionName(const std::wstring& sessionName)
+{
+    // Only returns true for the default session name that matches current elevation.
+    return wsl::shared::string::IsEqual(sessionName, GetDefaultSessionName());
 }
 
 SessionOptions::SessionOptions()
 {
-    m_sessionSettings.DisplayName = s_defaultSessionName;
+    m_sessionSettings.DisplayName = GetDefaultSessionName();
     m_sessionSettings.StoragePath = GetStoragePath().c_str();
     m_sessionSettings.CpuCount = settings::User().Get<settings::Setting::SessionCpuCount>();
     m_sessionSettings.MemoryMb = settings::User().Get<settings::Setting::SessionMemoryMb>();
@@ -37,6 +39,27 @@ SessionOptions::SessionOptions()
     m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
     m_sessionSettings.NetworkingMode = settings::User().Get<settings::Setting::SessionNetworkingMode>();
     m_sessionSettings.FeatureFlags = WslcFeatureFlagsVirtioFs;
+}
+
+bool SessionOptions::IsElevated()
+{
+    wil::unique_handle token;
+    THROW_IF_WIN32_BOOL_FALSE(::OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token));
+    return wsl::windows::common::security::IsTokenElevated(token.get());
+}
+
+const std::filesystem::path& SessionOptions::GetStoragePath()
+{
+    static const std::filesystem::path basePath = []() {
+        return settings::User().Get<settings::Setting::SessionStoragePath>().empty()
+                   ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::s_defaultStorageSubPath}
+                   : settings::User().Get<settings::Setting::SessionStoragePath>().c_str();
+    }();
+
+    static const std::filesystem::path storagePathNonAdmin = basePath / std::wstring{s_defaultSessionName};
+    static const std::filesystem::path storagePathAdmin = basePath / std::wstring{s_defaultAdminSessionName};
+
+    return IsElevated() ? storagePathAdmin : storagePathNonAdmin;
 }
 
 } // namespace wsl::windows::wslc::models
