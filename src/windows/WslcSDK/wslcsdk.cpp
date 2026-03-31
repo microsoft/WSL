@@ -20,6 +20,7 @@ Abstract:
 #include "wslutil.h"
 
 using namespace std::string_view_literals;
+using namespace wsl::windows::common::wslutil;
 
 namespace {
 constexpr uint32_t s_DefaultCPUCount = 2;
@@ -1052,8 +1053,8 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return S_OK;
-    ///return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-    //    HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+    return errorInfoWrapper.CaptureResult(
+        internalSession->session->ImportImage(ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1091,8 +1092,8 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return S_OK;
-    //return errorInfoWrapper.CaptureResult(
-      //  internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+    return errorInfoWrapper.CaptureResult(
+        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcLoadSessionImage(
