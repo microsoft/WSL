@@ -17,27 +17,26 @@ Abstract:
 #include "UserSettings.h"
 
 namespace wsl::windows::wslc::models {
-SessionOptions SessionOptions::Default()
+
+const std::filesystem::path& SessionOptions::GetStoragePath()
 {
-    // Use a function-local static to defer path initialization until first use.
     static const std::filesystem::path storagePath =
         settings::User().Get<settings::Setting::SessionStoragePath>().empty()
-            ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc\\storage"}
+            ? std::filesystem::path{wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / SessionOptions::s_defaultStorageSubPath}
             : settings::User().Get<settings::Setting::SessionStoragePath>().c_str();
-
-    SessionOptions options{};
-    options.m_sessionSettings.DisplayName = s_DefaultSessionName;
-    options.m_sessionSettings.CpuCount = settings::User().Get<settings::Setting::SessionCpuCount>();
-    options.m_sessionSettings.MemoryMb = settings::User().Get<settings::Setting::SessionMemoryMb>();
-    options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
-    options.m_sessionSettings.StoragePath = storagePath.c_str();
-    options.m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
-    options.m_sessionSettings.NetworkingMode = settings::User().Get<settings::Setting::SessionNetworkingMode>();
-    return options;
+    return storagePath;
 }
 
-const WSLCSessionSettings* SessionOptions::Get() const
+SessionOptions::SessionOptions()
 {
-    return &m_sessionSettings;
+    m_sessionSettings.DisplayName = s_defaultSessionName;
+    m_sessionSettings.StoragePath = GetStoragePath().c_str();
+    m_sessionSettings.CpuCount = settings::User().Get<settings::Setting::SessionCpuCount>();
+    m_sessionSettings.MemoryMb = settings::User().Get<settings::Setting::SessionMemoryMb>();
+    m_sessionSettings.BootTimeoutMs = s_defaultBootTimeoutMs;
+    m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
+    m_sessionSettings.NetworkingMode = settings::User().Get<settings::Setting::SessionNetworkingMode>();
+    m_sessionSettings.FeatureFlags = WslcFeatureFlagsVirtioFs;
 }
+
 } // namespace wsl::windows::wslc::models

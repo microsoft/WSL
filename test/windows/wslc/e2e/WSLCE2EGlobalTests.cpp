@@ -15,12 +15,17 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
+#include "WSLCE2EHelpers.h"
+
+using namespace WEX::Logging;
 
 namespace WSLCE2ETests {
 
 class WSLCE2EGlobalTests
 {
     WSLC_TEST_CLASS(WSLCE2EGlobalTests)
+
+    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -42,6 +47,52 @@ class WSLCE2EGlobalTests
     {
         WSL2_TEST_ONLY();
         RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Session_Targeting)
+    {
+        WSL2_TEST_ONLY();
+
+        // Generate a unique session name to avoid conflicts with previous runs or concurrent tests.
+        // Use only a short portion of the GUID to avoid MAX_PATH issues.
+        GUID sessionGuid;
+        VERIFY_SUCCEEDED(CoCreateGuid(&sessionGuid));
+        auto guidStr = wsl::shared::string::GuidToString<wchar_t>(sessionGuid, wsl::shared::string::GuidToStringFlags::None);
+        const auto sessionName = std::format(L"wslc-test-{}", guidStr.substr(0, 8));
+
+        auto session = TestSession::Create(sessionName);
+
+        // Load the Debian image into the test session to avoid hitting Docker Hub rate limits.
+        EnsureImageIsLoaded(DebianTestImage(), session.Name());
+
+        // Verify targeting a non-existent session fails.
+        auto result = RunWslc(L"container list --session INVALID_SESSION_NAME");
+        result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+
+        // Verify session list
+        result = RunWslc(L"session list");
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify there is a session with the name of the test session in the session list output.
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+        auto findResult = result.Stdout->find(session.Name());
+        VERIFY_ARE_NOT_EQUAL(findResult, std::wstring::npos);
+
+        // Run container list in the test session, which should succeed if the session is valid.
+        result = RunWslc(std::format(L"container list --session {}", session.Name()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Add a container to the new session.
+        result = RunWslc(
+            std::format(L"container create --session {} --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
+        result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
+        result.Verify({.ExitCode = S_OK});
+
+        // Verify container exists in the custom session
+        VerifyContainerIsListed(L"test-cont", L"created", session.Name());
+
+        // Verify container does not exist in the default CLI session.
+        VerifyContainerIsNotListed(L"test-cont");
     }
 
 private:
@@ -89,6 +140,7 @@ private:
                  << L"  remove     Remove containers.\r\n"
                  << L"  rmi        Remove images.\r\n"
                  << L"  run        Run a container.\r\n"
+                 << L"  save       Save images.\r\n"
                  << L"  start      Start a container.\r\n"
                  << L"  stop       Stop containers.\r\n"
                  << L"\r\n"

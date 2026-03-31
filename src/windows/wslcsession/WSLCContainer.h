@@ -76,7 +76,7 @@ public:
 
     void Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys);
     void Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
-    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
+    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Delete(WSLCDeleteFlags Flags);
     void Export(ULONG TarHandle) const;
     void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
@@ -184,6 +184,7 @@ public:
 
     IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
+    IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
     IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
