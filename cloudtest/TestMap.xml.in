@@ -9,6 +9,7 @@
         <Add Name="PipelineArtifactName" Value="drop_wsl_build"/>
       </Properties>
     </Provider>
+${PACKAGE_PROVIDER_BLOCK}
     <Provider Type="VSODrop">
       <Properties>
         <Add Name="CloudTest.ProviderCustomName" Value="[test_distro]" />
