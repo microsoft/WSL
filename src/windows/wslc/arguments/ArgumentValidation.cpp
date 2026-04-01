@@ -158,4 +158,21 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
 }
 
+InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (IsEqual(input, L"image"))
+    {
+        return InspectType::Image;
+    }
+    else if (IsEqual(input, L"container"))
+    {
+        return InspectType::Container;
+    }
+    else
+    {
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized inspect type. Supported inspect types are: image, container.", argName, input));
+    }
+}
+
 } // namespace wsl::windows::wslc::validation

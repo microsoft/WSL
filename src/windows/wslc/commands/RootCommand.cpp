@@ -18,6 +18,7 @@ Abstract:
 #include "ImageCommand.h"
 #include "SessionCommand.h"
 #include "SettingsCommand.h"
+#include "InspectCommand.h"
 
 using namespace wsl::windows::wslc::execution;
 
@@ -34,7 +35,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
-    commands.push_back(std::make_unique<ContainerInspectCommand>(FullName()));
+    commands.push_back(std::make_unique<InspectCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
     commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));

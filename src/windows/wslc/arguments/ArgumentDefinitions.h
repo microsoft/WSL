@@ -61,6 +61,7 @@ _(Interactive,    "interactive",         L"i",              Kind::Flag,        L
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       L"Name of the container") \
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container")*/ \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        L"Do not delete untagged parents") \
+_(ObjectId,       "object-id",           NO_ALIAS,          Kind::Positional,  L"Name or Id of any object type") \
 _(Output,         "output",              L"o",              Kind::Value,       L"Path for the saved image") \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  L"Path to the build context directory") \
 /*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       L"Progress type (format: none|ansi) (default: ansi)")*/ \
@@ -76,6 +77,7 @@ _(Tag,            "tag",                 L"t",              Kind::Value,       L
 _(Time,           "time",                L"t",              Kind::Value,       L"Time in seconds to wait before executing (default 5)") \
 /*_(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       L"Mount tmpfs to the container at the given path")*/ \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        L"Open a TTY with the container process.") \
+_(Type,           "type",                L"t",              Kind::Value,       L"Type of the object to inspect.") \
 /*_(User,           "user",                L"u",              Kind::Value,       L"User ID for the process (name|uid|uid:gid)")*/ \
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details") \
 _(Version,        "version",             L"v",              Kind::Flag,        L"Show version information for this tool") \
