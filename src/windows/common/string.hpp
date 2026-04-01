@@ -48,6 +48,33 @@ std::string WideToMultiByte(_In_opt_ LPCWSTR Source, _In_ size_t CharacterCount 
 
 std::string WideToMultiByte(_In_ std::wstring_view Source);
 
+std::wstring TruncateId(_In_ std::wstring_view id, bool shortenLength = true);
+std::string TruncateId(_In_ std::string_view id, bool shortenLength = true);
+
+// Template implementation for TruncateId to avoid code duplication.
+// Algorithm inspired from Moby for consistency in presentation of shortened IDs.
+// Always strips the algorithm prefix (e.g., "sha256:") if present, and optionally shortens to 12 characters.
+template <typename TChar>
+inline std::basic_string<TChar> TruncateIdImpl(std::basic_string_view<TChar> id, bool shortenLength)
+{
+    constexpr size_t shortLen = 12;
+    constexpr TChar colon = TChar(':');
+
+    // Find and skip algorithm prefix if present (e.g., "sha256:")
+    auto colonPos = id.find(colon);
+    if (colonPos != std::basic_string_view<TChar>::npos)
+    {
+        id.remove_prefix(colonPos + 1);
+    }
+
+    if (shortenLength && id.length() > shortLen)
+    {
+        return std::basic_string<TChar>{id.substr(0, shortLen)};
+    }
+
+    return std::basic_string<TChar>{id};
+}
+
 struct PhysicalMacAddress
 {
     BYTE Address[MAX_ADAPTER_ADDRESS_LENGTH]{};

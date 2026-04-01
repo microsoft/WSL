@@ -1287,6 +1287,59 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-failure:latest", false);
     }
 
+    TEST_METHOD(BuildImageFailureShowsBuildOutput)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-failure-output";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN echo 'build-log-marker' && /bin/false\n";
+        }
+
+        class ProgressAccumulator
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+        {
+        public:
+            ProgressAccumulator(std::string& output) : m_output(output)
+            {
+            }
+            HRESULT OnProgress(LPCSTR message, LPCSTR, ULONGLONG, ULONGLONG) override
+            {
+                if (message)
+                {
+                    m_output.append(message);
+                }
+                return S_OK;
+            }
+
+        private:
+            std::string& m_output;
+        };
+
+        std::string progressOutput;
+        auto callback = Microsoft::WRL::Make<ProgressAccumulator>(progressOutput);
+
+        auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
+        auto contextPathStr = contextDir.wstring();
+        LPCSTR tag = "wslc-test-build-failure-output:latest";
+        WSLCBuildImageOptions options{
+            .ContextPath = contextPathStr.c_str(),
+            .DockerfileHandle = HandleToULong(dockerfileHandle.get()),
+            .Tags = {&tag, 1},
+        };
+
+        VERIFY_FAILED(m_defaultSession->BuildImage(&options, callback.Get(), nullptr));
+        VERIFY_IS_TRUE(progressOutput.find("build-log-marker") != std::string::npos);
+    }
+
     TEST_METHOD(BuildImageStdinDockerfile)
     {
         WSL2_TEST_ONLY();
@@ -5269,6 +5322,7 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "logs-test-3", {"/bin/bash", "-c", "echo -n OK"});
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK"}});
 
             COMOutputHandle stdoutHandle{};
             COMOutputHandle stderrHandle{};
