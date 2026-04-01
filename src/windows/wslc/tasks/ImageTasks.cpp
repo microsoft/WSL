@@ -20,7 +20,7 @@ Abstract:
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "PullImageCallback.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include "Task.h"
 #include <format>
 
@@ -52,7 +52,7 @@ void BuildImage(CLIExecutionContext& context)
     bool verbose = context.Args.Contains(ArgType::Verbose);
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -89,32 +89,36 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(images);
+        auto json = ToJson(images, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        // Create table with or without column limits based on --no-trunc flag
+        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
+                                 {{{L"REPOSITORY", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"TAG", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"IMAGE ID", {12, 12, false}},
+                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<5>({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+
         for (const auto& image : images)
         {
-            // Truncate sha256:abc... to first 12 chars after prefix
-            auto id = image.Id;
-            if (id.starts_with("sha256:"))
-            {
-                id = id.substr(7, 12);
-            }
-
-            tablePrinter.AddRow({
+            table.OutputLine({
                 MultiByteToWide(image.Repository),
                 MultiByteToWide(image.Tag),
-                MultiByteToWide(id),
+                MultiByteToWide(TruncateId(image.Id, trunc)),
                 ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
                 std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
             });
         }
 
-        tablePrinter.Print();
+        table.Complete();
         break;
     }
     default:
@@ -175,7 +179,18 @@ void InspectImages(CLIExecutionContext& context)
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
+}
+
+void SaveImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    WI_ASSERT(context.Args.Contains(ArgType::Output));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto& output = context.Args.Get<ArgType::Output>();
+    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
 }
 } // namespace wsl::windows::wslc::task
