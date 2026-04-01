@@ -224,7 +224,7 @@ wil::unique_handle ClientRunningWSLCProcess::GetStdHandle(int Index)
     wslutil::COMOutputHandle handle;
     THROW_IF_FAILED_MSG(m_process->GetStdHandle(static_cast<WSLCFD>(Index), &handle), "Failed to get handle: %i", Index);
 
-    return handle.MoveHandle();
+    return handle.Release();
 }
 
 wil::unique_event ClientRunningWSLCProcess::GetExitEvent()

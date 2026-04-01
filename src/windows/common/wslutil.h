@@ -97,7 +97,7 @@ struct COMOutputHandle : public WSLCHandle
         }
     }
 
-    wil::unique_handle MoveHandle() noexcept
+    [[nodiscard]] wil::unique_handle Release() noexcept
     {
         wil::unique_handle handle(Handle.File);
         Handle.File = nullptr;
@@ -214,7 +214,7 @@ std::wstring ErrorCodeToString(HRESULT Error);
 
 ErrorStrings ErrorToString(const Error& error);
 
-HANDLE FromCOMInputHandle(WSLCHandle Handle);
+[[nodiscard]] HANDLE FromCOMInputHandle(WSLCHandle Handle);
 
 std::filesystem::path GetBasePath();
 

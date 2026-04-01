@@ -125,7 +125,7 @@ void ImageService::Build(
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
-        .DockerfileHandle = wsl::windows::common::wslutil::ToCOMInputHandle(dockerfileHandle),
+        .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Verbose = verbose,

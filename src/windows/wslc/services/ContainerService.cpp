@@ -208,13 +208,13 @@ int ContainerService::Attach(Session& session, const std::string& id)
     {
         // Non-TTY process - relay separate stdout/stderr streams
         WI_ASSERT(!stderrLogs.Empty());
-        ConsoleService::RelayNonTtyProcess(stdinLogs.MoveHandle(), stdoutLogs.MoveHandle(), stderrLogs.MoveHandle());
+        ConsoleService::RelayNonTtyProcess(stdinLogs.Release(), stdoutLogs.Release(), stderrLogs.Release());
     }
     else
     {
         // TTY process - relay using interactive TTY handling
         WI_ASSERT(stderrLogs.Empty());
-        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.MoveHandle().get(), true))
+        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.Release().get(), true))
         {
             wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
             return 0; // Exit early if user detached
@@ -392,12 +392,12 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
 
     wsl::windows::common::relay::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-        stdoutHandle.MoveHandle(), GetStdHandle(STD_OUTPUT_HANDLE)));
+        stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
 
     if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
         io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-            stderrHandle.MoveHandle(), GetStdHandle(STD_ERROR_HANDLE)));
+            stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.

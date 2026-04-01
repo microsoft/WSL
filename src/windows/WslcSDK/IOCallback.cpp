@@ -108,5 +108,5 @@ wil::unique_handle IOCallback::GetIOHandle(IWSLCProcess* process, WslcProcessIOH
 
     THROW_IF_FAILED(process->GetStdHandle(static_cast<WSLCFD>(static_cast<std::underlying_type_t<WslcProcessIOHandle>>(ioHandle)), &handle));
 
-    return handle.MoveHandle();
+    return handle.Release();
 }

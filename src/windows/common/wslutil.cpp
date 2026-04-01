@@ -529,7 +529,7 @@ wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(
     return errorStrings;
 }
 
-HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(WSLCHandle Handle)
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(WSLCHandle Handle)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), Handle.Handle.File == nullptr || Handle.Handle.File == INVALID_HANDLE_VALUE);
 
@@ -1332,10 +1332,9 @@ WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD
 {
     wil::unique_handle duplicatedHandle{DuplicateHandle(Handle, Access)};
 
-    auto comHandle = ToCOMInputHandle(duplicatedHandle.get());
-
     // N.B. COM closes the handle when returning an out parameter.
-    duplicatedHandle.release();
+    // The return value of this method should always be passed to a COM out parameter.
+    auto comHandle = ToCOMInputHandle(duplicatedHandle.release());
 
     return comHandle;
 }
