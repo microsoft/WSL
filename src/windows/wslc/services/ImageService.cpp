@@ -207,7 +207,7 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
 
     wsl::windows::common::HandleConsoleProgressBar progressBar(
         outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
-    THROW_IF_FAILED(session.Get()->SaveImage(wsl::windows::common::wslutil::ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
+    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
 }
 
 void ImageService::Tag()

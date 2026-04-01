@@ -43,7 +43,7 @@ class WSLCTests
     wil::com_ptr<IWSLCSession> m_defaultSession;
     static inline auto c_testSessionName = L"wslc-test";
 
-    void LoadTestImage(std::string_view imageName)
+    void LoadTestImage(std::string_view imageName, IWSLCSession* session = nullptr)
     {
         std::filesystem::path imagePath = GetTestImagePath(imageName);
         wil::unique_hfile imageFile{
@@ -53,7 +53,7 @@ class WSLCTests
         LARGE_INTEGER fileSize{};
         THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-        THROW_IF_FAILED(m_defaultSession->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+        THROW_IF_FAILED((session ? session : m_defaultSession.get())->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
     }
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -6304,5 +6304,28 @@ class WSLCTests
         ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "path");
         ValidateRepoParsing(
             "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80", "path");
+    }
+
+    TEST_METHOD(ElevatedTokenCanOpenNonElevatedHandles)
+    {
+        WSL2_TEST_ONLY();
+
+        wil::com_ptr<IWSLCSession> nonElevatedSession;
+
+        {
+            auto nonElevatedToken = GetNonElevatedToken(TokenImpersonation);
+            auto revert = wil::impersonate_token(nonElevatedToken.get());
+
+            nonElevatedSession = CreateSession(GetDefaultSessionSettings(L"non-elevated-session"), WSLCSessionFlagsNone);
+            LoadTestImage("debian:latest", nonElevatedSession.get());
+
+            WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-1", {"echo", "OK"});
+            auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+        }
+
+        WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-2", {"echo", "OK"});
+        auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+        ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 };
