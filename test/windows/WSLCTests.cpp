@@ -53,7 +53,8 @@ class WSLCTests
         LARGE_INTEGER fileSize{};
         THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-        THROW_IF_FAILED((session ? session : m_defaultSession.get())->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+        THROW_IF_FAILED(
+            (session ? session : m_defaultSession.get())->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
     }
 
     TEST_CLASS_SETUP(TestClassSetup)
