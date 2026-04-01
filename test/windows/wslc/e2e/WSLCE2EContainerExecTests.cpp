@@ -299,6 +299,125 @@ class WSLCE2EContainerExecTests
             {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
+        TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MultipleFiles)
+    {
+        WSL2_TEST_ONLY();
+
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_EXEC_ENV_FILE_MULTI_B=file1-b"});
+        WriteEnvFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_EXEC_ENV_FILE_MULTI_D=file2-d"});
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(
+            L"container exec --env-file {} --env-file {} {} env",
+            EscapePath(EnvTestFile1.wstring()),
+            EscapePath(EnvTestFile2.wstring()),
+            WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_MULTI_A=file1-a"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_MULTI_B=file1-b"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_MULTI_C=file2-c"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_MULTI_D=file2-d"));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_InvalidContent)
+    {
+        WSL2_TEST_ONLY();
+
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_VALID=ok", "BAD KEY=value"});
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
+        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_DuplicateKeys_Precedence)
+    {
+        WSL2_TEST_ONLY();
+
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_DUP=from-file-1"});
+        WriteEnvFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_DUP=from-file-2"});
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Later --env-file wins
+        result = RunWslc(std::format(
+            L"container exec --env-file {} --env-file {} {} env",
+            EscapePath(EnvTestFile1.wstring()),
+            EscapePath(EnvTestFile2.wstring()),
+            WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_DUP=from-file-2"));
+
+        // Explicit -e wins over env-file
+        result = RunWslc(std::format(
+            L"container exec -e WSLC_TEST_EXEC_ENV_DUP=from-cli --env-file {} --env-file {} {} env",
+            EscapePath(EnvTestFile1.wstring()),
+            EscapePath(EnvTestFile2.wstring()),
+            WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_DUP=from-cli"));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_ValueContainsEquals)
+    {
+        WSL2_TEST_ONLY();
+
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_EQUALS=value=with=equals"});
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_EQUALS=value=with=equals"));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_ExitCode_Propagates)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container exec {} sh -c \"exit 42\"", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 42});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_Stderr_Propagates)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container exec {} sh -c \"echo exec-error 1>&2\"", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"exec-error\n", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_StoppedContainer)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container exec {} echo should-fail", WslcContainerName));
+        result.Verify({.Stderr = L"The group or resource is not in the correct state to perform the requested operation. \r\nError code: ERROR_INVALID_STATE\r\n", .ExitCode = 1});
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
