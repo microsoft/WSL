@@ -348,7 +348,7 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
     auto stdoutLines = listResult.GetStdoutLines();
     for (const auto& line : stdoutLines)
     {
-        if (line.find(targetSession) != std::wstring::npos)
+        if (line.find(targetSession + L"\r\n") != std::wstring::npos)
         {
             auto result = RunWslc(std::format(L"session terminate \"{}\"", targetSession));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});

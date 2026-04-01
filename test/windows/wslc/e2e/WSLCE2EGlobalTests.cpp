@@ -159,11 +159,10 @@ class WSLCE2EGlobalTests
         result = RunWslc(L"container list", ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        // Verify session list shows the admin session name
+        // Verify session list shows the non-elevated session name
         result = RunWslc(L"session list");
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         VERIFY_IS_TRUE(result.Stdout.has_value());
-        result.Dump(true);
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
 
         // Terminate the session
@@ -207,7 +206,7 @@ class WSLCE2EGlobalTests
         result = RunWslc(L"container list", ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        // Verify session list shows the admin session name
+        // Verify session list shows the non-elevated session name
         result = RunWslc(L"session list");
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         VERIFY_IS_TRUE(result.Stdout.has_value());
