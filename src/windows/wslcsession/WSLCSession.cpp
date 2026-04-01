@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
+#include <wincrypt.h>
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -28,6 +29,110 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
+
+std::string Base64Decode(const std::string& encoded)
+{
+    DWORD size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, nullptr, &size, nullptr, nullptr));
+
+    std::string result(size, '\0');
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr));
+
+    result.resize(size);
+    return result;
+}
+
+// Resolve \r overwrites: for each \n-delimited line, keep only the content after the last \r.
+// This collapses terminal progress updates (e.g. "50%\r75%\r100%") to their final state.
+std::string ResolveCarriageReturns(const std::string& input)
+{
+    if (input.empty())
+    {
+        return {};
+    }
+
+    std::string result;
+    size_t lineStart = 0;
+    while (lineStart < input.size())
+    {
+        size_t lineEnd = input.find('\n', lineStart);
+        if (lineEnd == std::string::npos)
+        {
+            lineEnd = input.size();
+        }
+
+        // Find the last \r in this line segment (skip empty segments to avoid rfind underflow).
+        size_t contentStart = lineStart;
+        if (lineEnd > lineStart)
+        {
+            size_t lastCr = input.rfind('\r', lineEnd - 1);
+            if (lastCr != std::string::npos && lastCr >= lineStart)
+            {
+                contentStart = lastCr + 1;
+            }
+        }
+
+        result.append(input, contentStart, lineEnd - contentStart);
+        if (lineEnd < input.size())
+        {
+            result.push_back('\n');
+        }
+
+        lineStart = lineEnd + 1;
+    }
+
+    return result;
+}
+
+std::string TailLines(const std::string& input, int lineCount)
+{
+    if (input.empty() || lineCount <= 0)
+    {
+        return {};
+    }
+
+    size_t pos = input.size();
+    if (input[pos - 1] == '\n')
+    {
+        pos--;
+    }
+
+    for (int i = 0; i < lineCount && pos > 0; i++)
+    {
+        pos = input.rfind('\n', pos - 1);
+        if (pos == std::string::npos)
+        {
+            return input;
+        }
+    }
+
+    return input.substr(pos + 1);
+}
+
+std::string IndentLines(const std::string& input, const std::string& prefix)
+{
+    if (input.empty())
+    {
+        return {};
+    }
+
+    std::string result = prefix;
+    for (size_t i = 0; i < input.size(); i++)
+    {
+        result.push_back(input[i]);
+        if (i + 1 < input.size())
+        {
+            if (input[i] == '\n' || (input[i] == '\r' && input[i + 1] != '\n'))
+            {
+                result.append(prefix);
+            }
+        }
+    }
+
+    return result;
+}
 
 std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
 {
@@ -350,14 +455,13 @@ void WSLCSession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLCSession::OnDockerdExited, this)));
 }
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, const WslcRegistryAuthInformation* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
-    UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
-
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
+    RETURN_HR_IF(E_NOTIMPL, RegistryAuthenticationInformation != nullptr && *RegistryAuthenticationInformation != '\0');
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -471,7 +575,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback)
+HRESULT WSLCSession::BuildImage(const WSLCBuildImageOptions* Options, IProgressCallback* ProgressCallback, HANDLE CancelEvent)
 try
 {
     COMServiceExecutionContext context;
@@ -482,11 +586,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
-    std::optional<UserHandle> dockerfileFileHandle;
-    if (Options->DockerfileHandle != 0 && Options->DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
-    {
-        dockerfileFileHandle = OpenUserHandle(Options->DockerfileHandle, GENERIC_READ | SYNCHRONIZE);
-    }
+    auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle, GENERIC_READ | SYNCHRONIZE);
 
     auto lock = m_lock.lock_shared();
 
@@ -515,26 +615,19 @@ try
         buildArgs.push_back(Options->BuildArgs.Values[i]);
     }
 
-    if (dockerfileFileHandle.has_value())
-    {
-        buildArgs.push_back("-f");
-        buildArgs.push_back("-");
-    }
-
+    buildArgs.push_back("-f");
+    buildArgs.push_back("-");
     buildArgs.push_back(mountPath);
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
-    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, dockerfileFileHandle ? WSLCProcessFlagsStdin : WSLCProcessFlagsNone);
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     auto io = CreateIOContext();
 
-    if (dockerfileFileHandle)
-    {
-        io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-            common::relay::HandleWrapper{dockerfileFileHandle->Get()}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
-    }
+    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
+        common::relay::HandleWrapper{buildFileHandle.Get()}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = Options->Verbose;
     std::string allOutput;
@@ -542,6 +635,7 @@ try
     std::set<std::string> reportedSteps;
     std::set<std::string> reportedErrors;
     std::string exportingVertexDigest;
+    std::map<std::string, std::string> vertexLogs; // digest -> accumulated log output
 
     auto reportProgress = [&](const std::string& message) {
         if (ProgressCallback != nullptr)
@@ -574,14 +668,40 @@ try
         docker_schema::BuildKitSolveStatus status{};
         from_json(json, status);
 
+        // Accumulate logs before processing vertices so the error tail includes all data from this payload.
+        for (const auto& log : status.logs)
+        {
+            if (log.data.empty())
+            {
+                continue;
+            }
+
+            std::string decoded = Base64Decode(log.data);
+            if (!decoded.empty())
+            {
+                auto& logBuffer = vertexLogs[log.vertex];
+                logBuffer.append(decoded);
+
+                // Cap raw buffer size; we resolve \r and trim to last N lines at display time.
+                constexpr size_t c_maxLogBytes = 64 * 1024;
+                if (logBuffer.size() > c_maxLogBytes)
+                {
+                    logBuffer.erase(0, logBuffer.size() - c_maxLogBytes);
+                }
+
+                if (verbose)
+                {
+                    reportProgress(IndentLines(decoded, "  "));
+                }
+            }
+        }
+
         for (const auto& vertex : status.vertexes)
         {
             bool isInternal = vertex.name.find("[internal]") != std::string::npos;
 
             if (!vertex.started.empty() && reportedSteps.insert(vertex.digest).second)
             {
-                allOutput.append(vertex.name).append("\n");
-
                 if (verbose || (!isInternal && !vertex.name.empty() && vertex.name[0] == '['))
                 {
                     reportProgress(vertex.name + "\n");
@@ -597,7 +717,15 @@ try
 
             if (!vertex.error.empty() && !isInternal && reportedErrors.insert(vertex.digest).second)
             {
-                allOutput.append(vertex.error).append("\n");
+                if (auto it = vertexLogs.find(vertex.digest); it != vertexLogs.end() && !it->second.empty())
+                {
+                    if (!verbose)
+                    {
+                        std::string tail = TailLines(ResolveCarriageReturns(it->second), 16);
+                        reportProgress(IndentLines(tail, "  "));
+                    }
+                }
+
                 reportProgress(vertex.error + "\n");
             }
         }
@@ -620,7 +748,61 @@ try
 
     io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
-    io.Run({});
+    // Handle cancellation within the IO loop (NeedNotComplete) so pipes keep draining.
+    bool cancelled = false;
+    wil::unique_handle killTimer;
+    if (CancelEvent != nullptr)
+    {
+        killTimer.reset(CreateWaitableTimer(nullptr, TRUE, nullptr));
+        THROW_LAST_ERROR_IF_NULL(killTimer);
+
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(
+                CancelEvent,
+                [&]() {
+                    cancelled = true;
+                    LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
+                    LARGE_INTEGER dueTime{.QuadPart = -10LL * 10 * 1000 * 1000}; // 10 seconds
+                    THROW_IF_WIN32_BOOL_FALSE(SetWaitableTimer(killTimer.get(), &dueTime, 0, nullptr, nullptr, FALSE));
+                }),
+            relay::MultiHandleWait::NeedNotComplete);
+
+        io.AddHandle(
+            std::make_unique<relay::EventHandle>(
+                killTimer.get(), [&]() { LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL)); }),
+            relay::MultiHandleWait::NeedNotComplete);
+    }
+
+    try
+    {
+        io.Run({});
+    }
+    catch (...)
+    {
+        LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
+        try
+        {
+            buildProcess.Wait(10 * 1000);
+        }
+        catch (...)
+        {
+            if (wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_TIMEOUT))
+            {
+                LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGKILL));
+                try
+                {
+                    buildProcess.Wait(10 * 1000);
+                }
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION_MSG("Build process did not exit after SIGKILL");
+                }
+            }
+        }
+        throw;
+    }
+
+    THROW_HR_IF_MSG(E_ABORT, cancelled, "Cancellation handle was signaled");
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));

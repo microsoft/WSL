@@ -13,12 +13,9 @@ Abstract:
 --*/
 #pragma once
 
-#include <wslservice.h>
 #include <wslc.h>
 
 namespace wsl::windows::wslc::models {
-
-inline constexpr wchar_t s_DefaultSessionName[] = L"wslc-cli";
 
 struct Session
 {
@@ -34,12 +31,32 @@ private:
     wil::com_ptr<IWSLCSession> m_session;
 };
 
-struct SessionOptions
+class SessionOptions
 {
-    static SessionOptions Default();
-    const WSLCSessionSettings* Get() const;
+public:
+    // These are elevation-aware static methods that will return the correct
+    // session name or validate against the correct session name based on the
+    // elevation of the process.
+    static const wchar_t* GetDefaultSessionName();
+    static bool IsDefaultSessionName(const std::wstring& sessionName);
+
+    SessionOptions();
+
+    const WSLCSessionSettings* Get() const
+    {
+        return &m_sessionSettings;
+    }
 
 private:
+    static constexpr const wchar_t s_defaultSessionName[] = L"wslc-cli";
+    static constexpr const wchar_t s_defaultAdminSessionName[] = L"wslc-cli-admin";
+    static constexpr const wchar_t s_defaultStorageSubPath[] = L"wslc\\sessions";
+    static constexpr uint32_t s_defaultBootTimeoutMs = 30 * 1000;
+
+    static bool IsElevated();
+    static const std::filesystem::path& GetStoragePath();
+
     WSLCSessionSettings m_sessionSettings{};
 };
+
 } // namespace wsl::windows::wslc::models

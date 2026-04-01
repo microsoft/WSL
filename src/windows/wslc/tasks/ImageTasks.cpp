@@ -51,7 +51,7 @@ void BuildImage(CLIExecutionContext& context)
     bool verbose = context.Args.Contains(ArgType::Verbose);
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -88,7 +88,7 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(images);
+        auto json = ToJson(images, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }
@@ -161,7 +161,18 @@ void InspectImages(CLIExecutionContext& context)
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
+}
+
+void SaveImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    WI_ASSERT(context.Args.Contains(ArgType::Output));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto& output = context.Args.Get<ArgType::Output>();
+    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
 }
 } // namespace wsl::windows::wslc::task

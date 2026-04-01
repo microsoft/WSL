@@ -282,10 +282,13 @@ void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLCSi
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
+void DockerHTTPClient::SignalContainer(const std::string& Id, std::optional<WSLCSignal> Signal)
 {
     auto url = URL::Create("/containers/{}/kill", Id);
-    url.SetParameter("signal", std::to_string(Signal));
+    if (Signal.has_value())
+    {
+        url.SetParameter("signal", std::to_string(static_cast<int>(Signal.value())));
+    }
 
     Transaction(verb::post, url);
 }
@@ -564,7 +567,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             {
                 try
                 {
-                    RemainingContentLength = std::stoul(contentLength->value());
+                    RemainingContentLength = std::stoull(contentLength->value());
                 }
                 catch (const std::exception&)
                 {

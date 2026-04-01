@@ -24,6 +24,81 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
+namespace {
+    // Lazily compute the session storage base path.
+    struct SessionStorageBasePathAccessor
+    {
+        operator const std::filesystem::path&() const
+        {
+            static const std::filesystem::path basePath =
+                std::filesystem::absolute(std::filesystem::current_path() / L"wslc-cli-test-sessions");
+            return basePath;
+        }
+    };
+
+    static wil::com_ptr<IWSLCSessionManager> OpenSessionManager()
+    {
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        return sessionManager;
+    }
+
+    wil::com_ptr<IWSLCSession> CreateSession(const WSLCSessionSettings& sessionSettings, WSLCSessionFlags Flags = WSLCSessionFlagsNone)
+    {
+        const auto sessionManager = OpenSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateRunning);
+
+        return session;
+    }
+
+    WSLCSessionSettings GetDefaultSessionSettings(LPCWSTR name, LPCWSTR storagePath, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone)
+    {
+        WSLCSessionSettings settings{};
+        settings.DisplayName = name;
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.StoragePath = storagePath;
+        settings.MaximumStorageSizeMb = 4096; // 4GB.
+        settings.NetworkingMode = networkingMode;
+        return settings;
+    }
+
+    wil::com_ptr<IWSLCSession> CreateCustomSession(
+        const std::wstring& sessionName, const std::filesystem::path& storagePath, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone)
+    {
+        WSLCSessionSettings sessionSettings = GetDefaultSessionSettings(sessionName.c_str(), storagePath.c_str(), networkingMode);
+        return CreateSession(sessionSettings);
+    }
+
+    void CleanupCustomSession(wil::com_ptr<IWSLCSession>& session, const std::filesystem::path& storagePath)
+    {
+        if (session)
+        {
+            LOG_IF_FAILED(session->Terminate());
+        }
+
+        session.reset();
+
+        if (!storagePath.empty())
+        {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+            if (error)
+            {
+                Log::Error(std::format(L"Failed to cleanup storage path {}: {}", storagePath.wstring(), error.message()).c_str());
+            }
+        }
+    }
+} // namespace
+
 const TestImage& AlpineTestImage()
 {
     static const TestImage image{L"alpine", L"latest", std::filesystem::path{g_testDataPath} / L"alpine-latest.tar"};
@@ -48,9 +123,28 @@ const TestImage& InvalidTestImage()
     return image;
 }
 
-void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
+TestSession TestSession::Create(const std::wstring& displayName, WSLCNetworkingMode networkingMode)
 {
-    auto result = RunWslc(L"container list --all");
+    const std::filesystem::path& basePath = SessionStorageBasePathAccessor();
+    auto storagePath = basePath / displayName;
+    auto session = CreateCustomSession(displayName, storagePath, networkingMode);
+    return TestSession{displayName, storagePath.wstring(), std::move(session)};
+}
+
+TestSession::~TestSession()
+{
+    CleanupCustomSession(m_session, m_storagePath);
+}
+
+void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status, const std::wstring& sessionName)
+{
+    std::wstring command = L"container list --all";
+    if (!sessionName.empty())
+    {
+        command = std::format(L"container list --all --session {}", sessionName);
+    }
+
+    auto result = RunWslc(command);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -122,8 +216,7 @@ wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -132,8 +225,7 @@ wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -181,8 +273,7 @@ std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers(
 {
     auto result = RunWslc(L"container list --all --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(jsonOutput.c_str());
+    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(result.Stdout.value().c_str());
 }
 
 void EnsureImageContainersAreDeleted(const TestImage& image)
@@ -217,9 +308,15 @@ void EnsureImageIsDeleted(const TestImage& image)
     }
 }
 
-void EnsureImageIsLoaded(const TestImage& image)
+void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    auto result = RunWslc(L"image list");
+    std::wstring listCommand = L"image list";
+    if (!sessionName.empty())
+    {
+        listCommand = std::format(L"image list --session \"{}\"", sessionName);
+    }
+
+    auto result = RunWslc(listCommand);
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -232,7 +329,13 @@ void EnsureImageIsLoaded(const TestImage& image)
     }
 
     // Image not found, load it
-    auto loadResult = RunWslc(std::format(L"image load --input {}", image.Path.wstring()));
+    std::wstring loadCommand = std::format(L"image load --input \"{}\"", image.Path.wstring());
+    if (!sessionName.empty())
+    {
+        loadCommand = std::format(L"image load --input \"{}\" --session \"{}\"", image.Path.wstring(), sessionName);
+    }
+
+    auto loadResult = RunWslc(loadCommand);
     loadResult.Verify({.Stderr = L"", .ExitCode = 0});
 }
 } // namespace WSLCE2ETests

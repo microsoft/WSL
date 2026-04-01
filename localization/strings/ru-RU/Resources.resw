@@ -968,7 +968,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallNoArguments" xml:space="preserve">
-    <value>{} does not take any arguments. To unregister a distribution, use {} instead.</value>
+    <value>{} не принимает аргументов. Чтобы отменить регистрацию дистрибутива, используйте вместо этого {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
@@ -1919,7 +1919,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   wslc --help</value>
     <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaSessionNotFound" xml:space="preserve">
+  <data name="MessageWslcSessionNotFound" xml:space="preserve">
     <value>Сеанс не найден: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1927,31 +1927,31 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Недопустимый IP-адрес "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
+  <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>Сбой OpenSessionByName("{}")</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>Сеансы WSLA не найдены.</value>
+  <data name="MessageWslcNoSessionsFound" xml:space="preserve">
+    <value>Сеансы WSLC не найдены.</value>
   </data>
-  <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>Найден {} сеанс WSLA{}:</value>
+  <data name="MessageWslcSessionsFound" xml:space="preserve">
+    <value>Найден {} сеанс WSLC{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaShellExited" xml:space="preserve">
+  <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} выходит с: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaHeaderId" xml:space="preserve">
+  <data name="MessageWslcHeaderId" xml:space="preserve">
     <value>Код</value>
   </data>
-  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
+  <data name="MessageWslcHeaderCreatorPid" xml:space="preserve">
     <value>ИД процесса автора</value>
   </data>
-  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
+  <data name="MessageWslcHeaderDisplayName" xml:space="preserve">
     <value>Выводимое имя</value>
   </data>
-  <data name="MessageWslaUnknownCommand" xml:space="preserve">
+  <data name="MessageWslcUnknownCommand" xml:space="preserve">
     <value>Неизвестная команда: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -2081,32 +2081,32 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
 Сведения о конфиденциальности этого продукта см. на странице https://aka.ms/privacy.</value>
      <comment>Copyright notice and privacy link</comment>
   </data>
-  <data name="MessageWslaInvalidImage" xml:space="preserve">
+  <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Недопустимое изображение: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidName" xml:space="preserve">
-    <value>Invalid name: '{}'</value>
+  <data name="MessageWslcInvalidName" xml:space="preserve">
+    <value>Недопустимое имя: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Путь не является абсолютным: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeNotFound" xml:space="preserve">
-    <value>Volume not found: '{}'</value>
+  <data name="MessageWslcVolumeNotFound" xml:space="preserve">
+    <value>Том не найден: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeOptions" xml:space="preserve">
-    <value>Invalid volume options: '{}'</value>
+  <data name="MessageWslcInvalidVolumeOptions" xml:space="preserve">
+    <value>Недопустимые параметры тома: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeType" xml:space="preserve">
-    <value>Unsupported volume type: '{}'</value>
+  <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
+    <value>Неподдерживаемый тип тома: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeInUse" xml:space="preserve">
-    <value>Volume '{}' is in use.</value>
+  <data name="MessageWslcVolumeInUse" xml:space="preserve">
+    <value>Том "{}" используется.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

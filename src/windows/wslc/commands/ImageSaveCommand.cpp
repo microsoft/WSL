@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ImagePullCommand.cpp
+    ImageSaveCommand.cpp
 
 Abstract:
 
@@ -22,31 +22,30 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc {
-// Image Pull Command
-std::vector<Argument> ImagePullCommand::GetArguments() const
+// Image Save Command
+std::vector<Argument> ImageSaveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        // Argument::Create(ArgType::Scheme),
-        // Argument::Create(ArgType::Progress),
+        Argument::Create(ArgType::Output, true),
         Argument::Create(ArgType::Session),
     };
 }
 
-std::wstring ImagePullCommand::ShortDescription() const
+std::wstring ImageSaveCommand::ShortDescription() const
 {
-    return {L"Pull images."};
+    return {L"Save images."};
 }
 
-std::wstring ImagePullCommand::LongDescription() const
+std::wstring ImageSaveCommand::LongDescription() const
 {
-    return {L"Pulls images."};
+    return {L"Saves images."};
 }
 
-void ImagePullCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ImageSaveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context              //
         << CreateSession //
-        << PullImage;
+        << SaveImage;
 }
 } // namespace wsl::windows::wslc
