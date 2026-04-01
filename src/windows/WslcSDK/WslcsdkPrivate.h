@@ -64,10 +64,10 @@ typedef struct WslcContainerProcessOptionsInternal
 
 static_assert(
     sizeof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
-    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 72 bytes");
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL size mismatch");
 static_assert(
     __alignof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
-    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL alignment mismatch");
 
 static_assert(std::is_trivial_v<WslcContainerProcessOptionsInternal>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
 
@@ -84,6 +84,8 @@ typedef struct WslcContainerOptionsInternal
     uint32_t portsCount;
     const WslcContainerVolume* volumes;
     uint32_t volumesCount;
+    const WslcContainerNamedVolume* namedVolumes;
+    uint32_t namedVolumesCount;
     const WslcContainerProcessOptionsInternal* initProcessOptions;
     WSLCContainerNetworkType networking;
     WslcContainerFlags containerFlags;
@@ -91,10 +93,10 @@ typedef struct WslcContainerOptionsInternal
 } WslcContainerOptionsInternal;
 
 static_assert(
-    sizeof(WslcContainerOptionsInternal) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL must be 80 bytes");
+    sizeof(WslcContainerOptionsInternal) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL size mismatch");
 static_assert(
     __alignof(WslcContainerOptionsInternal) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
-    "WSLC_CONTAINER_OPTIONS_INTERNAL must be 8-byte aligned");
+    "WSLC_CONTAINER_OPTIONS_INTERNAL alignment mismatch");
 
 static_assert(std::is_trivial_v<WslcContainerOptionsInternal>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
 
