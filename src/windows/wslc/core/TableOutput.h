@@ -134,6 +134,12 @@ struct TableOutput
         }
     }
 
+    // Set whether to always show header even when there are no rows
+    void SetAlwaysShowHeader(bool alwaysShow)
+    {
+        m_alwaysShowHeader = alwaysShow;
+    }
+
     void OutputLine(line_t&& line)
     {
         m_empty = false;
@@ -156,6 +162,10 @@ struct TableOutput
         if (!m_empty)
         {
             EvaluateAndFlushBuffer();
+        }
+        else if (m_alwaysShowHeader)
+        {
+            OutputHeaderOnly();
         }
     }
 
@@ -183,6 +193,7 @@ private:
     bool m_bufferEvaluated = false;
     bool m_empty = true;
     bool m_limitColumnWidths = false;
+    bool m_alwaysShowHeader = true;
     std::wstringstream m_stream;
 
     void InitializeColumns(header_t&& header)
@@ -219,6 +230,28 @@ private:
 
         // Default to 80 columns if console info is unavailable
         return 80;
+    }
+
+    void OutputHeaderOnly()
+    {
+        // Set MaxLength to MinLength for all columns (header width only)
+        for (size_t i = 0; i < FieldCount; ++i)
+        {
+            m_columns[i].MaxLength = m_columns[i].MinLength;
+        }
+
+        // Set spacing configuration
+        m_columns[FieldCount - 1].SpaceAfter = false;
+
+        // Output the header
+        line_t headerLine;
+        for (size_t i = 0; i < FieldCount; ++i)
+        {
+            headerLine[i] = m_columns[i].Name.c_str();
+        }
+
+        OutputLineToStream(headerLine);
+        m_bufferEvaluated = true;
     }
 
     void EvaluateAndFlushBuffer()
