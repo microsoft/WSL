@@ -560,28 +560,38 @@ try
             // TODO: Consider using standard protocol numbers instead of our own enum.
             convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
 
+            // Validate IP address if provided and if valid, copy to runtime structure.
             if (internalPort.windowsAddress != nullptr)
             {
                 char addrBuf[INET6_ADDRSTRLEN]{};
-                if (internalPort.windowsAddress->ss_family == AF_INET)
+                switch (internalPort.windowsAddress->ss_family)
                 {
-                    const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
-                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
-                    convertedPort.Family = AF_INET;
-                }
-                else
-                {
-                    const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
-                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
-                    convertedPort.Family = AF_INET6;
+                    case AF_INET:
+                    {
+                        const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
+
+                        THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
+
+                        convertedPort.Family = AF_INET;
+                        break;
+                    }
+
+                    case AF_INET6:
+                    {
+                        const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
+
+                        THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
+
+                        convertedPort.Family = AF_INET6;
+                        break;
+                    }
+
+                    default:
+                        // Reject unsupported or malformed address families
+                        THROW_HR(E_INVALIDARG);
                 }
                 bindingAddressStrings[i] = addrBuf;
                 convertedPort.BindingAddress = bindingAddressStrings[i].c_str();
-            }
-            else
-            {
-                convertedPort.Family = AF_INET;
-                convertedPort.BindingAddress = "127.0.0.1";
             }
         }
         containerOptions.Ports = convertedPorts.get();
