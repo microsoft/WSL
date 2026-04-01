@@ -183,6 +183,31 @@ class WSLCTests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
+    TEST_METHOD(GetMinimumSupportedVersion)
+    {
+        WSL2_TEST_ONLY();
+
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+
+        WSLCVersion version{};
+
+        VERIFY_SUCCEEDED(sessionManager->GetMinimumSupportedClientVersion(&version));
+
+        if (WSL_PACKAGE_VERSION_MAJOR < 2 || (WSL_PACKAGE_VERSION_MAJOR == 2 && WSL_PACKAGE_VERSION_MINOR < 8))
+        {
+            VERIFY_ARE_EQUAL(version.Major, WSL_PACKAGE_VERSION_MAJOR);
+            VERIFY_ARE_EQUAL(version.Minor, WSL_PACKAGE_VERSION_MINOR);
+            VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
+        }
+        else
+        {
+            VERIFY_ARE_EQUAL(version.Major, 2);
+            VERIFY_ARE_EQUAL(version.Minor, 8);
+            VERIFY_ARE_EQUAL(version.Revision, 0);
+        }
+    }
+
     static RunningWSLCProcess::ProcessResult RunCommand(IWSLCSession* session, const std::vector<std::string>& command, int timeout = 600000)
     {
         WSLCProcessLauncher process(command[0], command);

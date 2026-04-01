@@ -311,16 +311,20 @@ std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
         decltype(wsl::shared::PackageVersion) requiredClientVersion{
             minimumClientVersion.Major, minimumClientVersion.Minor, minimumClientVersion.Revision};
 
-        THROW_HR_IF_MSG(
-            WSLC_E_SDK_UPDATED_NEEDED,
-            requiredClientVersion > wsl::shared::PackageVersion,
-            "WSLC SDK update required. Minimum supported version: %lu.%lu.%lu, current SDK version: %lu.%lu.%lu",
-            minimumClientVersion.Major,
-            minimumClientVersion.Minor,
-            minimumClientVersion.Revision,
-            WSL_PACKAGE_VERSION_MAJOR,
-            WSL_PACKAGE_VERSION_MINOR,
-            WSL_PACKAGE_VERSION_REVISION);
+        if (requiredClientVersion > wsl::shared::PackageVersion)
+        {
+            LOG_HR_MSG(
+                WSLC_E_SDK_UPDATE_NEEDED,
+                "WSLC SDK update required. Minimum supported version: %lu.%lu.%lu, current SDK version: %lu.%lu.%lu",
+                minimumClientVersion.Major,
+                minimumClientVersion.Minor,
+                minimumClientVersion.Revision,
+                WSL_PACKAGE_VERSION_MAJOR,
+                WSL_PACKAGE_VERSION_MINOR,
+                WSL_PACKAGE_VERSION_REVISION);
+
+            return {result, WSLC_E_SDK_UPDATE_NEEDED};
+        }
     }
 
     return {result, hr};
@@ -350,20 +354,6 @@ wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
     return result;
 }
 
-bool NeedsWslRuntimeInstalled()
-{
-    auto hr = CreateSessionManagerRaw().second;
-
-    if (SUCCEEDED(hr))
-    {
-        return false;
-    }
-    else if (hr == REGDB_E_CLASSNOTREG)
-    {
-        return true;
-    }
-    THROW_HR(hr);
-}
 } // namespace
 
 // SESSION DEFINITIONS
@@ -1366,7 +1356,20 @@ try
     WslcComponentFlags componentCheck = WSLC_COMPONENT_FLAG_NONE;
 
     WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, NeedsVirtualMachineServicesInstalled());
-    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE, NeedsWslRuntimeInstalled());
+
+    auto hr = CreateSessionManagerRaw().second;
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+    }
+    else if (hr == WSLC_E_SDK_UPDATE_NEEDED)
+    {
+        WI_SetFlag(componentCheck, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE);
+    }
+    else if (FAILED(hr))
+    {
+        THROW_HR(hr);
+    }
 
     *canRun = componentCheck == WSLC_COMPONENT_FLAG_NONE ? TRUE : FALSE;
     *missingComponents = componentCheck;
