@@ -1357,6 +1357,9 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle
 
         *Stdout = common::wslutil::ToCOMOutputHandle(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE);
         *Stderr = common::wslutil::ToCOMOutputHandle(stderrRead.get(), GENERIC_READ | SYNCHRONIZE);
+
+        WI_ASSERT(Stdout->Type == WSLCHandleTypePipe);
+        WI_ASSERT(Stderr->Type == WSLCHandleTypePipe);
     }
 }
 

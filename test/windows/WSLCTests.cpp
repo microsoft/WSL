@@ -5217,8 +5217,8 @@ class WSLCTests
                              ULONGLONG Tail = 0,
                              ULONGLONG Since = 0,
                              ULONGLONG Until = 0) {
-            COMOutputHandle stdoutHandle{};
-            COMOutputHandle stderrHandle{};
+            COMOutputHandle stdoutHandle;
+            COMOutputHandle stderrHandle;
             VERIFY_SUCCEEDED(container.Logs(Flags, &stdoutHandle, &stderrHandle, Since, Until, Tail));
 
             ValidateHandleOutput(stdoutHandle.Get(), expectedStdout);

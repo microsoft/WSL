@@ -531,6 +531,8 @@ wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(
 
 HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(WSLCHandle Handle)
 {
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), Handle.Handle.File == nullptr || Handle.Handle.File == INVALID_HANDLE_VALUE);
+
     switch (Handle.Type)
     {
     case WSLCHandleTypeFile:
@@ -1334,6 +1336,7 @@ WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD
 
     // N.B. COM closes the handle when returning an out parameter.
     duplicatedHandle.release();
+
     return comHandle;
 }
 
@@ -1345,7 +1348,14 @@ WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle)
         int socketType{};
         int len = sizeof(socketType);
 
-        if (getsockopt(reinterpret_cast<SOCKET>(Handle), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &len) == 0)
+        // N.B. FILE_TYPE_PIPE can describe a pipe, a named pipe, or a socket.
+        // Check for a named pipe first, since getsockopt() can return success for a named pipe.
+
+        if (GetNamedPipeInfo(Handle, nullptr, nullptr, nullptr, nullptr))
+        {
+            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = Handle}};
+        }
+        else if (getsockopt(reinterpret_cast<SOCKET>(Handle), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &len) == 0)
         {
             return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = Handle}};
         }

@@ -73,12 +73,18 @@ struct COMErrorInfo
 };
 
 static_assert(sizeof(WSLCHandle::Handle) == sizeof(HANDLE));
+static_assert(sizeof(FILE_HANDLE) == sizeof(HANDLE));
+static_assert(sizeof(PIPE_HANDLE) == sizeof(HANDLE));
+static_assert(sizeof(SOCKET_HANDLE) == sizeof(HANDLE));
 
 struct COMOutputHandle : public WSLCHandle
 {
     NON_COPYABLE(COMOutputHandle);
     NON_MOVABLE(COMOutputHandle);
-    COMOutputHandle() = default;
+    COMOutputHandle()
+    {
+        ZeroMemory(&Handle, sizeof(Handle));
+    }
 
     ~COMOutputHandle()
     {
