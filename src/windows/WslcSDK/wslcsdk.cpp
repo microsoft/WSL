@@ -593,6 +593,12 @@ try
                 bindingAddressStrings[i] = addrBuf;
                 convertedPort.BindingAddress = bindingAddressStrings[i].c_str();
             }
+            else
+            {
+                // If no binding address is provided, default to wildcard.
+                convertedPort.Family = AF_UNSPEC;
+                convertedPort.BindingAddress = nullptr;
+            }
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
