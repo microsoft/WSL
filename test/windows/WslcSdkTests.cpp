@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "wslcsdk.h"
+#include "wslc_schema.h"
 #include <optional>
 
 extern std::wstring g_testDataPath;
@@ -195,7 +196,7 @@ class WslcSdkTests
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 4096ull * 1024 * 1024; // 4 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &m_defaultSession, nullptr));
 
@@ -250,7 +251,7 @@ class WslcSdkTests
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 1024ull * 1024 * 1024; // 1 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
         UniqueSession session;
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
@@ -1060,6 +1061,28 @@ class WslcSdkTests
             std::string writtenContent((std::istreambuf_iterator<char>(written)), std::istreambuf_iterator<char>());
             VERIFY_ARE_EQUAL(writtenContent, "container-write\n");
         }
+    }
+
+    TEST_METHOD(ContainerInspect)
+    {
+        WSL2_TEST_ONLY();
+
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+
+        wil::unique_cotaskmem_ansistring inspectData;
+        VERIFY_SUCCEEDED(WslcInspectContainer(container.get(), &inspectData));
+
+        VERIFY_IS_NOT_NULL(inspectData);
+
+        auto inspectObject = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectData.get());
+
+        CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE];
+        VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
+
+        VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
     }
 
     TEST_METHOD(ContainerExec)
@@ -1890,36 +1913,145 @@ class WslcSdkTests
     }
 
     // -----------------------------------------------------------------------
+    // Storage tests
+    // -----------------------------------------------------------------------
+
+    TEST_METHOD(SessionCreateVhd)
+    {
+        WSL2_TEST_ONLY();
+
+        constexpr auto c_volumeName = "wslc-test-data-vol";
+        constexpr auto c_vhdSizeBytes = _1GB;
+
+        std::filesystem::path vhdSessionStorage = m_storagePath / "wslc-vhd-test-storage";
+        auto removeStorage = wil::scope_exit([&]() {
+            std::error_code error;
+            std::filesystem::remove_all(vhdSessionStorage, error);
+            if (error)
+            {
+                LogError("Failed to remove VHD test storage %ws: %hs", vhdSessionStorage.c_str(), error.message().c_str());
+            }
+        });
+
+        // Create a dedicated session so that volume creation does not affect the shared default session.
+        WslcSessionSettings sessionSettings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-vhd-test", vhdSessionStorage.c_str(), &sessionSettings));
+
+        WslcVhdRequirements sessionVhd{};
+        sessionVhd.sizeInBytes = 4 * _1GB;
+        sessionVhd.type = WSLC_VHD_TYPE_DYNAMIC;
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &sessionVhd));
+
+        UniqueSession session;
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+
+        // Load debian so we have a container image to work with.
+        std::filesystem::path debianTar = GetTestImagePath("debian:latest");
+        VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), debianTar.c_str(), nullptr, nullptr));
+
+        // Positive: create a named VHD volume in the session.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeInBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            // The backing VHD file must exist on disk.
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
+            VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+        }
+
+        // Positive: write a marker via a container that mounts the named volume.
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/bin/sh", "-c", "echo wslc-vhd-test > /data/marker.txt"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            WslcContainerNamedVolume namedVol{};
+            namedVol.name = c_volumeName;
+            namedVol.containerPath = "/data";
+            namedVol.readOnly = FALSE;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
+
+            auto output = RunContainerAndCapture(session.get(), containerSettings);
+            VERIFY_IS_TRUE(output.stderrOutput.empty());
+        }
+
+        // Positive: read back the marker in a second container (read-only mount).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/bin/sh", "-c", "cat /data/marker.txt"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            WslcContainerNamedVolume namedVol{};
+            namedVol.name = c_volumeName;
+            namedVol.containerPath = "/data";
+            namedVol.readOnly = TRUE;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
+
+            auto output = RunContainerAndCapture(session.get(), containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "wslc-vhd-test\n");
+        }
+
+        // Positive: delete the volume.
+        {
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_volumeName, &errorMsg));
+
+            // The backing VHD file must not exist on disk.
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
+            VERIFY_IS_FALSE(std::filesystem::exists(expectedVhdPath));
+        }
+
+        // Negative: null options pointer must fail.
+        VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), nullptr, nullptr), E_POINTER);
+
+        // Negative: null name must fail.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = nullptr;
+            vhd.sizeInBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: zero sizeInBytes must fail.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeInBytes = 0;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: fixed VHD type is not yet supported.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeInBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_FIXED;
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_NOTIMPL);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Stub tests for unimplemented (E_NOTIMPL) functions.
     // Each of these confirms the current state of the SDK; once the underlying
     // function is implemented the assertion below will catch it and the test
     // should be updated to exercise the real behaviour.
     // -----------------------------------------------------------------------
-
-    TEST_METHOD(ContainerInspectNotImplemented)
-    {
-        WSL2_TEST_ONLY();
-
-        UniqueContainer container;
-        WslcContainerSettings containerSettings;
-        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
-        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
-
-        PCSTR inspectData = nullptr;
-        VERIFY_ARE_EQUAL(WslcInspectContainer(container.get(), &inspectData), E_NOTIMPL);
-
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
-    }
-
-    TEST_METHOD(SessionCreateVhdNotImplemented)
-    {
-        WSL2_TEST_ONLY();
-
-        WslcVhdRequirements vhd{};
-        vhd.sizeInBytes = 1024ull * 1024 * 1024;
-        vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_ARE_EQUAL(WslcCreateSessionVhd(m_defaultSession, &vhd, nullptr), E_NOTIMPL);
-    }
 
     TEST_METHOD(InstallWithDependenciesNotImplemented)
     {
