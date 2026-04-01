@@ -287,7 +287,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
 
 void EnsureImageIsDeleted(const TestImage& image)
 {
-    auto result = RunWslc(L"image list --no-trunc");
+    auto result = RunWslc(L"image list -q");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -305,10 +305,10 @@ void EnsureImageIsDeleted(const TestImage& image)
 
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    std::wstring listCommand = L"image list --no-trunc";
+    std::wstring listCommand = L"image list -q";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list --no-trunc --session \"{}\"", sessionName);
+        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
     }
 
     auto result = RunWslc(listCommand);
