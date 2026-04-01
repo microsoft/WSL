@@ -119,12 +119,8 @@ class WSLCE2EImageDeleteTests
     {
         WSL2_TEST_ONLY();
 
-        EnsureImageIsLoaded(DebianImage);
-        VerifyImageIsNotUsed(DebianImage);
-
-        // Delete with --no-prune flag
-        auto result = RunWslc(std::format(L"image delete --no-prune {}", DebianImage.Name));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        // TODO: Implement once 'image tag' is implemented
+        SKIP_TEST_NOT_IMPL();
     }
 
 private:

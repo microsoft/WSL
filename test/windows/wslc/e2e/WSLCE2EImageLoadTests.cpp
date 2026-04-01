@@ -22,9 +22,9 @@ class WSLCE2EImageLoadTests
 {
     WSLC_TEST_CLASS(WSLCE2EImageLoadTests)
 
-    TEST_CLASS_SETUP(ClassSetup)
+    TEST_METHOD_SETUP(MethodSetup)
     {
-        EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsDeleted(DebianImage);
         return true;
     }
 
@@ -47,7 +47,7 @@ class WSLCE2EImageLoadTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(L"image load");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'input'\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Requested load but no input provided.\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Image_Load_InputFileNotFound)
@@ -62,17 +62,7 @@ class WSLCE2EImageLoadTests
     {
         WSL2_TEST_ONLY();
 
-        // Save an image first
-        auto tempArchivePath = wsl::windows::common::filesystem::GetTempFilename();
-        auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", tempArchivePath.wstring(), DebianImage.NameAndTag()));
-        saveResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Delete the image
-        auto deleteResult = RunWslc(std::format(L"image delete --force {}", DebianImage.Name));
-        deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Load it back
-        auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", tempArchivePath.wstring()));
+        auto loadResult = RunWslc(std::format(L"image load --input \"{}\"", DebianImage.Path));
         loadResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify it's loaded
@@ -89,9 +79,6 @@ class WSLCE2EImageLoadTests
             }
         }
         VERIFY_IS_TRUE(found, L"Image should be loaded");
-
-        // Cleanup
-        DeleteFileW(tempArchivePath.c_str());
     }
 
 private:
@@ -103,7 +90,6 @@ private:
         output << GetWslcHeader()        //
                << GetDescription()       //
                << GetUsage()             //
-               << GetAvailableCommands() //
                << GetAvailableOptions();
         return output.str();
     }
@@ -118,20 +104,12 @@ private:
         return L"Usage: wslc image load [<options>]\r\n\r\n";
     }
 
-    std::wstring GetAvailableCommands() const
-    {
-        std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  input    Provides path to the tar archive file containing the image\r\n"
-                 << L"\r\n";
-        return commands.str();
-    }
-
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -i,--input  Provides path to the tar archive file containing the image\r\n"
+                << L"  --session   Specify the session to use\r\n"
                 << L"  -h,--help   Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();

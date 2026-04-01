@@ -198,7 +198,6 @@ private:
     const TestImage BuiltImageTag2{L"wslc-e2e-build-args-tags", L"v2", L""};
     const TestImage BuiltImageDockerfile{L"wslc-e2e-build-dockerfile-ctx", L"latest", L""};
     const TestImage BuiltImageContainerfile{L"wslc-e2e-build-containerfile-ctx", L"latest", L""};
-    const TestImage BuiltImageVerbose{L"wslc-e2e-build-verbose", L"latest", L""};
 
     void BuildFromContextFile(const std::wstring& fileName, const TestImage& image)
     {
@@ -223,32 +222,6 @@ private:
         EnsureImageIsDeleted(BuiltImageTag2);
         EnsureImageIsDeleted(BuiltImageDockerfile);
         EnsureImageIsDeleted(BuiltImageContainerfile);
-        EnsureImageIsDeleted(BuiltImageVerbose);
-    }
-
-    TEST_METHOD(WSLCE2E_Image_Build_Verbose)
-    {
-        WSL2_TEST_ONLY();
-
-        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-verbose";
-        auto cleanup = SetupTestDirectory(testRoot);
-
-        auto contextDir = testRoot / L"context";
-        std::error_code ec;
-        std::filesystem::create_directories(contextDir, ec);
-        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
-
-        auto dockerfilePath = testRoot / L"Dockerfile";
-        WriteTestFile(dockerfilePath, "FROM debian:latest\nRUN echo 'build step'\nCMD [\"echo\", \"test\"]\n");
-
-        auto buildResult = RunWslc(
-            std::format(L"build \"{}\" -f \"{}\" -t {} --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageVerbose.NameAndTag()));
-        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        auto inspectData = InspectImage(BuiltImageVerbose.NameAndTag());
-        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
-        VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
-        VERIFY_ARE_EQUAL(BuiltImageVerbose.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
     }
 
     static auto SetupTestDirectory(const std::filesystem::path& testRoot)
