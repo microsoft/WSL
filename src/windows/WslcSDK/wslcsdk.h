@@ -21,7 +21,7 @@ Abstract:
 EXTERN_C_START
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 72
+#define WSLC_SESSION_OPTIONS_SIZE 80
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -32,7 +32,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 80
+#define WSLC_CONTAINER_OPTIONS_SIZE 96
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -66,6 +66,8 @@ typedef enum WslcVhdType
 
 typedef struct WslcVhdRequirements
 {
+    // Ignored by WslcSetSessionSettingsVHD
+    _In_z_ PCSTR name;
     _In_ uint64_t sizeInBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
 } WslcVhdRequirements;
@@ -96,7 +98,7 @@ STDAPI WslcSetSessionSettingsCpuCount(_In_ WslcSessionSettings* sessionSettings,
 STDAPI WslcSetSessionSettingsMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb);
 STDAPI WslcSetSessionSettingsTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS);
 
-STDAPI WslcSetSessionSettingsVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
+STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_opt_ const WslcVhdRequirements* vhdRequirements);
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
@@ -131,6 +133,13 @@ typedef struct WslcContainerVolume
     _In_z_ PCSTR containerPath;
     _In_ BOOL readOnly;
 } WslcContainerVolume;
+
+typedef struct WslcContainerNamedVolume
+{
+    _In_z_ PCSTR name;          // Name of the session volume (from WslcVhdRequirements.name)
+    _In_z_ PCSTR containerPath; // Absolute path inside the container
+    _In_ BOOL readOnly;
+} WslcContainerNamedVolume;
 
 typedef enum WslcContainerFlags
 {
@@ -180,6 +189,12 @@ STDAPI WslcSetContainerSettingsPortMappings(
 STDAPI WslcSetContainerSettingsVolumes(
     _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
 
+// Add named session volumes (created via WslcCreateSessionVhdVolume) to the container settings
+STDAPI WslcSetContainerSettingsNamedVolumes(
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
+    _In_ uint32_t namedVolumeCount);
+
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
@@ -209,11 +224,7 @@ STDAPI WslcGetContainerInitProcess(_In_ WslcContainer container, _Out_ WslcProce
 //
 // Return Value:
 //   S_OK on success. Otherwise, an HRESULT error code indicating the failure.
-//
-// Notes:
-//   - The caller must pass a non-null pointer to a PCSTR variable.
-//   - The returned string is immutable and must not be modified by the caller.
-STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PCSTR* inspectData);
+STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR* inspectData);
 
 typedef enum WslcContainerState
 {
@@ -470,7 +481,8 @@ STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*c
 
 // STORAGE
 
-STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcDeleteSessionVhdVolume(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // INSTALL
 

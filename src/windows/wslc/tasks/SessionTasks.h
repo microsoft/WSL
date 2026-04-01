@@ -20,4 +20,5 @@ namespace wsl::windows::wslc::task {
 void AttachToSession(CLIExecutionContext& context);
 void CreateSession(CLIExecutionContext& context);
 void ListSessions(CLIExecutionContext& context);
+void TerminateSession(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

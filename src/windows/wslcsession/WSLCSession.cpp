@@ -1643,7 +1643,7 @@ try
 
     std::lock_guard volumesLock(m_volumesLock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(type), type != "vhd");
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(type), type != WSLCVhdVolumeType);
 
     auto volume = WSLCVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), m_virtualMachine.value(), m_dockerClient.value());
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
@@ -1676,6 +1676,70 @@ try
     it->second->Delete();
     m_volumes.erase(it);
     WSL_LOG("VolumeDeleted", TraceLoggingValue(name.c_str(), "VolumeName"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::ListVolumes(WSLCVolumeInformation** Volumes, ULONG* Count)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Volumes);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *Volumes = nullptr;
+    *Count = 0;
+
+    auto lock = m_lock.lock_shared();
+    std::lock_guard volumesLock(m_volumesLock);
+
+    if (m_volumes.empty())
+    {
+        return S_OK;
+    }
+
+    auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(m_volumes.size());
+
+    ULONG index = 0;
+    for (const auto& [name, volume] : m_volumes)
+    {
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Type, WSLCVhdVolumeType) != 0);
+        index++;
+    }
+
+    *Volumes = output.release();
+    *Count = index;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::InspectVolume(LPCSTR Name, LPSTR* Output)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Name);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
+
+    *Output = nullptr;
+
+    std::string name = Name;
+    ValidateName(name.c_str());
+
+    auto lock = m_lock.lock_shared();
+    std::lock_guard volumesLock(m_volumesLock);
+
+    auto it = m_volumes.find(name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(name), it == m_volumes.end());
+
+    const auto& volume = it->second;
+
+    std::string json = volume->Inspect();
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
     return S_OK;
 }

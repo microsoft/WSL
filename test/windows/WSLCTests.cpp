@@ -2082,7 +2082,7 @@ class WSLCTests
             auto [read, write] = CreateSubprocessPipe(false, false);
 
             auto settings = GetDefaultSessionSettings(L"dmesg-output-test");
-            settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
+            settings.DmesgOutput = ToCOMInputHandle(write.get());
             WI_UpdateFlag(settings.FeatureFlags, WslcFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
             std::vector<char> dmesgContent;
@@ -3051,6 +3051,75 @@ class WSLCTests
         validateInvalidOptionsFailure(R"({"SizeBytes":"0"})", E_INVALIDARG, L"Invalid size: 0");
         validateInvalidOptionsFailure("{}", E_INVALIDARG, L"Invalid volume options: '{}'");
         validateInvalidOptionsFailure("", WSL_E_INVALID_JSON);
+    }
+
+    TEST_METHOD(ListAndInspectNamedVolumesTest)
+    {
+        WSL2_TEST_ONLY();
+
+        const std::string volumeName1 = "wsla-test-vol1";
+        const std::string volumeName2 = "wsla-test-vol2";
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName1.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName2.c_str()));
+        });
+
+        // Verify empty list is returned when no volumes exist.
+        wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(0u, volumes.size());
+
+        // Create first volume and verify list returns one entry.
+        WSLCVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName1.c_str();
+        volumeOptions.Type = "vhd";
+        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, volumes.size());
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName1);
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Type), std::string("vhd"));
+
+        // Create second volume and verify list returns two entries.
+        volumeOptions.Name = volumeName2.c_str();
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(2u, volumes.size());
+
+        std::set<std::string> names;
+        for (const auto& v : volumes)
+        {
+            names.insert(v.Name);
+            VERIFY_ARE_EQUAL(std::string(v.Type), std::string("vhd"));
+        }
+
+        VERIFY_IS_TRUE(names.contains(volumeName1));
+        VERIFY_IS_TRUE(names.contains(volumeName2));
+
+        // Verify InspectVolume returns correct details.
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(volumeName1.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
+        VERIFY_ARE_EQUAL(inspect.Name, volumeName1);
+        VERIFY_ARE_EQUAL(inspect.Type, std::string("vhd"));
+        VERIFY_IS_TRUE(inspect.VhdVolume.has_value());
+        VERIFY_ARE_EQUAL(inspect.VhdVolume->SizeBytes, 1073741824ull);
+        VERIFY_IS_FALSE(inspect.VhdVolume->HostPath.empty());
+
+        // Verify InspectVolume fails for a non-existent volume.
+        output.reset();
+        VERIFY_ARE_EQUAL(m_defaultSession->InspectVolume("does-not-exist", &output), WSLC_E_VOLUME_NOT_FOUND);
+
+        // Delete first volume and verify list returns one entry.
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName1.c_str()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, volumes.size());
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName2);
     }
 
     TEST_METHOD(CreateContainer)

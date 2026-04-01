@@ -33,6 +33,8 @@ COMMAND_LINE_TEST_CASE(L"session list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"session list extraarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"session shell session1", L"shell", true)
 COMMAND_LINE_TEST_CASE(L"session shell", L"shell", true)
+COMMAND_LINE_TEST_CASE(L"session terminate session1", L"terminate", true)
+COMMAND_LINE_TEST_CASE(L"session terminate", L"terminate", true)
 
 // Container command tests
 COMMAND_LINE_TEST_CASE(L"container list", L"list", true)
