@@ -93,14 +93,14 @@ WslCoreInstance::WslCoreInstance(
         {
             wsl::windows::common::ExecutionContext stepContext(wsl::windows::common::Context::MountDisk);
             THROW_HR_WITH_USER_ERROR(
-                E_FAIL,
+                WSL_E_DISTRO_MOUNT_FAILED,
                 wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(
                     static_cast<int>(result.FailureStep), stepDescription, result.Result));
         }
         else
         {
             THROW_HR_WITH_USER_ERROR(
-                E_FAIL,
+                WSL_E_DISTRO_START_FAILED,
                 wsl::shared::Localization::MessageDistributionFailedToStart(
                     static_cast<int>(result.FailureStep), stepDescription, result.Result));
         }
