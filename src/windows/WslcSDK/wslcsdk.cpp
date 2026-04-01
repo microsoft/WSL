@@ -1392,6 +1392,7 @@ EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason,
     switch (Reason)
     {
     case DLL_PROCESS_ATTACH:
+        wsl::windows::common::wslutil::InitializeWil();
         WslTraceLoggingInitialize(WslcTelemetryProvider, false);
         break;
 
