@@ -55,7 +55,11 @@ try
 
     *Handle = common::wslutil::ToCOMOutputHandle(handle.get(), Access);
 
-    WSL_LOG("GetStdHandle", TraceLoggingValue(static_cast<int>(Fd), "fd"), TraceLoggingValue(handle.get(), "handle"));
+    WSL_LOG(
+        "GetStdHandle",
+        TraceLoggingValue(static_cast<int>(Fd), "fd"),
+        TraceLoggingValue(handle.get(), "handle"),
+        TraceLoggingValue(static_cast<int>(Handle->Type), "type"));
 
     return S_OK;
 }
