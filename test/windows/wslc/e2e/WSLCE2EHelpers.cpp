@@ -139,10 +139,10 @@ TestSession::~TestSession()
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status, const std::wstring& sessionName)
 {
-    std::wstring command = L"container list --all";
+    std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"container list --all --session {}", sessionName);
+        command = std::format(L"container list --no-trunc --all --session {}", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -166,7 +166,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
 
 void VerifyImageIsUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"container list -a");
+    auto result = RunWslc(L"container list --no-trunc --all");
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -182,7 +182,7 @@ void VerifyImageIsUsed(const TestImage& image)
 
 void VerifyImageIsNotUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"container list -a");
+    auto result = RunWslc(L"container list --no-trunc --all");
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -196,21 +196,7 @@ void VerifyImageIsNotUsed(const TestImage& image)
 
 std::string GetHashId(const std::string& id, bool fullId)
 {
-    const int shortIdLength = 12;
-    VERIFY_IS_GREATER_THAN_OR_EQUAL(id.length(), shortIdLength);
-    if (fullId)
-    {
-        return id;
-    }
-
-    // Remove the "sha256:" prefix if it exists and return the first 12 characters
-    const std::string prefix = "sha256:";
-    if (id.rfind(prefix, 0) == 0)
-    {
-        return id.substr(prefix.length(), shortIdLength);
-    }
-
-    return id.substr(0, shortIdLength);
+    return wsl::windows::common::string::TruncateId(id, !fullId);
 }
 
 wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName)
@@ -249,7 +235,7 @@ namespace VT {
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
-    auto listResult = RunWslc(L"container list --all");
+    auto listResult = RunWslc(L"container list --no-trunc --all");
     listResult.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto stdoutLines = listResult.GetStdoutLines();
@@ -260,11 +246,19 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
             if (line.find(L"running") != std::wstring::npos)
             {
                 auto result = RunWslc(std::format(L"container kill {}", containerName));
-                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                // Tolerate ERROR_NOT_FOUND - container already stopped/removed
+                if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"ERROR_NOT_FOUND") == std::wstring::npos))
+                {
+                    result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                }
             }
 
             auto result = RunWslc(std::format(L"container remove --force {}", containerName));
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            // Tolerate ERROR_NOT_FOUND - container already removed
+            if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"ERROR_NOT_FOUND") == std::wstring::npos))
+            {
+                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            }
             break;
         }
     }
@@ -293,7 +287,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
 
 void EnsureImageIsDeleted(const TestImage& image)
 {
-    auto result = RunWslc(L"image list");
+    auto result = RunWslc(L"image list --no-trunc");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -311,10 +305,10 @@ void EnsureImageIsDeleted(const TestImage& image)
 
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    std::wstring listCommand = L"image list";
+    std::wstring listCommand = L"image list --no-trunc";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list --session \"{}\"", sessionName);
+        listCommand = std::format(L"image list --no-trunc --session \"{}\"", sessionName);
     }
 
     auto result = RunWslc(listCommand);

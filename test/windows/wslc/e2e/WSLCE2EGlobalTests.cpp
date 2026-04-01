@@ -79,8 +79,8 @@ class WSLCE2EGlobalTests
 
         VERIFY_IS_TRUE(result.Stdout.has_value());
 
-        // The space after cli is important to differentiate from the admin session which is wslc-cli-admin.
-        VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli ") != std::wstring::npos);
+        // The "\r\n" after session name is important to differentiate it from the admin session.
+        VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
 
     TEST_METHOD(WSLCE2E_Session_NonElevatedCannotAccessAdminSession)

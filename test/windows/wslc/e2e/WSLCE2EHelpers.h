@@ -153,7 +153,7 @@ void VerifyContainerIsNotListed(
     {
         wsl::shared::retry::RetryWithTimeout<void>(
             [&containerNameOrId]() {
-                auto result = RunWslc(L"container list --all");
+                auto result = RunWslc(L"container list --no-trunc --all");
                 result.Verify({.Stderr = L"", .ExitCode = 0});
 
                 auto outputLines = result.GetStdoutLines();

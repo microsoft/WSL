@@ -147,6 +147,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  --format      Output formatting (json or table) (Default:table)\r\n"
+                << L"  --no-trunc    Do not truncate output\r\n"
                 << L"  -q,--quiet    Outputs the container IDs only\r\n"
                 << L"  --session     Specify the session to use\r\n"
                 << L"  -v,--verbose  Output verbose details\r\n"
