@@ -19,6 +19,7 @@ Abstract:
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/windows.management.deployment.h>
 #include <Sfc.h>
+#include <RestartManager.h>
 #include "defs.h"
 
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
@@ -797,6 +798,39 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
     }
     CATCH_LOG();
 
+    return NOERROR;
+}
+
+extern "C" UINT __stdcall StopDeviceHostSurrogate(MSIHANDLE install)
+{
+    // Use the Restart Manager to find and shut down any process that has wsldevicehost.dll locked.
+    // This must run before InstallFiles to ensure the DLL can be overwritten during upgrade.
+
+    try
+    {
+        WSL_INSTALL_LOG("StopDeviceHostSurrogate");
+
+        const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
+        if (!installRoot.has_value())
+        {
+            return NOERROR;
+        }
+
+        const auto dllPath = installRoot.value() + L"wsldevicehost.dll";
+
+        DWORD session{};
+        WCHAR sessionKey[CCH_RM_SESSION_KEY + 1]{};
+        THROW_IF_WIN32_ERROR(RmStartSession(&session, 0, sessionKey));
+        auto endSession = wil::scope_exit([&] { RmEndSession(session); });
+
+        LPCWSTR file = dllPath.c_str();
+        THROW_IF_WIN32_ERROR(RmRegisterResources(session, 1, &file, 0, nullptr, 0, nullptr));
+
+        THROW_IF_WIN32_ERROR(RmShutdown(session, RmForceShutdown, nullptr));
+    }
+    CATCH_LOG();
+
+    // Always succeed — failure to stop the surrogate is not fatal.
     return NOERROR;
 }
 
