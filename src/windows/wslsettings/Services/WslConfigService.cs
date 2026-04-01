@@ -135,6 +135,7 @@ public class WslConfigService : IWslConfigService
     public uint CommitPendingChanges()
     {
         uint result = 0;
+        bool pendingStateChanged;
 
         lock (_wslCoreConfigInterfaceLockObj!)
         {
@@ -188,9 +189,15 @@ public class WslConfigService : IWslConfigService
             {
                 _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
             }
+
+            // We entered with pending changes. Fire only if they're now empty (full success).
+            pendingStateChanged = _pendingValues.Count == 0;
         }
 
-        _onPendingChangesChangedHandler?.Invoke();
+        if (pendingStateChanged)
+        {
+            _onPendingChangesChangedHandler?.Invoke();
+        }
         _onWslConfigChangedHandler?.Invoke();
         return result;
     }
