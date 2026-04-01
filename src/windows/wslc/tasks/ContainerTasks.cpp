@@ -141,13 +141,15 @@ void ListContainers(CLIExecutionContext& context)
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
         // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
-                                 {{{L"CONTAINER ID", {Config::NoLimit, 12, false}},
-                                   {L"NAME", {Config::NoLimit, 20, true}},
-                                   {L"IMAGE", {Config::NoLimit, 20, false}},
-                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
-                                   {L"STATUS", {Config::NoLimit, Config::NoLimit, false}}}})
-                           : wsl::windows::wslc::TableOutput<5>({L"CONTAINER ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
+        auto table =
+            trunc ? wsl::windows::wslc::TableOutput<6>(
+                        {{{L"CONTAINER ID", {Config::NoLimit, 12, false}},
+                          {L"NAME", {Config::NoLimit, 20, true}},
+                          {L"IMAGE", {Config::NoLimit, 20, false}},
+                          {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
+                          {L"STATUS", {Config::NoLimit, Config::NoLimit, false}},
+                          {L"PORTS", {Config::NoLimit, Config::NoLimit, false}}}})
+                  : wsl::windows::wslc::TableOutput<6>({L"CONTAINER ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS", L"PORTS"});
 
         // Add each container as a row
         for (const auto& container : containers)
@@ -158,6 +160,7 @@ void ListContainers(CLIExecutionContext& context)
                 MultiByteToWide(container.Image),
                 ContainerService::FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
+                ContainerService::FormatPorts(container.State, container.Ports),
             });
         }
 

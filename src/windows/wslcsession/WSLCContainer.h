@@ -93,6 +93,7 @@ public:
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
     WSLCContainerState State() const noexcept;
+    std::vector<WSLCPortMapping> GetPorts() const;
 
     __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 

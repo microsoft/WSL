@@ -154,6 +154,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
+static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping& mapping)
+{
+    return PortInformation{
+        .HostPort = mapping.HostPort,
+        .ContainerPort = mapping.ContainerPort,
+        .Protocol = static_cast<int>(mapping.Protocol),
+        .BindingAddress = mapping.BindingAddress,
+    };
+}
+
 std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
@@ -256,6 +266,36 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
+std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
+{
+    if (state != WslcContainerStateRunning || ports.empty())
+    {
+        return L"";
+    }
+
+    std::wstring result;
+    for (size_t i = 0; i < ports.size(); ++i)
+    {
+        const auto& port = ports[i];
+
+        std::wstring hostIp = wsl::shared::string::MultiByteToWide(port.BindingAddress);
+
+        std::wstring protocol = (port.Protocol == IPPROTO_TCP)   ? L"tcp"
+                                : (port.Protocol == IPPROTO_UDP) ? L"udp"
+                                                                 : std::format(L"{}", port.Protocol);
+
+        if (i > 0)
+        {
+            result += L", ";
+        }
+
+        result += std::format(
+            L"{}:{}->{}/{}", (hostIp.find(L':') != std::wstring::npos) ? std::format(L"[{}]", hostIp) : hostIp, port.HostPort, port.ContainerPort, protocol);
+    }
+
+    return result;
+}
+
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     // Create the container
@@ -339,7 +379,9 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
+    wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
     for (const auto& current : containers)
     {
         ContainerInformation entry;
@@ -349,6 +391,15 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
+
+        for (const auto& port : ports)
+        {
+            if (strcmp(port.Id, current.Id) == 0)
+            {
+                entry.Ports.push_back(PortInformationFromWSLCPortMapping(port.PortMapping));
+            }
+        }
+
         result.emplace_back(std::move(entry));
     }
 

@@ -24,11 +24,13 @@ cpp_quote("#endif")
 #define WSLC_MAX_IMAGE_NAME_LENGTH 255
 #define WSLC_MAX_VOLUME_NAME_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
+#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
+cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 
 typedef
 struct _WSLCVersion {
@@ -198,7 +200,7 @@ typedef struct _WSLCPortMapping
     USHORT ContainerPort;
     int Family;
     int Protocol;
-    [string] LPCSTR BindingAddress;
+    char BindingAddress[WSLC_MAX_BINDING_ADDRESS_LENGTH + 1];
 } WSLCPortMapping;
 
 typedef struct _WSLCTmpfsMount
@@ -291,6 +293,12 @@ typedef struct _WSLCContainerEntry
     ULONGLONG CreatedAt;
     WSLCContainerState State;
 } WSLCContainerEntry;
+
+typedef struct _WSLCContainerPortMapping
+{
+    WSLCContainerId Id;
+    WSLCPortMapping PortMapping;
+} WSLCContainerPortMapping;
 
 typedef [system_handle(sh_file)] HANDLE FILE_HANDLE;
 typedef [system_handle(sh_pipe)] HANDLE PIPE_HANDLE;
@@ -577,7 +585,10 @@ interface IWSLCSession : IUnknown
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
     HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLCContainer** Container);
-    HRESULT ListContainers([out, size_is(, *Count)] WSLCContainerEntry** Images, [out] ULONG* Count);
+    HRESULT ListContainers([out, size_is(, *Count)] WSLCContainerEntry** Containers,
+                                            [out] ULONG* Count,
+                                            [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports,
+                                            [out] ULONG* PortsCount);
     HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLCContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
