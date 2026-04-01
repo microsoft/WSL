@@ -678,6 +678,7 @@ typedef enum _WSLCSessionFlags
 interface IWSLCSessionManager : IUnknown
 {
     HRESULT GetVersion([out] WSLCVersion* Version);
+    HRESULT GetMinimumSupportedClientVersion([out] WSLCVersion* Version);
 
     // Session management.
     HRESULT CreateSession([in, ref] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
@@ -691,3 +692,4 @@ cpp_quote("#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_
 cpp_quote("#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2) /* 0x80040602 */")
 cpp_quote("#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3) /* 0x80040603 */")
 cpp_quote("#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4) /* 0x80040604 */")
+cpp_quote("#define WSLC_E_SDK_UPDATED_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5) /* 0x80040605 */")
