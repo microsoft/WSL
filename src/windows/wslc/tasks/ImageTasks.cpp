@@ -73,7 +73,7 @@ void ListImages(CLIExecutionContext& context)
         // Print only the image names.
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Repository + ":" + image.Tag));
+            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
         }
 
         return;
@@ -111,8 +111,8 @@ void ListImages(CLIExecutionContext& context)
         for (const auto& image : images)
         {
             table.OutputLine({
-                MultiByteToWide(image.Repository),
-                MultiByteToWide(image.Tag),
+                MultiByteToWide(image.Repository.value_or("<untagged>")),
+                MultiByteToWide(image.Tag.value_or("<untagged>")),
                 MultiByteToWide(TruncateId(image.Id, trunc)),
                 ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
                 std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),

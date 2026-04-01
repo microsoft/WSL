@@ -50,11 +50,11 @@ class WSLCE2EImageListTests
     {
         WSL2_TEST_ONLY();
 
-        const auto result = RunWslc(L"image list -q");
+        const auto result = RunWslc(L"image list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : result.GetStdoutLines())
         {
-            if (line.find(DebianImage.NameAndTag()) != std::wstring::npos)
+            if (line.find(DebianImage.Name) != std::wstring::npos && line.find(DebianImage.Tag) != std::wstring::npos)
             {
                 return;
             }
@@ -106,7 +106,9 @@ class WSLCE2EImageListTests
         for (const auto& image : images)
         {
             auto nameAndTag = std::format(
-                L"{}:{}", wsl::shared::string::MultiByteToWide(image.Repository), wsl::shared::string::MultiByteToWide(image.Tag));
+                L"{}:{}",
+                wsl::shared::string::MultiByteToWide(image.Repository.value_or("<untagged>")),
+                wsl::shared::string::MultiByteToWide(image.Tag.value_or("<untagged>")));
             imageNames.push_back(nameAndTag);
         }
 
