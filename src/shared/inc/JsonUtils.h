@@ -31,19 +31,21 @@ Abstract:
 
 namespace wsl::shared {
 
+constexpr int c_jsonPrettyPrintIndent = 2;
+
 template <typename T>
-std::string ToJson(const T& Value)
+std::string ToJson(const T& Value, int indent = -1)
 {
     nlohmann::json json;
     to_json(json, Value);
 
-    return json.dump();
+    return json.dump(indent);
 }
 
 template <typename T>
-std::wstring ToJsonW(const T& Value)
+std::wstring ToJsonW(const T& Value, int indent = -1)
 {
-    return wsl::shared::string::MultiByteToWide(ToJson(Value));
+    return wsl::shared::string::MultiByteToWide(ToJson(Value, indent));
 }
 
 template <typename T, typename TJson = nlohmann::json>

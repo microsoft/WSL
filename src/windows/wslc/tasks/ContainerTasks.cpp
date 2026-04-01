@@ -75,7 +75,7 @@ void InspectContainers(CLIExecutionContext& context)
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
 }
 
@@ -131,7 +131,7 @@ void ListContainers(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(containers);
+        auto json = ToJson(containers, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }

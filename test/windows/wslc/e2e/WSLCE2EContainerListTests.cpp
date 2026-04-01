@@ -180,10 +180,8 @@ class WSLCE2EContainerListTests
         // List containers with json format
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto output = result.GetStdoutOneLine();
-
         // Parse json and verify we got the expected container information back
-        auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(output.c_str());
+        auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1U, containers.size());
         VERIFY_ARE_EQUAL(containerId, wsl::shared::string::MultiByteToWide(containers[0].Id));
 
@@ -196,10 +194,8 @@ class WSLCE2EContainerListTests
         // List containers with json format again
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto output2 = result.GetStdoutOneLine();
-
         // Parse json and verify we got both containers back
-        containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(output2.c_str());
+        containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(2U, containers.size());
 
         // Extract container IDs

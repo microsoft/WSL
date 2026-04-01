@@ -108,12 +108,6 @@ interface IProgressCallback : IUnknown
     HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
 
-typedef struct _WslcRegistryAuthInformation
-{
-    int Dummy; // Dummy value for the .idl file to compile.
-    // TODO: Details TBD.
-} WslcRegistryAuthInformation;
-
 typedef struct _WSLCImageInformation
 {
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
@@ -533,7 +527,7 @@ interface IWSLCSession : IUnknown
     HRESULT GetState([out] WSLCSessionState* State);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR Image, [in, unique] const  WslcRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
