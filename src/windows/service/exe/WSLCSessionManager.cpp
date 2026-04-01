@@ -118,14 +118,16 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
 
-    WSL_LOG_TELEMETRY(
+    WSL_LOG(
         "WSLCCreateSession",
-        PDT_ProductAndServiceUsage,
+        TelemetryPrivacyDataTag(PDT_ProductAndServicePerformance),
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(Settings->DisplayName, "Name"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
-        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"));
+        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"),
+        TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
     THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", Settings->DisplayName);
 }
