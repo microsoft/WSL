@@ -1348,11 +1348,11 @@ WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD
     switch (Type)
     {
     case WSLCHandleTypeFile:
-        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File =  duplicatedHandle.release()}};
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = duplicatedHandle.release()}};
     case WSLCHandleTypePipe:
-        return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe =  duplicatedHandle.release()}};
+        return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = duplicatedHandle.release()}};
     case WSLCHandleTypeSocket:
-        return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket =  duplicatedHandle.release()}};
+        return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = duplicatedHandle.release()}};
     default:
         THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", static_cast<int>(Type));
     }
