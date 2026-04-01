@@ -71,7 +71,6 @@ public:
     WSLCSessionManagerImpl() = default;
     ~WSLCSessionManagerImpl();
 
-    void GetVersion(_Out_ WSLCVersion* Version);
     void CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession);
     void EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession);
     void ListSessions(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount);
@@ -181,6 +180,7 @@ public:
     WSLCSessionManager(wsl::windows::service::wslc::WSLCSessionManagerImpl* Impl);
 
     IFACEMETHOD(GetVersion)(_Out_ WSLCVersion* Version) override;
+    IFACEMETHOD(GetMinimumSupportedClientVersion)(_Out_ WSLCVersion* Version) override;
     IFACEMETHOD(CreateSession)(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession) override;
     IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount) override;

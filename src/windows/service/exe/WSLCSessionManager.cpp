@@ -321,13 +321,6 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionInformation** Session
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
 }
 
-void WSLCSessionManagerImpl::GetVersion(_Out_ WSLCVersion* Version)
-{
-    Version->Major = WSL_PACKAGE_VERSION_MAJOR;
-    Version->Minor = WSL_PACKAGE_VERSION_MINOR;
-    Version->Revision = WSL_PACKAGE_VERSION_REVISION;
-}
-
 void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
@@ -451,7 +444,31 @@ WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl) : COMImplCl
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
 {
-    return CallImpl(&WSLCSessionManagerImpl::GetVersion, Version);
+    Version->Major = WSL_PACKAGE_VERSION_MAJOR;
+    Version->Minor = WSL_PACKAGE_VERSION_MINOR;
+    Version->Revision = WSL_PACKAGE_VERSION_REVISION;
+
+    return S_OK;
+}
+
+HRESULT WSLCSessionManager::GetMinimumSupportedClientVersion(_Out_ WSLCVersion* Version)
+{
+    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 8, 0};
+
+    if constexpr (wsl::shared::PackageVersion < c_minClientVersion)
+    {
+        Version->Major = WSL_PACKAGE_VERSION_MAJOR;
+        Version->Minor = WSL_PACKAGE_VERSION_MINOR;
+        Version->Revision = WSL_PACKAGE_VERSION_REVISION;
+    }
+    else
+    {
+        Version->Major = std::get<0>(c_minClientVersion);
+        Version->Minor = std::get<1>(c_minClientVersion);
+        Version->Revision = std::get<2>(c_minClientVersion);
+    }
+
+    return S_OK;
 }
 
 HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
