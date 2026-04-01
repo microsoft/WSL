@@ -2082,7 +2082,7 @@ class WSLCTests
             auto [read, write] = CreateSubprocessPipe(false, false);
 
             auto settings = GetDefaultSessionSettings(L"dmesg-output-test");
-            settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
+            settings.DmesgOutput = ToCOMInputHandle(write.get());
             WI_UpdateFlag(settings.FeatureFlags, WslcFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
             std::vector<char> dmesgContent;

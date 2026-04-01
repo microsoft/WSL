@@ -416,7 +416,7 @@ typedef struct _WSLCSessionSettings {
     WSLCNetworkingMode NetworkingMode;
     [unique] ITerminationCallback* TerminationCallback;
     WSLCFeatureFlags FeatureFlags;
-    ULONG DmesgOutput;
+    WSLCHandle DmesgOutput;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
