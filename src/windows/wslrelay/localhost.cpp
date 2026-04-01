@@ -336,6 +336,7 @@ struct PortRelay
     uint32_t RelayPort;
     OVERLAPPED Overlapped{};
     bool Pending = false;
+    bool AssociatedWithIocp = false;
     wil::unique_socket PendingSocket;
     int Family;
     CHAR AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
@@ -347,10 +348,11 @@ struct PortRelay
 
     ~PortRelay()
     {
-        if (Pending)
+        if (Pending) // Cancel pending accept(), if any.
         {
-            LOG_HR(E_UNEXPECTED);
             CancelIoEx(reinterpret_cast<HANDLE>(ListenSocket.get()), &Overlapped);
+            // N.B. Don't wait for the cancellation here — the IOCP drains pending I/O
+            // in AcceptThread's scope_exit before PortRelay is destroyed.
         }
     }
 
@@ -408,11 +410,10 @@ struct PortRelay
         }
     }
 
-    void ScheduleAccept()
+    bool ScheduleAccept()
     {
-        WI_ASSERT(!Pending);
+        WI_VERIFY(!Pending);
 
-        Overlapped = {};
         PendingSocket.reset(WSASocket(Family, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
         memset(AcceptBuffer, 0, sizeof(AcceptBuffer));
         DWORD BytesReturned{};
@@ -420,9 +421,12 @@ struct PortRelay
         {
             const int error = WSAGetLastError();
             THROW_HR_IF(HRESULT_FROM_WIN32(error), error != WSA_IO_PENDING);
+
+            Pending = true;
+            return false;
         }
 
-        Pending = true;
+        return true;
     }
 };
 
@@ -462,42 +466,45 @@ std::shared_ptr<PortRelay> CreatePortListener(uint16_t WindowsPort, uint16_t Lin
     return std::make_shared<PortRelay>(std::move(ListenSocket), LinuxPort, RelayPort, Family);
 }
 
-void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& Ports, const GUID& VmId, HANDLE Iocp)
+void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& VmId, HANDLE Iocp)
 {
-    // Ensure pending I/O is always cancelled and drained, even if we exit via exception.
+    // Ensure pending I/O is always cancelled and drained on exit.
     auto drainPendingIo = wil::scope_exit([&]() {
-        DWORD PendingCount = 0;
-        for (auto& Entry : Ports)
+        DWORD pendingCount = 0;
+        for (auto& e : ports)
         {
-            if (Entry->Pending)
+            if (e->Pending)
             {
-                CancelIoEx(reinterpret_cast<HANDLE>(Entry->ListenSocket.get()), &Entry->Overlapped);
-                PendingCount++;
+                CancelIoEx(reinterpret_cast<HANDLE>(e->ListenSocket.get()), &e->Overlapped);
+                pendingCount++;
             }
         }
 
-        while (PendingCount > 0)
+        while (pendingCount > 0)
         {
-            DWORD Bytes{};
-            ULONG_PTR Key{};
-            OVERLAPPED* CompletedOverlapped{};
-            GetQueuedCompletionStatus(Iocp, &Bytes, &Key, &CompletedOverlapped, INFINITE);
-            if (CompletedOverlapped != nullptr && Key != 0)
+            DWORD bytes{};
+            ULONG_PTR key{};
+            OVERLAPPED* overlapped{};
+            GetQueuedCompletionStatus(Iocp, &bytes, &key, &overlapped, INFINITE);
+            if (overlapped != nullptr && key != 0)
             {
-                reinterpret_cast<PortRelay*>(Key)->Pending = false;
-                PendingCount--;
+                reinterpret_cast<PortRelay*>(key)->Pending = false;
+                pendingCount--;
             }
         }
     });
 
     // Schedule initial accepts on all ports.
-    for (auto& Entry : Ports)
+    for (auto& e : ports)
     {
-        if (!Entry->Pending)
+        if (!e->Pending)
         {
             try
             {
-                Entry->ScheduleAccept();
+                while (e->ScheduleAccept())
+                {
+                    e->LaunchRelay(VmId);
+                }
             }
             CATCH_LOG();
         }
@@ -506,130 +513,68 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& Ports, const GUID& Vm
     // Wait for I/O completions on the IOCP.
     while (true)
     {
-        DWORD Bytes{};
-        ULONG_PTR Key{};
-        OVERLAPPED* CompletedOverlapped{};
-        BOOL Success = GetQueuedCompletionStatus(Iocp, &Bytes, &Key, &CompletedOverlapped, INFINITE);
+        DWORD bytes{};
+        ULONG_PTR key{};
+        OVERLAPPED* overlapped{};
+        BOOL success = GetQueuedCompletionStatus(Iocp, &bytes, &key, &overlapped, INFINITE);
 
-        if (CompletedOverlapped == nullptr)
+        if (overlapped == nullptr)
         {
-            THROW_LAST_ERROR_IF(!Success);
-
+            THROW_LAST_ERROR_IF(!success);
             break; // Exit signal posted by stopAcceptThread.
         }
 
-        auto* Port = reinterpret_cast<PortRelay*>(Key);
+        auto* port = reinterpret_cast<PortRelay*>(key);
 
-        if (Success)
+        if (success)
         {
             try
             {
-                Port->CompleteAccept();
-                Port->LaunchRelay(VmId);
+                port->CompleteAccept();
+                port->LaunchRelay(VmId);
             }
             CATCH_LOG();
         }
         else
         {
-            Port->Pending = false;
+            port->Pending = false;
             LOG_LAST_ERROR();
         }
 
         // Schedule the next accept.
-        if (!Port->Pending)
+        if (!port->Pending)
         {
             try
             {
-                Port->ScheduleAccept();
+                while (port->ScheduleAccept())
+                {
+                    port->LaunchRelay(VmId);
+                }
             }
             CATCH_LOG();
         }
     }
 }
 
-struct MessageReader
+std::optional<WSLC_MAP_PORT> ReceiveServiceMessage()
 {
-    NON_COPYABLE(MessageReader);
-    NON_MOVABLE(MessageReader);
+    WSLC_MAP_PORT message{};
 
-    MessageReader() = default;
-
-    void Start()
+    DWORD bytesRead{};
+    if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), &message, sizeof(message), &bytesRead, nullptr))
     {
-        MessageConsumed.SetEvent();
-
-        Thread = std::thread([this]() {
-            while (true)
-            {
-                MessageConsumed.wait();
-                MessageConsumed.ResetEvent();
-
-                auto Msg = ReadMessage();
-                Message = Msg;
-                MessageReady.SetEvent();
-
-                if (!Msg.has_value())
-                {
-                    return; // stdin closed, exit reader thread.
-                }
-            }
-        });
+        LOG_LAST_ERROR();
+        return {};
+    }
+    else if (bytesRead == 0)
+    {
+        return {};
     }
 
-    // Returns the next message, or nullopt if the exit event was signaled or stdin closed.
-    std::optional<WSLC_MAP_PORT> WaitForMessage(HANDLE ExitEvent)
-    {
-        HANDLE Events[] = {ExitEvent, MessageReady.get()};
-        DWORD Count = ExitEvent ? 2 : 1;
-        HANDLE* Base = ExitEvent ? Events : &Events[1];
-
-        auto Result = WaitForMultipleObjects(Count, Base, false, INFINITE);
-        THROW_LAST_ERROR_IF(Result == WAIT_FAILED);
-
-        if (ExitEvent && Result == WAIT_OBJECT_0)
-        {
-            return {}; // Exit event signaled.
-        }
-
-        auto Msg = Message;
-        MessageReady.ResetEvent();
-        MessageConsumed.SetEvent();
-        return Msg;
-    }
-
-    ~MessageReader()
-    {
-        if (Thread.joinable())
-        {
-            Thread.detach(); // Reader may be stuck in ReadFile; process exit will clean it up.
-        }
-    }
-
-private:
-    static std::optional<WSLC_MAP_PORT> ReadMessage()
-    {
-        WSLC_MAP_PORT message{};
-        DWORD bytesRead{};
-        if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), &message, sizeof(message), &bytesRead, nullptr))
-        {
-            LOG_LAST_ERROR();
-            return {};
-        }
-        else if (bytesRead == 0)
-        {
-            return {};
-        }
-
-        WI_ASSERT(message.Header.MessageSize == sizeof(message));
-        WI_ASSERT(message.Header.MessageType == LxMessageWSLCMapPort);
-        return message;
-    }
-
-    wil::unique_event MessageReady{wil::EventOptions::ManualReset};
-    wil::unique_event MessageConsumed{wil::EventOptions::ManualReset};
-    std::optional<WSLC_MAP_PORT> Message;
-    std::thread Thread;
-};
+    WI_ASSERT(message.Header.MessageSize == sizeof(message));
+    WI_ASSERT(message.Header.MessageType == LxMessageWSLCMapPort);
+    return message;
+}
 
 void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
 {
@@ -639,19 +584,11 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
     THROW_LAST_ERROR_IF(!iocp);
 
     std::thread acceptThread;
-    std::atomic<bool> acceptThreadAlive{false};
 
     auto stopAcceptThread = [&]() {
         if (acceptThread.joinable())
         {
-            // Only post the exit signal if the thread is still running.
-            // If it already exited (e.g. due to an exception), posting would leave
-            // a stale completion in the IOCP that kills the next accept thread.
-            if (acceptThreadAlive.load())
-            {
-                PostQueuedCompletionStatus(iocp.get(), 0, 0, nullptr);
-            }
-
+            PostQueuedCompletionStatus(iocp.get(), 0, 0, nullptr);
             acceptThread.join();
             acceptThread = {};
         }
@@ -659,13 +596,10 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { stopAcceptThread(); });
 
-    MessageReader reader;
-    reader.Start();
-
     while (true)
     {
-        // Receive a message, or exit if the exit event is signaled.
-        auto message = reader.WaitForMessage(ExitEvent);
+        // Receive a message
+        auto message = ReceiveServiceMessage();
         if (!message.has_value())
         {
             return;
@@ -713,11 +647,7 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
             {
                 try
                 {
-                    auto relay = CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily);
-                    THROW_LAST_ERROR_IF_NULL(CreateIoCompletionPort(
-                        reinterpret_cast<HANDLE>(relay->ListenSocket.get()), iocp.get(), reinterpret_cast<ULONG_PTR>(relay.get()), 0));
-
-                    ports.emplace(key, std::move(relay));
+                    ports.emplace(key, CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily));
                     update = true;
                 }
                 catch (...)
@@ -740,12 +670,21 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
             std::vector<std::shared_ptr<PortRelay>> relays;
             for (auto& e : ports)
             {
+                // Associate each listen socket with the IOCP (skipped if already associated).
+                if (!e.second->AssociatedWithIocp)
+                {
+                    THROW_LAST_ERROR_IF_NULL(CreateIoCompletionPort(
+                        reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), iocp.get(), reinterpret_cast<ULONG_PTR>(e.second.get()), 0));
+
+                    SetFileCompletionNotificationModes(reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS);
+
+                    e.second->AssociatedWithIocp = true;
+                }
+
                 relays.emplace_back(e.second);
             }
 
-            acceptThreadAlive = true;
             acceptThread = std::thread([&, relays = std::move(relays)]() mutable {
-                auto markDead = wil::scope_exit([&]() { acceptThreadAlive = false; });
                 try
                 {
                     AcceptThread(relays, VmId, iocp.get());
