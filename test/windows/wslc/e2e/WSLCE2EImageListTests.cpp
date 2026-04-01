@@ -98,8 +98,7 @@ class WSLCE2EImageListTests
         const auto result = RunWslc(L"image list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto output = result.GetStdoutOneLine();
-        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(output.c_str());
+        const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(result.Stdout.value().c_str());
 
         VERIFY_ARE_EQUAL(2u, images.size());
 

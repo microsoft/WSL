@@ -216,8 +216,7 @@ wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -226,8 +225,7 @@ wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -275,8 +273,7 @@ std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers(
 {
     auto result = RunWslc(L"container list --all --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(jsonOutput.c_str());
+    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(result.Stdout.value().c_str());
 }
 
 void EnsureImageContainersAreDeleted(const TestImage& image)
