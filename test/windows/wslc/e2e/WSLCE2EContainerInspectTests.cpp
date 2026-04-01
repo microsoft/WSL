@@ -31,6 +31,7 @@ class WSLCE2EContainerInspectTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -38,6 +39,7 @@ class WSLCE2EContainerInspectTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         return true;
     }
 
@@ -92,9 +94,6 @@ class WSLCE2EContainerInspectTests
     {
         WSL2_TEST_ONLY();
 
-        const std::wstring WslcContainerName2 = L"wslc-test-container-2";
-        EnsureContainerDoesNotExist(WslcContainerName2);
-
         // Create two containers
         auto result1 = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result1.Verify({.Stderr = L"", .ExitCode = 0});
@@ -109,26 +108,46 @@ class WSLCE2EContainerInspectTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(2u, inspectData.size());
-
-        // Cleanup
-        EnsureContainerDoesNotExist(WslcContainerName2);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Inspect_VerboseOption)
+    TEST_METHOD(WSLCE2E_Container_Inspect_MixedValidAndInvalid)
     {
         WSL2_TEST_ONLY();
 
+        // Create one valid container
         auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = createResult.GetStdoutOneLine();
 
-        auto result = RunWslc(std::format(L"container inspect --verbose {}", containerId));
+        // Inspect with one valid and one invalid identifier
+        auto result = RunWslc(std::format(L"container inspect {} {}", containerId, WslcContainerName2));
+        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Inspect_DuplicateIdentifiers)
+    {
+        WSL2_TEST_ONLY();
+
+        // Create one container
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = createResult.GetStdoutOneLine();
+
+        // Inspect the same identifier twice
+        auto result = RunWslc(std::format(L"container inspect {} {}", containerId, containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.has_value());
+
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
+
+        VERIFY_ARE_EQUAL(2u, inspectData.size());
+        VERIFY_ARE_EQUAL(containerId, wsl::shared::string::MultiByteToWide(inspectData[0].Id));
+        VERIFY_ARE_EQUAL(containerId, wsl::shared::string::MultiByteToWide(inspectData[1].Id));
     }
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring WslcContainerName2 = L"wslc-test-container-2";
     const TestImage& DebianImage = DebianTestImage();
 
     std::wstring GetHelpMessage() const
@@ -144,7 +163,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Inspects a container.\r\n\r\n";
+        return L"Display detailed information about a container.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -165,7 +184,8 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  -h,--help  Shows help about the selected command\r\n"
+                << L"  --session       Specify the session to use\r\n"
+                << L"  -h,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }
