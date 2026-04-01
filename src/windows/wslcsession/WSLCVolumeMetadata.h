@@ -21,6 +21,9 @@ namespace wsl::windows::service::wslc {
 // Label key used to store WSLC volume metadata in Docker volume labels.
 constexpr auto WSLCVolumeMetadataLabel = "com.microsoft.wsl.volume.metadata";
 
+// Volume type identifier for VHD-backed volumes.
+constexpr auto WSLCVhdVolumeType = "vhd";
+
 struct WSLCVhdVolumeMetadataV1
 {
     std::wstring HostPath;
