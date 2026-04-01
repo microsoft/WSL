@@ -204,8 +204,7 @@ private:
         auto testRoot = std::filesystem::current_path() / image.Name;
         auto cleanup = SetupTestDirectory(testRoot);
 
-        auto fileNameUtf8 = wsl::windows::common::string::WideToMultiByte(fileName);
-        WriteTestFile(testRoot / fileName, std::format("FROM debian:latest\nCMD [\"echo\", \"wslc-e2e-build-{}\"]\n", fileNameUtf8));
+        WriteTestFile(testRoot / fileName, "FROM debian:latest\nCMD [\"echo\", \"build-ok\"]\n");
 
         auto buildResult = RunWslc(std::format(L"build \"{}\" -t {}", testRoot.wstring(), image.NameAndTag()));
         buildResult.Verify({.Stderr = L"", .ExitCode = 0});
