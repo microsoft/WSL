@@ -32,9 +32,6 @@ jobs:
     ${{ else }}:
       pool: ${{ parameters.pool }}
     steps:
-      - script: echo "Build requested for email - $(Build.RequestedForEmail)"
-        displayName: "Log build requested for email"
-
       - task: CloudTestServerBuildTask@2
         inputs:
           DisplayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
