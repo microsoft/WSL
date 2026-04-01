@@ -110,10 +110,11 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
+    // N.B. 'DmesgOutput' needs to be duplicated since COM will close it when this call completes.
     wil::unique_handle dmesgOutputHandle;
-    if (Settings->DmesgOutput != 0)
+    if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
     {
-        dmesgOutputHandle.reset(wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Settings->DmesgOutput)));
+        dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
     m_dmesgCollector = DmesgCollector::Create(
