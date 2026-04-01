@@ -221,6 +221,8 @@
                      N.B. It shouldn't be started on install because it will fail to start if the OC is missing, 
                      which would fail the install. -->
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
+
+                <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll" />
             </Component>
 
             <Component Id="wslg" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134731" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
@@ -232,7 +234,6 @@
                     <File Id="rdpnanoTransport.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdpnanoTransport.dll" />
                     <File Id="RdpWinStlHelper.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" />
                 <?endif?>
-                <File Id="wsldevicehost.dll" Source="${PACKAGE_INPUT_DIR}/wsldevicehost.dll" />
                 <File Id="${WSLG_TS_PLUGIN_DLL}" Source="${PACKAGE_INPUT_DIR}/${WSLG_TS_PLUGIN_DLL}" />
 
                 <!-- MSRDC Plugin registration -->
@@ -398,6 +399,14 @@
             Execute="deferred"
          />
 
+        <CustomAction Id="StopDeviceHostSurrogate"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="StopDeviceHostSurrogate"
+            Return="check"
+            Execute="deferred"
+         />
+
         <CustomAction Id="DeprovisionMsix"
             Impersonate="no"
             BinaryRef="wslinstall.dll"
@@ -485,6 +494,10 @@
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
+
+            <!-- Terminate the dllhost.exe surrogate hosting wsldevicehost.dll so the DLL can be overwritten during upgrade.
+                 Must run after StopService (which stops WSLService) but before InstallFiles. -->
+            <Custom Action="StopDeviceHostSurrogate" Before="InstallFiles" Condition='(not UPGRADINGPRODUCTCODE)' />
 
             <!-- Must run before InstallServices or else we'll fail if wslservice already exists.
                  Covers cases where:

@@ -4,6 +4,7 @@ EXPORTS
     CleanExplorerState
     CleanMsixState
     DeprovisionMsix
+    StopDeviceHostSurrogate
     WslValidateInstallation
     WslFinalizeInstallation
     InstallMsix
