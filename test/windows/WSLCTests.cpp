@@ -27,7 +27,7 @@ using wsl::windows::common::WSLCContainerLauncher;
 using wsl::windows::common::WSLCProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
-using wsl::windows::common::wslutil::PruneResult;
+using namespace wsl::windows::common::wslutil;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -43,7 +43,7 @@ class WSLCTests
     wil::com_ptr<IWSLCSession> m_defaultSession;
     static inline auto c_testSessionName = L"wslc-test";
 
-    void LoadTestImage(std::string_view imageName)
+    void LoadTestImage(std::string_view imageName, IWSLCSession* session = nullptr)
     {
         std::filesystem::path imagePath = GetTestImagePath(imageName);
         wil::unique_hfile imageFile{
@@ -53,7 +53,8 @@ class WSLCTests
         LARGE_INTEGER fileSize{};
         THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-        THROW_IF_FAILED(m_defaultSession->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+        THROW_IF_FAILED(
+            (session ? session : m_defaultSession.get())->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
     }
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -844,7 +845,7 @@ class WSLCTests
         LARGE_INTEGER fileSize{};
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+        VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "hello-world:latest");
@@ -861,7 +862,7 @@ class WSLCTests
             auto currentExecutableHandle = wil::open_file(wil::GetModuleFileNameW<std::wstring>().c_str());
             VERIFY_IS_TRUE(GetFileSizeEx(currentExecutableHandle.get(), &fileSize));
 
-            VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(HandleToULong(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
+            VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(ToCOMInputHandle(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
         }
@@ -879,8 +880,8 @@ class WSLCTests
         LARGE_INTEGER fileSize{};
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        VERIFY_SUCCEEDED(
-            m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
+        VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
+            ToCOMInputHandle(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
 
         ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
@@ -896,7 +897,8 @@ class WSLCTests
         // Validate that ImportImage fails if no tag is passed
         {
             VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+                m_defaultSession->ImportImage(ToCOMInputHandle(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart),
+                E_INVALIDARG);
         }
 
         // Validate that invalid tars fail with proper error message and code.
@@ -907,7 +909,7 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(
                 m_defaultSession->ImportImage(
-                    HandleToULong(currentExecutableHandle.get()), "invalid-image:test", nullptr, fileSize.QuadPart),
+                    ToCOMInputHandle(currentExecutableHandle.get()), "invalid-image:test", nullptr, fileSize.QuadPart),
                 E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
@@ -988,7 +990,7 @@ class WSLCTests
         auto contextPathStr = contextDir.wstring();
         WSLCBuildImageOptions optionsCopy = *options;
         optionsCopy.ContextPath = contextPathStr.c_str();
-        optionsCopy.DockerfileHandle = HandleToULong(dockerfileHandle.get());
+        optionsCopy.DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get());
 
         auto buildResult = m_defaultSession->BuildImage(&optionsCopy, nullptr, nullptr);
 
@@ -1330,7 +1332,7 @@ class WSLCTests
         LPCSTR tag = "wslc-test-build-failure-output:latest";
         WSLCBuildImageOptions options{
             .ContextPath = contextPathStr.c_str(),
-            .DockerfileHandle = HandleToULong(dockerfileHandle.get()),
+            .DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get()),
             .Tags = {&tag, 1},
         };
 
@@ -1364,7 +1366,7 @@ class WSLCTests
         LPCSTR tag = "wslc-test-build-stdin:latest";
         WSLCBuildImageOptions options{
             .ContextPath = contextPathStr.c_str(),
-            .DockerfileHandle = HandleToULong(readHandle.get()),
+            .DockerfileHandle = ToCOMInputHandle(readHandle.get()),
             .Tags = {&tag, 1},
         };
         VERIFY_SUCCEEDED(m_defaultSession->BuildImage(&options, nullptr, nullptr));
@@ -1447,7 +1449,7 @@ class WSLCTests
     {
         WSL2_TEST_ONLY();
 
-        WSLCBuildImageOptions options{.ContextPath = L"C:\\", .DockerfileHandle = 0, .Tags = {nullptr, 0}};
+        WSLCBuildImageOptions options{.ContextPath = L"C:\\", .DockerfileHandle = {}, .Tags = {nullptr, 0}};
 
         VERIFY_ARE_EQUAL(m_defaultSession->BuildImage(&options, nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE));
     }
@@ -1500,7 +1502,7 @@ class WSLCTests
 
         LPCSTR tag = "wslc-test-build-cancel:latest";
         WSLCBuildImageOptions options{
-            .ContextPath = contextPathStr.c_str(), .DockerfileHandle = HandleToULong(dockerfileHandle.get()), .Tags = {&tag, 1}};
+            .ContextPath = contextPathStr.c_str(), .DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get()), .Tags = {&tag, 1}};
 
         std::promise<HRESULT> result;
         std::thread buildThread(
@@ -1859,7 +1861,7 @@ class WSLCTests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             // Load the image from a saved tar
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:latest");
             WSLCContainerLauncher launcher("hello-world:latest", "wslc-hello-world-container");
@@ -1881,7 +1883,7 @@ class WSLCTests
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, nullptr));
+                VERIFY_SUCCEEDED(m_defaultSession->SaveImage(ToCOMInputHandle(imageTarFileHandle.get()), "hello-world:latest", nullptr, nullptr));
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
             }
@@ -1894,7 +1896,7 @@ class WSLCTests
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
                 // Load the image from a saved tar
-                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "hello-world:latest");
                 WSLCContainerLauncher launcher("hello-world:latest", "wslc-hello-world-container");
@@ -1916,7 +1918,7 @@ class WSLCTests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, nullptr));
+            VERIFY_FAILED(m_defaultSession->SaveImage(ToCOMInputHandle(imageTarFileHandle.get()), "hello-wld:latest", nullptr, nullptr));
             ValidateCOMErrorMessage(L"reference does not exist");
 
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
@@ -1929,7 +1931,7 @@ class WSLCTests
 
             BlockingOperation operation(
                 [&](HANDLE handle) {
-                    return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, cancelEvent.get());
+                    return m_defaultSession->SaveImage(ToCOMInputHandle(handle), "debian:latest", nullptr, cancelEvent.get());
                 },
                 E_ABORT);
 
@@ -1954,7 +1956,7 @@ class WSLCTests
 
         wil::unique_event testCompleted{wil::EventOptions::ManualReset};
         std::thread operationThread([&]() {
-            result.set_value(m_defaultSession->ImportImage(HandleToULong(pipeRead.get()), "dummy:latest", nullptr, 1024 * 1024));
+            result.set_value(m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "dummy:latest", nullptr, 1024 * 1024));
 
             WI_ASSERT(testCompleted.is_signaled()); // Sanity check.
         });
@@ -2003,7 +2005,7 @@ class WSLCTests
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
                 LARGE_INTEGER fileSize{};
                 VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+                VERIFY_SUCCEEDED(m_defaultSession->LoadImage(ToCOMInputHandle(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "hello-world:latest");
                 WSLCContainerLauncher launcher("hello-world:latest", "wslc-hello-world-container");
@@ -2018,7 +2020,7 @@ class WSLCTests
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
                 VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
-                VERIFY_SUCCEEDED(container.Get().Export(HandleToULong(containerTarFileHandle.get())));
+                VERIFY_SUCCEEDED(container.Get().Export(ToCOMInputHandle(containerTarFileHandle.get())));
                 VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_NOT_EQUAL(fileSize.QuadPart, 0);
             }
@@ -2038,7 +2040,7 @@ class WSLCTests
                 });
 
                 VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
-                    HandleToULong(containerTarFileHandle.get()), "test-imported-container:latest", nullptr, fileSize.QuadPart));
+                    ToCOMInputHandle(containerTarFileHandle.get()), "test-imported-container:latest", nullptr, fileSize.QuadPart));
 
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "test-imported-container:latest");
@@ -2059,7 +2061,7 @@ class WSLCTests
                 VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
 
-                ULONG outFile = HandleToULong(contTarFileHandle.get());
+                auto outFile = ToCOMInputHandle(contTarFileHandle.get());
 
                 container.Get().Stop(WSLCSignalSIGILL, 10);
                 container.Get().Delete(WSLCDeleteFlagsNone);
@@ -2672,6 +2674,10 @@ class WSLCTests
 
             VERIFY_IS_TRUE(std::equal(largeBuffer.begin(), largeBuffer.end(), result.Output[1].begin(), result.Output[1].end()));
             VERIFY_ARE_EQUAL(result.Output[2], "completed\n");
+
+            // Validate that a null out handle is rejected.
+
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
 
         // Create a stuck process and kill it.
@@ -2718,13 +2724,14 @@ class WSLCTests
             WSLCProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, WSLCProcessFlagsStdin);
 
             auto process = launcher.Launch(*m_defaultSession);
-            auto dummyHandle = process.GetStdHandle(1);
+            auto stdoutHandle = process.GetStdHandle(1);
 
+            COMOutputHandle dummyHandle;
             // Verify that the same handle can only be acquired once.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(1, reinterpret_cast<ULONG*>(&dummyHandle)), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, &dummyHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that trying to acquire a std handle that doesn't exist fails as expected.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(static_cast<WSLCFD>(3), &dummyHandle), E_INVALIDARG);
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             ResetTestSession();
@@ -3431,12 +3438,12 @@ class WSLCTests
                 auto restartedProcess = container.GetInitProcess();
                 VERIFY_ARE_EQUAL(restartedProcess.Wait(), 0);
 
-                wil::unique_handle stdoutLogs;
-                wil::unique_handle stderrLogs;
-                VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+                COMOutputHandle stdoutLogs{};
+                COMOutputHandle stderrLogs{};
+                VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, &stdoutLogs, &stderrLogs, 0, 0, 0));
 
-                ValidateHandleOutput(stdoutLogs.get(), "OK\nOK\nOK\n");
-                ValidateHandleOutput(stderrLogs.get(), "");
+                ValidateHandleOutput(stdoutLogs.Get(), "OK\nOK\nOK\n");
+                ValidateHandleOutput(stderrLogs.Get(), "");
             }
         }
 
@@ -5268,15 +5275,15 @@ class WSLCTests
                              ULONGLONG Tail = 0,
                              ULONGLONG Since = 0,
                              ULONGLONG Until = 0) {
-            wil::unique_handle stdoutLogs;
-            wil::unique_handle stderrLogs;
-            VERIFY_SUCCEEDED(container.Logs(Flags, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, Since, Until, Tail));
+            COMOutputHandle stdoutHandle;
+            COMOutputHandle stderrHandle;
+            VERIFY_SUCCEEDED(container.Logs(Flags, &stdoutHandle, &stderrHandle, Since, Until, Tail));
 
-            ValidateHandleOutput(stdoutLogs.get(), expectedStdout);
+            ValidateHandleOutput(stdoutHandle.Get(), expectedStdout);
 
             if (expectedStderr.has_value())
             {
-                ValidateHandleOutput(stderrLogs.get(), expectedStderr.value());
+                ValidateHandleOutput(stderrHandle.Get(), expectedStderr.value());
             }
         };
 
@@ -5317,11 +5324,11 @@ class WSLCTests
             auto initProcess = container.GetInitProcess();
             ValidateProcessOutput(initProcess, {{1, "OK"}});
 
-            wil::unique_handle stdoutLogs;
-            wil::unique_handle stderrLogs;
-            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsTimestamps, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+            COMOutputHandle stdoutHandle{};
+            COMOutputHandle stderrHandle{};
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsTimestamps, &stdoutHandle, &stderrHandle, 0, 0, 0));
 
-            auto output = ReadToString(stdoutLogs.get());
+            auto output = ReadToString(stdoutHandle.Get());
             VerifyPatternMatch(output, "20*-*-* OK"); // Timestamp is in ISO 8601 format
         }
 
@@ -5369,11 +5376,11 @@ class WSLCTests
             expectLogs(container.Get(), "", "");
 
             // Create a 'follow' logs call.
-            wil::unique_handle stdoutLogs;
-            wil::unique_handle stderrLogs;
-            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsFollow, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+            COMOutputHandle stdoutHandle{};
+            COMOutputHandle stderrHandle{};
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsFollow, &stdoutHandle, &stderrHandle, 0, 0, 0));
 
-            PartialHandleRead reader(stdoutLogs.get());
+            PartialHandleRead reader(stdoutHandle.Get());
 
             auto containerStdin = initProcess.GetStdHandle(0);
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "line1\n", 6, nullptr, nullptr));
@@ -5490,15 +5497,16 @@ class WSLCTests
             VERIFY_SUCCEEDED(result);
 
             // Verify that attaching to a created container fails.
-            wil::unique_handle attachedStdin;
-            wil::unique_handle attachedStdout;
-            wil::unique_handle attachedStderr;
-            VERIFY_ARE_EQUAL(
-                container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
-                HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            COMOutputHandle stdinHandle{};
+            COMOutputHandle stdoutHandle{};
+            COMOutputHandle stderrHandle{};
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Start the container.
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsAttach, nullptr));
+
+            // Verify that trying to attach with null handles fails.
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
 
             // Get its original std handles.
             auto process = container->GetInitProcess();
@@ -5506,10 +5514,13 @@ class WSLCTests
             auto originalStdout = process.GetStdHandle(1);
 
             // Attach to the container with separate handles.
-            VERIFY_SUCCEEDED(container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            stdinHandle.Reset();
+            stdoutHandle.Reset();
+            stderrHandle.Reset();
+            VERIFY_SUCCEEDED(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
 
             PartialHandleRead originalReader(originalStdout.get());
-            PartialHandleRead attachedReader(attachedStdout.get());
+            PartialHandleRead attachedReader(stdoutHandle.Get());
 
             // Write content on the original stdin.
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(originalStdin.get(), "line1\n", 6, nullptr, nullptr));
@@ -5519,7 +5530,7 @@ class WSLCTests
             attachedReader.Expect("line1\n");
 
             // Write content on the attached stdin.
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.get(), "line2\n", 6, nullptr, nullptr));
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(stdinHandle.Get(), "line2\n", 6, nullptr, nullptr));
 
             // Content should be relayed on both stdouts.
             originalReader.Expect("line1\nline2\n");
@@ -5534,19 +5545,24 @@ class WSLCTests
 
             process.Wait();
 
-            attachedStdin.reset();
-            attachedStdout.reset();
-            attachedStderr.reset();
+            stdinHandle.Reset();
+            stdoutHandle.Reset();
+            stderrHandle.Reset();
 
             // Validate that attaching to an exited container fails.
             VERIFY_ARE_EQUAL(container->State(), WslcContainerStateExited);
-            VERIFY_ARE_EQUAL(
-                container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
-                HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            stdinHandle.Reset();
+            stdoutHandle.Reset();
+            stderrHandle.Reset();
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Validate that attaching to a deleted container fails.
             VERIFY_SUCCEEDED(container->Get().Delete(WSLCDeleteFlagsNone));
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr), RPC_E_DISCONNECTED);
+            stdinHandle.Reset();
+            stdoutHandle.Reset();
+            stderrHandle.Reset();
+
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), RPC_E_DISCONNECTED);
 
             container->SetDeleteOnClose(false);
         }
@@ -5560,15 +5576,15 @@ class WSLCTests
             auto originalStdin = process.GetStdHandle(0);
             auto originalStdout = process.GetStdHandle(1);
 
-            wil::unique_handle attachedStdin;
-            wil::unique_handle attachedStdout;
-            wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            COMOutputHandle attachedStdin;
+            COMOutputHandle attachedStdout;
+            COMOutputHandle attachedStderr;
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
 
             PartialHandleRead originalReader(originalStdout.get());
-            PartialHandleRead attachedReader(attachedStdout.get());
+            PartialHandleRead attachedReader(attachedStdout.Get());
 
-            attachedStdin.reset();
+            attachedStdin.Reset();
 
             // Expect both readers to be closed.
             originalReader.ExpectClosed();
@@ -5583,12 +5599,13 @@ class WSLCTests
             auto process = container.GetInitProcess();
             auto originalTty = process.GetStdHandle(WSLCFDTty);
 
-            wil::unique_handle attachedTty;
-            wil::unique_handle dummy;
-            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedTty, (ULONG*)&dummy, (ULONG*)&dummy));
+            COMOutputHandle attachedTty{};
+            COMOutputHandle dummyHandle1{};
+            COMOutputHandle dummyHandle2{};
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedTty, &dummyHandle1, &dummyHandle2));
 
             PartialHandleRead originalReader(originalTty.get());
-            PartialHandleRead attachedReader(attachedTty.get());
+            PartialHandleRead attachedReader(attachedTty.Get());
 
             // Read the prompt from the original tty (hardcoded bytes since behavior is constant).
             auto prompt = originalReader.ReadBytes(13);
@@ -5602,7 +5619,7 @@ class WSLCTests
 
             // Close the tty.
             originalTty.reset();
-            attachedTty.reset();
+            attachedTty.Reset();
 
             originalReader.ExpectClosed();
             attachedReader.ExpectClosed();
@@ -5614,22 +5631,22 @@ class WSLCTests
             auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
 
             auto initProcess = container.GetInitProcess();
-            ULONG dummy{};
+            WSLCHandle dummy{};
             VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStdin, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
             VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStdout, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
             VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStderr, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
 
             // Verify that the container can be attached to.
-            wil::unique_handle attachedStdin;
-            wil::unique_handle attachedStdout;
-            wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, (ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            COMOutputHandle attachedStdin{};
+            COMOutputHandle attachedStdout{};
+            COMOutputHandle attachedStderr{};
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
 
-            PartialHandleRead attachedReader(attachedStdout.get());
+            PartialHandleRead attachedReader(attachedStdout.Get());
 
             // Write content on the attached stdin.
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.get(), "OK\n", 3, nullptr, nullptr));
-            attachedStdin.reset();
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.Get(), "OK\n", 3, nullptr, nullptr));
+            attachedStdin.Reset();
 
             attachedReader.Expect("OK\n");
             attachedReader.ExpectClosed();
@@ -5924,8 +5941,9 @@ class WSLCTests
         WSL2_TEST_ONLY();
 
         // Start a blocking export
-        BlockingOperation operation(
-            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); });
+        BlockingOperation operation([&](HANDLE handle) {
+            return m_defaultSession->SaveImage(ToCOMInputHandle(handle), "debian:latest", nullptr, nullptr);
+        });
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
 
@@ -5971,7 +5989,7 @@ class WSLCTests
         ValidateProcessOutput(process, {{1, "OK\n"}});
 
         // Start a blocking export
-        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operation.Complete(); });
 
@@ -5985,11 +6003,11 @@ class WSLCTests
         }
 
         {
-            wil::unique_handle stdoutLogs;
-            wil::unique_handle stderrLogs;
-            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, false));
+            COMOutputHandle stdoutHandle;
+            COMOutputHandle stderrHandle;
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLCLogsFlagsNone, &stdoutHandle, &stderrHandle, 0, 0, false));
 
-            ValidateHandleOutput(stdoutLogs.get(), "OK\n");
+            ValidateHandleOutput(stdoutHandle.Get(), "OK\n");
         }
 
         {
@@ -6002,7 +6020,7 @@ class WSLCTests
 
         {
             // Validate that another export can run.
-            BlockingOperation secondExport([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
+            BlockingOperation secondExport([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); });
             secondExport.Complete();
         }
 
@@ -6020,7 +6038,7 @@ class WSLCTests
         // Validate that SaveImage is aborted when the session terminates.
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
         BlockingOperation operation(
-            [&](HANDLE handle) { return m_defaultSession->SaveImage(HandleToULong(handle), "debian:latest", nullptr, nullptr); }, E_ABORT, true, true);
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(ToCOMInputHandle(handle), "debian:latest", nullptr, nullptr); }, E_ABORT, true, true);
 
         // Terminate the session.
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
@@ -6043,7 +6061,7 @@ class WSLCTests
         });
 
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
-        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); }, E_ABORT, true, true);
+        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); }, E_ABORT, true, true);
 
         // Avoid attempting container delete on scope exit after intentional session termination;
         // rely on the prune scope-exit above to clean up instead.
@@ -6097,11 +6115,12 @@ class WSLCTests
 
             // Validate detaching from an attached tty.
             {
-                wil::unique_handle attachedTty;
-                wil::unique_handle unused;
-                VERIFY_SUCCEEDED(container.Get().Attach(DetachKeys, (ULONG*)&attachedTty, (ULONG*)&unused, (ULONG*)&unused));
+                COMOutputHandle ttyHandle{};
+                COMOutputHandle unusedHandle1{};
+                COMOutputHandle unusedHandle2{};
+                VERIFY_SUCCEEDED(container.Get().Attach(DetachKeys, &ttyHandle, &unusedHandle1, &unusedHandle2));
 
-                validateDetaches(attachedTty.get(), attachedTty.get(), DetachSequence);
+                validateDetaches(ttyHandle.Get(), ttyHandle.Get(), DetachSequence);
             }
 
             // Validate detaching from an exec'd process.
@@ -6139,8 +6158,8 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
 
-            wil::unique_handle unused;
-            VERIFY_ARE_EQUAL(container.Get().Attach("invalid", (ULONG*)&unused, (ULONG*)&unused, (ULONG*)&unused), E_INVALIDARG);
+            COMOutputHandle unusedHandle{};
+            VERIFY_ARE_EQUAL(container.Get().Attach("invalid", &unusedHandle, &unusedHandle, &unusedHandle), E_INVALIDARG);
 
             WSLCProcessLauncher processLauncher({}, {"cat"}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
             processLauncher.SetDetachKeys("invalid");
@@ -6347,5 +6366,28 @@ class WSLCTests
         ValidateRepoParsing("2001:0db8:85a3:0000:0000:8a2e:0370:7334/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "path");
         ValidateRepoParsing(
             "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80/path", "2001:0db8:85a3:0000:0000:8a2e:0370:7334:80", "path");
+    }
+
+    TEST_METHOD(ElevatedTokenCanOpenNonElevatedHandles)
+    {
+        WSL2_TEST_ONLY();
+
+        wil::com_ptr<IWSLCSession> nonElevatedSession;
+
+        {
+            auto nonElevatedToken = GetNonElevatedToken(TokenImpersonation);
+            auto revert = wil::impersonate_token(nonElevatedToken.get());
+
+            nonElevatedSession = CreateSession(GetDefaultSessionSettings(L"non-elevated-session"), WSLCSessionFlagsNone);
+            LoadTestImage("debian:latest", nonElevatedSession.get());
+
+            WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-1", {"echo", "OK"});
+            auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+        }
+
+        WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-2", {"echo", "OK"});
+        auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+        ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 };
