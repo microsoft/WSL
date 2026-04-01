@@ -81,10 +81,7 @@ struct COMOutputHandle : public WSLCHandle
 {
     NON_COPYABLE(COMOutputHandle);
     NON_MOVABLE(COMOutputHandle);
-    COMOutputHandle()
-    {
-        ZeroMemory(&Handle, sizeof(Handle));
-    }
+    COMOutputHandle() = default;
 
     ~COMOutputHandle()
     {
