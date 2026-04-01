@@ -53,10 +53,8 @@ class WSLCE2EContainerAttachTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
-        // Create and start a container in the background with TTY
         auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
         const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
@@ -74,6 +72,11 @@ class WSLCE2EContainerAttachTests
         session.ExpectStdout("hello\r\n");
         session.ExpectStdout(expectedPrompt);
 
+        session.WriteLine("whoami");
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
+        session.ExpectStdout(expectedPrompt);
+
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();
         VERIFY_ARE_EQUAL(0, exitCode);
@@ -83,9 +86,8 @@ class WSLCE2EContainerAttachTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-
         auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
@@ -94,6 +96,10 @@ class WSLCE2EContainerAttachTests
         // Write test data to stdin
         session.WriteLine("test line 1");
         session.WriteLine("test line 2");
+
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY process.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -104,22 +110,20 @@ class WSLCE2EContainerAttachTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Container_Attach_VerboseOption)
+    TEST_METHOD(WSLCE2E_Container_Attach_MissingContainerId)
     {
         WSL2_TEST_ONLY();
-        VerifyContainerIsNotListed(WslcContainerName);
 
-        auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto containerId = result.GetStdoutOneLine();
+        auto result = RunWslc(L"container attach");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
+    }
 
-        auto session = RunWslcInteractive(std::format(L"container attach --verbose {}", containerId));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-        session.WriteLine("verbose attach line");
-        session.CloseStdin();
-        auto exitCode = session.Wait(10000);
-        VERIFY_ARE_EQUAL(0, exitCode);
-        session.VerifyNoErrors();
+    TEST_METHOD(WSLCE2E_Container_Attach_ContainerNotFound)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container attach {}", WslcContainerName));
+        result.Verify({.ExitCode = 1});
     }
 
 private:
@@ -160,7 +164,8 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  -h,--help  Shows help about the selected command\r\n"
+                << L"  --session       Specify the session to use\r\n" //
+                << L"  -h,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }
