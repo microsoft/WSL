@@ -1345,17 +1345,16 @@ WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD
 
     // N.B. COM closes the handle when returning an out parameter.
     // The return value of this method should always be passed to a COM out parameter.
-    HANDLE raw = duplicatedHandle.release();
     switch (Type)
     {
     case WSLCHandleTypeFile:
-        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = raw}};
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File =  duplicatedHandle.release()}};
     case WSLCHandleTypePipe:
-        return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = raw}};
+        return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe =  duplicatedHandle.release()}};
     case WSLCHandleTypeSocket:
-        return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = raw}};
+        return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket =  duplicatedHandle.release()}};
     default:
-        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", Type);
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", static_cast<int>(Type));
     }
 }
 
