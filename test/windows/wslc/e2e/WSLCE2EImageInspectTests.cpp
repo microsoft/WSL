@@ -66,8 +66,8 @@ class WSLCE2EImageInspectTests
 
         auto result = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto jsonOutput = result.GetStdoutOneLine();
-        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectImage>>(jsonOutput.c_str());
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectImage>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         VERIFY_IS_TRUE(inspectData[0].RepoTags.has_value());
         VERIFY_ARE_EQUAL(1u, inspectData[0].RepoTags.value().size());

@@ -458,7 +458,7 @@ void WSLCContainerImpl::CopyTo(IWSLCContainer** Container) const
     THROW_IF_FAILED(m_comWrapper.CopyTo(Container));
 }
 
-void WSLCContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const
+void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -480,8 +480,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, U
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
     {
-        *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(
-            reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE));
+        *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE);
 
         return;
     }
@@ -506,14 +505,11 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, U
 
     m_ioRelay.AddHandles(std::move(handles));
 
-    *Stdin = HandleToULong(
-        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE));
+    *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE);
 
-    *Stdout = HandleToULong(
-        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE));
+    *Stdout = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE);
 
-    *Stderr = HandleToULong(
-        common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE));
+    *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE);
 }
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
@@ -767,7 +763,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
     ReleaseResources();
 }
 
-void WSLCContainerImpl::Export(ULONG OutHandle) const
+void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -782,7 +778,7 @@ void WSLCContainerImpl::Export(ULONG OutHandle) const
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     SocketCodePair = m_dockerClient.ExportContainer(m_id);
 
-    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle, GENERIC_WRITE | SYNCHRONIZE);
+    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
     wsl::windows::common::relay::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
@@ -1344,7 +1340,7 @@ void WSLCContainerImpl::Inspect(LPSTR* Output) const
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
-void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const
+void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -1363,7 +1359,7 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get(), GENERIC_READ | SYNCHRONIZE));
+        *Stdout = common::wslutil::ToCOMOutputHandle(ttyRead.get(), GENERIC_READ | SYNCHRONIZE);
     }
     else
     {
@@ -1376,8 +1372,11 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
 
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE));
-        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get(), GENERIC_READ | SYNCHRONIZE));
+        *Stdout = common::wslutil::ToCOMOutputHandle(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE);
+        *Stderr = common::wslutil::ToCOMOutputHandle(stderrRead.get(), GENERIC_READ | SYNCHRONIZE);
+
+        WI_ASSERT(Stdout->Type == WSLCHandleTypePipe);
+        WI_ASSERT(Stderr->Type == WSLCHandleTypePipe);
     }
 }
 
@@ -1555,13 +1554,13 @@ WSLCContainer::WSLCContainer(WSLCContainerImpl* impl, std::function<void(const W
 {
 }
 
-HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
+HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
 {
     COMServiceExecutionContext context;
 
-    *Stdin = 0;
-    *Stdout = 0;
-    *Stderr = 0;
+    *Stdin = {};
+    *Stdout = {};
+    *Stderr = {};
 
     return CallImpl(&WSLCContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
 }
@@ -1689,20 +1688,20 @@ try
 }
 CATCH_LOG();
 
-HRESULT WSLCContainer::Export(ULONG OutHandle)
+HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCContainerImpl::Export, OutHandle);
+    return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
 
-HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     COMServiceExecutionContext context;
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
 
-    *Stdout = 0;
-    *Stderr = 0;
+    *Stdout = {};
+    *Stderr = {};
 
     return CallImpl(&WSLCContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }

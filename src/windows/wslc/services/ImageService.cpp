@@ -14,8 +14,10 @@ Abstract:
 #include "ImageService.h"
 #include "SessionService.h"
 #include <wslutil.h>
+#include <HandleConsoleProgressBar.h>
 
 using namespace wsl::shared;
+using namespace wsl::windows::common::wslutil;
 
 namespace {
 
@@ -123,7 +125,7 @@ void ImageService::Build(
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
-        .DockerfileHandle = HandleToULong(dockerfileHandle),
+        .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
         .Verbose = verbose,
@@ -158,7 +160,8 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
 
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
-    THROW_IF_FAILED(session.Get()->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
@@ -196,8 +199,15 @@ void ImageService::Push()
 {
 }
 
-void ImageService::Save()
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)
 {
+    wil::unique_hfile outputFile{
+        CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!outputFile);
+
+    wsl::windows::common::HandleConsoleProgressBar progressBar(
+        outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
 }
 
 void ImageService::Tag()

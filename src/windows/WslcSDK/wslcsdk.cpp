@@ -20,6 +20,7 @@ Abstract:
 #include "wslutil.h"
 
 using namespace std::string_view_literals;
+using namespace wsl::windows::common::wslutil;
 
 namespace {
 constexpr uint32_t s_DefaultCPUCount = 2;
@@ -264,6 +265,85 @@ private:
     wsl::windows::common::relay::HandleWrapper m_fileHandle;
     ULONGLONG m_length;
 };
+
+// TODO: Implement Server SKU specific checks
+bool NeedsVirtualMachineServicesInstalled()
+{
+    return !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled();
+}
+
+#define WSLC_API_MIN_VERSION_SUPPORTED 2, 8, 0
+
+bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
+{
+    constexpr auto minimalPackageVersion = std::tuple<uint32_t, uint32_t, uint32_t>{WSLC_API_MIN_VERSION_SUPPORTED};
+    return version.has_value() && version >= minimalPackageVersion;
+}
+
+enum class WslRuntimeState
+{
+    NotInstalled,
+    InstalledWithoutWslcSupport,
+    InstalledWithWslcSupport,
+};
+
+WslRuntimeState CheckWslRuntimeState()
+{
+    auto version = wsl::windows::common::wslutil::GetInstalledPackageVersion();
+
+    if (!version.has_value())
+    {
+        return WslRuntimeState::NotInstalled;
+    }
+
+    return DoesWslRuntimeVersionSupportWslc(version) ? WslRuntimeState::InstalledWithWslcSupport : WslRuntimeState::InstalledWithoutWslcSupport;
+}
+
+std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
+{
+    wil::com_ptr<IWSLCSessionManager> result;
+    HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&result));
+    return {result, hr};
+}
+
+wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
+{
+    auto [result, hr] = CreateSessionManagerRaw();
+
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        WslRuntimeState currentState = CheckWslRuntimeState();
+        THROW_WIN32_IF_MSG(
+            ERROR_NOT_SUPPORTED,
+            currentState == WslRuntimeState::InstalledWithoutWslcSupport,
+            "The currently installed WSL version does not support WSLC.");
+        THROW_HR_IF_MSG(
+            hr,
+            currentState == WslRuntimeState::InstalledWithWslcSupport,
+            "The WSL install appears to be corrupted; session manager class was not registered.");
+    }
+
+    THROW_IF_FAILED(hr);
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(result.get());
+
+    return result;
+}
+
+bool NeedsWslRuntimeInstalled()
+{
+    auto hr = CreateSessionManagerRaw().second;
+
+    if (SUCCEEDED(hr))
+    {
+        return false;
+    }
+    else if (hr == REGDB_E_CLASSNOTREG)
+    {
+        return true;
+    }
+    THROW_HR(hr);
+}
 } // namespace
 
 // SESSION DEFINITIONS
@@ -332,9 +412,7 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
-    wil::com_ptr<IWSLCSessionManager> sessionManager;
-    RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+    wil::com_ptr<IWSLCSessionManager> sessionManager = CreateSessionManager();
 
     auto result = std::make_unique<WslcSessionImpl>();
     WSLCSessionSettings runtimeSettings{};
@@ -1052,7 +1130,7 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1090,7 +1168,7 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcLoadSessionImage(
@@ -1192,9 +1270,21 @@ CATCH_RETURN();
 STDAPI WslcCanRun(_Out_ BOOL* canRun, _Out_ WslcComponentFlags* missingComponents)
 try
 {
-    UNREFERENCED_PARAMETER(canRun);
-    UNREFERENCED_PARAMETER(missingComponents);
-    return E_NOTIMPL;
+    RETURN_HR_IF_NULL(E_POINTER, canRun);
+    RETURN_HR_IF_NULL(E_POINTER, missingComponents);
+
+    *canRun = FALSE;
+    *missingComponents = WSLC_COMPONENT_FLAG_NONE;
+
+    WslcComponentFlags componentCheck = WSLC_COMPONENT_FLAG_NONE;
+
+    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, NeedsVirtualMachineServicesInstalled());
+    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE, NeedsWslRuntimeInstalled());
+
+    *canRun = componentCheck == WSLC_COMPONENT_FLAG_NONE ? TRUE : FALSE;
+    *missingComponents = componentCheck;
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1206,9 +1296,7 @@ try
     static_assert(std::is_trivial_v<WslcVersion>, "WslcVersion must be trivial");
     *version = {};
 
-    wil::com_ptr<IWSLCSessionManager> sessionManager;
-    RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+    wil::com_ptr<IWSLCSessionManager> sessionManager = CreateSessionManager();
 
     WSLCVersion runtimeVersion{};
     RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));

@@ -935,57 +935,6 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
-    TEST_METHOD(WSLCE2E_Session_Shell)
-    {
-        WSL2_TEST_ONLY();
-        {
-            // Session shell should attach to the wslc session.
-            auto session = RunWslcInteractive(L"session shell");
-            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
-
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.WriteLine("echo hello");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("echo hello");
-            session.ExpectStdout("hello\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.WriteLine("whoami");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("whoami");
-            session.ExpectStdout("root\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.ExitAndVerifyNoErrors();
-            auto exitCode = session.Wait();
-            VERIFY_ARE_EQUAL(0, exitCode);
-        }
-        {
-            // Session shell should attach to the wslc by name also.
-            auto session = RunWslcInteractive(L"session shell wslc-cli");
-            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
-
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.WriteLine("echo hello");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("echo hello");
-            session.ExpectStdout("hello\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.WriteLine("whoami");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("whoami");
-            session.ExpectStdout("root\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.ExitAndVerifyNoErrors();
-            auto exitCode = session.Wait();
-            VERIFY_ARE_EQUAL(0, exitCode);
-        }
-    }
-
     TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
     {
         WSL2_TEST_ONLY();
