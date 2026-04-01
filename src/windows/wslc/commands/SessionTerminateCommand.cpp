@@ -35,7 +35,7 @@ std::wstring SessionTerminateCommand::ShortDescription() const
 
 std::wstring SessionTerminateCommand::LongDescription() const
 {
-    return {L"Terminates an active session. The session will be deleted after all references have been released."};
+    return {L"Terminates an active session. If no session is specified, the default session will be terminated."};
 }
 
 void SessionTerminateCommand::ExecuteInternal(CLIExecutionContext& context) const

@@ -148,15 +148,28 @@ Session SessionService::OpenSession(const std::wstring& displayName)
 
 int SessionService::TerminateSession(const std::wstring& displayName)
 {
+    THROW_HR_IF(E_INVALIDARG, displayName.empty());
+
     wil::com_ptr<IWSLCSessionManager> sessionManager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->OpenSessionByName(displayName.c_str(), &session));
+    HRESULT hr = sessionManager->OpenSessionByName(displayName.c_str(), &session);
+    if (FAILED(hr))
+    {
+        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
+        {
+            wslutil::PrintMessage(Localization::MessageWslcSessionNotFound(displayName.c_str()), stderr);
+            return 1;
+        }
+
+        THROW_HR(hr);
+    }
+
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-    HRESULT hr = session->Terminate();
+    hr = session->Terminate();
     if (FAILED(hr))
     {
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
