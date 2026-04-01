@@ -483,7 +483,7 @@ try
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
 
-    auto buildFileHandle = common::wslutil::FromCOMInputHandle(Options->DockerfileHandle);
+    auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
     auto lock = m_lock.lock_shared();
 
@@ -524,7 +524,7 @@ try
     auto io = CreateIOContext();
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{buildFileHandle}, common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+        buildFileHandle.Get(), common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = Options->Verbose;
     std::string allOutput;
@@ -820,7 +820,7 @@ CATCH_RETURN();
 
 void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent)
 {
-    auto userHandle = common::wslutil::FromCOMInputHandle(OutputHandle);
+    auto userHandle = OpenUserHandle(OutputHandle);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -843,7 +843,7 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         io.AddHandle(
             std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, userHandle),
+                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             MultiHandleWait::CancelOnCompleted);
     }
 

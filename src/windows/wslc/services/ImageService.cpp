@@ -17,6 +17,7 @@ Abstract:
 #include <HandleConsoleProgressBar.h>
 
 using namespace wsl::shared;
+using namespace wsl::windows::common::wslutil;
 
 namespace {
 
@@ -160,12 +161,7 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     LARGE_INTEGER fileSize{};
     THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-    WSLCHandle handle;
-    handle.Type = WSLCHandleTypeFile;
-    handle.Handle.File = imageFile.get();
-
-
-    THROW_IF_FAILED(session.Get()->LoadImage(handle, nullptr, fileSize.QuadPart));
+    THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)

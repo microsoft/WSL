@@ -300,7 +300,7 @@ typedef [system_handle(sh_file)] HANDLE FILE_HANDLE;
 typedef [system_handle(sh_pipe)] HANDLE PIPE_HANDLE;
 typedef [system_handle(sh_socket)] HANDLE SOCKET_HANDLE;
 
-typedef [v1_enum] enum _WSLCHandleType
+typedef enum _WSLCHandleType
 {
     WSLCHandleTypeUnknown = 0,
     WSLCHandleTypeFile = 1,

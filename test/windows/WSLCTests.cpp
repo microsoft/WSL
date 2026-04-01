@@ -2673,7 +2673,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, &dummyHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that trying to acquire a std handle that doesn't exist fails as expected.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStderr, &dummyHandle), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(static_cast<WSLCFD>(3), &dummyHandle), E_INVALIDARG);
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             ResetTestSession();
@@ -5575,21 +5575,16 @@ class WSLCTests
             VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLCFDStderr, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
 
             // Verify that the container can be attached to.
-            wil::unique_handle attachedStdin;
-            wil::unique_handle attachedStdout;
-            wil::unique_handle attachedStderr;
-            {
-                COMOutputHandle stdinHandle{};
-                COMOutputHandle stdoutHandle{};
-                COMOutputHandle stderrHandle{};
-                VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
-            }
+            COMOutputHandle attachedStdin{};
+            COMOutputHandle attachedStdout{};
+            COMOutputHandle attachedStderr{};
+            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
 
-            PartialHandleRead attachedReader(attachedStdout.get());
+            PartialHandleRead attachedReader(attachedStdout.Get());
 
             // Write content on the attached stdin.
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.get(), "OK\n", 3, nullptr, nullptr));
-            attachedStdin.reset();
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.Get(), "OK\n", 3, nullptr, nullptr));
+            attachedStdin.Reset();
 
             attachedReader.Expect("OK\n");
             attachedReader.ExpectClosed();

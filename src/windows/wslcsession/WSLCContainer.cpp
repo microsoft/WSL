@@ -463,8 +463,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
     {
-        *Stdin = common::wslutil::ToCOMOutputHandle(
-            reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE);
+        *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE);
 
         return;
     }
@@ -489,14 +488,11 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     m_ioRelay.AddHandles(std::move(handles));
 
-    *Stdin = common::wslutil::ToCOMOutputHandle(
-        reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE);
+    *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE);
 
-    *Stdout = common::wslutil::ToCOMOutputHandle(
-        reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE);
+    *Stdout = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE);
 
-    *Stderr = common::wslutil::ToCOMOutputHandle(
-        reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE);
+    *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE);
 }
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
@@ -750,7 +746,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
     ReleaseResources();
 }
 
-void WSLCContainerImpl::Export(WSLCHandle TarHandle) const
+void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -765,7 +761,7 @@ void WSLCContainerImpl::Export(WSLCHandle TarHandle) const
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     SocketCodePair = m_dockerClient.ExportContainer(m_id);
 
-    auto userHandle = common::wslutil::FromCOMInputHandle(TarHandle);
+    auto userHandle = m_wslcSession.OpenUserHandle(OutHandle);
 
     wsl::windows::common::relay::MultiHandleWait io = m_wslcSession.CreateIOContext();
 
@@ -782,7 +778,7 @@ void WSLCContainerImpl::Export(WSLCHandle TarHandle) const
     else
     {
         io.AddHandle(
-            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle),
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(HandleWrapper{std::move(SocketCodePair.second)}, userHandle.Get()),
             wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted);
     }
 
