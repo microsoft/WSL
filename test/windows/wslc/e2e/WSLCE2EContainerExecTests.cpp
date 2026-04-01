@@ -24,6 +24,10 @@ class WSLCE2EContainerExecTests
 
     TEST_CLASS_SETUP(ClassSetup)
     {
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), HostEnvVariableValue2.c_str()));
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(MissingHostEnvVariableName.c_str(), nullptr));
+
         EnsureImageIsLoaded(DebianImage);
         return true;
     }
@@ -32,12 +36,25 @@ class WSLCE2EContainerExecTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), nullptr));
+        VERIFY_IS_TRUE(::SetEnvironmentVariableW(MissingHostEnvVariableName.c_str(), nullptr));
         return true;
     }
 
     TEST_METHOD_SETUP(TestMethodSetup)
     {
+        EnvTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
+        EnvTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
         EnsureContainerDoesNotExist(WslcContainerName);
+        return true;
+    }
+
+    TEST_METHOD_CLEANUP(TestMethodCleanup)
+    {
+        DeleteFileW(EnvTestFile1.c_str());
+        DeleteFileW(EnvTestFile2.c_str());
         return true;
     }
 
@@ -151,20 +168,151 @@ class WSLCE2EContainerExecTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Container_Exec_VerboseOption)
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvOption)
     {
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        result = RunWslc(std::format(L"container exec --verbose {} echo hello", WslcContainerName));
-        result.Verify({.Stdout = L"hello\n", .Stderr = L"", .ExitCode = 0});
+        result = RunWslc(std::format(L"container exec -e {}=A {} env", HostEnvVariableName, WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=A", HostEnvVariableName)));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_KeyOnly_UsesHostValue)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container exec -e {} {} env", HostEnvVariableName, WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        result.Dump();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvFile)
+    {
+        WSL2_TEST_ONLY();
+
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a", "WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"});
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"));
+    }
+
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_MultipleValues)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(
+            L"container exec -e {}=value-a -e {}=value-b {} env",
+            HostEnvVariableName,
+            HostEnvVariableName2,
+            WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=value-a", HostEnvVariableName)));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=value-b", HostEnvVariableName2)));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_KeyOnly_MultipleValues_UsesHostValues)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(
+            L"container exec -e {} -e {} {} env",
+            HostEnvVariableName,
+            HostEnvVariableName2,
+            WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName2, HostEnvVariableValue2)));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_EmptyValue)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Pass an explicit empty value and verify it is present as KEY=
+        result = RunWslc(std::format(L"container exec -e {}= {} env", HostEnvVariableName, WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=", HostEnvVariableName)));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_MixedWithEnvFile)
+    {
+        WSL2_TEST_ONLY();
+
+        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"});
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(
+            L"container exec -e WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto outputLines = result.GetStdoutLines();
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"));
+        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli"));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MissingFile)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
+        result.Verify(
+            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+
+    // Test environment variables
+    const std::wstring HostEnvVariableName = L"WSLC_TEST_HOST_ENV";
+    const std::wstring HostEnvVariableName2 = L"WSLC_TEST_HOST_ENV2";
+    const std::wstring HostEnvVariableValue = L"wslc-host-env-value";
+    const std::wstring HostEnvVariableValue2 = L"wslc-host-env-value2";
+    const std::wstring MissingHostEnvVariableName = L"WSLC_TEST_MISSING_HOST_ENV";
+
+    // Test environment variable files
+    std::filesystem::path EnvTestFile1;
+    std::filesystem::path EnvTestFile2;
 
     std::wstring GetHelpMessage() const
     {
@@ -191,9 +339,9 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following arguments are available:\r\n"
-                 << L"  container-id    Container ID\r\n"
-                 << L"  command         The command to run\r\n"
-                 << L"  arguments       Arguments to pass to container's init process\r\n"
+                 << L"  container-id      Container ID\r\n"
+                 << L"  command           The command to run\r\n"
+                 << L"  arguments         Arguments to pass to the command being executed inside the container\r\n"
                  << L"\r\n";
         return commands.str();
     }
@@ -206,10 +354,35 @@ private:
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
+                << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
+    }
+
+    void WriteEnvFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines) const
+    {
+        std::ofstream envFile(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+        VERIFY_IS_TRUE(envFile.is_open());
+        for (const auto& line : envVariableLines)
+        {
+            envFile << line << "\n";
+        }
+        VERIFY_IS_TRUE(envFile.good());
+    }
+
+    bool ContainsOutputLine(const std::vector<std::wstring>& outputLines, const std::wstring& expectedLine) const
+    {
+        for (const auto& line : outputLines)
+        {
+            if (line == expectedLine)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 };
 } // namespace WSLCE2ETests
