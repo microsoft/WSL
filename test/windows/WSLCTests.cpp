@@ -1332,7 +1332,7 @@ class WSLCTests
         LPCSTR tag = "wslc-test-build-failure-output:latest";
         WSLCBuildImageOptions options{
             .ContextPath = contextPathStr.c_str(),
-            .DockerfileHandle = HandleToULong(dockerfileHandle.get()),
+            .DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get()),
             .Tags = {&tag, 1},
         };
 
