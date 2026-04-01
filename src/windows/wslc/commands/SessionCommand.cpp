@@ -22,9 +22,9 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> SessionCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
-    commands.reserve(2);
     commands.push_back(std::make_unique<SessionListCommand>(FullName()));
     commands.push_back(std::make_unique<SessionShellCommand>(FullName()));
+    commands.push_back(std::make_unique<SessionTerminateCommand>(FullName()));
     return commands;
 }
 

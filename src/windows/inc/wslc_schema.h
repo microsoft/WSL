@@ -101,4 +101,21 @@ struct InspectImage
         InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config);
 };
 
+struct InspectVhdVolume
+{
+    std::string HostPath;
+    uint64_t SizeBytes{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVhdVolume, HostPath, SizeBytes);
+};
+
+struct InspectVolume
+{
+    std::string Name;
+    std::string Type;
+    std::optional<InspectVhdVolume> VhdVolume;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVolume, Name, Type, VhdVolume);
+};
+
 } // namespace wsl::windows::common::wslc_schema

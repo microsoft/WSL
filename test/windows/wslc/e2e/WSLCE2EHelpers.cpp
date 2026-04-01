@@ -12,6 +12,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "SessionModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -331,5 +332,29 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
 
     auto loadResult = RunWslc(loadCommand);
     loadResult.Verify({.Stderr = L"", .ExitCode = 0});
+}
+
+void EnsureSessionIsTerminated(const std::wstring& sessionName)
+{
+    std::wstring targetSession = sessionName;
+    if (targetSession.empty())
+    {
+        targetSession = std::wstring{wsl::windows::wslc::models::SessionOptions::GetDefaultSessionName()};
+    }
+
+    auto listResult = RunWslc(L"session list");
+    listResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+    auto stdoutLines = listResult.GetStdoutLines();
+    for (const auto& line : stdoutLines)
+    {
+        // Check if the line ends with the target session name
+        if (line.size() >= targetSession.size() && line.compare(line.size() - targetSession.size(), targetSession.size(), targetSession) == 0)
+        {
+            auto result = RunWslc(std::format(L"session terminate \"{}\"", targetSession));
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
 }
 } // namespace WSLCE2ETests
