@@ -40,8 +40,15 @@ enum class Setting : size_t
     SessionStorageSizeMb,
     SessionStoragePath,
     SessionNetworkingMode,
+    SessionHostFileShareMode,
 
     Max
+};
+
+enum class HostFileShareMode
+{
+    Plan9,
+    VirtioFs
 };
 
 namespace details {
@@ -68,11 +75,12 @@ namespace details {
         static std::optional<value_t> Validate(const yaml_t& value);               \
     };
 
-    DEFINE_SETTING_MAPPING(SessionCpuCount,       uint32_t,    uint32_t,           4,                             "session.cpuCount")
-    DEFINE_SETTING_MAPPING(SessionMemoryMb,       std::string, uint32_t,           2048,                          "session.memorySize")
-    DEFINE_SETTING_MAPPING(SessionStorageSizeMb,  std::string, uint32_t,           102400,                        "session.maxStorageSize")
-    DEFINE_SETTING_MAPPING(SessionStoragePath,    std::string, std::wstring,       {},                            "session.defaultStoragePath")
-    DEFINE_SETTING_MAPPING(SessionNetworkingMode, std::string, WSLCNetworkingMode, WSLCNetworkingModeVirtioProxy, "session.networkingMode")
+    DEFINE_SETTING_MAPPING(SessionCpuCount,          uint32_t,    uint32_t,           4,                             "session.cpuCount")
+    DEFINE_SETTING_MAPPING(SessionMemoryMb,          std::string, uint32_t,           2048,                          "session.memorySize")
+    DEFINE_SETTING_MAPPING(SessionStorageSizeMb,     std::string, uint32_t,           102400,                        "session.maxStorageSize")
+    DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::wstring,       {},                            "session.defaultStoragePath")
+    DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode, WSLCNetworkingModeVirtioProxy, "session.networkingMode")
+    DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,  HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on
