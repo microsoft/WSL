@@ -217,22 +217,6 @@ wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
     return inspectData[0];
 }
 
-namespace VT {
-    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste)
-    {
-        const auto containerId = InspectContainer(containerNameOrId).Id;
-        const auto shortId = GetHashId(containerId);
-        return BuildContainerPrompt(shortId, withBracketedPaste);
-    }
-
-    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId)
-    {
-        const auto containerId = InspectContainer(containerNameOrId).Id;
-        const auto shortId = GetHashId(containerId);
-        return BuildContainerAttachPrompt(shortId);
-    }
-} // namespace VT
-
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     auto listResult = RunWslc(L"container list --no-trunc --all");
