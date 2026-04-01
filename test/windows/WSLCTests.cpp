@@ -6451,12 +6451,15 @@ class WSLCTests
             LoadTestImage("debian:latest", nonElevatedSession.get());
 
             WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-1", {"echo", "OK"});
-            auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+            auto container = launcher.Launch(*nonElevatedSession);
+            auto initProcess = container.GetInitProcess();
             ValidateProcessOutput(initProcess, {{1, "OK\n"}});
         }
 
         WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-2", {"echo", "OK"});
-        auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+        auto container = launcher.Launch(*nonElevatedSession);
+        auto initProcess = container.GetInitProcess();
+
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 };
