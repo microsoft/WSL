@@ -11,4 +11,7 @@
 
     <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
 
+    <ItemGroup>
+            <Compile Include="$(MSBuildThisFileDirectory)Microsoft.WSL.Containers.Interop.cs" />
+    </ItemGroup>
 </Project>
