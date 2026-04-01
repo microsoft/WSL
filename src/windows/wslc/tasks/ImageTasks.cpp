@@ -19,7 +19,7 @@ Abstract:
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "PullImageCallback.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include "Task.h"
 #include <format>
 
@@ -94,13 +94,20 @@ void ListImages(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        // Create table with or without column limits based on --no-trunc flag
+        auto table = trunc ? wsl::windows::wslc::TableOutput<2>(
+                                 {{{L"NAME", {Config::NoLimit, 20, false}}, {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<2>({L"NAME", L"SIZE"});
+
         for (const auto& image : images)
         {
-            tablePrinter.AddRow({MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
+            table.OutputLine({MultiByteToWide(image.Name), std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))});
         }
 
-        tablePrinter.Print();
+        table.Complete();
         break;
     }
     default:
