@@ -188,10 +188,12 @@ endif()
 
 if (${TARGET_PLATFORM} STREQUAL "x64")
     add_compile_definitions(_AMD64_)
+    set(DISTRO_HOSTTYPE x86_64)
 endif()
 
 if (${TARGET_PLATFORM} STREQUAL "arm64")
     add_compile_definitions(_ARM64_)
+    set(DISTRO_HOSTTYPE aarch64)
 endif()
 
 add_definitions(/sdl) # Default-initialize class members
@@ -214,6 +216,7 @@ add_compile_definitions(UNICODE
                         WSL_PACKAGE_VERSION_MAJOR=${PACKAGE_VERSION_MAJOR}
                         WSL_PACKAGE_VERSION_MINOR=${PACKAGE_VERSION_MINOR}
                         WSL_PACKAGE_VERSION_REVISION=${PACKAGE_VERSION_REVISION}
+                        DISTRO_HOSTTYPE="${DISTRO_HOSTTYPE}"
                         WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS})
 
 if (${OFFICIAL_BUILD})

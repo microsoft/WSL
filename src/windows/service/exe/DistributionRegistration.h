@@ -107,7 +107,7 @@ namespace Property {
 
     inline DistributionPropertyWithDefault<std::vector<std::string>> DefaultEnvironment{
         L"DefaultEnvironment",
-        {"HOSTTYPE=" LXSS_DISTRO_HOSTTYPE,
+        {"HOSTTYPE=" DISTRO_HOSTTYPE,
          "LANG=en_US.UTF-8",
          "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games",
          "TERM=xterm-256color"}};
