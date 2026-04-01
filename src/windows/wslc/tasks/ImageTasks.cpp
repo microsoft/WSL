@@ -98,7 +98,8 @@ void ListImages(CLIExecutionContext& context)
         using Config = wsl::windows::wslc::ColumnWidthConfig;
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
-        // Create table with or without column limits based on --no-trunc flag
+        // Create table — only IMAGE ID uses fixed width; other columns auto-size.
+        // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
         auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
                                  {{{L"REPOSITORY", {Config::NoLimit, Config::NoLimit, false}},
                                    {L"TAG", {Config::NoLimit, Config::NoLimit, false}},

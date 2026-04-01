@@ -148,7 +148,7 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
 
         // Parse the image reference, but handle dangling images like "<none>:<none>"
         std::string imageRef = image.Image;
-        if (imageRef.find("<none>") != std::string::npos)
+        if (imageRef == "<none>:<none>")
         {
             info.Repository = "<none>";
             info.Tag = "<none>";
