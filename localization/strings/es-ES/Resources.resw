@@ -967,7 +967,7 @@ Revirtiendo a las redes NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallNoArguments" xml:space="preserve">
-    <value>{} does not take any arguments. To unregister a distribution, use {} instead.</value>
+    <value>{} no toma ningún argumento. Para anular el registro de una distribución, use {} en su lugar.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
@@ -1918,7 +1918,7 @@ Uso:
   wslc --help</value>
     <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaSessionNotFound" xml:space="preserve">
+  <data name="MessageWslcSessionNotFound" xml:space="preserve">
     <value>No se encontró la sesión: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1926,31 +1926,31 @@ Uso:
     <value>Dirección IP “{}” no válida</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
+  <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>Error de OpenSessionByName("{}")</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>No se encontraron sesiones WSLA.</value>
+  <data name="MessageWslcNoSessionsFound" xml:space="preserve">
+    <value>No WSLC sessions found.</value>
   </data>
-  <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>Se encontró la sesión de WSLA {}{}:</value>
+  <data name="MessageWslcSessionsFound" xml:space="preserve">
+    <value>Found {} WSLC session{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaShellExited" xml:space="preserve">
+  <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} salió con: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaHeaderId" xml:space="preserve">
+  <data name="MessageWslcHeaderId" xml:space="preserve">
     <value>Id.</value>
   </data>
-  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
+  <data name="MessageWslcHeaderCreatorPid" xml:space="preserve">
     <value>PID de creador</value>
   </data>
-  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
+  <data name="MessageWslcHeaderDisplayName" xml:space="preserve">
     <value>Nombre para mostrar</value>
   </data>
-  <data name="MessageWslaUnknownCommand" xml:space="preserve">
+  <data name="MessageWslcUnknownCommand" xml:space="preserve">
     <value>Comando desconocido: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -2080,11 +2080,11 @@ Uso:
 Para obtener información de privacidad sobre este producto, visita https://aka.ms/privacy.</value>
      <comment>Copyright notice and privacy link</comment>
   </data>
-  <data name="MessageWslaInvalidImage" xml:space="preserve">
+  <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Imagen no válida: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidName" xml:space="preserve">
+  <data name="MessageWslcInvalidName" xml:space="preserve">
     <value>Nombre no válido: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -2092,19 +2092,19 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>La ruta de acceso no es absoluta: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeNotFound" xml:space="preserve">
+  <data name="MessageWslcVolumeNotFound" xml:space="preserve">
     <value>Volumen no encontrado: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeOptions" xml:space="preserve">
+  <data name="MessageWslcInvalidVolumeOptions" xml:space="preserve">
     <value>Opciones de volumen no válidas: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeType" xml:space="preserve">
+  <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Tipo de volumen no compatible: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeInUse" xml:space="preserve">
+  <data name="MessageWslcVolumeInUse" xml:space="preserve">
     <value>El volumen '{}' está en uso.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

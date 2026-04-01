@@ -285,3 +285,13 @@ std::string wsl::windows::common::string::WideToMultiByte(_In_ std::wstring_view
 {
     return WideToMultiByte(Source.data(), Source.length());
 }
+
+std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
+{
+    return TruncateIdImpl(id, shortenLength);
+}
+
+std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, bool shortenLength)
+{
+    return TruncateIdImpl(id, shortenLength);
+}

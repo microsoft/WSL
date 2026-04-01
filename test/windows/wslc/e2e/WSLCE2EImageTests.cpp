@@ -75,6 +75,7 @@ private:
                  << L"  list     List images.\r\n"
                  << L"  load     Load images.\r\n"
                  << L"  pull     Pull images.\r\n"
+                 << L"  save     Save images.\r\n"
                  << L"\r\n"
                  << L"For more details on a specific command, pass it the help argument. [-h]\r\n"
                  << L"\r\n";

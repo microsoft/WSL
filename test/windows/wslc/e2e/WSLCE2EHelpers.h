@@ -97,7 +97,37 @@ const TestImage& DebianTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
-void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
+struct TestSession
+{
+    static TestSession Create(const std::wstring& displayName, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone);
+
+    TestSession(std::wstring name, std::filesystem::path storagePath, wil::com_ptr<IWSLCSession> session) :
+        m_name(std::move(name)), m_storagePath(std::move(storagePath)), m_session(std::move(session))
+    {
+    }
+
+    ~TestSession();
+
+    NON_COPYABLE(TestSession);
+    NON_MOVABLE(TestSession);
+
+    const std::wstring& Name() const
+    {
+        return m_name;
+    }
+
+    const std::filesystem::path& StoragePath() const
+    {
+        return m_storagePath;
+    }
+
+private:
+    std::wstring m_name;
+    std::filesystem::path m_storagePath;
+    wil::com_ptr<IWSLCSession> m_session;
+};
+
+void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 
@@ -107,9 +137,10 @@ wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring&
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
-void EnsureImageIsLoaded(const TestImage& image);
+void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
+void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
@@ -122,7 +153,7 @@ void VerifyContainerIsNotListed(
     {
         wsl::shared::retry::RetryWithTimeout<void>(
             [&containerNameOrId]() {
-                auto result = RunWslc(L"container list --all");
+                auto result = RunWslc(L"container list --no-trunc --all");
                 result.Verify({.Stderr = L"", .ExitCode = 0});
 
                 auto outputLines = result.GetStdoutLines();

@@ -22,10 +22,12 @@ cpp_quote("#endif")
 
 #define WSLC_MAX_CONTAINER_NAME_LENGTH 255
 #define WSLC_MAX_IMAGE_NAME_LENGTH 255
+#define WSLC_MAX_VOLUME_NAME_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
+cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 
 typedef
@@ -107,12 +109,6 @@ interface IProgressCallback : IUnknown
 {
     HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
-
-typedef struct _WslcRegistryAuthInformation
-{
-    int Dummy; // Dummy value for the .idl file to compile.
-    // TODO: Details TBD.
-} WslcRegistryAuthInformation;
 
 typedef struct _WSLCImageInformation
 {
@@ -296,6 +292,35 @@ typedef struct _WSLCContainerEntry
     WSLCContainerState State;
 } WSLCContainerEntry;
 
+typedef [system_handle(sh_file)] HANDLE FILE_HANDLE;
+typedef [system_handle(sh_pipe)] HANDLE PIPE_HANDLE;
+typedef [system_handle(sh_socket)] HANDLE SOCKET_HANDLE;
+
+typedef enum _WSLCHandleType
+{
+    WSLCHandleTypeUnknown = 0,
+    WSLCHandleTypeFile = 1,
+    WSLCHandleTypePipe = 2,
+    WSLCHandleTypeSocket = 3
+} WSLCHandleType;
+
+typedef struct _WSLCHandle
+{
+    WSLCHandleType Type;
+
+    [switch_type(WSLCHandleType), switch_is(Type)]
+    union
+    {
+        [case(WSLCHandleTypeFile)]
+        FILE_HANDLE File;
+        [case(WSLCHandleTypePipe)]
+        PIPE_HANDLE Pipe;
+        [case(WSLCHandleTypeSocket)]
+        SOCKET_HANDLE Socket;
+        [default];
+    } Handle;
+} WSLCHandle;
+
 typedef enum _WSLCProcessState
 {
     WslcProcessStateUnknown = 0,
@@ -313,7 +338,8 @@ interface IWSLCProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
     HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
-    HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
+    HRESULT GetStdHandle([in] WSLCFD Fd, [out] WSLCHandle* Handle);
+    HRESULT GetFlags([out] WSLCProcessFlags* Flags);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] WSLCProcessState* State, [out] int* Code);
     HRESULT ResizeTty([in] ULONG Rows, [in] ULONG Columns);
@@ -392,7 +418,7 @@ typedef struct _WSLCSessionSettings {
     WSLCNetworkingMode NetworkingMode;
     [unique] ITerminationCallback* TerminationCallback;
     WSLCFeatureFlags FeatureFlags;
-    ULONG DmesgOutput;
+    WSLCHandle DmesgOutput;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
@@ -422,19 +448,20 @@ typedef enum _WSLCDeleteFlags
 ]
 interface IWSLCContainer : IUnknown
 {
-    HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
+    HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] WSLCHandle* StdIn, [out] WSLCHandle* StdOut, [out] WSLCHandle* StdErr);
     HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
     HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] LPCSTR DetachKeys);
     HRESULT Delete([in] WSLCDeleteFlags Flags);
-    HRESULT Export([in] ULONG TarHandle);
+    HRESULT Export([in] WSLCHandle TarHandle);
     HRESULT GetState([out] WSLCContainerState* State);
     HRESULT GetInitProcess([out] IWSLCProcess** Process);
     HRESULT Exec([in, ref] const WSLCProcessOptions* Options, [in, unique] LPCSTR DetachKeys, [out] IWSLCProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT Logs([in] WSLCLogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
+    HRESULT Kill([in] WSLCSignal Signal);
 }
 
 typedef enum _WSLCDeletedImageType
@@ -466,7 +493,7 @@ typedef struct _WSLCDeleteImageOptions
 typedef struct _WSLCBuildImageOptions
 {
     LPCWSTR ContextPath;
-    ULONG DockerfileHandle;
+    WSLCHandle DockerfileHandle;
     WSLCStringArray Tags;
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
     BOOL Verbose; // Show all build progress including internal steps and all statuses.
@@ -485,6 +512,12 @@ typedef struct _WSLCVolumeOptions
     LPCSTR Type;
     [unique] LPCSTR Options;
 } WSLCVolumeOptions;
+
+typedef struct _WSLCVolumeInformation
+{
+    char Name[WSLC_MAX_VOLUME_NAME_LENGTH + 1];
+    char Type[64];
+} WSLCVolumeInformation;
 
 typedef struct _WSLCContainerPruneFilter
 {
@@ -531,11 +564,11 @@ interface IWSLCSession : IUnknown
     HRESULT GetState([out] WSLCSessionState* State);
 
     // Image management.
-    HRESULT PullImage([in] LPCSTR Image, [in, unique] const  WslcRegistryAuthInformation* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
+    HRESULT PullImage([in] LPCSTR Image, [in, unique] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT BuildImage([in] const WSLCBuildImageOptions* Options, [in, unique] IProgressCallback* ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
+    HRESULT LoadImage([in] WSLCHandle ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT ImportImage([in] WSLCHandle ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT SaveImage([in] WSLCHandle OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, unique, system_handle(sh_event)] HANDLE CancelEvent);
     HRESULT ListImages([in, unique] const WSLCListImageOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
@@ -576,6 +609,8 @@ interface IWSLCSession : IUnknown
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options);
     HRESULT DeleteVolume([in] LPCSTR Name);
+    HRESULT ListVolumes([out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
+    HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 }
 
 //

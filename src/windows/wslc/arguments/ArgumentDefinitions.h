@@ -36,15 +36,15 @@ Abstract:
 _(All,            "all",                 L"a",              Kind::Flag,        L"Show all regardless of state.") \
 _(Attach,         "attach",              L"a",              Kind::Flag,        Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,       "build-arg",           NO_ALIAS,          Kind::Value,       L"Set build-time variables (KEY=VALUE)") \
-_(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       L"Write the container ID to the provided path.") \
+/*_(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       L"Write the container ID to the provided path.")*/ \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L"The command to run") \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Force,          "force",               L"f",              Kind::Flag,        L"Delete containers even if they are running") \
 _(Detach,         "detach",              L"d",              Kind::Flag,        L"Run container in detached mode") \
-_(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       L"IP address of the DNS nameserver in resolv.conf") \
-_(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       L"Set the default DNS Domain") \
-_(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       L"Set DNS options") \
-_(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       L"Set DNS search domains") \
+/*_(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       L"IP address of the DNS nameserver in resolv.conf")*/ \
+/*_(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       L"Set the default DNS Domain")*/ \
+/*_(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       L"Set DNS options")*/ \
+/*_(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       L"Set DNS search domains")*/ \
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       L"Specifies the container init process executable") \
 _(Env,            "env",                 L"e",              Kind::Value,       L"Key=Value pairs for environment variables") \
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       L"File containing key=value pairs of env variables") \
@@ -52,32 +52,34 @@ _(File,           "file",                L"f",              Kind::Value,       L
 _(Follow,         "follow",              L"f",              Kind::Flag,        L"Follow log output") \
 _(Format,         "format",              NO_ALIAS,          Kind::Value,       L"Output formatting (json or table) (Default:table)") \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L"Arguments to pass to container's init process") \
-_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       L"Group Id for the process") \
+/*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       L"Group Id for the process")*/ \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(ImageForce,     "force",               L"f",              Kind::Flag,        L"Delete images even if they are being used") \
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  L"Image name") \
 _(Input,          "input",               L"i",              Kind::Value,       L"Provides path to the tar archive file containing the image") \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       L"Name of the container") \
-_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container") \
+/*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container")*/ \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        L"Do not delete untagged parents") \
+_(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        L"Do not truncate output") \
+_(Output,         "output",              L"o",              Kind::Value,       L"Path for the saved image") \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  L"Path to the build context directory") \
-_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       L"Progress type (format: none|ansi) (default: ansi)") \
+/*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       L"Progress type (format: none|ansi) (default: ansi)")*/ \
 _(Publish,        "publish",             L"p",              Kind::Value,       L"Publish a port from a container to host") \
-_(Pull,           "pull",                NO_ALIAS,          Kind::Value,       L"Image pull policy (always|missing|never) (default:never)") \
+/*_(Pull,           "pull",                NO_ALIAS,          Kind::Value,       L"Image pull policy (always|missing|never) (default:never)")*/ \
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        L"Outputs the container IDs only") \
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        L"Remove the container after it stops") \
-_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       L"Use this scheme for registry connection") \
+/*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       L"Use this scheme for registry connection")*/ \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  L"Session ID") \
 _(Signal,         "signal",              L"s",              Kind::Value,       L"Signal to send (default: SIGKILL)") \
 _(Tag,            "tag",                 L"t",              Kind::Value,       L"Tag for the built image") \
 _(Time,           "time",                L"t",              Kind::Value,       L"Time in seconds to wait before executing (default 5)") \
-_(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       L"Mount tmpfs to the container at the given path") \
+/*_(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       L"Mount tmpfs to the container at the given path")*/ \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        L"Open a TTY with the container process.") \
-_(User,           "user",                L"u",              Kind::Value,       L"User ID for the process (name|uid|uid:gid)") \
+/*_(User,           "user",                L"u",              Kind::Value,       L"User ID for the process (name|uid|uid:gid)")*/ \
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details") \
 _(Version,        "version",             L"v",              Kind::Flag,        L"Show version information for this tool") \
-_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container") \
+/*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container")*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       L"Bind mount a volume to the container") \
 // clang-format on
