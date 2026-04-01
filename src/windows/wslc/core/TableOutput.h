@@ -85,6 +85,8 @@ struct ColumnDefinition
 template <size_t FieldCount>
 struct TableOutput
 {
+    static_assert(FieldCount > 0, "TableOutput requires at least one column");
+
     using header_t = std::array<std::wstring, FieldCount>;
     using line_t = std::array<std::wstring, FieldCount>;
     using column_config_t = std::array<ColumnWidthConfig, FieldCount>;
