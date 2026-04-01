@@ -566,29 +566,29 @@ try
                 char addrBuf[INET6_ADDRSTRLEN]{};
                 switch (internalPort.windowsAddress->ss_family)
                 {
-                    case AF_INET:
-                    {
-                        const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
+                case AF_INET:
+                {
+                    const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
 
-                        THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
+                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
 
-                        convertedPort.Family = AF_INET;
-                        break;
-                    }
+                    convertedPort.Family = AF_INET;
+                    break;
+                }
 
-                    case AF_INET6:
-                    {
-                        const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
+                case AF_INET6:
+                {
+                    const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
 
-                        THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
+                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
 
-                        convertedPort.Family = AF_INET6;
-                        break;
-                    }
+                    convertedPort.Family = AF_INET6;
+                    break;
+                }
 
-                    default:
-                        // Reject unsupported or malformed address families
-                        THROW_HR(E_INVALIDARG);
+                default:
+                    // Reject unsupported or malformed address families
+                    THROW_HR(E_INVALIDARG);
                 }
                 bindingAddressStrings[i] = addrBuf;
                 convertedPort.BindingAddress = bindingAddressStrings[i].c_str();
