@@ -58,7 +58,7 @@ This will generate a `wsl.sln` file that you can build either with Visual Studio
 Build parameters:
 
 - `cmake . -A arm64`: Build a package for ARM64
-- `cmake . -DCMAKE_BUILD_TYPE=Release`: Build for release
+- `cmake . -DCMAKE_BUILD_TYPE=Release` and then `cmake --build . --config Release`: Build for release
 - `cmake . -DBUILD_BUNDLE=TRUE`: Build a bundle msix package (requires building ARM64 first)
 
 Note: To build and deploy faster during development, see options in `UserConfig.cmake`.
