@@ -2621,6 +2621,10 @@ class WSLCTests
 
             VERIFY_IS_TRUE(std::equal(largeBuffer.begin(), largeBuffer.end(), result.Output[1].begin(), result.Output[1].end()));
             VERIFY_ARE_EQUAL(result.Output[2], "completed\n");
+
+            // Validate that a null out handle is rejected.
+
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(WSLCFDStdout, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
 
         // Create a stuck process and kill it.
@@ -5446,6 +5450,9 @@ class WSLCTests
 
             // Start the container.
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsAttach, nullptr));
+
+            // Verify that trying to attach with null handles fails.
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
 
             // Get its original std handles.
             auto process = container->GetInitProcess();
