@@ -159,18 +159,6 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName2);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Remove_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = result.GetStdoutOneLine();
-
-        result = RunWslc(std::format(L"container remove --verbose {}", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-    }
-
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";

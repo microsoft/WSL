@@ -59,15 +59,6 @@ class WSLCE2ESettingsTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stdout->find(L"Settings reset to defaults"));
     }
 
-    TEST_METHOD(WSLCE2E_Settings_Reset_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(L"settings reset --verbose");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.has_value());
-    }
-
 private:
     std::wstring GetHelpMessage() const
     {

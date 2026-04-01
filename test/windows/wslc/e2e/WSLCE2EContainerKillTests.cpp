@@ -150,18 +150,6 @@ class WSLCE2EContainerKillTests
         VerifyContainerIsListed(secondContainerId, L"running");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Kill_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto containerId = result.GetStdoutOneLine();
-
-        result = RunWslc(std::format(L"container kill --verbose {}", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-    }
-
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";

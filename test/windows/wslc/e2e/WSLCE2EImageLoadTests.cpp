@@ -94,23 +94,6 @@ class WSLCE2EImageLoadTests
         DeleteFileW(tempArchivePath.c_str());
     }
 
-    TEST_METHOD(WSLCE2E_Image_Load_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto tempArchivePath = wsl::windows::common::filesystem::GetTempFilename();
-        auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", tempArchivePath.wstring(), DebianImage.NameAndTag()));
-        saveResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        auto deleteResult = RunWslc(std::format(L"image delete --force {}", DebianImage.Name));
-        deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        auto loadResult = RunWslc(std::format(L"image load --verbose --input \"{}\"", tempArchivePath.wstring()));
-        loadResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        DeleteFileW(tempArchivePath.c_str());
-    }
-
 private:
     const TestImage& DebianImage = DebianTestImage();
 

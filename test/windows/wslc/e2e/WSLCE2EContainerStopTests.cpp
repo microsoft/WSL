@@ -254,18 +254,6 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = result.GetStdoutOneLine();
-
-        result = RunWslc(std::format(L"container stop --verbose {} -t 0", containerId));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-    }
-
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";

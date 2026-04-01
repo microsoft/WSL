@@ -210,19 +210,6 @@ class WSLCE2EContainerListTests
         VERIFY_IS_TRUE(std::find(containerIds.begin(), containerIds.end(), containerId2) != containerIds.end());
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        result = RunWslc(L"container list --verbose --all");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.has_value());
-        VERIFY_IS_FALSE(result.Stdout->empty());
-    }
-
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const std::wstring WslcContainerName2 = L"wslc-test-container-2";

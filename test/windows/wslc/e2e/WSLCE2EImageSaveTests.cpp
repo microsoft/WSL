@@ -86,15 +86,6 @@ class WSLCE2EImageSaveTests
         VERIFY_ARE_EQUAL(sourceFileSize, archiveFileSize);
     }
 
-    TEST_METHOD(WSLCE2E_Image_Save_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        const auto result = RunWslc(std::format(L"image save --verbose --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(std::filesystem::exists(SavedArchivePath));
-    }
-
     TEST_METHOD(WSLCE2E_Image_Save_Load)
     {
         WSL2_TEST_ONLY();

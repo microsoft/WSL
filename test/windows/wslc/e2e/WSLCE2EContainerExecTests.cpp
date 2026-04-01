@@ -124,13 +124,14 @@ class WSLCE2EContainerExecTests
     TEST_METHOD(WSLCE2E_Container_Exec_InteractiveTTY)
     {
         WSL2_TEST_ONLY();
-
+        VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
 
         const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
 
-        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", WslcContainerName));
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
         session.ExpectStdout(expectedPrompt);
@@ -138,6 +139,11 @@ class WSLCE2EContainerExecTests
         session.WriteLine("echo hello");
         session.ExpectCommandEcho("echo hello");
         session.ExpectStdout("hello\r\n");
+        session.ExpectStdout(expectedPrompt);
+
+        session.WriteLine("whoami");
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
         session.ExpectStdout(expectedPrompt);
 
         session.ExitAndVerifyNoErrors();
@@ -148,16 +154,21 @@ class WSLCE2EContainerExecTests
     TEST_METHOD(WSLCE2E_Container_Exec_InteractiveNoTTY)
     {
         WSL2_TEST_ONLY();
-
+        VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
 
-        auto session = RunWslcInteractive(std::format(L"container exec -i {} cat", WslcContainerName));
+        auto session = RunWslcInteractive(std::format(L"container exec -i {} cat", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
         // Write test data to stdin
         session.WriteLine("test line 1");
         session.WriteLine("test line 2");
+
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY process.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -173,10 +184,10 @@ class WSLCE2EContainerExecTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec -e {}=A {} env", HostEnvVariableName, WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=A", HostEnvVariableName)));
@@ -187,13 +198,12 @@ class WSLCE2EContainerExecTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec -e {} {} env", HostEnvVariableName, WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
-        result.Dump();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
     }
 
@@ -204,10 +214,10 @@ class WSLCE2EContainerExecTests
         WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a", "WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a"));
@@ -220,14 +230,14 @@ class WSLCE2EContainerExecTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(
             L"container exec -e {}=value-a -e {}=value-b {} env",
             HostEnvVariableName,
             HostEnvVariableName2,
             WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=value-a", HostEnvVariableName)));
@@ -239,14 +249,14 @@ class WSLCE2EContainerExecTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(
             L"container exec -e {} -e {} {} env",
             HostEnvVariableName,
             HostEnvVariableName2,
             WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
@@ -258,11 +268,11 @@ class WSLCE2EContainerExecTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Pass an explicit empty value and verify it is present as KEY=
         result = RunWslc(std::format(L"container exec -e {}= {} env", HostEnvVariableName, WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=", HostEnvVariableName)));
@@ -275,11 +285,11 @@ class WSLCE2EContainerExecTests
         WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(
             L"container exec -e WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a"));
@@ -292,7 +302,7 @@ class WSLCE2EContainerExecTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
         result.Verify(
@@ -307,14 +317,14 @@ class WSLCE2EContainerExecTests
         WriteEnvFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_EXEC_ENV_FILE_MULTI_D=file2-d"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(
             L"container exec --env-file {} --env-file {} {} env",
             EscapePath(EnvTestFile1.wstring()),
             EscapePath(EnvTestFile2.wstring()),
             WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_MULTI_A=file1-a"));
@@ -330,7 +340,7 @@ class WSLCE2EContainerExecTests
         WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_VALID=ok", "BAD KEY=value"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
@@ -344,7 +354,7 @@ class WSLCE2EContainerExecTests
         WriteEnvFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_DUP=from-file-2"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Later --env-file wins
         result = RunWslc(std::format(
@@ -352,7 +362,7 @@ class WSLCE2EContainerExecTests
             EscapePath(EnvTestFile1.wstring()),
             EscapePath(EnvTestFile2.wstring()),
             WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_DUP=from-file-2"));
@@ -363,7 +373,7 @@ class WSLCE2EContainerExecTests
             EscapePath(EnvTestFile1.wstring()),
             EscapePath(EnvTestFile2.wstring()),
             WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_DUP=from-cli"));
@@ -376,10 +386,10 @@ class WSLCE2EContainerExecTests
         WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_EQUALS=value=with=equals"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_EQUALS=value=with=equals"));

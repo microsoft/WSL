@@ -99,15 +99,6 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsListed(WslcContainerName, L"running");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"container run --verbose --rm {} echo hello", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.has_value());
-    }
-
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();

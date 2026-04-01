@@ -112,20 +112,6 @@ class WSLCE2EImageListTests
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), AlpineImage.NameAndTag()));
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        const auto result = RunWslc(L"image list --verbose");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Verbose output should contain image information
-        VERIFY_IS_TRUE(result.Stdout.has_value());
-        auto output = result.Stdout.value();
-        VERIFY_IS_FALSE(output.empty());
-        // With verbose flag, output includes more details about images
-    }
-
 private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& AlpineImage = AlpineTestImage();

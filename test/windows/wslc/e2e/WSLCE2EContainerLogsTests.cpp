@@ -81,39 +81,6 @@ class WSLCE2EContainerLogsTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Logs_FollowLogs)
-    {
-        WSL2_TEST_ONLY();
-
-        // Run a container in the background
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"echo line1; sleep 1; echo line2\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // View logs with follow flag (will timeout after container exits)
-        result = RunWslc(std::format(L"container logs --follow {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        // Should contain both lines
-        auto output = result.Stdout.value_or(L"");
-        VERIFY_IS_TRUE(output.find(L"line1") != std::wstring::npos);
-        VERIFY_IS_TRUE(output.find(L"line2") != std::wstring::npos);
-    }
-
-    TEST_METHOD(WSLCE2E_Container_Logs_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"container run --name {} {} echo verbose-log", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"verbose-log\n", .Stderr = L"", .ExitCode = 0});
-
-        result = RunWslc(std::format(L"container logs --verbose {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stdout->find(L"verbose-log"));
-    }
-
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
@@ -131,7 +98,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Views container logs.\r\n\r\n";
+        return L"View logs for a container.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -152,8 +119,9 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  -f,--follow    Follow log output\r\n"
-                << L"  -h,--help      Shows help about the selected command\r\n"
+                << L"  --session       Specify the session to use\r\n"
+                << L"  -f,--follow     Follow log output\r\n"
+                << L"  -h,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

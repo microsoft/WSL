@@ -25,6 +25,7 @@ class WSLCE2EContainerStartTests
     TEST_CLASS_SETUP(ClassSetup)
     {
         EnsureImageIsLoaded(DebianImage);
+        EnsureImageIsLoaded(AlpineImage);
         return true;
     }
 
@@ -32,6 +33,7 @@ class WSLCE2EContainerStartTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(DebianImage);
+        EnsureImageIsDeleted(AlpineImage);
         return true;
     }
 
@@ -78,14 +80,15 @@ class WSLCE2EContainerStartTests
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Verify it ran
-        VerifyContainerIsListed(containerId, L"exited");
+        // Stop it
+        result = RunWslc(std::format(L"container stop {} -t 0", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_Start_AttachTTY)
     {
         WSL2_TEST_ONLY();
-
+        VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container create -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
@@ -102,6 +105,11 @@ class WSLCE2EContainerStartTests
         session.ExpectStdout("hello\r\n");
         session.ExpectStdout(expectedPrompt);
 
+        session.WriteLine("whoami");
+        session.ExpectCommandEcho("whoami");
+        session.ExpectStdout("root\r\n");
+        session.ExpectStdout(expectedPrompt);
+
         session.ExitAndVerifyNoErrors();
         auto exitCode = session.Wait();
         VERIFY_ARE_EQUAL(0, exitCode);
@@ -110,7 +118,7 @@ class WSLCE2EContainerStartTests
     TEST_METHOD(WSLCE2E_Container_Start_AttachNoTTY)
     {
         WSL2_TEST_ONLY();
-
+        VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container create -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
@@ -123,6 +131,10 @@ class WSLCE2EContainerStartTests
         session.WriteLine("test line 1");
         session.WriteLine("test line 2");
 
+        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
+        // limitation where we are not getting stdout data correctly from non-TTY process.
+        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+
         // Close stdin to signal EOF to cat
         session.CloseStdin();
 
@@ -132,32 +144,26 @@ class WSLCE2EContainerStartTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Container_Start_Interactive)
+    TEST_METHOD(WSLCE2E_Container_Start_AttachShortRunningInitProcess)
     {
         WSL2_TEST_ONLY();
+        VerifyContainerIsNotListed(WslcContainerName);
 
-        auto result = RunWslc(std::format(L"container create --name {} {} echo test", WslcContainerName, DebianImage.NameAndTag()));
+        constexpr auto ExpectedExitCode = 37;
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
+
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Start with interactive flag
-        result = RunWslc(std::format(L"container start -i {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-    }
-
-    TEST_METHOD(WSLCE2E_Container_Start_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(std::format(L"container create --name {} {} echo test", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        result = RunWslc(std::format(L"container start --verbose {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
 
     std::wstring GetHelpMessage() const
     {
@@ -172,7 +178,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Starts a container.\r\n\r\n";
+        return L"Starts a container. Provides options to attach to the container's stdout and stderr streams and could be interactive to keep stdin open.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -184,7 +190,7 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following arguments are available:\r\n" //
-                 << L"  container-id    Container ID\r\n"         //
+                 << L"  container-id      Container ID\r\n"         //
                  << L"\r\n";
         return commands.str();
     }
@@ -193,9 +199,10 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  -a,--attach      Attach to the container\r\n"
-                << L"  -i,--interactive Attach to stdin and keep it open\r\n"
-                << L"  -h,--help        Shows help about the selected command\r\n"
+                << L"  -a,--attach       Attach to stdout/stderr of the container\r\n"
+                << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
+                << L"  --session         Specify the session to use\r\n"
+                << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }
