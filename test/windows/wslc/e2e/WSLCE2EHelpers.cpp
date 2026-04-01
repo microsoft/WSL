@@ -165,7 +165,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
 
 void VerifyImageIsUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"container list -a");
+    auto result = RunWslc(L"container list --no-trunc --all");
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
