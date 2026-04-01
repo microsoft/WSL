@@ -1034,6 +1034,15 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_VerboseOption)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container create --verbose --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout.has_value());
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
