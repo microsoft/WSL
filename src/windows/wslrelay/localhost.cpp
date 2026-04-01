@@ -545,7 +545,6 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& Ports, const GUID& Vm
             CATCH_LOG();
         }
     }
-
 }
 
 struct MessageReader
@@ -554,7 +553,6 @@ struct MessageReader
     NON_MOVABLE(MessageReader);
 
     MessageReader() = default;
-
 
     void Start()
     {
