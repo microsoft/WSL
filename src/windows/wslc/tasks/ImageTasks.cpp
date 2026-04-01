@@ -19,7 +19,7 @@ Abstract:
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "PullImageCallback.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include "Task.h"
 #include <format>
 
@@ -51,7 +51,7 @@ void BuildImage(CLIExecutionContext& context)
     bool verbose = context.Args.Contains(ArgType::Verbose);
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -88,19 +88,26 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(images);
+        auto json = ToJson(images, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        // Create table with or without column limits based on --no-trunc flag
+        auto table = trunc ? wsl::windows::wslc::TableOutput<2>(
+                                 {{{L"NAME", {Config::NoLimit, 20, false}}, {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<2>({L"NAME", L"SIZE"});
+
         for (const auto& image : images)
         {
-            tablePrinter.AddRow({MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
+            table.OutputLine({MultiByteToWide(image.Name), std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))});
         }
 
-        tablePrinter.Print();
+        table.Complete();
         break;
     }
     default:
@@ -161,7 +168,18 @@ void InspectImages(CLIExecutionContext& context)
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
+}
+
+void SaveImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    WI_ASSERT(context.Args.Contains(ArgType::Output));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto& output = context.Args.Get<ArgType::Output>();
+    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
 }
 } // namespace wsl::windows::wslc::task

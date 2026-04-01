@@ -19,12 +19,12 @@ Abstract:
 #include "ContainerTasks.h"
 #include "SessionModel.h"
 #include "SessionService.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
-using namespace wsl::shared::string;
+using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
@@ -75,7 +75,7 @@ void InspectContainers(CLIExecutionContext& context)
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
 }
 
@@ -131,17 +131,29 @@ void ListContainers(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(containers);
+        auto json = ToJson(containers, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        // Create table with or without column limits based on --no-trunc flag
+        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
+                                 {{{L"CONTAINER ID", {Config::NoLimit, 12, false}},
+                                   {L"NAME", {Config::NoLimit, 20, true}},
+                                   {L"IMAGE", {Config::NoLimit, 20, false}},
+                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"STATUS", {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<5>({L"CONTAINER ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
+
+        // Add each container as a row
         for (const auto& container : containers)
         {
-            tablePrinter.AddRow({
-                MultiByteToWide(container.Id),
+            table.OutputLine({
+                MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
                 ContainerService::FormatRelativeTime(container.CreatedAt),
@@ -149,7 +161,7 @@ void ListContainers(CLIExecutionContext& context)
             });
         }
 
-        tablePrinter.Print();
+        table.Complete();
         break;
     }
     default:
@@ -281,7 +293,7 @@ void StartContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     const auto& id = WideToMultiByte(context.Args.Get<ArgType::ContainerId>());
-    ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
+    context.ExitCode = ContainerService::Start(context.Data.Get<Data::Session>(), id, context.Args.Contains(ArgType::Attach));
 }
 
 void StopContainers(CLIExecutionContext& context)

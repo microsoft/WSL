@@ -18,8 +18,8 @@ Abstract:
 
 using wsl::windows::service::wslc::WSLCProcess;
 
-WSLCProcess::WSLCProcess(std::unique_ptr<WSLCProcessControl>&& Control, std::unique_ptr<WSLCProcessIO>&& Io) :
-    m_control(std::move(Control)), m_io(std::move(Io))
+WSLCProcess::WSLCProcess(std::shared_ptr<WSLCProcessControl> Control, std::unique_ptr<WSLCProcessIO>&& Io, WSLCProcessFlags Flags) :
+    m_control(std::move(Control)), m_io(std::move(Io)), m_flags(Flags)
 {
 }
 
@@ -39,23 +39,36 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCProcess::GetStdHandle(ULONG Index, ULONG* Handle)
+HRESULT WSLCProcess::GetStdHandle(WSLCFD Fd, WSLCHandle* Handle)
 try
 {
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_io, "Process IO not attached");
 
-    auto handle = m_io->OpenFd(Index);
+    auto handle = m_io->OpenFd(Fd);
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !handle.is_valid());
 
-    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(handle.get()));
+    DWORD Access = SYNCHRONIZE;
+
+    WI_SetFlagIf(Access, GENERIC_WRITE, Fd == WSLCFDTty || Fd == WSLCFDStdin);
+    WI_SetFlagIf(Access, GENERIC_READ, Fd == WSLCFDStdout || Fd == WSLCFDStderr || Fd == WSLCFDTty);
+
+    *Handle = common::wslutil::ToCOMOutputHandle(handle.get(), Access);
 
     WSL_LOG(
         "GetStdHandle",
-        TraceLoggingValue(Index, "fd"),
+        TraceLoggingValue(static_cast<int>(Fd), "fd"),
         TraceLoggingValue(handle.get(), "handle"),
-        TraceLoggingValue(*Handle, "remoteHandle"));
+        TraceLoggingValue(static_cast<int>(Handle->Type), "type"));
 
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCProcess::GetFlags(WSLCProcessFlags* Flags)
+try
+{
+    *Flags = m_flags;
     return S_OK;
 }
 CATCH_RETURN();
