@@ -2452,7 +2452,7 @@ Return Value:
         }
         else if (PollDescriptors[0].revents & POLLIN)
         {
-            auto transaction = channel.StartTransaction();
+            auto transaction = channel.ReceiveTransaction();
             auto [Header, Span] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
             if (Header == nullptr)
             {
@@ -2683,7 +2683,7 @@ Arguments:
 
     Buffer - Supplies the message buffer.
 
-    Channel - Supplies a channel to send the response.
+    SendResult - Supplies a function to send the response.
 
     Config - Supplies the distribution config.
 

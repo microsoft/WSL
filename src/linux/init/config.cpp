@@ -350,7 +350,7 @@ Routine Description:
 
 Arguments:
 
-    ResponseChannel - Supplies channel used to send responses.
+    Transaction - Supplies transaction used to send responses.
 
     InteropChannel - Supplies a channel to the host to be used for create
         process requests.
@@ -632,7 +632,7 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a file descriptor to send the response message.
+    SendResponse - Supplies a function to send the response message.
 
     Buffer - Supplies the message buffer.
 

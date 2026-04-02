@@ -266,7 +266,7 @@ public:
 #ifdef WIN32
                 if (errno == HCS_E_CONNECTION_TIMEOUT)
                 {
-                    THROW_HR_MSG(HCS_E_CONNECTION_TIMEOUT, "Timeout: %d, expected type: %hs, channel: %hs", timeout, ToString(TMessage::Type), m_name);
+                    THROW_HR_MSG(HCS_E_CONNECTION_TIMEOUT, "Timeout: %u, expected type: %hs, channel: %hs", timeout, ToString(TMessage::Type), m_name);
                 }
 #endif
 
@@ -326,7 +326,7 @@ public:
             // Handle transaction messages
             if (header->TransactionStep == static_cast<uint32_t>(TRANSACTION_STEP::NONE))
             {
-                // Skip stale non-transaction messages (Since they are not in the same id range)
+                // Skip stale non-transaction messages
 #ifdef WIN32
                 WSL_LOG(
                     "DiscardStaleNonTransactionMessage",
