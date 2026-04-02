@@ -148,6 +148,7 @@ private:
     std::mutex m_volumesLock;
     std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
     std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>> m_volumes;
+    std::unordered_set<std::string> m_anonymousVolumes; // TODO: Implement proper anonymous volume support.
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;
