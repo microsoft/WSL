@@ -77,8 +77,7 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLCContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerOptions& options)
+static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
 {
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
