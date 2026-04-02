@@ -490,6 +490,9 @@ class WslcSdkTests
         {
             WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr);
 
+            auto cleanup =
+                wil::scope_exit([this]() { WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr); });
+
             wil::unique_handle imageTarFileHandle{CreateFileW(
                 exportedImageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
@@ -506,7 +509,10 @@ class WslcSdkTests
 
         // Positive: import an exported image tar via path and verify the image can be run.
         {
+
             WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr);
+
+            auto cleanup = wil::scope_exit([this]() { WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr); });
 
             VERIFY_SUCCEEDED(WslcImportSessionImageFromFile(m_defaultSession, c_pathImportedImageName, exportedImageTar.c_str(), nullptr, nullptr));
 
