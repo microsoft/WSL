@@ -36,9 +36,10 @@ class WSLCVolumeMountUnitTests
             {LR"(C:\hostPath::ro)", LR"(C:\hostPath)", R"()", true},
             {LR"(C:\hostPath:)", LR"(C:\hostPath)", R"()", false},
             {LR"(C:\hostPath::rw)", LR"(C:\hostPath)", R"()", false},
-            {LR"(C:\hostPath:/containerPath:invalid_mode)", LR"(C:\hostPath:/containerPath)", R"(invalid_mode)", false},
-            {LR"(C:\hostPath:/containerPath:ro:extra)", LR"(C:\hostPath:/containerPath:ro)", R"(extra)", false},
             {LR"(C:\hostPath:/containerPath:)", LR"(C:\hostPath:/containerPath)", R"()", false},
+            {LR"(C:/hostPath:ro)", LR"(C)", R"(/hostPath)", true},
+            {LR"(C:/hostPath)", LR"(C)", R"(/hostPath)", false},
+            {LR"(::)", LR"(:)", R"()", false},
         };
 
         for (const auto& arg : validVolumeArgs)
@@ -66,16 +67,15 @@ class WSLCVolumeMountUnitTests
         }
     }
 
-    TEST_METHOD(VolumeMount_Parse_InvalidPaths)
+    TEST_METHOD(VolumeMount_Parse_InvalidContainerPath)
     {
         // Drive colon gets misinterpreted as the host:container separator,
-        // producing a non-absolute host path. Now caught by host path validation.
+        // producing a non-absolute container path. Caught by container path validation.
         std::vector<std::wstring> invalidPathCases = {
-            LR"(C:\hostPath:ro)", // host='C' (not absolute), container=\hostPath
-            LR"(C:\hostPath)",    // host='C' (not absolute), container=\hostPath
-            LR"(C:/hostPath:ro)", // host='C' (not absolute), container=/hostPath
-            LR"(C:/hostPath)",    // host='C' (not absolute), container=/hostPath
-            LR"(::)",             // host=':' (not absolute)
+            LR"(C:\hostPath:ro)",                          // host='C', container=\hostPath (not absolute)
+            LR"(C:\hostPath)",                             // host='C', container=\hostPath (not absolute)
+            LR"(C:\hostPath:/containerPath:invalid_mode)", // container=invalid_mode (not absolute)
+            LR"(C:\hostPath:/containerPath:ro:extra)",     // container=extra (not absolute)
         };
 
         for (const auto& value : invalidPathCases)
