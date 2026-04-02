@@ -96,14 +96,14 @@ WslCoreInstance::WslCoreInstance(
             THROW_HR_WITH_USER_ERROR(
                 WSL_E_DISTRO_MOUNT_FAILED,
                 wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(
-                    stepInfo, result.Result));
+                    result.Result, stepInfo));
         }
         else
         {
             THROW_HR_WITH_USER_ERROR(
                 WSL_E_DISTRO_START_FAILED,
                 wsl::shared::Localization::MessageDistributionFailedToStart(
-                    stepInfo, result.Result));
+                    result.Result, stepInfo));
         }
     }
 

@@ -10,7 +10,7 @@ Abstract:
 
     Unit tests for distribution start failure diagnostics.
     Validates CreateInstanceStepDescription mapping, error message formatting,
-    and backward-compatibility of the new 3-parameter error messages.
+    and backward-compatibility of the 2-parameter error messages.
 
 --*/
 
@@ -123,7 +123,7 @@ class DiagnosticsTests
         auto stepInfo = std::to_wstring(step) + L" (" + stepDesc + L")";
         constexpr int linuxError = 5; // EIO
 
-        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(stepInfo, linuxError);
+        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(linuxError, stepInfo);
 
         Log::Comment(WEX::Common::String().Format(L"Generic error message: \"%s\"", msg.c_str()));
         VERIFY_IS_FALSE(msg.empty(), L"Error message should not be empty");
@@ -145,7 +145,7 @@ class DiagnosticsTests
         auto stepInfo = std::to_wstring(step) + L" (" + stepDesc + L")";
         constexpr int linuxError = 28; // ENOSPC
 
-        auto msg = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(stepInfo, linuxError);
+        auto msg = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(linuxError, stepInfo);
 
         Log::Comment(WEX::Common::String().Format(L"MountDisk error message: \"%s\"", msg.c_str()));
         VERIFY_IS_FALSE(msg.empty(), L"MountDisk error message should not be empty");
@@ -170,8 +170,8 @@ class DiagnosticsTests
         auto stepInfo = std::to_wstring(step) + L" (" + stepDesc + L")";
         constexpr int linuxError = 5;
 
-        auto generic = wsl::shared::Localization::MessageDistributionFailedToStart(stepInfo, linuxError);
-        auto mountDisk = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(stepInfo, linuxError);
+        auto generic = wsl::shared::Localization::MessageDistributionFailedToStart(linuxError, stepInfo);
+        auto mountDisk = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(linuxError, stepInfo);
 
         VERIFY_ARE_NOT_EQUAL(generic, mountDisk,
                              L"The mount-disk-specific message should differ from the generic one");
@@ -183,12 +183,12 @@ class DiagnosticsTests
 
     TEST_METHOD(ErrorMessageFormatIncludesTwoParameters)
     {
-        // The format accepts (stepInfo, linuxError) where stepInfo is pre-formatted.
-        // Verify by calling with distinctive values and checking all appear.
+        // The format accepts (linuxError, stepInfo) — error code first to match
+        // the original parameter order for non-en-US locale compatibility.
         const std::wstring stepInfo = L"42 (UNIQUE_STEP_SENTINEL)";
         constexpr int linuxError = 7777;
 
-        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(stepInfo, linuxError);
+        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(linuxError, stepInfo);
 
         VERIFY_IS_TRUE(msg.find(L"42") != std::wstring::npos,
                        L"Step number 42 should appear in formatted message");
