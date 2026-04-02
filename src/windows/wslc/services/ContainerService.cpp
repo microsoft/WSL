@@ -68,8 +68,7 @@ static void SetContainerTTYOptions(WSLCProcessOptions& options)
         }
     }
 
-    PrintMessage(L"error: --tty requires stdin or stdout to be a console", stderr);
-    THROW_HR(E_FAIL);
+    THROW_HR_WITH_USER_ERROR(E_FAIL, L"--tty requires stdin or stdout to be a console");
 }
 
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
