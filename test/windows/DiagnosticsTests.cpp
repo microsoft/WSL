@@ -207,11 +207,11 @@ class DiagnosticsTests
         // EINVAL and EUCLEAN (117) at MountDisk step should be treated as
         // disk corruption. This test documents the known error codes so that
         // if the enum or constants change, the test signals the need for review.
-        VERIFY_ARE_EQUAL(EINVAL, 22, L"EINVAL should be 22");
+        VERIFY_ARE_EQUAL(22, EINVAL, L"EINVAL should be 22");
 
         // EUCLEAN is not in the Windows SDK; the code uses literal 117.
         constexpr int EUCLEAN_LINUX = 117;
-        VERIFY_ARE_EQUAL(EUCLEAN_LINUX, 117, L"EUCLEAN should be 117");
+        VERIFY_ARE_EQUAL(117, EUCLEAN_LINUX, L"EUCLEAN should be 117");
     }
 };
 } // namespace DiagnosticsTests
