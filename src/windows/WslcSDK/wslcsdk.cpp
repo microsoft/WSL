@@ -1384,3 +1384,22 @@ try
     return E_NOTIMPL;
 }
 CATCH_RETURN();
+
+EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
+{
+    wil::DLLMain(Instance, Reason, Reserved);
+
+    switch (Reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        wsl::windows::common::wslutil::InitializeWil();
+        WslTraceLoggingInitialize(WslcTelemetryProvider, false);
+        break;
+
+    case DLL_PROCESS_DETACH:
+        WslTraceLoggingUninitialize();
+        break;
+    }
+
+    return TRUE;
+}
