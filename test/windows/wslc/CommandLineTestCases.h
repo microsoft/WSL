@@ -71,8 +71,9 @@ COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L
 COMMAND_LINE_TEST_CASE(L"exec --workdir /app cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec -w /app cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"container exec --workdir /app cont1 sh", L"exec", true)
-COMMAND_LINE_TEST_CASE(L"exec --workdir", L"exec", false)       // Missing value for --workdir
-COMMAND_LINE_TEST_CASE(L"exec cont1 --workdir", L"exec", false) // Invalid argument specifier after container id
+COMMAND_LINE_TEST_CASE(L"exec --workdir", L"exec", false)          // Missing value for --workdir
+COMMAND_LINE_TEST_CASE(L"exec cont1 --workdir", L"exec", false)    // Invalid argument specifier after container id
+COMMAND_LINE_TEST_CASE(L"exec --workdir \"\" cont1 echo Hello", L"exec", false) // Empty working directory
 COMMAND_LINE_TEST_CASE(L"kill cont1 --signal sigkill", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"container kill cont1 -s KILL", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"inspect cont1", L"inspect", true)

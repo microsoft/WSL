@@ -141,6 +141,20 @@ class WSLCCLIExecutionUnitTests
         VERIFY_IS_TRUE(options.WorkingDirectory.empty());
     }
 
+    // Test: Full parse of 'exec --workdir "" cont1 cmd' rejects empty working directory
+    TEST_METHOD(ExecCommand_ParseWorkDirEmptyValue_ThrowsArgumentException)
+    {
+        // Invoke ContainerExecCommand parsing directly with the subcommand arguments it accepts.
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir \"\" cont1 sh");
+
+        ContainerExecCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
     // Test: Full parse of 'exec --workdir /path cont1 cmd' sets WorkingDirectory
     TEST_METHOD(ExecCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
     {

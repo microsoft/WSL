@@ -46,6 +46,16 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
 
+    case ArgType::WorkDir:
+    {
+        const auto& value = execArgs.Get<ArgType::WorkDir>();
+        if (value.empty() || value.find_first_not_of(L" \t") == std::wstring::npos)
+        {
+            throw ArgumentException(std::format(L"Invalid {} argument value: working directory cannot be empty or whitespace", m_name));
+        }
+        break;
+    }
+
     default:
         break;
     }
