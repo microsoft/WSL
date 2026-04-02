@@ -1518,7 +1518,7 @@ class WSLCTests
 
     TEST_METHOD(AnonymousVolumes)
     {
-        // TODO: Add more test coverage once anonymous volume are fully supported and switch to using -v instead of building an image.
+        // TODO: Add more test coverage once anonymous volumes are fully supported and switch to using -v instead of building an image.
 
         WSL2_TEST_ONLY();
 
