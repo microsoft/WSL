@@ -49,7 +49,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Session),
         // Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
-        // Argument::Create(ArgType::User),
+        Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, false, NO_LIMIT),
         // Argument::Create(ArgType::Virtual),
     };

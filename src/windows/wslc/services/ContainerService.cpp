@@ -135,6 +135,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetEntrypoint(std::move(entrypoints));
     }
 
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        containerLauncher.SetUser(std::move(user));
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
@@ -414,9 +420,14 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLCProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
 
-    ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
+    auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        processLauncher.SetUser(std::move(user));
+    }
+
+    return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
