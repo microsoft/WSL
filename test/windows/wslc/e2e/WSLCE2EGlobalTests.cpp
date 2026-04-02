@@ -413,9 +413,9 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following commands are available:\r\n"
-                 << L"  container  Container command.\r\n"
-                 << L"  image      Image command.\r\n"
-                 << L"  session    Session command.\r\n"
+                 << L"  container  Manage containers.\r\n"
+                 << L"  image      Manage images.\r\n"
+                 << L"  session    Manage sessions.\r\n"
                  << L"  settings   Open the settings file in the default editor.\r\n"
                  << L"  attach     Attach to a container.\r\n"
                  << L"  build      Build an image from a Dockerfile.\r\n"

@@ -57,7 +57,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Image command.\r\n\r\n";
+        return L"Manage container images, including building, pulling, listing, and removing them.\r\n\r\n";
     }
 
     std::wstring GetUsage() const

@@ -58,7 +58,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Container command for demonstration purposes.\r\n\r\n";
+        return L"Manage the lifecycle of WSL containers, including creating, starting, stopping, and removing them.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
