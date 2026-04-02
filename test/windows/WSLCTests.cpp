@@ -376,8 +376,7 @@ class WSLCTests
         }
     }
 
-    std::pair<HRESULT, wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation>> DeleteImageNoThrow(
-        const std::string& Image, DWORD Flags)
+    std::pair<HRESULT, wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation>> DeleteImageNoThrow(const std::string& Image, DWORD Flags)
     {
         WSLCDeleteImageOptions options{};
         options.Image = Image.c_str();
@@ -463,9 +462,8 @@ class WSLCTests
         auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
             VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
 
-            auto cleanup = wil::scope_exit([&]() {
-                LOG_IF_FAILED(DeleteImageNoThrow(ExpectedTag.value_or(Image), WSLCDeleteImageFlagsForce).first);
-            });
+            auto cleanup = wil::scope_exit(
+                [&]() { LOG_IF_FAILED(DeleteImageNoThrow(ExpectedTag.value_or(Image), WSLCDeleteImageFlagsForce).first); });
 
             if (!ExpectedTag.has_value())
             {
@@ -882,9 +880,8 @@ class WSLCTests
     {
         WSL2_TEST_ONLY();
 
-        auto cleanup = wil::scope_exit([&]() {
-            LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first);
-        });
+        auto cleanup =
+            wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
 
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         wil::unique_handle imageTarFileHandle{
@@ -951,8 +948,7 @@ class WSLCTests
 
         // Test delete failed if image in use.
         VERIFY_ARE_EQUAL(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
-            DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
 
         // Force should succeed.
         auto deletedImages = DeleteImage("alpine:latest", WSLCDeleteImageFlagsForce);
@@ -963,9 +959,7 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
 
         // Test delete failed if image does not exist.
-        VERIFY_ARE_EQUAL(
-            WSLC_E_IMAGE_NOT_FOUND,
-            DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsForce).first);
+        VERIFY_ARE_EQUAL(WSLC_E_IMAGE_NOT_FOUND, DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsForce).first);
     }
 
     void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected)
@@ -1150,7 +1144,6 @@ class WSLCTests
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-large:latest", WSLCDeleteImageFlagsForce).first);
-
 
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
