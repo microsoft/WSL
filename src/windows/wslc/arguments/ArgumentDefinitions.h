@@ -72,6 +72,7 @@ _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        L
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       L"Use this scheme for registry connection")*/ \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  L"Session ID") \
+_(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
 _(Signal,         "signal",              L"s",              Kind::Value,       L"Signal to send (default: SIGKILL)") \
 _(Tag,            "tag",                 L"t",              Kind::Value,       L"Tag for the built image") \
 _(Time,           "time",                L"t",              Kind::Value,       L"Time in seconds to wait before executing (default 5)") \
