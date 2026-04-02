@@ -14,5 +14,4 @@ target_link_libraries(wslinstall
                       common
                       legacy_stdio_definitions
                       Crypt32.lib
-                      sfc.lib
-                      rstrtmgr.lib)
+                      sfc.lib)

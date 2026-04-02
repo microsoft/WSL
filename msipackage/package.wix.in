@@ -399,14 +399,6 @@
             Execute="deferred"
          />
 
-        <CustomAction Id="StopDeviceHostSurrogate"
-            Impersonate="no"
-            BinaryRef="wslinstall.dll"
-            DllEntry="StopDeviceHostSurrogate"
-            Return="check"
-            Execute="deferred"
-         />
-
         <CustomAction Id="DeprovisionMsix"
             Impersonate="no"
             BinaryRef="wslinstall.dll"
@@ -495,11 +487,6 @@
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
 
-            <!-- Terminate the dllhost.exe surrogate hosting wsldevicehost.dll so the DLL can be overwritten when installing files.
-                 Must run after StopService (which stops WSLService) but before InstallFiles.
-                 Conditioned on '(not UPGRADINGPRODUCTCODE)' so it does not run in the old product's removal sequence during major upgrades. -->
-            <Custom Action="StopDeviceHostSurrogate" Before="InstallFiles" Condition='(not UPGRADINGPRODUCTCODE)' />
-
             <!-- Must run before InstallServices or else we'll fail if wslservice already exists.
                  Covers cases where:
                  - The MSI package is installed for the first time and the old MSIX needs to be removed
@@ -565,7 +552,7 @@
         <!-- Force all applications to exit during upgrade.
              See: https://learn.microsoft.com/en-us/windows/win32/msi/msirmshutdown
         -->
-        <Property Id="MSIRMSHUTDOWN" Value="0" Secure="yes" />
+        <Property Id="MSIRMSHUTDOWN" Value="1" Secure="yes" />
     </Package>
 </Wix>
 
