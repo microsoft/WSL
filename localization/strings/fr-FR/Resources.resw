@@ -1050,26 +1050,7 @@ Retour à la mise en réseau NAT.</value>
     <value>Échec du démarrage de distribution. Code d’erreur : {}, étape d’échec : {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionFailedToStartMountDisk" xml:space="preserve">
-    <value>The distribution failed to start because WSL could not mount the distribution's virtual disk. Failure step: {}. Linux error code: {}.
-Check the distribution's disk and any disk-related settings in .wslconfig, such as 'swapFile', before trying again.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}{Locked="swapFile"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageCreateInstanceStepFormatDisk" xml:space="preserve">
-    <value>format the distribution's virtual disk</value>
-  </data>
-  <data name="MessageCreateInstanceStepMountDisk" xml:space="preserve">
-    <value>mount the distribution's virtual disk</value>
-  </data>
-  <data name="MessageCreateInstanceStepLaunchDistribution" xml:space="preserve">
-    <value>launch the distribution</value>
-  </data>
-  <data name="MessageCreateInstanceStepRunTar" xml:space="preserve">
-    <value>complete distribution import</value>
-  </data>
-  <data name="MessageCreateInstanceStepUnknown" xml:space="preserve">
-    <value>start the distribution</value>
-  </data>    <data name="MessageDiskCorrupted" xml:space="preserve">
+  <data name="MessageDiskCorrupted" xml:space="preserve">
     <value>Échec du démarrage de la distribution, car son disque virtuel est endommagé.</value>
   </data>
   <data name="MessageConfigKeyDuplicated" xml:space="preserve">

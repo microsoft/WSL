@@ -1046,7 +1046,7 @@ Falling back to NAT networking.</value>
   <data name="MessageDistributionFailedToStartMountDisk" xml:space="preserve">
     <value>The distribution failed to start because WSL could not mount the distribution's virtual disk. Failure step: {}. Linux error code: {}.
 Check the distribution's disk and any disk-related settings in .wslconfig, such as 'swapFile', before trying again.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}{Locked="swapFile"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCreateInstanceStepFormatDisk" xml:space="preserve">
     <value>format the distribution's virtual disk</value>
