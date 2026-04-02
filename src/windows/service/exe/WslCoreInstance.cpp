@@ -60,8 +60,6 @@ WslCoreInstance::WslCoreInstance(
         }
     }
 
-    const auto stepDescription = CreateInstanceStepDescription(result.FailureStep);
-    const auto stepInfo = std::to_wstring(static_cast<int>(result.FailureStep)) + L" (" + stepDescription + L")";
     WSL_LOG(
         "CreateInstanceGuestResult",
         TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
@@ -69,12 +67,13 @@ WslCoreInstance::WslCoreInstance(
         TraceLoggingValue(m_runtimeId, "vmId"),
         TraceLoggingValue(result.Result, "linuxError"),
         TraceLoggingValue(static_cast<int>(result.FailureStep), "failureStep"),
-        TraceLoggingValue(stepDescription.c_str(), "failureStepDescription"),
         TraceLoggingValue(result.Pid, "pid"),
         TraceLoggingValue(result.ConnectPort, "connectPort"));
 
     if (result.Result != 0)
     {
+        const auto stepDescription = CreateInstanceStepDescription(result.FailureStep);
+        const auto stepInfo = std::to_wstring(static_cast<int>(result.FailureStep)) + L" (" + stepDescription + L")";
         WSL_LOG(
             "CreateInstanceGuestFailure",
             TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
