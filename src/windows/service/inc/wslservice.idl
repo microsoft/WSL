@@ -95,7 +95,7 @@ cpp_quote("#define LXSS_DISTRO_VERSION_2 2")
 cpp_quote("#define LXSS_DISTRO_VERSION_CURRENT LXSS_DISTRO_VERSION_2")
 cpp_quote("#define LXSS_DISTRO_USES_WSL_FS(DistroVersion) (DistroVersion >= LXSS_DISTRO_VERSION_2)")
 
-cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=x86_64\0LANG=en_US.UTF-8\0PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games\0TERM=xterm-256color\0\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=\" DISTRO_HOSTTYPE \"\\0LANG=en_US.UTF-8\\0PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games\\0TERM=xterm-256color\\0\"")
 
 cpp_quote("#define LXSS_DISTRO_DEFAULT_KERNEL_COMMAND_LINE \"BOOT_IMAGE=/kernel init=/init\"")
 

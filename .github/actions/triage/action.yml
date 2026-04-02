@@ -21,14 +21,17 @@ runs:
       - name: 'Run WTI'
         shell: pwsh
         env: 
+            INPUT_COMMENT: "${{ inputs.comment }}"
+            INPUT_ISSUE: "${{ inputs.issue }}"
+            INPUT_TOKEN: "${{ inputs.token }}"
             previous_body: "${{ inputs.previous_body }}"
         run: |
             $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
             
             $maybe_comment = @()
-            if (![string]::IsNullOrEmpty("${{ inputs.comment }}"))
+            if (![string]::IsNullOrEmpty($env:INPUT_COMMENT))
             {
-                $maybe_comment = @("--comment", "${{ inputs.comment }}")
+                $maybe_comment = @("--comment", $env:INPUT_COMMENT)
             }
             
             $maybe_previous_body = @()
@@ -40,4 +43,4 @@ runs:
             
             curl.exe -L https://github.com/OneBlue/wti/releases/download/v0.1.12/wti.exe -o triage/wti.exe
             
-            cd triage && .\wti.exe --issue ${{ inputs.issue }} --config config.yml --github-token "${{ inputs.token }}" --ignore-tags @maybe_comment @maybe_previous_body
+            cd triage && .\wti.exe --issue $env:INPUT_ISSUE --config config.yml --github-token $env:INPUT_TOKEN --ignore-tags @maybe_comment @maybe_previous_body
