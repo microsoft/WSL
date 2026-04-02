@@ -127,16 +127,13 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
 
     // Create a non-persistent session: lifetime is tied to our COM reference.
     auto session = SessionService::CreateSession(options);
-
     wsl::windows::common::wslutil::PrintMessage(std::format(L"Created session: {}", displayName), stderr);
+
+    const std::string shell = "/bin/sh";
+    wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};
 
     wsl::windows::common::ConsoleState console;
     const auto windowSize = console.GetWindowSize();
-
-    const std::string shell = "/bin/sh";
-
-    wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};
-
     launcher.SetTtySize(windowSize.Y, windowSize.X);
 
     return ConsoleService::AttachToCurrentConsole(launcher.Launch(*session.Get()));
