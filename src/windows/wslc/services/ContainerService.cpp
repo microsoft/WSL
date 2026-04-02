@@ -166,6 +166,11 @@ static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping&
 
 std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
+    if (timestamp == 0)
+    {
+        return L"";
+    }
+
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
     constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
