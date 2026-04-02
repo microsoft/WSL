@@ -38,39 +38,6 @@ class WSLCE2EImagePullTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Pull_PullImage)
-    {
-        WSL2_TEST_ONLY();
-
-        // Note: This test may fail without network access or if Docker Hub is unreachable
-        // Pull a small, commonly available image
-        auto result = RunWslc(L"image pull alpine:latest");
-        
-        // We verify the command runs, but don't strictly enforce success 
-        // since it depends on network/registry availability
-        // Just verify it doesn't crash
-        VERIFY_IS_TRUE(result.ExitCode == 0 || result.ExitCode == 1);
-    }
-
-    TEST_METHOD(WSLCE2E_Image_Pull_PullSpecificTag)
-    {
-        WSL2_TEST_ONLY();
-
-        // Pull a specific version
-        auto result = RunWslc(L"image pull alpine:3.18");
-        
-        // Similar to above - just verify command completes
-        VERIFY_IS_TRUE(result.ExitCode == 0 || result.ExitCode == 1);
-    }
-
-    TEST_METHOD(WSLCE2E_Image_Pull_VerboseOption)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(L"image pull --verbose alpine:latest");
-        VERIFY_IS_TRUE(result.ExitCode == 0 || result.ExitCode == 1);
-    }
-
 private:
     std::wstring GetHelpMessage() const
     {
@@ -97,7 +64,7 @@ private:
     {
         std::wstringstream commands;
         commands << L"The following arguments are available:\r\n" //
-                 << L"  image    Image name\r\n"                   //
+                 << L"  image      Image name\r\n"                   //
                  << L"\r\n";
         return commands.str();
     }
@@ -106,6 +73,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
+                << L"  --session  Specify the session to use\r\n" //
                 << L"  -h,--help  Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();

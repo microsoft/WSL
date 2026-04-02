@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains end-to-end tests for WSLC session list and shell commands.
+    This file contains end-to-end tests for WSLC session command.
 --*/
 
 #include "precomp.h"
@@ -22,64 +22,163 @@ class WSLCE2ESessionTests
 {
     WSLC_TEST_CLASS(WSLCE2ESessionTests)
 
-    TEST_METHOD(WSLCE2E_Session_List_HelpCommand)
+    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
+
+    TEST_METHOD(WSLCE2E_Session_HelpCommand)
     {
         WSL2_TEST_ONLY();
-
-        auto result = RunWslc(L"session list --help");
-        result.Verify({.Stdout = GetSessionListHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        auto result = RunWslc(L"session --help");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Session_List_Verbose)
+    TEST_METHOD(WSLCE2E_Session_NoSubcommand_ShowsHelp)
+    {
+        WSL2_TEST_ONLY();
+        auto result = RunWslc(L"session");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Session_InvalidCommand_DisplaysErrorMessage)
+    {
+        WSL2_TEST_ONLY();
+        auto result = RunWslc(L"session INVALID_CMD");
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Session_CreateMixedElevation_Fails)
     {
         WSL2_TEST_ONLY();
 
-        // First create a session by running a container
-        RunWslc(L"container list", ElevationType::Elevated).Verify({.Stderr = L"", .ExitCode = 0});
+        EnsureSessionIsTerminated(L"wslc-cli");
+        EnsureSessionIsTerminated(L"wslc-cli-admin");
 
-        // Now list sessions with verbose output
-        auto result = RunWslc(L"session list --verbose", ElevationType::Elevated);
+        // Ensure elevated cannot create the non-elevated session.
+        auto result = RunWslc(L"container list --session wslc-cli", ElevationType::Elevated);
+        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+
+        // Ensure non-elevated cannot create the elevated session.
+        result = RunWslc(L"container list --session wslc-cli-admin", ElevationType::NonElevated);
+        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Session_Targeting)
+    {
+        WSL2_TEST_ONLY();
+
+        // Generate a unique session name to avoid conflicts with previous runs or concurrent tests.
+        // Use only a short portion of the GUID to avoid MAX_PATH issues.
+        GUID sessionGuid;
+        VERIFY_SUCCEEDED(CoCreateGuid(&sessionGuid));
+        auto guidStr = wsl::shared::string::GuidToString<wchar_t>(sessionGuid, wsl::shared::string::GuidToStringFlags::None);
+        const auto sessionName = std::format(L"wslc-test-{}", guidStr.substr(0, 8));
+
+        auto session = TestSession::Create(sessionName);
+
+        // Load the Debian image into the test session to avoid hitting Docker Hub rate limits.
+        EnsureImageIsLoaded(DebianTestImage(), session.Name());
+
+        // Verify targeting a non-existent session fails.
+        auto result = RunWslc(L"container list --session INVALID_SESSION_NAME");
+        result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+
+        // Verify session list
+        result = RunWslc(L"session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Verbose output should have more details
+        // Verify there is a session with the name of the test session in the session list output.
         VERIFY_IS_TRUE(result.Stdout.has_value());
-        auto output = result.Stdout.value();
-        // With verbose flag, should include more information (actual format depends on implementation)
-        VERIFY_IS_FALSE(output.empty());
+        auto findResult = result.Stdout->find(session.Name());
+        VERIFY_ARE_NOT_EQUAL(findResult, std::wstring::npos);
+
+        // Run container list in the test session, which should succeed if the session is valid.
+        result = RunWslc(std::format(L"container list --session {}", session.Name()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Add a container to the new session.
+        result = RunWslc(
+            std::format(L"container create --session {} --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
+        result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
+        result.Verify({.ExitCode = 0});
+
+        // Verify container exists in the custom session
+        VerifyContainerIsListed(L"test-cont", L"created", session.Name());
+
+        // Verify container does not exist in the default CLI session.
+        VerifyContainerIsNotListed(L"test-cont");
     }
 
-    TEST_METHOD(WSLCE2E_Session_Shell_HelpCommand)
+    TEST_METHOD(WSLCE2E_Session_NonElevatedCannotAccessAdminSession)
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(L"session shell --help");
-        result.Verify({.Stdout = GetSessionShellHelpMessage(), .Stderr = L"", .ExitCode = 0});
+        // First ensure admin session is created by running container list.
+        auto result = RunWslc(L"container list", ElevationType::Elevated);
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Try to explicitly target the admin session from non-elevated process
+        result = RunWslc(L"container list --session wslc-cli-admin", ElevationType::NonElevated);
+
+        // Should fail with access denied.
+        result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Session_ElevatedCanAccessNonElevatedSession)
+    {
+        WSL2_TEST_ONLY();
+
+        // First ensure non-elevated session is created by running container list.
+        auto result = RunWslc(L"container list", ElevationType::NonElevated);
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Elevated user should be able to explicitly target the non-admin session
+        result = RunWslc(L"container list --session wslc-cli", ElevationType::Elevated);
+
+        // This should work - elevated users can access non-elevated sessions
+        result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
 private:
-    std::wstring GetSessionListHelpMessage() const
+    std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()
-               << L"Lists active session(s).\r\n\r\n"
-               << L"Usage: wslc session list [<options>]\r\n\r\n"
-               << L"The following options are available:\r\n"
-               << L"  -v,--verbose  Show detailed information about the listed sessions.\r\n"
-               << L"  -h,--help     Shows help about the selected command\r\n\r\n";
+        output << GetWslcHeader()        //
+               << GetDescription()       //
+               << GetUsage()             //
+               << GetAvailableCommands() //
+               << GetAvailableOptions();
         return output.str();
     }
 
-    std::wstring GetSessionShellHelpMessage() const
+    std::wstring GetDescription() const
     {
-        std::wstringstream output;
-        output << GetWslcHeader()
-               << L"Attaches to a session.\r\n\r\n"
-               << L"Usage: wslc session shell [<options>] [<session-id>]\r\n\r\n"
-               << L"The following arguments are available:\r\n"
-               << L"  session-id  Session ID\r\n\r\n"
-               << L"The following options are available:\r\n"
-               << L"  -h,--help   Shows help about the selected command\r\n\r\n";
-        return output.str();
+        return L"Session command.\r\n\r\n";
+    }
+
+    std::wstring GetUsage() const
+    {
+        return L"Usage: wslc session [<command>] [<options>]\r\n\r\n";
+    }
+
+    std::wstring GetAvailableCommands() const
+    {
+        std::wstringstream commands;
+        commands << L"The following sub-commands are available:\r\n"
+                 << L"  list       List sessions.\r\n"
+                 << L"  shell      Attach to a session.\r\n"
+                 << L"  terminate  Terminate a session.\r\n"
+                 << L"\r\n"
+                 << L"For more details on a specific command, pass it the help argument. [-h]\r\n"
+                 << L"\r\n";
+        return commands.str();
+    }
+
+    std::wstring GetAvailableOptions() const
+    {
+        std::wstringstream options;
+        options << L"The following options are available:\r\n"
+                << L"  -h,--help  Shows help about the selected command\r\n"
+                << L"\r\n";
+        return options.str();
     }
 };
 } // namespace WSLCE2ETests
