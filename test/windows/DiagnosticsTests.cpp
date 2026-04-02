@@ -80,8 +80,8 @@ class DiagnosticsTests
     {
         auto descInit = CreateInstanceStepDescription(LxInitCreateInstanceStepLaunchInit);
         auto descSysDistro = CreateInstanceStepDescription(LxInitCreateInstanceStepLaunchSystemDistro);
-        VERIFY_ARE_EQUAL(descInit, descSysDistro,
-                         L"LaunchInit (0x3) and LaunchSystemDistro (0x3) should map to the same description");
+        VERIFY_ARE_EQUAL(
+            descInit, descSysDistro, L"LaunchInit (0x3) and LaunchSystemDistro (0x3) should map to the same description");
     }
 
     // -----------------------------------------------------------------------
@@ -129,12 +129,10 @@ class DiagnosticsTests
         VERIFY_IS_FALSE(msg.empty(), L"Error message should not be empty");
 
         // The message must contain the step info and the error code as substrings
-        VERIFY_IS_TRUE(msg.find(std::to_wstring(step)) != std::wstring::npos,
-                       L"Message should contain the failure step number");
-        VERIFY_IS_TRUE(msg.find(std::to_wstring(linuxError)) != std::wstring::npos,
-                       L"Message should contain the Linux error code");
-        VERIFY_IS_TRUE(msg.find(stepDesc) != std::wstring::npos,
-                       L"Message should contain the human-readable step description");
+        VERIFY_IS_TRUE(msg.find(std::to_wstring(step)) != std::wstring::npos, L"Message should contain the failure step number");
+        VERIFY_IS_TRUE(
+            msg.find(std::to_wstring(linuxError)) != std::wstring::npos, L"Message should contain the Linux error code");
+        VERIFY_IS_TRUE(msg.find(stepDesc) != std::wstring::npos, L"Message should contain the human-readable step description");
     }
 
     TEST_METHOD(MountDiskErrorMessageContainsWslConfigGuidance)
@@ -151,16 +149,15 @@ class DiagnosticsTests
         VERIFY_IS_FALSE(msg.empty(), L"MountDisk error message should not be empty");
 
         // Must contain .wslconfig and swapFile references for actionable guidance
-        VERIFY_IS_TRUE(msg.find(L".wslconfig") != std::wstring::npos,
-                       L"MountDisk message should mention .wslconfig for actionable guidance");
-        VERIFY_IS_TRUE(msg.find(L"swapFile") != std::wstring::npos,
-                       L"MountDisk message should mention swapFile setting");
+        VERIFY_IS_TRUE(
+            msg.find(L".wslconfig") != std::wstring::npos, L"MountDisk message should mention .wslconfig for actionable guidance");
+        VERIFY_IS_TRUE(msg.find(L"swapFile") != std::wstring::npos, L"MountDisk message should mention swapFile setting");
 
         // Must still contain the error code and step info
-        VERIFY_IS_TRUE(msg.find(std::to_wstring(step)) != std::wstring::npos,
-                       L"MountDisk message should contain the failure step number");
-        VERIFY_IS_TRUE(msg.find(std::to_wstring(linuxError)) != std::wstring::npos,
-                       L"MountDisk message should contain the Linux error code");
+        VERIFY_IS_TRUE(
+            msg.find(std::to_wstring(step)) != std::wstring::npos, L"MountDisk message should contain the failure step number");
+        VERIFY_IS_TRUE(
+            msg.find(std::to_wstring(linuxError)) != std::wstring::npos, L"MountDisk message should contain the Linux error code");
     }
 
     TEST_METHOD(GenericAndMountDiskMessagesAreDifferent)
@@ -173,8 +170,7 @@ class DiagnosticsTests
         auto generic = wsl::shared::Localization::MessageDistributionFailedToStart(linuxError, stepInfo);
         auto mountDisk = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(linuxError, stepInfo);
 
-        VERIFY_ARE_NOT_EQUAL(generic, mountDisk,
-                             L"The mount-disk-specific message should differ from the generic one");
+        VERIFY_ARE_NOT_EQUAL(generic, mountDisk, L"The mount-disk-specific message should differ from the generic one");
     }
 
     // -----------------------------------------------------------------------
@@ -190,12 +186,10 @@ class DiagnosticsTests
 
         auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(linuxError, stepInfo);
 
-        VERIFY_IS_TRUE(msg.find(L"42") != std::wstring::npos,
-                       L"Step number 42 should appear in formatted message");
-        VERIFY_IS_TRUE(msg.find(L"UNIQUE_STEP_SENTINEL") != std::wstring::npos,
-                       L"Step description should appear in formatted message");
-        VERIFY_IS_TRUE(msg.find(L"7777") != std::wstring::npos,
-                       L"Linux error code 7777 should appear in formatted message");
+        VERIFY_IS_TRUE(msg.find(L"42") != std::wstring::npos, L"Step number 42 should appear in formatted message");
+        VERIFY_IS_TRUE(
+            msg.find(L"UNIQUE_STEP_SENTINEL") != std::wstring::npos, L"Step description should appear in formatted message");
+        VERIFY_IS_TRUE(msg.find(L"7777") != std::wstring::npos, L"Linux error code 7777 should appear in formatted message");
     }
 
     // -----------------------------------------------------------------------

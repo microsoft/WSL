@@ -93,16 +93,12 @@ WslCoreInstance::WslCoreInstance(
         {
             wsl::windows::common::ExecutionContext stepContext(wsl::windows::common::Context::MountDisk);
             THROW_HR_WITH_USER_ERROR(
-                WSL_E_DISTRO_MOUNT_FAILED,
-                wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(
-                    result.Result, stepInfo));
+                WSL_E_DISTRO_MOUNT_FAILED, wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(result.Result, stepInfo));
         }
         else
         {
             THROW_HR_WITH_USER_ERROR(
-                WSL_E_DISTRO_START_FAILED,
-                wsl::shared::Localization::MessageDistributionFailedToStart(
-                    result.Result, stepInfo));
+                WSL_E_DISTRO_START_FAILED, wsl::shared::Localization::MessageDistributionFailedToStart(result.Result, stepInfo));
         }
     }
 
