@@ -334,7 +334,7 @@ try
 CATCH_LOG()
 
 void ConfigHandleInteropMessage(
-    wsl::shared::SocketChannel& ResponseChannel,
+    wsl::shared::Transaction& Transaction,
     wsl::shared::SocketChannel& InteropChannel,
     bool Elevated,
     gsl::span<gsl::byte> Message,
@@ -381,7 +381,7 @@ try
 
     case LxInitMessageQueryDrvfsElevated:
     {
-        ResponseChannel.SendResultMessage<bool>(Elevated);
+        Transaction.SendResultMessage<bool>(Elevated);
         break;
     }
 
@@ -397,7 +397,7 @@ try
         auto Value = UtilGetEnvironmentVariable(Query->Buffer);
         wsl::shared::MessageWriter<LX_INIT_QUERY_ENVIRONMENT_VARIABLE> Response(LxInitMessageQueryEnvironmentVariable);
         Response.WriteString(Value);
-        ResponseChannel.SendMessage<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Response.Span());
+        Transaction.Send<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Response.Span());
     }
 
     break;
@@ -405,7 +405,7 @@ try
     case LxInitMessageQueryFeatureFlags:
     {
         assert(Config.FeatureFlags.has_value());
-        ResponseChannel.SendResultMessage<int32_t>(Config.FeatureFlags.value());
+        Transaction.SendResultMessage<int32_t>(Config.FeatureFlags.value());
         break;
     }
 
@@ -419,7 +419,7 @@ try
         }
 
         bool success = false;
-        auto sendResponse = wil::scope_exit([&]() { ResponseChannel.SendResultMessage<bool>(success); });
+        auto sendResponse = wil::scope_exit([&]() { Transaction.SendResultMessage<bool>(success); });
 
         if (!Config.BootInit || Config.InitPid.value_or(0) != getpid())
         {
@@ -435,7 +435,7 @@ try
 
     case LxInitMessageQueryNetworkingMode:
         assert(Config.NetworkingMode.has_value());
-        ResponseChannel.SendResultMessage<uint8_t>(static_cast<uint8_t>(Config.NetworkingMode.value()));
+        Transaction.SendResultMessage<uint8_t>(static_cast<uint8_t>(Config.NetworkingMode.value()));
         break;
 
     case LxInitMessageQueryVmId:
@@ -446,7 +446,7 @@ try
             Response.WriteString(Config.VmId.value());
         }
 
-        ResponseChannel.SendMessage<LX_INIT_QUERY_VM_ID>(Response.Span());
+        Transaction.Send<LX_INIT_QUERY_VM_ID>(Response.Span());
         break;
     }
 
@@ -618,7 +618,7 @@ try
 }
 CATCH_LOG()
 
-int ConfigInitializeInstance(wsl::shared::SocketChannel& Channel, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config)
+int ConfigInitializeInstance(const std::function<void(gsl::span<gsl::byte>&)>& SendResponse, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -923,7 +923,8 @@ try
         Response.WriteString(Response->VersionIndex, Version->c_str());
     }
 
-    Channel.SendMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(Response.Span());
+    auto responseSpan = Response.Span();
+    SendResponse(responseSpan);
 
     //
     // Accept the interop connection.
@@ -973,13 +974,14 @@ try
                     continue;
                 }
 
-                auto [Message, Span] = ClientChannel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+                auto transaction = ClientChannel.ReceiveTransaction();
+                auto [Message, Span] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
                 if (Message == nullptr)
                 {
                     continue;
                 }
 
-                ConfigHandleInteropMessage(ClientChannel, InteropChannel, Elevated, Span, Message, Config);
+                ConfigHandleInteropMessage(transaction, InteropChannel, Elevated, Span, Message, Config);
             }
         });
 
@@ -2186,7 +2188,7 @@ Return Value:
     return Result;
 }
 
-int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::SocketChannel& Channel, const wsl::linux::WslDistributionConfig& Config)
+int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::Transaction& Transaction, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -2207,7 +2209,7 @@ Return Value:
 
 --*/
 {
-    Channel.SendResultMessage<int32_t>(ConfigRemountDrvFsImpl(Buffer, Config));
+    Transaction.SendResultMessage<int32_t>(ConfigRemountDrvFsImpl(Buffer, Config));
 
     return 0;
 }

@@ -86,17 +86,18 @@ public:
         message.WriteString(message->PathIndex, Path);
         gsl::copy(as_bytes(gsl::span(ArgumentsData)), message.InsertBuffer(message->CommandLineIndex, ArgumentsData.size()));
         // Expects 2 replies
-        channel.SendMessage<CREATE_PROCESS_MESSAGE>(message.Span(), 2);
+        auto transaction = channel.StartTransaction();
+        transaction.Send<CREATE_PROCESS_MESSAGE>(message.Span());
 
-        auto readResult = [&](uint32_t expectedOffset = 0) {
-            const auto& message = channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, Timeout, expectedOffset);
+        auto readResult = [&]() {
+            const auto& message = transaction.Receive<RESULT_MESSAGE<int32_t>>(nullptr, Timeout);
             return message.Result;
         };
 
         // First reply with default sequence offset 0.
         auto processSocket = wsl::windows::common::hvsocket::Connect(RuntimeId, readResult(), terminatingEvent);
         // Second reply with sequence offset 1.
-        const auto execResult = readResult(1);
+        const auto execResult = readResult();
         THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
 
         return processSocket;

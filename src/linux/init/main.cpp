@@ -193,7 +193,7 @@ int MountInit(const char* Target);
 
 int MountPlan9(const char* Name, const char* Target, bool ReadOnly, std::optional<int> BufferSize = {});
 
-int ProcessMessage(wsl::shared::SocketChannel& channel, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
 
 wil::unique_fd RegisterSeccompHook();
 
@@ -2808,7 +2808,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
     }
 }
 
-int ProcessMountFolderMessage(wsl::shared::SocketChannel& Channel, gsl::span<gsl::byte> Buffer)
+int ProcessMountFolderMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
 
 /*++
 
@@ -2844,7 +2844,7 @@ Return Value:
     }
 
     int Result = MountPlan9(Name, Target, Message->ReadOnly);
-    Channel.SendResultMessage<int32_t>(Result);
+    Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }
 
@@ -3163,7 +3163,7 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-int ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
 
 /*++
 
@@ -3259,7 +3259,7 @@ try
             return -1;
         }
 
-        Channel.SendResultMessage(EjectScsi(EjectMessage->Lun));
+        Transaction.SendResultMessage(EjectScsi(EjectMessage->Lun));
         return 0;
     }
 
@@ -3495,10 +3495,10 @@ try
         return 0;
 
     case LxMiniInitMountFolder:
-        return ProcessMountFolderMessage(Channel, Buffer);
+        return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Channel, Buffer);
+        return ProcessCreateProcessMessage(Transaction, Buffer);
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -4169,13 +4169,14 @@ int main(int Argc, char* Argv[])
         }
         else if (PollDescriptors[0].revents & POLLIN)
         {
-            auto [Message, Range] = channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+            auto transaction = channel.ReceiveTransaction();
+            auto [Message, Range] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
             if (Message == nullptr)
             {
                 break; // Socket was closed, exit
             }
 
-            Result = ProcessMessage(channel, Message->MessageType, Range, Config);
+            Result = ProcessMessage(transaction, Message->MessageType, Range, Config);
             if (Result < 0)
             {
                 goto ErrorExit;
