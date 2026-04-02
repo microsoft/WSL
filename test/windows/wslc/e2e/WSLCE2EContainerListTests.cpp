@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::common::string;
@@ -228,7 +229,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Lists containers. By default, only running containers are shown; use --all to include all containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerListLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

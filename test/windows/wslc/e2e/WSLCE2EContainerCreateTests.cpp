@@ -20,6 +20,7 @@ Abstract:
 #include <wil/resource.h>
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace WEX::Logging;
 
@@ -1076,7 +1077,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Creates a container.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerCreateLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

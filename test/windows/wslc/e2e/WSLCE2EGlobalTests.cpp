@@ -16,10 +16,12 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "Argument.h"
 
 using namespace WEX::Logging;
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EGlobalTests
 {
@@ -411,31 +413,43 @@ private:
 
     std::wstring GetAvailableCommands() const
     {
+        std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
+            {L"container", Localization::WSLCCLI_ContainerCommandDesc()},
+            {L"image", Localization::WSLCCLI_ImageCommandDesc()},
+            {L"session", Localization::WSLCCLI_SessionCommandDesc()},
+            {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},
+            {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
+            {L"build", Localization::WSLCCLI_ImageBuildDesc()},
+            {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
+            {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
+            {L"images", Localization::WSLCCLI_ImageListDesc()},
+            {L"inspect", Localization::WSLCCLI_ContainerInspectDesc()},
+            {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
+            {L"list", Localization::WSLCCLI_ContainerListDesc()},
+            {L"load", Localization::WSLCCLI_ImageLoadDesc()},
+            {L"logs", Localization::WSLCCLI_ContainerLogsDesc()},
+            {L"pull", Localization::WSLCCLI_ImagePullDesc()},
+            {L"remove", Localization::WSLCCLI_ContainerRemoveDesc()},
+            {L"rmi", Localization::WSLCCLI_ImageRemoveDesc()},
+            {L"run", Localization::WSLCCLI_ContainerRunDesc()},
+            {L"save", Localization::WSLCCLI_ImageSaveDesc()},
+            {L"start", Localization::WSLCCLI_ContainerStartDesc()},
+            {L"stop", Localization::WSLCCLI_ContainerStopDesc()},
+        };
+
+        size_t maxLen = 0;
+        for (const auto& [name, _] : entries)
+        {
+            maxLen = (std::max)(maxLen, name.size());
+        }
+
         std::wstringstream commands;
-        commands << L"The following commands are available:\r\n"
-                 << L"  container  Container command.\r\n"
-                 << L"  image      Image command.\r\n"
-                 << L"  session    Session command.\r\n"
-                 << L"  settings   Open the settings file in the default editor.\r\n"
-                 << L"  attach     Attach to a container.\r\n"
-                 << L"  build      Build an image from a Dockerfile.\r\n"
-                 << L"  create     Create a container.\r\n"
-                 << L"  exec       Execute a command in a running container.\r\n"
-                 << L"  images     List images.\r\n"
-                 << L"  inspect    Inspect a container.\r\n"
-                 << L"  kill       Kill containers.\r\n"
-                 << L"  list       List containers.\r\n"
-                 << L"  load       Load images.\r\n"
-                 << L"  logs       View container logs.\r\n"
-                 << L"  pull       Pull images.\r\n"
-                 << L"  remove     Remove containers.\r\n"
-                 << L"  rmi        Remove images.\r\n"
-                 << L"  run        Run a container.\r\n"
-                 << L"  save       Save images.\r\n"
-                 << L"  start      Start a container.\r\n"
-                 << L"  stop       Stop containers.\r\n"
-                 << L"\r\n"
-                 << L"For more details on a specific command, pass it the help argument. [-h]\r\n\r\n";
+        commands << L"The following commands are available:\r\n";
+        for (const auto& [name, desc] : entries)
+        {
+            commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";
+        }
+        commands << L"\r\n" << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L"]\r\n\r\n";
         return commands.str();
     }
 

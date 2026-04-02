@@ -15,8 +15,10 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "Argument.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageTests
 {
@@ -57,7 +59,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Image command.\r\n\r\n";
+        return Localization::WSLCCLI_ImageCommandLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -67,18 +69,29 @@ private:
 
     std::wstring GetAvailableCommands() const
     {
+        std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
+            {L"build", Localization::WSLCCLI_ImageBuildDesc()},
+            {L"remove", Localization::WSLCCLI_ImageRemoveDesc()},
+            {L"inspect", Localization::WSLCCLI_ImageInspectDesc()},
+            {L"list", Localization::WSLCCLI_ImageListDesc()},
+            {L"load", Localization::WSLCCLI_ImageLoadDesc()},
+            {L"pull", Localization::WSLCCLI_ImagePullDesc()},
+            {L"save", Localization::WSLCCLI_ImageSaveDesc()},
+        };
+
+        size_t maxLen = 0;
+        for (const auto& [name, _] : entries)
+        {
+            maxLen = (std::max)(maxLen, name.size());
+        }
+
         std::wstringstream commands;
-        commands << L"The following sub-commands are available:\r\n"
-                 << L"  build    Build an image from a Dockerfile.\r\n"
-                 << L"  remove   Remove images.\r\n"
-                 << L"  inspect  Inspect images.\r\n"
-                 << L"  list     List images.\r\n"
-                 << L"  load     Load images.\r\n"
-                 << L"  pull     Pull images.\r\n"
-                 << L"  save     Save images.\r\n"
-                 << L"\r\n"
-                 << L"For more details on a specific command, pass it the help argument. [-h]\r\n"
-                 << L"\r\n";
+        commands << L"The following sub-commands are available:\r\n";
+        for (const auto& [name, desc] : entries)
+        {
+            commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";
+        }
+        commands << L"\r\n" << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L"]\r\n" << L"\r\n";
         return commands.str();
     }
 

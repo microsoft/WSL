@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace wsl::windows::wslc::models;
 
@@ -155,7 +156,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Lists images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageListLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

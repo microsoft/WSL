@@ -28,6 +28,7 @@ using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
 
@@ -142,7 +143,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         {
             // Attempt to pull the image if not found
             PullImageCallback callback;
-            PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
+            PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
             ImageService imageService;
             imageService.Pull(session, image, &callback);
         }
@@ -442,13 +443,15 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, 0));
 
     wsl::windows::common::relay::MultiHandleWait io;
-    io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-        stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
+    io.AddHandle(
+        std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+            stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
 
     if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
-        io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-            stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(
+            std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+                stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.

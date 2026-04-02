@@ -18,24 +18,25 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Session List Command
 std::vector<Argument> SessionListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Verbose, std::nullopt, std::nullopt, L"Show detailed information about the listed sessions."),
+        Argument::Create(ArgType::Verbose, std::nullopt, std::nullopt, Localization::WSLCCLI_SessionListVerboseArgDescription()),
     };
 }
 
 std::wstring SessionListCommand::ShortDescription() const
 {
-    return {L"List sessions."};
+    return Localization::WSLCCLI_SessionListDesc();
 }
 
 std::wstring SessionListCommand::LongDescription() const
 {
-    return {L"Lists active session(s)."};
+    return Localization::WSLCCLI_SessionListLongDesc();
 }
 
 void SessionListCommand::ExecuteInternal(CLIExecutionContext& context) const
