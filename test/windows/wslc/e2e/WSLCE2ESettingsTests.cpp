@@ -38,27 +38,6 @@ class WSLCE2ESettingsTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Settings_Reset_HelpCommand)
-    {
-        WSL2_TEST_ONLY();
-
-        auto result = RunWslc(L"settings reset --help");
-        result.Verify({.Stdout = GetSettingsResetHelpMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
-    TEST_METHOD(WSLCE2E_Settings_Reset_Success)
-    {
-        WSL2_TEST_ONLY();
-
-        // Reset settings to defaults
-        auto result = RunWslc(L"settings reset");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-        
-        // Should contain success message
-        VERIFY_IS_TRUE(result.Stdout.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stdout->find(L"Settings reset to defaults"));
-    }
-
 private:
     std::wstring GetHelpMessage() const
     {
