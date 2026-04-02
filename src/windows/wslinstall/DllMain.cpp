@@ -804,7 +804,7 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
 extern "C" UINT __stdcall StopDeviceHostSurrogate(MSIHANDLE install)
 {
     // Use the Restart Manager to find and shut down any process that has wsldevicehost.dll locked.
-    // This must run before InstallFiles to ensure the DLL can be overwritten during upgrade.
+    // This must run before InstallFiles to ensure the DLL can be overwritten when installing files.
 
     try
     {
@@ -826,7 +826,14 @@ extern "C" UINT __stdcall StopDeviceHostSurrogate(MSIHANDLE install)
         LPCWSTR file = dllPath.c_str();
         THROW_IF_WIN32_ERROR(RmRegisterResources(session, 1, &file, 0, nullptr, 0, nullptr));
 
-        THROW_IF_WIN32_ERROR(RmShutdown(session, RmForceShutdown, nullptr));
+        // First attempt a graceful shutdown of processes using wsldevicehost.dll.
+        DWORD rmError = RmShutdown(session, 0, nullptr);
+        if (rmError != ERROR_SUCCESS)
+        {
+            // If graceful shutdown failed, do a forced shutdown.
+            WSL_INSTALL_LOG("StopDeviceHostSurrogate: graceful shutdown failed, attempting forced shutdown.");
+            THROW_IF_WIN32_ERROR(RmShutdown(session, RmForceShutdown, nullptr));
+        }
     }
     CATCH_LOG();
 
