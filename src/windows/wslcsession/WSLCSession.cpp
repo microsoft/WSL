@@ -2028,6 +2028,7 @@ void WSLCSession::RecoverExistingContainers()
                 *this,
                 m_virtualMachine.value(),
                 m_volumes,
+                m_anonymousVolumes,
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
@@ -2061,6 +2062,7 @@ void WSLCSession::RecoverExistingVolumes()
     {
         if (!volume.Labels.contains(WSLCVolumeMetadataLabel))
         {
+            m_anonymousVolumes.insert(volume.Name);
             continue;
         }
 
