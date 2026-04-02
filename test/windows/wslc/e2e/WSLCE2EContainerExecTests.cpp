@@ -214,7 +214,6 @@ class WSLCE2EContainerExecTests
         VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"));
     }
 
-
     TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_MultipleValues)
     {
         WSL2_TEST_ONLY();
@@ -223,10 +222,7 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         result = RunWslc(std::format(
-            L"container exec -e {}=value-a -e {}=value-b {} env",
-            HostEnvVariableName,
-            HostEnvVariableName2,
-            WslcContainerName));
+            L"container exec -e {}=value-a -e {}=value-b {} env", HostEnvVariableName, HostEnvVariableName2, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -241,11 +237,7 @@ class WSLCE2EContainerExecTests
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-        result = RunWslc(std::format(
-            L"container exec -e {} -e {} {} env",
-            HostEnvVariableName,
-            HostEnvVariableName2,
-            WslcContainerName));
+        result = RunWslc(std::format(L"container exec -e {} -e {} {} env", HostEnvVariableName, HostEnvVariableName2, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -299,7 +291,7 @@ class WSLCE2EContainerExecTests
             {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
-        TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MultipleFiles)
+    TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MultipleFiles)
     {
         WSL2_TEST_ONLY();
 
@@ -310,10 +302,7 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         result = RunWslc(std::format(
-            L"container exec --env-file {} --env-file {} {} env",
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            WslcContainerName));
+            L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         const auto outputLines = result.GetStdoutLines();
@@ -348,10 +337,7 @@ class WSLCE2EContainerExecTests
 
         // Later --env-file wins
         result = RunWslc(std::format(
-            L"container exec --env-file {} --env-file {} {} env",
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            WslcContainerName));
+            L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
         auto outputLines = result.GetStdoutLines();
