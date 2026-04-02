@@ -6602,6 +6602,7 @@ class WSLCTests
         WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-2", {"echo", "OK"});
         auto container = launcher.Launch(*nonElevatedSession);
         auto initProcess = container.GetInitProcess();
+
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 };
