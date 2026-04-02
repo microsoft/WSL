@@ -239,6 +239,8 @@
                      which would fail the install. -->
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
 
+                <File Id="wsldevicehost.dll" Source="${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll" />
+
                 <!-- WSLC COM app - activated through WSLService -->
                 <RegistryKey Root="HKCR" Key="AppID\{E9B79997-57E3-4201-AECC-6A464E530DD2}">
                     <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
@@ -356,7 +358,6 @@
                     <File Id="rdpnanoTransport.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdpnanoTransport.dll" />
                     <File Id="RdpWinStlHelper.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" />
                 <?endif?>
-                <File Id="wsldevicehost.dll" Source="${PACKAGE_INPUT_DIR}/wsldevicehost.dll" />
                 <File Id="${WSLG_TS_PLUGIN_DLL}" Source="${PACKAGE_INPUT_DIR}/${WSLG_TS_PLUGIN_DLL}" />
 
                 <!-- MSRDC Plugin registration -->
@@ -675,7 +676,7 @@
         <!-- Force all applications to exit during upgrade.
              See: https://learn.microsoft.com/en-us/windows/win32/msi/msirmshutdown
         -->
-        <Property Id="MSIRMSHUTDOWN" Value="0" Secure="yes" />
+        <Property Id="MSIRMSHUTDOWN" Value="1" Secure="yes" />
     </Package>
 </Wix>
 

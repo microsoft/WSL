@@ -1273,7 +1273,11 @@ int Uninstall()
 
     const auto exitCode = wsl::windows::common::install::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::install::MsiMessageCallback);
 
-    if (exitCode != 0)
+    if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+    {
+        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+    }
+    else if (exitCode != 0)
     {
         clearLogs.release();
         THROW_HR_WITH_USER_ERROR(
