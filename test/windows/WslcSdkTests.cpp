@@ -491,7 +491,7 @@ class WslcSdkTests
             WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr);
 
             auto cleanup =
-                wil::scope_exit([this]() { WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr); });
+                wil::scope_exit([this]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr)); });
 
             wil::unique_handle imageTarFileHandle{CreateFileW(
                 exportedImageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
@@ -512,7 +512,7 @@ class WslcSdkTests
 
             WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr);
 
-            auto cleanup = wil::scope_exit([this]() { WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr); });
+            auto cleanup = wil::scope_exit([this]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr)); });
 
             VERIFY_SUCCEEDED(WslcImportSessionImageFromFile(m_defaultSession, c_pathImportedImageName, exportedImageTar.c_str(), nullptr, nullptr));
 
