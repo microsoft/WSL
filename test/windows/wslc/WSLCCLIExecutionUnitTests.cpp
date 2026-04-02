@@ -144,7 +144,7 @@ class WSLCCLIExecutionUnitTests
     // Test: Full parse of 'exec --workdir /path cont1 cmd' sets WorkingDirectory
     TEST_METHOD(ExecCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
     {
-        // Simulate the args that reach ContainerExecCommand after routing consumed "exec"
+        // Invoke ContainerExecCommand parsing directly with the subcommand arguments it accepts.
         auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir /tmp/mydir cont1 sh");
 
         ContainerExecCommand command{L""};
