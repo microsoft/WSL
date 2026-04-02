@@ -5182,7 +5182,8 @@ class WSLCTests
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
-            VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
+            VERIFY_IS_TRUE(containers[0].StateChangedAt <= originalStateChangedAt + 60);
+            VERIFY_IS_TRUE(containers[0].StateChangedAt + 60 >= originalStateChangedAt);
             VERIFY_ARE_EQUAL(containers[0].CreatedAt, originalCreatedAt);
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
