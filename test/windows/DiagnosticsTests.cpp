@@ -33,28 +33,28 @@ class DiagnosticsTests
     {
         auto desc = CreateInstanceStepDescription(LxInitCreateInstanceStepFormatDisk);
         VERIFY_IS_FALSE(desc.empty(), L"FormatDisk should produce a non-empty description");
-        Log::Comment(WEX::Common::String().Format(L"FormatDisk -> \"%s\"", desc.c_str()));
+        WEX::Logging::Log::Comment(WEX::Common::String().Format(L"FormatDisk -> \"%s\"", desc.c_str()));
     }
 
     TEST_METHOD(StepDescriptionMountDisk)
     {
         auto desc = CreateInstanceStepDescription(LxInitCreateInstanceStepMountDisk);
         VERIFY_IS_FALSE(desc.empty(), L"MountDisk should produce a non-empty description");
-        Log::Comment(WEX::Common::String().Format(L"MountDisk -> \"%s\"", desc.c_str()));
+        WEX::Logging::Log::Comment(WEX::Common::String().Format(L"MountDisk -> \"%s\"", desc.c_str()));
     }
 
     TEST_METHOD(StepDescriptionLaunchSystemDistro)
     {
         auto desc = CreateInstanceStepDescription(LxInitCreateInstanceStepLaunchSystemDistro);
         VERIFY_IS_FALSE(desc.empty(), L"LaunchSystemDistro should produce a non-empty description");
-        Log::Comment(WEX::Common::String().Format(L"LaunchSystemDistro -> \"%s\"", desc.c_str()));
+        WEX::Logging::Log::Comment(WEX::Common::String().Format(L"LaunchSystemDistro -> \"%s\"", desc.c_str()));
     }
 
     TEST_METHOD(StepDescriptionRunTar)
     {
         auto desc = CreateInstanceStepDescription(LxInitCreateInstanceStepRunTar);
         VERIFY_IS_FALSE(desc.empty(), L"RunTar should produce a non-empty description");
-        Log::Comment(WEX::Common::String().Format(L"RunTar -> \"%s\"", desc.c_str()));
+        WEX::Logging::Log::Comment(WEX::Common::String().Format(L"RunTar -> \"%s\"", desc.c_str()));
     }
 
     TEST_METHOD(StepDescriptionNone)
@@ -64,7 +64,7 @@ class DiagnosticsTests
         // None is not a known step, so it should fall through to the default
         auto unknownDesc = CreateInstanceStepDescription(static_cast<LX_MINI_CREATE_INSTANCE_STEP>(0xFF));
         VERIFY_ARE_EQUAL(desc, unknownDesc, L"None and an arbitrary unknown value should both hit the default case");
-        Log::Comment(WEX::Common::String().Format(L"None/Unknown -> \"%s\"", desc.c_str()));
+        WEX::Logging::Log::Comment(WEX::Common::String().Format(L"None/Unknown -> \"%s\"", desc.c_str()));
     }
 
     TEST_METHOD(StepDescriptionUnknownFutureValue)
@@ -125,7 +125,7 @@ class DiagnosticsTests
 
         auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(linuxError, stepInfo);
 
-        Log::Comment(WEX::Common::String().Format(L"Generic error message: \"%s\"", msg.c_str()));
+        WEX::Logging::Log::Comment(WEX::Common::String().Format(L"Generic error message: \"%s\"", msg.c_str()));
         VERIFY_IS_FALSE(msg.empty(), L"Error message should not be empty");
 
         // The message must contain the step info and the error code as substrings
@@ -147,7 +147,7 @@ class DiagnosticsTests
 
         auto msg = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(linuxError, stepInfo);
 
-        Log::Comment(WEX::Common::String().Format(L"MountDisk error message: \"%s\"", msg.c_str()));
+        WEX::Logging::Log::Comment(WEX::Common::String().Format(L"MountDisk error message: \"%s\"", msg.c_str()));
         VERIFY_IS_FALSE(msg.empty(), L"MountDisk error message should not be empty");
 
         // Must contain .wslconfig and swapFile references for actionable guidance
