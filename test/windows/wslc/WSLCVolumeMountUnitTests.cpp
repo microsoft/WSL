@@ -35,13 +35,10 @@ class WSLCVolumeMountUnitTests
             {LR"(C:\host Path:/container Path:rw)", LR"(C:\host Path)", R"(/container Path)", false},
             {LR"(C:\hostPath::ro)", LR"(C:\hostPath)", R"()", true},
             {LR"(C:\hostPath:)", LR"(C:\hostPath)", R"()", false},
-            {LR"(C:\hostPath:ro)", LR"(C)", R"(\hostPath)", true},
             {LR"(C:\hostPath::rw)", LR"(C:\hostPath)", R"()", false},
             {LR"(C:\hostPath:/containerPath:invalid_mode)", LR"(C:\hostPath:/containerPath)", R"(invalid_mode)", false},
             {LR"(C:\hostPath:/containerPath:ro:extra)", LR"(C:\hostPath:/containerPath:ro)", R"(extra)", false},
             {LR"(C:\hostPath:/containerPath:)", LR"(C:\hostPath:/containerPath)", R"()", false},
-            {LR"(C:\hostPath)", LR"(C)", R"(\hostPath)", false},
-            {LR"(C:/hostPath)", LR"(C)", R"(/hostPath)", false},
             {LR"(::)", LR"(:)", R"()", false},
         };
 
@@ -66,6 +63,21 @@ class WSLCVolumeMountUnitTests
         for (const auto& value : emptyHostPathCases)
         {
             WEX::Logging::Log::Comment(std::format(L"Testing invalid volume argument: '{}'", value).c_str());
+            VERIFY_THROWS(VolumeMount::Parse(value), wil::ResultException);
+        }
+    }
+
+    TEST_METHOD(VolumeMount_Parse_InvalidContainerPath)
+    {
+        // Container paths must be absolute Linux paths (starting with '/')
+        std::vector<std::wstring> invalidContainerPathCases = {
+            LR"(C:\hostPath:ro)", // drive colon misinterpreted as separator, container = \hostPath
+            LR"(C:\hostPath)",    // drive colon misinterpreted as separator, container = \hostPath
+        };
+
+        for (const auto& value : invalidContainerPathCases)
+        {
+            WEX::Logging::Log::Comment(std::format(L"Testing invalid container path: '{}'", value).c_str());
             VERIFY_THROWS(VolumeMount::Parse(value), wil::ResultException);
         }
     }
