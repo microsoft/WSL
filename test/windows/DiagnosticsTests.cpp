@@ -117,17 +117,18 @@ class DiagnosticsTests
     TEST_METHOD(GenericErrorMessageContainsStepAndErrorCode)
     {
         // Verify MessageDistributionFailedToStart produces a message that
-        // includes the step number, step description, and Linux error code.
+        // includes the step info and Linux error code.
         constexpr int step = static_cast<int>(LxInitCreateInstanceStepMountDisk);
         auto stepDesc = CreateInstanceStepDescription(LxInitCreateInstanceStepMountDisk);
+        auto stepInfo = std::to_wstring(step) + L" (" + stepDesc + L")";
         constexpr int linuxError = 5; // EIO
 
-        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(step, stepDesc, linuxError);
+        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(stepInfo, linuxError);
 
         Log::Comment(WEX::Common::String().Format(L"Generic error message: \"%s\"", msg.c_str()));
         VERIFY_IS_FALSE(msg.empty(), L"Error message should not be empty");
 
-        // The message must contain the step number and the error code as substrings
+        // The message must contain the step info and the error code as substrings
         VERIFY_IS_TRUE(msg.find(std::to_wstring(step)) != std::wstring::npos,
                        L"Message should contain the failure step number");
         VERIFY_IS_TRUE(msg.find(std::to_wstring(linuxError)) != std::wstring::npos,
@@ -141,9 +142,10 @@ class DiagnosticsTests
         // Verify the mount-disk-specific message includes .wslconfig guidance.
         constexpr int step = static_cast<int>(LxInitCreateInstanceStepMountDisk);
         auto stepDesc = CreateInstanceStepDescription(LxInitCreateInstanceStepMountDisk);
+        auto stepInfo = std::to_wstring(step) + L" (" + stepDesc + L")";
         constexpr int linuxError = 28; // ENOSPC
 
-        auto msg = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(step, stepDesc, linuxError);
+        auto msg = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(stepInfo, linuxError);
 
         Log::Comment(WEX::Common::String().Format(L"MountDisk error message: \"%s\"", msg.c_str()));
         VERIFY_IS_FALSE(msg.empty(), L"MountDisk error message should not be empty");
@@ -165,28 +167,28 @@ class DiagnosticsTests
     {
         constexpr int step = static_cast<int>(LxInitCreateInstanceStepMountDisk);
         auto stepDesc = CreateInstanceStepDescription(LxInitCreateInstanceStepMountDisk);
+        auto stepInfo = std::to_wstring(step) + L" (" + stepDesc + L")";
         constexpr int linuxError = 5;
 
-        auto generic = wsl::shared::Localization::MessageDistributionFailedToStart(step, stepDesc, linuxError);
-        auto mountDisk = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(step, stepDesc, linuxError);
+        auto generic = wsl::shared::Localization::MessageDistributionFailedToStart(stepInfo, linuxError);
+        auto mountDisk = wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(stepInfo, linuxError);
 
         VERIFY_ARE_NOT_EQUAL(generic, mountDisk,
                              L"The mount-disk-specific message should differ from the generic one");
     }
 
     // -----------------------------------------------------------------------
-    // Error message backward compatibility — new format has 3 parameters
+    // Error message backward compatibility — format has 2 parameters
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(ErrorMessageFormatIncludesThreeParameters)
+    TEST_METHOD(ErrorMessageFormatIncludesTwoParameters)
     {
-        // The new format should accept (step, stepDescription, linuxError).
+        // The format accepts (stepInfo, linuxError) where stepInfo is pre-formatted.
         // Verify by calling with distinctive values and checking all appear.
-        constexpr int step = 42;
-        const std::wstring stepDesc = L"UNIQUE_STEP_SENTINEL";
+        const std::wstring stepInfo = L"42 (UNIQUE_STEP_SENTINEL)";
         constexpr int linuxError = 7777;
 
-        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(step, stepDesc, linuxError);
+        auto msg = wsl::shared::Localization::MessageDistributionFailedToStart(stepInfo, linuxError);
 
         VERIFY_IS_TRUE(msg.find(L"42") != std::wstring::npos,
                        L"Step number 42 should appear in formatted message");

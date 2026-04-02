@@ -61,6 +61,7 @@ WslCoreInstance::WslCoreInstance(
     }
 
     const auto stepDescription = CreateInstanceStepDescription(result.FailureStep);
+    const auto stepInfo = std::to_wstring(static_cast<int>(result.FailureStep)) + L" (" + stepDescription + L")";
     WSL_LOG(
         "CreateInstanceGuestResult",
         TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
@@ -95,14 +96,14 @@ WslCoreInstance::WslCoreInstance(
             THROW_HR_WITH_USER_ERROR(
                 WSL_E_DISTRO_MOUNT_FAILED,
                 wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(
-                    static_cast<int>(result.FailureStep), stepDescription, result.Result));
+                    stepInfo, result.Result));
         }
         else
         {
             THROW_HR_WITH_USER_ERROR(
                 WSL_E_DISTRO_START_FAILED,
                 wsl::shared::Localization::MessageDistributionFailedToStart(
-                    static_cast<int>(result.FailureStep), stepDescription, result.Result));
+                    stepInfo, result.Result));
         }
     }
 
