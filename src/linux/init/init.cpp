@@ -422,7 +422,10 @@ Options=nosuid,nodev,noexec
         else
         {
             // Clean up stale binfmt config if the feature was previously enabled.
-            unlink("/run/binfmt.d/WSLInterop.conf");
+            if (unlink("/run/binfmt.d/WSLInterop.conf") < 0 && errno != ENOENT)
+            {
+                LOG_ERROR("Failed to remove stale binfmt config: {}", errno);
+            }
         }
 
         return 0;
