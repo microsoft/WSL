@@ -33,6 +33,11 @@ using namespace std::chrono_literals;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
 
+static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
+{
+    options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
+}
+
 static wsl::windows::common::RunningWSLCContainer CreateInternal(
     Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
 {
@@ -122,9 +127,17 @@ static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping&
 
 std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
+    if (timestamp == 0)
+    {
+        return L"";
+    }
+
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
     constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+    constexpr LONGLONG SecondsPerWeek = SecondsPerDay * 7;
+    constexpr LONGLONG SecondsPerMonth = SecondsPerDay * 30;
+    constexpr LONGLONG SecondsPerYear = SecondsPerDay * 365;
 
     auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
     if (elapsed < 0)
@@ -132,24 +145,36 @@ std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
         elapsed = 0;
     }
 
+    auto pluralize = [](LONGLONG count, const wchar_t* singular, const wchar_t* plural) {
+        return std::format(L"{} {} ago", count, (count == 1 ? singular : plural));
+    };
+
     if (elapsed < SecondsPerMinute)
     {
-        const auto seconds = elapsed;
-        return std::format(L"{} {} ago", seconds, (seconds == 1 ? L"second" : L"seconds"));
+        return pluralize(elapsed, L"second", L"seconds");
     }
     else if (elapsed < SecondsPerHour)
     {
-        const auto minutes = elapsed / SecondsPerMinute;
-        return std::format(L"{} {} ago", minutes, (minutes == 1 ? L"minute" : L"minutes"));
+        return pluralize(elapsed / SecondsPerMinute, L"minute", L"minutes");
     }
     else if (elapsed < SecondsPerDay)
     {
-        const auto hours = elapsed / SecondsPerHour;
-        return std::format(L"{} {} ago", hours, (hours == 1 ? L"hour" : L"hours"));
+        return pluralize(elapsed / SecondsPerHour, L"hour", L"hours");
+    }
+    else if (elapsed < SecondsPerWeek)
+    {
+        return pluralize(elapsed / SecondsPerDay, L"day", L"days");
+    }
+    else if (elapsed < SecondsPerMonth)
+    {
+        return pluralize(elapsed / SecondsPerWeek, L"week", L"weeks");
+    }
+    else if (elapsed < SecondsPerYear)
+    {
+        return pluralize(elapsed / SecondsPerMonth, L"month", L"months");
     }
 
-    const auto days = elapsed / SecondsPerDay;
-    return std::format(L"{} {} ago", days, (days == 1 ? L"day" : L"days"));
+    return pluralize(elapsed / SecondsPerYear, L"year", L"years");
 }
 
 int ContainerService::Attach(Session& session, const std::string& id)
