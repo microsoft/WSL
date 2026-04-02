@@ -423,6 +423,43 @@ class UnitTests
         }
     }
 
+    TEST_METHOD(BinfmtSurvivesDistroTermination)
+    {
+        WSL2_TEST_ONLY();
+
+        constexpr auto secondDistro = L"binfmt-test-distro";
+
+        // Import a second WSL2 distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", secondDistro, g_testDistroPath)), 0L);
+
+        auto cleanupDistro = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [secondDistro]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", secondDistro));
+        });
+
+        // Enable systemd on both distros.
+        auto cleanupSystemd = EnableSystemd();
+
+        LxsstuLaunchWsl(std::format(L"-d {} -u root -e sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", secondDistro).c_str());
+        TerminateDistribution(secondDistro);
+
+        // Verify interop works in both distros.
+        auto [out1, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+        VERIFY_ARE_EQUAL(out1, L"ok\r\n");
+
+        auto [out2, __] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} cmd.exe /c echo ok", secondDistro).c_str());
+        VERIFY_ARE_EQUAL(out2, L"ok\r\n");
+
+        // Terminate the second distro and verify interop still works in the first.
+        TerminateDistribution(secondDistro);
+
+        auto [out3, ___] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
+        VERIFY_ARE_EQUAL(out3, L"ok\r\n");
+
+        // Verify binfmt handler is still registered.
+        auto [binfmtStatus, ____] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/fs/binfmt_misc/WSLInterop");
+        VERIFY_IS_TRUE(binfmtStatus.find(L"enabled") != std::wstring::npos);
+    }
+
     TEST_METHOD(Dup)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));
