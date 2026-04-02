@@ -35,12 +35,12 @@ std::vector<Argument> SessionCommand::GetArguments() const
 
 std::wstring SessionCommand::ShortDescription() const
 {
-    return {L"Session command."};
+    return {L"Manage sessions."};
 }
 
 std::wstring SessionCommand::LongDescription() const
 {
-    return {L"Session command."};
+    return {L"Manage WSL container sessions, including listing active sessions and launching interactive shells."};
 }
 
 void SessionCommand::ExecuteInternal(CLIExecutionContext& context) const

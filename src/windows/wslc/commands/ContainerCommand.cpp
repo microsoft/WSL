@@ -42,12 +42,12 @@ std::vector<Argument> ContainerCommand::GetArguments() const
 
 std::wstring ContainerCommand::ShortDescription() const
 {
-    return {L"Container command."};
+    return {L"Manage containers."};
 }
 
 std::wstring ContainerCommand::LongDescription() const
 {
-    return {L"Container command for demonstration purposes."};
+    return {L"Manage the lifecycle of WSL containers, including creating, starting, stopping, and removing them."};
 }
 
 void ContainerCommand::ExecuteInternal(CLIExecutionContext& context) const

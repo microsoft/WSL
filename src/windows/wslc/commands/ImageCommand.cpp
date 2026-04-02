@@ -38,12 +38,12 @@ std::vector<Argument> ImageCommand::GetArguments() const
 
 std::wstring ImageCommand::ShortDescription() const
 {
-    return {L"Image command."};
+    return {L"Manage images."};
 }
 
 std::wstring ImageCommand::LongDescription() const
 {
-    return {L"Image command."};
+    return {L"Manage container images, including building, pulling, listing, and removing them."};
 }
 
 void ImageCommand::ExecuteInternal(CLIExecutionContext& context) const
