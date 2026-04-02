@@ -21,10 +21,11 @@ struct ContainerService
 {
     static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
     static std::wstring FormatRelativeTime(ULONGLONG timestamp);
+    static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
     static int Attach(models::Session& session, const std::string& id);
     static int Run(models::Session& session, const std::string& image, models::ContainerOptions options);
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options);
-    static void Start(models::Session& session, const std::string& id, bool attach = false);
+    static int Start(models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force);

@@ -50,7 +50,7 @@ public:
     void OnContainerReleased() noexcept;
 
 private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode);
+    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t eventTime);
 
     std::mutex m_lock;
     DockerHTTPClient& m_client;
@@ -72,7 +72,7 @@ public:
     void SetExitCode(int ExitCode);
 
 private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode);
+    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t eventTime);
 
     mutable std::mutex m_lock;
     std::string m_id;

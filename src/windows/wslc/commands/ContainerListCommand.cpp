@@ -29,6 +29,7 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
     return {
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
+        Argument::Create(ArgType::NoTrunc),
         Argument::Create(ArgType::Quiet),
         Argument::Create(ArgType::Session),
     };

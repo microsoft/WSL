@@ -56,6 +56,7 @@ public:
         _In_ const wsl::windows::common::docker_schema::Volume& Volume, _In_ WSLCVirtualMachine& VirtualMachine, _In_ DockerHTTPClient& DockerClient);
 
     void Delete();
+    std::string Inspect() const;
 
     const std::string& Name() const noexcept
     {

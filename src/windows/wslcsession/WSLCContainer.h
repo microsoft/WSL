@@ -68,23 +68,24 @@ public:
         DockerHTTPClient& DockerClient,
         IORelay& Relay,
         WSLCContainerState InitialState,
+        std::uint64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags);
 
     ~WSLCContainerImpl();
 
     void Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys);
-    void Attach(LPCSTR DetachKeys, ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
-    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
+    void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
+    void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Delete(WSLCDeleteFlags Flags);
-    void Export(ULONG TarHandle) const;
+    void Export(WSLCHandle TarHandle) const;
     void GetStateChangedAt(_Out_ ULONGLONG* StateChangedAt);
     void GetCreatedAt(_Out_ ULONGLONG* CreatedAt);
     void GetState(_Out_ WSLCContainerState* State);
     void GetInitProcess(_Out_ IWSLCProcess** process) const;
     void Exec(_In_ const WSLCProcessOptions* Options, LPCSTR DetachKeys, _Out_ IWSLCProcess** Process);
     void Inspect(LPSTR* Output) const;
-    void Logs(WSLCLogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
+    void Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
 
     void CopyTo(IWSLCContainer** Container) const;
@@ -92,8 +93,9 @@ public:
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
     WSLCContainerState State() const noexcept;
+    std::vector<WSLCPortMapping> GetPorts() const;
 
-    __requires_lock_held(m_lock) void Transition(WSLCContainerState State) noexcept;
+    __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
     void OnProcessReleased(DockerExecProcessControl* process) noexcept;
 
@@ -130,11 +132,13 @@ private:
     __requires_exclusive_lock_held(m_lock) void DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode);
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
     void WaitForContainerEvent();
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
+    __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) void DisconnectComWrapper();
+
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLCProcessFlags flags);
 
     wsl::windows::common::wslc_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect) const;
@@ -150,13 +154,14 @@ private:
     WSLCContainerFlags m_containerFlags{};
     mutable std::mutex m_processesLock;
     __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
-    __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<WSLCProcess> m_initProcess;
+    __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
-    wil::unique_event m_stoppedNotifiedEvent{wil::EventOptions::ManualReset};
+    std::mutex m_stopStateLock;
+    std::optional<std::promise<std::uint64_t>> m_stopState;
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
-    std::uint64_t m_createdAt{static_cast<std::uint64_t>(std::time(nullptr))};
+    std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
     WSLCSession& m_wslcSession;
     WSLCVirtualMachine& m_virtualMachine;
@@ -178,23 +183,37 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
 public:
     WSLCContainer(WSLCContainerImpl* impl, std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
-    IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
+    IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
+    IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;
     IFACEMETHOD(Delete)(WSLCDeleteFlags Flags) override;
-    IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
+    IFACEMETHOD(Export)(_In_ WSLCHandle TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLCContainerState* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCProcessOptions* Options, _In_opt_ LPCSTR DetachKeys, _Out_ IWSLCProcess** Process) override;
     IFACEMETHOD(Start)(WSLCContainerStartFlags Flags, _In_opt_ LPCSTR DetachKeys) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
-    IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
+    IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
+    // Cache read-only properties so they remain accessible after the impl is disconnected.
+    // Called from WSLCContainerImpl::DisconnectComWrapper() while m_lock is held exclusively.
+    void CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
+
 private:
     std::function<void(const WSLCContainerImpl*)> m_onDeleted;
+
+    // Cached read-only properties populated by CacheState() so they remain
+    // accessible after the impl is disconnected.
+    mutable wil::srwlock m_cacheLock;
+    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedId;
+    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedName;
+    _Guarded_by_(m_cacheLock) std::optional<WSLCContainerState> m_cachedState;
+    _Guarded_by_(m_cacheLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_cachedInitProcess;
 };
+
 } // namespace wsl::windows::service::wslc

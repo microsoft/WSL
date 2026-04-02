@@ -23,6 +23,7 @@ Abstract:
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
+using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VmPortAllocation;
 using wsl::windows::service::wslc::VMPortMapping;
 using wsl::windows::service::wslc::WSLCProcess;
@@ -328,7 +329,10 @@ WSLCVirtualMachine::~WSLCVirtualMachine()
     // Clear the state of all remaining processes now that the VM has exited.
     for (auto& e : m_trackedProcesses)
     {
-        e->OnVmTerminated();
+        if (auto locked = e.lock())
+        {
+            locked->OnVmTerminated();
+        }
     }
 }
 
@@ -419,25 +423,30 @@ try
             TraceLoggingValue(message->Signaled, "Signaled"));
 
         // Signal the exited process, if it's been monitored.
+        // N.B. Lock weak_ptr under lock, then call OnExited outside it to avoid
+        // deadlock with the destructor's m_lock -> m_trackedProcessesLock ordering.
+        std::shared_ptr<VMProcessControl> exited;
         {
             std::lock_guard lock{m_trackedProcessesLock};
 
-            bool found = false;
             for (auto& e : m_trackedProcesses)
             {
-                if (e->GetPid() == message->Pid)
+                auto locked = e.lock();
+                if (locked && locked->GetPid() == message->Pid)
                 {
-                    WI_ASSERT(!found);
-
-                    try
-                    {
-                        e->OnExited(message->Signaled ? 128 + message->Code : message->Code);
-                    }
-                    CATCH_LOG();
-
-                    found = true;
+                    exited = std::move(locked);
+                    break;
                 }
             }
+        }
+
+        if (exited)
+        {
+            try
+            {
+                exited->OnExited(message->Signaled ? 128 + message->Code : message->Code);
+            }
+            CATCH_LOG();
         }
     }
 }
@@ -695,7 +704,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
 
     wil::unique_socket ttyControlHandle;
 
-    std::map<ULONG, wil::unique_handle> stdHandles;
+    std::map<ULONG, TypedHandle> stdHandles;
     for (auto& [fd, handle] : sockets)
     {
         if (ttyControl != nullptr && fd == ttyControl->Fd)
@@ -704,18 +713,18 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
             continue;
         }
 
-        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(handle.release()));
+        stdHandles.emplace(fd, TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(handle.release())}, WSLCHandleTypeSocket});
     }
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
-    auto control = std::make_unique<VMProcessControl>(*this, pid, std::move(ttyControlHandle));
+    auto control = std::make_shared<VMProcessControl>(*this, pid, std::move(ttyControlHandle));
 
     {
         std::lock_guard lock{m_trackedProcessesLock};
-        m_trackedProcesses.emplace_back(control.get());
+        m_trackedProcesses.emplace_back(control);
     }
 
-    auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io));
+    auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options.Flags);
 
     setErrno(0);
 
@@ -1068,7 +1077,10 @@ void WSLCVirtualMachine::OnProcessReleased(int Pid)
 {
     std::lock_guard lock{m_trackedProcessesLock};
 
-    std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
+    std::erase_if(m_trackedProcesses, [Pid](const auto& e) {
+        auto locked = e.lock();
+        return !locked || locked->GetPid() == Pid;
+    });
 }
 
 std::shared_ptr<VmPortAllocation> WSLCVirtualMachine::TryAllocatePort(uint16_t Port, int Family, int Protocol)

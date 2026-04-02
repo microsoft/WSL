@@ -47,13 +47,6 @@ std::wstring ContainerStartCommand::LongDescription() const
 
 void ContainerStartCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
-        << StartContainer;
-
-    if (context.Args.Contains(ArgType::Attach))
-    {
-        context << AttachContainer(context.Args.Get<ArgType::ContainerId>());
-    }
+    context << CreateSession << StartContainer;
 }
 } // namespace wsl::windows::wslc

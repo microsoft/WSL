@@ -85,7 +85,6 @@ public:
 private:
     std::string m_image;
     std::string m_name;
-    std::deque<std::string> m_bindingAddressStorage;
     std::vector<WSLCPortMapping> m_ports;
     std::vector<WSLCVolume> m_volumes;
     std::vector<WSLCNamedVolume> m_namedVolumes;

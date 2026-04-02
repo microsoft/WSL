@@ -529,6 +529,23 @@ wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(
     return errorStrings;
 }
 
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::FromCOMInputHandle(WSLCHandle Handle)
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE), Handle.Handle.File == nullptr || Handle.Handle.File == INVALID_HANDLE_VALUE);
+
+    switch (Handle.Type)
+    {
+    case WSLCHandleTypeFile:
+        return Handle.Handle.File;
+    case WSLCHandleTypePipe:
+        return Handle.Handle.Pipe;
+    case WSLCHandleTypeSocket:
+        return Handle.Handle.Socket;
+    default:
+        THROW_HR_MSG(E_UNEXPECTED, "Unsupported handle type: %d", Handle.Type);
+    }
+}
+
 std::wstring wsl::windows::common::wslutil::ConstructPipePath(std::wstring_view PipeName)
 {
     return c_pipePrefix + std::wstring(PipeName);
@@ -1309,6 +1326,70 @@ wil::unique_hlocal_string wsl::windows::common::wslutil::SidToString(_In_ PSID U
     THROW_LAST_ERROR_IF(!ConvertSidToStringSid(UserSid, &sid));
 
     return sid;
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD Access)
+{
+    wil::unique_handle duplicatedHandle{DuplicateHandle(Handle, Access)};
+
+    // N.B. COM closes the handle when returning an out parameter.
+    // The return value of this method should always be passed to a COM out parameter.
+    auto comHandle = ToCOMInputHandle(duplicatedHandle.release());
+
+    return comHandle;
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD Access, WSLCHandleType Type)
+{
+    wil::unique_handle duplicatedHandle{DuplicateHandle(Handle, Access)};
+
+    // N.B. COM closes the handle when returning an out parameter.
+    // The return value of this method should always be passed to a COM out parameter.
+    switch (Type)
+    {
+    case WSLCHandleTypeFile:
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = duplicatedHandle.release()}};
+    case WSLCHandleTypePipe:
+        return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = duplicatedHandle.release()}};
+    case WSLCHandleTypeSocket:
+        return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = duplicatedHandle.release()}};
+    default:
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", static_cast<int>(Type));
+    }
+}
+
+WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle)
+{
+    auto type = GetFileType(Handle);
+    if (type == FILE_TYPE_PIPE)
+    {
+        int socketType{};
+        int len = sizeof(socketType);
+
+        // N.B. FILE_TYPE_PIPE can describe a pipe, a named pipe, or a socket.
+        // Check for a named pipe first, since getsockopt() can return success for a named pipe.
+
+        if (GetNamedPipeInfo(Handle, nullptr, nullptr, nullptr, nullptr))
+        {
+            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = Handle}};
+        }
+        else if (getsockopt(reinterpret_cast<SOCKET>(Handle), SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &len) == 0)
+        {
+            return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = Handle}};
+        }
+        else
+        {
+            return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = Handle}};
+        }
+    }
+    else if (type == FILE_TYPE_DISK)
+    {
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = Handle}};
+    }
+    else
+    {
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", type);
+    }
 }
 
 winrt::Windows::Management::Deployment::PackageVolume wsl::windows::common::wslutil::GetSystemVolume()

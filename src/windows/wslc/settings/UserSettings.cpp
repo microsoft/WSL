@@ -42,7 +42,9 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Maximum disk image size in megabytes (default: 100GB)\n"
     "  # maxStorageSize: 100GB\n"
     "\n"
-    "  # Default path for container storage (default: %LocalAppData%\\wslc\\storage)\n"
+    "  # Default path for session storage. By default, storage is per-session under:\n"
+    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli        (standard sessions)\n"
+    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin (elevated sessions)\n"
     "  # defaultStoragePath: \"\"\n";
 
 // Validate individual setting specializations
@@ -51,7 +53,7 @@ namespace details {
     std::optional<uint32_t> ParseSettingsMemoryValue(const std::string& value)
     {
         auto parsed = wsl::shared::string::ParseMemorySize(value.c_str());
-        auto converted = parsed.has_value() ? *parsed / 1048576 : 0; // To Mb, and anything less than 1Mb is considered invalid.
+        auto converted = parsed.has_value() ? *parsed / _1MB : 0; // To Mb, and anything less than 1Mb is considered invalid.
         return converted > 0 ? std::optional{static_cast<uint32_t>(converted)} : std::nullopt;
     }
 
@@ -78,6 +80,38 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionStoragePath)
     {
         return MultiByteToWide(value);
+    }
+
+    WSLC_VALIDATE_SETTING(SessionNetworkingMode)
+    {
+        if (value == "none")
+        {
+            return WSLCNetworkingModeNone;
+        }
+        if (value == "nat")
+        {
+            return WSLCNetworkingModeNAT;
+        }
+        if (value == "virtioproxy")
+        {
+            return WSLCNetworkingModeVirtioProxy;
+        }
+
+        return std::nullopt;
+    }
+
+    WSLC_VALIDATE_SETTING(SessionHostFileShareMode)
+    {
+        if (value == "plan9")
+        {
+            return HostFileShareMode::Plan9;
+        }
+        if (value == "virtiofs")
+        {
+            return HostFileShareMode::VirtioFs;
+        }
+
+        return std::nullopt;
     }
 
 #undef WSLC_VALIDATE_SETTING
@@ -239,7 +273,7 @@ void UserSettings::Reset() const
 
 void UserSettings::PrepareToShellExecuteFile() const
 {
-    if (m_type == UserSettingsType::Default)
+    if (m_type == UserSettingsType::Default && !std::filesystem::exists(m_settingsPath))
     {
         // First run — create the directory and write the commented-out defaults template.
         Reset();

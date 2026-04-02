@@ -174,9 +174,6 @@ try
 
     wsl::windows::common::security::ApplyProcessMitigationPolicies();
 
-    // Ensure that the OS has support for running lifted WSL.
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_SERVICE_DISABLED), !wsl::windows::common::helpers::IsWslSupportInterfacePresent());
-
     // Initialize Winsock.
     WSADATA Data;
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));

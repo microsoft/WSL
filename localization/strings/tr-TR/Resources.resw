@@ -961,7 +961,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallNoArguments" xml:space="preserve">
-    <value>{} does not take any arguments. To unregister a distribution, use {} instead.</value>
+    <value>{} bağımsız değişken almaz. Dağıtımın kaydını silmek için bunun yerine {} kullanın.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
@@ -1912,7 +1912,7 @@ Kullanım:
   wslc --help</value>
     <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaSessionNotFound" xml:space="preserve">
+  <data name="MessageWslcSessionNotFound" xml:space="preserve">
     <value>Oturum bulunamadı: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1920,31 +1920,31 @@ Kullanım:
     <value>Geçersiz IP adresi '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
+  <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
     <value>OpenSessionByName('{}') başarısız oldu</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>WSLA oturumu bulunamadı.</value>
+  <data name="MessageWslcNoSessionsFound" xml:space="preserve">
+    <value>No WSLC sessions found.</value>
   </data>
-  <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>{} WSLA oturumu bulundu{}:</value>
+  <data name="MessageWslcSessionsFound" xml:space="preserve">
+    <value>Found {} WSLC session{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaShellExited" xml:space="preserve">
+  <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} şu kodla çıktı: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaHeaderId" xml:space="preserve">
+  <data name="MessageWslcHeaderId" xml:space="preserve">
     <value>Kimlik</value>
   </data>
-  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
+  <data name="MessageWslcHeaderCreatorPid" xml:space="preserve">
     <value>Oluşturan PID</value>
   </data>
-  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
+  <data name="MessageWslcHeaderDisplayName" xml:space="preserve">
     <value>Görünen Ad</value>
   </data>
-  <data name="MessageWslaUnknownCommand" xml:space="preserve">
+  <data name="MessageWslcUnknownCommand" xml:space="preserve">
     <value>Bilinmeyen komut: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -2074,32 +2074,32 @@ Kullanım:
 Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfasını ziyaret edin.</value>
      <comment>Copyright notice and privacy link</comment>
   </data>
-  <data name="MessageWslaInvalidImage" xml:space="preserve">
+  <data name="MessageWslcInvalidImage" xml:space="preserve">
     <value>Geçersiz resim: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidName" xml:space="preserve">
-    <value>Invalid name: '{}'</value>
+  <data name="MessageWslcInvalidName" xml:space="preserve">
+    <value>Geçersiz ad: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePathNotAbsolute" xml:space="preserve">
     <value>Yol mutlak değil: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeNotFound" xml:space="preserve">
-    <value>Volume not found: '{}'</value>
+  <data name="MessageWslcVolumeNotFound" xml:space="preserve">
+    <value>Birim bulunamadı: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeOptions" xml:space="preserve">
-    <value>Invalid volume options: '{}'</value>
+  <data name="MessageWslcInvalidVolumeOptions" xml:space="preserve">
+    <value>Geçersiz birim seçenekleri: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaInvalidVolumeType" xml:space="preserve">
-    <value>Unsupported volume type: '{}'</value>
+  <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
+    <value>Desteklenmeyen birim türü: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslaVolumeInUse" xml:space="preserve">
-    <value>Volume '{}' is in use.</value>
+  <data name="MessageWslcVolumeInUse" xml:space="preserve">
+    <value>'{}' birimi kullanımda.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
