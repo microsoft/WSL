@@ -108,7 +108,7 @@ void TerminateSession(CLIExecutionContext& context)
 
 void EnterSession(CLIExecutionContext& context)
 {
-    auto storagePath = context.Args.Get<ArgType::StoragePath>();
+    auto storagePath = std::filesystem::absolute(context.Args.Get<ArgType::StoragePath>());
 
     std::wstring sessionName;
     if (context.Args.Contains(ArgType::Name))
@@ -120,10 +120,9 @@ void EnterSession(CLIExecutionContext& context)
         GUID guid{};
         THROW_IF_FAILED(CoCreateGuid(&guid));
         sessionName = wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::None);
-        PrintMessage(sessionName, stderr);
     }
 
-    context.ExitCode = SessionService::Enter(storagePath, sessionName);
+    context.ExitCode = SessionService::Enter(storagePath.wstring(), sessionName);
 }
 
 } // namespace wsl::windows::wslc::task

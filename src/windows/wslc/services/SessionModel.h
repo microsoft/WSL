@@ -47,6 +47,11 @@ public:
         return &m_sessionSettings;
     }
 
+    WSLCSessionSettings* Get()
+    {
+        return &m_sessionSettings;
+    }
+
 private:
     static constexpr const wchar_t s_defaultSessionName[] = L"wslc-cli";
     static constexpr const wchar_t s_defaultAdminSessionName[] = L"wslc-cli-admin";
