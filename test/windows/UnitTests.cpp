@@ -436,6 +436,70 @@ class UnitTests
         VERIFY_ARE_EQUAL(out, L"hello\n");
     }
 
+    WSL2_TEST_METHOD(BinfmtSurvivesDistroTermination)
+    {
+        //
+        // Regression test for the "Exec format error" bug: binfmt_misc registrations
+        // (most importantly WSLInterop) must survive when a peer systemd-enabled distro
+        // terminates. Before this fix, peer's systemd-binfmt.service ExecStop ran
+        // `systemd-binfmt --unregister`, which writes `-1` to
+        // /proc/sys/fs/binfmt_misc/status and clears the entire binfmt_misc entry
+        // table. Because WSL peer distros share the root user namespace (no
+        // CLONE_NEWUSER), that clear wipes WSLInterop globally and breaks Windows
+        // interop in every other running distro.
+        //
+
+        constexpr auto peerDistroName = L"binfmt-peer-test";
+
+        // Enable systemd on the primary test distro.
+        auto cleanupSystemd = EnableSystemd();
+
+        // Import a second distro from the same tarball as the test distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", peerDistroName, g_testDistroPath)), 0L);
+
+        auto cleanupPeer = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", peerDistroName));
+        });
+
+        // Enable systemd in the peer distro (no helper exists for non-test distros).
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"mkdir -p /etc && printf '[boot]\\nsystemd=true\\n' > /etc/wsl.conf\"", peerDistroName)),
+            0L);
+
+        // Terminate so the config takes effect on next start.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop works in both distros (this also starts the peer with systemd).
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo alive");
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
+        }
+
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- cmd.exe /c echo alive", peerDistroName));
+            VERIFY_ARE_EQUAL(out, L"alive\r\n");
+        }
+
+        // Terminate the peer distro — this triggers systemd shutdown. Without the
+        // fix, ExecStop=systemd-binfmt --unregister would clear the binfmt entry
+        // table for every running distro.
+        TerminateDistribution(peerDistroName);
+
+        // Verify interop still works in the primary distro.
+        {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo survived");
+            VERIFY_ARE_EQUAL(out, L"survived\r\n");
+        }
+
+        // Verify the binfmt entry still exists and carries the F (fix-binary) flag.
+        // The F flag is required so the kernel resolves the interpreter at
+        // registration time, making the entry independent of mount-namespace state.
+        {
+            auto [flags, _] = LxsstuLaunchWslAndCaptureOutput(L"grep ^flags /proc/sys/fs/binfmt_misc/WSLInterop");
+            VERIFY_IS_TRUE(flags.find(L"F") != std::wstring::npos);
+        }
+    }
+
     TEST_METHOD(Dup)
     {
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));
