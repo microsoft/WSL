@@ -495,8 +495,9 @@
         <InstallExecuteSequence>
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
 
-            <!-- Terminate the dllhost.exe surrogate hosting wsldevicehost.dll so the DLL can be overwritten during upgrade.
-                 Must run after StopService (which stops WSLService) but before InstallFiles. -->
+            <!-- Terminate the dllhost.exe surrogate hosting wsldevicehost.dll so the DLL can be overwritten when installing files.
+                 Must run after StopService (which stops WSLService) but before InstallFiles.
+                 Conditioned on '(not UPGRADINGPRODUCTCODE)' so it does not run in the old product's removal sequence during major upgrades. -->
             <Custom Action="StopDeviceHostSurrogate" Before="InstallFiles" Condition='(not UPGRADINGPRODUCTCODE)' />
 
             <!-- Must run before InstallServices or else we'll fail if wslservice already exists.
