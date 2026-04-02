@@ -1516,6 +1516,62 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_ABORT, result.get_future().get());
     }
 
+    TEST_METHOD(AnonymousVolumes)
+    {
+        // TODO: Add more test coverage once anonymous volume are fully supported and switch to using -v instead of building an image.
+
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            WSLCDeleteImageOptions deleteOptions{.Image = "wslc-test-build:latest", .Flags = WSLCDeleteImageFlagsForce};
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "VOLUME /volume\n"; // Use VOLUME to force the creation of an anonymous volume.
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
+        ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
+
+        WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess();
+
+        auto containerId = container.Id();
+
+        ValidateProcessOutput(result, {});
+
+        ResetTestSession();
+
+        container.SetDeleteOnClose(false);
+
+        // Manually cleanup the container since the session has been reset.
+        auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            wil::com_ptr<IWSLCContainer> container;
+            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &container));
+
+            VERIFY_SUCCEEDED(container->Delete(WSLCDeleteFlagsForce));
+        });
+
+        // Validate that the session is correctly restarted.
+        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+        wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+
+        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+        VERIFY_ARE_EQUAL(containers.size(), 1);
+        VERIFY_ARE_EQUAL(containers[0].Id, containerId);
+    }
+
     TEST_METHOD(TagImage)
     {
         WSL2_TEST_ONLY();
@@ -6538,15 +6594,12 @@ class WSLCTests
             LoadTestImage("debian:latest", nonElevatedSession.get());
 
             WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-1", {"echo", "OK"});
-            auto container = launcher.Launch(*nonElevatedSession);
-            auto initProcess = container.GetInitProcess();
+            auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
             ValidateProcessOutput(initProcess, {{1, "OK\n"}});
         }
 
         WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-2", {"echo", "OK"});
-        auto container = launcher.Launch(*nonElevatedSession);
-        auto initProcess = container.GetInitProcess();
-
+        auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 };
