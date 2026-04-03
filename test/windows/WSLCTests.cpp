@@ -2326,6 +2326,12 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
         }
+
+        // Verify DNS resolution.
+        // Note: without DNS tunneling, NAT mode uses the ICS SharedAccess DNS proxy which only supports UDP.
+        // TCP DNS queries (dig +tcp) will time out without tunneling.
+        VerifyDigDnsResolution(session.get(), "getent ahosts bing.com");
+        VerifyDnsQueries(session.get(), mode, enableDnsTunneling);
     }
 
     TEST_METHOD(NATNetworking)
@@ -2342,6 +2348,77 @@ class WSLCTests
     TEST_METHOD(VirtioProxyNetworking)
     {
         ValidateNetworking(WSLCNetworkingModeVirtioProxy);
+    }
+
+    TEST_METHOD(VirtioProxyNetworkingWithDnsTunneling)
+    {
+        WINDOWS_11_TEST_ONLY();
+        ValidateNetworking(WSLCNetworkingModeVirtioProxy, true);
+    }
+
+    // DNS test helpers
+
+    void VerifyDigDnsResolution(IWSLCSession* session, const std::string& digCommandLine)
+    {
+        auto result = ExpectCommandResult(session, {"/bin/sh", "-c", digCommandLine}, 0);
+        VERIFY_IS_FALSE(result.Output[1].empty());
+    }
+
+    void VerifyDnsResolutionDig(IWSLCSession* session, WSLCNetworkingMode mode, bool enableDnsTunneling)
+    {
+        // TCP DNS works except for NAT without tunneling (ICS SharedAccess DNS proxy is UDP-only).
+        const bool includeTcp = (mode != WSLCNetworkingModeNAT) || enableDnsTunneling;
+
+        // Test A record resolution (IPv4) and reverse DNS lookup over UDP
+        VerifyDigDnsResolution(session, "dig +short +time=5 A bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 -x 8.8.8.8");
+
+        if (includeTcp)
+        {
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 A bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 -x 8.8.8.8");
+        }
+    }
+
+    void VerifyDnsResolutionRecordTypes(IWSLCSession* session)
+    {
+        VerifyDigDnsResolution(session, "dig +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 SOA bing.com");
+    }
+
+    void VerifyDnsQueries(IWSLCSession* session, WSLCNetworkingMode mode, bool enableDnsTunneling)
+    {
+        // TCP DNS works except for NAT without tunneling (ICS SharedAccess DNS proxy is UDP-only).
+        const bool includeTcp = (mode != WSLCNetworkingModeNAT) || enableDnsTunneling;
+
+        // UDP queries for all record types
+        VerifyDigDnsResolution(session, "dig +short +time=5 A bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 AAAA bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 -x 8.8.8.8");
+        VerifyDigDnsResolution(session, "dig +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(session, "dig +time=5 CNAME bing.com");
+        VerifyDigDnsResolution(session, "dig +time=5 SRV bing.com");
+
+        if (includeTcp)
+        {
+            // ANY - dig expects a large response so it queries directly over TCP
+            VerifyDigDnsResolution(session, "dig +short +time=5 ANY bing.com");
+
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 A bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 AAAA bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 MX bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 NS bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 -x 8.8.8.8");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 SOA bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 TXT bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +time=5 CNAME bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +time=5 SRV bing.com");
+        }
     }
 
     void ValidatePortMapping(WSLCNetworkingMode networkingMode)
