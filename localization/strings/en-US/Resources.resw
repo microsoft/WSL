@@ -2394,6 +2394,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
     <value>Bind mount a volume to the container</value>
   </data>
+  <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
+    <value>Working directory inside the container</value>
+  </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
     <value>Write the container ID to the provided path.</value>
   </data>
