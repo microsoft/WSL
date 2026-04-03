@@ -180,7 +180,7 @@ class InstallerTests
     // This avoids install failures on older Server SKUs where the RM has stricter silent-mode behavior.
     static void PrepareForMsiOperation()
     {
-        CoFreeUnusedLibrariesEx(0);
+        CoFreeUnusedLibrariesEx(0, 0);
     }
 
     void UninstallMsi()
