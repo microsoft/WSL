@@ -1111,8 +1111,7 @@ class WSLCE2EContainerCreateTests
         result = RunWslc(std::format(
             L"container exec -u root:badgid {} id -u",
             WslcContainerName));
-        result.Dump();
-        result.Verify({.Stderr = L"unable to find group badgid: no matching entries in group file\r\n", .ExitCode = 126});
+        result.Verify({.Stdout = L"unable to find group badgid: no matching entries in group file\r\n", .ExitCode = 126});
     }
 
 private:
