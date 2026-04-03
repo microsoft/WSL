@@ -3621,10 +3621,7 @@ class WSLCTests
         // Validate that invalid start flags are rejected.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-stop-start-invalid-flags", {"echo", "OK"});
-            auto container = launcher.Launch(*m_defaultSession);
-            auto process = container.GetInitProcess();
-            VERIFY_ARE_EQUAL(process.Wait(), 0);
-
+            auto container = launcher.Create(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.Get().Start(static_cast<WSLCContainerStartFlags>(0x2), nullptr), E_INVALIDARG);
         }
     }
@@ -5628,9 +5625,7 @@ class WSLCTests
         // Validate that invalid logs flags are rejected.
         {
             WSLCContainerLauncher launcher("debian:latest", "logs-test-invalid-flags", {"/bin/bash", "-c", "echo OK"});
-            auto container = launcher.Launch(*m_defaultSession);
-            auto initProcess = container.GetInitProcess();
-            VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
+            auto container = launcher.Create(*m_defaultSession);
 
             COMOutputHandle stdoutHandle{};
             COMOutputHandle stderrHandle{};
