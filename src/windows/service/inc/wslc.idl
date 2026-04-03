@@ -238,6 +238,7 @@ typedef enum _WSLCContainerStartFlags
 {
     WSLCContainerStartFlagsNone = 0,
     WSLCContainerStartFlagsAttach = 1, // Attach stdio handles on start.
+    WSLCContainerStartFlagsValid = WSLCContainerStartFlagsAttach
 } WSLCContainerStartFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerStartFlags);")
@@ -438,6 +439,7 @@ typedef enum _WSLCLogsFlags
     WSLCLogsFlagsNone = 0,
     WSLCLogsFlagsFollow = 1,
     WSLCLogsFlagsTimestamps = 2,
+    WSLCLogsFlagsValid = WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps
 } WSLCLogsFlags;
 
 typedef enum _WSLCDeleteFlags
@@ -489,6 +491,7 @@ typedef enum _WSLCDeleteImageFlags
     WSLCDeleteImageFlagsNone = 0,
     WSLCDeleteImageFlagsForce = 1,
     WSLCDeleteImageFlagsNoPrune = 2,
+    WSLCDeleteImageFlagsValid = WSLCDeleteImageFlagsForce | WSLCDeleteImageFlagsNoPrune
 } WSLCDeleteImageFlags;
 
 typedef struct _WSLCDeleteImageOptions

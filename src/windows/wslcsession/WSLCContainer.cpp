@@ -1643,11 +1643,15 @@ HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
 }
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
+try
 {
     COMServiceExecutionContext context;
 
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: %i", Flags);
+
     return CallImpl(&WSLCContainerImpl::Start, Flags, DetachKeys);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Inspect(LPSTR* Output)
 {
@@ -1697,16 +1701,22 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
 
+DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
+
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+try
 {
     COMServiceExecutionContext context;
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
+
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: %i", Flags);
 
     *Stdout = {};
     *Stderr = {};
 
     return CallImpl(&WSLCContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::GetId(WSLCContainerId Id)
 try
