@@ -1282,12 +1282,10 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         {
             auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
-            THROW_HR_IF_MSG(
+            THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                !allocation,
-                "Port %hu is in use, cannot open container %hs",
-                e.VmPort,
-                dockerContainer.Id.c_str());
+                std::format(L"Port {} is already in use, cannot open container {}", e.VmPort, dockerContainer.Id),
+                !allocation);
 
             inserted.VmMapping.AssignVmPort(allocation);
         }
@@ -1451,12 +1449,10 @@ void WSLCContainerImpl::MapPorts()
                 auto allocatedPort =
                     m_virtualMachine.TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
 
-                THROW_HR_IF_MSG(
+                THROW_HR_WITH_USER_ERROR_IF(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    !allocatedPort,
-                    "Port %hu is in use, cannot start container %hs",
-                    e.ContainerPort,
-                    m_id.c_str());
+                    std::format(L"Port {} is already in use, cannot start container {}", e.ContainerPort, m_id),
+                    !allocatedPort);
 
                 e.VmMapping.AssignVmPort(allocatedPort);
 
@@ -1464,7 +1460,20 @@ void WSLCContainerImpl::MapPorts()
             }
         }
 
-        m_virtualMachine.MapPort(e.VmMapping);
+        try
+        {
+            m_virtualMachine.MapPort(e.VmMapping);
+        }
+        catch (const wil::ResultException& ex)
+        {
+            if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                    std::format(L"Port {} is already in use, cannot start container {}", e.ContainerPort, m_id));
+            }
+            throw;
+        }
     }
 }
 
