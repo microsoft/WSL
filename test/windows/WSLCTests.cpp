@@ -355,6 +355,15 @@ class WSLCTests
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
         }
+
+        // Validate that creating a session on a non-existing storage fails if WSLCSessionStorageFlagsNoCreate is set.
+        {
+            auto settings = GetDefaultSessionSettings(L"storage-not-found");
+            settings.StoragePath = L"C:\\does-not-exist";
+            settings.StorageFlags = WSLCSessionStorageFlagsNoCreate;
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+        }
     }
 
     void ExpectImagePresent(IWSLCSession& Session, const char* Image, bool Present = true)

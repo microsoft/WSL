@@ -42,6 +42,8 @@ public:
 
     SessionOptions();
 
+    static const std::filesystem::path& GetStoragePath();
+
     const WSLCSessionSettings* Get() const
     {
         return &m_sessionSettings;
@@ -59,7 +61,6 @@ private:
     static constexpr uint32_t s_defaultBootTimeoutMs = 30 * 1000;
 
     static bool IsElevated();
-    static const std::filesystem::path& GetStoragePath();
 
     WSLCSessionSettings m_sessionSettings{};
 };

@@ -25,7 +25,8 @@ std::vector<Argument> SessionEnterCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::StoragePath, true),
-        Argument::Create(ArgType::Name, std::nullopt, std::nullopt, L"Name for the session. If not provided, a GUID is generated."),
+        Argument::Create(
+            ArgType::Name, std::nullopt, std::nullopt, L"Name for the session. If not provided, a GUID is generated."),
     };
 }
 
@@ -36,8 +37,9 @@ std::wstring SessionEnterCommand::ShortDescription() const
 
 std::wstring SessionEnterCommand::LongDescription() const
 {
-    return {L"Creates a non-persistent session with the given storage path and opens a shell into it. "
-            L"The session is deleted when the shell exits. If no name is provided, a GUID is generated and printed to stderr."};
+    return {
+        L"Creates a non-persistent session with the given storage path and opens a shell into it. "
+        L"The session is deleted when the shell exits. If no name is provided, a GUID is generated and printed to stderr."};
 }
 
 void SessionEnterCommand::ExecuteInternal(CLIExecutionContext& context) const

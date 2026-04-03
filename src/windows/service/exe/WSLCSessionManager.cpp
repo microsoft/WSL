@@ -212,6 +212,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(_In_ ULONG
     sessionSettings.NetworkingMode = Settings->NetworkingMode;
     sessionSettings.FeatureFlags = Settings->FeatureFlags;
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
+    sessionSettings.StorageFlags = Settings->StorageFlags;
     return sessionSettings;
 }
 

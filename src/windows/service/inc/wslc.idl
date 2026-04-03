@@ -415,6 +415,14 @@ interface IWSLCVirtualMachine : IUnknown
     HRESULT RemoveShare([in] REFGUID ShareId);
 }
 
+typedef enum _WSLCSessionStorageFlags
+{
+    WSLCSessionStorageFlagsNone = 0,
+    WSLCSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
+} WSLCSessionStorageFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionStorageFlags);")
+
 // Settings for IWSLCSessionManager::CreateSession - full session configuration
 typedef struct _WSLCSessionSettings {
     LPCWSTR DisplayName;
@@ -427,6 +435,7 @@ typedef struct _WSLCSessionSettings {
     [unique] ITerminationCallback* TerminationCallback;
     WSLCFeatureFlags FeatureFlags;
     WSLCHandle DmesgOutput;
+    WSLCSessionStorageFlags StorageFlags;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
@@ -554,6 +563,7 @@ typedef struct _WSLCSessionInitSettings
     ULONG CreatorPid;
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
+    WSLCSessionStorageFlags StorageFlags;
     ULONGLONG MaximumStorageSizeMb;
     ULONG BootTimeoutMs;
     WSLCNetworkingMode NetworkingMode;
@@ -679,7 +689,11 @@ typedef enum _WSLCSessionFlags
     WSLCSessionFlagsNone = 0,
     WSLCSessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
     WSLCSessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
+    WSLCSessionFlagsOpenExistingStorage = 4, // Only open an existing storage folder, don't create one if it doesn't already exist.
 } WSLCSessionFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")
+
 
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),

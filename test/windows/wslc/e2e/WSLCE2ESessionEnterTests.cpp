@@ -16,8 +16,11 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "SessionModel.h"
 
 using namespace WEX::Logging;
+
+using wsl::windows::wslc::models::SessionOptions;
 
 namespace WSLCE2ETests {
 
@@ -25,15 +28,10 @@ class WSLCE2ESessionEnterTests
 {
     WSLC_TEST_CLASS(WSLCE2ESessionEnterTests)
 
-    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
-
     TEST_CLASS_SETUP(TestClassSetup)
     {
-        return true;
-    }
-
-    TEST_CLASS_CLEANUP(TestClassCleanup)
-    {
+        // Terminate the wslc session since we use its storage path in this test class.
+        RunWslc(L"session terminate");
         return true;
     }
 
@@ -41,32 +39,15 @@ class WSLCE2ESessionEnterTests
     {
         WSL2_TEST_ONLY();
 
-        // Generate a unique storage path for this test.
-        GUID testGuid;
-        VERIFY_SUCCEEDED(CoCreateGuid(&testGuid));
-        auto guidStr = wsl::shared::string::GuidToString<wchar_t>(testGuid, wsl::shared::string::GuidToStringFlags::None);
-        auto storagePath = std::filesystem::absolute(std::filesystem::current_path() / L"wslc-cli-test-sessions" / guidStr.substr(0, 8));
-        const auto sessionName = std::format(L"wslc-enter-test-{}", guidStr.substr(0, 8));
-
-        auto cleanupStorage = wil::scope_exit([&] {
-            std::error_code error;
-            std::filesystem::remove_all(storagePath, error);
-        });
+        constexpr auto sessionName = L"test-wslc-session-enter";
 
         // Run an interactive session enter with an explicit name.
-        auto session = RunWslcInteractive(std::format(L"session enter \"{}\" --name {}", storagePath.wstring(), sessionName));
+        auto session = RunWslcInteractive(std::format(L"session enter \"{}\" --name {}", SessionOptions::GetStoragePath(), sessionName));
         VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
         session.ExpectStdout(VT::SESSION_PROMPT);
 
-        // Verify basic command execution inside the session.
-        session.WriteLine("echo hello");
-        session.ExpectStdout(VT::RESET);
-        session.ExpectCommandEcho("echo hello");
-        session.ExpectStdout("hello\r\n");
-        session.ExpectStdout(VT::SESSION_PROMPT);
-
-        // Verify whoami returns root.
+        // Validate that the shell is running as root.
         session.WriteLine("whoami");
         session.ExpectStdout(VT::RESET);
         session.ExpectCommandEcho("whoami");
@@ -80,9 +61,7 @@ class WSLCE2ESessionEnterTests
         VERIFY_IS_TRUE(listResult.Stdout->find(sessionName) != std::wstring::npos);
 
         // Exit the shell.
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
-        VERIFY_ARE_EQUAL(0, exitCode);
+        VERIFY_ARE_EQUAL(session.Exit(), 0);
 
         // Verify the session is no longer in the session list after exiting.
         listResult = RunWslc(L"session list");
@@ -95,84 +74,24 @@ class WSLCE2ESessionEnterTests
     {
         WSL2_TEST_ONLY();
 
-        // Generate a unique storage path for this test.
-        GUID testGuid;
-        VERIFY_SUCCEEDED(CoCreateGuid(&testGuid));
-        auto guidStr = wsl::shared::string::GuidToString<wchar_t>(testGuid, wsl::shared::string::GuidToStringFlags::None);
-        auto storagePath = std::filesystem::absolute(std::filesystem::current_path() / L"wslc-cli-test-sessions" / guidStr.substr(0, 8));
+        auto session = RunWslcInteractive(std::format(L"session enter \"{}\"", SessionOptions::GetStoragePath()));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
-        auto cleanupStorage = wil::scope_exit([&] {
-            std::error_code error;
-            std::filesystem::remove_all(storagePath, error);
-        });
+        session.ExpectStderr("Created session: ");
+        session.ExpectStdout(VT::SESSION_PROMPT);
 
-        // Run session enter without --name; the generated GUID should be printed to stderr.
-        auto result = RunWslcInteractive(std::format(L"session enter \"{}\"", storagePath.wstring()));
-        VERIFY_IS_TRUE(result.IsRunning(), L"Session should be running");
-
-        // The generated session name (a GUID) should appear on stderr.
-        // GUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars without braces)
-        result.ExpectStdout(VT::SESSION_PROMPT);
-
-        // Run a basic command to confirm the session is functional.
-        result.WriteLine("echo working");
-        result.ExpectStdout(VT::RESET);
-        result.ExpectCommandEcho("echo working");
-        result.ExpectStdout("working\r\n");
-        result.ExpectStdout(VT::SESSION_PROMPT);
-
-        // Exit the shell.
-        result.ExitAndVerifyNoErrors();
-        auto exitCode = result.Wait();
-        VERIFY_ARE_EQUAL(0, exitCode);
+        VERIFY_ARE_EQUAL(session.Exit(), 0);
     }
 
-    TEST_METHOD(WSLCE2E_SessionEnter_SessionIsDeleted_AfterExit)
+    TEST_METHOD(WSLCE2E_SessionEnter_StoragePathNotFound)
     {
         WSL2_TEST_ONLY();
 
-        // Generate a unique storage path and session name for this test.
-        GUID testGuid;
-        VERIFY_SUCCEEDED(CoCreateGuid(&testGuid));
-        auto guidStr = wsl::shared::string::GuidToString<wchar_t>(testGuid, wsl::shared::string::GuidToStringFlags::None);
-        auto storagePath = std::filesystem::absolute(std::filesystem::current_path() / L"wslc-cli-test-sessions" / guidStr.substr(0, 8));
-        const auto sessionName = std::format(L"wslc-enter-del-{}", guidStr.substr(0, 8));
-
-        auto cleanupStorage = wil::scope_exit([&] {
-            std::error_code error;
-            std::filesystem::remove_all(storagePath, error);
+        auto result = RunWslc(L"session enter does-not-exist");
+        result.Verify({
+            .Stderr = L"The system cannot find the path specified. \r\nError code: ERROR_PATH_NOT_FOUND\r\n",
+            .ExitCode = 1,
         });
-
-        // Create and immediately exit the session.
-        {
-            auto session = RunWslcInteractive(std::format(L"session enter \"{}\" --name {}", storagePath.wstring(), sessionName));
-            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
-            session.ExpectStdout(VT::SESSION_PROMPT);
-            session.ExitAndVerifyNoErrors();
-            auto exitCode = session.Wait();
-            VERIFY_ARE_EQUAL(0, exitCode);
-        }
-
-        // After exit, the session should have been terminated and removed.
-        auto listResult = RunWslc(L"session list");
-        listResult.Verify({.Stderr = L"", .ExitCode = S_OK});
-        VERIFY_IS_TRUE(listResult.Stdout.has_value());
-        VERIFY_IS_FALSE(listResult.Stdout->find(sessionName) != std::wstring::npos);
-
-        // Attempting to terminate the session should fail with not found.
-        auto terminateResult = RunWslc(std::format(L"session terminate {}", sessionName));
-        VERIFY_IS_TRUE(terminateResult.ExitCode.has_value());
-        VERIFY_ARE_NOT_EQUAL(static_cast<DWORD>(0), terminateResult.ExitCode.value());
-    }
-
-    TEST_METHOD(WSLCE2E_SessionEnter_MissingStoragePath_Fails)
-    {
-        WSL2_TEST_ONLY();
-
-        // session enter with no arguments should fail (missing required storage-path).
-        auto result = RunWslc(L"session enter");
-        VERIFY_IS_TRUE(result.ExitCode.has_value());
-        VERIFY_ARE_NOT_EQUAL(static_cast<DWORD>(0), result.ExitCode.value());
     }
 };
 } // namespace WSLCE2ETests

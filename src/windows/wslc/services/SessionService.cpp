@@ -23,7 +23,6 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
-DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);
 
 int SessionService::Attach(const std::wstring& sessionName)
 {
@@ -102,7 +101,7 @@ int SessionService::Attach(const std::wstring& sessionName)
     return static_cast<int>(exitCode);
 }
 
-Session SessionService::CreateSession(const SessionOptions& options)
+Session SessionService::CreateSession(const SessionOptions& options, WSLCSessionFlags Flags)
 {
     const WSLCSessionSettings* settings = options.Get();
     wil::com_ptr<IWSLCSessionManager> sessionManager;
@@ -110,7 +109,7 @@ Session SessionService::CreateSession(const SessionOptions& options)
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(settings, WSLCSessionFlagsPersistent | WSLCSessionFlagsOpenExisting, &session));
+    THROW_IF_FAILED(sessionManager->CreateSession(settings, Flags, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
@@ -124,9 +123,12 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     SessionOptions options;
     options.Get()->DisplayName = displayName.c_str();
     options.Get()->StoragePath = storagePath.c_str();
+    options.Get()->StorageFlags = WSLCSessionStorageFlagsNoCreate; // Don't create storage if it doesn't exist.
 
     // Create a non-persistent session: lifetime is tied to our COM reference.
-    auto session = SessionService::CreateSession(options);
+    // Use WSLCSessionFlagsOpenExistingStorage so we don't accidentally create a new sessions storage.
+    // TODO: Consider adding a 'create' verb to do that.
+    auto session = SessionService::CreateSession(options, WSLCSessionFlagsOpenExistingStorage);
     wsl::windows::common::wslutil::PrintMessage(std::format(L"Created session: {}", displayName), stderr);
 
     const std::string shell = "/bin/sh";

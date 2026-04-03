@@ -38,7 +38,7 @@ COMMAND_LINE_TEST_CASE(L"session terminate", L"terminate", true)
 COMMAND_LINE_TEST_CASE(L"session enter C:\\storage", L"enter", true)
 COMMAND_LINE_TEST_CASE(L"session enter C:\\storage --name my-session", L"enter", true)
 COMMAND_LINE_TEST_CASE(L"session enter", L"enter", false)                        // Missing required storage-path
-COMMAND_LINE_TEST_CASE(L"session enter C:\\storage --notanarg", L"enter", false)  // Invalid argument
+COMMAND_LINE_TEST_CASE(L"session enter C:\\storage --notanarg", L"enter", false) // Invalid argument
 COMMAND_LINE_TEST_CASE(L"session enter --name my-session", L"enter", false)      // Missing required positional before flag
 
 // Container command tests
