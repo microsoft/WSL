@@ -208,6 +208,7 @@ private:
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
+                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
