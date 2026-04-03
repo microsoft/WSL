@@ -217,22 +217,6 @@ wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
     return inspectData[0];
 }
 
-namespace VT {
-    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste)
-    {
-        const auto containerId = InspectContainer(containerNameOrId).Id;
-        const auto shortId = GetHashId(containerId);
-        return BuildContainerPrompt(shortId, withBracketedPaste);
-    }
-
-    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId)
-    {
-        const auto containerId = InspectContainer(containerNameOrId).Id;
-        const auto shortId = GetHashId(containerId);
-        return BuildContainerAttachPrompt(shortId);
-    }
-} // namespace VT
-
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     auto listResult = RunWslc(L"container list --no-trunc --all");
@@ -287,7 +271,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
 
 void EnsureImageIsDeleted(const TestImage& image)
 {
-    auto result = RunWslc(L"image list --no-trunc");
+    auto result = RunWslc(L"image list -q");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -305,10 +289,10 @@ void EnsureImageIsDeleted(const TestImage& image)
 
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    std::wstring listCommand = L"image list --no-trunc";
+    std::wstring listCommand = L"image list -q";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list --no-trunc --session \"{}\"", sessionName);
+        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
     }
 
     auto result = RunWslc(listCommand);

@@ -100,6 +100,20 @@ namespace details {
         return std::nullopt;
     }
 
+    WSLC_VALIDATE_SETTING(SessionHostFileShareMode)
+    {
+        if (value == "plan9")
+        {
+            return HostFileShareMode::Plan9;
+        }
+        if (value == "virtiofs")
+        {
+            return HostFileShareMode::VirtioFs;
+        }
+
+        return std::nullopt;
+    }
+
 #undef WSLC_VALIDATE_SETTING
 
 } // namespace details

@@ -32,6 +32,7 @@ using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::RelayedProcessIO;
+using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VMPortMapping;
 using wsl::windows::service::wslc::WSLCContainer;
 using wsl::windows::service::wslc::WSLCContainerImpl;
@@ -264,7 +265,8 @@ void ProcessNamedVolumes(
 
 void ValidateNamedVolumes(
     const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes)
+    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_set<std::string>& anonymousVolumes)
 {
     for (const auto& mount : mounts)
     {
@@ -273,7 +275,7 @@ void ValidateNamedVolumes(
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLC_E_VOLUME_NOT_FOUND,
                 wsl::shared::Localization::MessageWslcVolumeNotFound(mount.Name),
-                !sessionVolumes.contains(mount.Name));
+                !sessionVolumes.contains(mount.Name) && !anonymousVolumes.contains(mount.Name));
         }
     }
 }
@@ -420,6 +422,23 @@ const std::string& WSLCContainerImpl::Name() const noexcept
     return m_name;
 }
 
+std::vector<WSLCPortMapping> WSLCContainerImpl::GetPorts() const
+{
+    auto lock = m_lock.lock_shared();
+    if (m_state != WslcContainerStateRunning)
+    {
+        return {};
+    }
+
+    std::vector<WSLCPortMapping> result;
+    result.reserve(m_mappedPorts.size());
+    for (const auto& port : m_mappedPorts)
+    {
+        result.push_back(port.Serialize());
+    }
+    return result;
+}
+
 void WSLCContainerImpl::GetStateChangedAt(ULONGLONG* Result)
 {
     auto lock = m_lock.lock_shared();
@@ -463,7 +482,8 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
     {
-        *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE);
+        *Stdin = common::wslutil::ToCOMOutputHandle(
+            reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE, WSLCHandleTypeSocket);
 
         return;
     }
@@ -488,11 +508,11 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     m_ioRelay.AddHandles(std::move(handles));
 
-    *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE);
+    *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE, WSLCHandleTypePipe);
 
-    *Stdout = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE);
+    *Stdout = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
 
-    *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE);
+    *Stderr = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
 }
 
 void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
@@ -518,7 +538,8 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
 
             if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
             {
-                io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id, detachKeys).release()});
+                io = std::make_unique<TTYProcessIO>(TypedHandle{
+                    wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id, detachKeys).release()}, WSLCHandleTypeSocket});
             }
             else
             {
@@ -878,7 +899,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         std::unique_ptr<WSLCProcessIO> io;
         if (request.Tty)
         {
-            io = std::make_unique<TTYProcessIO>(std::move(stream));
+            io = std::make_unique<TTYProcessIO>(TypedHandle{std::move(stream), WSLCHandleTypeSocket});
         }
         else
         {
@@ -1217,6 +1238,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_set<std::string>& anonymousVolumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1225,7 +1247,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes);
+    ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes, anonymousVolumes);
 
     auto labels(dockerContainer.Labels);
     auto metadataIt = labels.find(WSLCContainerMetadataLabel);
@@ -1342,7 +1364,7 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = common::wslutil::ToCOMOutputHandle(ttyRead.get(), GENERIC_READ | SYNCHRONIZE);
+        *Stdout = common::wslutil::ToCOMOutputHandle(ttyRead.get(), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
     }
     else
     {
@@ -1355,11 +1377,8 @@ void WSLCContainerImpl::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle
 
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = common::wslutil::ToCOMOutputHandle(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE);
-        *Stderr = common::wslutil::ToCOMOutputHandle(stderrRead.get(), GENERIC_READ | SYNCHRONIZE);
-
-        WI_ASSERT(Stdout->Type == WSLCHandleTypePipe);
-        WI_ASSERT(Stderr->Type == WSLCHandleTypePipe);
+        *Stdout = common::wslutil::ToCOMOutputHandle(stdoutRead.get(), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
+        *Stderr = common::wslutil::ToCOMOutputHandle(stderrRead.get(), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
     }
 }
 
@@ -1367,7 +1386,7 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
 {
     // Create one pipe for each STD handle.
     std::vector<std::unique_ptr<OverlappedIOHandle>> ioHandles;
-    std::map<ULONG, wil::unique_handle> fds;
+    std::map<ULONG, TypedHandle> fds;
 
     // This is required for docker to know when stdin is closed.
     auto closeStdin = [socket = stream.get(), this]() {
@@ -1380,7 +1399,7 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
         ioHandles.emplace_back(
             std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, stream.get()));
 
-        fds.emplace(WSLCFDStdin, stdinWrite.release());
+        fds.emplace(WSLCFDStdin, TypedHandle{wil::unique_handle{stdinWrite.release()}, WSLCHandleTypePipe});
     }
     else
     {
@@ -1391,8 +1410,8 @@ std::unique_ptr<RelayedProcessIO> WSLCContainerImpl::CreateRelayedProcessIO(wil:
     auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
     auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
-    fds.emplace(WSLCFDStdout, stdoutRead.release());
-    fds.emplace(WSLCFDStderr, stderrRead.release());
+    fds.emplace(WSLCFDStdout, TypedHandle{wil::unique_handle{stdoutRead.release()}, WSLCHandleTypePipe});
+    fds.emplace(WSLCFDStderr, TypedHandle{wil::unique_handle{stderrRead.release()}, WSLCHandleTypePipe});
 
     ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
         std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));

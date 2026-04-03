@@ -44,21 +44,21 @@ try
 {
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_io, "Process IO not attached");
 
-    auto handle = m_io->OpenFd(Fd);
+    auto typedHandle = m_io->OpenFd(Fd);
 
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !handle.is_valid());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !typedHandle.is_valid());
 
     DWORD Access = SYNCHRONIZE;
 
     WI_SetFlagIf(Access, GENERIC_WRITE, Fd == WSLCFDTty || Fd == WSLCFDStdin);
     WI_SetFlagIf(Access, GENERIC_READ, Fd == WSLCFDStdout || Fd == WSLCFDStderr || Fd == WSLCFDTty);
 
-    *Handle = common::wslutil::ToCOMOutputHandle(handle.get(), Access);
+    *Handle = common::wslutil::ToCOMOutputHandle(typedHandle.get(), Access, typedHandle.Type);
 
     WSL_LOG(
         "GetStdHandle",
         TraceLoggingValue(static_cast<int>(Fd), "fd"),
-        TraceLoggingValue(handle.get(), "handle"),
+        TraceLoggingValue(typedHandle.get(), "handle"),
         TraceLoggingValue(static_cast<int>(Handle->Type), "type"));
 
     return S_OK;
@@ -77,7 +77,7 @@ wil::unique_handle WSLCProcess::GetStdHandle(int Index)
 {
     THROW_WIN32_IF(ERROR_INVALID_STATE, !m_io);
 
-    return m_io->OpenFd(Index);
+    return std::move(m_io->OpenFd(Index).Handle);
 }
 
 HANDLE WSLCProcess::GetExitEvent()

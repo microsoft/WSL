@@ -145,7 +145,18 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
     {
         const WSLCImageInformation& image = *ptr;
         ImageInformation info{};
-        info.Name = image.Image;
+
+        // Parse the image reference — dangling images have no repo/tag
+        std::string imageRef = image.Image;
+        if (imageRef != "<none>:<none>")
+        {
+            auto parsed = wsl::windows::common::wslutil::ParseImage(imageRef);
+            info.Repository = parsed.first;
+            info.Tag = parsed.second;
+        }
+
+        info.Id = image.Hash;
+        info.Created = image.Created;
         info.Size = image.Size;
         result.push_back(info);
     }

@@ -68,8 +68,7 @@ static void SetContainerTTYOptions(WSLCProcessOptions& options)
         }
     }
 
-    PrintMessage(L"error: --tty requires stdin or stdout to be a console", stderr);
-    THROW_HR(E_FAIL);
+    THROW_HR_WITH_USER_ERROR(E_FAIL, L"--tty requires stdin or stdout to be a console");
 }
 
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
@@ -154,11 +153,29 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
+static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping& mapping)
+{
+    return PortInformation{
+        .HostPort = mapping.HostPort,
+        .ContainerPort = mapping.ContainerPort,
+        .Protocol = static_cast<int>(mapping.Protocol),
+        .BindingAddress = mapping.BindingAddress,
+    };
+}
+
 std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
+    if (timestamp == 0)
+    {
+        return L"";
+    }
+
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
     constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+    constexpr LONGLONG SecondsPerWeek = SecondsPerDay * 7;
+    constexpr LONGLONG SecondsPerMonth = SecondsPerDay * 30;
+    constexpr LONGLONG SecondsPerYear = SecondsPerDay * 365;
 
     auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
     if (elapsed < 0)
@@ -166,24 +183,36 @@ std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
         elapsed = 0;
     }
 
+    auto pluralize = [](LONGLONG count, const wchar_t* singular, const wchar_t* plural) {
+        return std::format(L"{} {} ago", count, (count == 1 ? singular : plural));
+    };
+
     if (elapsed < SecondsPerMinute)
     {
-        const auto seconds = elapsed;
-        return std::format(L"{} {} ago", seconds, (seconds == 1 ? L"second" : L"seconds"));
+        return pluralize(elapsed, L"second", L"seconds");
     }
     else if (elapsed < SecondsPerHour)
     {
-        const auto minutes = elapsed / SecondsPerMinute;
-        return std::format(L"{} {} ago", minutes, (minutes == 1 ? L"minute" : L"minutes"));
+        return pluralize(elapsed / SecondsPerMinute, L"minute", L"minutes");
     }
     else if (elapsed < SecondsPerDay)
     {
-        const auto hours = elapsed / SecondsPerHour;
-        return std::format(L"{} {} ago", hours, (hours == 1 ? L"hour" : L"hours"));
+        return pluralize(elapsed / SecondsPerHour, L"hour", L"hours");
+    }
+    else if (elapsed < SecondsPerWeek)
+    {
+        return pluralize(elapsed / SecondsPerDay, L"day", L"days");
+    }
+    else if (elapsed < SecondsPerMonth)
+    {
+        return pluralize(elapsed / SecondsPerWeek, L"week", L"weeks");
+    }
+    else if (elapsed < SecondsPerYear)
+    {
+        return pluralize(elapsed / SecondsPerMonth, L"month", L"months");
     }
 
-    const auto days = elapsed / SecondsPerDay;
-    return std::format(L"{} {} ago", days, (days == 1 ? L"day" : L"days"));
+    return pluralize(elapsed / SecondsPerYear, L"year", L"years");
 }
 
 int ContainerService::Attach(Session& session, const std::string& id)
@@ -254,6 +283,36 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
     }
 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
+}
+
+std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
+{
+    if (state != WslcContainerStateRunning || ports.empty())
+    {
+        return L"";
+    }
+
+    std::wstring result;
+    for (size_t i = 0; i < ports.size(); ++i)
+    {
+        const auto& port = ports[i];
+
+        std::wstring hostIp = wsl::shared::string::MultiByteToWide(port.BindingAddress);
+
+        std::wstring protocol = (port.Protocol == IPPROTO_TCP)   ? L"tcp"
+                                : (port.Protocol == IPPROTO_UDP) ? L"udp"
+                                                                 : std::format(L"{}", port.Protocol);
+
+        if (i > 0)
+        {
+            result += L", ";
+        }
+
+        result += std::format(
+            L"{}:{}->{}/{}", (hostIp.find(L':') != std::wstring::npos) ? std::format(L"[{}]", hostIp) : hostIp, port.HostPort, port.ContainerPort, protocol);
+    }
+
+    return result;
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
@@ -339,7 +398,9 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
+    wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
     for (const auto& current : containers)
     {
         ContainerInformation entry;
@@ -349,6 +410,15 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
+
+        for (const auto& port : ports)
+        {
+            if (strcmp(port.Id, current.Id) == 0)
+            {
+                entry.Ports.push_back(PortInformationFromWSLCPortMapping(port.PortMapping));
+            }
+        }
+
         result.emplace_back(std::move(entry));
     }
 

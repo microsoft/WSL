@@ -1516,6 +1516,62 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_ABORT, result.get_future().get());
     }
 
+    TEST_METHOD(AnonymousVolumes)
+    {
+        // TODO: Add more test coverage once anonymous volumes are fully supported and switch to using -v instead of building an image.
+
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            WSLCDeleteImageOptions deleteOptions{.Image = "wslc-test-build:latest", .Flags = WSLCDeleteImageFlagsForce};
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "VOLUME /volume\n"; // Use VOLUME to force the creation of an anonymous volume.
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
+        ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
+
+        WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess();
+
+        auto containerId = container.Id();
+
+        ValidateProcessOutput(result, {});
+
+        ResetTestSession();
+
+        container.SetDeleteOnClose(false);
+
+        // Manually cleanup the container since the session has been reset.
+        auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            wil::com_ptr<IWSLCContainer> container;
+            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &container));
+
+            VERIFY_SUCCEEDED(container->Delete(WSLCDeleteFlagsForce));
+        });
+
+        // Validate that the session is correctly restarted.
+        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+        wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+
+        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+        VERIFY_ARE_EQUAL(containers.size(), 1);
+        VERIFY_ARE_EQUAL(containers[0].Id, containerId);
+    }
+
     TEST_METHOD(TagImage)
     {
         WSL2_TEST_ONLY();
@@ -2082,7 +2138,7 @@ class WSLCTests
             auto [read, write] = CreateSubprocessPipe(false, false);
 
             auto settings = GetDefaultSessionSettings(L"dmesg-output-test");
-            settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
+            settings.DmesgOutput = ToCOMInputHandle(write.get());
             WI_UpdateFlag(settings.FeatureFlags, WslcFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
             std::vector<char> dmesgContent;
@@ -3653,8 +3709,10 @@ class WSLCTests
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLCContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
 
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -3697,7 +3755,9 @@ class WSLCTests
             ULONGLONG runningCreatedAt{};
             {
                 wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
                 VERIFY_ARE_EQUAL(containers.size(), 1);
                 runningStateChangedAt = containers[0].StateChangedAt;
                 runningCreatedAt = containers[0].CreatedAt;
@@ -3724,7 +3784,9 @@ class WSLCTests
             // Verify that StateChangedAt was updated after the state transition.
             {
                 wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+                wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
+                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
                 VERIFY_ARE_EQUAL(containers.size(), 1);
 
                 auto now = static_cast<ULONGLONG>(time(nullptr));
@@ -3957,8 +4019,10 @@ class WSLCTests
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLCContainerState>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
 
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -4410,6 +4474,66 @@ class WSLCTests
 
             ExpectHttpResponse(L"http://[::1]:1234", 200);
 
+            // Verify that ListContainers returns the port data for a running container.
+            {
+                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+                wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+                // Find the container ID for "test-ports"
+                std::string testPortsId;
+                for (const auto& entry : containers)
+                {
+                    if (std::string(entry.Name) == "test-ports")
+                    {
+                        testPortsId = entry.Id;
+                        break;
+                    }
+                }
+                VERIFY_IS_FALSE(testPortsId.empty());
+
+                // Filter ports for this container
+                std::vector<WSLCPortMapping> containerPorts;
+                for (const auto& port : ports)
+                {
+                    if (testPortsId == port.Id)
+                    {
+                        containerPorts.push_back(port.PortMapping);
+                    }
+                }
+
+                VERIFY_ARE_EQUAL(2, containerPorts.size());
+                VERIFY_ARE_EQUAL(1234, containerPorts[0].HostPort);
+                VERIFY_ARE_EQUAL(8000, containerPorts[0].ContainerPort);
+                VERIFY_ARE_EQUAL(AF_INET, containerPorts[0].Family);
+                VERIFY_ARE_EQUAL(1234, containerPorts[1].HostPort);
+                VERIFY_ARE_EQUAL(8000, containerPorts[1].ContainerPort);
+                VERIFY_ARE_EQUAL(AF_INET6, containerPorts[1].Family);
+                VERIFY_ARE_EQUAL(IPPROTO_TCP, containerPorts[0].Protocol);
+                VERIFY_ARE_EQUAL(IPPROTO_TCP, containerPorts[1].Protocol);
+            }
+
+            // Verify that a created (not yet started) container returns no ports.
+            {
+                WSLCContainerLauncher createdLauncher("debian:latest", "test-ports-created", {"echo", "OK"}, {}, containerNetworkType);
+                createdLauncher.AddPort(1235, 8000, AF_INET);
+
+                auto createdContainer = createdLauncher.Create(session);
+
+                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+                wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+                std::string createdId = createdContainer.Id();
+                for (const auto& port : ports)
+                {
+                    VERIFY_ARE_NOT_EQUAL(createdId, std::string(port.Id));
+                }
+
+                VERIFY_SUCCEEDED(createdContainer.Get().Delete(WSLCDeleteFlagsNone));
+                createdContainer.Reset();
+            }
+
             // Validate that the port cannot be reused while the container is running.
             WSLCContainerLauncher subLauncher(
                 "python:3.12-alpine", "test-ports-2", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
@@ -4419,9 +4543,21 @@ class WSLCTests
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(session);
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
+            // Verify that a stopped container returns no ports.
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+            {
+                wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+                wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(session.ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
+                std::string stoppedId = container.Id();
+                for (const auto& port : ports)
+                {
+                    VERIFY_ARE_NOT_EQUAL(stoppedId, std::string(port.Id));
+                }
+            }
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
             container.Reset(); // TODO: Re-think container lifetime management.
 
             // Validate that the port can be reused now that the container is stopped.
@@ -4512,7 +4648,7 @@ class WSLCTests
             // Invalid address family (launched manually because AddPort() throws on unsupported family).
             {
                 WSLCPortMapping port{};
-                port.BindingAddress = "127.0.0.1";
+                strcpy_s(port.BindingAddress, "127.0.0.1");
                 port.HostPort = 1234;
                 port.ContainerPort = 1234;
                 port.Protocol = IPPROTO_TCP;
@@ -5081,7 +5217,8 @@ class WSLCTests
 
             // Capture StateChangedAt and CreatedAt before the session is destroyed.
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
             originalStateChangedAt = containers[0].StateChangedAt;
             originalCreatedAt = containers[0].CreatedAt;
@@ -5098,7 +5235,8 @@ class WSLCTests
 
             // Verify that StateChangedAt was correctly restored from the Docker timestamp.
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
             VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
             VERIFY_ARE_EQUAL(containers[0].CreatedAt, originalCreatedAt);
@@ -5880,7 +6018,9 @@ class WSLCTests
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 0);
         }
     }
@@ -5915,7 +6055,8 @@ class WSLCTests
         VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+        wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(containers.size(), 0);
     }
 
@@ -6020,7 +6161,9 @@ class WSLCTests
 
         {
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
             if (containers.size() > 0)
             {
@@ -6451,12 +6594,15 @@ class WSLCTests
             LoadTestImage("debian:latest", nonElevatedSession.get());
 
             WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-1", {"echo", "OK"});
-            auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+            auto container = launcher.Launch(*nonElevatedSession);
+            auto initProcess = container.GetInitProcess();
             ValidateProcessOutput(initProcess, {{1, "OK\n"}});
         }
 
         WSLCContainerLauncher launcher("debian:latest", "test-non-elevated-handles-2", {"echo", "OK"});
-        auto initProcess = launcher.Launch(*nonElevatedSession).GetInitProcess();
+        auto container = launcher.Launch(*nonElevatedSession);
+        auto initProcess = container.GetInitProcess();
+
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
     }
 };

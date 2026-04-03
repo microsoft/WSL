@@ -2,6 +2,8 @@ LIBRARY wslcsdk
 
 EXPORTS
 
+DllMain
+
 WslcInitSessionSettings
 WslcInitContainerSettings
 WslcInitProcessSettings

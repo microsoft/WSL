@@ -140,8 +140,10 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
     THROW_HR_IF(E_INVALIDARG, vhdMetadata.HostPath.empty());
     THROW_HR_IF(E_INVALIDARG, vhdMetadata.SizeBytes == 0);
 
-    auto deviceIt = Volume.Options.find("device");
-    THROW_HR_IF(E_INVALIDARG, deviceIt == Volume.Options.end());
+    THROW_HR_IF_MSG(E_INVALIDARG, !Volume.Options.has_value(), "Volume.Options is empty");
+
+    auto deviceIt = Volume.Options->find("device");
+    THROW_HR_IF(E_INVALIDARG, deviceIt == Volume.Options->end());
     THROW_HR_IF(E_INVALIDARG, deviceIt->second.empty());
 
     std::string virtualMachinePath = deviceIt->second;

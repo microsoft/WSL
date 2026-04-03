@@ -65,7 +65,7 @@ struct Volume
     std::string Name;
     std::string Driver;
     std::string Mountpoint;
-    std::map<std::string, std::string> Options;
+    std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);

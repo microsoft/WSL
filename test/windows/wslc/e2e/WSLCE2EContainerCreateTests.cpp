@@ -696,10 +696,12 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        auto session = RunWslcInteractive(std::format(L"container run -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        const auto& prompt = ">";
+        auto session = RunWslcInteractive(
+            std::format(L"container run -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
         session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
@@ -724,13 +726,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container run -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -745,12 +744,15 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+
+        const auto& prompt = ">";
+        auto result = RunWslc(std::format(
+            L"container run -itd -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedAttachPrompt = VT::BuildContainerAttachPrompt(prompt);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
 
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
@@ -785,13 +787,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -806,13 +805,16 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+
+        const auto& prompt = ">";
+        auto result =
+            RunWslc(std::format(L"container run -itd -e PS1={} --name {} {}", prompt, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
 
-        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", containerId));
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash --norc", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
         session.ExpectStdout(expectedPrompt);
@@ -843,13 +845,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container exec -i {} cat", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -864,11 +863,14 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container create -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+
+        const auto& prompt = ">";
+        auto result = RunWslc(std::format(
+            L"container create -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
 
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
@@ -902,13 +904,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();

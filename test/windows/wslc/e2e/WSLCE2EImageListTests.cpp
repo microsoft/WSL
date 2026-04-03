@@ -54,7 +54,7 @@ class WSLCE2EImageListTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : result.GetStdoutLines())
         {
-            if (line.find(DebianImage.NameAndTag()) != std::wstring::npos)
+            if (line.find(DebianImage.Name) != std::wstring::npos && line.find(DebianImage.Tag) != std::wstring::npos)
             {
                 return;
             }
@@ -105,11 +105,37 @@ class WSLCE2EImageListTests
         std::vector<std::wstring> imageNames;
         for (const auto& image : images)
         {
-            imageNames.push_back(wsl::shared::string::MultiByteToWide(image.Name));
+            auto nameAndTag = std::format(
+                L"{}:{}",
+                wsl::shared::string::MultiByteToWide(image.Repository.value_or("<untagged>")),
+                wsl::shared::string::MultiByteToWide(image.Tag.value_or("<untagged>")));
+            imageNames.push_back(nameAndTag);
         }
 
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), DebianImage.NameAndTag()));
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), AlpineImage.NameAndTag()));
+    }
+
+    TEST_METHOD(WSLCE2E_Image_List_TableFormat_HasExpectedColumns)
+    {
+        WSL2_TEST_ONLY();
+
+        const auto result = RunWslc(L"image list");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        bool foundHeader = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line.find(L"REPOSITORY") != std::wstring::npos && line.find(L"TAG") != std::wstring::npos &&
+                line.find(L"IMAGE ID") != std::wstring::npos && line.find(L"CREATED") != std::wstring::npos &&
+                line.find(L"SIZE") != std::wstring::npos)
+            {
+                foundHeader = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(foundHeader, L"Expected table header with REPOSITORY, TAG, IMAGE ID, CREATED, SIZE columns");
     }
 
 private:

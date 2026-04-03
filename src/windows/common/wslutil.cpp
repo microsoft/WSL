@@ -1339,6 +1339,25 @@ WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD
     return comHandle;
 }
 
+WSLCHandle wsl::windows::common::wslutil::ToCOMOutputHandle(HANDLE Handle, DWORD Access, WSLCHandleType Type)
+{
+    wil::unique_handle duplicatedHandle{DuplicateHandle(Handle, Access)};
+
+    // N.B. COM closes the handle when returning an out parameter.
+    // The return value of this method should always be passed to a COM out parameter.
+    switch (Type)
+    {
+    case WSLCHandleTypeFile:
+        return WSLCHandle{.Type = WSLCHandleTypeFile, .Handle = {.File = duplicatedHandle.release()}};
+    case WSLCHandleTypePipe:
+        return WSLCHandle{.Type = WSLCHandleTypePipe, .Handle = {.Pipe = duplicatedHandle.release()}};
+    case WSLCHandleTypeSocket:
+        return WSLCHandle{.Type = WSLCHandleTypeSocket, .Handle = {.Socket = duplicatedHandle.release()}};
+    default:
+        THROW_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported handle type: %d", static_cast<int>(Type));
+    }
+}
+
 WSLCHandle wsl::windows::common::wslutil::ToCOMInputHandle(HANDLE Handle)
 {
     auto type = GetFileType(Handle);

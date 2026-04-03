@@ -15,6 +15,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
 #include "ImageTasks.h"
@@ -72,7 +73,7 @@ void ListImages(CLIExecutionContext& context)
         // Print only the image names.
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Name));
+            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
         }
 
         return;
@@ -97,14 +98,25 @@ void ListImages(CLIExecutionContext& context)
         using Config = wsl::windows::wslc::ColumnWidthConfig;
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
-        // Create table with or without column limits based on --no-trunc flag
-        auto table = trunc ? wsl::windows::wslc::TableOutput<2>(
-                                 {{{L"NAME", {Config::NoLimit, 20, false}}, {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
-                           : wsl::windows::wslc::TableOutput<2>({L"NAME", L"SIZE"});
+        // Create table — only IMAGE ID uses fixed width; other columns auto-size.
+        // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
+        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
+                                 {{{L"REPOSITORY", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"TAG", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"IMAGE ID", {12, 12, false}},
+                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<5>({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
 
         for (const auto& image : images)
         {
-            table.OutputLine({MultiByteToWide(image.Name), std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))});
+            table.OutputLine({
+                MultiByteToWide(image.Repository.value_or("<untagged>")),
+                MultiByteToWide(image.Tag.value_or("<untagged>")),
+                MultiByteToWide(TruncateId(image.Id, trunc)),
+                ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
+            });
         }
 
         table.Complete();
