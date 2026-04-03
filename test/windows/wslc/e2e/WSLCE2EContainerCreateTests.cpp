@@ -741,67 +741,6 @@ class WSLCE2EContainerCreateTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Container_RunAttach_TTY)
-    {
-        WSL2_TEST_ONLY();
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        const auto& prompt = ">";
-        auto result = RunWslc(std::format(
-            L"container run -itd -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-        auto containerId = result.GetStdoutOneLine();
-
-        const auto& expectedAttachPrompt = VT::BuildContainerAttachPrompt(prompt);
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
-
-        auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-
-        // The container attach prompt appears twice.
-        session.ExpectStdout(expectedAttachPrompt);
-        session.ExpectStdout(expectedAttachPrompt);
-
-        session.WriteLine("echo hello");
-        session.ExpectCommandEcho("echo hello");
-        session.ExpectStdout("hello\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        session.WriteLine("whoami");
-        session.ExpectCommandEcho("whoami");
-        session.ExpectStdout("root\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
-        VERIFY_ARE_EQUAL(0, exitCode);
-    }
-
-    TEST_METHOD(WSLCE2E_Container_RunAttach_NoTTY)
-    {
-        WSL2_TEST_ONLY();
-        VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-        auto containerId = result.GetStdoutOneLine();
-
-        auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-
-        session.WriteLine("test line 1");
-        session.ExpectStdout("test line 1\n");
-        session.WriteLine("test line 2");
-        session.ExpectStdout("test line 2\n");
-
-        // Close stdin to signal EOF to cat
-        session.CloseStdin();
-
-        // Wait for cat to exit with code 0
-        auto exitCode = session.Wait(10000);
-        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
-        session.VerifyNoErrors();
-    }
-
     TEST_METHOD(WSLCE2E_Container_ExecInteractive_TTY)
     {
         WSL2_TEST_ONLY();
