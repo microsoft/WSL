@@ -338,5 +338,18 @@ if ($LASTEXITCODE -eq 0)
 else
 {
     Remove-Item $logArchive -ErrorAction Ignore
-    Write-Host -ForegroundColor Red "Failed to compress logs. They are available in: $(Resolve-Path $folder)"
+
+    # Fall back to zip if tar fails (e.g. on SKUs that lack tar.exe)
+    $logArchive = "$(Resolve-Path $folder).zip"
+    try
+    {
+        Compress-Archive -Path $folder -DestinationPath $logArchive -Force
+        Remove-Item $folder -Recurse
+        Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+    }
+    catch
+    {
+        Remove-Item $logArchive -ErrorAction Ignore
+        Write-Host -ForegroundColor Red "Failed to compress logs. They are available in: $(Resolve-Path $folder)"
+    }
 }
