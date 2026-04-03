@@ -38,8 +38,7 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLCContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
+static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
 {
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
@@ -280,7 +279,7 @@ std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions, nullptr);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
 
@@ -304,7 +303,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
-    auto runningContainer = CreateInternal(session, image, runOptions, nullptr);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
