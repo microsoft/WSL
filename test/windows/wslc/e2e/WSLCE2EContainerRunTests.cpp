@@ -103,9 +103,7 @@ class WSLCE2EContainerRunTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run --rm -u root {} sh -c \"id -un; id -u; id -g\"",
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --rm -u root {} sh -c \"id -un; id -u; id -g\"", DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
@@ -113,9 +111,7 @@ class WSLCE2EContainerRunTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run --rm -u 0 {} id -u",
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --rm -u 0 {} id -u", DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"0\n", .Stderr = L"", .ExitCode = 0});
     }
 
@@ -131,19 +127,16 @@ class WSLCE2EContainerRunTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run --rm -u user_does_not_exist {} id -u",
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+        auto result = RunWslc(std::format(L"container run --rm -u user_does_not_exist {} id -u", DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_UserOption_InvalidFormat_Fails)
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run --rm -u root:badgid {} id -u",
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --rm -u root:badgid {} id -u", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"unable to find group badgid: no matching entries in group file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
@@ -151,9 +144,8 @@ class WSLCE2EContainerRunTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run --rm -u root:root {} sh -c \"id -un; id -u; id -g\"",
-            DebianImage.NameAndTag()));
+        auto result =
+            RunWslc(std::format(L"container run --rm -u root:root {} sh -c \"id -un; id -u; id -g\"", DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
@@ -161,9 +153,7 @@ class WSLCE2EContainerRunTests
     {
         WSL2_TEST_ONLY();
 
-        auto result = RunWslc(std::format(
-            L"container run --rm -u nobody {} sh -c \"id -un; id -u; id -g\"",
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --rm -u nobody {} sh -c \"id -un; id -u; id -g\"", DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"nobody\n65534\n65534\n", .Stderr = L"", .ExitCode = 0});
     }
 
