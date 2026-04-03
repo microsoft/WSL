@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
@@ -37,12 +38,12 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
 
 std::wstring ContainerListCommand::ShortDescription() const
 {
-    return {L"List containers."};
+    return Localization::WSLCCLI_ContainerListDesc();
 }
 
 std::wstring ContainerListCommand::LongDescription() const
 {
-    return {L"Lists containers. By default, only running containers are shown; use --all to include all containers."};
+    return Localization::WSLCCLI_ContainerListLongDesc();
 }
 
 void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
@@ -52,7 +53,7 @@ void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) con
         auto format = execArgs.Get<ArgType::Format>();
         if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
         {
-            throw CommandException(L"Invalid format type specified. Supported format types are: json, table");
+            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
         }
     }
 }

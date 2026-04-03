@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Start Command
@@ -35,14 +36,12 @@ std::vector<Argument> ContainerStartCommand::GetArguments() const
 
 std::wstring ContainerStartCommand::ShortDescription() const
 {
-    return {L"Start a container."};
+    return Localization::WSLCCLI_ContainerStartDesc();
 }
 
 std::wstring ContainerStartCommand::LongDescription() const
 {
-    return {
-        L"Starts a container. Provides options to attach to the container's stdout and stderr streams and could be interactive "
-        L"to keep stdin open."};
+    return Localization::WSLCCLI_ContainerStartLongDesc();
 }
 
 void ContainerStartCommand::ExecuteInternal(CLIExecutionContext& context) const

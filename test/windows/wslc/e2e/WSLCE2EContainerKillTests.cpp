@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EContainerKillTests
 {
@@ -168,7 +169,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Kills containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerKillLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
