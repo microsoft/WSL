@@ -364,6 +364,14 @@ class WSLCTests
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
         }
+
+        // Reject invalid storage flags.
+        {
+            auto settings = GetDefaultSessionSettings(L"invalid-storage-flags");
+            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x2);
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+        }
     }
 
     void ExpectImagePresent(IWSLCSession& Session, const char* Image, bool Present = true)

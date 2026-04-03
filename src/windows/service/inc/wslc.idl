@@ -419,6 +419,7 @@ typedef enum _WSLCSessionStorageFlags
 {
     WSLCSessionStorageFlagsNone = 0,
     WSLCSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
+    WSLCSessionStorageFlagsValid = WSLCSessionStorageFlagsNoCreate
 } WSLCSessionStorageFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionStorageFlags);")
