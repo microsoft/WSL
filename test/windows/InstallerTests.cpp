@@ -180,12 +180,12 @@ class InstallerTests
         auto productCode = GetMsiProductCode();
         VERIFY_IS_FALSE(productCode.empty());
 
-        CallMsiExec(std::format(L"/qn /norestart /x {} /L*V {}", productCode, GenerateMsiLogPath()));
+        CallMsiExec(std::format(L"/qn /norestart /x {} MSIRMSHUTDOWN=0 /L*V {}", productCode, GenerateMsiLogPath()));
     }
 
     void InstallMsi()
     {
-        CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", m_msiPath, GenerateMsiLogPath()));
+        CallMsiExec(std::format(L"/qn /norestart /i {} MSIRMSHUTDOWN=0 /L*V {}", m_msiPath, GenerateMsiLogPath()));
     }
 
     void InstallMsix() const
@@ -367,7 +367,7 @@ class InstallerTests
         LogInfo("Installing: %ls", installerFile.c_str());
         if (wsl::shared::string::EndsWith<wchar_t>(installerFile, L".msi"))
         {
-            CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", installerFile, GenerateMsiLogPath()));
+            CallMsiExec(std::format(L"/qn /norestart /i {} MSIRMSHUTDOWN=0 /L*V {}", installerFile, GenerateMsiLogPath()));
         }
         else
         {
