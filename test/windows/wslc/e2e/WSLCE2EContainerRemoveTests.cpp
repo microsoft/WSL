@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EContainerRemoveTests
 {
@@ -178,7 +179,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Removes containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerRemoveLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

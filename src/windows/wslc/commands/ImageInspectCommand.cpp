@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
@@ -34,12 +35,12 @@ std::vector<Argument> ImageInspectCommand::GetArguments() const
 
 std::wstring ImageInspectCommand::ShortDescription() const
 {
-    return {L"Inspect images."};
+    return Localization::WSLCCLI_ImageInspectDesc();
 }
 
 std::wstring ImageInspectCommand::LongDescription() const
 {
-    return {L"Inspect images."};
+    return Localization::WSLCCLI_ImageInspectLongDesc();
 }
 
 void ImageInspectCommand::ExecuteInternal(CLIExecutionContext& context) const

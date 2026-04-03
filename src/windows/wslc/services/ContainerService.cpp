@@ -28,6 +28,7 @@ using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
 
@@ -102,7 +103,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         {
             // Attempt to pull the image if not found
             PullImageCallback callback;
-            PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
+            PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
             ImageService imageService;
             imageService.Pull(session, image, &callback);
         }

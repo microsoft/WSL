@@ -22,6 +22,7 @@ Abstract:
 #include <wslc.h>
 
 using namespace wsl::windows::common;
+using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
@@ -121,13 +122,12 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
     // failure since we also know it failed to be found in the map.
     catch (ArgumentException)
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).", argName, input));
+        throw ArgumentException(Localization::WSLCCLI_InvalidSignalError(argName, input));
     }
 
     if (signalValue < MIN_SIGNAL || signalValue > MAX_SIGNAL)
     {
-        throw ArgumentException(std::format(L"Invalid {} value: {} is out of valid range ({}-{}).", argName, input, MIN_SIGNAL, MAX_SIGNAL));
+        throw ArgumentException(Localization::WSLCCLI_SignalOutOfRangeError(argName, input, MIN_SIGNAL, MAX_SIGNAL));
     }
 
     return static_cast<WSLCSignal>(signalValue);

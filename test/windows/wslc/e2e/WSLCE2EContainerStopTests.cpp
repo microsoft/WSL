@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EContainerStopTests
 {
@@ -272,7 +273,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Stops containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerStopLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
