@@ -144,8 +144,8 @@ void VMPortMapping::Unmap()
 {
     if (Vm)
     {
+        auto clearVm = wil::scope_exit([&] { Vm = nullptr; });
         Vm->UnmapPort(*this);
-        Vm = nullptr;
     }
 }
 
