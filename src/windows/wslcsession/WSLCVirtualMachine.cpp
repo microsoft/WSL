@@ -145,6 +145,7 @@ void VMPortMapping::Unmap()
     if (Vm)
     {
         Vm->UnmapPort(*this);
+        Vm = nullptr;
     }
 }
 
