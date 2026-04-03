@@ -137,7 +137,6 @@ jobs:
           - ${{ if eq(parameters.isRelease, true) }}:
               - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
                 displayName: "Sign ${{ target.target }} (${{ parameters.platform }})"
-                condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
                 inputs:
                   ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
                   signConfigType: ${{ parameters.esrp.signConfigType }}
@@ -179,7 +178,6 @@ jobs:
 
               - task: PowerShell@2
                 displayName: "Copy signed ${{ target.target }} to staging (${{ parameters.platform }})"
-                condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
                 inputs:
                   targetType: inline
                   script: |

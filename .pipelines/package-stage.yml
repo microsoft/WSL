@@ -227,7 +227,6 @@ stages:
           - ${{ if eq(parameters.isRelease, true) }}:
               - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
                 displayName: "Sign nuget packages"
-                condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
                 inputs:
                   ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
                   signConfigType: ${{ parameters.esrp.signConfigType }}
