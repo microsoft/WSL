@@ -105,7 +105,11 @@ struct TableOutput
 
     // Constructor with column width configuration (legacy)
     TableOutput(header_t&& header, column_config_t&& config, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
-        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(true), m_columnPadding(columnPadding), m_columnConfigs(std::move(config)), m_outputFn(DefaultOutputFn())
+        m_sizingBuffer(sizingBuffer),
+        m_limitColumnWidths(true),
+        m_columnPadding(columnPadding),
+        m_columnConfigs(std::move(config)),
+        m_outputFn(DefaultOutputFn())
     {
         InitializeColumns(std::move(header));
     }
