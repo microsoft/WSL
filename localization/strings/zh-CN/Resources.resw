@@ -1937,6 +1937,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>找到 {} WSLC 会话{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcTerminateSessionFailed" xml:space="preserve">
+    <value>Session termination failed: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} 退出，返回值: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2106,6 +2110,18 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
     <value>卷 '{}' 正在使用中。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
+    <value>发现了 Dockerfile 和 Containerfile。使用 -f 选择要使用的文件</value>
+    <comment>{FixedPlaceholder="Dockerfile"}{FixedPlaceholder="Containerfile"}{FixedPlaceholder="-f"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
+    <value>Failed to open '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
+    <value>No Containerfile or Dockerfile found in '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

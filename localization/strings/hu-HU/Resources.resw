@@ -1925,11 +1925,15 @@ Usage:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
-    <value>No WSLC sessions found.</value>
+    <value>Nem találhatók WSLC-munkamenetek.</value>
   </data>
   <data name="MessageWslcSessionsFound" xml:space="preserve">
-    <value>Found {} WSLC session{}:</value>
+    <value>{} talált WSLC-munkamenet{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTerminateSessionFailed" xml:space="preserve">
+    <value>Session termination failed: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} exited with: {}</value>
@@ -2100,6 +2104,18 @@ További információ a termékről: https://aka.ms/privacy.</value>
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
     <value>A(z) {} kötet használatban van.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
+    <value>Both Dockerfile and Containerfile found. Use -f to select the file to use</value>
+    <comment>{FixedPlaceholder="Dockerfile"}{FixedPlaceholder="Containerfile"}{FixedPlaceholder="-f"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
+    <value>Failed to open '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
+    <value>No Containerfile or Dockerfile found in '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

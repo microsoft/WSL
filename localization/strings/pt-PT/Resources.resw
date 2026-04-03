@@ -1925,11 +1925,15 @@ Utilização:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
-    <value>No WSLC sessions found.</value>
+    <value>Não foram encontradas sessões WSLC.</value>
   </data>
   <data name="MessageWslcSessionsFound" xml:space="preserve">
-    <value>Found {} WSLC session{}:</value>
+    <value>Encontrada {} sessão WSLC{}:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTerminateSessionFailed" xml:space="preserve">
+    <value>Falha ao terminar a sessão: "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} terminou com: {}</value>
@@ -2100,6 +2104,18 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
     <value>O volume '{}' está em utilização.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
+    <value>Dockerfile e Containerfile encontrados. Utilize -f para selecionar o ficheiro a utilizar</value>
+    <comment>{FixedPlaceholder="Dockerfile"}{FixedPlaceholder="Containerfile"}{FixedPlaceholder="-f"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
+    <value>Falha ao abrir "{}": {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
+    <value>Não foi encontrado Containerfile ou Dockerfile em "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

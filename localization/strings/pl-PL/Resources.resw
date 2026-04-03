@@ -1925,11 +1925,15 @@ Użycie:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNoSessionsFound" xml:space="preserve">
-    <value>No WSLC sessions found.</value>
+    <value>Nie znaleziono sesji WSLC.</value>
   </data>
   <data name="MessageWslcSessionsFound" xml:space="preserve">
-    <value>Found {} WSLC session{}:</value>
+    <value>Znaleziono {} sesj{} WSLC:</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTerminateSessionFailed" xml:space="preserve">
+    <value>Session termination failed: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcShellExited" xml:space="preserve">
     <value>Operacja {} zakończyła działanie z kodem: {}</value>
@@ -2100,6 +2104,18 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
     <value>Wolumin „{}” jest używany.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
+    <value>Both Dockerfile and Containerfile found. Use -f to select the file to use</value>
+    <comment>{FixedPlaceholder="Dockerfile"}{FixedPlaceholder="Containerfile"}{FixedPlaceholder="-f"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
+    <value>Failed to open '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
+    <value>No Containerfile or Dockerfile found in '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
