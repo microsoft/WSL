@@ -132,7 +132,7 @@ class WSLCE2EContainerRunTests
             {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_UserOption_InvalidFormat_Fails)
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_UnknownGroup_Fails)
     {
         WSL2_TEST_ONLY();
 
