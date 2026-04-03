@@ -202,7 +202,7 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
 {
     auto repoTag = RepoTag::Parse(targetImage);
-    WSLATagImageOptions options{};
+    WSLCTagImageOptions options{};
     options.Image = sourceImage.c_str();
     options.Repo = repoTag.Repo.c_str();
     options.Tag = repoTag.Tag.c_str();
