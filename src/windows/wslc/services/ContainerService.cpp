@@ -33,44 +33,6 @@ using namespace std::chrono_literals;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
 
-static void SetContainerTTYOptions(WSLCProcessOptions& options)
-{
-    if (!WI_IsFlagSet(options.Flags, WSLCProcessFlagsTty))
-    {
-        return;
-    }
-
-    auto tryGetConsoleInfo = [](HANDLE handle, CONSOLE_SCREEN_BUFFER_INFOEX& info) -> bool {
-        info.cbSize = sizeof(info);
-        return ::GetConsoleScreenBufferInfoEx(handle, &info) != FALSE;
-    };
-
-    CONSOLE_SCREEN_BUFFER_INFOEX info{};
-    HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (tryGetConsoleInfo(stdoutHandle, info))
-    {
-        options.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
-        options.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
-        return;
-    }
-
-    HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD stdinMode = 0;
-    if (::GetConsoleMode(stdinHandle, &stdinMode))
-    {
-        wil::unique_hfile consoleOutput(CreateFileW(
-            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
-        if (consoleOutput && tryGetConsoleInfo(consoleOutput.get(), info))
-        {
-            options.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
-            options.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
-            return;
-        }
-    }
-
-    THROW_HR_WITH_USER_ERROR(E_FAIL, L"--tty requires stdin or stdout to be a console");
-}
-
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
