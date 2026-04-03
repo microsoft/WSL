@@ -50,7 +50,7 @@ void Argument::Validate(const ArgMap& execArgs) const
     case ArgType::WorkDir:
     {
         const auto& value = execArgs.Get<ArgType::WorkDir>();
-        if (value.empty() || value.find_first_not_of(L" \t") == std::wstring::npos)
+        if (value.empty() || std::all_of(value.begin(), value.end(), std::iswspace))
         {
             throw ArgumentException(std::format(L"Invalid {} argument value: working directory cannot be empty or whitespace", m_name));
         }
