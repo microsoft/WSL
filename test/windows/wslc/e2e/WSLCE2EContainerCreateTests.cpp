@@ -1033,6 +1033,88 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_UserOption_UidRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} -u 0 {} sh -c \"id -u; id -g\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_UserOption_NameGroupRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} -u root:root {} sh -c \"id -un; id -u; id -g\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_UserOption_UnknownUser_Fails)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} -u user_does_not_exist {} id -u",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_UserOption_UidRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(
+            L"container exec -u 0 {} sh -c \"id -u; id -g\"",
+            WslcContainerName));
+        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_UserOption_NameGroupRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(
+            L"container exec -u root:root {} sh -c \"id -un; id -u; id -g\"",
+            WslcContainerName));
+        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_UserOption_InvalidGroup_Fails)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(
+            L"container exec -u root:badgid {} id -u",
+            WslcContainerName));
+        result.Dump();
+        result.Verify({.Stderr = L"unable to find group badgid: no matching entries in group file\r\n", .ExitCode = 126});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -1108,7 +1190,9 @@ private:
                 << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
-                << L"  -h,--help         Shows help about the selected command\r\n\r\n";
+                << L"  -h,--help         Shows help about the selected command\r\n"
+                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
+                << L"\r\n";
         return options.str();
     }
 
