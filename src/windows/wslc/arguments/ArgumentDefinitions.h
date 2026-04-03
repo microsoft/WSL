@@ -82,5 +82,5 @@ _(Verbose,        "verbose",             L"v",              Kind::Flag,        L
 _(Version,        "version",             NO_ALIAS,              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       Localization::WSLCCLI_VolumeArgDescription()) \
-_(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkDirArgDescription()) \
+_(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkingDirArgDescription()) \
 // clang-format on
