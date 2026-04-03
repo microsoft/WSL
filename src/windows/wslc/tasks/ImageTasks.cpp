@@ -15,11 +15,12 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "PullImageCallback.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include "Task.h"
 #include <format>
 
@@ -37,11 +38,8 @@ void BuildImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& contextPath = context.Args.Get<ArgType::Path>();
 
-    std::wstring tag;
-    if (context.Args.Contains(ArgType::Tag))
-    {
-        tag = context.Args.Get<ArgType::Tag>();
-    }
+    auto tags = context.Args.GetAll<ArgType::Tag>();
+    auto buildArgs = context.Args.GetAll<ArgType::BuildArg>();
 
     std::wstring dockerfilePath;
     if (context.Args.Contains(ArgType::File))
@@ -51,8 +49,10 @@ void BuildImage(CLIExecutionContext& context)
 
     PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
 
+    bool verbose = context.Args.Contains(ArgType::Verbose);
+
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tag, dockerfilePath, &callback);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -73,7 +73,7 @@ void ListImages(CLIExecutionContext& context)
         // Print only the image names.
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Name));
+            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
         }
 
         return;
@@ -89,19 +89,37 @@ void ListImages(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(images);
+        auto json = ToJson(images, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        // Create table — only IMAGE ID uses fixed width; other columns auto-size.
+        // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
+        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
+                                 {{{L"REPOSITORY", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"TAG", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"IMAGE ID", {12, 12, false}},
+                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<5>({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+
         for (const auto& image : images)
         {
-            tablePrinter.AddRow({MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
+            table.OutputLine({
+                MultiByteToWide(image.Repository.value_or("<untagged>")),
+                MultiByteToWide(image.Tag.value_or("<untagged>")),
+                MultiByteToWide(TruncateId(image.Id, trunc)),
+                ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
+            });
         }
 
-        tablePrinter.Print();
+        table.Complete();
         break;
     }
     default:
@@ -145,7 +163,7 @@ void LoadImage(CLIExecutionContext& context)
     }
 
     // TODO Read from stdin if no input argument is provided.
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Requested load but no input provided.");
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageLoadNoInputError());
 }
 
 void InspectImages(CLIExecutionContext& context)
@@ -155,15 +173,26 @@ void InspectImages(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto imageIds = context.Args.GetAll<ArgType::ImageId>();
 
-    std::vector<wsl::windows::common::docker_schema::InspectImage> result;
+    std::vector<wsl::windows::common::wslc_schema::InspectImage> result;
     for (const auto& id : imageIds)
     {
         auto inspectData = ImageService::Inspect(session, WideToMultiByte(id));
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
+}
+
+void SaveImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    WI_ASSERT(context.Args.Contains(ArgType::Output));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+    auto& output = context.Args.Get<ArgType::Output>();
+    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
 }
 
 void TagImage(CLIExecutionContext& context)
@@ -172,7 +201,6 @@ void TagImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& source = context.Args.Get<ArgType::Source>();
     auto& target = context.Args.Get<ArgType::Target>();
-
     services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
 }
 } // namespace wsl::windows::wslc::task

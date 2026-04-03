@@ -101,9 +101,9 @@ try
         break;
     }
 
-    case wslrelay::RelayMode::WSLAPortRelay:
+    case wslrelay::RelayMode::WSLCPortRelay:
     {
-        wsl::windows::wslrelay::localhost::RunWSLAPortRelay(vmId, port, exitEvent.get());
+        wsl::windows::wslrelay::localhost::RunWSLCPortRelay(vmId, port, exitEvent.get());
         break;
     }
 

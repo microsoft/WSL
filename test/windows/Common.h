@@ -95,22 +95,30 @@ using namespace std::chrono_literals;
         return; \
     }
 
+#define WSL_TEST_CLASS_PROPERTIES \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManager.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManagerProxyStub.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslclient.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslservice.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslcsession.exe")
+
 #define WSL_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManager.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManagerProxyStub.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslclient.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslservice.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslaservice.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslasession.exe") \
+        WSL_TEST_CLASS_PROPERTIES \
+    END_TEST_CLASS()
+
+#define WSLC_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"WSLC") \
     END_TEST_CLASS()
 
 //
@@ -340,15 +348,19 @@ public:
     ~PartialHandleRead();
 
     void Expect(const std::string& Expected);
+    void ExpectConsume(const std::string& Expected);
     void ExpectClosed(DWORD Timeout = 60 * 1000);
 
     std::string ReadBytes(size_t Length);
+    std::string ConsumeBytes(size_t Length);
+
+    std::string GetData() const;
 
 private:
     void Run();
 
     HANDLE m_handle{};
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     std::thread m_thread;
     std::string m_data;
@@ -563,7 +575,6 @@ inline auto EnableSystemd(const std::string& extraConfig = "")
 std::wstring EscapePath(std::wstring_view Path);
 
 void StopWslService();
-void StopWslaService();
 
 std::optional<GUID> GetDistributionId(LPCWSTR Name);
 wil::unique_hkey OpenDistributionKey(LPCWSTR Name);
@@ -584,4 +595,60 @@ void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
 
 std::filesystem::path GetTestImagePath(std::string_view imageName);
 
-void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode);
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
+
+template <typename T>
+void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
+{
+    std::map<T, size_t> expectedCounts;
+    std::map<T, size_t> actualCounts;
+
+    for (const auto& e : expected)
+    {
+        expectedCounts[e]++;
+    }
+
+    for (const auto& e : actual)
+    {
+        actualCounts[e]++;
+    }
+
+    std::wstring error;
+
+    for (const auto& [value, count] : expectedCounts)
+    {
+        if (actualCounts[value] != count)
+        {
+            error += std::format(L"Value '{}' expected {} times but was found {} times.\n", value, count, actualCounts[value]);
+        }
+    }
+
+    for (const auto& [value, count] : actualCounts)
+    {
+        if (expectedCounts.find(value) == expectedCounts.end())
+        {
+            error += std::format(L"Unexpected value found: '{}'", value);
+        }
+    }
+
+    if (!error.empty())
+    {
+        error += std::format(L"Expected ({} elements):\n", expected.size());
+        for (const auto& e : expected)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Actual ({} elements):\n", actual.size());
+
+        for (const auto& e : actual)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Called from: {}", source);
+
+        LogError("VerifyAreEqualUnordered failed: %ls", error.c_str());
+        VERIFY_FAIL();
+    }
+}

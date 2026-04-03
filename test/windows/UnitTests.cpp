@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 
 #include "Common.h"
+#include "install.h"
 #include <AclAPI.h>
 #include <fstream>
 #include <filesystem>
@@ -271,6 +272,7 @@ class UnitTests
         };
 
         // Validate user sessions state with gui apps disabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = false}));
         {
             validateUserSession();
 
@@ -284,7 +286,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps enabled.
         {
-            WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+            config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
             validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
@@ -353,7 +355,7 @@ class UnitTests
         WSL2_TEST_ONLY();
 
         // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
 
         auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
@@ -2349,7 +2351,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             {
                 LogInfo("Validating signature for: %ls", e.path().c_str());
 
-                wsl::windows::common::wslutil::ValidateFileSignature(e.path().c_str());
+                wsl::windows::common::install::ValidateFileSignature(e.path().c_str());
                 signedFiles++;
             }
         }
@@ -3805,7 +3807,7 @@ localhostForwarding=true
         validateUidChange(L"root", 0, L"The operation completed successfully. \r\n", L"", 0);
 
         const std::wstring invalidUser = L"Nonexistent";
-        validateUidChange(invalidUser, 0, L"", L"/usr/bin/id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
+        validateUidChange(invalidUser, 0, L"", L"id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
@@ -3929,7 +3931,7 @@ localhostForwarding=true
             VERIFY_ARE_EQUAL(ExpectedVersion, version);
         };
 
-        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"12");
+        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"13");
 
         constexpr auto testTar = L"exported-distro.tar";
         constexpr auto tmpDistroName = L"tmpdistro";
@@ -4029,10 +4031,10 @@ VERSION_ID="Invalid|Format"
         // Verify that importing a distribution with an os-release as then converting works as well
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--import {} . {} --version {}", tmpDistroName, g_testDistroPath, convertVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--set-version {} {}", tmpDistroName, currentVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
     }
 
     TEST_METHOD(DistributionId)
@@ -6409,8 +6411,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     // See https://github.com/microsoft/WSL/issues/13173.
     TEST_METHOD(SetSidNoWarning)
     {
-        auto [out, err] =
-            LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,stderr");
 
         VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
         VERIFY_ARE_EQUAL(err, L"");
@@ -6536,6 +6537,106 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
             L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(BytesToHex)
+    {
+        using wsl::windows::common::string::BytesToHex;
+
+        VERIFY_ARE_EQUAL(BytesToHex({}), L"0x");
+        VERIFY_ARE_EQUAL(BytesToHex({0x0F}), L"0x0f");
+        VERIFY_ARE_EQUAL(BytesToHex({0xDE, 0xAD, 0xBE, 0xEF}), L"0xdeadbeef");
+        VERIFY_ARE_EQUAL(BytesToHex({0x00, 0x00}), L"0x0000");
+        VERIFY_ARE_EQUAL(BytesToHex({0xFF, 0xFF}), L"0xffff");
+    }
+
+    TEST_METHOD(HexToBytes)
+    {
+        using wsl::windows::common::string::BytesToHex;
+        using wsl::windows::common::string::HexToBytes;
+        using ByteVec = std::vector<BYTE>;
+
+        // Wide string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes("0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Wide string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes("deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Empty string
+        VERIFY_ARE_EQUAL(HexToBytes(L""), (ByteVec{}));
+
+        // Single byte
+        VERIFY_ARE_EQUAL(HexToBytes(L"0x0f"), (ByteVec{0x0F}));
+
+        // Uppercase hex digits
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xDEADBEEF"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Round-trip: BytesToHex -> HexToBytes
+        const ByteVec original = {0x01, 0x23, 0xAB};
+        VERIFY_ARE_EQUAL(HexToBytes(BytesToHex(original)), original);
+
+        // Odd-length string (after stripping "0x") throws E_INVALIDARG
+        bool threw = false;
+        try
+        {
+            HexToBytes(L"0xabc");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
+
+        // Invalid hex character throws E_INVALIDARG
+        threw = false;
+        try
+        {
+            HexToBytes(L"0xZZ");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
+    }
+
+    TEST_METHOD(InteractiveMount)
+    {
+        WSL2_TEST_ONLY();
+
+        // Add a fake interactive mount helper.
+        DistroFileChange mountHelper(L"/sbin/mount.hang", false);
+        mountHelper.SetContent(
+            L"#!/bin/sh\n"
+            L"read pass < /dev/tty\n");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod +x /sbin/mount.hang"), (DWORD)0);
+
+        // Don't keep the original fstab as it can be missing on the pipeline.
+        DistroFileChange fstab(L"/etc/fstab", false);
+        fstab.SetContent(L"none /mnt/ttytest hang 0 0\n");
+
+        // Restart the distro with this mount.
+        WslShutdown();
+        wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(L"echo booted").c_str());
+        auto result = process.RunAndCaptureOutput(60 * 1000);
+        VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
+        VERIFY_ARE_EQUAL(result.ExitCode, 0);
+    }
+
+    TEST_METHOD(UninstallRejectsArguments)
+    {
+        VerifyOutput(
+            L"--uninstall Distro",
+            wsl::shared::Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG) + L"\r\n",
+            -1);
     }
 
 }; // namespace UnitTests

@@ -35,9 +35,47 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+struct ImageLoadResult
+{
+    std::optional<std::string> stream;
+    std::optional<ErrorResponse> errorDetail;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, errorDetail);
+};
+
 struct EmptyRequest
 {
     using TResponse = void;
+};
+
+struct CreateVolume
+{
+    using TResponse = void;
+
+    std::string Name;
+    std::string Driver;
+    std::map<std::string, std::string> DriverOpts;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateVolume, Name, Driver, DriverOpts, Labels);
+};
+
+struct Volume
+{
+    std::string Name;
+    std::string Driver;
+    std::string Mountpoint;
+    std::optional<std::map<std::string, std::string>> Options;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
+};
+
+struct ListVolumesResponse
+{
+    std::vector<Volume> Volumes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ListVolumesResponse, Volumes);
 };
 
 struct EmptyObject
@@ -59,12 +97,13 @@ inline void from_json(const nlohmann::json& j, EmptyObject& obj)
 
 struct Mount
 {
+    std::string Name;
     std::string Source;
     std::string Target;
     std::string Type;
     bool ReadOnly{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Target, Source, Type, ReadOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly);
 };
 
 struct PortMapping
@@ -84,9 +123,10 @@ struct HostConfig
     std::optional<std::vector<std::string>> Dns;
     std::optional<std::vector<std::string>> DnsSearch;
     std::optional<std::vector<std::string>> DnsOptions;
+    std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Tmpfs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs);
 };
 
 struct CreateContainer
@@ -164,6 +204,42 @@ struct InspectExec
     bool Running{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectExec, Pid, ExitCode, Running);
+};
+
+struct PruneContainerLabelFilter
+{
+    std::map<std::string, bool> presentLabels;
+    std::map<std::string, bool> absentLabels;
+    std::optional<std::uint64_t> until;
+};
+
+inline void to_json(nlohmann::json& j, const PruneContainerLabelFilter& object)
+{
+    j = nlohmann::json{};
+    if (!object.presentLabels.empty())
+    {
+        j["label"] = object.presentLabels;
+    }
+
+    if (!object.absentLabels.empty())
+    {
+        j["label!"] = object.absentLabels;
+    }
+
+    // This is required because docker crashes if 'until' is null.
+    // TODO: Open a PR to fix this directly in moby.
+    if (object.until.has_value())
+    {
+        j["until"] = nlohmann::json{{std::to_string(object.until.value()), true}};
+    }
+}
+
+struct PruneContainerResult
+{
+    std::optional<std::vector<std::string>> ContainersDeleted; // Null if no containers were deleted.
+    uint64_t SpaceReclaimed{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneContainerResult, ContainersDeleted, SpaceReclaimed);
 };
 
 struct Image
@@ -321,9 +397,12 @@ struct ContainerInfo
     std::string Image;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
+    std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
+    int64_t Created{};
+    HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created, HostConfig);
 };
 
 struct BuildKitVertex
@@ -336,11 +415,30 @@ struct BuildKitVertex
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
 };
 
+struct BuildKitStatus
+{
+    std::string id;
+    std::string vertex;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+};
+
+struct BuildKitLog
+{
+    std::string vertex;
+    std::string data; // base64-encoded output
+    int stream{};     // 1 = stdout, 2 = stderr
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitLog, vertex, data, stream);
+};
+
 struct BuildKitSolveStatus
 {
     std::vector<BuildKitVertex> vertexes;
+    std::vector<BuildKitStatus> statuses;
+    std::vector<BuildKitLog> logs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes, statuses, logs);
 };
 
 struct CreateImageProgressDetails
@@ -356,10 +454,11 @@ struct CreateImageProgress
 {
     std::string status;
     std::string id;
+    std::optional<ErrorResponse> errorDetail;
 
     CreateImageProgressDetails progressDetail;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail, errorDetail);
 };
 
 } // namespace wsl::windows::common::docker_schema

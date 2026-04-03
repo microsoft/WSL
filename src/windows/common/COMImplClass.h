@@ -16,7 +16,7 @@ Abstract:
 
 #pragma once
 
-namespace wsl::windows::service::wsla {
+namespace wsl::windows::service::wslc {
 
 template <typename TImpl>
 class COMImplClass
@@ -95,4 +95,4 @@ private:
     TImpl* m_impl = nullptr;
 };
 
-} // namespace wsl::windows::service::wsla
+} // namespace wsl::windows::service::wslc

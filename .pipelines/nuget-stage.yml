@@ -7,6 +7,7 @@ parameters:
   type: object
   default:
       - Microsoft.WSL.PluginApi
+      - Microsoft.WSL.Containers
 
 stages:
 - stage: nuget

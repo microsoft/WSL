@@ -13,36 +13,36 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "SessionService.h"
-#include <wslaservice.h>
-#include <WSLAProcessLauncher.h>
+#include <wslc.h>
+#include <WSLCProcessLauncher.h>
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
-DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
+DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);
 
 int SessionService::Attach(const std::wstring& sessionName)
 {
     THROW_HR_IF(E_INVALIDARG, sessionName.empty());
 
-    wil::com_ptr<IWSLASessionManager> manager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+    wil::com_ptr<IWSLCSessionManager> manager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
-    wil::com_ptr<IWSLASession> session;
+    wil::com_ptr<IWSLCSession> session;
     HRESULT hr = manager->OpenSessionByName(sessionName.c_str(), &session);
     if (FAILED(hr))
     {
         if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
         {
-            wslutil::PrintMessage(Localization::MessageWslaSessionNotFound(sessionName.c_str()), stderr);
+            wslutil::PrintMessage(Localization::MessageWslcSessionNotFound(sessionName.c_str()), stderr);
             return 1;
         }
 
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
         wslutil::PrintMessage(
-            Localization::MessageErrorCode(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), errorString), stderr);
+            Localization::MessageErrorCode(Localization::MessageWslcOpenSessionFailed(sessionName.c_str()), errorString), stderr);
         return 1;
     }
 
@@ -55,10 +55,10 @@ int SessionService::Attach(const std::wstring& sessionName)
     const std::string shell = "/bin/sh";
 
     // Launch with terminal fds (PTY).
-    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin};
-    launcher.SetTtySize(windowSize.X, windowSize.Y);
+    wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};
+    launcher.SetTtySize(windowSize.Y, windowSize.X);
     auto process = launcher.Launch(*session);
-    auto tty = process.GetStdHandle(WSLAFDTty);
+    auto tty = process.GetStdHandle(WSLCFDTty);
     auto updateTerminalSize = [&]() {
         const auto windowSize = console.GetWindowSize();
         LOG_IF_FAILED(process.Get().ResizeTty(windowSize.Y, windowSize.X));
@@ -94,21 +94,20 @@ int SessionService::Attach(const std::wstring& sessionName)
 
     auto exitCode = process.GetExitCode();
 
-    wslutil::PrintMessage(wsl::shared::Localization::MessageWslaShellExited(string::MultiByteToWide(shell), static_cast<int>(exitCode)), stdout);
+    wslutil::PrintMessage(wsl::shared::Localization::MessageWslcShellExited(string::MultiByteToWide(shell), static_cast<int>(exitCode)), stdout);
 
     return static_cast<int>(exitCode);
 }
 
-Session SessionService::CreateSession(const std::optional<SessionOptions>& options)
+Session SessionService::CreateSession(const SessionOptions& options)
 {
-    SessionOptions sessionOptions = options.has_value() ? options.value() : SessionOptions::Default();
-    const WSLASessionSettings* settings = sessionOptions.Get();
-    wil::com_ptr<IWSLASessionManager> sessionManager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    const WSLCSessionSettings* settings = options.Get();
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    wil::com_ptr<IWSLASession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(sessionManager->CreateSession(settings, WSLCSessionFlagsPersistent | WSLCSessionFlagsOpenExisting, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
@@ -116,11 +115,11 @@ Session SessionService::CreateSession(const std::optional<SessionOptions>& optio
 std::vector<SessionInformation> SessionService::List()
 {
     std::vector<SessionInformation> result;
-    wil::com_ptr<IWSLASessionManager> sessionManager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    wil::unique_cotaskmem_array_ptr<WSLASessionInformation> sessions;
+    wil::unique_cotaskmem_array_ptr<WSLCSessionInformation> sessions;
     THROW_IF_FAILED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
     for (size_t i = 0; i < sessions.size(); ++i)
     {
@@ -133,5 +132,52 @@ std::vector<SessionInformation> SessionService::List()
     }
 
     return result;
+}
+
+Session SessionService::OpenSession(const std::wstring& displayName)
+{
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(sessionManager->OpenSessionByName(displayName.c_str(), &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+    return Session(std::move(session));
+}
+
+int SessionService::TerminateSession(const std::wstring& displayName)
+{
+    THROW_HR_IF(E_INVALIDARG, displayName.empty());
+
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    wil::com_ptr<IWSLCSession> session;
+    HRESULT hr = sessionManager->OpenSessionByName(displayName.c_str(), &session);
+    if (FAILED(hr))
+    {
+        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
+        {
+            wslutil::PrintMessage(Localization::MessageWslcSessionNotFound(displayName.c_str()), stderr);
+            return 1;
+        }
+
+        THROW_HR(hr);
+    }
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    hr = session->Terminate();
+    if (FAILED(hr))
+    {
+        auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
+        wslutil::PrintMessage(
+            Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.c_str()), errorString), stderr);
+        return 1;
+    }
+
+    return 0;
 }
 } // namespace wsl::windows::wslc::services

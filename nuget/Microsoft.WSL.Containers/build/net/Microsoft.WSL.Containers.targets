@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup Condition="'$(WSLCSDK_Platform)' == ''">
+        <WSLCSDK_Platform Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x64</WSLCSDK_Platform>
+        <WSLCSDK_Platform Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</WSLCSDK_Platform>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(WSLCSDK_Platform)' == ''">
+        <WSLCSDK_Platform Condition="'$(Platform)' != 'AnyCPU'">$(Platform)</WSLCSDK_Platform>
+    </PropertyGroup>
+
+    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
+
+</Project>

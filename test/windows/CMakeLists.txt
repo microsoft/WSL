@@ -9,7 +9,7 @@ set(SOURCES
     PluginTests.cpp
     PolicyTests.cpp
     InstallerTests.cpp
-    WSLATests.cpp
+    WSLCTests.cpp
     WslcSdkTests.cpp)
 
 set(HEADERS
@@ -30,6 +30,9 @@ target_link_libraries(wsltests
                       wslcsdk
                       ${TAEF_LINK_LIBRARIES}
                       ${COMMON_LINK_LIBRARIES}
+                      ${MSI_LINK_LIBRARIES}
+                      ${HCS_LINK_LIBRARIES}
+                      ${SERVICE_LINK_LIBRARIES}
                       VirtDisk.lib
                       Wer.lib
                       Dbghelp.lib

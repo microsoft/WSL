@@ -33,8 +33,8 @@ TRACELOGGING_DEFINE_PROVIDER(
     TraceLoggingOptionMicrosoftTelemetry());
 
 TRACELOGGING_DEFINE_PROVIDER(
-    WslaTelemetryProvider,
-    "Microsoft.Windows.Wsla",
+    WslcTelemetryProvider,
+    "Microsoft.Windows.Wslc",
     // {0383CE62-8F86-4766-AFB2-9D66A7FB1E90}
     (0x383ce62, 0x8f86, 0x4766, 0xaf, 0xb2, 0x9d, 0x66, 0xa7, 0xfb, 0x1e, 0x90),
     TraceLoggingOptionMicrosoftTelemetry());

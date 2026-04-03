@@ -19,7 +19,7 @@ Abstract:
 #include <vector>
 #include <charconv>
 #include <format>
-#include <wslaservice.h>
+#include <wslc.h>
 #include <string.hpp>
 
 using namespace wsl::windows::wslc::models;
@@ -41,8 +41,12 @@ T GetIntegerFromString(const std::wstring& value, const std::wstring& argName = 
     std::string narrowValue = wsl::windows::common::string::WideToMultiByte(value);
 
     T convertedValue{};
-    auto result = std::from_chars(narrowValue.c_str(), narrowValue.c_str() + narrowValue.size(), convertedValue);
-    if (result.ec != std::errc())
+    const char* begin = narrowValue.c_str();
+    const char* end = begin + narrowValue.size();
+    auto result = std::from_chars(begin, end, convertedValue);
+
+    // Reject conversion errors and partial parses (e.g. "1.5", "9abc")
+    if (result.ec != std::errc() || result.ptr != end)
     {
         throw ArgumentException(std::format(L"Invalid {} argument value: {}", argName, value));
     }
@@ -50,10 +54,12 @@ T GetIntegerFromString(const std::wstring& value, const std::wstring& argName = 
     return convertedValue;
 }
 
-void ValidateWSLASignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
-WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring& argName = {});
+void ValidateWSLCSignalFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
+WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
+
+void ValidateVolumeMount(const std::vector<std::wstring>& values);
 
 } // namespace wsl::windows::wslc::validation

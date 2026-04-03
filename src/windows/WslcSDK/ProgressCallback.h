@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "wslaservice.h"
+#include "wslc.h"
 #include "wslcsdkprivate.h"
 #include <winrt/base.h>
 
@@ -27,7 +27,7 @@ struct ProgressCallback : public winrt::implements<ProgressCallback, IProgressCa
     template <typename Options>
     static winrt::com_ptr<ProgressCallback> CreateIf(const Options* options)
     {
-        if (options->progressCallback)
+        if (options && options->progressCallback)
         {
             return winrt::make_self<ProgressCallback>(options->progressCallback, options->progressCallbackContext);
         }

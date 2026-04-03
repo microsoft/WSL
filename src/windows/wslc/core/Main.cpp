@@ -20,6 +20,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "RootCommand.h"
+#include "UserSettings.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -36,7 +37,7 @@ try
     wslutil::ConfigureCrt();
     wslutil::InitializeWil();
 
-    WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
+    WslTraceLoggingInitialize(WslcTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
 
     wslutil::SetCrtEncoding(_O_U8TEXT);
@@ -46,6 +47,25 @@ try
     // The execution context must be declared after COM is initialized because it stores internal
     // COM references.
     CLIExecutionContext context;
+
+    // Register a console control handler so Ctrl-C signals the cancel event.
+    // This allows long-running operations (e.g. image build) to be cancelled.
+    // The static pointer is required because SetConsoleCtrlHandler only accepts function pointers.
+    // CancelEvent starts null; when a task creates it, the handler picks it up automatically.
+    static auto& s_cancelEvent = context.CancelEvent;
+    auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
+        if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT)
+        {
+            if (s_cancelEvent && !s_cancelEvent.is_signaled())
+            {
+                s_cancelEvent.SetEvent();
+                return TRUE;
+            }
+        }
+        return FALSE;
+    };
+    SetConsoleCtrlHandler(ctrlHandler, TRUE);
+    auto unregisterHandler = wil::scope_exit([&]() { SetConsoleCtrlHandler(ctrlHandler, FALSE); });
 
     WSADATA data{};
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
@@ -89,6 +109,14 @@ try
         // Using WSL shared utility to get the HRESULT from the caught exception.
         // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
         result = wil::ResultFromCaughtException();
+
+        // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
+        if (context.CancelEvent && context.CancelEvent.is_signaled())
+        {
+            fwprintf(stderr, L"\nCancelled.\n");
+            return 1;
+        }
+
         if (FAILED(result))
         {
             if (const auto& reported = context.ReportedError())

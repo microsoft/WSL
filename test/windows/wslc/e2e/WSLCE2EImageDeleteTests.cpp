@@ -17,10 +17,11 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageDeleteTests
 {
-    WSL_TEST_CLASS(WSLCE2EImageDeleteTests)
+    WSLC_TEST_CLASS(WSLCE2EImageDeleteTests)
 
     TEST_METHOD_SETUP(MethodSetup)
     {
@@ -49,7 +50,7 @@ class WSLCE2EImageDeleteTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
+        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -131,22 +132,28 @@ private:
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
-               << GetAvailableCommands() //
+        output << GetWslcHeader()              //
+               << GetDescription()             //
+               << GetUsage()                   //
+               << GetAvailableCommandAliases() //
+               << GetAvailableCommands()       //
                << GetAvailableOptions();
         return output.str();
     }
 
     std::wstring GetDescription() const
     {
-        return L"Deletes images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageRemoveLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
     {
-        return L"Usage: wslc image delete [<options>] <image>\r\n\r\n";
+        return L"Usage: wslc image remove [<options>] <image>\r\n\r\n";
+    }
+
+    std::wstring GetAvailableCommandAliases() const
+    {
+        return L"The following command aliases are available: delete rm\r\n\r\n";
     }
 
     std::wstring GetAvailableCommands() const

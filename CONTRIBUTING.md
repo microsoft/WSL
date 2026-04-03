@@ -40,12 +40,12 @@ Note that WSL distro's launch in the Windows Console (unless you have taken step
 
 ### Collect WSL logs for networking issues
 
-Install tcpdump in your WSL distribution using the following commands.
+Install iptables and tcpdump in your WSL distribution using the following commands.
 Note: This will not work if WSL has Internet connectivity issues.
 
 ```
 # sudo apt-get update
-# sudo apt-get -y install tcpdump
+# sudo apt-get -y install iptables tcpdump
 ```
 
 Install [WPR](https://learn.microsoft.com/windows-hardware/test/wpt/windows-performance-recorder)

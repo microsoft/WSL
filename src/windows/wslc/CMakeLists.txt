@@ -1,4 +1,4 @@
-set(WSLC_SUBDIRS arguments commands core services tasks)
+set(WSLC_SUBDIRS arguments commands core services settings tasks)
 list(TRANSFORM WSLC_SUBDIRS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/ OUTPUT_VARIABLE WSLC_SUBDIR_PATHS)
 
 list(TRANSFORM WSLC_SUBDIR_PATHS APPEND /*.h OUTPUT_VARIABLE HEADER_PATTERNS)
@@ -13,7 +13,8 @@ target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUB
 
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}
-                      common)
+                      common
+                      yaml-cpp)
 
 target_precompile_headers(wslclib REUSE_FROM common)
 set_target_properties(wslclib PROPERTIES FOLDER windows)

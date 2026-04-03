@@ -202,7 +202,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
         return {};
     }
 
-    // Handle case where we expect a positional but
+    // Handle case where we expect a positional but don't find one - check forwarded args.
 
     // Check for forwarded arg existence.
     if (m_forwardArgs.empty())

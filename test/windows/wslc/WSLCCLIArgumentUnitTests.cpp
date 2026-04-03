@@ -20,7 +20,7 @@ Abstract:
 #include "ArgumentTypes.h"
 #include "ArgumentValidation.h"
 #include "Exceptions.h"
-#include <wslaservice.h>
+#include <wslc.h>
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::argument;
@@ -33,7 +33,7 @@ using namespace WEX::TestExecution;
 namespace WSLCCLIArgumentUnitTests {
 class WSLCCLIArgumentUnitTests
 {
-    WSL_TEST_CLASS(WSLCCLIArgumentUnitTests)
+    WSLC_TEST_CLASS(WSLCCLIArgumentUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -115,21 +115,21 @@ class WSLCCLIArgumentUnitTests
         VERIFY_NO_THROW(validation::ValidateIntegerFromString<LONGLONG>({L"1234", L"-1234567890123"}, L"testArg"));
         VERIFY_THROWS(validation::ValidateIntegerFromString<LONGLONG>({L"1234", L"-92233720369999854775808"}, L"testArg"), ArgumentException);
 
-        // Verify WSLASignal conversion
-        auto validSignal = validation::GetWSLASignalFromString(L"SIGTERM");
-        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
-        validSignal = validation::GetWSLASignalFromString(L"TERM"); // No prefix
-        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
-        validSignal = validation::GetWSLASignalFromString(L"sIgTerm"); // Case-insensitive
-        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
-        validSignal = validation::GetWSLASignalFromString(L"term"); // Case-insensitive no prefix
-        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
-        VERIFY_THROWS(validation::GetWSLASignalFromString(L"INVALID_SIGNAL"), ArgumentException);
-        validSignal = validation::GetWSLASignalFromString(L"15"); // SIGTERM is 15
-        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
-        VERIFY_THROWS(validation::GetWSLASignalFromString(L"999"), ArgumentException); // Out of range
-        VERIFY_NO_THROW(validation::ValidateWSLASignalFromString({L"HUP", L"9", L"SIGKILL", L"stop"}, L"signalArg"));
-        VERIFY_THROWS(validation::ValidateWSLASignalFromString({L"SIGHUP", L"999"}, L"signalArg"), ArgumentException); // 999 is out of range
+        // Verify WSLCSignal conversion
+        auto validSignal = validation::GetWSLCSignalFromString(L"SIGTERM");
+        VERIFY_ARE_EQUAL(validSignal, WSLCSignalSIGTERM);
+        validSignal = validation::GetWSLCSignalFromString(L"TERM"); // No prefix
+        VERIFY_ARE_EQUAL(validSignal, WSLCSignalSIGTERM);
+        validSignal = validation::GetWSLCSignalFromString(L"sIgTerm"); // Case-insensitive
+        VERIFY_ARE_EQUAL(validSignal, WSLCSignalSIGTERM);
+        validSignal = validation::GetWSLCSignalFromString(L"term"); // Case-insensitive no prefix
+        VERIFY_ARE_EQUAL(validSignal, WSLCSignalSIGTERM);
+        VERIFY_THROWS(validation::GetWSLCSignalFromString(L"INVALID_SIGNAL"), ArgumentException);
+        validSignal = validation::GetWSLCSignalFromString(L"15"); // SIGTERM is 15
+        VERIFY_ARE_EQUAL(validSignal, WSLCSignalSIGTERM);
+        VERIFY_THROWS(validation::GetWSLCSignalFromString(L"999"), ArgumentException); // Out of range
+        VERIFY_NO_THROW(validation::ValidateWSLCSignalFromString({L"HUP", L"9", L"SIGKILL", L"stop"}, L"signalArg"));
+        VERIFY_THROWS(validation::ValidateWSLCSignalFromString({L"SIGHUP", L"999"}, L"signalArg"), ArgumentException); // 999 is out of range
 
         // Verify format type
         auto format = validation::GetFormatTypeFromString(L"json");

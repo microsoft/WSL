@@ -15,13 +15,13 @@ Abstract:
 #include "TerminationCallback.h"
 
 namespace {
-WslcSessionTerminationReason ConvertReason(WSLAVirtualMachineTerminationReason Reason)
+WslcSessionTerminationReason ConvertReason(WSLCVirtualMachineTerminationReason Reason)
 {
     switch (Reason)
     {
-    case WSLAVirtualMachineTerminationReasonShutdown:
+    case WSLCVirtualMachineTerminationReasonShutdown:
         return WSLC_SESSION_TERMINATION_REASON_SHUTDOWN;
-    case WSLAVirtualMachineTerminationReasonCrashed:
+    case WSLCVirtualMachineTerminationReasonCrashed:
         return WSLC_SESSION_TERMINATION_REASON_CRASHED;
     default:
         return WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
@@ -35,7 +35,7 @@ TerminationCallback::TerminationCallback(WslcSessionTerminationCallback callback
 }
 
 // TODO: Details from the runtime are dropped; should the SDK callback function be updated to include the reasons string?
-HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR)
+HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLCVirtualMachineTerminationReason Reason, LPCWSTR)
 {
     if (m_callback)
     {
@@ -45,7 +45,7 @@ HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLAVirtualMachineT
     return S_OK;
 }
 
-winrt::com_ptr<TerminationCallback> TerminationCallback::CreateIf(const WSLC_SESSION_OPTIONS_INTERNAL* options)
+winrt::com_ptr<TerminationCallback> TerminationCallback::CreateIf(const WslcSessionOptionsInternal* options)
 {
     if (options->terminationCallback)
     {

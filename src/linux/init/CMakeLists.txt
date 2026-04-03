@@ -21,7 +21,7 @@ set(SOURCES
     WslDistributionConfig.cpp
     wslinfo.cpp
     wslpath.cpp
-    WSLAInit.cpp)
+    WSLCInit.cpp)
 
 set(HEADERS
     ../inc/lxwil.h
@@ -52,3 +52,14 @@ add_linux_executable(init "${SOURCES}" "${HEADERS};${COMMON_LINUX_HEADERS}" "${I
 add_dependencies(init localization)
 
 set_target_properties(init PROPERTIES FOLDER linux)
+
+set(INITRAMFS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/initrd.img)
+set(INIT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/init)
+add_custom_command(
+    OUTPUT ${INITRAMFS} "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
+    DEPENDS init ${INIT}
+    COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive -File "${CMAKE_SOURCE_DIR}/tools/create-initrd.ps1" "${INIT}" "${INITRAMFS}"
+    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/initramfs"
+    VERBATIM)
+add_custom_target(initramfs DEPENDS ${INITRAMFS})
+set_target_properties(initramfs PROPERTIES FOLDER linux)

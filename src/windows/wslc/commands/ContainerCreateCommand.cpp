@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Create Command
@@ -30,39 +31,40 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, true),
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
-        Argument::Create(ArgType::CIDFile),
-        Argument::Create(ArgType::DNS),
-        Argument::Create(ArgType::DNSDomain),
-        Argument::Create(ArgType::DNSOption),
-        Argument::Create(ArgType::DNSSearch),
+        // Argument::Create(ArgType::CIDFile),
+        // Argument::Create(ArgType::DNS),
+        // Argument::Create(ArgType::DNSDomain),
+        // Argument::Create(ArgType::DNSOption),
+        // Argument::Create(ArgType::DNSSearch),
         Argument::Create(ArgType::Entrypoint),
         Argument::Create(ArgType::Env, false, NO_LIMIT),
-        Argument::Create(ArgType::EnvFile),
-        Argument::Create(ArgType::GroupId),
+        Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
+        // Argument::Create(ArgType::GroupId),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Name),
-        Argument::Create(ArgType::NoDNS),
-        Argument::Create(ArgType::Progress),
+        // Argument::Create(ArgType::NoDNS),
+        // Argument::Create(ArgType::Progress),
+        Argument::Create(ArgType::Publish, false, NO_LIMIT),
         Argument::Create(ArgType::Remove),
-        Argument::Create(ArgType::Scheme),
+        // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::Session),
-        Argument::Create(ArgType::TMPFS),
+        // Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
-        Argument::Create(ArgType::User),
-        Argument::Create(ArgType::Volume),
-        Argument::Create(ArgType::Virtual),
+        // Argument::Create(ArgType::User),
+        Argument::Create(ArgType::Volume, false, NO_LIMIT),
+        // Argument::Create(ArgType::Virtual),
     };
     // clang-format on
 }
 
 std::wstring ContainerCreateCommand::ShortDescription() const
 {
-    return {L"Create a container."};
+    return Localization::WSLCCLI_ContainerCreateDesc();
 }
 
 std::wstring ContainerCreateCommand::LongDescription() const
 {
-    return {L"Creates a container."};
+    return Localization::WSLCCLI_ContainerCreateLongDesc();
 }
 
 // clang-format off

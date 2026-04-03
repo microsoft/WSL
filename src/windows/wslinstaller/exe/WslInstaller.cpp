@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "WslInstaller.h"
 
 extern wil::unique_event g_stopEvent;
@@ -75,8 +76,16 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
         }
     };
 
-    auto result = wsl::windows::common::wslutil::UpgradeViaMsi(
+    auto result = wsl::windows::common::install::UpgradeViaMsi(
         GetMsiPackagePath().c_str(), L"SKIPMSIX=1", logFile.has_value() ? logFile->c_str() : nullptr, messageCallback);
+
+    // ERROR_SUCCESS_REBOOT_REQUIRED (3010) means the install succeeded but some files
+    // will be replaced on the next reboot. Treat as success since the service runs
+    // silently with no user-facing console.
+    if (result == ERROR_SUCCESS_REBOOT_REQUIRED)
+    {
+        result = ERROR_SUCCESS;
+    }
 
     WSL_LOG("MSIUpgradeResult", TraceLoggingValue(result, "result"), TraceLoggingValue(errors.c_str(), "errorMessage"));
 
@@ -140,7 +149,7 @@ std::shared_ptr<InstallContext> LaunchInstall()
         return {};
     }
 
-    wsl::windows::common::wslutil::WriteInstallLog(std::format("Starting upgrade via WslInstaller. Previous version: {}", existingVersion));
+    wsl::windows::common::install::WriteInstallLog(std::format("Starting upgrade via WslInstaller. Previous version: {}", existingVersion));
 
     // Return an existing install if any
     if (auto ptr = weak_context.lock(); ptr != nullptr)

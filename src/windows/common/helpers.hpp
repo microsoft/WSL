@@ -149,8 +149,6 @@ std::filesystem::path GetUserProfilePath(_In_opt_ HANDLE userToken = nullptr);
 
 std::filesystem::path GetWslConfigPath(_In_opt_ HANDLE userToken = nullptr);
 
-bool IsDisableVgpuSettingsSupported();
-
 bool IsPackageInstalled(_In_ LPCWSTR PackageFamilyName);
 
 bool IsServicePresent(_In_ LPCWSTR ServiceName);
@@ -198,5 +196,7 @@ DWORD RunProcess(_Inout_ std::wstring& CommandLine);
 void SetHandleInheritable(_In_ HANDLE Handle, _In_ bool Inheritable = true);
 
 bool TryAttachConsole();
+
+void RegisterWithDcat(_In_ bool IncludeVersionNumber = true);
 
 } // namespace wsl::windows::common::helpers

@@ -1010,6 +1010,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         }
 
         // Remove completed handles from m_handles.
+        bool hasHandleToWaitFor = false;
         for (auto it = m_handles.begin(); it != m_handles.end();)
         {
             if (!it->second)
@@ -1027,11 +1028,16 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             }
             else
             {
+                // If only NeedNotComplete handles are left, we want to exit Run.
+                if (WI_IsFlagClear(it->first, Flags::NeedNotComplete))
+                {
+                    hasHandleToWaitFor = true;
+                }
                 ++it;
             }
         }
 
-        if (m_handles.empty() || m_cancel)
+        if (!hasHandleToWaitFor || m_cancel)
         {
             break;
         }
@@ -1365,9 +1371,9 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
     {
         if (PendingChunkSize == 0)
         {
-            if (buffer.front() == '\r' || buffer.front() == '\n')
+            // Consume CRLF's between chunks.
+            if (PendingBuffer.empty() && (buffer.front() == '\r' || buffer.front() == '\n'))
             {
-                // Consume CRLF's between chunks.
                 advance(1);
                 continue;
             }
@@ -1381,11 +1387,17 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
                 // Incomplete size header, buffer until next read.
                 break;
             }
+            // Advance beyond the LF
+            advance(end - buffer.begin() + 1);
 
-            THROW_HR_IF_MSG(E_INVALIDARG, end - buffer.begin() < 2, "Malformed chunk header: %hs", PendingBuffer.c_str());
-            PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CRLF.
+            THROW_HR_IF_MSG(
+                E_INVALIDARG,
+                PendingBuffer.size() < 2 || PendingBuffer.back() != '\r',
+                "Malformed chunk header: %hs",
+                PendingBuffer.c_str());
+            PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CR.
 
-#ifdef WSLA_HTTP_DEBUG
+#ifdef WSLC_HTTP_DEBUG
 
             WSL_LOG("HTTPChunkHeader", TraceLoggingValue(PendingBuffer.c_str(), "Size"));
 
@@ -1403,7 +1415,6 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
             }
 
             ExpectHeader = false;
-            advance(PendingBuffer.size() + 2);
             PendingBuffer.clear();
         }
         else
@@ -1419,7 +1430,7 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
             if (PendingChunkSize == 0)
             {
 
-#ifdef WSLA_HTTP_DEBUG
+#ifdef WSLC_HTTP_DEBUG
 
                 WSL_LOG("HTTPChunk", TraceLoggingValue(PendingBuffer.c_str(), "Content"));
 
@@ -1432,7 +1443,7 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 }
 
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Buffer) :
-    Handle(std::move(MovedHandle)), Buffer(Buffer)
+    Handle(std::move(MovedHandle)), Buffer(Buffer), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
 }
@@ -1464,10 +1475,15 @@ void WriteHandle::Schedule()
 
     Event.ResetEvent();
 
+    Overlapped.Offset = Offset.LowPart;
+    Overlapped.OffsetHigh = Offset.HighPart;
+
     // Schedule the write.
     DWORD bytesWritten{};
     if (WriteFile(Handle.Get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesWritten, &Overlapped))
     {
+        Offset.QuadPart += bytesWritten;
+
         Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
         if (Buffer.empty())
         {
@@ -1494,6 +1510,7 @@ void WriteHandle::Collect()
     // Complete the write.
     DWORD bytesWritten{};
     THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.Get(), &Overlapped, &bytesWritten, false));
+    Offset.QuadPart += bytesWritten;
 
     Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
     if (Buffer.empty())

@@ -362,18 +362,26 @@ struct PortRelay
     {
         WI_VERIFY(PendingSocket);
 
-        std::thread thread{[WindowsSocket = std::move(PendingSocket), LinuxPort = LinuxPort, RelayPort = RelayPort, Family = Family, VmId = VmId]() {
-            try
-            {
+        std::thread thread{
+            [WindowsSocket = std::move(PendingSocket), LinuxPort = LinuxPort, RelayPort = RelayPort, Family = Family, VmId = VmId]() {
+                try
+                {
+                    WSL_LOG(
+                        "StartPortRelay",
+                        TraceLoggingValue(LinuxPort, "LinuxPort"),
+                        TraceLoggingValue(WindowsSocket.get(), "Socket"),
+                        TraceLoggingValue(Family, "Family"));
+
+                    RunRelay(WindowsSocket.get(), VmId, LinuxPort, RelayPort, Family);
+                }
+                CATCH_LOG();
+
                 WSL_LOG(
-                    "StartPortRelay", TraceLoggingValue(LinuxPort, "LinuxPort"), TraceLoggingValue(WindowsSocket.get(), "Socket"));
-
-                RunRelay(WindowsSocket.get(), VmId, LinuxPort, RelayPort, Family);
-            }
-            CATCH_LOG();
-
-            WSL_LOG("StopPortRelay", TraceLoggingValue(LinuxPort, "LinuxPort"), TraceLoggingValue(WindowsSocket.get(), "Socket"));
-        }};
+                    "StopPortRelay",
+                    TraceLoggingValue(LinuxPort, "LinuxPort"),
+                    TraceLoggingValue(WindowsSocket.get(), "Socket"),
+                    TraceLoggingValue(Family, "Family"));
+            }};
 
         thread.detach();
     }
@@ -479,7 +487,7 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
             events.push_back(e->AcceptEvent.get());
         }
 
-        // Then wait for IO, or exit event.
+        // WaitForMultipleObjects supports at most MAXIMUM_WAIT_OBJECTS (64) handles.
         auto result = WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), false, INFINITE);
         THROW_LAST_ERROR_IF(result == WAIT_FAILED);
 
@@ -498,9 +506,9 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
     }
 }
 
-std::optional<WSLA_MAP_PORT> ReceiveServiceMessage()
+std::optional<WSLC_MAP_PORT> ReceiveServiceMessage()
 {
-    WSLA_MAP_PORT message{};
+    WSLC_MAP_PORT message{};
 
     DWORD bytesRead{};
     if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), &message, sizeof(message), &bytesRead, nullptr))
@@ -514,11 +522,11 @@ std::optional<WSLA_MAP_PORT> ReceiveServiceMessage()
     }
 
     WI_ASSERT(message.Header.MessageSize == sizeof(message));
-    WI_ASSERT(message.Header.MessageType == LxMessageWSLAMapPort);
+    WI_ASSERT(message.Header.MessageType == LxMessageWSLCMapPort);
     return message;
 }
 
-void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
+void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
 {
     std::map<std::tuple<uint16_t, uint32_t>, std::shared_ptr<PortRelay>> ports;
 
@@ -553,6 +561,7 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
             WSL_LOG(
                 "PortMapping",
                 TraceLoggingValue(result, "Result"),
+                TraceLoggingValue(message->AddressFamily, "Family"),
                 TraceLoggingValue(message->WindowsPort, "WindowsPort"),
                 TraceLoggingValue(message->LinuxPort, "LinuxPort"),
                 TraceLoggingValue(message->Stop, "Remove"));
@@ -585,6 +594,15 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
             }
             else
             {
+                // WaitForMultipleObjects supports at most MAXIMUM_WAIT_OBJECTS (64) handles.
+                // Reject the mapping if adding it would exceed the limit (1 handle reserved for the exit event).
+                constexpr size_t c_maxPorts = MAXIMUM_WAIT_OBJECTS - 1;
+                if (ports.size() >= c_maxPorts)
+                {
+                    result = HRESULT_FROM_WIN32(ERROR_TOO_MANY_OPEN_FILES);
+                    continue;
+                }
+
                 try
                 {
                     ports.emplace(key, CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily));

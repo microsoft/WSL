@@ -361,6 +361,7 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer;
+    LARGE_INTEGER Offset{};
 };
 
 template <typename TRead = ReadHandle>
@@ -504,7 +505,8 @@ public:
     {
         None = 0,
         CancelOnCompleted = 1,
-        IgnoreErrors = 2
+        IgnoreErrors = 2,
+        NeedNotComplete = 4,
     };
 
     MultiHandleWait() = default;

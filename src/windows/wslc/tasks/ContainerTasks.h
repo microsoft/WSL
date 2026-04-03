@@ -31,12 +31,12 @@ private:
 };
 
 void CreateContainer(CLIExecutionContext& context);
-void DeleteContainers(CLIExecutionContext& context);
 void ExecContainer(CLIExecutionContext& context);
 void GetContainers(CLIExecutionContext& context);
 void InspectContainers(CLIExecutionContext& context);
 void KillContainers(CLIExecutionContext& context);
 void ListContainers(CLIExecutionContext& context);
+void RemoveContainers(CLIExecutionContext& context);
 void RunContainer(CLIExecutionContext& context);
 void SetContainerOptionsFromArgs(CLIExecutionContext& context);
 void StartContainer(CLIExecutionContext& context);

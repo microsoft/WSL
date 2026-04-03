@@ -38,7 +38,7 @@ struct CommandLineTestCase
 
 class WSLCCLIExecutionUnitTests
 {
-    WSL_TEST_CLASS(WSLCCLIExecutionUnitTests)
+    WSLC_TEST_CLASS(WSLCCLIExecutionUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -72,7 +72,7 @@ class WSLCCLIExecutionUnitTests
             if (dataType == Data::Session)
             {
                 // Create a null session for testing - Session requires a COM pointer
-                wil::com_ptr<IWSLASession> nullSession; // Creates null COM pointer
+                wil::com_ptr<IWSLCSession> nullSession; // Creates null COM pointer
                 wsl::windows::wslc::models::Session session{nullSession};
                 dataMap.Add<Data::Session>(std::move(session));
                 handled = true;

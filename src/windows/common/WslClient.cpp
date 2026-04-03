@@ -13,13 +13,14 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include "WslInstall.h"
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
 #include <conio.h>
-#include "wslaservice.h"
-#include "WSLAProcessLauncher.h"
+#include "wslc.h"
+#include "WSLCProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
 #define BASH_PATH L"/bin/bash"
@@ -29,7 +30,7 @@ using winrt::Windows::Management::Deployment::DeploymentOptions;
 using wsl::shared::Localization;
 using wsl::windows::common::ClientExecutionContext;
 using wsl::windows::common::Context;
-using wsl::windows::common::WSLAProcessLauncher;
+using wsl::windows::common::WSLCProcessLauncher;
 using namespace wsl::windows::common;
 using namespace wsl::shared;
 using namespace wsl::windows::common::distribution;
@@ -152,7 +153,7 @@ int BashMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     const auto options = ParseLegacyArguments(commandLine);
@@ -1261,7 +1262,7 @@ int UpdatePackage(std::wstring_view commandLine)
     parser.AddArgument(NoOp(), WSL_UPDATE_ARG_PROMPT_OPTION_LONG);
     parser.Parse();
 
-    return wsl::windows::common::wslutil::UpdatePackage(preRelease, false);
+    return wsl::windows::common::install::UpdatePackage(preRelease, false);
 }
 
 int Uninstall()
@@ -1270,9 +1271,13 @@ int Uninstall()
     auto clearLogs =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFile(logFile.c_str())); });
 
-    const auto exitCode = wsl::windows::common::wslutil::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::wslutil::MsiMessageCallback);
+    const auto exitCode = wsl::windows::common::install::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::install::MsiMessageCallback);
 
-    if (exitCode != 0)
+    if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+    {
+        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+    }
+    else if (exitCode != 0)
     {
         clearLogs.release();
         THROW_HR_WITH_USER_ERROR(
@@ -1307,7 +1312,7 @@ int WslconfigMain(_In_ int argc, _In_reads_(argc) LPWSTR* argv)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     using wsl::shared::string::IsEqual;
@@ -1516,16 +1521,16 @@ int RunDebugShell()
     THROW_HR(HCS_E_CONNECTION_CLOSED);
 }
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
+DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);
 
-// Temporary debugging tool for WSLA
-int WslaShell(_In_ std::wstring_view commandLine)
+// Temporary debugging tool for WSLC
+int WslcShell(_In_ std::wstring_view commandLine)
 {
-    WSLASessionSettings sessionSettings{};
-    sessionSettings.DisplayName = L"WSLAShell";
+    WSLCSessionSettings sessionSettings{};
+    sessionSettings.DisplayName = L"WSLCShell";
     sessionSettings.CpuCount = 4;
     sessionSettings.MemoryMb = 4096;
-    sessionSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
+    sessionSettings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
     sessionSettings.BootTimeoutMs = 30 * 1000;
     sessionSettings.MaximumStorageSizeMb = 4096;
 
@@ -1542,9 +1547,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(rootVhdOverride, L"--vhd");
     parser.AddArgument(Utf8String(shell), L"--shell");
-    parser.AddArgument(SetFlag<WslaFeatureFlagsDnsTunneling>(sessionSettings.FeatureFlags), L"--dns-tunneling");
-    parser.AddArgument(SetFlag<WslaFeatureFlagsPmemVhds>(sessionSettings.FeatureFlags), L"--pmem-vhds");
-    parser.AddArgument(SetFlag<WslaFeatureFlagsVirtioFs>(sessionSettings.FeatureFlags), L"--virtiofs");
+    parser.AddArgument(SetFlag<WslcFeatureFlagsDnsTunneling>(sessionSettings.FeatureFlags), L"--dns-tunneling");
+    parser.AddArgument(SetFlag<WslcFeatureFlagsVirtioFs>(sessionSettings.FeatureFlags), L"--virtiofs");
     parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");
@@ -1558,7 +1562,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--virtiofs] [--networking-mode <mode>] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
+            LR"({} --wslc [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--virtiofs] [--networking-mode <mode>] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
@@ -1567,19 +1571,19 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     switch (sessionSettings.NetworkingMode)
     {
-    case WSLANetworkingMode::WSLANetworkingModeNone:
-    case WSLANetworkingMode::WSLANetworkingModeNAT:
-    case WSLANetworkingMode::WSLANetworkingModeVirtioProxy:
+    case WSLCNetworkingMode::WSLCNetworkingModeNone:
+    case WSLCNetworkingMode::WSLCNetworkingModeNAT:
+    case WSLCNetworkingMode::WSLCNetworkingModeVirtioProxy:
         break;
     default:
         THROW_HR(E_INVALIDARG);
     }
 
-    wil::com_ptr<IWSLASessionManager> sessionManager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    wil::com_ptr<IWSLASession> session;
+    wil::com_ptr<IWSLCSession> session;
 
     if (!rootVhdOverride.empty())
     {
@@ -1605,13 +1609,13 @@ int WslaShell(_In_ std::wstring_view commandLine)
     }
     else
     {
-        THROW_IF_FAILED(sessionManager->CreateSession(&sessionSettings, WSLASessionFlagsNone, &session));
+        THROW_IF_FAILED(sessionManager->CreateSession(&sessionSettings, WSLCSessionFlagsNone, &session));
     }
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-    std::optional<wil::com_ptr<IWSLAContainer>> container;
-    std::optional<wsl::windows::common::ClientRunningWSLAProcess> process;
+    std::optional<wil::com_ptr<IWSLCContainer>> container;
+    std::optional<wsl::windows::common::ClientRunningWSLCProcess> process;
     // Get the terminal size.
     HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
@@ -1620,7 +1624,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     Info.cbSize = sizeof(Info);
     THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
 
-    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty};
+    wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty};
     launcher.SetTtySize(Info.srWindow.Bottom - Info.srWindow.Top + 1, Info.srWindow.Right - Info.srWindow.Left + 1);
 
     process = launcher.Launch(*session);
@@ -1669,7 +1673,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         std::vector<wil::unique_handle> handleStorage;
         HANDLE ttyInput = nullptr;
         HANDLE ttyOutput = nullptr;
-        auto& it = handleStorage.emplace_back(process->GetStdHandle(WSLAFDTty));
+        auto& it = handleStorage.emplace_back(process->GetStdHandle(WSLCFDTty));
         ttyInput = it.get();
         ttyOutput = it.get();
 
@@ -1707,7 +1711,7 @@ int WslMain(_In_ std::wstring_view commandLine)
     // Call the MSI package if we're in an MSIX context
     if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
-        return wsl::windows::common::wslutil::CallMsiPackage();
+        return wsl::windows::common::install::CallMsiPackage();
     }
 
     // Use exit code -1 so invokers of wsl.exe can distinguish between a Linux
@@ -1933,11 +1937,20 @@ int WslMain(_In_ std::wstring_view commandLine)
         }
         else if (argument == WSL_UNINSTALL_ARG)
         {
+            commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
+            argument = wsl::windows::common::helpers::ParseArgument(commandLine);
+            if (!argument.empty())
+            {
+                wsl::windows::common::wslutil::PrintMessage(
+                    Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG), stdout);
+                return exitCode;
+            }
+
             return Uninstall();
         }
-        else if (argument == L"--wsla")
+        else if (argument == L"--wslc")
         {
-            return WslaShell(commandLine);
+            return WslcShell(commandLine);
         }
         else
         {
