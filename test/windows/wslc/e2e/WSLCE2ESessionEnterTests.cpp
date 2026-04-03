@@ -30,7 +30,8 @@ class WSLCE2ESessionEnterTests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
-        RunWslc(L"image ls");
+        // Ensure that the wslc cli session storage is created.
+        RunWslc(L"image ls").Verify({.ExitCode = 0});
 
         // Terminate the wslc session since we use its storage path in this test class.
         RunWslc(L"session terminate");
