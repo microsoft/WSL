@@ -153,8 +153,8 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
     else
     {
-        throw ArgumentException(
-            std::format(L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
     }
 }
 

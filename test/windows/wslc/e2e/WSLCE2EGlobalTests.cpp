@@ -444,7 +444,7 @@ private:
         }
 
         std::wstringstream commands;
-        commands << L"The following commands are available:\r\n";
+        commands << Localization::WSLCCLI_AvailableCommands() << L"\r\n";
         for (const auto& [name, desc] : entries)
         {
             commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";

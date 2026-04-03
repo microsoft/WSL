@@ -23,7 +23,7 @@ using namespace wsl::windows::wslc::task;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
-// Container CreateCommand
+// Container Create Command
 std::vector<Argument> ContainerCreateCommand::GetArguments() const
 {
     // clang-format off

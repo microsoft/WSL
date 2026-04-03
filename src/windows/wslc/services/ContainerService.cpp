@@ -443,15 +443,13 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, 0));
 
     wsl::windows::common::relay::MultiHandleWait io;
-    io.AddHandle(
-        std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-            stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
+    io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+        stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
 
     if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
-        io.AddHandle(
-            std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-                stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+            stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.

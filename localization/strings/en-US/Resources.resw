@@ -2168,7 +2168,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ContainerListLongDesc" xml:space="preserve">
     <value>Lists containers. By default, only running containers are shown; use --all to include all containers.</value>
-    <comment>{Locked="--all"}Command line arguments should not be translated</comment>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerLogsDesc" xml:space="preserve">
     <value>View container logs.</value>
@@ -2187,7 +2187,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ContainerRunLongDesc" xml:space="preserve">
     <value>Runs a container. By default, the container is started in the background; use --detach to run in the foreground.</value>
-    <comment>{Locked="--detach"}Command line arguments should not be translated</comment>
+    <comment>{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerStartDesc" xml:space="preserve">
     <value>Start a container.</value>
@@ -2329,7 +2329,7 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Follow log output</value>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
-    <value>Output formatting (json or table) (Default:table)</value>
+    <value>Output formatting (json or table) (Default: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
@@ -2373,7 +2373,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
     <value>Signal to send (default: {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
@@ -2454,22 +2454,22 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).</value>
-    <comment>{FixedPlaceholder="{}"}{Locked="SIGKILL"}{Locked="kill"}Command line arguments should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Invalid {} value: {} is out of valid range ({}-{}).</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Image '{}' not found, pulling</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
     <value>Environment variable key cannot be empty</value>
   </data>
   <data name="WSLCCLI_EnvKeyWhitespaceError" xml:space="preserve">
     <value>Environment variable key '{}' cannot contain whitespace</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Requested load but no input provided.</value>
