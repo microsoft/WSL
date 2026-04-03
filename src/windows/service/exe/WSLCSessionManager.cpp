@@ -57,7 +57,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     THROW_HR_IF_MSG(
         E_INVALIDARG,
         WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
-        "Invalid storage flags flags: %i",
+        "Invalid storage flags: %i",
         Settings->StorageFlags);
 
     auto tokenInfo = GetCallingProcessTokenInfo();

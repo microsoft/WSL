@@ -30,6 +30,8 @@ class WSLCE2ESessionEnterTests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
+        RunWslc(L"image ls");
+
         // Terminate the wslc session since we use its storage path in this test class.
         RunWslc(L"session terminate");
         return true;
