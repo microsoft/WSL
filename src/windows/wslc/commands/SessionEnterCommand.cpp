@@ -11,6 +11,7 @@ Abstract:
     Implementation of the session enter command.
 
 --*/
+
 #include "CLIExecutionContext.h"
 #include "SessionCommand.h"
 #include "SessionTasks.h"
@@ -20,7 +21,7 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc {
-// Session Enter Command
+
 std::vector<Argument> SessionEnterCommand::GetArguments() const
 {
     return {
