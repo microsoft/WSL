@@ -16,6 +16,7 @@ Abstract:
 #include "SessionCommand.h"
 
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Session Root Command
@@ -35,12 +36,12 @@ std::vector<Argument> SessionCommand::GetArguments() const
 
 std::wstring SessionCommand::ShortDescription() const
 {
-    return {L"Session command."};
+    return Localization::WSLCCLI_SessionCommandDesc();
 }
 
 std::wstring SessionCommand::LongDescription() const
 {
-    return {L"Session command."};
+    return Localization::WSLCCLI_SessionCommandLongDesc();
 }
 
 void SessionCommand::ExecuteInternal(CLIExecutionContext& context) const

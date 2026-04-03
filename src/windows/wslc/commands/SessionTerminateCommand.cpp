@@ -18,6 +18,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Session Terminate Command
@@ -30,12 +31,12 @@ std::vector<Argument> SessionTerminateCommand::GetArguments() const
 
 std::wstring SessionTerminateCommand::ShortDescription() const
 {
-    return {L"Terminate a session."};
+    return Localization::WSLCCLI_SessionTerminateDesc();
 }
 
 std::wstring SessionTerminateCommand::LongDescription() const
 {
-    return {L"Terminates an active session. If no session is specified, the default session will be terminated."};
+    return Localization::WSLCCLI_SessionTerminateLongDesc();
 }
 
 void SessionTerminateCommand::ExecuteInternal(CLIExecutionContext& context) const

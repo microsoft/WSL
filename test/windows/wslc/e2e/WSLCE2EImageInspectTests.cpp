@@ -18,6 +18,7 @@ Abstract:
 #include <wslc_schema.h>
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageInspectTests
 {
@@ -92,7 +93,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Inspect images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageInspectLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
