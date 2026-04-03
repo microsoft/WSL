@@ -20,6 +20,7 @@ Abstract:
 #include <wil/resource.h>
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace WEX::Logging;
 
@@ -255,7 +256,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume :/containerPath {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: ':/containerPath'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -269,7 +270,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume :/containerPath:ro {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: ':/containerPath:ro'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -289,7 +290,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume C:\\hostPath:ro {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:ro'. Container path must be an absolute path (starting with '/'). Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -309,14 +310,14 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath:invalid_mode {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Unspecified error \r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:invalid_mode'. Container path must be an absolute path (starting with '/'). Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
         {
             auto result = RunWslc(std::format(
                 L"container run --name {} --volume C:\\hostPath:/containerPath:ro:extra {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Unspecified error \r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath:/containerPath:ro:extra'. Container path must be an absolute path (starting with '/'). Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -338,7 +339,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume \"C:\\hostPath\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: 'C:\\hostPath'. Container path must be an absolute path (starting with '/'). Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -351,7 +352,7 @@ class WSLCE2EContainerCreateTests
 
         {
             auto result = RunWslc(std::format(L"container run --name {} --volume \":\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Unspecified error \r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Invalid volume specifications: ':'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -696,10 +697,12 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
-        auto session = RunWslcInteractive(std::format(L"container run -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+        const auto& prompt = ">";
+        auto session = RunWslcInteractive(
+            std::format(L"container run -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
         session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
@@ -724,13 +727,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container run -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -745,12 +745,15 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+
+        const auto& prompt = ">";
+        auto result = RunWslc(std::format(
+            L"container run -itd -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedAttachPrompt = VT::BuildContainerAttachPrompt(prompt);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
 
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
@@ -785,13 +788,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -806,13 +806,16 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container run -itd --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+
+        const auto& prompt = ">";
+        auto result =
+            RunWslc(std::format(L"container run -itd -e PS1={} --name {} {}", prompt, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
 
-        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash", containerId));
+        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash --norc", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
         session.ExpectStdout(expectedPrompt);
@@ -843,13 +846,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container exec -i {} cat", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -864,20 +864,19 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container create -it --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+
+        const auto& prompt = ">";
+        auto result = RunWslc(std::format(
+            L"container create -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
-        // The container attach prompt is different for the first prompt.
-        const auto& expectedAttachPrompt = VT::InspectAndBuildContainerAttachPrompt(WslcContainerName);
-        const auto& expectedPrompt = VT::InspectAndBuildContainerPrompt(WslcContainerName);
+        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
 
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // The container attach prompt appears twice.
-        session.ExpectStdout(expectedAttachPrompt);
-        session.ExpectStdout(expectedAttachPrompt);
+        session.ExpectStdout(expectedPrompt);
 
         session.WriteLine("echo hello");
         session.ExpectCommandEcho("echo hello");
@@ -906,13 +905,10 @@ class WSLCE2EContainerCreateTests
         auto session = RunWslcInteractive(std::format(L"container start --attach {}", containerId));
         VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
 
-        // Write test data to stdin
         session.WriteLine("test line 1");
+        session.ExpectStdout("test line 1\n");
         session.WriteLine("test line 2");
-
-        // Stdin relay is confirmed working. Stdout verification is skipped due to a known
-        // limitation where we are not getting stdout data correctly from non-TTY process.
-        // BUG: Stdin does not support overlapped IO. Can verify output once this is fixed.
+        session.ExpectStdout("test line 2\n");
 
         // Close stdin to signal EOF to cat
         session.CloseStdin();
@@ -923,55 +919,20 @@ class WSLCE2EContainerCreateTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Session_Shell)
+    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_ShortRunningInitProcess)
     {
         WSL2_TEST_ONLY();
-        {
-            // Session shell should attach to the wslc session.
-            auto session = RunWslcInteractive(L"session shell");
-            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
+        VerifyContainerIsNotListed(WslcContainerName);
 
-            session.ExpectStdout(VT::SESSION_PROMPT);
+        constexpr auto ExpectedExitCode = 37;
 
-            session.WriteLine("echo hello");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("echo hello");
-            session.ExpectStdout("hello\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
+        auto result = RunWslc(std::format(
+            L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
 
-            session.WriteLine("whoami");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("whoami");
-            session.ExpectStdout("root\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
-            session.ExitAndVerifyNoErrors();
-            auto exitCode = session.Wait();
-            VERIFY_ARE_EQUAL(0, exitCode);
-        }
-        {
-            // Session shell should attach to the wslc by name also.
-            auto session = RunWslcInteractive(L"session shell wslc-cli");
-            VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
-
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.WriteLine("echo hello");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("echo hello");
-            session.ExpectStdout("hello\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.WriteLine("whoami");
-            session.ExpectStdout(VT::RESET);
-            session.ExpectCommandEcho("whoami");
-            session.ExpectStdout("root\r\n");
-            session.ExpectStdout(VT::SESSION_PROMPT);
-
-            session.ExitAndVerifyNoErrors();
-            auto exitCode = session.Wait();
-            VERIFY_ARE_EQUAL(0, exitCode);
-        }
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
     TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
@@ -1116,7 +1077,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Creates a container.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerCreateLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -1138,28 +1099,16 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  --cidfile         Write the container ID to the provided path.\r\n"
-                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
-                << L"  --dns-domain      Set the default DNS Domain\r\n"
-                << L"  --dns-option      Set DNS options\r\n"
-                << L"  --dns-search      Set DNS search domains\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
-                << L"  --groupid         Group Id for the process\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
-                << L"  --no-dns          No configuration of DNS in the container\r\n"
-                << L"  --progress        Progress type (format: none|ansi) (default: ansi)\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
-                << L"  --scheme          Use this scheme for registry connection\r\n"
                 << L"  --session         Specify the session to use\r\n"
-                << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
-                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
-                << L"  --virtualization  Expose virtualization capabilities to the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n\r\n";
         return options.str();
     }

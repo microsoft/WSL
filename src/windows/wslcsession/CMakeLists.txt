@@ -52,7 +52,8 @@ target_link_libraries(wslcsession
                       ${COMMON_LINK_LIBRARIES}
                       common
                       legacy_stdio_definitions
-                      VirtDisk.lib)
+                      VirtDisk.lib
+                      Crypt32.lib)
 
 target_precompile_headers(wslcsession REUSE_FROM common)
 set_target_properties(wslcsession PROPERTIES FOLDER windows)

@@ -16,6 +16,7 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
+using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
@@ -187,6 +188,21 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     }
 
     vm.m_hostPath = value.substr(0, splitColon);
+
+    if (vm.m_hostPath.empty())
+    {
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG,
+            std::format(L"Invalid volume specifications: '{}'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]", value));
+    }
+
+    if (!vm.m_containerPath.empty() && vm.m_containerPath[0] != '/')
+    {
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG,
+            std::format(L"Invalid volume specifications: '{}'. Container path must be an absolute path (starting with '/'). Expected format: <host path>:<container path>[:mode]", value));
+    }
+
     return vm;
 }
 
@@ -213,12 +229,12 @@ std::optional<std::wstring> EnvironmentVariable::Parse(const std::wstring& entry
 
     if (key.empty())
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Environment variable key cannot be empty");
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_EnvKeyEmptyError());
     }
 
     if (std::any_of(key.begin(), key.end(), std::iswspace))
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"Environment variable key '{}' cannot contain whitespace", key));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_EnvKeyWhitespaceError(key));
     }
 
     if (!value.has_value())

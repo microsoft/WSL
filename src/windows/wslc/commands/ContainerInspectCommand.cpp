@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Inspect Command
@@ -33,12 +34,12 @@ std::vector<Argument> ContainerInspectCommand::GetArguments() const
 
 std::wstring ContainerInspectCommand::ShortDescription() const
 {
-    return {L"Inspect a container."};
+    return Localization::WSLCCLI_ContainerInspectDesc();
 }
 
 std::wstring ContainerInspectCommand::LongDescription() const
 {
-    return {L"Display detailed information about a container."};
+    return Localization::WSLCCLI_ContainerInspectLongDesc();
 }
 
 // clang-format off

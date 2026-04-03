@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ImageRemoveCommand.cpp
+    ImageSaveCommand.cpp
 
 Abstract:
 
@@ -21,34 +21,32 @@ Abstract:
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 using namespace wsl::shared;
-using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
-// Image Remove Command
-std::vector<Argument> ImageRemoveCommand::GetArguments() const
+// Image Save Command
+std::vector<Argument> ImageSaveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        Argument::Create(ArgType::ImageForce),
-        Argument::Create(ArgType::NoPrune),
+        Argument::Create(ArgType::Output, true),
         Argument::Create(ArgType::Session),
     };
 }
 
-std::wstring ImageRemoveCommand::ShortDescription() const
+std::wstring ImageSaveCommand::ShortDescription() const
 {
-    return Localization::WSLCCLI_ImageRemoveDesc();
+    return Localization::WSLCCLI_ImageSaveDesc();
 }
 
-std::wstring ImageRemoveCommand::LongDescription() const
+std::wstring ImageSaveCommand::LongDescription() const
 {
-    return Localization::WSLCCLI_ImageRemoveLongDesc();
+    return Localization::WSLCCLI_ImageSaveLongDesc();
 }
 
-void ImageRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ImageSaveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context              //
         << CreateSession //
-        << DeleteImage;
+        << SaveImage;
 }
 } // namespace wsl::windows::wslc

@@ -18,8 +18,10 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace wsl::windows::wslc::models;
+using namespace wsl::windows::common::string;
 
 class WSLCE2EContainerListTests
 {
@@ -65,7 +67,7 @@ class WSLCE2EContainerListTests
         VERIFY_IS_FALSE(containerId.empty());
 
         // Find container in list output
-        result = RunWslc(L"container list --all");
+        result = RunWslc(L"container list --no-trunc --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto outputLines = result.GetStdoutLines();
         std::optional<std::wstring> foundContainerLine{};
@@ -91,7 +93,7 @@ class WSLCE2EContainerListTests
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto containerId = result.GetStdoutOneLine();
+        auto containerId = TruncateId(result.GetStdoutOneLine());
         VERIFY_IS_FALSE(containerId.empty());
 
         // Find container in list output with no options
@@ -121,7 +123,7 @@ class WSLCE2EContainerListTests
         // Create (but do not start) a container.
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = result.GetStdoutOneLine();
+        const auto containerId = TruncateId(result.GetStdoutOneLine());
         VERIFY_IS_FALSE(containerId.empty());
 
         // Default list should only show running containers.
@@ -179,10 +181,8 @@ class WSLCE2EContainerListTests
         // List containers with json format
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto output = result.GetStdoutOneLine();
-
         // Parse json and verify we got the expected container information back
-        auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(output.c_str());
+        auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1U, containers.size());
         VERIFY_ARE_EQUAL(containerId, wsl::shared::string::MultiByteToWide(containers[0].Id));
 
@@ -195,10 +195,8 @@ class WSLCE2EContainerListTests
         // List containers with json format again
         result = RunWslc(L"container list --all --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto output2 = result.GetStdoutOneLine();
-
         // Parse json and verify we got both containers back
-        containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(output2.c_str());
+        containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(2U, containers.size());
 
         // Extract container IDs
@@ -231,7 +229,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Lists containers. By default, only running containers are shown; use --all to include all containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerListLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -249,7 +247,8 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -a,--all    Show all regardless of state.\r\n"
-                << L"  --format    Output formatting (json or table) (Default:table)\r\n"
+                << L"  --format    " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
+                << L"  --no-trunc  Do not truncate output\r\n"
                 << L"  -q,--quiet  Outputs the container IDs only\r\n"
                 << L"  --session   Specify the session to use\r\n"
                 << L"  -h,--help   Shows help about the selected command\r\n"

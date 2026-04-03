@@ -65,7 +65,7 @@ struct Volume
     std::string Name;
     std::string Driver;
     std::string Mountpoint;
-    std::map<std::string, std::string> Options;
+    std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
@@ -423,12 +423,22 @@ struct BuildKitStatus
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
 };
 
+struct BuildKitLog
+{
+    std::string vertex;
+    std::string data; // base64-encoded output
+    int stream{};     // 1 = stdout, 2 = stderr
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitLog, vertex, data, stream);
+};
+
 struct BuildKitSolveStatus
 {
     std::vector<BuildKitVertex> vertexes;
     std::vector<BuildKitStatus> statuses;
+    std::vector<BuildKitLog> logs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes, statuses);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes, statuses, logs);
 };
 
 struct CreateImageProgressDetails

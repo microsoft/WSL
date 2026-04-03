@@ -487,7 +487,7 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
             events.push_back(e->AcceptEvent.get());
         }
 
-        // Then wait for IO, or exit event.
+        // WaitForMultipleObjects supports at most MAXIMUM_WAIT_OBJECTS (64) handles.
         auto result = WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), false, INFINITE);
         THROW_LAST_ERROR_IF(result == WAIT_FAILED);
 
@@ -594,6 +594,15 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
             }
             else
             {
+                // WaitForMultipleObjects supports at most MAXIMUM_WAIT_OBJECTS (64) handles.
+                // Reject the mapping if adding it would exceed the limit (1 handle reserved for the exit event).
+                constexpr size_t c_maxPorts = MAXIMUM_WAIT_OBJECTS - 1;
+                if (ports.size() >= c_maxPorts)
+                {
+                    result = HRESULT_FROM_WIN32(ERROR_TOO_MANY_OPEN_FILES);
+                    continue;
+                }
+
                 try
                 {
                     ports.emplace(key, CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily));

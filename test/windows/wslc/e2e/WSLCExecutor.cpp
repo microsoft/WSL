@@ -23,30 +23,52 @@ namespace WSLCE2ETests {
 using namespace WEX::Logging;
 using namespace wsl::windows::common;
 
-void WSLCExecutionResult::Dump() const
-{
-    static auto DumpHex = [](const std::wstring& s) {
-        std::wstringstream ss;
-        ss << L"len=" << s.size() << L" [";
-        for (size_t i = 0; i < s.size(); ++i)
-        {
-            ss << L"0x" << std::hex << std::setw(4) << std::setfill(L'0') << static_cast<unsigned int>(static_cast<wchar_t>(s[i])) << L' ';
-        }
-        ss << L"]";
-        return ss.str();
-    };
+namespace {
+    wil::unique_handle GetNonElevatedPrimaryToken()
+    {
+        // This method is necessary because GetNonElevatedToken(TokenPrimary) does
+        // not actually give a de-elevated token when called from an elevated process.
+        // By getting impersonation token first this de-elevates the token, and then
+        // converts it to a primary token.
+        auto impersonationToken = GetNonElevatedToken(TokenImpersonation);
+        wil::unique_handle primaryToken;
+        THROW_IF_WIN32_BOOL_FALSE(
+            DuplicateTokenEx(impersonationToken.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, TokenPrimary, &primaryToken));
 
+        VERIFY_IS_FALSE(wsl::windows::common::security::IsTokenElevated(primaryToken.get()));
+        return primaryToken;
+    }
+} // namespace
+
+void WSLCExecutionResult::Dump(bool escapeStrings) const
+{
     Log::Comment((L"Command Line: \"" + CommandLine + L"\"").c_str());
     if (Stdout)
     {
-        Log::Comment((L"Stdout: \"" + *Stdout + L"\"").c_str());
-        Log::Comment((L"Stdout (hex): " + DumpHex(*Stdout)).c_str());
+        if (escapeStrings)
+        {
+            std::string stdoutStr = wsl::windows::common::string::WideToMultiByte(*Stdout);
+            std::string escapedStdout = EscapeString(stdoutStr);
+            Log::Comment(std::format(L"Stdout: \"{}\"", wsl::shared::string::MultiByteToWide(escapedStdout)).c_str());
+        }
+        else
+        {
+            Log::Comment((L"Stdout: \"" + *Stdout + L"\"").c_str());
+        }
     }
 
     if (Stderr)
     {
-        Log::Comment((L"Stderr: \"" + *Stderr + L"\"").c_str());
-        Log::Comment((L"Stderr (hex): " + DumpHex(*Stderr)).c_str());
+        if (escapeStrings)
+        {
+            std::string stderrStr = wsl::windows::common::string::WideToMultiByte(*Stderr);
+            std::string escapedStderr = EscapeString(stderrStr);
+            Log::Comment(std::format(L"Stderr (escaped): \"{}\"", wsl::shared::string::MultiByteToWide(escapedStderr)).c_str());
+        }
+        else
+        {
+            Log::Comment((L"Stderr: \"" + *Stderr + L"\"").c_str());
+        }
     }
 
     if (ExitCode)
@@ -94,21 +116,37 @@ std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
 std::wstring WSLCExecutionResult::GetStdoutOneLine() const
 {
     auto stdoutLines = GetStdoutLines();
+
+    // Remove empty trailing lines (common when output ends with \n)
+    while (!stdoutLines.empty() && stdoutLines.back().empty())
+    {
+        stdoutLines.pop_back();
+    }
+
     VERIFY_ARE_EQUAL(1u, stdoutLines.size());
     return stdoutLines[0];
 }
 
-WSLCExecutionResult RunWslc(const std::wstring& commandLine)
+WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+
+    // If running non-elevated we need to keep the token alive until it completes.
+    wil::unique_handle nonElevatedToken;
+    if (elevationType == ElevationType::NonElevated)
+    {
+        nonElevatedToken = GetNonElevatedPrimaryToken();
+        process.SetToken(nonElevatedToken.get());
+    }
+
     const auto output = process.RunAndCaptureOutput();
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = output.ExitCode};
 }
 
-void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)
+void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType)
 {
-    RunWslc(cmd).Verify(expected);
+    RunWslc(cmd, elevationType).Verify(expected);
 }
 
 std::wstring GetWslcHeader()
@@ -120,7 +158,7 @@ std::wstring GetWslcHeader()
     return header.str();
 }
 
-WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
+WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
 
@@ -134,6 +172,14 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
 
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
     process.SetStdHandles(childStdinRead.get(), childStdoutWrite.get(), childStderrWrite.get());
+
+    wil::unique_handle nonElevatedToken;
+    if (elevationType == ElevationType::NonElevated)
+    {
+        nonElevatedToken = GetNonElevatedPrimaryToken();
+        process.SetToken(nonElevatedToken.get());
+    }
+
     wil::unique_handle processHandle = process.Start();
 
     childStdinRead.reset();
@@ -141,18 +187,29 @@ WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine)
     childStderrWrite.reset();
 
     return WSLCInteractiveSession(
-        commandLine, std::move(parentStdinWrite), std::move(parentStdoutRead), std::move(parentStderrRead), std::move(processHandle));
+        commandLine,
+        std::move(parentStdinWrite),
+        std::move(parentStdoutRead),
+        std::move(parentStderrRead),
+        std::move(processHandle),
+        std::move(nonElevatedToken)); // Transfer token ownership to the session
 }
 
 // WSLCInteractiveSession implementation
 
 WSLCInteractiveSession::WSLCInteractiveSession(
-    std::wstring commandLine, wil::unique_hfile stdinWrite, wil::unique_hfile stdoutRead, wil::unique_hfile stderrRead, wil::unique_handle processHandle) :
+    std::wstring commandLine,
+    wil::unique_hfile stdinWrite,
+    wil::unique_hfile stdoutRead,
+    wil::unique_hfile stderrRead,
+    wil::unique_handle processHandle,
+    wil::unique_handle nonElevatedToken) :
     CommandLine(std::move(commandLine)),
     m_stdinWrite(std::move(stdinWrite)),
     m_stdoutRead(std::move(stdoutRead)),
     m_stderrRead(std::move(stderrRead)),
-    m_processHandle(std::move(processHandle))
+    m_processHandle(std::move(processHandle)),
+    m_nonElevatedToken(std::move(nonElevatedToken))
 {
     m_stdoutReader = std::make_unique<PartialHandleRead>(m_stdoutRead.get());
     m_stderrReader = std::make_unique<PartialHandleRead>(m_stderrRead.get());
@@ -179,11 +236,13 @@ WSLCInteractiveSession::~WSLCInteractiveSession()
 
 void WSLCInteractiveSession::ExpectStdout(const std::string& expected)
 {
+    Log::Comment(std::format(L"Expecting stdout: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(expected))).c_str());
     m_stdoutReader->ExpectConsume(expected);
 }
 
 void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
 {
+    Log::Comment(std::format(L"Expecting stderr: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(expected))).c_str());
     m_stderrReader->ExpectConsume(expected);
 }
 
@@ -195,6 +254,8 @@ void WSLCInteractiveSession::ExpectCommandEcho(const std::string& command)
 
 void WSLCInteractiveSession::Write(const std::string& data)
 {
+    Log::Comment(std::format(L"Writing to stdin: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(data))).c_str());
+
     OVERLAPPED overlapped{};
     wil::unique_event event(wil::EventOptions::ManualReset);
     overlapped.hEvent = event.get();

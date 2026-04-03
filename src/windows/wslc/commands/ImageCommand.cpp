@@ -15,6 +15,7 @@ Abstract:
 #include "ImageCommand.h"
 
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Root Command
@@ -27,6 +28,7 @@ std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
     commands.push_back(std::make_unique<ImageListCommand>(FullName()));
     commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageSaveCommand>(FullName()));
     return commands;
 }
 
@@ -37,12 +39,12 @@ std::vector<Argument> ImageCommand::GetArguments() const
 
 std::wstring ImageCommand::ShortDescription() const
 {
-    return {L"Image command."};
+    return Localization::WSLCCLI_ImageCommandDesc();
 }
 
 std::wstring ImageCommand::LongDescription() const
 {
-    return {L"Image command."};
+    return Localization::WSLCCLI_ImageCommandLongDesc();
 }
 
 void ImageCommand::ExecuteInternal(CLIExecutionContext& context) const

@@ -37,8 +37,6 @@ namespace VT {
 
     // Prompt patterns used in WSLC.
     constexpr auto SESSION_PROMPT = VT_B_START VT_RED "root@ [ " VT_RESET "/" VT_RED " ]# ";
-    constexpr auto CONTAINER_PROMPT = VT_B_START "root@:/# ";
-    constexpr auto CONTAINER_ATTACH_PROMPT = VT_CR VT_ERASE_LINE VT_CR "root@:/# ";
 
     // Constexpr representations of the control sequences for use in tests.
     constexpr auto B_START = VT_B_START;
@@ -56,29 +54,20 @@ namespace VT {
 #undef VT_ERASE_LINE
 #undef VT_CR
 
-    // Helper function to build container prompt with container ID (first 12 chars)
-    // Example: root@2a88a6f4b7c8:/#
-    inline std::string BuildContainerPrompt(const std::string& containerId, bool withBracketedPaste = true)
+    // Helper function to build container prompt
+    inline std::string BuildContainerPrompt(const std::string& prompt, bool withBracketedPaste = true)
     {
-        const std::string shortId = containerId.substr(0, 12);
         if (withBracketedPaste)
         {
-            return std::format("{}root@{}:/# ", B_START, shortId);
+            return std::format("{}{}", B_START, prompt);
         }
-        return std::format("root@{}:/# ", shortId);
+        return std::format("{}", prompt);
     }
 
-    // Helper function to build container prompt by inspecting the container
-    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste = true);
-
-    inline std::string BuildContainerAttachPrompt(const std::string& containerId)
+    inline std::string BuildContainerAttachPrompt(const std::string& prompt)
     {
-        const std::string shortId = containerId.substr(0, 12);
-        return std::format("{}{}{}root@{}:/# ", CR, ERASE_LINE, CR, shortId);
+        return std::format("{}{}{}{}", CR, ERASE_LINE, CR, prompt);
     }
-
-    // Helper function to build container attach prompt by inspecting the container
-    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId);
 } // namespace VT
 
 struct TestImage
@@ -97,7 +86,37 @@ const TestImage& DebianTestImage();
 const TestImage& PythonTestImage();
 const TestImage& InvalidTestImage();
 
-void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
+struct TestSession
+{
+    static TestSession Create(const std::wstring& displayName, WSLCNetworkingMode networkingMode = WSLCNetworkingModeNone);
+
+    TestSession(std::wstring name, std::filesystem::path storagePath, wil::com_ptr<IWSLCSession> session) :
+        m_name(std::move(name)), m_storagePath(std::move(storagePath)), m_session(std::move(session))
+    {
+    }
+
+    ~TestSession();
+
+    NON_COPYABLE(TestSession);
+    NON_MOVABLE(TestSession);
+
+    const std::wstring& Name() const
+    {
+        return m_name;
+    }
+
+    const std::filesystem::path& StoragePath() const
+    {
+        return m_storagePath;
+    }
+
+private:
+    std::wstring m_name;
+    std::filesystem::path m_storagePath;
+    wil::com_ptr<IWSLCSession> m_session;
+};
+
+void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
 
@@ -107,9 +126,10 @@ wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring&
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
-void EnsureImageIsLoaded(const TestImage& image);
+void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName = L"");
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
+void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
@@ -122,7 +142,7 @@ void VerifyContainerIsNotListed(
     {
         wsl::shared::retry::RetryWithTimeout<void>(
             [&containerNameOrId]() {
-                auto result = RunWslc(L"container list --all");
+                auto result = RunWslc(L"container list --no-trunc --all");
                 result.Verify({.Stderr = L"", .ExitCode = 0});
 
                 auto outputLines = result.GetStdoutLines();

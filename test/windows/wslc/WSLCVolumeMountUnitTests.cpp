@@ -33,18 +33,12 @@ class WSLCVolumeMountUnitTests
             {LR"(C:\hostPath:/containerPath:rw)", LR"(C:\hostPath)", R"(/containerPath)", false},
             {LR"(C:\host Path:/container Path:ro)", LR"(C:\host Path)", R"(/container Path)", true},
             {LR"(C:\host Path:/container Path:rw)", LR"(C:\host Path)", R"(/container Path)", false},
-            {LR"(:/containerPath)", LR"()", R"(/containerPath)", false},
             {LR"(C:\hostPath::ro)", LR"(C:\hostPath)", R"()", true},
-            {LR"(:/containerPath:ro)", LR"()", R"(/containerPath)", true},
             {LR"(C:\hostPath:)", LR"(C:\hostPath)", R"()", false},
-            {LR"(C:\hostPath:ro)", LR"(C)", R"(\hostPath)", true},
             {LR"(C:\hostPath::rw)", LR"(C:\hostPath)", R"()", false},
-            {LR"(C:\hostPath:/containerPath:invalid_mode)", LR"(C:\hostPath:/containerPath)", R"(invalid_mode)", false},
-            {LR"(C:\hostPath:/containerPath:ro:extra)", LR"(C:\hostPath:/containerPath:ro)", R"(extra)", false},
             {LR"(C:\hostPath:/containerPath:)", LR"(C:\hostPath:/containerPath)", R"()", false},
-            {LR"(C:\hostPath)", LR"(C)", R"(\hostPath)", false},
+            {LR"(C:/hostPath:ro)", LR"(C)", R"(/hostPath)", true},
             {LR"(C:/hostPath)", LR"(C)", R"(/hostPath)", false},
-            {LR"(:)", LR"()", R"()", false},
             {LR"(::)", LR"(:)", R"()", false},
         };
 
@@ -55,6 +49,39 @@ class WSLCVolumeMountUnitTests
             VERIFY_ARE_EQUAL(std::get<1>(arg), result.HostPath());
             VERIFY_ARE_EQUAL(std::get<2>(arg), result.ContainerPath());
             VERIFY_ARE_EQUAL(std::get<3>(arg), result.IsReadOnly());
+        }
+    }
+
+    TEST_METHOD(VolumeMount_Parse_InvalidArgs)
+    {
+        std::vector<std::wstring> emptyHostPathCases = {
+            LR"(:/containerPath)",
+            LR"(:/containerPath:ro)",
+            LR"(:)",
+        };
+
+        for (const auto& value : emptyHostPathCases)
+        {
+            WEX::Logging::Log::Comment(std::format(L"Testing invalid volume argument: '{}'", value).c_str());
+            VERIFY_THROWS(VolumeMount::Parse(value), wil::ResultException);
+        }
+    }
+
+    TEST_METHOD(VolumeMount_Parse_InvalidContainerPath)
+    {
+        // Drive colon gets misinterpreted as the host:container separator,
+        // producing a non-absolute container path. Caught by container path validation.
+        std::vector<std::wstring> invalidPathCases = {
+            LR"(C:\hostPath:ro)",                          // host='C', container=\hostPath (not absolute)
+            LR"(C:\hostPath)",                             // host='C', container=\hostPath (not absolute)
+            LR"(C:\hostPath:/containerPath:invalid_mode)", // container=invalid_mode (not absolute)
+            LR"(C:\hostPath:/containerPath:ro:extra)",     // container=extra (not absolute)
+        };
+
+        for (const auto& value : invalidPathCases)
+        {
+            WEX::Logging::Log::Comment(std::format(L"Testing invalid path: '{}'", value).c_str());
+            VERIFY_THROWS(VolumeMount::Parse(value), wil::ResultException);
         }
     }
 };

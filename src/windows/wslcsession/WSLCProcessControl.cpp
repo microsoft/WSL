@@ -59,7 +59,7 @@ void DockerContainerProcessControl::Signal(int Signal)
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_container == nullptr || m_exitEvent.is_signaled());
 
-    m_client.SignalContainer(m_container->ID(), Signal);
+    m_client.SignalContainer(m_container->ID(), static_cast<WSLCSignal>(Signal));
 }
 
 void DockerContainerProcessControl::ResizeTty(ULONG Rows, ULONG Columns)

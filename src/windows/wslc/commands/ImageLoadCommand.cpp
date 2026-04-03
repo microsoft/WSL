@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Load Command
@@ -27,17 +28,18 @@ std::vector<Argument> ImageLoadCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Input),
+        Argument::Create(ArgType::Session),
     };
 }
 
 std::wstring ImageLoadCommand::ShortDescription() const
 {
-    return {L"Load images."};
+    return Localization::WSLCCLI_ImageLoadDesc();
 }
 
 std::wstring ImageLoadCommand::LongDescription() const
 {
-    return {L"Loads images."};
+    return Localization::WSLCCLI_ImageLoadLongDesc();
 }
 
 void ImageLoadCommand::ExecuteInternal(CLIExecutionContext& context) const

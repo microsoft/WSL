@@ -216,7 +216,7 @@ private:
     GUID m_vmId{};
 
     std::mutex m_trackedProcessesLock;
-    std::vector<VMProcessControl*> m_trackedProcesses;
+    std::vector<std::weak_ptr<VMProcessControl>> m_trackedProcesses;
 
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
 

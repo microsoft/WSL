@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Run Command
@@ -30,41 +31,41 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::ImageId, true),
         Argument::Create(ArgType::Command),
         Argument::Create(ArgType::ForwardArgs),
-        Argument::Create(ArgType::CIDFile),
+        // Argument::Create(ArgType::CIDFile),
         Argument::Create(ArgType::Detach),
-        Argument::Create(ArgType::DNS),
-        Argument::Create(ArgType::DNSDomain),
-        Argument::Create(ArgType::DNSOption),
-        Argument::Create(ArgType::DNSSearch),
+        // Argument::Create(ArgType::DNS),
+        // Argument::Create(ArgType::DNSDomain),
+        // Argument::Create(ArgType::DNSOption),
+        // Argument::Create(ArgType::DNSSearch),
         Argument::Create(ArgType::Entrypoint),
         Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Name),
-        Argument::Create(ArgType::NoDNS),
-        Argument::Create(ArgType::Progress),
+        // Argument::Create(ArgType::NoDNS),
+        // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Publish, false, NO_LIMIT),
-        Argument::Create(ArgType::Pull),
+        // Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
-        Argument::Create(ArgType::Scheme),
+        // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::Session),
-        Argument::Create(ArgType::TMPFS),
+        // Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
-        Argument::Create(ArgType::User),
+        // Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, false, NO_LIMIT),
-        Argument::Create(ArgType::Virtual),
+        // Argument::Create(ArgType::Virtual),
     };
     // clang-format on
 }
 
 std::wstring ContainerRunCommand::ShortDescription() const
 {
-    return {L"Run a container."};
+    return Localization::WSLCCLI_ContainerRunDesc();
 }
 
 std::wstring ContainerRunCommand::LongDescription() const
 {
-    return {L"Runs a container. By default, the container is started in the background; use --detach to run in the foreground."};
+    return Localization::WSLCCLI_ContainerRunLongDesc();
 }
 
 // clang-format off
