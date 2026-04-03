@@ -226,7 +226,7 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 
         message.route.rtm_flags |= RTNH_F_ONLINK;
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ({}) RTA_PRIORITY ([not set])",
+            "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ({}) RTA_PRIORITY ([not set])",
             route.to.value().Addr().c_str(),
             route.via.value().Addr().c_str());
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
@@ -243,13 +243,13 @@ void RoutingTable::ModifyDefaultLinkLocalRouteImpl(const Route& route, int opera
     } __attribute__((packed));
 
     GNS_LOG_INFO(
-        "SendMessage Route (default), operation ({}), netLinkflags ({})",
+        "SendMessage Route (default onlink), operation ({}), netLinkflags ({})",
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
+            "Netlink message configuration: RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
             route.metric);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
     });
@@ -278,7 +278,7 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
+            "Netlink message configuration: RTA_DST ([not set]) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
             route.via.value().Addr().c_str(),
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);
@@ -304,7 +304,7 @@ void RoutingTable::ModifyLinkLocalRouteImpl(const Route& route, int operation, i
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
+            "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
             route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
@@ -336,7 +336,7 @@ void RoutingTable::ModifyOfflinkRouteImpl(const Route& route, int operation, int
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
+            "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
             route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
             route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
             route.metric);

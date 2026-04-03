@@ -354,6 +354,8 @@ class NetworkTests
 
     TEST_METHOD(DefaultOnlinkRoutes)
     {
+        WSL2_TEST_ONLY();
+
         wsl::shared::hns::Route defaultRouteV4;
         defaultRouteV4.NextHop = L"0.0.0.0";
         defaultRouteV4.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
