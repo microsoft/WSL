@@ -78,8 +78,8 @@ _(Time,           "time",                L"t",              Kind::Value,       L
 /*_(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription())*/ \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        Localization::WSLCCLI_TTYArgDescription()) \
 /*_(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription())*/ \
-_(Verbose,        "verbose",             L"v",              Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \
-_(Version,        "version",             NO_ALIAS,              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
+_(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \
+_(Version,        "version",             L"v",              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       Localization::WSLCCLI_VolumeArgDescription()) \
 _(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkingDirArgDescription()) \
