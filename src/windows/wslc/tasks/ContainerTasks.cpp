@@ -278,6 +278,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Entrypoint.push_back(WideToMultiByte(context.Args.Get<ArgType::Entrypoint>()));
     }
 
+    if (context.Args.Contains(ArgType::User))
+    {
+        options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();

@@ -97,6 +97,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetEntrypoint(std::move(entrypoints));
     }
 
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        containerLauncher.SetUser(std::move(user));
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
@@ -396,14 +402,18 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLCProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
 
-    wsl::windows::common::WSLCProcessLauncher launcher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+    auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        processLauncher.SetUser(std::move(user));
+    }
     if (!options.WorkingDirectory.empty())
     {
         launcher.SetWorkingDirectory(std::move(options.WorkingDirectory));
     }
 
-    ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(launcher.Launch(*container));
+    return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)

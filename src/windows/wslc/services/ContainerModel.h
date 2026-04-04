@@ -40,6 +40,7 @@ struct ContainerOptions
     std::vector<std::wstring> Volumes;
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
+    std::optional<std::string> User{};
 };
 
 struct CreateContainerResult
