@@ -410,7 +410,7 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     }
     if (!options.WorkingDirectory.empty())
     {
-        launcher.SetWorkingDirectory(std::move(options.WorkingDirectory));
+        processLauncher.SetWorkingDirectory(std::move(options.WorkingDirectory));
     }
 
     return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
