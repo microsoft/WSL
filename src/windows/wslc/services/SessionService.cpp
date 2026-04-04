@@ -125,9 +125,8 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     options.Get()->StorageFlags = WSLCSessionStorageFlagsNoCreate; // Don't create storage if it doesn't exist.
 
     // Create a non-persistent session: lifetime is tied to our COM reference.
-    // Use WSLCSessionFlagsOpenExistingStorage so we don't accidentally create a new sessions storage.
     // TODO: Consider adding a 'create' verb to do that.
-    auto session = SessionService::CreateSession(options, WSLCSessionFlagsOpenExistingStorage);
+    auto session = SessionService::CreateSession(options);
     wsl::windows::common::wslutil::PrintMessage(Localization::MessageWslcCreatedSession(displayName), stderr);
 
     const std::string shell = "/bin/sh";
