@@ -341,4 +341,16 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         }
     }
 }
+
+void WriteFile(const std::filesystem::path& filePath, const std::vector<std::string>& lines)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    VERIFY_IS_TRUE(file.is_open());
+    for (const auto& line : lines)
+    {
+        file << line << "\n";
+    }
+
+    VERIFY_IS_TRUE(file.good());
+}
 } // namespace WSLCE2ETests
