@@ -77,7 +77,7 @@ _(Tag,            "tag",                 L"t",              Kind::Value,       L
 _(Time,           "time",                L"t",              Kind::Value,       Localization::WSLCCLI_TimeArgDescription()) \
 /*_(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription())*/ \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        Localization::WSLCCLI_TTYArgDescription()) \
-/*_(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription())*/ \
+_(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription()) \
 _(Verbose,        "verbose",             NO_ALIAS,              Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \
 _(Version,        "version",             NO_ALIAS,              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
