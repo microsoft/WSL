@@ -175,8 +175,17 @@ class InstallerTests
         return wsl::windows::common::registry::ReadString(m_lxssKey.get(), L"MSI", L"ProductCode", L"");
     }
 
+    // Release any in-process COM DLLs (e.g. wslserviceproxystub.dll loaded by prior tests)
+    // so the Restart Manager doesn't detect the test process as holding files.
+    // This avoids install failures on older Server SKUs where the RM has stricter silent-mode behavior.
+    static void PrepareForMsiOperation()
+    {
+        CoFreeUnusedLibrariesEx(0, 0);
+    }
+
     void UninstallMsi()
     {
+        PrepareForMsiOperation();
         auto productCode = GetMsiProductCode();
         VERIFY_IS_FALSE(productCode.empty());
 
@@ -185,6 +194,7 @@ class InstallerTests
 
     void InstallMsi()
     {
+        PrepareForMsiOperation();
         CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", m_msiPath, GenerateMsiLogPath()));
     }
 
@@ -367,6 +377,7 @@ class InstallerTests
         LogInfo("Installing: %ls", installerFile.c_str());
         if (wsl::shared::string::EndsWith<wchar_t>(installerFile, L".msi"))
         {
+            PrepareForMsiOperation();
             CallMsiExec(std::format(L"/qn /norestart /i {} /L*V {}", installerFile, GenerateMsiLogPath()));
         }
         else

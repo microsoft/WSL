@@ -20,6 +20,7 @@ Abstract:
 #include "SettingsCommand.h"
 
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
@@ -58,14 +59,12 @@ std::vector<Argument> RootCommand::GetArguments() const
 
 std::wstring RootCommand::ShortDescription() const
 {
-    return {L"WSLC is the Windows Subsystem for Linux Container CLI tool."};
+    return Localization::WSLCCLI_RootCommandDesc();
 }
 
 std::wstring RootCommand::LongDescription() const
 {
-    return {
-        L"WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL containers "
-        L"from the command line."};
+    return Localization::WSLCCLI_RootCommandLongDesc();
 }
 
 void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
