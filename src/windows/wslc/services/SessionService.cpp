@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "SessionService.h"
 #include "ConsoleService.h"
-#include "UserSettings.h"
 #include <wslc.h>
 #include <WSLCProcessLauncher.h>
 
