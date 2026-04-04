@@ -341,6 +341,64 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_EQUALS=value=with=equals"));
     }
 
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_NameRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm -u root {} sh -c \"id -un; id -u; id -g\"", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_UidRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm -u 0 {} id -u", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"0\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_UidGidRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm -u 0:0 {} sh -c \"id -u; id -g\"", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_UnknownUser_Fails)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm -u user_does_not_exist {} id -u", DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_UnknownGroup_Fails)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm -u root:badgid {} id -u", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"unable to find group badgid: no matching entries in group file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_NameGroupRoot)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result =
+            RunWslc(std::format(L"container run --rm -u root:root {} sh -c \"id -un; id -u; id -g\"", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_UserOption_NonRootUser_Succeeds)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm -u nobody {} sh -c \"id -un; id -u; id -g\"", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"nobody\n65534\n65534\n", .Stderr = L"", .ExitCode = 0});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -405,6 +463,7 @@ private:
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
+                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";

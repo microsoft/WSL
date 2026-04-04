@@ -36,7 +36,7 @@ std::vector<Argument> ContainerExecCommand::GetArguments() const
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TTY),
-        // Argument::Create(ArgType::User),
+        Argument::Create(ArgType::User),
     };
 }
 
