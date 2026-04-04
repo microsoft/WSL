@@ -132,6 +132,10 @@ typedef enum _WSLCListImagesFlags
     // Note: If neither dangling flag is set, no dangling filter is passed (default: both).
 } WSLCListImagesFlags;
 
+cpp_quote("#define WSLCListImagesFlagsValid (WSLCListImagesFlagsAll | WSLCListImagesFlagsDigests | WSLCListImagesFlagsDanglingTrue | WSLCListImagesFlagsDanglingFalse)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);")
+
 typedef struct _WSLCLabelInformation
 {
     [string] LPSTR Key;
@@ -160,6 +164,8 @@ typedef enum _WSLCProcessFlags
     WSLCProcessFlagsStdin = 1,
     WSLCProcessFlagsTty = 2
 } WSLCProcessFlags;
+
+cpp_quote("#define WSLCProcessFlagsValid (WSLCProcessFlagsStdin | WSLCProcessFlagsTty)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCProcessFlags);")
 
@@ -231,6 +237,8 @@ typedef enum _WSLCContainerFlags
     WSLCContainerFlagsInit = 4, // Run the container under an init process.
 } WSLCContainerFlags;
 
+cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit)")
+
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
 
 
@@ -238,8 +246,9 @@ typedef enum _WSLCContainerStartFlags
 {
     WSLCContainerStartFlagsNone = 0,
     WSLCContainerStartFlagsAttach = 1, // Attach stdio handles on start.
-    WSLCContainerStartFlagsValid = WSLCContainerStartFlagsAttach
 } WSLCContainerStartFlags;
+
+cpp_quote("#define WSLCContainerStartFlagsValid (WSLCContainerStartFlagsAttach)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerStartFlags);")
 
@@ -373,6 +382,8 @@ typedef enum _WSLCFeatureFlags
     WslcFeatureFlagsDebug = 16,
 } WSLCFeatureFlags;
 
+cpp_quote("#define WSLCFeatureFlagsValid (WslcFeatureFlagsDnsTunneling | WslcFeatureFlagsEarlyBootDmesg | WslcFeatureFlagsGPU | WslcFeatureFlagsVirtioFs | WslcFeatureFlagsDebug)")
+
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);")
 
 //
@@ -439,16 +450,22 @@ typedef enum _WSLCLogsFlags
     WSLCLogsFlagsNone = 0,
     WSLCLogsFlagsFollow = 1,
     WSLCLogsFlagsTimestamps = 2,
-    WSLCLogsFlagsValid = WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps
 } WSLCLogsFlags;
+
+cpp_quote("#define WSLCLogsFlagsValid (WSLCLogsFlagsFollow | WSLCLogsFlagsTimestamps)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);")
 
 typedef enum _WSLCDeleteFlags
 {
     WSLCDeleteFlagsNone = 0,
     WSLCDeleteFlagsForce = 1,
-    WSLCDeleteFlagsValid = WSLCDeleteFlagsForce
     // TODO: Flags to remove anonymous volumes, bridge links, etc.
 } WSLCDeleteFlags;
+
+cpp_quote("#define WSLCDeleteFlagsValid (WSLCDeleteFlagsForce)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteFlags);")
 
 
 [
@@ -491,8 +508,11 @@ typedef enum _WSLCDeleteImageFlags
     WSLCDeleteImageFlagsNone = 0,
     WSLCDeleteImageFlagsForce = 1,
     WSLCDeleteImageFlagsNoPrune = 2,
-    WSLCDeleteImageFlagsValid = WSLCDeleteImageFlagsForce | WSLCDeleteImageFlagsNoPrune
 } WSLCDeleteImageFlags;
+
+cpp_quote("#define WSLCDeleteImageFlagsValid (WSLCDeleteImageFlagsForce | WSLCDeleteImageFlagsNoPrune)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteImageFlags);")
 
 typedef struct _WSLCDeleteImageOptions
 {
@@ -683,6 +703,10 @@ typedef enum _WSLCSessionFlags
     WSLCSessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
     WSLCSessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
 } WSLCSessionFlags;
+
+cpp_quote("#define WSLCSessionFlagsValid (WSLCSessionFlagsPersistent | WSLCSessionFlagsOpenExisting)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")
 
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),

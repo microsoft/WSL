@@ -1521,7 +1521,6 @@ int RunDebugShell()
     THROW_HR(HCS_E_CONNECTION_CLOSED);
 }
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCFeatureFlags);
 
 // Temporary debugging tool for WSLC
 int WslcShell(_In_ std::wstring_view commandLine)

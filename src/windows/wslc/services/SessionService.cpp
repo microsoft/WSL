@@ -20,7 +20,6 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
-DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);
 
 int SessionService::Attach(const std::wstring& sessionName)
 {

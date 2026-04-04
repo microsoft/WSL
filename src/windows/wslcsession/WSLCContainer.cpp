@@ -1647,7 +1647,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: %i", Flags);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
     return CallImpl(&WSLCContainerImpl::Start, Flags, DetachKeys);
 }
@@ -1667,7 +1667,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: %i", Flags);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
 
     // Special case for Delete(): If deletion is successful, notify the WSLCSession that the container has been deleted.
     auto [lock, impl] = LockImpl();
@@ -1701,7 +1701,6 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 try
@@ -1709,7 +1708,7 @@ try
     COMServiceExecutionContext context;
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
 
-    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: %i", Flags);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: 0x%x", Flags);
 
     *Stdout = {};
     *Stderr = {};
