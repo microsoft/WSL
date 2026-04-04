@@ -1939,6 +1939,10 @@ Usage:
     <value>{} exited with: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcCreatedSession" xml:space="preserve">
+    <value>Created session: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcHeaderId" xml:space="preserve">
     <value>ID</value>
   </data>
@@ -2281,6 +2285,17 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_SessionTerminateLongDesc" xml:space="preserve">
     <value>Terminates an active session. If no session is specified, the default session will be terminated.</value>
   </data>
+  <data name="WSLCCLI_SessionEnterDesc" xml:space="preserve">
+    <value>Enter a temporary session.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterLongDesc" xml:space="preserve">
+    <value>Creates a non-persistent session with the given storage path and opens a shell into it. The session is deleted when the shell exits. If no name is provided, a GUID is generated and printed to stderr.</value>
+    <comment>{Locked="GUID"}{Locked="stderr"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionEnterNameArgDescription" xml:space="preserve">
+    <value>Name for the session. If not provided, a GUID is generated.</value>
+    <comment>{Locked="GUID"}Technical terms should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SettingsCommandDesc" xml:space="preserve">
     <value>Open the settings file in the default editor.</value>
   </data>
@@ -2481,5 +2496,4 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Requested load but no input provided.</value>
   </data>
->>>>>>> origin/feature/wsl-for-apps
 </root>

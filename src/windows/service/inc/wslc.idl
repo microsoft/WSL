@@ -690,7 +690,6 @@ typedef enum _WSLCSessionFlags
     WSLCSessionFlagsNone = 0,
     WSLCSessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
     WSLCSessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
-    WSLCSessionFlagsOpenExistingStorage = 4, // Only open an existing storage folder, don't create one if it doesn't already exist.
 } WSLCSessionFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")

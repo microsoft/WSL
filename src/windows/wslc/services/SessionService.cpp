@@ -100,7 +100,7 @@ int SessionService::Attach(const std::wstring& sessionName)
     return static_cast<int>(exitCode);
 }
 
-Session SessionService::CreateSession(const SessionOptions& options, WSLCSessionFlags Flags)
+Session SessionService::CreateSession(const SessionOptions& options)
 {
     const WSLCSessionSettings* settings = options.Get();
     wil::com_ptr<IWSLCSessionManager> sessionManager;
@@ -108,7 +108,7 @@ Session SessionService::CreateSession(const SessionOptions& options, WSLCSession
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(settings, Flags, &session));
+    THROW_IF_FAILED(sessionManager->CreateSession(settings, WSLCSessionFlagsPersistent | WSLCSessionFlagsOpenExisting, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
@@ -128,7 +128,7 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     // Use WSLCSessionFlagsOpenExistingStorage so we don't accidentally create a new sessions storage.
     // TODO: Consider adding a 'create' verb to do that.
     auto session = SessionService::CreateSession(options, WSLCSessionFlagsOpenExistingStorage);
-    wsl::windows::common::wslutil::PrintMessage(std::format(L"Created session: {}", displayName), stderr);
+    wsl::windows::common::wslutil::PrintMessage(Localization::MessageWslcCreatedSession(displayName), stderr);
 
     const std::string shell = "/bin/sh";
     wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};

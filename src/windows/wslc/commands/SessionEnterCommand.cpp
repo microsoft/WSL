@@ -19,6 +19,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
@@ -27,20 +28,18 @@ std::vector<Argument> SessionEnterCommand::GetArguments() const
     return {
         Argument::Create(ArgType::StoragePath, true),
         Argument::Create(
-            ArgType::Name, std::nullopt, std::nullopt, L"Name for the session. If not provided, a GUID is generated."),
+            ArgType::Name, std::nullopt, std::nullopt, Localization::WSLCCLI_SessionEnterNameArgDescription()),
     };
 }
 
 std::wstring SessionEnterCommand::ShortDescription() const
 {
-    return {L"Enter a temporary session."};
+    return Localization::WSLCCLI_SessionEnterDesc();
 }
 
 std::wstring SessionEnterCommand::LongDescription() const
 {
-    return {
-        L"Creates a non-persistent session with the given storage path and opens a shell into it. "
-        L"The session is deleted when the shell exits. If no name is provided, a GUID is generated and printed to stderr."};
+    return Localization::WSLCCLI_SessionEnterLongDesc();
 }
 
 void SessionEnterCommand::ExecuteInternal(CLIExecutionContext& context) const
