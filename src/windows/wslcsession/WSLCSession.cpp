@@ -996,7 +996,6 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
 }
 
-
 HRESULT WSLCSession::ListImages(const WSLCListImageOptions* Options, WSLCImageInformation** Images, ULONG* Count)
 try
 {
@@ -1159,7 +1158,6 @@ try
     return S_OK;
 }
 CATCH_RETURN();
-
 
 HRESULT WSLCSession::DeleteImage(const WSLCDeleteImageOptions* Options, WSLCDeletedImageInformation** DeletedImages, ULONG* Count)
 try

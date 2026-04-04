@@ -1701,7 +1701,6 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
     return CallImpl(&WSLCContainerImpl::Export, TarHandle);
 }
 
-
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 try
 {
