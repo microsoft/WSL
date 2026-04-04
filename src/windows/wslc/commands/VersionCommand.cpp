@@ -18,17 +18,22 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 std::wstring VersionCommand::ShortDescription() const
 {
-    return {L"Show version information."};
+    return Localization::WSLCCLI_VersionDesc();
 }
 
 std::wstring VersionCommand::LongDescription() const
 {
-    return {L"Show version information for this tool."};
+    return Localization::WSLCCLI_VersionLongDesc();
+}
+
+void VersionCommand::PrintVersion()
+{
+    wsl::windows::common::wslutil::PrintMessage(std::format(L"{} {}", s_ExecutableName, WSL_PACKAGE_VERSION));
 }
 
 void VersionCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     UNREFERENCED_PARAMETER(context);
-    wsl::windows::common::wslutil::PrintMessage(std::format(L"{} v{}", s_ExecutableName, WSL_PACKAGE_VERSION));
+    PrintVersion();
 }
 } // namespace wsl::windows::wslc

@@ -73,7 +73,7 @@ void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (context.Args.Contains(ArgType::Version))
     {
-        wsl::windows::common::wslutil::PrintMessage(std::format(L"{} v{}", s_ExecutableName, WSL_PACKAGE_VERSION));
+        VersionCommand::PrintVersion();
         return;
     }
 

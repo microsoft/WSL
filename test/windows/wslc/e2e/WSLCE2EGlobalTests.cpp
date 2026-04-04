@@ -407,7 +407,7 @@ private:
 
     std::wstring GetVersionMessage() const
     {
-        return std::format(L"wslc v{}\r\n", WSL_PACKAGE_VERSION);
+        return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
     }
 
     std::wstring GetDescription() const
@@ -445,6 +445,7 @@ private:
             {L"save", Localization::WSLCCLI_ImageSaveDesc()},
             {L"start", Localization::WSLCCLI_ContainerStartDesc()},
             {L"stop", Localization::WSLCCLI_ContainerStopDesc()},
+            {L"version", Localization::WSLCCLI_VersionDesc()},
         };
 
         size_t maxLen = 0;
