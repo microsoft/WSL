@@ -39,6 +39,7 @@ struct ContainerOptions
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
     std::vector<std::string> Entrypoint;
+    std::optional<std::string> User{};
 };
 
 struct CreateContainerResult
