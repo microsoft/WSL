@@ -27,8 +27,7 @@ std::vector<Argument> SessionEnterCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::StoragePath, true),
-        Argument::Create(
-            ArgType::Name, std::nullopt, std::nullopt, Localization::WSLCCLI_SessionEnterNameArgDescription()),
+        Argument::Create(ArgType::Name, std::nullopt, std::nullopt, Localization::WSLCCLI_SessionEnterNameArgDescription()),
     };
 }
 
