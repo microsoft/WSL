@@ -353,4 +353,9 @@ void WriteFile(const std::filesystem::path& filePath, const std::vector<std::str
 
     VERIFY_IS_TRUE(file.good());
 }
+
+std::wstring GetPythonHttpServerScript(uint16_t port)
+{
+    return std::format(L"python3 -m http.server {}", port);
+}
 } // namespace WSLCE2ETests
