@@ -163,7 +163,7 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n" //
+        options << L"The following options are available:\r\n"         //
                 << L"  --session       Specify the session to use\r\n" //
                 << L"  -h,--help       Shows help about the selected command\r\n"
                 << L"\r\n";

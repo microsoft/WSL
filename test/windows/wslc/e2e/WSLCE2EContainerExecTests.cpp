@@ -209,7 +209,6 @@ class WSLCE2EContainerExecTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"));
     }
 
-
     TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_MultipleValues)
     {
         WSL2_TEST_ONLY();
@@ -218,10 +217,7 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(
-            L"container exec -e {}=value-a -e {}=value-b {} env",
-            HostEnvVariableName,
-            HostEnvVariableName2,
-            WslcContainerName));
+            L"container exec -e {}=value-a -e {}=value-b {} env", HostEnvVariableName, HostEnvVariableName2, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=value-a", HostEnvVariableName)));
@@ -235,11 +231,7 @@ class WSLCE2EContainerExecTests
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        result = RunWslc(std::format(
-            L"container exec -e {} -e {} {} env",
-            HostEnvVariableName,
-            HostEnvVariableName2,
-            WslcContainerName));
+        result = RunWslc(std::format(L"container exec -e {} -e {} {} env", HostEnvVariableName, HostEnvVariableName2, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
@@ -301,10 +293,7 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(
-            L"container exec --env-file {} --env-file {} {} env",
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            WslcContainerName));
+            L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_FILE_MULTI_A=file1-a"));
@@ -338,10 +327,7 @@ class WSLCE2EContainerExecTests
 
         // Later --env-file wins
         result = RunWslc(std::format(
-            L"container exec --env-file {} --env-file {} {} env",
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            WslcContainerName));
+            L"container exec --env-file {} --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), EscapePath(EnvTestFile2.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_DUP=from-file-2"));
