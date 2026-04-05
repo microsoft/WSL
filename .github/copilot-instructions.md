@@ -84,7 +84,8 @@ DEFAULT_MOVABLE(MyClass);
 ### Headers
 
 - Use `#pragma once` (no traditional `#ifndef` include guards)
-- Every `.cpp` file must start with `#include "precomp.h"`
+- In Windows C++ components, every `.cpp` file must start with `#include "precomp.h"`
+- Linux-side code (`src/linux/`) does not use precompiled headers
 - Use `.h` for C-compatible headers, `.hpp` for C++-only headers
 - Include order is enforced by `.clang-format` (precomp first, then system, then project)
 
@@ -271,12 +272,13 @@ Test debugging:
 - Output location: `doc/site/`
 - **Note**: May show warnings about mermaid CDN access on restricted networks
 
-### Code Formatting and Validation (Works on Linux/Windows)
-- Format all source: `.\FormatSource.ps1`
+### Code Formatting and Validation
+- Format all source (Windows, requires `cmake .` first): `.\FormatSource.ps1`
+- Format check (Linux/cross-platform): `clang-format --dry-run --style=file <files>`
 - Validate copyright headers: `python3 tools/devops/validate-copyright-headers.py`
   - **Note**: Will report missing headers in generated/dependency files (`_deps/`), which is expected
 - Validate localization: `python3 tools/devops/validate-localization.py`
-  - **Note**: Only works after Windows build (requires `localization/strings/en-us/Resources.resw`)
+  - **Note**: Only works after Windows build (requires `localization/strings/en-US/Resources.resw`)
 
 ### Distribution Validation (Limited on Linux)
 - Validate distribution info: `python3 distributions/validate.py distributions/DistributionInfo.json`

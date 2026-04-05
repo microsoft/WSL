@@ -1,6 +1,6 @@
 ## Code Review Guidelines for WSL
 
-When reviewing code, enforce the conventions in `copilot-instructions.md`. Focus especially on these high-risk areas:
+When reviewing code, enforce the conventions in `.github/copilot-instructions.md`. Focus especially on these high-risk areas:
 
 ### ABI Safety (Critical)
 - **Flag** new methods added to existing COM interfaces without a new versioned interface/IID
