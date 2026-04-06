@@ -18,7 +18,7 @@ The following options are handled by `test.bat` / `run-tests.ps1` before invokin
 
 ### **/attachdebugger**
 
-Automatically launches WinDbgX and attaches it to the test host process. Requires [WinDbg](https://aka.ms/windbg) to be installed (`winget install Microsoft.WinDbg`). Under the hood it passes `/waitfordebugger` to TE.exe, finds the `TE.ProcessHost.exe` child process, and attaches WinDbgX to it. When combined with `/inproc`, WinDbgX attaches to `TE.exe` directly instead.
+Automatically launches WinDbgX and attaches it to the test host process. Requires [WinDbg](https://aka.ms/windbg) to be installed (`winget install Microsoft.WinDbg`). Under the hood it passes `/waitfordebugger /inproc` to TE.exe so tests run in-process, then attaches WinDbgX directly to `TE.exe`.
 
 `test.bat /attachdebugger /name:*MyTest*`
 
