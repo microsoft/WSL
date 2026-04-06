@@ -1042,7 +1042,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
     }
 
-    if (containerOptions.Entrypoint.Count)
+    if (containerOptions.Entrypoint.Count > 0)
     {
         request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
     }

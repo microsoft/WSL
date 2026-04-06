@@ -1061,7 +1061,7 @@ class WSLCTests
         VERIFY_IS_TRUE(result.Output[1].find("Hello from a WSL container!") != std::string::npos);
     }
 
-    // This test validate both that we can build an image with an empty CMD, and that we can run such as an image.
+    // This test validates both that we can build an image with an empty CMD, and that we can run such an image.
     TEST_METHOD(BuildImageEntrypoint)
     {
         WSL2_TEST_ONLY();
