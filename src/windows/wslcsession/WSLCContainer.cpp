@@ -1037,16 +1037,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.OpenStdin = true;
     }
 
-    if (containerOptions.InitProcessOptions.CommandLine.Count > 0)
-    {
-        request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
-    }
-
-    if (containerOptions.Entrypoint.Count > 0)
-    {
-        request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
-    }
-
+    request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
+    request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
 
     if (containerOptions.StopSignal != WSLCSignalNone)

@@ -165,7 +165,7 @@ struct CreateContainer
     std::optional<std::string> StopSignal;
     std::optional<std::string> WorkingDir;
     std::vector<std::string> Cmd;
-    std::optional<std::vector<std::string>> Entrypoint;
+    std::vector<std::string> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
     std::map<std::string, std::string> Labels;
