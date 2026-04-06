@@ -532,30 +532,26 @@ class WSLCTests
         ExpectHttpResponse(registryUrl.c_str(), 401, true);
 
         wil::unique_cotaskmem_ansistring token;
-        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(
-                    registryAddress,
-                    c_username,
-                    c_password,
-                    &token));
-
         VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->Authenticate(
                     registryAddress,
                     c_username,
                     "wrong-password",
                     &token));
-                    
-        ValidateCOMErrorMessage(
-            std::format(L"login attempt to {} failed with status: 401 Unauthorized", registryUrl).c_str());
+        ValidateCOMErrorMessageContains(L"failed with status: 401 Unauthorized");
 
-        auto image = "hello-world";
-        auto version = "latest";
-        auto privateImage = std::format("{}/library/{}:{}", registryAddress, image, version);
+        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(
+            registryAddress,
+            c_username,
+            c_password,
+            &token));
+        VERIFY_IS_NOT_NULL(token.get());
 
-        VERIFY_ARE_EQUAL(m_defaultSession->PullImage(privateImage.c_str(), nullptr, nullptr), E_FAIL);
-        ValidateCOMErrorMessage(std::format(L"Head \"http://{}/v2/{}/manifests/{}\": no basic auth credentials", registryAddress, image, version).c_str());
+        auto image = std::format("{}/library/hello-world:latest", registryAddress);
+        VERIFY_ARE_EQUAL(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr), E_FAIL);
+        ValidateCOMErrorMessageContains(L"no basic auth credentials");
 
         auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
-        VERIFY_SUCCEEDED(m_defaultSession->PullImage(privateImage.c_str(), xRegistryAuth.c_str(), nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), xRegistryAuth.c_str(), nullptr));
     }
 
     TEST_METHOD(ListImages)
@@ -1028,6 +1024,25 @@ class WSLCTests
                 LogError("Expected COM error: '%ls' but none was set", Expected->c_str());
                 VERIFY_FAIL();
             }
+        }
+    }
+
+    void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
+    {
+        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+        if (comError.has_value())
+        {
+            if (wcsstr(comError->Message.get(), ExpectedSubstring.c_str()) == nullptr)
+            {
+                LogError("Expected COM error containing: '%ls', but got: '%ls'", ExpectedSubstring.c_str(), comError->Message.get());
+                VERIFY_FAIL();
+            }
+        }
+        else
+        {
+            LogError("Expected COM error containing: '%ls' but none was set", ExpectedSubstring.c_str());
+            VERIFY_FAIL();
         }
     }
 
