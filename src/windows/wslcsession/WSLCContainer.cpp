@@ -1470,7 +1470,7 @@ void WSLCContainerImpl::MapPorts()
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    std::format(L"Port {} is already in use, cannot start container {}", e.ContainerPort, m_id));
+                    std::format(L"Port {} is already in use, cannot start container {}", e.VmMapping.HostPort(), m_id));
             }
             throw;
         }
