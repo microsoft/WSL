@@ -70,6 +70,7 @@ Abstract:
 #include <array>
 #include <xstring>
 #include <algorithm>
+#include <atomic>
 #include <map>
 #include <memory>
 #include <vector>

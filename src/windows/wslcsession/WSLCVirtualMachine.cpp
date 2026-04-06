@@ -839,10 +839,13 @@ void WSLCVirtualMachine::LaunchPortRelay()
 
     wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
     process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
+    process.InheritHandle(m_vmTerminatingEvent.get());
     process.Start();
 
-    readPipe.release();
-    writePipe.release();
+    // Close the parent's copies of the child's stdin/stdout handles so that
+    // pipe EOF is properly detected if the relay process exits.
+    readPipe.reset();
+    writePipe.reset();
 }
 
 void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)

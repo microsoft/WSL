@@ -963,16 +963,33 @@ CATCH_LOG()
 
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
+    EnsureIocp();
+    handle->Register(m_iocp.get(), handle.get());
     m_handles.emplace_back(flags, std::move(handle));
 }
 
 void MultiHandleWait::Cancel()
 {
-    m_cancel = true;
+    // Wake up GetQueuedCompletionStatus. The key=0 completion will set m_cancel in Run().
+    if (m_iocp)
+    {
+        PostQueuedCompletionStatus(m_iocp.get(), 0, 0, nullptr);
+    }
 }
+
+void MultiHandleWait::EnsureIocp()
+{
+    if (!m_iocp)
+    {
+        m_iocp.reset(CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1));
+        THROW_LAST_ERROR_IF(!m_iocp);
+    }
+}
+
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     m_cancel = false; // Run may be called multiple times.
+    EnsureIocp();
 
     std::optional<std::chrono::steady_clock::time_point> deadline;
 
@@ -1042,13 +1059,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             break;
         }
 
-        // Wait for the next operation to complete.
-        std::vector<HANDLE> waitHandles;
-        for (const auto& e : m_handles)
-        {
-            waitHandles.emplace_back(e.second->GetHandle());
-        }
-
+        // Wait for the next operation to complete via IOCP.
         DWORD waitTimeout = INFINITE;
         if (deadline.has_value())
         {
@@ -1058,34 +1069,55 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             waitTimeout = static_cast<DWORD>(std::max(0LL, miliseconds));
         }
 
-        auto result = WaitForMultipleObjects(static_cast<DWORD>(waitHandles.size()), waitHandles.data(), false, waitTimeout);
-        if (result == WAIT_TIMEOUT)
-        {
-            THROW_WIN32(ERROR_TIMEOUT);
-        }
-        else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
-        {
-            auto index = result - WAIT_OBJECT_0;
+        DWORD bytesTransferred{};
+        ULONG_PTR completionKey{};
+        OVERLAPPED* completedOverlapped{};
+        BOOL success = GetQueuedCompletionStatus(m_iocp.get(), &bytesTransferred, &completionKey, &completedOverlapped, waitTimeout);
 
-            try
-            {
-                m_handles[index].second->Collect();
-            }
-            catch (...)
-            {
-                if (WI_IsFlagSet(m_handles[index].first, Flags::IgnoreErrors))
-                {
-                    m_handles.erase(m_handles.begin() + index);
-                }
-                else
-                {
-                    throw;
-                }
-            }
-        }
-        else
+        if (!success && completedOverlapped == nullptr)
         {
-            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
+            // Timeout or error with no completion packet.
+            auto error = GetLastError();
+            if (error == WAIT_TIMEOUT)
+            {
+                THROW_WIN32(ERROR_TIMEOUT);
+            }
+            THROW_WIN32(error);
+        }
+
+        if (completionKey == 0)
+        {
+            // Cancel signal posted by Cancel() or an external PostQueuedCompletionStatus.
+            m_cancel = true;
+            continue;
+        }
+
+        // Find the top-level handle in m_handles that matches the completion target.
+        auto* completionTarget = reinterpret_cast<OverlappedIOHandle*>(completionKey);
+
+        auto it = std::ranges::find_if(
+            m_handles, [completionTarget](const auto& entry) { return entry.second.get() == completionTarget; });
+
+        if (it == m_handles.end())
+        {
+            // Handle was already removed (e.g., by CancelOnCompleted). Discard the completion.
+            continue;
+        }
+
+        try
+        {
+            it->second->Collect();
+        }
+        catch (...)
+        {
+            if (WI_IsFlagSet(it->first, Flags::IgnoreErrors))
+            {
+                m_handles.erase(it);
+            }
+            else
+            {
+                throw;
+            }
         }
     }
 
@@ -1102,13 +1134,39 @@ EventHandle::EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSigna
 {
 }
 
+EventHandle::~EventHandle()
+{
+}
+
+void EventHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+{
+    CompletionTarget = completionTarget;
+    Iocp = iocp;
+}
+
 void EventHandle::Schedule()
 {
+    // If registered with an IOCP, use RegisterWaitForSingleObject to bridge the event.
+    if (Iocp != nullptr && !WaitHandle)
+    {
+        THROW_IF_WIN32_BOOL_FALSE(
+            RegisterWaitForSingleObject(&WaitHandle, Handle.Get(), &EventHandle::WaitCallback, this, INFINITE, WT_EXECUTEONLYONCE));
+    }
+
     State = IOHandleStatus::Pending;
+}
+
+VOID CALLBACK EventHandle::WaitCallback(PVOID context, BOOLEAN /*timedOut*/)
+{
+    auto* self = static_cast<EventHandle*>(context);
+    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
 }
 
 void EventHandle::Collect()
 {
+    // Clean up the wait registration so it can be re-registered if needed.
+    WaitHandle.reset();
+
     State = IOHandleStatus::Completed;
     OnSignalled();
 }
@@ -1126,11 +1184,15 @@ ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl
 
 ReadHandle::~ReadHandle()
 {
+    WaitBridge.reset();
+
     if (State == IOHandleStatus::Pending)
     {
-        DWORD bytesRead{};
         if (CancelIoEx(Handle.Get(), &Overlapped))
         {
+            // Always wait for the cancellation to complete so the OVERLAPPED (a member
+            // of this object) is no longer referenced by the kernel when the destructor returns.
+            DWORD bytesRead{};
             if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
             {
                 auto error = GetLastError();
@@ -1142,6 +1204,33 @@ ReadHandle::~ReadHandle()
             // ERROR_NOT_FOUND is returned if there was no IO to cancel.
             LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
         }
+    }
+}
+
+void ReadHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+{
+    CompletionTarget = completionTarget;
+    Iocp = iocp;
+    if (!RegisteredWithIocp)
+    {
+        // Try to associate the handle with the IOCP. Not all handle types support this
+        // (e.g., some socket types, console handles). Fall back to event-based mode on failure.
+        //
+        // N.B. FILE_SKIP_COMPLETION_PORT_ON_SUCCESS is required before associating with the IOCP.
+        // Without it, synchronous completions would both be processed inline by Schedule() AND
+        // queue an IOCP packet, causing double-processing. If it's not supported for this handle
+        // type, fall back to event-based mode entirely.
+        if (SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
+        {
+            auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            if (result != nullptr)
+            {
+                // Clear the event from OVERLAPPED — completions now go to the IOCP.
+                Overlapped.hEvent = nullptr;
+                RegisteredWithIocp = true;
+            }
+        }
+        // else: fall back to event-based mode (Overlapped.hEvent remains set)
     }
 }
 
@@ -1187,12 +1276,29 @@ void ReadHandle::Schedule()
 
         // The read is pending, update to 'Pending'
         State = IOHandleStatus::Pending;
+
+        // If not registered with IOCP, bridge the event to the IOCP so
+        // GetQueuedCompletionStatus will wake up when this I/O completes.
+        if (!RegisteredWithIocp && Iocp != nullptr && !WaitBridge)
+        {
+            THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
+                &WaitBridge, Event.get(), &ReadHandle::WaitBridgeCallback, this, INFINITE, WT_EXECUTEONLYONCE));
+        }
     }
+}
+
+VOID CALLBACK ReadHandle::WaitBridgeCallback(PVOID context, BOOLEAN /*timedOut*/)
+{
+    auto* self = static_cast<ReadHandle*>(context);
+    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
 }
 
 void ReadHandle::Collect()
 {
     WI_ASSERT(State == IOHandleStatus::Pending);
+
+    // Tear down the event-to-IOCP bridge if it was set up.
+    WaitBridge.reset();
 
     // Transition back to standby
     State = IOHandleStatus::Standby;
@@ -1233,16 +1339,38 @@ SingleAcceptHandle::SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapp
 
 SingleAcceptHandle::~SingleAcceptHandle()
 {
+    WaitBridge.reset();
+
     if (State == IOHandleStatus::Pending)
     {
         LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
 
+        // Always wait for the cancellation to complete so the OVERLAPPED is no longer
+        // referenced by the kernel when the destructor returns.
         DWORD bytesProcessed{};
         DWORD flagsReturned{};
         if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
         {
             auto error = GetLastError();
             LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+        }
+    }
+}
+
+void SingleAcceptHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+{
+    CompletionTarget = completionTarget;
+    Iocp = iocp;
+    if (!RegisteredWithIocp)
+    {
+        if (SetFileCompletionNotificationModes(ListenSocket.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
+        {
+            auto result = CreateIoCompletionPort(ListenSocket.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            if (result != nullptr)
+            {
+                Overlapped.hEvent = nullptr;
+                RegisteredWithIocp = true;
+            }
         }
     }
 }
@@ -1265,12 +1393,26 @@ void SingleAcceptHandle::Schedule()
         THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)ListenSocket.Get());
 
         State = IOHandleStatus::Pending;
+
+        if (!RegisteredWithIocp && Iocp != nullptr && !WaitBridge)
+        {
+            THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
+                &WaitBridge, Event.get(), &SingleAcceptHandle::WaitBridgeCallback, this, INFINITE, WT_EXECUTEONLYONCE));
+        }
     }
+}
+
+VOID CALLBACK SingleAcceptHandle::WaitBridgeCallback(PVOID context, BOOLEAN /*timedOut*/)
+{
+    auto* self = static_cast<SingleAcceptHandle*>(context);
+    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
 }
 
 void SingleAcceptHandle::Collect()
 {
     WI_ASSERT(State == IOHandleStatus::Pending);
+
+    WaitBridge.reset();
 
     DWORD bytesReceived{};
     DWORD flagsReturned{};
@@ -1450,11 +1592,15 @@ WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& B
 
 WriteHandle::~WriteHandle()
 {
+    WaitBridge.reset();
+
     if (State == IOHandleStatus::Pending)
     {
-        DWORD bytesRead{};
         if (CancelIoEx(Handle.Get(), &Overlapped))
         {
+            // Always wait for the cancellation to complete so the OVERLAPPED is no longer
+            // referenced by the kernel when the destructor returns.
+            DWORD bytesRead{};
             if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
             {
                 auto error = GetLastError();
@@ -1463,8 +1609,25 @@ WriteHandle::~WriteHandle()
         }
         else
         {
-            // ERROR_NOT_FOUND is returned if there was no IO to cancel.
             LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        }
+    }
+}
+
+void WriteHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+{
+    CompletionTarget = completionTarget;
+    Iocp = iocp;
+    if (!RegisteredWithIocp)
+    {
+        if (SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
+        {
+            auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            if (result != nullptr)
+            {
+                Overlapped.hEvent = nullptr;
+                RegisteredWithIocp = true;
+            }
         }
     }
 }
@@ -1497,12 +1660,26 @@ void WriteHandle::Schedule()
 
         // The write is pending, update to 'Pending'
         State = IOHandleStatus::Pending;
+
+        if (!RegisteredWithIocp && Iocp != nullptr && !WaitBridge)
+        {
+            THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
+                &WaitBridge, Event.get(), &WriteHandle::WaitBridgeCallback, this, INFINITE, WT_EXECUTEONLYONCE));
+        }
     }
+}
+
+VOID CALLBACK WriteHandle::WaitBridgeCallback(PVOID context, BOOLEAN /*timedOut*/)
+{
+    auto* self = static_cast<WriteHandle*>(context);
+    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
 }
 
 void WriteHandle::Collect()
 {
     WI_ASSERT(State == IOHandleStatus::Pending);
+
+    WaitBridge.reset();
 
     // Transition back to standby
     State = IOHandleStatus::Standby;
@@ -1548,6 +1725,14 @@ DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapp
         Read = std::make_unique<relay::ReadHandle>(
             std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { this->OnRead(Buffer); });
     }
+}
+
+void DockerIORelayHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+{
+    CompletionTarget = completionTarget;
+    Read->Register(iocp, completionTarget);
+    WriteStdout.Register(iocp, completionTarget);
+    WriteStderr.Register(iocp, completionTarget);
 }
 
 void DockerIORelayHandle::Schedule()
