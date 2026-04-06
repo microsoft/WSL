@@ -80,6 +80,37 @@ class WSLCCLICommandUnitTests
         }
     }
 
+    // Test: Verify SessionEnterCommand has the expected arguments
+    TEST_METHOD(SessionEnterCommand_HasExpectedArguments)
+    {
+        auto cmd = SessionEnterCommand(L"session");
+        auto args = cmd.GetArguments();
+
+        // Should have 2 arguments: storage-path (positional, required) and name (value, optional)
+        VERIFY_ARE_EQUAL(2u, args.size());
+
+        // Verify storage-path argument
+        auto& storagePath = args[0];
+        VERIFY_ARE_EQUAL(ArgType::StoragePath, storagePath.Type());
+        VERIFY_ARE_EQUAL(Kind::Positional, storagePath.Kind());
+        VERIFY_IS_TRUE(storagePath.Required());
+
+        // Verify name argument
+        auto& name = args[1];
+        VERIFY_ARE_EQUAL(ArgType::Name, name.Type());
+        VERIFY_ARE_EQUAL(Kind::Value, name.Kind());
+        VERIFY_IS_FALSE(name.Required());
+    }
+
+    // Test: Verify SessionEnterCommand descriptions are not empty
+    TEST_METHOD(SessionEnterCommand_HasDescriptions)
+    {
+        auto cmd = SessionEnterCommand(L"session");
+
+        VERIFY_IS_FALSE(cmd.ShortDescription().empty());
+        VERIFY_IS_FALSE(cmd.LongDescription().empty());
+    }
+
     // Test: Verify ContainerCommand has subcommands
     TEST_METHOD(ContainerCommand_HasSubcommands)
     {
