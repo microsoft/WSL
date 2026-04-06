@@ -20,7 +20,7 @@ namespace wsl::windows::wslc::services {
 class ConsoleService
 {
 public:
-    int AttachToCurrentConsole(wsl::windows::common::ClientRunningWSLCProcess&& process);
+    static int AttachToCurrentConsole(wsl::windows::common::ClientRunningWSLCProcess&& process);
     static bool RelayInteractiveTty(wsl::windows::common::ClientRunningWSLCProcess& process, HANDLE tty, bool triggerRefresh = false);
     static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr);
 };
