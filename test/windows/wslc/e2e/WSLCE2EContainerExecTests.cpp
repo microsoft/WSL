@@ -174,7 +174,6 @@ class WSLCE2EContainerExecTests
         result = RunWslc(std::format(L"container exec -e {}=A {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=A", HostEnvVariableName)));
     }
 
@@ -188,7 +187,6 @@ class WSLCE2EContainerExecTests
         result = RunWslc(std::format(L"container exec -e {} {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
     }
 
@@ -204,7 +202,6 @@ class WSLCE2EContainerExecTests
         result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        const auto outputLines = result.GetStdoutLines();
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a"));
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"));
     }
