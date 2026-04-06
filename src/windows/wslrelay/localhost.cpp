@@ -673,11 +673,14 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
                 // Associate each listen socket with the IOCP (skipped if already associated).
                 if (!e.second->AssociatedWithIocp)
                 {
-                    THROW_LAST_ERROR_IF_NULL(CreateIoCompletionPort(
-                        reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), iocp.get(), reinterpret_cast<ULONG_PTR>(e.second.get()), 0));
-
+                    // Set FILE_SKIP_COMPLETION_PORT_ON_SUCCESS before associating with the IOCP.
+                    // Without it, synchronous AcceptEx completions would both be processed inline
+                    // AND queue an IOCP packet, causing double-processing.
                     THROW_IF_WIN32_BOOL_FALSE(SetFileCompletionNotificationModes(
                         reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS));
+
+                    THROW_LAST_ERROR_IF_NULL(CreateIoCompletionPort(
+                        reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), iocp.get(), reinterpret_cast<ULONG_PTR>(e.second.get()), 0));
 
                     e.second->AssociatedWithIocp = true;
                 }
