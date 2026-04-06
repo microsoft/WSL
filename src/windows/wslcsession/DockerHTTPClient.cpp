@@ -118,7 +118,7 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 {
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth)
 {
     auto url = URL::Create("/images/create");
 
@@ -131,7 +131,14 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
         url.SetParameter("tag", tagOrDigest.value());
     }
 
-    return SendRequestImpl(verb::post, url, {}, {});
+    std::map<std::string, std::string> customHeaders;
+    
+    if (registryAuth.has_value())
+    {
+        customHeaders["X-Registry-Auth"] = registryAuth.value();
+    }
+
+    return SendRequestImpl(verb::post, url, {}, {}, customHeaders);
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)
@@ -161,6 +168,33 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
     url.SetParameter("tag", Tag);
 
     Transaction<docker_schema::EmptyRequest>(verb::post, url);
+}
+
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PushImage(const std::string& ImageName, const std::optional<std::string>& tag, const std::optional<std::string>& registryAuth)
+{
+    auto url = URL::Create("/images/{}/push", ImageName);
+
+    if (tag.has_value())
+    {
+        url.SetParameter("tag", tag.value());
+    }
+
+    std::map<std::string, std::string> customHeaders;
+
+    if (registryAuth.has_value())
+    {
+        customHeaders["X-Registry-Auth"] = registryAuth.value();
+    }
+
+    return SendRequestImpl(verb::post, url, {}, {}, customHeaders);
+}
+
+std::string DockerHTTPClient::Authenticate(const std::string& serverAddress, const std::string& username, const std::string& password)
+{
+    auto response = Transaction<docker_schema::AuthRequest>(
+        verb::post, URL::Create("/auth"), {.username = username, .password = password, .serveraddress = serverAddress});
+
+    return response.IdentityToken.value_or("");
 }
 
 std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const ListImagesFilters& filters)
@@ -619,7 +653,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnResponseBytes(const gsl::span
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequestImpl(
-    verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers)
+    verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers, const std::map<std::string, std::string>& CustomHeaders)
 {
     auto context = std::make_unique<DockerHTTPClient::HTTPRequestContext>(ConnectSocket());
 
@@ -637,9 +671,14 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
     req.set(http::field::connection, "close");
     req.set(http::field::accept, "application/json");
 
-    for (const auto [field, value] : Headers)
+    for (const auto& [field, value] : Headers)
     {
         req.set(field, value);
+    }
+
+    for (const auto& [name, value] : CustomHeaders)
+    {
+        req.set(name, value);
     }
 
     http::write(context->stream, req);

@@ -35,6 +35,8 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     WSLCContainerLauncher.cpp
+    WSLCLocalRegistry.cpp
+    WslcCredentialStore.cpp
     VirtioNetworking.cpp
     WSLCProcessLauncher.cpp
     WslClient.cpp
@@ -116,6 +118,8 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     WSLCContainerLauncher.h
+    WSLCLocalRegistry.h
+    WslcCredentialStore.h
     VirtioNetworking.h
     WSLCProcessLauncher.h
     WslClient.h
@@ -134,6 +138,7 @@ set(HEADERS
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
 add_dependencies(common wslserviceidl wslcidl localization wslservicemc wslinstalleridl)
+target_link_libraries(common PRIVATE Crypt32.lib)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)

@@ -17,6 +17,8 @@ Abstract:
 #include "wslc.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
+#include "WSLCLocalRegistry.h"
+#include "WslcCredentialStore.h"
 #include "WslCoreFilesystem.h"
 
 using namespace std::literals::chrono_literals;
@@ -508,6 +510,52 @@ class WSLCTests
                 VERIFY_FAIL();
             }
         }
+    }
+
+    TEST_METHOD(AuthenticateTests)
+    {
+        WSL2_TEST_ONLY();
+
+        constexpr auto c_username = "wslctest";
+        constexpr auto c_password = "password";
+
+        auto registryFolder = std::filesystem::current_path() / "registry-storage";
+        std::filesystem::create_directories(registryFolder);
+
+        auto registry = wsl::windows::common::WSLCLocalRegistry::Start(
+            *m_defaultSession, registryFolder, c_username, c_password);
+
+        auto registryUrl = std::format(L"http://{}/v2/", registry.GetServerAddress());
+        auto registryAddress = registry.GetServerAddress();
+        
+        // The registry may take to some time before its up and running. Retry until its ready to accept connections.
+        ExpectHttpResponse(registryUrl.c_str(), 401, true);
+
+        wil::unique_cotaskmem_ansistring token;
+        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(
+                    registryAddress,
+                    c_username,
+                    c_password,
+                    &token));
+
+        VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->Authenticate(
+                    registryAddress,
+                    c_username,
+                    "wrong-password",
+                    &token));
+                    
+        ValidateCOMErrorMessage(
+            std::format(L"login attempt to {} failed with status: 401 Unauthorized", registryUrl).c_str());
+
+        auto image = "hello-world";
+        auto version = "latest";
+        auto privateImage = std::format("{}/library/{}:{}", registryAddress, image, version);
+
+        VERIFY_ARE_EQUAL(m_defaultSession->PullImage(privateImage.c_str(), nullptr, nullptr), E_FAIL);
+        ValidateCOMErrorMessage(std::format(L"Head \"http://{}/v2/{}/manifests/{}\": no basic auth credentials", registryAddress, image, version).c_str());
+
+        auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage(privateImage.c_str(), xRegistryAuth.c_str(), nullptr));
     }
 
     TEST_METHOD(ListImages)
