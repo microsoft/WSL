@@ -117,6 +117,7 @@ private:
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
+                << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
