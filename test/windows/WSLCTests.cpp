@@ -1061,6 +1061,65 @@ class WSLCTests
         VERIFY_IS_TRUE(result.Output[1].find("Hello from a WSL container!") != std::string::npos);
     }
 
+    // This test validate both that we can build an image with an empty CMD, and that we can run such as an image.
+    TEST_METHOD(BuildImageEntrypoint)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-entrypoint";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-entrypoint:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "CMD []\n";
+            dockerfile << "ENTRYPOINT [\"/bin/echo\", \"Entrypoint\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-entrypoint:latest"));
+        ExpectImagePresent(*m_defaultSession, "wslc-test-entrypoint:latest");
+
+        // Validate that the entrypoint is started by default.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-1");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "Entrypoint\n"}});
+        }
+
+        // Validate that arguments are passed to the entrypoint, and don't override it.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-2", {"extra-arg"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "Entrypoint extra-arg\n"}});
+        }
+
+        // Validate that the entrypoint can be overridden.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-3");
+            launcher.SetEntrypoint({"/bin/echo", "OverriddenEntrypoint"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OverriddenEntrypoint\n"}});
+        }
+
+        // Validate that the entrypoint can be overridden and that CMD args are passed to the entrypoint.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-4", {"extra-arg"});
+            launcher.SetEntrypoint({"/bin/echo", "OverriddenEntrypoint"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OverriddenEntrypoint extra-arg\n"}});
+        }
+    }
+
     TEST_METHOD(BuildImageWithContext)
     {
         WSL2_TEST_ONLY();
