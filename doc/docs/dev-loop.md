@@ -96,7 +96,8 @@ bin\x64\debug\test.bat /name:*UnitTest* -f
 
 See [debugging](debugging.md) for general debugging instructions.
 
-To attach a debugger to the unit test process, use: `/waitfordebugger` when calling `test.bat`. 
+To automatically attach WinDbgX to the unit test process, use: `/attachdebugger` when calling `test.bat`.
+To wait for a debugger to be manually attached, use: `/waitfordebugger`.
 Use `/breakonfailure` to automatically break on the first test failure. 
 
 ## Tips and tricks

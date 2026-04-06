@@ -45,9 +45,52 @@ if ($Fast)
     $SetupScript = $null
 }
 
-te.exe $TestDllPath /p:SetupScript=$SetupScript  /p:Version=$Version /p:DistroPath=$DistroPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
-
-if (!$?)
+# Handle /attachdebugger: verify WinDbgX is available, then add /waitfordebugger so we can find and attach to the test host.
+$AttachDebugger = $false
+if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
 {
-    exit 1
+    $TeArgs = @($TeArgs | Where-Object { $_ -ine '/attachdebugger' })
+    if (Get-Command "WinDbgX.exe" -ErrorAction SilentlyContinue)
+    {
+        $AttachDebugger = $true
+        $TeArgs += '/waitfordebugger'
+    }
+    else
+    {
+        Write-Warning "/attachdebugger was requested, but WinDbgX.exe was not found. Continuing without debugger."
+    }
 }
+
+$teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath",
+    "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
+$teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
+
+if ($AttachDebugger)
+{
+    $targetPid = if ($TeArgs -icontains '/inproc') { $teProcess.Id } else { $null }
+
+    if (-not $targetPid)
+    {
+        for ($i = 0; $i -lt 120 -and -not $teProcess.HasExited; $i++)
+        {
+            Start-Sleep -Milliseconds 500
+            $child = Get-CimInstance Win32_Process -Filter "ParentProcessId = $($teProcess.Id) AND Name = 'TE.ProcessHost.exe'" -ErrorAction SilentlyContinue
+            if ($child) { $targetPid = $child[0].ProcessId; break }
+        }
+    }
+
+    if ($targetPid)
+    {
+        $targetName = if ($targetPid -eq $teProcess.Id) { "TE.exe" } else { "TE.ProcessHost.exe" }
+        Write-Host "Launching WinDbgX attached to $targetName (PID: $targetPid)..."
+        Start-Process "WinDbgX.exe" -ArgumentList "-p $targetPid"
+    }
+    else
+    {
+        Write-Warning "Could not find TE.ProcessHost.exe within 60 seconds."
+        Write-Host "Attach a debugger manually to TE.exe (PID: $($teProcess.Id))."
+    }
+}
+
+$teProcess | Wait-Process
+if ($teProcess.ExitCode -ne 0) { exit 1 }
