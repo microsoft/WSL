@@ -132,7 +132,7 @@ class WSLCE2EContainerRunTests
 
         // Run the container with a valid image
         auto result = RunWslc(std::format(L"container run --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Run should be deleted on return so no retry.
         VerifyContainerIsNotListed(WslcContainerName);
@@ -145,7 +145,7 @@ class WSLCE2EContainerRunTests
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} -e {}=A {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=A", HostEnvVariableName)));
     }
@@ -161,7 +161,7 @@ class WSLCE2EContainerRunTests
             HostEnvVariableName,
             HostEnvVariableName2,
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=A", HostEnvVariableName)));
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=B", HostEnvVariableName2)));
@@ -174,7 +174,7 @@ class WSLCE2EContainerRunTests
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} -e {} {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
     }
@@ -190,7 +190,7 @@ class WSLCE2EContainerRunTests
             HostEnvVariableName,
             HostEnvVariableName2,
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}={}", HostEnvVariableName2, HostEnvVariableValue2)));
@@ -203,7 +203,7 @@ class WSLCE2EContainerRunTests
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} -e {}= {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=", HostEnvVariableName)));
     }
@@ -220,7 +220,7 @@ class WSLCE2EContainerRunTests
             WslcContainerName,
             EscapePath(EnvTestFile1.wstring()),
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_FILE_A=env-file-a"));
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_FILE_B=env-file-b"));
@@ -238,7 +238,7 @@ class WSLCE2EContainerRunTests
             WslcContainerName,
             EscapePath(EnvTestFile1.wstring()),
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_MIX_FILE_A=from-file-a"));
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_MIX_FILE_B=from-file-b"));
@@ -260,7 +260,7 @@ class WSLCE2EContainerRunTests
             EscapePath(EnvTestFile1.wstring()),
             EscapePath(EnvTestFile2.wstring()),
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_FILE_MULTI_A=file1-a"));
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_FILE_MULTI_B=file1-b"));
@@ -310,7 +310,7 @@ class WSLCE2EContainerRunTests
             EscapePath(EnvTestFile1.wstring()),
             EscapePath(EnvTestFile2.wstring()),
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_DUP=from-file-2"));
 
@@ -321,7 +321,7 @@ class WSLCE2EContainerRunTests
             EscapePath(EnvTestFile1.wstring()),
             EscapePath(EnvTestFile2.wstring()),
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_DUP=from-cli"));
     }
@@ -338,7 +338,7 @@ class WSLCE2EContainerRunTests
             WslcContainerName,
             EscapePath(EnvTestFile1.wstring()),
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_EQUALS=value=with=equals"));
     }

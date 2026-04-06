@@ -57,7 +57,7 @@ class WSLCE2EContainerAttachTests
         const auto& prompt = ">";
         auto result = RunWslc(std::format(
             L"container run -itd -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         const auto& expectedAttachPrompt = VT::BuildContainerAttachPrompt(prompt);
@@ -90,7 +90,7 @@ class WSLCE2EContainerAttachTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));

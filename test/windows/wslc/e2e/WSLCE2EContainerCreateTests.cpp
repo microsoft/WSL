@@ -74,7 +74,7 @@ class WSLCE2EContainerCreateTests
     {
         WSL2_TEST_ONLY();
         auto result = RunWslc(L"container create --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
@@ -103,7 +103,7 @@ class WSLCE2EContainerCreateTests
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         std::wstring containerId = result.GetStdoutOneLine();
 
         // Verify the container is listed with the correct status
@@ -117,7 +117,7 @@ class WSLCE2EContainerCreateTests
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         // Attempt to create another container with the same name
@@ -146,7 +146,7 @@ class WSLCE2EContainerCreateTests
             hostDirectory.wstring(),
             AlpineImage.NameAndTag(),
             fileName));
-        result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermissionByDefault)
@@ -161,7 +161,7 @@ class WSLCE2EContainerCreateTests
             hostDirectory.wstring(),
             AlpineImage.NameAndTag(),
             fileName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read all file content
         auto content = ReadFileContent(VolumeTestFile1.wstring());
@@ -180,7 +180,7 @@ class WSLCE2EContainerCreateTests
             hostDirectory.wstring(),
             AlpineImage.NameAndTag(),
             fileName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read all file content
         std::wifstream in(VolumeTestFile1);
@@ -367,11 +367,11 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Start the container.
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify with retry timeout of 1 minute.
         VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
@@ -385,7 +385,7 @@ class WSLCE2EContainerCreateTests
         const auto& prompt = ">";
         auto result = RunWslc(std::format(
             L"container create -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
@@ -415,7 +415,7 @@ class WSLCE2EContainerCreateTests
         WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container create -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         // Start with attach
@@ -446,7 +446,7 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(std::format(
             L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
 
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
@@ -458,10 +458,10 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(
             std::format(L"container create --name {} -u 0 {} sh -c \"id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_UserOption_NameGroupRoot)
@@ -470,10 +470,10 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(
             L"container create --name {} -u root:root {} sh -c \"id -un; id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_UserOption_UnknownUser_Fails)

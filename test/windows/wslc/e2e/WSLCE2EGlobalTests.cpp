@@ -57,11 +57,11 @@ class WSLCE2EGlobalTests
 
         // Run container list to create the default elevated session
         auto result = RunWslc(L"container list", ElevationType::Elevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the admin session name
         result = RunWslc(L"session list", ElevationType::Elevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
@@ -73,11 +73,11 @@ class WSLCE2EGlobalTests
 
         // Run container list non-elevated to create the default non-elevated session
         auto result = RunWslc(L"container list", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the non-admin session name
         result = RunWslc(L"session list", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.Stdout.has_value());
 
@@ -91,7 +91,7 @@ class WSLCE2EGlobalTests
 
         // First ensure admin session is created by running container list.
         auto result = RunWslc(L"container list", ElevationType::Elevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Try to explicitly target the admin session from non-elevated process
         result = RunWslc(L"container list --session wslc-cli-admin", ElevationType::NonElevated);
@@ -106,13 +106,13 @@ class WSLCE2EGlobalTests
 
         // First ensure non-elevated session is created by running container list.
         auto result = RunWslc(L"container list", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Elevated user should be able to explicitly target the non-admin session
         result = RunWslc(L"container list --session wslc-cli", ElevationType::Elevated);
 
         // This should work - elevated users can access non-elevated sessions
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
     TEST_METHOD(WSLCE2E_Session_CreateMixedElevation_Fails)
@@ -137,21 +137,21 @@ class WSLCE2EGlobalTests
 
         // Run container list to create the default session if it does not already exist
         auto result = RunWslc(L"container list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the admin session name
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
 
         // Terminate the session
         result = RunWslc(L"session terminate");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
 
@@ -159,21 +159,21 @@ class WSLCE2EGlobalTests
 
         // Run container list to create the default session if it does not already exist
         result = RunWslc(L"container list", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the non-elevated session name
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
 
         // Terminate the session
         result = RunWslc(L"session terminate", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
@@ -184,21 +184,21 @@ class WSLCE2EGlobalTests
 
         // Run container list to create the default session if it does not already exist
         auto result = RunWslc(L"container list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the admin session name
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
 
         // Terminate the session
         result = RunWslc(L"session terminate wslc-cli-admin");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
 
@@ -206,21 +206,21 @@ class WSLCE2EGlobalTests
 
         // Run container list to create the default session if it does not already exist
         result = RunWslc(L"container list", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the non-elevated session name
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
 
         // Terminate the session
         result = RunWslc(L"session terminate wslc-cli", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
@@ -231,13 +231,13 @@ class WSLCE2EGlobalTests
 
         // Run container list to create the default sessions if they do not already exist.
         auto result = RunWslc(L"container list", ElevationType::Elevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         result = RunWslc(L"container list", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows both sessions.
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
@@ -248,11 +248,11 @@ class WSLCE2EGlobalTests
 
         // Terminate the non-elevated session from the elevated process.
         result = RunWslc(L"session terminate wslc-cli", ElevationType::Elevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify non-elevated session no longer shows up
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
@@ -279,7 +279,7 @@ class WSLCE2EGlobalTests
 
         // Verify session list
         result = RunWslc(L"session list");
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify there is a session with the name of the test session in the session list output.
         VERIFY_IS_TRUE(result.Stdout.has_value());
@@ -288,13 +288,13 @@ class WSLCE2EGlobalTests
 
         // Run container list in the test session, which should succeed if the session is valid.
         result = RunWslc(std::format(L"container list --session {}", session.Name()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Add a container to the new session.
         result = RunWslc(
             std::format(L"container create --session {} --name {} {}", session.Name(), L"test-cont", DebianTestImage().NameAndTag()));
         result.Dump(); // Dump so it is easier to find any potential issues with the pull in the test output.
-        result.Verify({.ExitCode = S_OK});
+        result.Verify({.ExitCode = 0});
 
         // Verify container exists in the custom session
         VerifyContainerIsListed(L"test-cont", L"created", session.Name());
@@ -309,9 +309,9 @@ class WSLCE2EGlobalTests
 
         // Ensure sessions are created by running container list elevated and non-elevated.
         auto result = RunWslc(L"container list", ElevationType::NonElevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         result = RunWslc(L"container list", ElevationType::Elevated);
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         {
             Log::Comment(L"Testing elevated interactive session");
