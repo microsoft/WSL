@@ -1219,14 +1219,20 @@ void ReadHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
     {
         // Try to associate the handle with the IOCP. Not all handle types support this
         // (e.g., some socket types, console handles). Fall back to event-based mode on failure.
-        auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
-        if (result != nullptr)
+        //
+        // N.B. FILE_SKIP_COMPLETION_PORT_ON_SUCCESS is required before associating with the IOCP.
+        // Without it, synchronous completions would both be processed inline by Schedule() AND
+        // queue an IOCP packet, causing double-processing. If it's not supported for this handle
+        // type, fall back to event-based mode entirely.
+        if (SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
         {
-            SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS);
-
-            // Clear the event from OVERLAPPED — completions now go to the IOCP.
-            Overlapped.hEvent = nullptr;
-            RegisteredWithIocp = true;
+            auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            if (result != nullptr)
+            {
+                // Clear the event from OVERLAPPED — completions now go to the IOCP.
+                Overlapped.hEvent = nullptr;
+                RegisteredWithIocp = true;
+            }
         }
         // else: fall back to event-based mode (Overlapped.hEvent remains set)
     }
@@ -1362,12 +1368,14 @@ void SingleAcceptHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTar
     Iocp = iocp;
     if (!RegisteredWithIocp)
     {
-        auto result = CreateIoCompletionPort(ListenSocket.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
-        if (result != nullptr)
+        if (SetFileCompletionNotificationModes(ListenSocket.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
         {
-            SetFileCompletionNotificationModes(ListenSocket.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS);
-            Overlapped.hEvent = nullptr;
-            RegisteredWithIocp = true;
+            auto result = CreateIoCompletionPort(ListenSocket.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            if (result != nullptr)
+            {
+                Overlapped.hEvent = nullptr;
+                RegisteredWithIocp = true;
+            }
         }
     }
 }
@@ -1618,12 +1626,14 @@ void WriteHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
     Iocp = iocp;
     if (!RegisteredWithIocp)
     {
-        auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
-        if (result != nullptr)
+        if (SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
         {
-            SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS);
-            Overlapped.hEvent = nullptr;
-            RegisteredWithIocp = true;
+            auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            if (result != nullptr)
+            {
+                Overlapped.hEvent = nullptr;
+                RegisteredWithIocp = true;
+            }
         }
     }
 }

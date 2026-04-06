@@ -676,7 +676,8 @@ void wsl::windows::wslrelay::localhost::RunWSLCPortRelay(const GUID& VmId, uint3
                     THROW_LAST_ERROR_IF_NULL(CreateIoCompletionPort(
                         reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), iocp.get(), reinterpret_cast<ULONG_PTR>(e.second.get()), 0));
 
-                    SetFileCompletionNotificationModes(reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS);
+                    THROW_IF_WIN32_BOOL_FALSE(SetFileCompletionNotificationModes(
+                        reinterpret_cast<HANDLE>(e.second->ListenSocket.get()), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS));
 
                     e.second->AssociatedWithIocp = true;
                 }
