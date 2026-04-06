@@ -521,6 +521,9 @@ class WSLCTests
 
         auto registryFolder = std::filesystem::current_path() / "registry-storage";
         std::filesystem::create_directories(registryFolder);
+        wil:on_scope_exit([&]() {
+            std::filesystem::remove_all(registryFolder);
+        });
 
         auto registry = wsl::windows::common::WSLCLocalRegistry::Start(
             *m_defaultSession, registryFolder, c_username, c_password);
