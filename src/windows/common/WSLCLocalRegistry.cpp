@@ -19,31 +19,9 @@ using wsl::windows::common::WSLCLocalRegistry;
 
 namespace {
 
-constexpr auto c_registryImage = "registry:3";
-constexpr auto c_htpasswdImage = "httpd:2";
+constexpr auto c_registryImage = "wslc-registry:latest";
 
-std::string GenerateHtpasswd(IWSLCSession& session, const std::string& username, const std::string& password)
-{
-    THROW_IF_FAILED(session.PullImage(c_htpasswdImage, nullptr, nullptr));
-
-    const auto command = std::format("htpasswd -Bbn '{}' '{}'", username, password);
-
-    WSLCContainerLauncher launcher(c_htpasswdImage, {}, {"/bin/sh", "-c", command});
-    launcher.SetContainerFlags(WSLCContainerFlagsRm);
-
-    auto container = launcher.Launch(session);
-    auto result = container.GetInitProcess().WaitAndCaptureOutput();
-
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
-
-    auto output = result.Output[1];
-    output.erase(output.find_last_not_of("\n\r") + 1);
-
-    THROW_HR_IF_MSG(E_FAIL, output.empty(), "%hs", launcher.FormatResult(result).c_str());
-    return output;
-}
-
-std::vector<std::string> BuildRegistryEnv(IWSLCSession& session, const std::string& username, const std::string& password)
+std::vector<std::string> BuildRegistryEnv(const std::string& username, const std::string& password)
 {
     std::vector<std::string> env = {
         "REGISTRY_HTTP_ADDR=0.0.0.0:5000",
@@ -51,12 +29,8 @@ std::vector<std::string> BuildRegistryEnv(IWSLCSession& session, const std::stri
 
     if (!username.empty())
     {
-        auto htpasswdEntry = GenerateHtpasswd(session, username, password);
-
-        env.push_back(std::format("HTPASSWD_CONTENT={}", htpasswdEntry));
-        env.push_back("REGISTRY_AUTH=htpasswd");
-        env.push_back("REGISTRY_AUTH_HTPASSWD_REALM=WSLC Test Registry");
-        env.push_back("REGISTRY_AUTH_HTPASSWD_PATH=/htpasswd");
+        env.push_back(std::format("USERNAME={}", username));
+        env.push_back(std::format("PASSWORD={}", password));
     }
 
     return env;
@@ -85,17 +59,12 @@ WSLCLocalRegistry::~WSLCLocalRegistry()
 WSLCLocalRegistry WSLCLocalRegistry::Start(
     IWSLCSession& session, const std::string& username, const std::string& password)
 {
-    THROW_IF_FAILED(session.PullImage(c_registryImage, nullptr, nullptr));    
-
-    auto env = BuildRegistryEnv(session, username, password);
+    auto env = BuildRegistryEnv(username, password);
 
     WSLCContainerLauncher launcher(c_registryImage, {}, {}, env);
+    launcher.SetEntrypoint({"/entrypoint.sh"});
     launcher.AddPort(5000, 5000, AF_INET);
 
-    if (!username.empty())
-    {
-        launcher.SetEntrypoint({"/bin/sh", "-c", "echo \"$HTPASSWD_CONTENT\" > /htpasswd && registry serve /etc/distribution/config.yml"});
-    }
     auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
 
     return WSLCLocalRegistry(

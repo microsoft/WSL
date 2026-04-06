@@ -92,6 +92,11 @@ class WSLCTests
             LoadTestImage("hello-world:latest");
         }
 
+        if (!hasImage("wslc-registry:latest"))
+        {
+            LoadTestImage("wslc-registry:latest");
+        }
+
         PruneResult result;
         VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
         if (result.result.ContainersCount > 0)
