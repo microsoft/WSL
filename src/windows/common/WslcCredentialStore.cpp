@@ -13,57 +13,53 @@ Abstract:
 --*/
 
 #include "WslcCredentialStore.h"
-#include <format>
+#include <nlohmann/json.hpp>
 #include <wincrypt.h>
 
-std::string wsl::windows::common::BuildRegistryAuthHeader(
-    const std::string& username, const std::string& password, const std::string& serverAddress)
-{
-    auto authJson = std::format(
-        R"({{"username":"{}","password":"{}","serveraddress":"{}"}})", username, password, serverAddress);
+namespace {
 
+std::string Base64Encode(const std::string& input)
+{
     DWORD base64Size = 0;
     THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
-        reinterpret_cast<const BYTE*>(authJson.c_str()),
-        static_cast<DWORD>(authJson.size()),
+        reinterpret_cast<const BYTE*>(input.c_str()),
+        static_cast<DWORD>(input.size()),
         CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
         nullptr,
         &base64Size));
 
-    std::string result(base64Size, '\0');
+    auto buffer = std::make_unique<char[]>(base64Size);
     THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
-        reinterpret_cast<const BYTE*>(authJson.c_str()),
-        static_cast<DWORD>(authJson.size()),
+        reinterpret_cast<const BYTE*>(input.c_str()),
+        static_cast<DWORD>(input.size()),
         CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-        result.data(),
+        buffer.get(),
         &base64Size));
 
-    result.resize(base64Size);
-    return result;
+    return std::string(buffer.get());
+}
+
+} // namespace
+
+std::string wsl::windows::common::BuildRegistryAuthHeader(
+    const std::string& username, const std::string& password, const std::string& serverAddress)
+{
+    nlohmann::json authJson = {
+        {"username", username},
+        {"password", password},
+        {"serveraddress", serverAddress}
+    };
+
+    return Base64Encode(authJson.dump());
 }
 
 std::string wsl::windows::common::BuildRegistryAuthHeader(
     const std::string& identityToken, const std::string& serverAddress)
 {
-    auto authJson = std::format(
-        R"({{"identitytoken":"{}","serveraddress":"{}"}})", identityToken, serverAddress);
+    nlohmann::json authJson = {
+        {"identitytoken", identityToken},
+        {"serveraddress", serverAddress}
+    };
 
-    DWORD base64Size = 0;
-    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
-        reinterpret_cast<const BYTE*>(authJson.c_str()),
-        static_cast<DWORD>(authJson.size()),
-        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-        nullptr,
-        &base64Size));
-
-    std::string result(base64Size, '\0');
-    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
-        reinterpret_cast<const BYTE*>(authJson.c_str()),
-        static_cast<DWORD>(authJson.size()),
-        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-        result.data(),
-        &base64Size));
-
-    result.resize(base64Size);
-    return result;
+    return Base64Encode(authJson.dump());
 }
