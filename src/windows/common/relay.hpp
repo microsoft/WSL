@@ -157,6 +157,56 @@ private:
     std::function<void()> m_onDestroy;
 };
 
+// RAII wrapper for handles returned by RegisterWaitForSingleObject.
+// Supports operator&, operator bool, and reset() to match usage in relay.cpp.
+struct unique_registered_wait
+{
+    unique_registered_wait() = default;
+    ~unique_registered_wait()
+    {
+        reset();
+    }
+    unique_registered_wait(const unique_registered_wait&) = delete;
+    unique_registered_wait& operator=(const unique_registered_wait&) = delete;
+    unique_registered_wait(unique_registered_wait&& other) noexcept : m_handle(other.m_handle)
+    {
+        other.m_handle = nullptr;
+    }
+    unique_registered_wait& operator=(unique_registered_wait&& other) noexcept
+    {
+        reset();
+        m_handle = other.m_handle;
+        other.m_handle = nullptr;
+        return *this;
+    }
+
+    explicit operator bool() const
+    {
+        return m_handle != nullptr;
+    }
+    bool operator!() const
+    {
+        return m_handle == nullptr;
+    }
+    HANDLE* operator&()
+    {
+        return &m_handle;
+    }
+
+    void reset()
+    {
+        if (m_handle != nullptr)
+        {
+            // Use INVALID_HANDLE_VALUE to wait for any pending callbacks to finish before returning.
+            UnregisterWaitEx(m_handle, INVALID_HANDLE_VALUE);
+            m_handle = nullptr;
+        }
+    }
+
+private:
+    HANDLE m_handle{};
+};
+
 enum class IOHandleStatus
 {
     Standby,
@@ -242,6 +292,9 @@ public:
     virtual void Schedule() = 0;
     virtual void Collect() = 0;
     virtual HANDLE GetHandle() const = 0;
+    virtual void Register(HANDLE, OverlappedIOHandle*)
+    {
+    }
     IOHandleStatus GetState() const;
 
 protected:
@@ -255,13 +308,20 @@ public:
     NON_MOVABLE(EventHandle)
 
     EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
+    ~EventHandle();
+    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    static VOID CALLBACK WaitCallback(PVOID context, BOOLEAN timedOut);
+
     HandleWrapper Handle;
     std::function<void()> OnSignalled;
+    HANDLE Iocp{};
+    OverlappedIOHandle* CompletionTarget{};
+    unique_registered_wait WaitHandle;
 };
 
 class ReadHandle : public OverlappedIOHandle
@@ -273,17 +333,24 @@ public:
     ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
     virtual ~ReadHandle();
 
+    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    static VOID CALLBACK WaitBridgeCallback(PVOID context, BOOLEAN timedOut);
+
     HandleWrapper Handle;
     std::function<void(const gsl::span<char>& Buffer)> OnRead;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
     LARGE_INTEGER Offset{};
+    HANDLE Iocp{};
+    OverlappedIOHandle* CompletionTarget{};
+    bool RegisteredWithIocp{};
+    unique_registered_wait WaitBridge;
 };
 
 class SingleAcceptHandle : public OverlappedIOHandle
@@ -295,17 +362,24 @@ public:
     SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
     ~SingleAcceptHandle();
 
+    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    static VOID CALLBACK WaitBridgeCallback(PVOID context, BOOLEAN timedOut);
+
     HandleWrapper ListenSocket;
     HandleWrapper AcceptedSocket;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::function<void()> OnAccepted;
     char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
+    HANDLE Iocp{};
+    OverlappedIOHandle* CompletionTarget{};
+    bool RegisteredWithIocp{};
+    unique_registered_wait WaitBridge;
 };
 
 class LineBasedReadHandle : public ReadHandle
@@ -351,17 +425,24 @@ public:
 
     WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Buffer = {});
     ~WriteHandle();
+    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
     void Push(const gsl::span<char>& Buffer);
 
 private:
+    static VOID CALLBACK WaitBridgeCallback(PVOID context, BOOLEAN timedOut);
+
     HandleWrapper Handle;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer;
     LARGE_INTEGER Offset{};
+    HANDLE Iocp{};
+    OverlappedIOHandle* CompletionTarget{};
+    bool RegisteredWithIocp{};
+    unique_registered_wait WaitBridge;
 };
 
 template <typename TRead = ReadHandle>
@@ -374,6 +455,12 @@ public:
     RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output) :
         Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(Output))
     {
+    }
+
+    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override
+    {
+        Read.Register(iocp, completionTarget);
+        Write.Register(iocp, completionTarget);
     }
 
     void Schedule() override
@@ -468,6 +555,7 @@ public:
     };
 
     DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat);
+    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -493,6 +581,7 @@ private:
     std::vector<char> PendingBuffer;
     WriteHandle* ActiveHandle = nullptr;
     size_t RemainingBytes = 0;
+    OverlappedIOHandle* CompletionTarget{};
 };
 
 class MultiHandleWait
@@ -516,6 +605,9 @@ public:
     void Cancel();
 
 private:
+    void EnsureIocp();
+
+    wil::unique_handle m_iocp;
     std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
     bool m_cancel = false;
 };
