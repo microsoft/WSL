@@ -151,11 +151,13 @@ public:
         std::vector<std::string> labels;
     };
 
-    std::unique_ptr<HTTPRequestContext> PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth = std::nullopt);
+    std::unique_ptr<HTTPRequestContext> PullImage(
+        const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth = std::nullopt);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
-    std::unique_ptr<HTTPRequestContext> PushImage(const std::string& ImageName, const std::optional<std::string>& tag, const std::optional<std::string>& registryAuth = std::nullopt);
+    std::unique_ptr<HTTPRequestContext> PushImage(
+        const std::string& ImageName, const std::optional<std::string>& tag, const std::optional<std::string>& registryAuth = std::nullopt);
     std::string Authenticate(const std::string& serverAddress, const std::string& username, const std::string& password);
     std::vector<common::docker_schema::Image> ListImages(bool all = false, bool digests = false, const ListImagesFilters& filters = {});
     common::docker_schema::InspectImage InspectImage(const std::string& NameOrId);
@@ -226,7 +228,11 @@ private:
     wil::unique_socket ConnectSocket();
 
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
-        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers = {}, const std::map<std::string, std::string>& CustomHeaders = {});
+        boost::beast::http::verb Method,
+        const URL& Url,
+        const std::string& Body,
+        const std::map<boost::beast::http::field, std::string>& Headers = {},
+        const std::map<std::string, std::string>& CustomHeaders = {});
 
     std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");

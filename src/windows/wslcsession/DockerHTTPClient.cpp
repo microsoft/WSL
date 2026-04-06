@@ -118,7 +118,8 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 {
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(
+    const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth)
 {
     auto url = URL::Create("/images/create");
 
@@ -132,7 +133,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
     }
 
     std::map<std::string, std::string> customHeaders;
-    
+
     if (registryAuth.has_value())
     {
         customHeaders["X-Registry-Auth"] = registryAuth.value();
@@ -170,7 +171,8 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
     Transaction<docker_schema::EmptyRequest>(verb::post, url);
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PushImage(const std::string& ImageName, const std::optional<std::string>& tag, const std::optional<std::string>& registryAuth)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PushImage(
+    const std::string& ImageName, const std::optional<std::string>& tag, const std::optional<std::string>& registryAuth)
 {
     auto url = URL::Create("/images/{}/push", ImageName);
 
@@ -666,7 +668,11 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnResponseBytes(const gsl::span
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequestImpl(
-    verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers, const std::map<std::string, std::string>& CustomHeaders)
+    verb Method,
+    const URL& Url,
+    const std::string& Body,
+    const std::map<boost::beast::http::field, std::string>& Headers,
+    const std::map<std::string, std::string>& CustomHeaders)
 {
     auto context = std::make_unique<DockerHTTPClient::HTTPRequestContext>(ConnectSocket());
 

@@ -174,8 +174,7 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    void PushImageToRegistry(
-        IWSLCSession& session, const std::string& imageName, const char* registryAddress, const std::string& registryAuth)
+    void PushImageToRegistry(IWSLCSession& session, const std::string& imageName, const char* registryAddress, const std::string& registryAuth)
     {
         auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(imageName);
         auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
@@ -581,28 +580,19 @@ class WSLCTests
         constexpr auto c_username = "wslctest";
         constexpr auto c_password = "password";
 
-        auto registry = wsl::windows::common::WSLCLocalRegistry::Start(
-            *m_defaultSession, c_username, c_password);
+        auto registry = wsl::windows::common::WSLCLocalRegistry::Start(*m_defaultSession, c_username, c_password);
 
         auto registryUrl = std::format(L"http://{}/v2/", registry.GetServerAddress());
         auto registryAddress = registry.GetServerAddress();
-        
+
         // The registry may take to some time before its up and running. Retry until its ready to accept connections.
         ExpectHttpResponse(registryUrl.c_str(), 401, true);
 
         wil::unique_cotaskmem_ansistring token;
-        VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->Authenticate(
-                    registryAddress,
-                    c_username,
-                    "wrong-password",
-                    &token));
+        VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->Authenticate(registryAddress, c_username, "wrong-password", &token));
         ValidateCOMErrorMessageContains(L"failed with status: 401 Unauthorized");
 
-        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(
-            registryAddress,
-            c_username,
-            c_password,
-            &token));
+        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress, c_username, c_password, &token));
         VERIFY_IS_NOT_NULL(token.get());
 
         auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
