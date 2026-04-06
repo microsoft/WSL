@@ -1190,17 +1190,13 @@ ReadHandle::~ReadHandle()
     {
         if (CancelIoEx(Handle.Get(), &Overlapped))
         {
-            if (!RegisteredWithIocp)
+            // Always wait for the cancellation to complete so the OVERLAPPED (a member
+            // of this object) is no longer referenced by the kernel when the destructor returns.
+            DWORD bytesRead{};
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
             {
-                // Wait for cancellation only when using event-based I/O.
-                // When using IOCP, the cancellation completion goes to the IOCP queue
-                // and will be discarded since the handle is being destroyed.
-                DWORD bytesRead{};
-                if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
-                {
-                    auto error = GetLastError();
-                    LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-                }
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
             }
         }
         else
@@ -1349,15 +1345,14 @@ SingleAcceptHandle::~SingleAcceptHandle()
     {
         LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
 
-        if (!RegisteredWithIocp)
+        // Always wait for the cancellation to complete so the OVERLAPPED is no longer
+        // referenced by the kernel when the destructor returns.
+        DWORD bytesProcessed{};
+        DWORD flagsReturned{};
+        if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
         {
-            DWORD bytesProcessed{};
-            DWORD flagsReturned{};
-            if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
-            {
-                auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-            }
+            auto error = GetLastError();
+            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
         }
     }
 }
@@ -1603,14 +1598,13 @@ WriteHandle::~WriteHandle()
     {
         if (CancelIoEx(Handle.Get(), &Overlapped))
         {
-            if (!RegisteredWithIocp)
+            // Always wait for the cancellation to complete so the OVERLAPPED is no longer
+            // referenced by the kernel when the destructor returns.
+            DWORD bytesRead{};
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
             {
-                DWORD bytesRead{};
-                if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
-                {
-                    auto error = GetLastError();
-                    LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-                }
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
             }
         }
         else
