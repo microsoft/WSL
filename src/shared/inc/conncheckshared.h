@@ -123,6 +123,7 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
                 *connCheckStatus = ConnCheckStatus::NoRecordsForFamily;
                 return unique_socket{}; 
             }
+
             throw std::runtime_error(std::format("CheckConnection: getaddrinfo() failed: {}", status));
         }
 
