@@ -170,7 +170,7 @@ class WSLCE2EContainerExecTests
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-
+        
         result = RunWslc(std::format(L"container exec -e {}=A {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -183,7 +183,7 @@ class WSLCE2EContainerExecTests
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-
+    
         result = RunWslc(std::format(L"container exec -e {} {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -421,6 +421,28 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stdout = L"unable to find group badgid: no matching entries in group file\r\n", .ExitCode = 126});
     }
 
+    TEST_METHOD(WSLCE2E_Container_Exec_WorkDir)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container exec --workdir /tmp {} pwd", WslcContainerName));
+        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Exec_WorkDir_ShortAlias)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container exec -w /tmp {} pwd", WslcContainerName));
+        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
     const TestImage& DebianImage = DebianTestImage();
@@ -479,6 +501,7 @@ private:
                 << L"  --session         Specify the session to use\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
+                << L"  -w,--workdir      Working directory inside the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
