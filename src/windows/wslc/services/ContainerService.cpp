@@ -406,6 +406,10 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
         auto user = options.User.value();
         processLauncher.SetUser(std::move(user));
     }
+    if (!options.WorkingDirectory.empty())
+    {
+        processLauncher.SetWorkingDirectory(std::move(options.WorkingDirectory));
+    }
 
     return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
 }

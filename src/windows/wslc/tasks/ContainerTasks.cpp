@@ -293,6 +293,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::WorkDir))
+    {
+        options.WorkingDirectory = WideToMultiByte(context.Args.Get<ArgType::WorkDir>());
+    }
+
     context.Data.Add<Data::ContainerOptions>(std::move(options));
 }
 
