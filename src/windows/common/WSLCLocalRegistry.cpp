@@ -22,37 +22,41 @@ namespace {
 constexpr auto c_registryImage = "registry:3";
 constexpr auto c_htpasswdImage = "httpd:2";
 
-void PopulateHtpasswd(IWSLCSession& session, const std::filesystem::path& storagePath, const std::string& username, const std::string& password)
+std::string GenerateHtpasswd(IWSLCSession& session, const std::string& username, const std::string& password)
 {
-    LOG_IF_FAILED(session.PullImage(c_htpasswdImage, nullptr, nullptr));
+    THROW_IF_FAILED(session.PullImage(c_htpasswdImage, nullptr, nullptr));
 
-    // Write the htpasswd file into /data/ on the shared folder.
-    const auto command = std::format("htpasswd -Bbn '{}' '{}' > /data/htpasswd", username, password);
+    const auto command = std::format("htpasswd -Bbn '{}' '{}'", username, password);
 
-    WSLCContainerLauncher launcher("httpd:2", {}, {"/bin/sh", "-c", command});
-    launcher.AddVolume(storagePath.wstring(), "/data", false);
+    WSLCContainerLauncher launcher(c_htpasswdImage, {}, {"/bin/sh", "-c", command});
     launcher.SetContainerFlags(WSLCContainerFlagsRm);
 
     auto container = launcher.Launch(session);
     auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    auto output = result.Output[1];
+    output.erase(output.find_last_not_of("\n\r") + 1);
+
+    THROW_HR_IF_MSG(E_FAIL, output.empty(), "%hs", launcher.FormatResult(result).c_str());
+    return output;
 }
 
-std::vector<std::string> BuildRegistryEnv(bool withAuth)
+std::vector<std::string> BuildRegistryEnv(IWSLCSession& session, const std::string& username, const std::string& password)
 {
-    // Builds the environment variable list for the registry:3 container.
     std::vector<std::string> env = {
         "REGISTRY_HTTP_ADDR=0.0.0.0:5000",
-        "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data/registry",
-        "REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io"
     };
 
-    if (withAuth)
+    if (!username.empty())
     {
+        auto htpasswdEntry = GenerateHtpasswd(session, username, password);
+
+        env.push_back(std::format("HTPASSWD_CONTENT={}", htpasswdEntry));
         env.push_back("REGISTRY_AUTH=htpasswd");
         env.push_back("REGISTRY_AUTH_HTPASSWD_REALM=WSLC Test Registry");
-        env.push_back("REGISTRY_AUTH_HTPASSWD_PATH=/data/htpasswd");
+        env.push_back("REGISTRY_AUTH_HTPASSWD_PATH=/htpasswd");
     }
 
     return env;
@@ -79,27 +83,19 @@ WSLCLocalRegistry::~WSLCLocalRegistry()
 }
 
 WSLCLocalRegistry WSLCLocalRegistry::Start(
-    IWSLCSession& session, const std::filesystem::path& storagePath, const std::string& username, const std::string& password)
+    IWSLCSession& session, const std::string& username, const std::string& password)
 {
-    // Ensure required images are available.
-    LOG_IF_FAILED(session.PullImage(c_registryImage, nullptr, nullptr));
+    THROW_IF_FAILED(session.PullImage(c_registryImage, nullptr, nullptr));    
 
-    // If credentials are provided, populate the htpasswd file on the folder.
+    auto env = BuildRegistryEnv(session, username, password);
+
+    WSLCContainerLauncher launcher(c_registryImage, {}, {}, env);
+    launcher.AddPort(5000, 5000, AF_INET);
+
     if (!username.empty())
     {
-        PopulateHtpasswd(session, storagePath, username, password);
+        launcher.SetEntrypoint({"/bin/sh", "-c", "echo \"$HTPASSWD_CONTENT\" > /htpasswd && registry serve /etc/distribution/config.yml"});
     }
-
-    // Launch the registry container.
-    WSLCContainerLauncher launcher(
-        c_registryImage,
-        {},
-        {},
-        BuildRegistryEnv(!username.empty()));
-
-    launcher.AddPort(5000, 5000, AF_INET);
-    launcher.AddVolume(storagePath.wstring(), "/data", false);
-
     auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
 
     return WSLCLocalRegistry(

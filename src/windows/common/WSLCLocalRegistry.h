@@ -29,7 +29,6 @@ public:
 
     static WSLCLocalRegistry Start(
         IWSLCSession& Session,
-        const std::filesystem::path& StoragePath,
         const std::string& Username = {},
         const std::string& Password = {});
 

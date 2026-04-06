@@ -87,6 +87,11 @@ class WSLCTests
             LoadTestImage("python:3.12-alpine");
         }
 
+        if (!hasImage("hello-world:latest"))
+        {
+            LoadTestImage("hello-world:latest");
+        }
+
         PruneResult result;
         VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
         if (result.result.ContainersCount > 0)
@@ -167,6 +172,32 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->OpenContainer(name.c_str(), &rawContainer));
 
         return RunningWSLCContainer(std::move(rawContainer), {});
+    }
+
+    void PushImageToRegistry(
+        IWSLCSession& session, const std::string& imageName, const char* registryAddress, const std::string& registryAuth)
+    {
+        auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(imageName);
+        auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
+        auto registryRepo = std::format("{}/{}", registryAddress, repo);
+        auto registryTag = tag.value_or("latest");
+
+        WSLCTagImageOptions tagOptions{};
+        tagOptions.Image = imageName.c_str();
+        tagOptions.Repo = registryRepo.c_str();
+        tagOptions.Tag = registryTag.c_str();
+
+        // Tag the image with the registry address so it can be pushed.
+        VERIFY_SUCCEEDED(session.TagImage(&tagOptions));
+
+        // Ensures the tag is removed to allow tests to try to push or pull the same image again.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            WSLCDeleteImageOptions deleteOptions{.Image = registryImage.c_str(), .Flags = WSLCDeleteImageFlagsNone};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            LOG_IF_FAILED(session.DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+        });
+
+        VERIFY_SUCCEEDED(session.PushImage(registryImage.c_str(), registryAuth.c_str(), nullptr));
     }
 
     TEST_METHOD(GetVersion)
@@ -519,14 +550,8 @@ class WSLCTests
         constexpr auto c_username = "wslctest";
         constexpr auto c_password = "password";
 
-        auto registryFolder = std::filesystem::current_path() / "registry-storage";
-        std::filesystem::create_directories(registryFolder);
-        wil:on_scope_exit([&]() {
-            std::filesystem::remove_all(registryFolder);
-        });
-
         auto registry = wsl::windows::common::WSLCLocalRegistry::Start(
-            *m_defaultSession, registryFolder, c_username, c_password);
+            *m_defaultSession, c_username, c_password);
 
         auto registryUrl = std::format(L"http://{}/v2/", registry.GetServerAddress());
         auto registryAddress = registry.GetServerAddress();
@@ -549,12 +574,17 @@ class WSLCTests
             &token));
         VERIFY_IS_NOT_NULL(token.get());
 
-        auto image = std::format("{}/library/hello-world:latest", registryAddress);
+        auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, xRegistryAuth);
+
+        // Pulling without credentials should fail.
+        auto image = std::format("{}/hello-world:latest", registryAddress);
         VERIFY_ARE_EQUAL(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr), E_FAIL);
         ValidateCOMErrorMessageContains(L"no basic auth credentials");
 
-        auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        // Pulling with credentials should succeed.
         VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), xRegistryAuth.c_str(), nullptr));
+        ExpectImagePresent(*m_defaultSession, image.c_str());
     }
 
     TEST_METHOD(ListImages)
