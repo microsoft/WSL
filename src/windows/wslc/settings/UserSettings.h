@@ -82,7 +82,7 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::wstring,       {},                            "session.defaultStoragePath")
     DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode, WSLCNetworkingModeVirtioProxy, "session.networkingMode")
     DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,  HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
-    DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,               false,                         "session.dnsTunneling")
+    DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,               true,                          "session.dnsTunneling")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on
