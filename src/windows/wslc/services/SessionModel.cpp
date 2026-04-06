@@ -38,7 +38,10 @@ SessionOptions::SessionOptions()
     m_sessionSettings.BootTimeoutMs = s_defaultBootTimeoutMs;
     m_sessionSettings.MaximumStorageSizeMb = settings::User().Get<settings::Setting::SessionStorageSizeMb>();
     m_sessionSettings.NetworkingMode = settings::User().Get<settings::Setting::SessionNetworkingMode>();
-    m_sessionSettings.FeatureFlags = WslcFeatureFlagsVirtioFs;
+    if (settings::User().Get<settings::Setting::SessionHostFileShareMode>() == settings::HostFileShareMode::VirtioFs)
+    {
+        WI_SetFlag(m_sessionSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+    }
 }
 
 bool SessionOptions::IsElevated()

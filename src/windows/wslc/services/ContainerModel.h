@@ -38,7 +38,9 @@ struct ContainerOptions
     bool TTY = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
+    std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
+    std::optional<std::string> User{};
 };
 
 struct CreateContainerResult
@@ -59,6 +61,16 @@ struct KillContainerOptions
     int Signal = WSLCSignalSIGKILL;
 };
 
+struct PortInformation
+{
+    uint16_t HostPort{};
+    uint16_t ContainerPort{};
+    int Protocol{}; // IP protocol number (e.g., IPPROTO_TCP or IPPROTO_UDP)
+    std::string BindingAddress;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(PortInformation, HostPort, ContainerPort, Protocol, BindingAddress);
+};
+
 struct ContainerInformation
 {
     std::string Id;
@@ -67,8 +79,9 @@ struct ContainerInformation
     WSLCContainerState State;
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
+    std::vector<PortInformation> Ports;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
 };
 
 struct EnvironmentVariable

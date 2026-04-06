@@ -516,9 +516,22 @@ std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendReq
     auto context = SendRequestImpl(Method, Url, Body, {});
 
     // Read the response header and body.
+    // Limit response size to prevent unbounded memory growth from pathological responses.
+    // All callers expect JSON metadata (list, inspect, create, etc.), not large binary payloads.
+    constexpr size_t MaxResponseSize = 64 * _1MB;
+
     std::optional<HTTPResponse> responseHeader;
     std::string responseBody;
-    auto OnResponse = [&responseBody](const gsl::span<char>& span) { responseBody.append(span.data(), span.size()); };
+    const auto& url = Url;
+    auto OnResponse = [&responseBody, &url](const gsl::span<char>& span) {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
+            span.size() > MaxResponseSize - responseBody.size(),
+            "Docker API response exceeds maximum size (%zu bytes) for %hs",
+            MaxResponseSize,
+            url.Get().c_str());
+        responseBody.append(span.data(), span.size());
+    };
 
     auto onHttpResponse = [&](const auto& response) { responseHeader = response; };
     MultiHandleWait io;

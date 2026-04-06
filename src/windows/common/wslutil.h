@@ -319,6 +319,7 @@ wil::unique_hlocal_string SidToString(_In_ PSID Sid);
 
 WSLCHandle ToCOMInputHandle(HANDLE Handle);
 [[nodiscard]] WSLCHandle ToCOMOutputHandle(HANDLE Handle, DWORD Access);
+[[nodiscard]] WSLCHandle ToCOMOutputHandle(HANDLE Handle, DWORD Access, WSLCHandleType Type);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 

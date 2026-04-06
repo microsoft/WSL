@@ -236,11 +236,13 @@ WSLCInteractiveSession::~WSLCInteractiveSession()
 
 void WSLCInteractiveSession::ExpectStdout(const std::string& expected)
 {
+    Log::Comment(std::format(L"Expecting stdout: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(expected))).c_str());
     m_stdoutReader->ExpectConsume(expected);
 }
 
 void WSLCInteractiveSession::ExpectStderr(const std::string& expected)
 {
+    Log::Comment(std::format(L"Expecting stderr: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(expected))).c_str());
     m_stderrReader->ExpectConsume(expected);
 }
 
@@ -252,6 +254,8 @@ void WSLCInteractiveSession::ExpectCommandEcho(const std::string& command)
 
 void WSLCInteractiveSession::Write(const std::string& data)
 {
+    Log::Comment(std::format(L"Writing to stdin: \"{}\"", wsl::shared::string::MultiByteToWide(EscapeString(data))).c_str());
+
     OVERLAPPED overlapped{};
     wil::unique_event event(wil::EventOptions::ManualReset);
     overlapped.hEvent = event.get();

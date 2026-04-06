@@ -11,8 +11,10 @@ Abstract:
     This file contains the SessionService implementation
 
 --*/
+
 #include "precomp.h"
 #include "SessionService.h"
+#include "ConsoleService.h"
 #include <wslc.h>
 #include <WSLCProcessLauncher.h>
 
@@ -20,7 +22,6 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
-DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);
 
 int SessionService::Attach(const std::wstring& sessionName)
 {
@@ -99,7 +100,7 @@ int SessionService::Attach(const std::wstring& sessionName)
     return static_cast<int>(exitCode);
 }
 
-Session SessionService::CreateSession(const SessionOptions& options)
+Session SessionService::CreateSession(const SessionOptions& options, WSLCSessionFlags Flags)
 {
     const WSLCSessionSettings* settings = options.Get();
     wil::com_ptr<IWSLCSessionManager> sessionManager;
@@ -107,9 +108,34 @@ Session SessionService::CreateSession(const SessionOptions& options)
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(settings, WSLCSessionFlagsPersistent | WSLCSessionFlagsOpenExisting, &session));
+    THROW_IF_FAILED(sessionManager->CreateSession(settings, Flags, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
+}
+
+int SessionService::Enter(const std::wstring& storagePath, const std::wstring& displayName)
+{
+    THROW_HR_IF(E_INVALIDARG, storagePath.empty());
+    THROW_HR_IF(E_INVALIDARG, displayName.empty());
+
+    // Build session settings from the user configuration, overriding storage path and display name.
+    SessionOptions options;
+    options.Get()->DisplayName = displayName.c_str();
+    options.Get()->StoragePath = storagePath.c_str();
+    options.Get()->StorageFlags = WSLCSessionStorageFlagsNoCreate; // Don't create storage if it doesn't exist.
+
+    // Create a non-persistent session: lifetime is tied to our COM reference.
+    auto session = SessionService::CreateSession(options, WSLCSessionFlagsNone);
+    wsl::windows::common::wslutil::PrintMessage(Localization::MessageWslcCreatedSession(displayName), stderr);
+
+    const std::string shell = "/bin/sh";
+    wsl::windows::common::WSLCProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin};
+
+    wsl::windows::common::ConsoleState console;
+    const auto windowSize = console.GetWindowSize();
+    launcher.SetTtySize(windowSize.Y, windowSize.X);
+
+    return ConsoleService::AttachToCurrentConsole(launcher.Launch(*session.Get()));
 }
 
 std::vector<SessionInformation> SessionService::List()

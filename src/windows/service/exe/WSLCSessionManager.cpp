@@ -54,6 +54,11 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     // Ensure that the session display name is non-null and not too long.
     THROW_HR_IF(E_INVALIDARG, Settings->DisplayName == nullptr);
     THROW_HR_IF(E_INVALIDARG, wcslen(Settings->DisplayName) >= std::size(WSLCSessionInformation{}.DisplayName));
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
+        "Invalid storage flags: %i",
+        Settings->StorageFlags);
 
     auto tokenInfo = GetCallingProcessTokenInfo();
 
@@ -212,6 +217,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(_In_ ULONG
     sessionSettings.NetworkingMode = Settings->NetworkingMode;
     sessionSettings.FeatureFlags = Settings->FeatureFlags;
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
+    sessionSettings.StorageFlags = Settings->StorageFlags;
     return sessionSettings;
 }
 

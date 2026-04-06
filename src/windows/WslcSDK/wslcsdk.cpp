@@ -676,7 +676,7 @@ try
 
             // TODO: Consider using standard protocol numbers instead of our own enum.
             convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
-            convertedPort.BindingAddress = "127.0.0.1";
+            strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
@@ -1384,3 +1384,22 @@ try
     return E_NOTIMPL;
 }
 CATCH_RETURN();
+
+EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
+{
+    wil::DLLMain(Instance, Reason, Reserved);
+
+    switch (Reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        wsl::windows::common::wslutil::InitializeWil();
+        WslTraceLoggingInitialize(WslcTelemetryProvider, false);
+        break;
+
+    case DLL_PROCESS_DETACH:
+        WslTraceLoggingUninitialize();
+        break;
+    }
+
+    return TRUE;
+}
