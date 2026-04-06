@@ -170,7 +170,7 @@ class WSLCE2EContainerExecTests
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        
+
         result = RunWslc(std::format(L"container exec -e {}=A {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -183,7 +183,7 @@ class WSLCE2EContainerExecTests
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-    
+
         result = RunWslc(std::format(L"container exec -e {} {} env", HostEnvVariableName, WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
