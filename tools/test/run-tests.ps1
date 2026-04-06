@@ -54,6 +54,12 @@ if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
     {
         $AttachDebugger = $true
         $TeArgs += '/waitfordebugger'
+        # Run in-process so WinDbgX can attach directly to TE.exe without
+        # polling for a TE.ProcessHost.exe child process.
+        if (-not ($TeArgs -icontains '/inproc'))
+        {
+            $TeArgs += '/inproc'
+        }
     }
     else
     {
@@ -67,30 +73,9 @@ $teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru
 
 if ($AttachDebugger)
 {
-    $targetPid = if ($TeArgs -icontains '/inproc') { $teProcess.Id } else { $null }
-
-    if (-not $targetPid)
-    {
-        for ($i = 0; $i -lt 120 -and -not $teProcess.HasExited; $i++)
-        {
-            Start-Sleep -Milliseconds 500
-            $child = Get-CimInstance Win32_Process -Filter "ParentProcessId = $($teProcess.Id) AND Name = 'TE.ProcessHost.exe'" -ErrorAction SilentlyContinue
-            if ($child) { $targetPid = $child[0].ProcessId; break }
-        }
-    }
-
-    if ($targetPid)
-    {
-        $targetName = if ($targetPid -eq $teProcess.Id) { "TE.exe" } else { "TE.ProcessHost.exe" }
-        Write-Host "Launching WinDbgX attached to $targetName (PID: $targetPid)..."
-        Start-Process "WinDbgX.exe" -ArgumentList "-p $targetPid"
-    }
-    else
-    {
-        Write-Warning "Could not find TE.ProcessHost.exe within 60 seconds."
-        Write-Host "Attach a debugger manually to TE.exe (PID: $($teProcess.Id))."
-    }
+    # /inproc is always added above, so attach directly to TE.exe.
+    Write-Host "Launching WinDbgX attached to TE.exe (PID: $($teProcess.Id))..."
+    Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
 }
 
-$teProcess | Wait-Process
-if ($teProcess.ExitCode -ne 0) { exit 1 }
+exit ($teProcess | Wait-Process -PassThru).ExitCode
