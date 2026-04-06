@@ -173,12 +173,12 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --format      " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
-                << L"  --no-trunc    Do not truncate output\r\n"
-                << L"  -q,--quiet    Outputs the container IDs only\r\n"
-                << L"  --session     Specify the session to use\r\n"
-                << L"  -v,--verbose  Output verbose details\r\n"
-                << L"  -h,--help     Shows help about the selected command\r\n"
+                << L"  --format    " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
+                << L"  --no-trunc  Do not truncate output\r\n"
+                << L"  -q,--quiet  Outputs the container IDs only\r\n"
+                << L"  --session   Specify the session to use\r\n"
+                << L"  --verbose   Output verbose details\r\n"
+                << L"  -h,--help   Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

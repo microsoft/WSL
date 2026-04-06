@@ -26,7 +26,6 @@ COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
 // Session command tests
 COMMAND_LINE_TEST_CASE(L"session list", L"list", true)
-COMMAND_LINE_TEST_CASE(L"session list -v", L"list", true)
 COMMAND_LINE_TEST_CASE(L"session list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"session list --verbose --help", L"list", true)
 COMMAND_LINE_TEST_CASE(L"session list --notanarg", L"list", false)
@@ -68,6 +67,12 @@ COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
+COMMAND_LINE_TEST_CASE(L"exec --workdir /app cont1 echo Hello", L"exec", true)
+COMMAND_LINE_TEST_CASE(L"exec -w /app cont1 echo Hello", L"exec", true)
+COMMAND_LINE_TEST_CASE(L"container exec --workdir /app cont1 sh", L"exec", true)
+COMMAND_LINE_TEST_CASE(L"exec --workdir", L"exec", false)                       // Missing value for --workdir
+COMMAND_LINE_TEST_CASE(L"exec cont1 --workdir", L"exec", false)                 // Invalid argument specifier after container id
+COMMAND_LINE_TEST_CASE(L"exec --workdir \"\" cont1 echo Hello", L"exec", false) // Empty working directory
 COMMAND_LINE_TEST_CASE(L"kill cont1 --signal sigkill", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"container kill cont1 -s KILL", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"inspect cont1", L"inspect", true)
@@ -98,7 +103,6 @@ COMMAND_LINE_TEST_CASE(L"image build C:\\context --tag tag1 --tag tag2 --tag tag
 COMMAND_LINE_TEST_CASE(L"image build C:\\context --build-arg KEY=VALUE", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context --build-arg A=1 --build-arg B=2", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test:latest --build-arg KEY=VALUE -f Dockerfile.custom", L"build", true)
-COMMAND_LINE_TEST_CASE(L"image build C:\\context -v", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context --verbose", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test --build-arg KEY=VALUE --verbose", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build", L"build", false)
@@ -110,7 +114,7 @@ COMMAND_LINE_TEST_CASE(L"images", L"images", true) // Aliased off the root chang
 COMMAND_LINE_TEST_CASE(L"image ls", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list --format badformat", L"list", false)
-COMMAND_LINE_TEST_CASE(L"image list -v", L"list", true)
+COMMAND_LINE_TEST_CASE(L"image list --verbose", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list -q", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image pull ubuntu", L"pull", true)
 COMMAND_LINE_TEST_CASE(L"pull ubuntu", L"pull", true)

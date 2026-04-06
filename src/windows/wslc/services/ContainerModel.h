@@ -38,6 +38,7 @@ struct ContainerOptions
     bool TTY = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
+    std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
 };
