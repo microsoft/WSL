@@ -977,7 +977,6 @@ class WSLCTests
 
         // Test delete failed if image does not exist.
         VERIFY_ARE_EQUAL(WSLC_E_IMAGE_NOT_FOUND, DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsForce).first);
-        
 
         // Validate that invalid flags are rejected.
         {
