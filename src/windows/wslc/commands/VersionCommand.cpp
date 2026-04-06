@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "VersionCommand.h"
 
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
