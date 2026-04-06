@@ -370,8 +370,16 @@ try
     {
         THROW_HR_IF(E_INVALIDARG, DnsSocket == nullptr);
 
-        THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
-        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
+        const auto result = wsl::core::networking::DnsResolver::LoadDnsResolverMethods();
+        if (FAILED(result))
+        {
+            LOG_HR_MSG(result, "Failed to load DNS resolver methods, DNS tunneling will be disabled");
+            WI_ClearFlag(m_featureFlags, WslcFeatureFlagsDnsTunneling);
+        }
+        else
+        {
+            dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
+        }
     }
     else
     {
@@ -390,6 +398,8 @@ try
         // Enable DNS tunneling if a DNS socket was provided
         if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
+            WI_ASSERT(dnsSocketHandle);
+
             m_natConfig->EnableDnsTunneling = true;
             in_addr address{};
             WI_VERIFY(inet_pton(AF_INET, LX_INIT_DNS_TUNNELING_IP_ADDRESS, &address) == 1);

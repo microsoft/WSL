@@ -2364,30 +2364,6 @@ class WSLCTests
         VERIFY_IS_FALSE(result.Output[1].empty());
     }
 
-    void VerifyDnsResolutionDig(IWSLCSession* session, WSLCNetworkingMode mode, bool enableDnsTunneling)
-    {
-        // TCP DNS works except for NAT without tunneling (ICS SharedAccess DNS proxy is UDP-only).
-        const bool includeTcp = (mode != WSLCNetworkingModeNAT) || enableDnsTunneling;
-
-        // Test A record resolution (IPv4) and reverse DNS lookup over UDP
-        VerifyDigDnsResolution(session, "dig +short +time=5 A bing.com");
-        VerifyDigDnsResolution(session, "dig +short +time=5 -x 8.8.8.8");
-
-        if (includeTcp)
-        {
-            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 A bing.com");
-            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 -x 8.8.8.8");
-        }
-    }
-
-    void VerifyDnsResolutionRecordTypes(IWSLCSession* session)
-    {
-        VerifyDigDnsResolution(session, "dig +short +time=5 MX bing.com");
-        VerifyDigDnsResolution(session, "dig +short +time=5 NS bing.com");
-        VerifyDigDnsResolution(session, "dig +short +time=5 TXT bing.com");
-        VerifyDigDnsResolution(session, "dig +short +time=5 SOA bing.com");
-    }
-
     void VerifyDnsQueries(IWSLCSession* session, WSLCNetworkingMode mode, bool enableDnsTunneling)
     {
         // TCP DNS works except for NAT without tunneling (ICS SharedAccess DNS proxy is UDP-only).
