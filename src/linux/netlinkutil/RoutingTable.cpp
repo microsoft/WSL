@@ -248,9 +248,7 @@ void RoutingTable::ModifyDefaultLinkLocalRouteImpl(const Route& route, int opera
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
-        GNS_LOG_INFO(
-            "Netlink message configuration: RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
-            route.metric);
+        GNS_LOG_INFO("Netlink message configuration: RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})", route.metric);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
     });
 }

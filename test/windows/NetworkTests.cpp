@@ -370,10 +370,8 @@ class NetworkTests
         defaultRouteV6.Metric = 1;
         SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
-        const bool defaultV4RouteExists =
-            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
-        const bool defaultV6RouteExists =
-            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
+        const bool defaultV4RouteExists = LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
+        const bool defaultV6RouteExists = LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
 
         VERIFY_IS_TRUE(defaultV4RouteExists);
         VERIFY_IS_TRUE(defaultV6RouteExists);

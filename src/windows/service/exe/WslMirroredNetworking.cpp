@@ -348,9 +348,9 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessRouteChange()
                     endpointRoute.Metric = UINT16_MAX;
                 }
 
-                // Some Windows interfaces (like VPNs) can have metric 0 and routes over that interface with metric also 0, adding up to 0.
-                // Linux treats metric 0 as unspecified and will default to a 1024 metric. The highest priority metric in Linux is 1
-                // instead so we need to switch the metric from 0 to 1.
+                // Some Windows interfaces (like VPNs) can have metric 0 and routes over that interface with metric also 0, adding
+                // up to 0. Linux treats metric 0 as unspecified and will default to a 1024 metric. The highest priority metric in
+                // Linux is 1 instead so we need to switch the metric from 0 to 1.
                 if (endpointRoute.Metric == 0)
                 {
                     endpointRoute.Metric = 1;
