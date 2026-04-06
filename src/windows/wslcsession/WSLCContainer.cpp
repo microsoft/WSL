@@ -1466,7 +1466,7 @@ void WSLCContainerImpl::MapPorts()
         }
         catch (const wil::ResultException& ex)
         {
-            if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+            if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || ex.GetErrorCode() == HRESULT_FROM_WIN32(WSAEADDRINUSE))
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
