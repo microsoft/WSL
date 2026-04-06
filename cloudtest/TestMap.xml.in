@@ -9,7 +9,13 @@
         <Add Name="PipelineArtifactName" Value="drop_wsl_build"/>
       </Properties>
     </Provider>
-${PACKAGE_PROVIDER_BLOCK}
+    <Provider Type="PipelineArtifacts">
+      <Properties>
+        <Add Name="CloudTest.ProviderCustomName" Value="[package]" />
+        <Add Name="PipelineArtifactBuildUrl" Value="https://${VSO_ORG}.visualstudio.com/${VSO_PROJECT}/_build/results?buildId=${PIPELINE_BUILD_ID}"/>
+        <Add Name="PipelineArtifactName" Value="drop_wsl_package"/>
+      </Properties>
+    </Provider>
     <Provider Type="VSODrop">
       <Properties>
         <Add Name="CloudTest.ProviderCustomName" Value="[test_distro]" />

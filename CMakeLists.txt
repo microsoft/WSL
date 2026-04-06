@@ -27,6 +27,31 @@ if (NOT ${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION} STREQUAL ${CMAKE_SYSTEM_VERS
     message(FATAL_ERROR "Incorrect Windows SDK version: ${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}, requires ${CMAKE_SYSTEM_VERSION}")
 endif()
 
+# BUNDLE_ONLY mode: skip all source builds; only configure the msixbundle target and nuspec files.
+# Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
+option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
+if (BUNDLE_ONLY)
+    if (NOT PACKAGE_VERSION)
+        message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
+    endif()
+
+    if (NOT PACKAGE_VERSION MATCHES "^([0-9]+).([0-9]+).([0-9]+).([0-9]+)$")
+        message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'")
+    endif()
+
+    if(NOT CMAKE_BUILD_TYPE)
+        set(CMAKE_BUILD_TYPE "Release")
+    endif()
+
+    set(CMAKE_CONFIGURATION_TYPES "${CMAKE_BUILD_TYPE}" CACHE STRING "" FORCE)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
+    set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
+
+    add_subdirectory(nuget)
+    add_subdirectory(msixinstaller)
+    return()
+endif()
+
 include(FetchContent)
 
 # Import GSL and nlohmannjson

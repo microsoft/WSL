@@ -211,16 +211,6 @@ jobs:
               Copy-Item -Path "bin\${{ parameters.platform }}\release\installer.msix" -Destination "$(ob_outputDirectory)\installer\installer.${{ parameters.platform }}.msix"
               if (Test-Path "generated\dev-cert.pfx") { Copy-Item "generated\dev-cert.pfx" "$(ob_outputDirectory)\installer\dev-cert.pfx" }
 
-      # Include wslcsdk binaries for NuGet packaging in the package stage
-      - powershell: |
-          $nugetDir = "$(ob_outputDirectory)\nuget-bin\${{ parameters.platform }}"
-          New-Item -ItemType Directory -Path $nugetDir -Force
-          foreach ($file in @("wslcsdk.dll", "wslcsdk.lib")) {
-              $src = "bin\${{ parameters.platform }}\Release\$file"
-              if (Test-Path $src) { Copy-Item $src $nugetDir }
-          }
-        displayName: Stage NuGet binaries (${{ parameters.platform }})
-
       - powershell: |
           $binFolder = ".\bin\${{ parameters.platform }}\Release"
           $pdbFolder = Join-Path $(ob_outputDirectory) "pdb\${{ parameters.platform }}\Release"
