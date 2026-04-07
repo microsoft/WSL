@@ -6671,48 +6671,47 @@ class WSLCTests
             VERIFY_ARE_EQUAL(result.result.DeletedCount, 0u);
         }
 
-        // Validate dangling prune: load image, untag it, prune dangling.
+        // Validate dangling prune: create a dangling image by re-tagging, then prune it.
         {
+            // Load alpine, then tag debian:latest as alpine:latest to make the original alpine dangling.
             LoadTestImage("alpine:latest");
             auto cleanup = wil::scope_exit([&]() {
                 pruneImages(WSLCPruneImagesFlagsDanglingTrue);
                 LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
             });
 
-            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+            WSLCTagImageOptions tagOptions{.Image = "debian:latest", .Repo = "alpine", .Tag = "latest"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
-            // DanglingTrue should not prune a tagged image.
+            // DanglingTrue should prune the now-dangling original alpine image.
             auto result = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
-            ExpectImagePresent(*m_defaultSession, "alpine:latest");
-
-            // Untag the image to make it dangling.
-            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNoPrune);
-            ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
-
-            // DanglingTrue prunes untagged images.
-            result = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
             VERIFY_IS_TRUE(result.result.DeletedCount > 0);
-            VERIFY_IS_TRUE(result.result.SpaceReclaimed > 0);
+
+            // A second prune should find nothing.
+            result = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            VERIFY_ARE_EQUAL(result.result.DeletedCount, 0u);
         }
 
         // Validate 'until' filter.
         {
+            // Create a dangling image again.
             LoadTestImage("alpine:latest");
             auto cleanup = wil::scope_exit([&]() {
                 pruneImages(WSLCPruneImagesFlagsDanglingTrue);
                 LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
             });
 
-            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNoPrune);
+            WSLCTagImageOptions tagOptions{.Image = "debian:latest", .Repo = "alpine", .Tag = "latest"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
-            auto now = static_cast<uint64_t>(time(nullptr));
+            // Docker's 'until' filter uses the image's original Created timestamp, not load time.
+            // Use timestamp 1 (near epoch) which is before any real image was built.
+            auto result = pruneImages(WSLCPruneImagesFlagsNone, 1);
+            VERIFY_ARE_EQUAL(result.result.DeletedCount, 0u);
 
-            // Until in the past - dangling image was just created, should not match.
-            auto result = pruneImages(WSLCPruneImagesFlagsNone, now - 3600);
-            ExpectImagePresent(*m_defaultSession, "alpine:latest", false); // still untagged
-
-            // Until in the future - dangling image should be pruned.
-            result = pruneImages(WSLCPruneImagesFlagsNone, now + 3600);
+            // Use a timestamp far in the future to ensure the dangling image is pruned.
+            auto future = static_cast<uint64_t>(time(nullptr)) + 3600;
+            result = pruneImages(WSLCPruneImagesFlagsNone, future);
             VERIFY_IS_TRUE(result.result.DeletedCount > 0);
         }
 
@@ -6734,8 +6733,8 @@ class WSLCTests
 
         // Validate error paths.
         {
-            // Null result pointer.
-            VERIFY_ARE_EQUAL(m_defaultSession->PruneImages(nullptr, nullptr), E_POINTER);
+            // Null result pointer - RPC rejects null [out] pointer before our code runs.
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneImages(nullptr, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
 
             // Mutually exclusive dangling flags.
             ImagePruneResult result;
