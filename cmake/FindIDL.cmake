@@ -31,10 +31,12 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
             COMMAND midl /nologo /target NT100 /env "${IDL_ENV}" /Zp8 /char unsigned /ms_ext /c_ext /h ${IDL_HEADER} /iid ${IDL_I} /proxy ${IDL_P} /dlldata ${IDL_DLLDATA} ${idl_file} ${IDL_DEFINITIONS}
             COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}"
             WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-            DEPENDS ${idl_file}
+            DEPENDS ${idl_file} ${PREVIOUS_OUTPUT}
             MAIN_DEPENDENCY ${idl_file}
             VERBATIM
         )
+
+        set(PREVIOUS_OUTPUT ${MIDL_OUTPUT})
 
         set_source_files_properties(${MIDL_OUTPUT} PROPERTIES GENERATED TRUE)
         list(APPEND TARGET_OUTPUTS ${MIDL_OUTPUT})
