@@ -705,9 +705,11 @@ try
                 {
                     const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
 
-                    THROW_IF_FAILED(InetNtopToHresult(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
-                    //THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
-
+                    HRESULT hr = InetNtopToHresult(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf));
+                    if (FAILED(hr))
+                    {
+                        THROW_HR_MSG(hr, "inet_ntop() failed for address family AF_INET");
+                    }
                     convertedPort.Family = AF_INET;
                     break;
                 }
@@ -715,9 +717,11 @@ try
                 case AF_INET6:
                 {
                     const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
-
-                    THROW_IF_FAILED(InetNtopToHresult(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
-
+                    HRESULT hr = InetNtopToHresult(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf));
+                    if (FAILED(hr))
+                    {
+                        THROW_HR_MSG(hr, "inet_ntop() failed for address family AF_INET6");
+                    }
                     convertedPort.Family = AF_INET6;
                     break;
                 }
