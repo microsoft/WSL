@@ -41,6 +41,7 @@ struct ContainerOptions
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
+    std::vector<std::string> Tmpfs;
 };
 
 struct CreateContainerResult
@@ -253,5 +254,22 @@ private:
     {
         return IsReadOnlyMode(mode) || mode == L"rw";
     }
+};
+
+struct TmpfsMount
+{
+    std::string ContainerPath() const
+    {
+        return m_containerPath;
+    }
+    std::string Options() const
+    {
+        return m_options;
+    }
+    static TmpfsMount Parse(const std::string& value);
+
+private:
+    std::string m_containerPath;
+    std::string m_options;
 };
 } // namespace wsl::windows::wslc::models

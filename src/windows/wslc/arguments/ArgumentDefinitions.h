@@ -76,7 +76,7 @@ _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L
 _(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription(L"SIGKILL")) \
 _(Tag,            "tag",                 L"t",              Kind::Value,       Localization::WSLCCLI_TagArgDescription()) \
 _(Time,           "time",                L"t",              Kind::Value,       Localization::WSLCCLI_TimeArgDescription()) \
-/*_(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription())*/ \
+_(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        Localization::WSLCCLI_TTYArgDescription()) \
 _(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription()) \
 _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \
