@@ -120,7 +120,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     WSL_LOG_TELEMETRY(
         "WSLCCreateSession",
-        PDT_ProductAndServicePerformance,
+        PDT_ProductAndServiceUsage,
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(Settings->DisplayName, "Name"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
