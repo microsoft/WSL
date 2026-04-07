@@ -227,6 +227,40 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::s
     return {response.result_int(), std::move(socket)};
 }
 
+docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const PruneImagesFilters& filters)
+{
+    auto url = URL::Create("/images/prune");
+
+    nlohmann::json filtersJson;
+
+    if (filters.dangling.has_value())
+    {
+        filtersJson["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
+    }
+
+    if (filters.until.has_value())
+    {
+        filtersJson["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
+    }
+
+    if (!filters.presentLabels.empty())
+    {
+        filtersJson["label"] = filters.presentLabels;
+    }
+
+    if (!filters.absentLabels.empty())
+    {
+        filtersJson["label!"] = filters.absentLabels;
+    }
+
+    if (!filtersJson.empty())
+    {
+        url.SetParameter("filters", filtersJson.dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneImageResult>(verb::post, url);
+}
+
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
 {
     auto url = URL::Create("/containers/json");

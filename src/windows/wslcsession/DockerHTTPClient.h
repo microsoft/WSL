@@ -160,6 +160,16 @@ public:
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
     std::pair<uint32_t, wil::unique_socket> SaveImage(const std::string& NameOrId);
 
+    struct PruneImagesFilters
+    {
+        std::optional<bool> dangling;
+        std::optional<std::uint64_t> until;
+        std::vector<std::string> presentLabels;
+        std::vector<std::string> absentLabels;
+    };
+
+    common::docker_schema::PruneImageResult PruneImages(const PruneImagesFilters& filters = {});
+
     // Exec.
     common::docker_schema::CreateExecResponse CreateExec(const std::string& Container, const common::docker_schema::CreateExec& Request);
     wil::unique_socket StartExec(const std::string& Id, const common::docker_schema::StartExec& Request);
