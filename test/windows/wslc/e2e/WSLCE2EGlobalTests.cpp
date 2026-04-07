@@ -56,6 +56,12 @@ class WSLCE2EGlobalTests
         WSL2_TEST_ONLY();
         RunWslcAndVerify(L"version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
     }
+
+    TEST_METHOD(WSLCE2E_VersionFlag)
+    {
+        WSL2_TEST_ONLY();
+        RunWslcAndVerify(L"--version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
+    }
     TEST_METHOD(WSLCE2E_Session_DefaultElevated)
     {
         WSL2_TEST_ONLY();
