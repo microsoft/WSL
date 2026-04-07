@@ -42,6 +42,11 @@ SessionOptions::SessionOptions()
     {
         WI_SetFlag(m_sessionSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
     }
+
+    if (settings::User().Get<settings::Setting::SessionDnsTunneling>())
+    {
+        WI_SetFlag(m_sessionSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
+    }
 }
 
 bool SessionOptions::IsElevated()
