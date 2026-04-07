@@ -82,6 +82,7 @@ public:
     IFACEMETHOD(DeleteImage)(_In_ const WSLCDeleteImageOptions* Options, _Out_ WSLCDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCTagImageOptions* Options) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(PruneImages)(_In_opt_ const WSLCPruneImagesOptions* Options, _Out_ WSLCPruneImagesResults* Result) override;
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _Out_ IWSLCContainer** Container) override;
