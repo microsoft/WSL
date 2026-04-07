@@ -58,6 +58,8 @@ class WSLCCLIParserUnitTests
 
         for (const auto& testCase : testCases)
         {
+            bool succeeded = false;
+
             try
             {
                 Log::Comment(String().Format(L"Testing: %ls", testCase.commandLine.c_str()));
@@ -72,6 +74,31 @@ class WSLCCLIParserUnitTests
                 {
                     stateMachine.ThrowIfError();
                 }
+
+                // Validate count limits and required arguments, mirroring Command::ValidateArguments.
+                // Skip all validation if --help is present, as Command::ValidateArguments does.
+                if (!args.Contains(ArgType::Help))
+                {
+                    for (const auto& arg : GetArgumentsForSet(testCase.argumentSet))
+                    {
+                        if (arg.Required() && !args.Contains(arg.Type()))
+                        {
+                            throw ArgumentException(std::wstring(L"Required argument missing: ") + arg.Name());
+                        }
+
+                        if ((arg.Limit() > 0) && (arg.Limit() < args.Count(arg.Type())))
+                        {
+                            throw ArgumentException(std::wstring(L"Too many values for argument: ") + arg.Name());
+                        }
+
+                        if (args.Contains(arg.Type()))
+                        {
+                            arg.Validate(args);
+                        }
+                    }
+                }
+
+                succeeded = true;
 
                 if (testCase.commandLine.find(L"image1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
                 {
@@ -141,6 +168,8 @@ class WSLCCLIParserUnitTests
                     Log::Comment(String().Format(L"Test case threw expected exception: %hs", ex.what()));
                 }
             }
+
+            VERIFY_ARE_EQUAL(testCase.expectedResult, succeeded, String().Format(L"Command line: %ls", testCase.commandLine.c_str()));
         }
     }
 };

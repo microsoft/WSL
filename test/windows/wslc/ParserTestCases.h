@@ -101,8 +101,8 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -ihp=80:80 image1)") \
 /* Validation tests */ \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal 9 image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -t blah)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -t 5)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -t blah image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -t 5 image1)") \
 \
 /* Multi-positional tests */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command)") \
@@ -113,10 +113,11 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command f="hello world" forward
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -v image1 command f="hello world" forward echo)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 \\command\\?"" --f -z forward hello world)") \
 \
-/* Image name followed by a command and forwarded args. All tokens after the image name         \
- * are forwarded to the container and are not parsed as wslc flags. The second case uses        \
- * '\' + newline between tokens, which CommandLineToArgvW passes through as literal '\' tokens. \
- * These are forwarded to the container shell, which correctly handles them. */ \
+/* Once the image name is parsed, the next token becomes the optional <command> positional \
+ * and everything after that goes into ForwardArgs. Neither <command> nor ForwardArgs are  \
+ * interpreted as wslc options. The second case uses '\' + newline between tokens, which   \
+ * CommandLineToArgvW passes through as literal '\' tokens that the container shell        \
+ * handles correctly. */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc jrottenberg/ffmpeg:4.4-alpine ffmpeg -i http://url/to/media.mp4 -stats)") \
 WSLC_PARSER_TEST_CASE(Run, true, L"wslc jrottenberg/ffmpeg:4.4-alpine \\\nffmpeg \\\n-i http://url/to/media.mp4 \\\n-stats") \
 \
