@@ -481,7 +481,8 @@ class WSLCTests
             auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
             ExpectHttpResponse(registryUrl.c_str(), 200, true);
 
-            PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress));
+            PushImageToRegistry(
+                *m_defaultSession, "hello-world:latest", registryAddress, wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress));
 
             auto image = std::format("{}/hello-world:latest", registryAddress);
 
