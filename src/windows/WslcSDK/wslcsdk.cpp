@@ -660,9 +660,11 @@ try
     }
 
     std::unique_ptr<WSLCPortMapping[]> convertedPorts;
+    std::vector<std::string> bindingAddressStrings;
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
         convertedPorts = std::make_unique<WSLCPortMapping[]>(internalContainerSettings->portsCount);
+        bindingAddressStrings.resize(internalContainerSettings->portsCount);
         for (uint32_t i = 0; i < internalContainerSettings->portsCount; ++i)
         {
             const WslcContainerPortMapping& internalPort = internalContainerSettings->ports[i];
@@ -671,12 +673,55 @@ try
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
 
-            // TODO: Ipv6 & custom binding address support.
-            convertedPort.Family = AF_INET;
-
             // TODO: Consider using standard protocol numbers instead of our own enum.
             convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
-            strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
+            // Validate IP address if provided and if valid, copy to runtime structure.
+            if (internalPort.windowsAddress != nullptr)
+            {
+                char addrBuf[INET6_ADDRSTRLEN]{};
+                switch (internalPort.windowsAddress->ss_family)
+                {
+                case AF_INET:
+                {
+                    const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
+
+                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
+
+                    convertedPort.Family = AF_INET;
+                    break;
+                }
+
+                case AF_INET6:
+                {
+                    const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
+
+                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
+
+                    convertedPort.Family = AF_INET6;
+                    break;
+                }
+
+                default:
+                    // Reject unsupported or malformed address families
+                    THROW_HR(E_INVALIDARG);
+                }
+                bindingAddressStrings[i] = addrBuf;
+                HRESULT hr = strncpy_s(convertedPort.BindingAddress,
+                                       sizeof(convertedPort.BindingAddress),
+                                       bindingAddressStrings[i].c_str(),
+                                       _TRUNCATE);
+
+                if (hr == STRUNCATE)
+                {
+                    // Log this as a warning since the address is valid but was truncated to fit in the buffer, which means the port mapping may not work as expected.
+                }
+            }
+            else
+            {
+                // If no binding address is provided, default to local host.
+                convertedPort.Family = AF_INET;
+                strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
+            }
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
@@ -809,7 +854,11 @@ try
 
     for (uint32_t i = 0; i < portMappingCount; ++i)
     {
-        RETURN_HR_IF(E_NOTIMPL, portMappings[i].windowsAddress != nullptr);
+        if (portMappings[i].windowsAddress != nullptr)
+        {
+            const auto family = portMappings[i].windowsAddress->ss_family;
+            RETURN_HR_IF(E_INVALIDARG, family != AF_INET && family != AF_INET6);
+        }
         RETURN_HR_IF(E_NOTIMPL, portMappings[i].protocol != 0);
     }
 
