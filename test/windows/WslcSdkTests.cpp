@@ -927,6 +927,109 @@ class WslcSdkTests
 
             ExpectHttpResponse(L"http://127.0.0.1:12341", 200);
         }
+
+        // Functional: port mapping with explicit IPv4 windowsAddress (127.0.0.1).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"python3", "-m", "http.server", "8000"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+            const char* env[] = {"PYTHONUNBUFFERED=1"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+
+            sockaddr_storage addr4{};
+            auto* sin4 = reinterpret_cast<sockaddr_in*>(&addr4);
+            sin4->sin_family = AF_INET;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, "127.0.0.1", &sin4->sin_addr), 1);
+
+            WslcContainerPortMapping mapping{};
+            mapping.windowsPort = 12343;
+            mapping.containerPort = 8000;
+            mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
+            mapping.windowsAddress = &addr4;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+            UniqueProcess process;
+            VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+            wil::unique_handle ownedStdout;
+            VERIFY_SUCCEEDED(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &ownedStdout));
+
+            WaitForOutput(std::move(ownedStdout), "Serving HTTP on", 30s);
+
+            ExpectHttpResponse(L"http://127.0.0.1:12343", 200);
+        }
+
+        // Functional: port mapping with explicit IPv6 windowsAddress (::1).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"python3", "-m", "http.server", "8000", "--bind", "::"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+            const char* env[] = {"PYTHONUNBUFFERED=1"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+
+            sockaddr_storage addr6{};
+            auto* sin6 = reinterpret_cast<sockaddr_in6*>(&addr6);
+            sin6->sin6_family = AF_INET6;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET6, "::1", &sin6->sin6_addr), 1);
+
+            WslcContainerPortMapping mapping{};
+            mapping.windowsPort = 12344;
+            mapping.containerPort = 8000;
+            mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
+            mapping.windowsAddress = &addr6;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+            UniqueProcess process;
+            VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+            wil::unique_handle ownedStdout;
+            VERIFY_SUCCEEDED(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &ownedStdout));
+
+            WaitForOutput(std::move(ownedStdout), "Serving HTTP on", 30s);
+
+            ExpectHttpResponse(L"http://[::1]:12344", 200);
+        }
+
+        // Negative: unsupported address family must fail at container creation.
+        {
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+
+            sockaddr_storage badAddr{};
+            badAddr.ss_family = AF_UNIX; // unsupported for port mapping
+
+            WslcContainerPortMapping mapping{};
+            mapping.windowsPort = 12345;
+            mapping.containerPort = 8000;
+            mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
+            mapping.windowsAddress = &badAddr;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+
+            WslcContainer rawContainer = nullptr;
+            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &rawContainer, nullptr), E_INVALIDARG);
+            VERIFY_IS_NULL(rawContainer);
+        }
     }
 
     TEST_METHOD(ContainerVolumeUnit)
