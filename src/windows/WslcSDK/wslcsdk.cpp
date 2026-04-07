@@ -1308,11 +1308,12 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, options);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->image);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->registryAuth);
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalType->session->PushImage(options->image, options->registryAuth ? options->registryAuth : "", progressCallback.get()));
+        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get()));
 }
 CATCH_RETURN();
 

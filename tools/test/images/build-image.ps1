@@ -4,12 +4,12 @@
 .DESCRIPTION
     This script builds a custom image using wslc from a specified Dockerfile and saves the resulting image as a .tar file. 
     This is useful for preparing test images for WSL container tests.
-.PARAMETER Dockerfile
-    Path to the Dockerfile to build.
+.PARAMETER DockerfileDir
+    Path to the directory containing the Dockerfile to build.
 .PARAMETER ImageTag
     Tag for the built image.
 .PARAMETER OutputFile
-    Path to save the exported .tar file.
+    Path to save the exported .tar file. Defaults to <DockerfileDir name>.tar in the current directory.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
@@ -34,10 +34,14 @@ if ([System.IO.Path]::GetExtension($OutputFile) -ne ".tar") {
 }
 
 
-& wslc build -t $ImageTag $DockerfileDir
-if ($LASTEXITCODE -ne 0) { throw "wslc build failed with exit code $LASTEXITCODE" }
+if ($PSCmdlet.ShouldProcess($ImageTag, "Build image from '$DockerfileDir'")) {
+    & wslc build -t $ImageTag $DockerfileDir
+    if ($LASTEXITCODE -ne 0) { throw "wslc build failed with exit code $LASTEXITCODE" }
+}
 
-& wslc save --output $OutputFile $ImageTag
-if ($LASTEXITCODE -ne 0) { throw "wslc save failed with exit code $LASTEXITCODE" }
+if ($PSCmdlet.ShouldProcess($OutputFile, "Save image '$ImageTag'")) {
+    & wslc save --output $OutputFile $ImageTag
+    if ($LASTEXITCODE -ne 0) { throw "wslc save failed with exit code $LASTEXITCODE" }
+}
 
 Write-Host "Image built and saved to $OutputFile successfully."

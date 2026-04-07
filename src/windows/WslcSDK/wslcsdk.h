@@ -459,7 +459,7 @@ STDAPI WslcTagSessionImage(_In_ WslcSession session, _In_ const WslcTagImageOpti
 typedef struct WslcPushImageOptions
 {
     _In_z_ PCSTR image;
-    _In_opt_z_ PCSTR registryAuth; // Base64-encoded X-Registry-Auth header value.
+    _In_z_ PCSTR registryAuth; // Base64-encoded X-Registry-Auth header value.
     _In_opt_ WslcContainerImageProgressCallback progressCallback;
     _In_opt_ PVOID progressCallbackContext;
 } WslcPushImageOptions;
