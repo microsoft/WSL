@@ -591,9 +591,7 @@ interface IWSLCSession : IUnknown
     HRESULT ListImages([in, unique] const WSLCListImageOptions* Options, [out, size_is(, *Count)] WSLCImageInformation** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
-    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
-    HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
 
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
@@ -635,6 +633,9 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteVolume([in] LPCSTR Name);
     HRESULT ListVolumes([out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
+
+    HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
 }
 
 //

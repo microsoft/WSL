@@ -12,8 +12,8 @@ Abstract:
 
 --*/
 
+#include "precomp.h"
 #include "WslcCredentialStore.h"
-#include <nlohmann/json.hpp>
 #include <wincrypt.h>
 
 namespace {

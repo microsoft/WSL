@@ -11,6 +11,8 @@ Abstract:
     Implementation of WSLCLocalRegistry.
 
 --*/
+
+#include "precomp.h"
 #include "WSLCLocalRegistry.h"
 
 using wsl::windows::common::RunningWSLCContainer;
