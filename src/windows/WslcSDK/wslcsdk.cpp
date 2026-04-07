@@ -684,8 +684,13 @@ try
 
     containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
 
+    if (internalContainerSettings->entrypoint && internalContainerSettings->entrypointCount)
+    {
+        containerOptions.Entrypoint.Values = internalContainerSettings->entrypoint;
+        containerOptions.Entrypoint.Count = internalContainerSettings->entrypointCount;
+    }
+
     // TODO: No user access
-    // containerOptions.Entrypoint;
     // containerOptions.Labels;
     // containerOptions.LabelsCount;
     // containerOptions.StopSignal;
@@ -740,6 +745,22 @@ try
     auto internalType = CheckAndGetInternalType(containerSettings);
 
     internalType->containerFlags = flags;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsEntrypoint(_In_ WslcContainerSettings* containerSettings, _In_reads_(argc) PCSTR const* argv, _In_ size_t argc)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(
+        E_INVALIDARG,
+        (argv == nullptr && argc != 0) || (argv != nullptr && argc == 0) ||
+            (argc > static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+
+    internalType->entrypoint = argv;
+    internalType->entrypointCount = static_cast<uint32_t>(argc);
 
     return S_OK;
 }
@@ -1186,8 +1207,7 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    // TODO: Auth
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, nullptr, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get()));
 }
 CATCH_RETURN();
 
@@ -1279,6 +1299,72 @@ try
 
     return errorInfoWrapper.CaptureResult(
         internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
+}
+CATCH_RETURN();
+
+STDAPI WslcTagSessionImage(_In_ WslcSession session, _In_ const WslcTagImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->image);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->repo);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->tag);
+
+    WSLCTagImageOptions runtimeOptions{};
+    runtimeOptions.Image = options->image;
+    runtimeOptions.Repo = options->repo;
+    runtimeOptions.Tag = options->tag;
+
+    return errorInfoWrapper.CaptureResult(internalType->session->TagImage(&runtimeOptions));
+}
+CATCH_RETURN();
+
+STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->image);
+
+    auto progressCallback = ProgressCallback::CreateIf(options);
+
+    return errorInfoWrapper.CaptureResult(
+        internalType->session->PushImage(options->image, options->registryAuth ? options->registryAuth : "", progressCallback.get()));
+}
+CATCH_RETURN();
+
+STDAPI WslcSessionAuthenticate(
+    _In_ WslcSession session,
+    _In_z_ PCSTR serverAddress,
+    _In_z_ PCSTR username,
+    _In_z_ PCSTR password,
+    _Outptr_result_z_ PSTR* identityToken,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, serverAddress);
+    RETURN_HR_IF_NULL(E_POINTER, username);
+    RETURN_HR_IF_NULL(E_POINTER, password);
+    RETURN_HR_IF_NULL(E_POINTER, identityToken);
+
+    *identityToken = nullptr;
+
+    wil::unique_cotaskmem_ansistring token;
+    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &token));
+    if (SUCCEEDED(hr))
+    {
+        *identityToken = token.release();
+    }
+
+    return errorInfoWrapper;
 }
 CATCH_RETURN();
 

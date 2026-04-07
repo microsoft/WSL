@@ -285,6 +285,7 @@ set(COMMON_LINK_LIBRARIES
     Shlwapi.lib
     synchronization.lib
     Bcrypt.lib
+    Crypt32.lib
     icu.lib)
 
 set(MSI_LINK_LIBRARIES

@@ -32,7 +32,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 96
+#define WSLC_CONTAINER_OPTIONS_SIZE 112
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -179,6 +179,8 @@ STDAPI WslcSetContainerSettingsHostName(_In_ WslcContainerSettings* containerSet
 STDAPI WslcSetContainerSettingsDomainName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR domainName);
 
 STDAPI WslcSetContainerSettingsFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
+
+STDAPI WslcSetContainerSettingsEntrypoint(_In_ WslcContainerSettings* containerSettings, _In_reads_(argc) PCSTR const* argv, _In_ size_t argc);
 
 STDAPI WslcSetContainerSettingsPortMappings(
     _In_ WslcContainerSettings* containerSettings,
@@ -387,11 +389,6 @@ typedef struct WslcImageProgressMessage
     _Out_ WslcImageProgressDetail detail;
 } WslcImageProgressMessage;
 
-typedef struct WslcRegistryAuthenticationInformation
-{
-    // TBD
-} WslcRegistryAuthenticationInformation;
-
 // pointer-to-function typedef (unambiguous)
 typedef HRESULT(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
@@ -401,7 +398,7 @@ typedef struct WslcPullImageOptions
     _In_z_ PCSTR uri;
     WslcContainerImageProgressCallback progressCallback;
     PVOID progressCallbackContext;
-    _In_opt_ const WslcRegistryAuthenticationInformation* authInfo;
+    _In_opt_z_ PCSTR registryAuth;
 } WslcPullImageOptions;
 
 STDAPI WslcPullSessionImage(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
@@ -451,6 +448,58 @@ typedef struct WslcImageInfo
 } WslcImageInfo;
 
 STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+typedef struct WslcTagImageOptions
+{
+    _In_z_ PCSTR image; // Source image name or ID.
+    _In_z_ PCSTR repo;  // Target repository name.
+    _In_z_ PCSTR tag;   // Target tag name.
+} WslcTagImageOptions;
+
+STDAPI WslcTagSessionImage(_In_ WslcSession session, _In_ const WslcTagImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+typedef struct WslcPushImageOptions
+{
+    _In_z_ PCSTR image;
+    _In_opt_z_ PCSTR registryAuth; // Base64-encoded X-Registry-Auth header value.
+    _In_opt_ WslcContainerImageProgressCallback progressCallback;
+    _In_opt_ PVOID progressCallbackContext;
+} WslcPushImageOptions;
+
+STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Authenticates with a container registry and returns an identity token.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   serverAddress
+//       The registry server address (e.g. "127.0.0.1:5000").
+//
+//   username
+//       The username for authentication.
+//
+//   password
+//       The password for authentication.
+//
+//   identityToken
+//       On success, receives a pointer to a null-terminated ANSI string
+//       containing the identity token.
+//
+//       The string is allocated using CoTaskMemAlloc. The caller takes
+//       ownership of the returned memory and must free it by calling
+//       CoTaskMemFree when it is no longer needed.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the failure.
+STDAPI WslcSessionAuthenticate(
+    _In_ WslcSession session,
+    _In_z_ PCSTR serverAddress,
+    _In_z_ PCSTR username,
+    _In_z_ PCSTR password,
+    _Outptr_result_z_ PSTR* identityToken,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Retrieves the list of container images
 // Parameters:
