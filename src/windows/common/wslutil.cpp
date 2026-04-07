@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "wslutil.h"
 #include "WslPluginApi.h"
+#include <wincrypt.h>
 #include "wslinstallerservice.h"
 #include "wslc.h"
 
@@ -1412,4 +1413,35 @@ catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
+}
+
+std::string wsl::windows::common::wslutil::Base64Encode(const std::string& input)
+{
+    DWORD base64Size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()), static_cast<DWORD>(input.size()), CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, nullptr, &base64Size));
+
+    auto buffer = std::make_unique<char[]>(base64Size);
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()),
+        static_cast<DWORD>(input.size()),
+        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+        buffer.get(),
+        &base64Size));
+
+    return std::string(buffer.get());
+}
+
+std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encoded)
+{
+    DWORD size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, nullptr, &size, nullptr, nullptr));
+
+    std::string result(size, '\0');
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr));
+
+    result.resize(size);
+    return result;
 }

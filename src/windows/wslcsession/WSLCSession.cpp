@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
-#include <wincrypt.h>
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -29,20 +28,6 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
-
-std::string Base64Decode(const std::string& encoded)
-{
-    DWORD size = 0;
-    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
-        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, nullptr, &size, nullptr, nullptr));
-
-    std::string result(size, '\0');
-    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
-        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr));
-
-    result.resize(size);
-    return result;
-}
 
 // Resolve \r overwrites: for each \n-delimited line, keep only the content after the last \r.
 // This collapses terminal progress updates (e.g. "50%\r75%\r100%") to their final state.
@@ -700,7 +685,7 @@ try
                 continue;
             }
 
-            std::string decoded = Base64Decode(log.data);
+            std::string decoded = wslutil::Base64Decode(log.data);
             if (!decoded.empty())
             {
                 auto& logBuffer = vertexLogs[log.vertex];

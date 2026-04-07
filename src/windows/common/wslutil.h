@@ -323,4 +323,7 @@ WSLCHandle ToCOMInputHandle(HANDLE Handle);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 
+std::string Base64Encode(const std::string& input);
+std::string Base64Decode(const std::string& encoded);
+
 } // namespace wsl::windows::common::wslutil
