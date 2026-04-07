@@ -89,8 +89,6 @@ typedef struct WslcContainerOptionsInternal
     const WslcContainerProcessOptionsInternal* initProcessOptions;
     WSLCContainerNetworkType networking;
     WslcContainerFlags containerFlags;
-    PCSTR const* entrypoint;
-    uint32_t entrypointCount;
 
 } WslcContainerOptionsInternal;
 

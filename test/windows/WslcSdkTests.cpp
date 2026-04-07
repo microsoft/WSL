@@ -1987,7 +1987,8 @@ class WslcSdkTests
     // Uses the COM API (via GetInternalType) with WSLCContainerLauncher to get host-mode networking,
     // which the SDK doesn't expose. Host networking shares the VM's network namespace, so the registry
     // is reachable at 127.0.0.1:<port> from both dockerd (inside the VM) and the host.
-    std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
+    std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+        const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
         std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
         if (!username.empty())
@@ -2072,7 +2073,8 @@ class WslcSdkTests
         {
             wil::unique_cotaskmem_ansistring token;
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, "wrong-password", &token, &errorMsg), E_FAIL);
+            VERIFY_ARE_EQUAL(
+                WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, "wrong-password", &token, &errorMsg), E_FAIL);
             VERIFY_IS_NOT_NULL(errorMsg.get());
             LogInfo("Authenticate error: %ws", errorMsg.get());
         }

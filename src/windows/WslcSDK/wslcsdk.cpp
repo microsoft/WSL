@@ -684,12 +684,6 @@ try
 
     containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
 
-    if (internalContainerSettings->entrypoint && internalContainerSettings->entrypointCount)
-    {
-        containerOptions.Entrypoint.Values = internalContainerSettings->entrypoint;
-        containerOptions.Entrypoint.Count = internalContainerSettings->entrypointCount;
-    }
-
     // TODO: No user access
     // containerOptions.Labels;
     // containerOptions.LabelsCount;
@@ -745,22 +739,6 @@ try
     auto internalType = CheckAndGetInternalType(containerSettings);
 
     internalType->containerFlags = flags;
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-STDAPI WslcSetContainerSettingsEntrypoint(_In_ WslcContainerSettings* containerSettings, _In_reads_(argc) PCSTR const* argv, _In_ size_t argc)
-try
-{
-    auto internalType = CheckAndGetInternalType(containerSettings);
-    RETURN_HR_IF(
-        E_INVALIDARG,
-        (argv == nullptr && argc != 0) || (argv != nullptr && argc == 0) ||
-            (argc > static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
-
-    internalType->entrypoint = argv;
-    internalType->entrypointCount = static_cast<uint32_t>(argc);
 
     return S_OK;
 }

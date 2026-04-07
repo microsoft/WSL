@@ -32,7 +32,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 112
+#define WSLC_CONTAINER_OPTIONS_SIZE 96
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -179,8 +179,6 @@ STDAPI WslcSetContainerSettingsHostName(_In_ WslcContainerSettings* containerSet
 STDAPI WslcSetContainerSettingsDomainName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR domainName);
 
 STDAPI WslcSetContainerSettingsFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
-
-STDAPI WslcSetContainerSettingsEntrypoint(_In_ WslcContainerSettings* containerSettings, _In_reads_(argc) PCSTR const* argv, _In_ size_t argc);
 
 STDAPI WslcSetContainerSettingsPortMappings(
     _In_ WslcContainerSettings* containerSettings,

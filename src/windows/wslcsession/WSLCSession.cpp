@@ -119,19 +119,6 @@ std::string IndentLines(const std::string& input, const std::string& prefix)
     return result;
 }
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
-{
-    size_t separator = Input.find_last_of(':');
-    if (separator == std::string::npos)
-    {
-        return {Input, {}};
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidImage(Input), separator >= Input.size() - 1 || separator == 0);
-
-    return {Input.substr(0, separator), Input.substr(separator + 1)};
-}
-
 void ValidateName(LPCSTR Name)
 {
     const auto& locale = std::locale::classic();

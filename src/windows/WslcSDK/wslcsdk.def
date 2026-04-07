@@ -45,7 +45,6 @@ WslcSetContainerSettingsNamedVolumes
 WslcSetContainerSettingsInitProcess
 WslcSetContainerSettingsFlags
 WslcSetContainerSettingsPortMappings
-WslcSetContainerSettingsEntrypoint
 
 WslcCreateContainerProcess
 WslcStartContainer
