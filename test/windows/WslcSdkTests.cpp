@@ -877,18 +877,18 @@ class WslcSdkTests
 
         // Negative: port mappings with NONE networking must fail at container creation.
         {
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_NONE));
+            WslcContainerSettings containerSettings1;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings1, WSLC_CONTAINER_NETWORKING_MODE_NONE));
 
             WslcContainerPortMapping mapping{};
             mapping.windowsPort = 12342;
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings1, &mapping, 1));
 
             WslcContainer rawContainer = nullptr;
-            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &rawContainer, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings1, &rawContainer, nullptr), E_INVALIDARG);
             VERIFY_IS_NULL(rawContainer);
         }
 
@@ -902,19 +902,19 @@ class WslcSdkTests
             const char* env[] = {"PYTHONUNBUFFERED=1"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
 
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+            WslcContainerSettings containerSettings2;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings2));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings2, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings2, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
 
             WslcContainerPortMapping mapping{};
             mapping.windowsPort = 12341;
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings2, &mapping, 1));
 
             UniqueContainer container;
-            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings2, &container, nullptr));
             VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
             UniqueProcess process;
@@ -937,10 +937,10 @@ class WslcSdkTests
             const char* env[] = {"PYTHONUNBUFFERED=1"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
 
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+            WslcContainerSettings containerSettings3;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings3));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings3, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings3, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
 
             sockaddr_storage addr4{};
             auto* sin4 = reinterpret_cast<sockaddr_in*>(&addr4);
@@ -952,10 +952,10 @@ class WslcSdkTests
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
             mapping.windowsAddress = &addr4;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings3, &mapping, 1));
 
             UniqueContainer container;
-            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings3, &container, nullptr));
             VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
             UniqueProcess process;
@@ -978,10 +978,10 @@ class WslcSdkTests
             const char* env[] = {"PYTHONUNBUFFERED=1"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
 
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+            WslcContainerSettings containerSettings4;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings4));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings4, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings4, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
 
             sockaddr_storage addr6{};
             auto* sin6 = reinterpret_cast<sockaddr_in6*>(&addr6);
@@ -993,10 +993,10 @@ class WslcSdkTests
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
             mapping.windowsAddress = &addr6;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings4, &mapping, 1));
 
             UniqueContainer container;
-            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings4, &container, nullptr));
             VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
             UniqueProcess process;
@@ -1012,9 +1012,9 @@ class WslcSdkTests
 
         // Negative: unsupported address family must fail at container creation.
         {
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+            WslcContainerSettings containerSettings5;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings5));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings5, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
 
             sockaddr_storage badAddr{};
             badAddr.ss_family = AF_UNIX; // unsupported for port mapping
@@ -1024,10 +1024,10 @@ class WslcSdkTests
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
             mapping.windowsAddress = &badAddr;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings5, &mapping, 1));
 
             WslcContainer rawContainer = nullptr;
-            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &rawContainer, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings5, &rawContainer, nullptr), E_INVALIDARG);
             VERIFY_IS_NULL(rawContainer);
         }
     }
