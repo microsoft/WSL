@@ -6645,6 +6645,110 @@ class WSLCTests
         }
     }
 
+    TEST_METHOD(ImagePrune)
+    {
+        WSL2_TEST_ONLY();
+
+        auto pruneImages = [this](DWORD flags = WSLCPruneImagesFlagsNone, uint64_t until = 0,
+                                  const std::vector<WSLCPruneImageLabelFilter>& labels = {}) {
+            ImagePruneResult result;
+            WSLCPruneImagesOptions options{};
+            options.Flags = flags;
+            options.Until = until;
+            options.Labels = labels.empty() ? nullptr : const_cast<WSLCPruneImageLabelFilter*>(labels.data());
+            options.LabelsCount = static_cast<ULONG>(labels.size());
+
+            VERIFY_SUCCEEDED(m_defaultSession->PruneImages(&options, &result.result));
+            return result;
+        };
+
+        // Clean up any stale dangling images from prior tests.
+        pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+
+        // Prune with no unused images returns empty.
+        {
+            auto result = pruneImages();
+            VERIFY_ARE_EQUAL(result.result.DeletedCount, 0u);
+        }
+
+        // Validate dangling prune: load image, untag it, prune dangling.
+        {
+            LoadTestImage("alpine:latest");
+            auto cleanup = wil::scope_exit([&]() {
+                pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+                LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
+            });
+
+            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+
+            // DanglingTrue should not prune a tagged image.
+            auto result = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+
+            // Untag the image to make it dangling.
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNoPrune);
+            ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
+
+            // DanglingTrue prunes untagged images.
+            result = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            VERIFY_IS_TRUE(result.result.DeletedCount > 0);
+            VERIFY_IS_TRUE(result.result.SpaceReclaimed > 0);
+        }
+
+        // Validate 'until' filter.
+        {
+            LoadTestImage("alpine:latest");
+            auto cleanup = wil::scope_exit([&]() {
+                pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+                LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
+            });
+
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNoPrune);
+
+            auto now = static_cast<uint64_t>(time(nullptr));
+
+            // Until in the past - dangling image was just created, should not match.
+            auto result = pruneImages(WSLCPruneImagesFlagsNone, now - 3600);
+            ExpectImagePresent(*m_defaultSession, "alpine:latest", false); // still untagged
+
+            // Until in the future - dangling image should be pruned.
+            result = pruneImages(WSLCPruneImagesFlagsNone, now + 3600);
+            VERIFY_IS_TRUE(result.result.DeletedCount > 0);
+        }
+
+        // Validate null Options uses defaults (dangling-only prune).
+        {
+            LoadTestImage("alpine:latest");
+            auto cleanup = wil::scope_exit([&]() {
+                pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+                LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
+            });
+
+            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+
+            // Null options should not prune tagged images.
+            ImagePruneResult result;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneImages(nullptr, &result.result));
+            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+        }
+
+        // Validate error paths.
+        {
+            // Null result pointer.
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneImages(nullptr, nullptr), E_POINTER);
+
+            // Mutually exclusive dangling flags.
+            ImagePruneResult result;
+            WSLCPruneImagesOptions invalidOptions{};
+            invalidOptions.Flags = WSLCPruneImagesFlagsDanglingTrue | WSLCPruneImagesFlagsDanglingFalse;
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneImages(&invalidOptions, &result.result), E_INVALIDARG);
+
+            // Invalid flags.
+            invalidOptions.Flags = 0x4;
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneImages(&invalidOptions, &result.result), E_INVALIDARG);
+        }
+    }
+
     TEST_METHOD(ImageParsing)
     {
         using wsl::windows::common::wslutil::ParseImage;
