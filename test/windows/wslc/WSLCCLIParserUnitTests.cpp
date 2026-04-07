@@ -73,16 +73,23 @@ class WSLCCLIParserUnitTests
                     stateMachine.ThrowIfError();
                 }
 
-                if (testCase.commandLine.find(L"cont1") != std::wstring::npos)
+                if (testCase.commandLine.find(L"image1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
+                {
+                    VERIFY_IS_TRUE(args.Contains(ArgType::ImageId));
+                    auto imageId = args.Get<ArgType::ImageId>();
+                    VERIFY_ARE_EQUAL(L"image1", imageId);
+                }
+
+                if (testCase.commandLine.find(L"cont1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::List)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ContainerId));
                     auto containerId = args.Get<ArgType::ContainerId>();
                     VERIFY_ARE_EQUAL(L"cont1", containerId);
                 }
 
-                if (testCase.commandLine.find(L"rm") != std::wstring::npos)
+                if (testCase.commandLine.find(L"--rm") != std::wstring::npos)
                 {
-                    // Ensure 'rm' was parsed wherever it was found.
+                    // Ensure '--rm' was parsed wherever it was found.
                     VERIFY_IS_TRUE(args.Contains(ArgType::Remove));
                 }
 
@@ -99,7 +106,7 @@ class WSLCCLIParserUnitTests
                     auto forwardArgs = args.Get<ArgType::ForwardArgs>();
                     std::wstring forwardArgsConcat = wsl::shared::string::Join(forwardArgs, L' ');
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"hello world") != std::wstring::npos); // Forward args should contain hello world
-                    VERIFY_IS_TRUE(forwardArgsConcat.find(L"cont1") == std::wstring::npos); // Forward args should not contain the containerId
+                    VERIFY_IS_TRUE(forwardArgsConcat.find(L"image1") == std::wstring::npos); // Forward args should not contain the imageId
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"command") == std::wstring::npos); // Forward args should not contain the command
                     LogComment(L"Forwarded Args: " + forwardArgsConcat);
                 }

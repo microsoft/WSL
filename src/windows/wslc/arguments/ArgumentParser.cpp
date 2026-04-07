@@ -173,12 +173,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     if ((m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit()) ||
         (m_anchorPositional.value().Limit() == NO_LIMIT))
     {
-        // validate that we dont have any invalid argument specifiers.
-        if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
-        {
-            return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
-        }
-
         m_executionArgs.Add(m_anchorPositional.value().Type(), std::wstring{currArg});
         return {};
     }
@@ -192,12 +186,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     const Argument* nextPositional = NextPositional();
     if (nextPositional)
     {
-        // validate that we dont have any invalid argument specifiers.
-        if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
-        {
-            return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
-        }
-
         m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
         return {};
     }

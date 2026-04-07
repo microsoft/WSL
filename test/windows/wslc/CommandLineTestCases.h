@@ -55,6 +55,18 @@ COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
 COMMAND_LINE_TEST_CASE(L"run ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --rm -it --entrypoint bash archlinux:latest -c \"echo 123\"", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run jrottenberg/ffmpeg:4.4-alpine -i http://url/to/media.mp4 -stats", L"run", true)
+COMMAND_LINE_TEST_CASE(
+    L"run -v ${PWD}:/data jrottenberg/ffmpeg:4.4-scratch -stats -i http://www.hevc-10bit.mkv -c:v libx265 -pix_fmt yuv420p10 -t "
+    L"5 -f mp4 test.mp4",
+    L"run",
+    true)
+COMMAND_LINE_TEST_CASE(
+    L"run -v ${PWD}:/data -it jrottenberg/ffmpeg:4.4-scratch -stats -i https://file-examples/file_example_MP4_480_1_5MG.mp4 -c:v "
+    L"libx265 -pix_fmt yuv420p10 -t 5 -f mp4 /dataout.mp4",
+    L"run",
+    true)
 COMMAND_LINE_TEST_CASE(L"container run ubuntu bash -c 'echo Hello World'", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run -it --name foo ubuntu", L"run", true)
@@ -77,7 +89,6 @@ COMMAND_LINE_TEST_CASE(L"exec --workdir /app cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec -w /app cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"container exec --workdir /app cont1 sh", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec --workdir", L"exec", false)                       // Missing value for --workdir
-COMMAND_LINE_TEST_CASE(L"exec cont1 --workdir", L"exec", false)                 // Invalid argument specifier after container id
 COMMAND_LINE_TEST_CASE(L"exec --workdir \"\" cont1 echo Hello", L"exec", false) // Empty working directory
 COMMAND_LINE_TEST_CASE(L"kill cont1 --signal sigkill", L"kill", true)
 COMMAND_LINE_TEST_CASE(L"container kill cont1 -s KILL", L"kill", true)
