@@ -79,7 +79,8 @@ class WSLCE2EImageTagTests
 
         auto imageWithDigest = L"debian-mock:tag@sha256:11111111111111111111111111111111";
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), imageWithDigest));
-        auto errorMessage = std::format(L"Invalid image tag format: '{}'. Expected format is 'name:tag'\r\nError code: E_INVALIDARG\r\n", imageWithDigest);
+        auto errorMessage =
+            std::format(L"Invalid image tag format: '{}'. Expected format is 'name:tag'\r\nError code: E_INVALIDARG\r\n", imageWithDigest);
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
