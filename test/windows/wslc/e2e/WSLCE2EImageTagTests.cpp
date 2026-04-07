@@ -73,6 +73,16 @@ class WSLCE2EImageTagTests
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_Image_Tag_TargetImageWithDigest_Fail)
+    {
+        WSL2_TEST_ONLY();
+
+        auto imageWithDigest = L"debian-mock:tag@sha256:11111111111111111111111111111111";
+        auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), imageWithDigest));
+        auto errorMessage = std::format(L"Invalid image tag format: '{}'. Expected format is 'name:tag'\r\nError code: E_INVALIDARG\r\n", imageWithDigest);
+        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+    }
+
     TEST_METHOD(WSLCE2E_Image_Tag_Success)
     {
         WSL2_TEST_ONLY();
@@ -212,6 +222,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"               //
+                << L"  --session  Specify the session to use\r\n"            //
                 << L"  -h,--help  Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
