@@ -232,7 +232,6 @@ void VirtioNetworking::RefreshGuestConnection()
     // Add virtio net adapter to guest. If the adapter already exists update adapter state.
     if (device_options != m_trackedDeviceOptions)
     {
-        m_trackedDeviceOptions = device_options;
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
@@ -246,6 +245,8 @@ void VirtioNetworking::RefreshGuestConnection()
                 LOG_IF_FAILED(server->AddSharePath(c_eth0DeviceName, device_options.c_str(), 0));
             }
         }
+
+        m_trackedDeviceOptions = device_options;
     }
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
