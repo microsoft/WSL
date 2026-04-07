@@ -201,6 +201,26 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
     }
 }
 
+HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
+{
+    const char* result = inet_ntop(af, src, dst, dstCount);
+    if (result)
+    {
+        return S_OK;
+    }
+
+    switch (errno)
+    {
+    case EAFNOSUPPORT:
+        return E_INVALIDARG;
+    case ENOSPC:
+        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+    default:
+        return E_FAIL;
+    }
+}
+
+
 bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
 {
     if (initProcessOptions)
@@ -685,7 +705,8 @@ try
                 {
                     const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
 
-                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
+                    THROW_IF_FAILED(InetNtopToHresult(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
+                    //THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf)));
 
                     convertedPort.Family = AF_INET;
                     break;
@@ -695,7 +716,7 @@ try
                 {
                     const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
 
-                    THROW_HR_IF_NULL(E_UNEXPECTED, inet_ntop(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
+                    THROW_IF_FAILED(InetNtopToHresult(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf)));
 
                     convertedPort.Family = AF_INET6;
                     break;
@@ -751,6 +772,7 @@ try
     return errorInfoWrapper;
 }
 CATCH_RETURN();
+
 
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
