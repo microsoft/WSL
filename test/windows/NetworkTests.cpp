@@ -352,7 +352,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(v6State.DefaultRoute->Device, L"eth0");
     }
 
-    TEST_METHOD(DefaultOnlinkRoutes)
+    TEST_METHOD(AddRemoveDefaultOnlinkRoutes)
     {
         WSL2_TEST_ONLY();
 
@@ -370,11 +370,23 @@ class NetworkTests
         defaultRouteV6.Metric = 1;
         SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
-        const bool defaultV4RouteExists = LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
-        const bool defaultV6RouteExists = LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep \"metric 1\"") == (DWORD)0;
+        const bool defaultV4RouteExists =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+        const bool defaultV6RouteExists =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteRemoved =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
+        const bool defaultV6RouteRemoved =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
 
         VERIFY_IS_TRUE(defaultV4RouteExists);
         VERIFY_IS_TRUE(defaultV6RouteExists);
+        VERIFY_IS_TRUE(defaultV4RouteRemoved);
+        VERIFY_IS_TRUE(defaultV6RouteRemoved);
     }
 
     TEST_METHOD(SetInterfaceDownAndUp)

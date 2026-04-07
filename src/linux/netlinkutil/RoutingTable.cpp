@@ -287,6 +287,11 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 template <typename TAddr>
 void RoutingTable::ModifyLinkLocalRouteImpl(const Route& route, int operation, int flags)
 {
+    if (!route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Link-local route is missing its destination address");
+    }
+
     struct Message : RouteMessage
     {
         utils::AddressAttribute<TAddr> to;
@@ -316,6 +321,10 @@ void RoutingTable::ModifyOfflinkRouteImpl(const Route& route, int operation, int
     if (!route.via.has_value())
     {
         throw RuntimeErrorWithSourceLocation("Offlink route is missing its next hop");
+    }
+    if (!route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Offlink route is missing its destination address");
     }
 
     struct Message : RouteMessage
