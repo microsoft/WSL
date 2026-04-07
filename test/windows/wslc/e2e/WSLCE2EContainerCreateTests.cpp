@@ -988,8 +988,6 @@ class WSLCE2EContainerCreateTests
     TEST_METHOD(WSLCE2E_Container_Run_PortAlreadyInUse)
     {
         // Bug: https://github.com/microsoft/WSL/issues/14448
-        SKIP_TEST_NOT_IMPL();
-
         WSL2_TEST_ONLY();
 
         // Start a container with a simple server listening on a port
@@ -1005,6 +1003,7 @@ class WSLCE2EContainerCreateTests
         // Attempt to start another container mapping the same host port
         auto result2 = RunWslc(std::format(L"container run -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
         result2.Verify({.ExitCode = 1});
+        VERIFY_IS_TRUE(result2.Stderr.has_value() && result2.Stderr.value().find(L"is already in use") != std::wstring::npos);
     }
 
     // https://github.com/microsoft/WSL/issues/14433
