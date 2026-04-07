@@ -977,6 +977,13 @@ class WSLCTests
 
         // Test delete failed if image does not exist.
         VERIFY_ARE_EQUAL(WSLC_E_IMAGE_NOT_FOUND, DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsForce).first);
+
+        // Validate that invalid flags are rejected.
+        {
+            WSLCDeleteImageOptions invalidOptions{.Image = "alpine:latest", .Flags = 0x4};
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->DeleteImage(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()), E_INVALIDARG);
+        }
     }
 
     void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected)
@@ -3673,6 +3680,13 @@ class WSLCTests
             // Validate that deleted containers can't be started.
             VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
         }
+
+        // Validate that invalid start flags are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-stop-start-invalid-flags", {"echo", "OK"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.Get().Start(static_cast<WSLCContainerStartFlags>(0x2), nullptr), E_INVALIDARG);
+        }
     }
 
     TEST_METHOD(OpenContainer)
@@ -5669,6 +5683,16 @@ class WSLCTests
 
             expectLogs(container.Get(), "line1\nline2\n", "");
             expectLogs(container.Get(), "line1\nline2\n", "", WSLCLogsFlagsFollow);
+        }
+
+        // Validate that invalid logs flags are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "logs-test-invalid-flags", {"/bin/bash", "-c", "echo OK"});
+            auto container = launcher.Create(*m_defaultSession);
+
+            COMOutputHandle stdoutHandle{};
+            COMOutputHandle stderrHandle{};
+            VERIFY_ARE_EQUAL(container.Get().Logs(static_cast<WSLCLogsFlags>(0x4), &stdoutHandle, &stderrHandle, 0, 0, 0), E_INVALIDARG);
         }
     }
 
