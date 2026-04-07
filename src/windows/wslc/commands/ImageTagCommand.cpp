@@ -17,8 +17,8 @@ Abstract:
 #include "ImageTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
-#include "Localization.h"
 
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 

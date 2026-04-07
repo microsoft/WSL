@@ -190,7 +190,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Tags an existing image.\r\n\r\n";
+        return L"Tags an image.\r\n\r\n";
     }
 
     std::wstring GetUsage() const
