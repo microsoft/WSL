@@ -286,9 +286,10 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::TMPFS))
     {
         auto tmpfs = context.Args.GetAll<ArgType::TMPFS>();
+        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
         for (const auto& value : tmpfs)
         {
-            options.Tmpfs.push_back(WideToMultiByte(value));
+            options.Tmpfs.emplace_back(WideToMultiByte(value));
         }
     }
 

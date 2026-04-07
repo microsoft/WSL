@@ -27,6 +27,7 @@ class WSLCCLITmpfsParserUnitTests
     TEST_METHOD(WSLCCLITmpfsMount_Parse)
     {
         std::vector<std::tuple<std::string, std::string, std::string>> validTmpfsSpecs = {
+            {"", "", ""},
             {"/tmp", "/tmp", ""},
             {"/tmp:size=50m", "/tmp", "size=50m"},
             {"/var/tmp:size=1g", "/var/tmp", "size=1g"},
@@ -37,6 +38,13 @@ class WSLCCLITmpfsParserUnitTests
             {"/scratch:nosuid,nodev,noexec", "/scratch", "nosuid,nodev,noexec"},
             {"/wsl/tmp:size=2g,uid=0,gid=0,mode=1777", "/wsl/tmp", "size=2g,uid=0,gid=0,mode=1777"},
         };
+
+        for (const auto& [input, expectedContainerPath, expectedOptions] : validTmpfsSpecs)
+        {
+            auto result = models::TmpfsMount::Parse(input);
+            VERIFY_ARE_EQUAL(expectedContainerPath, result.ContainerPath());
+            VERIFY_ARE_EQUAL(expectedOptions, result.Options());
+        }
     }
 };
 
