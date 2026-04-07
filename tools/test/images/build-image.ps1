@@ -42,6 +42,7 @@ if ($PSCmdlet.ShouldProcess($ImageTag, "Build image from '$DockerfileDir'")) {
 if ($PSCmdlet.ShouldProcess($OutputFile, "Save image '$ImageTag'")) {
     & wslc save --output $OutputFile $ImageTag
     if ($LASTEXITCODE -ne 0) { throw "wslc save failed with exit code $LASTEXITCODE" }
+    
+    Write-Host "Image built and saved to $OutputFile successfully."
 }
 
-Write-Host "Image built and saved to $OutputFile successfully."
