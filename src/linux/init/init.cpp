@@ -2473,7 +2473,7 @@ Return Value:
 
             case LxInitMessageInitialize:
             {
-                auto SendResponse = [&](gsl::span<gsl::byte>& span) {
+                auto SendResponse = [&](const gsl::span<gsl::byte>& span) {
                     transaction.Send<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(span);
                 };
                 ConfigInitializeInstance(SendResponse, Span, Config);
@@ -2645,7 +2645,7 @@ Return Value:
 
         case LxInitMessageInitialize:
         {
-            auto SendResponse = [&](gsl::span<gsl::byte>& span) {
+            auto SendResponse = [&](const gsl::span<gsl::byte>& span) {
                 Channel.SendMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(span);
             };
             ConfigInitializeInstance(SendResponse, Message, Config);

@@ -409,7 +409,7 @@ void ConfigHandleInteropMessage(
 
 void ConfigInitializeCgroups(wsl::linux::WslDistributionConfig& Config);
 
-int ConfigInitializeInstance(const std::function<void(gsl::span<gsl::byte>&)>& SendResponse, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config);
+int ConfigInitializeInstance(const std::function<void(const gsl::span<gsl::byte>&)>& SendResponse, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config);
 
 void ConfigMountDrvFsVolumes(unsigned int DrvFsVolumes, uid_t OwnerUid, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config);
 

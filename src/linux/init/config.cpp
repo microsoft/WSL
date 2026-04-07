@@ -618,7 +618,7 @@ try
 }
 CATCH_LOG()
 
-int ConfigInitializeInstance(const std::function<void(gsl::span<gsl::byte>&)>& SendResponse, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config)
+int ConfigInitializeInstance(const std::function<void(const gsl::span<gsl::byte>&)>& SendResponse, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -923,8 +923,7 @@ try
         Response.WriteString(Response->VersionIndex, Version->c_str());
     }
 
-    auto responseSpan = Response.Span();
-    SendResponse(responseSpan);
+    SendResponse(Response.Span());
 
     //
     // Accept the interop connection.
