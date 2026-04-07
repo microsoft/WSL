@@ -17,7 +17,6 @@ Abstract:
 #include "wslc.h"
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
-#include "WSLCLocalRegistry.h"
 #include "WslcCredentialStore.h"
 #include "WslCoreFilesystem.h"
 
@@ -184,7 +183,24 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    void PushImageToRegistry(IWSLCSession& session, const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
+    std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(const std::string& username = {}, const std::string& password = {}, USHORT port = 5000)
+    {
+        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
+        if (!username.empty())
+        {
+            env.push_back(std::format("USERNAME={}", username));
+            env.push_back(std::format("PASSWORD={}", password));
+        }
+
+        WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+        launcher.SetEntrypoint({"/entrypoint.sh"});
+        launcher.AddPort(port, port, AF_INET);
+
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        return {std::move(container), std::format("127.0.0.1:{}", port)};
+    }
+
+    static void PushImageToRegistry(IWSLCSession& session, const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
     {
         auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(imageName);
         auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
@@ -459,14 +475,13 @@ class WSLCTests
 
         {
             // Start a local registry without auth and push hello-world:latest to it.
-            auto registry = wsl::windows::common::WSLCLocalRegistry::Start(*m_defaultSession);
-            auto registryAddress = registry.GetServerAddress();
+            auto [registryContainer, registryAddress] = StartLocalRegistry();
 
             // Wait for the registry to be ready.
             auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
             ExpectHttpResponse(registryUrl.c_str(), 200, true);
 
-            PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, registry.GetAuthHeader());
+            PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress));
 
             auto image = std::format("{}/hello-world:latest", registryAddress);
 
@@ -514,9 +529,8 @@ class WSLCTests
         WSL2_TEST_ONLY();
 
         // Start a local registry without auth to avoid Docker Hub rate limits.
-        auto registry = wsl::windows::common::WSLCLocalRegistry::Start(*m_defaultSession);
-        auto registryAddress = registry.GetServerAddress();
-        auto auth = registry.GetAuthHeader();
+        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto auth = wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress);
 
         // Wait for the registry to be ready.
         auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
@@ -572,10 +586,9 @@ class WSLCTests
         constexpr auto c_username = "wslctest";
         constexpr auto c_password = "password";
 
-        auto registry = wsl::windows::common::WSLCLocalRegistry::Start(*m_defaultSession, c_username, c_password);
+        auto [registryContainer, registryAddress] = StartLocalRegistry(c_username, c_password);
 
-        auto registryUrl = std::format(L"http://{}/v2/", registry.GetServerAddress());
-        auto registryAddress = registry.GetServerAddress();
+        auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
 
         // The registry may take some time before it's up and running. Retry until it's ready to accept connections.
         ExpectHttpResponse(registryUrl.c_str(), 401, true);
@@ -587,7 +600,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, c_password, &token));
         VERIFY_IS_NOT_NULL(token.get());
 
-        auto xRegistryAuth = registry.GetAuthHeader();
+        auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
         PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, xRegistryAuth);
 
         // Pulling without credentials should fail.
