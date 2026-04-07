@@ -32,8 +32,6 @@ using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
-
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
@@ -95,6 +93,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     {
         auto entrypoints = options.Entrypoint;
         containerLauncher.SetEntrypoint(std::move(entrypoints));
+    }
+
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        containerLauncher.SetUser(std::move(user));
     }
 
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
@@ -396,9 +400,18 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLCProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
 
-    ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
+    auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        processLauncher.SetUser(std::move(user));
+    }
+    if (!options.WorkingDirectory.empty())
+    {
+        processLauncher.SetWorkingDirectory(std::move(options.WorkingDirectory));
+    }
+
+    return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)

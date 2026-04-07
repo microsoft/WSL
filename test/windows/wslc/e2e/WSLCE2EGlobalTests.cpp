@@ -51,6 +51,11 @@ class WSLCE2EGlobalTests
         RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
+    TEST_METHOD(WSLCE2E_VersionCommand)
+    {
+        WSL2_TEST_ONLY();
+        RunWslcAndVerify(L"version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
+    }
     TEST_METHOD(WSLCE2E_Session_DefaultElevated)
     {
         WSL2_TEST_ONLY();
@@ -400,6 +405,11 @@ private:
         return output.str();
     }
 
+    std::wstring GetVersionMessage() const
+    {
+        return std::format(L"wslc {}\r\n", WSL_PACKAGE_VERSION);
+    }
+
     std::wstring GetDescription() const
     {
         return L"WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL "
@@ -435,6 +445,8 @@ private:
             {L"save", Localization::WSLCCLI_ImageSaveDesc()},
             {L"start", Localization::WSLCCLI_ContainerStartDesc()},
             {L"stop", Localization::WSLCCLI_ContainerStopDesc()},
+            {L"tag", Localization::WSLCCLI_ImageTagDesc()},
+            {L"version", Localization::WSLCCLI_VersionDesc()},
         };
 
         size_t maxLen = 0;

@@ -17,6 +17,7 @@ Abstract:
 #include "ImageTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
+#include "Localization.h"
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
@@ -33,12 +34,12 @@ std::vector<Argument> ImageTagCommand::GetArguments() const
 
 std::wstring ImageTagCommand::ShortDescription() const
 {
-    return {L"Tags an existing image."};
+    return Localization::WSLCCLI_ImageTagDesc();
 }
 
 std::wstring ImageTagCommand::LongDescription() const
 {
-    return {L"Tags an existing image."};
+    return Localization::WSLCCLI_ImageTagLongDesc();
 }
 
 void ImageTagCommand::ExecuteInternal(CLIExecutionContext& context) const
