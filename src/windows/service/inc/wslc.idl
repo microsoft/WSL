@@ -547,6 +547,39 @@ typedef struct _WSLCTagImageOptions
     LPCSTR Tag;   // Target tag name.
 } WSLCTagImageOptions;
 
+typedef struct _WSLCPruneImageLabelFilter
+{
+    WSLCLabel Label;
+    BOOL Present; // If true, filter:{label=key(=value)}, if false filter:{label!=key(=value)}
+} WSLCPruneImageLabelFilter;
+
+typedef enum _WSLCPruneImagesFlags
+{
+    WSLCPruneImagesFlagsNone = 0,
+    WSLCPruneImagesFlagsDanglingTrue = 1,  // Only prune dangling (untagged) images.
+    WSLCPruneImagesFlagsDanglingFalse = 2, // Prune all images not used by any container.
+    // Note: If neither dangling flag is set, no dangling filter is passed (Docker defaults to dangling-only).
+} WSLCPruneImagesFlags;
+
+cpp_quote("#define WSLCPruneImagesFlagsValid (WSLCPruneImagesFlagsDanglingTrue | WSLCPruneImagesFlagsDanglingFalse)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCPruneImagesFlags);")
+
+typedef struct _WSLCPruneImagesOptions
+{
+    DWORD Flags; // WSLCPruneImagesFlags
+    ULONGLONG Until;
+    [unique, size_is(LabelsCount)] WSLCPruneImageLabelFilter* Labels;
+    ULONG LabelsCount;
+} WSLCPruneImagesOptions;
+
+typedef struct _WSLCPruneImagesResults
+{
+    [unique, size_is(DeletedCount)] WSLCDeletedImageInformation* DeletedImages;
+    ULONG DeletedCount;
+    ULONGLONG SpaceReclaimed;
+} WSLCPruneImagesResults;
+
 typedef struct _WSLCVolumeOptions
 {
     LPCSTR Name;
@@ -615,6 +648,7 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
     HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
+    HRESULT PruneImages([in, unique] const WSLCPruneImagesOptions* Options, [out] WSLCPruneImagesResults* Result);
 
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
