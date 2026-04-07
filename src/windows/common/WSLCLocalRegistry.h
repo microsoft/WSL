@@ -27,21 +27,14 @@ public:
     DEFAULT_MOVABLE(WSLCLocalRegistry);
     ~WSLCLocalRegistry();
 
-    static WSLCLocalRegistry Start(
-        IWSLCSession& Session,
-        const std::string& Username = {},
-        const std::string& Password = {});
+    static WSLCLocalRegistry Start(IWSLCSession& Session, const std::string& Username = {}, const std::string& Password = {});
 
     const char* GetServerAddress() const;
     const std::string& GetUsername() const;
     const std::string& GetPassword() const;
 
 private:
-    WSLCLocalRegistry(
-        IWSLCSession& session,
-        RunningWSLCContainer&& container,
-        std::string&& username,
-        std::string&& password);
+    WSLCLocalRegistry(IWSLCSession& session, RunningWSLCContainer&& container, std::string&& username, std::string&& password);
 
     wil::com_ptr<IWSLCSession> m_session;
     std::string m_username;

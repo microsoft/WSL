@@ -38,11 +38,7 @@ std::vector<std::string> BuildRegistryEnv(const std::string& username, const std
 
 } // namespace
 
-WSLCLocalRegistry::WSLCLocalRegistry(
-    IWSLCSession& session,
-    RunningWSLCContainer&& container,
-    std::string&& username,
-    std::string&& password) :
+WSLCLocalRegistry::WSLCLocalRegistry(IWSLCSession& session, RunningWSLCContainer&& container, std::string&& username, std::string&& password) :
     m_session(wil::com_ptr<IWSLCSession>(&session)),
     m_username(std::move(username)),
     m_password(std::move(password)),
@@ -56,8 +52,7 @@ WSLCLocalRegistry::~WSLCLocalRegistry()
     m_container.Reset();
 }
 
-WSLCLocalRegistry WSLCLocalRegistry::Start(
-    IWSLCSession& session, const std::string& username, const std::string& password)
+WSLCLocalRegistry WSLCLocalRegistry::Start(IWSLCSession& session, const std::string& username, const std::string& password)
 {
     auto env = BuildRegistryEnv(username, password);
 
@@ -67,11 +62,7 @@ WSLCLocalRegistry WSLCLocalRegistry::Start(
 
     auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
 
-    return WSLCLocalRegistry(
-        session,
-        std::move(container),
-        std::string(username),
-        std::string(password));
+    return WSLCLocalRegistry(session, std::move(container), std::string(username), std::string(password));
 }
 
 const char* WSLCLocalRegistry::GetServerAddress() const
