@@ -83,7 +83,7 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
         print(f'\n{changes}')
 
 @backoff.on_exception(backoff.expo, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException), max_time=600)
-def get_github_pr_message(token: str, message: str) -> str:
+def get_github_pr_message(token: str, message: str) -> tuple[str | None, str | None]:
     match = re.search(r'\(#([0-9]+)\)', message)
     if match is None:
         print(f'Warning: failed to extract GitHub PR number from message: {message}', file=sys.stderr)
