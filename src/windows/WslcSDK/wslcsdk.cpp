@@ -637,6 +637,8 @@ try
     auto result = std::make_unique<WslcContainerImpl>();
 
     WSLCContainerOptions containerOptions{};
+    std::unique_ptr<WSLCPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
+
     containerOptions.Image = internalContainerSettings->image;
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
@@ -679,12 +681,10 @@ try
         containerOptions.NamedVolumesCount = static_cast<ULONG>(internalContainerSettings->namedVolumesCount);
     }
 
-    std::unique_ptr<WSLCPortMapping[]> convertedPorts;
-    std::vector<std::string> bindingAddressStrings;
+    
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
         convertedPorts = std::make_unique<WSLCPortMapping[]>(internalContainerSettings->portsCount);
-        bindingAddressStrings.resize(internalContainerSettings->portsCount);
         for (uint32_t i = 0; i < internalContainerSettings->portsCount; ++i)
         {
             const WslcContainerPortMapping& internalPort = internalContainerSettings->ports[i];
@@ -730,10 +730,9 @@ try
                     // Reject unsupported or malformed address families
                     THROW_HR(E_INVALIDARG);
                 }
-                bindingAddressStrings[i] = addrBuf;
                 HRESULT hr = strncpy_s(convertedPort.BindingAddress,
                                        sizeof(convertedPort.BindingAddress),
-                                       bindingAddressStrings[i].c_str(),
+                                       addrBuf,
                                        _TRUNCATE);
 
                 if (hr == STRUNCATE)
@@ -748,7 +747,7 @@ try
                 strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
             }
         }
-        containerOptions.Ports = convertedPorts.get();
+        containerOptions.Ports = convertedPorts.get();//Make sure convertedPorts stays in scope for life of containerOptions
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
