@@ -44,18 +44,14 @@ class WSLCE2EContainerStopTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"container stop --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignal)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignal)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -70,10 +66,8 @@ class WSLCE2EContainerStopTests
         }
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_KillsRunningContainer)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_KillsRunningContainer)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -91,10 +85,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_ByName)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_ByName)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -112,20 +104,16 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_NotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_NotFound)
     {
-        WSL2_TEST_ONLY();
-
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container stop {} -t 0", WslcContainerName));
         result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_TargetedContainerOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_TargetedContainerOnly)
     {
-        WSL2_TEST_ONLY();
-
         // Run first container in background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -151,10 +139,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(secondContainerId, L"running");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_SignalByName)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_SignalByName)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -172,10 +158,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignalName)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignalName)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -193,10 +177,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"running");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_InvalidTimeout)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_InvalidTimeout)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -234,10 +216,8 @@ class WSLCE2EContainerStopTests
         }
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_ValidTimeoutNegativeOne)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_ValidTimeoutNegativeOne)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
