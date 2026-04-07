@@ -220,7 +220,6 @@ HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
     }
 }
 
-
 bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
 {
     if (initProcessOptions)
@@ -681,7 +680,6 @@ try
         containerOptions.NamedVolumesCount = static_cast<ULONG>(internalContainerSettings->namedVolumesCount);
     }
 
-    
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
         convertedPorts = std::make_unique<WSLCPortMapping[]>(internalContainerSettings->portsCount);
@@ -730,10 +728,7 @@ try
                     // Reject unsupported or malformed address families
                     THROW_HR(E_INVALIDARG);
                 }
-                HRESULT hr = strncpy_s(convertedPort.BindingAddress,
-                                       sizeof(convertedPort.BindingAddress),
-                                       addrBuf,
-                                       _TRUNCATE);
+                HRESULT hr = strncpy_s(convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress), addrBuf, _TRUNCATE);
 
                 if (hr == STRUNCATE)
                 {
@@ -747,7 +742,7 @@ try
                 strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
             }
         }
-        containerOptions.Ports = convertedPorts.get();//Make sure convertedPorts stays in scope for life of containerOptions
+        containerOptions.Ports = convertedPorts.get(); // Make sure convertedPorts stays in scope for life of containerOptions
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
@@ -775,7 +770,6 @@ try
     return errorInfoWrapper;
 }
 CATCH_RETURN();
-
 
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
