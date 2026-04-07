@@ -466,8 +466,7 @@ class WSLCTests
             auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
             ExpectHttpResponse(registryUrl.c_str(), 200, true);
 
-            auto auth = wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress);
-            PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, auth);
+            PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, registry.GetAuthHeader());
 
             auto image = std::format("{}/hello-world:latest", registryAddress);
 
@@ -517,6 +516,7 @@ class WSLCTests
         // Start a local registry without auth to avoid Docker Hub rate limits.
         auto registry = wsl::windows::common::WSLCLocalRegistry::Start(*m_defaultSession);
         auto registryAddress = registry.GetServerAddress();
+        auto auth = registry.GetAuthHeader();
 
         // Wait for the registry to be ready.
         auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
@@ -524,7 +524,6 @@ class WSLCTests
 
         auto validatePull = [&](const std::string& sourceImage, const std::string& registryTag) {
             // Push the source image to the local registry.
-            auto auth = wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress);
             PushImageToRegistry(*m_defaultSession, sourceImage, registryAddress, auth);
 
             auto registryImage = std::format("{}/{}", registryAddress, registryTag);
@@ -553,7 +552,7 @@ class WSLCTests
 
         // Validate that pushing a non-existent image fails.
         {
-            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", nullptr, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", "", nullptr), E_INVALIDARG);
         }
 
         // Validate that PushImage() returns the appropriate error if the session is terminated.
@@ -562,7 +561,7 @@ class WSLCTests
 
             auto cleanup = wil::scope_exit([&]() { ResetTestSession(); });
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("hello-world:latest", nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("hello-world:latest", "", nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 
@@ -582,13 +581,13 @@ class WSLCTests
         ExpectHttpResponse(registryUrl.c_str(), 401, true);
 
         wil::unique_cotaskmem_ansistring token;
-        VERIFY_ARE_EQUAL(m_defaultSession->Authenticate(registryAddress, c_username, "wrong-password", &token), E_FAIL);
+        VERIFY_ARE_EQUAL(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, "wrong-password", &token), E_FAIL);
         ValidateCOMErrorMessageContains(L"failed with status: 401 Unauthorized");
 
-        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress, c_username, c_password, &token));
+        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, c_password, &token));
         VERIFY_IS_NOT_NULL(token.get());
 
-        auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        auto xRegistryAuth = registry.GetAuthHeader();
         PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, xRegistryAuth);
 
         // Pulling without credentials should fail.

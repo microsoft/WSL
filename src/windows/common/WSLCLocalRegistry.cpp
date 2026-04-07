@@ -21,10 +21,10 @@ namespace {
 
 constexpr auto c_registryImage = "wslc-registry:latest";
 
-std::vector<std::string> BuildRegistryEnv(const std::string& username, const std::string& password)
+std::vector<std::string> BuildRegistryEnv(const std::string& username, const std::string& password, USHORT port)
 {
     std::vector<std::string> env = {
-        "REGISTRY_HTTP_ADDR=0.0.0.0:5000",
+        std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port),
     };
 
     if (!username.empty())
@@ -38,10 +38,12 @@ std::vector<std::string> BuildRegistryEnv(const std::string& username, const std
 
 } // namespace
 
-WSLCLocalRegistry::WSLCLocalRegistry(IWSLCSession& session, RunningWSLCContainer&& container, std::string&& username, std::string&& password) :
+WSLCLocalRegistry::WSLCLocalRegistry(
+    IWSLCSession& session, RunningWSLCContainer&& container, std::string&& username, std::string&& password, std::string&& serverAddress) :
     m_session(wil::com_ptr<IWSLCSession>(&session)),
     m_username(std::move(username)),
     m_password(std::move(password)),
+    m_serverAddress(std::move(serverAddress)),
     m_container(std::move(container))
 {
 }
@@ -52,30 +54,14 @@ WSLCLocalRegistry::~WSLCLocalRegistry()
     m_container.Reset();
 }
 
-WSLCLocalRegistry WSLCLocalRegistry::Start(IWSLCSession& session, const std::string& username, const std::string& password)
+WSLCLocalRegistry WSLCLocalRegistry::Start(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
 {
-    auto env = BuildRegistryEnv(username, password);
+    auto env = BuildRegistryEnv(username, password, port);
 
     WSLCContainerLauncher launcher(c_registryImage, {}, {}, env);
     launcher.SetEntrypoint({"/entrypoint.sh"});
-    launcher.AddPort(5000, 5000, AF_INET);
+    launcher.AddPort(port, port, AF_INET);
 
     auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
-
-    return WSLCLocalRegistry(session, std::move(container), std::string(username), std::string(password));
-}
-
-const char* WSLCLocalRegistry::GetServerAddress() const
-{
-    return "127.0.0.1:5000";
-}
-
-const std::string& WSLCLocalRegistry::GetUsername() const
-{
-    return m_username;
-}
-
-const std::string& WSLCLocalRegistry::GetPassword() const
-{
-    return m_password;
+    return WSLCLocalRegistry(session, std::move(container), std::string(username), std::string(password), std::format("127.0.0.1:{}", port));
 }

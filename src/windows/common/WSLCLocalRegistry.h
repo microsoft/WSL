@@ -17,6 +17,7 @@ Abstract:
 
 #pragma once
 #include "WSLCContainerLauncher.h"
+#include "WslcCredentialStore.h"
 
 namespace wsl::windows::common {
 
@@ -27,16 +28,23 @@ public:
     DEFAULT_MOVABLE(WSLCLocalRegistry);
     ~WSLCLocalRegistry();
 
-    static WSLCLocalRegistry Start(IWSLCSession& Session, const std::string& Username = {}, const std::string& Password = {});
+    static WSLCLocalRegistry Start(IWSLCSession& Session, const std::string& Username = {}, const std::string& Password = {}, USHORT Port = 5000);
 
-    const char* GetServerAddress() const;
-    const std::string& GetUsername() const;
-    const std::string& GetPassword() const;
+    std::string GetServerAddress()
+    {
+        return m_serverAddress;
+    }
+
+    std::string GetAuthHeader()
+    {
+        return BuildRegistryAuthHeader(m_username, m_password, m_serverAddress);
+    }
 
 private:
-    WSLCLocalRegistry(IWSLCSession& session, RunningWSLCContainer&& container, std::string&& username, std::string&& password);
+    WSLCLocalRegistry(IWSLCSession& session, RunningWSLCContainer&& container, std::string&& username, std::string&& password, std::string&& serverAddress);
 
     wil::com_ptr<IWSLCSession> m_session;
+    std::string m_serverAddress;
     std::string m_username;
     std::string m_password;
     RunningWSLCContainer m_container;
