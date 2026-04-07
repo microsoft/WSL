@@ -11,6 +11,7 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
     endforeach()
 
     string(TOLOWER ${TARGET_PLATFORM} IDL_ENV)
+    set(PREVIOUS_OUTPUT "")
 
     foreach(idl_file ${idl_files_with_proxy})
 
