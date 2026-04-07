@@ -201,7 +201,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Tags an image.\r\n\r\n";
+        return wsl::shared::Localization::WSLCCLI_ImageTagLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
