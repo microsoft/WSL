@@ -5041,5 +5041,32 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
+
+    TEST_METHOD(DnsResolutionBasicDnsTunneling)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDigDnsTunneling)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypesDnsTunneling)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
+        NetworkTests::VerifyDnsResolutionRecordTypes();
+    }
 };
 } // namespace NetworkTests

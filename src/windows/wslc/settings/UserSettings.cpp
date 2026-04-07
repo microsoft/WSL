@@ -114,6 +114,11 @@ namespace details {
         return std::nullopt;
     }
 
+    WSLC_VALIDATE_SETTING(SessionDnsTunneling)
+    {
+        return value;
+    }
+
 #undef WSLC_VALIDATE_SETTING
 
 } // namespace details
