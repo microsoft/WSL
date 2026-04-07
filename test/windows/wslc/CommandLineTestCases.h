@@ -56,6 +56,7 @@ COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
 COMMAND_LINE_TEST_CASE(L"run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --rm -it --entrypoint bash archlinux:latest -c \"echo 123\"", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --rm --entrypoint /bin/bash debian:latest -c ls", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run jrottenberg/ffmpeg:4.4-alpine -i http://url/to/media.mp4 -stats", L"run", true)
 COMMAND_LINE_TEST_CASE(
     L"run -v ${PWD}:/data jrottenberg/ffmpeg:4.4-scratch -stats -i http://www.hevc-10bit.mkv -c:v libx265 -pix_fmt yuv420p10 -t "
