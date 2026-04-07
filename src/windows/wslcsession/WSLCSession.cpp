@@ -1329,13 +1329,8 @@ try
 
     if (Options != nullptr)
     {
-        RETURN_HR_IF(
-            E_INVALIDARG,
-            WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingTrue) &&
-                WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingFalse));
-        RETURN_HR_IF(
-            E_INVALIDARG,
-            WI_IsAnyFlagSet(static_cast<WSLCPruneImagesFlags>(Options->Flags), ~WSLCPruneImagesFlagsValid));
+        RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingFalse));
+        RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(static_cast<WSLCPruneImagesFlags>(Options->Flags), ~WSLCPruneImagesFlagsValid));
     }
 
     auto lock = m_lock.lock_shared();
@@ -1402,8 +1397,7 @@ try
         for (const auto& image : pruneResult.ImagesDeleted.value())
         {
             THROW_HR_IF(
-                E_UNEXPECTED,
-                (image.Deleted.empty() && image.Untagged.empty()) || (!image.Deleted.empty() && !image.Untagged.empty()));
+                E_UNEXPECTED, (image.Deleted.empty() && image.Untagged.empty()) || (!image.Deleted.empty() && !image.Untagged.empty()));
 
             if (!image.Deleted.empty())
             {

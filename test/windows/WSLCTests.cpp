@@ -6649,18 +6649,18 @@ class WSLCTests
     {
         WSL2_TEST_ONLY();
 
-        auto pruneImages = [this](DWORD flags = WSLCPruneImagesFlagsNone, uint64_t until = 0,
-                                  const std::vector<WSLCPruneImageLabelFilter>& labels = {}) {
-            ImagePruneResult result;
-            WSLCPruneImagesOptions options{};
-            options.Flags = flags;
-            options.Until = until;
-            options.Labels = labels.empty() ? nullptr : const_cast<WSLCPruneImageLabelFilter*>(labels.data());
-            options.LabelsCount = static_cast<ULONG>(labels.size());
+        auto pruneImages =
+            [this](DWORD flags = WSLCPruneImagesFlagsNone, uint64_t until = 0, const std::vector<WSLCPruneImageLabelFilter>& labels = {}) {
+                ImagePruneResult result;
+                WSLCPruneImagesOptions options{};
+                options.Flags = flags;
+                options.Until = until;
+                options.Labels = labels.empty() ? nullptr : const_cast<WSLCPruneImageLabelFilter*>(labels.data());
+                options.LabelsCount = static_cast<ULONG>(labels.size());
 
-            VERIFY_SUCCEEDED(m_defaultSession->PruneImages(&options, &result.result));
-            return result;
-        };
+                VERIFY_SUCCEEDED(m_defaultSession->PruneImages(&options, &result.result));
+                return result;
+            };
 
         // Clean up any stale dangling images from prior tests.
         pruneImages(WSLCPruneImagesFlagsDanglingTrue);
