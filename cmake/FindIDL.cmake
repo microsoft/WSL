@@ -36,7 +36,7 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
             VERBATIM
         )
 
-        set(PREVIOUS_OUTPUT ${MIDL_OUTPUT})
+        set(PREVIOUS_OUTPUT ${IDL_HEADER})
 
         set_source_files_properties(${MIDL_OUTPUT} PROPERTIES GENERATED TRUE)
         list(APPEND TARGET_OUTPUTS ${MIDL_OUTPUT})
