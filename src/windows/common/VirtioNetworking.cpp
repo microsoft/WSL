@@ -72,9 +72,11 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
 }
 
 void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)
+try
 {
     static_cast<VirtioNetworking*>(context)->RefreshGuestConnection();
 }
+CATCH_LOG()
 
 HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
 {
@@ -164,8 +166,7 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
     return 0;
 }
 
-void VirtioNetworking::RefreshGuestConnection() noexcept
-try
+void VirtioNetworking::RefreshGuestConnection()
 {
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
@@ -240,7 +241,6 @@ try
 
     m_networkSettings = std::move(networkSettings);
 }
-CATCH_LOG();
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
