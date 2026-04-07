@@ -590,11 +590,11 @@ class WSLCTests
         auto registryUrl = std::format(L"http://{}/v2/", registry.GetServerAddress());
         auto registryAddress = registry.GetServerAddress();
 
-        // The registry may take to some time before its up and running. Retry until its ready to accept connections.
+        // The registry may take some time before it's up and running. Retry until it's ready to accept connections.
         ExpectHttpResponse(registryUrl.c_str(), 401, true);
 
         wil::unique_cotaskmem_ansistring token;
-        VERIFY_ARE_EQUAL(E_FAIL, m_defaultSession->Authenticate(registryAddress, c_username, "wrong-password", &token));
+        VERIFY_ARE_EQUAL(m_defaultSession->Authenticate(registryAddress, c_username, "wrong-password", &token), E_FAIL);
         ValidateCOMErrorMessageContains(L"failed with status: 401 Unauthorized");
 
         VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress, c_username, c_password, &token));
@@ -1081,6 +1081,12 @@ class WSLCTests
 
         if (comError.has_value())
         {
+            if (!comError->Message)
+            {
+                LogError("Expected COM error containing: '%ls', but COM error message was null", ExpectedSubstring.c_str());
+                VERIFY_FAIL();
+            }
+
             if (wcsstr(comError->Message.get(), ExpectedSubstring.c_str()) == nullptr)
             {
                 LogError("Expected COM error containing: '%ls', but got: '%ls'", ExpectedSubstring.c_str(), comError->Message.get());
