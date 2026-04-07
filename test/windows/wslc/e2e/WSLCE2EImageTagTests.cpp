@@ -69,7 +69,7 @@ class WSLCE2EImageTagTests
         WSL2_TEST_ONLY();
 
         auto result = RunWslc(std::format(L"image tag {} {}", InvalidImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLA_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
+        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
@@ -85,12 +85,14 @@ class WSLCE2EImageTagTests
 
         auto resultSourceInspect = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
         resultSourceInspect.Verify({.Stderr = L"", .ExitCode = 0});
-        auto sourceInspect = resultSourceInspect.GetStdoutOneLine();
+        auto sourceInspect = resultSourceInspect.Stdout;
 
         auto resultTargetInspect = RunWslc(std::format(L"image inspect {}", DebianTaggedImage.NameAndTag()));
         resultTargetInspect.Verify({.Stderr = L"", .ExitCode = 0});
-        auto targetInspect = resultTargetInspect.GetStdoutOneLine();
+        auto targetInspect = resultTargetInspect.Stdout;
 
+        VERIFY_IS_TRUE(sourceInspect.has_value());
+        VERIFY_IS_TRUE(targetInspect.has_value());
         VERIFY_ARE_EQUAL(sourceInspect, targetInspect);
     }
 
@@ -118,12 +120,14 @@ class WSLCE2EImageTagTests
 
             auto resultSourceInspect = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
             resultSourceInspect.Verify({.Stderr = L"", .ExitCode = 0});
-            auto sourceInspect = resultSourceInspect.GetStdoutOneLine();
+            auto sourceInspect = resultSourceInspect.Stdout;
 
             auto resultTargetInspect = RunWslc(std::format(L"image inspect {}", DebianTaggedImage.NameAndTag()));
             resultTargetInspect.Verify({.Stderr = L"", .ExitCode = 0});
-            auto targetInspect = resultTargetInspect.GetStdoutOneLine();
+            auto targetInspect = resultTargetInspect.Stdout;
 
+            VERIFY_IS_TRUE(sourceInspect.has_value());
+            VERIFY_IS_TRUE(targetInspect.has_value());
             VERIFY_ARE_EQUAL(sourceInspect, targetInspect);
         }
 
@@ -133,12 +137,14 @@ class WSLCE2EImageTagTests
 
             auto resultSourceInspect = RunWslc(std::format(L"image inspect {}", AlpineImage.NameAndTag()));
             resultSourceInspect.Verify({.Stderr = L"", .ExitCode = 0});
-            auto sourceInspect = resultSourceInspect.GetStdoutOneLine();
+            auto sourceInspect = resultSourceInspect.Stdout;
 
             auto resultTargetInspect = RunWslc(std::format(L"image inspect {}", DebianTaggedImage.NameAndTag()));
             resultTargetInspect.Verify({.Stderr = L"", .ExitCode = 0});
-            auto targetInspect = resultTargetInspect.GetStdoutOneLine();
+            auto targetInspect = resultTargetInspect.Stdout;
 
+            VERIFY_IS_TRUE(sourceInspect.has_value());
+            VERIFY_IS_TRUE(targetInspect.has_value());
             VERIFY_ARE_EQUAL(sourceInspect, targetInspect);
         }
     }

@@ -24,12 +24,4 @@ struct ImageInformation
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
 };
-
-struct RepoTag
-{
-    std::string Repo;
-    std::string Tag;
-
-    static RepoTag Parse(const std::string& repoTag);
-};
 } // namespace wsl::windows::wslc::models

@@ -201,11 +201,19 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
 {
-    auto repoTag = RepoTag::Parse(targetImage);
+    EnumReferenceFormat format;
+    auto parsed = ParseImage(targetImage, &format);
+    if (format == EnumReferenceFormat::Digest)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
+    }
+
     WSLCTagImageOptions options{};
     options.Image = sourceImage.c_str();
-    options.Repo = repoTag.Repo.c_str();
-    options.Tag = repoTag.Tag.c_str();
+    options.Repo = parsed.first.c_str();
+    const std::string tag = parsed.second ? *parsed.second : "";
+    options.Tag = tag.c_str();
+
     THROW_IF_FAILED(session.Get()->TagImage(&options));
 }
 

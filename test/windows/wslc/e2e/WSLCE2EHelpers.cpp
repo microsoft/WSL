@@ -13,6 +13,7 @@ Abstract:
 
 #include "precomp.h"
 #include "SessionModel.h"
+#include "ImageModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -196,12 +197,13 @@ void VerifyImageIsNotUsed(const TestImage& image)
 
 void VerifyImageIsListed(const TestImage& image)
 {
-    auto result = RunWslc(L"image list");
+    auto result = RunWslc(L"image list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto outputLines = result.GetStdoutLines();
-    for (const auto& line : outputLines)
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
     {
-        if (line.find(image.NameAndTag()) != std::wstring::npos)
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
         {
             return;
         }
