@@ -355,6 +355,23 @@ class WSLCTests
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
         }
+
+        // Validate that creating a session on a non-existing storage fails if WSLCSessionStorageFlagsNoCreate is set.
+        {
+            auto settings = GetDefaultSessionSettings(L"storage-not-found");
+            settings.StoragePath = L"C:\\does-not-exist";
+            settings.StorageFlags = WSLCSessionStorageFlagsNoCreate;
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+        }
+
+        // Reject invalid storage flags.
+        {
+            auto settings = GetDefaultSessionSettings(L"invalid-storage-flags");
+            settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x2);
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+        }
     }
 
     void ExpectImagePresent(IWSLCSession& Session, const char* Image, bool Present = true)
@@ -374,6 +391,24 @@ class WSLCTests
             LogError("Image presence check failed for image: %hs, images: %hs", Image, wsl::shared::string::Join(tags, ',').c_str());
             VERIFY_FAIL();
         }
+    }
+
+    std::pair<HRESULT, wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation>> DeleteImageNoThrow(const std::string& Image, DWORD Flags)
+    {
+        WSLCDeleteImageOptions options{};
+        options.Image = Image.c_str();
+        options.Flags = Flags;
+        wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+        auto hr = m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>());
+        return {hr, std::move(deletedImages)};
+    }
+
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> DeleteImage(const std::string& Image, DWORD Flags)
+    {
+        auto [hr, deletedImages] = DeleteImageNoThrow(Image, Flags);
+        VERIFY_SUCCEEDED(hr);
+
+        return std::move(deletedImages);
     }
 
     TEST_METHOD(PullImage)
@@ -444,12 +479,8 @@ class WSLCTests
         auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
             VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
 
-            auto cleanup = wil::scope_exit([&]() {
-                WSLCDeleteImageOptions options{.Flags = WSLCDeleteImageFlagsForce};
-                options.Image = ExpectedTag.has_value() ? ExpectedTag->c_str() : Image.c_str();
-                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
-            });
+            auto cleanup = wil::scope_exit(
+                [&]() { LOG_IF_FAILED(DeleteImageNoThrow(ExpectedTag.value_or(Image), WSLCDeleteImageFlagsForce).first); });
 
             if (!ExpectedTag.has_value())
             {
@@ -527,12 +558,8 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
         auto cleanup = wil::scope_exit([&]() {
-            WSLCDeleteImageOptions options{.Image = "debian:test-tag1", .Flags = WSLCDeleteImageFlagsNone};
-            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
-
-            options.Image = "debian:test-tag2";
-            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            LOG_IF_FAILED(DeleteImageNoThrow("debian:test-tag1", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("debian:test-tag2", WSLCDeleteImageFlagsNone).first);
         });
 
         LogInfo("Test: Basic listing with nullptr options");
@@ -756,9 +783,7 @@ class WSLCTests
 
             auto alpineCleanup = wil::scope_exit([&]() {
                 RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "image", "prune", "-f"});
-                WSLCDeleteImageOptions options{.Image = "alpine:latest", .Flags = WSLCDeleteImageFlagsNone};
-                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+                LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
             });
 
             // List only dangling images
@@ -872,6 +897,9 @@ class WSLCTests
     {
         WSL2_TEST_ONLY();
 
+        auto cleanup =
+            wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
+
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         wil::unique_handle imageTarFileHandle{
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
@@ -936,18 +964,11 @@ class WSLCTests
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
 
         // Test delete failed if image in use.
-        WSLCDeleteImageOptions options{};
-        options.Image = "alpine:latest";
-        options.Flags = WSLCDeleteImageFlagsNone;
-        wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-
         VERIFY_ARE_EQUAL(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
-            m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
 
         // Force should succeed.
-        options.Flags = WSLCDeleteImageFlagsForce;
-        VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+        auto deletedImages = DeleteImage("alpine:latest", WSLCDeleteImageFlagsForce);
         VERIFY_IS_TRUE(deletedImages.size() > 0);
         VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);
 
@@ -955,8 +976,14 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
 
         // Test delete failed if image does not exist.
-        VERIFY_ARE_EQUAL(
-            WSLC_E_IMAGE_NOT_FOUND, m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(WSLC_E_IMAGE_NOT_FOUND, DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsForce).first);
+
+        // Validate that invalid flags are rejected.
+        {
+            WSLCDeleteImageOptions invalidOptions{.Image = "alpine:latest", .Flags = 0x4};
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->DeleteImage(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()), E_INVALIDARG);
+        }
     }
 
     void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected)
@@ -1018,6 +1045,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1039,6 +1068,65 @@ class WSLCTests
         VERIFY_IS_TRUE(result.Output[1].find("Hello from a WSL container!") != std::string::npos);
     }
 
+    // This test validates both that we can build an image with an empty CMD, and that we can run such an image.
+    TEST_METHOD(BuildImageEntrypoint)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-entrypoint";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-entrypoint:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "CMD []\n";
+            dockerfile << "ENTRYPOINT [\"/bin/echo\", \"Entrypoint\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-entrypoint:latest"));
+        ExpectImagePresent(*m_defaultSession, "wslc-test-entrypoint:latest");
+
+        // Validate that the entrypoint is started by default.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-1");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "Entrypoint\n"}});
+        }
+
+        // Validate that arguments are passed to the entrypoint, and don't override it.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-2", {"extra-arg"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "Entrypoint extra-arg\n"}});
+        }
+
+        // Validate that the entrypoint can be overridden.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-3");
+            launcher.SetEntrypoint({"/bin/echo", "OverriddenEntrypoint"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OverriddenEntrypoint\n"}});
+        }
+
+        // Validate that the entrypoint can be overridden and that CMD args are passed to the entrypoint.
+        {
+            WSLCContainerLauncher launcher("wslc-test-entrypoint:latest", "wslc-entrypoint-test-4", {"extra-arg"});
+            launcher.SetEntrypoint({"/bin/echo", "OverriddenEntrypoint"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OverriddenEntrypoint extra-arg\n"}});
+        }
+    }
+
     TEST_METHOD(BuildImageWithContext)
     {
         WSL2_TEST_ONLY();
@@ -1046,6 +1134,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-file";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-context:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1082,6 +1172,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-many";
         std::filesystem::create_directories(contextDir / "files");
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-many:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1134,6 +1226,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-large";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-large:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1185,6 +1279,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-multistage";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-multistage:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1224,6 +1320,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-dockerignore";
         std::filesystem::create_directories(contextDir / "temp");
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-dockerignore:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1294,6 +1392,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-failure-output";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-args:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1347,6 +1447,8 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-stdin";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-stdin:latest", WSLCDeleteImageFlagsForce).first);
+
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
         });
@@ -1387,9 +1489,7 @@ class WSLCTests
         auto contextDir = std::filesystem::current_path() / "build-context-buildargs";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            WSLCDeleteImageOptions deleteOptions{.Image = "wslc-test-build-args:latest", .Flags = WSLCDeleteImageFlagsForce};
-            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build-args:latest", WSLCDeleteImageFlagsForce).first);
 
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
@@ -1423,11 +1523,9 @@ class WSLCTests
         std::filesystem::create_directories(contextDir);
         LPCSTR tags[] = {"wslc-test-multitag:v1", "wslc-test-multitag:v2"};
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
             for (auto* tag : tags)
             {
-                WSLCDeleteImageOptions deleteOptions{.Image = tag, .Flags = WSLCDeleteImageFlagsForce};
-                LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+                LOG_IF_FAILED(DeleteImageNoThrow(tag, WSLCDeleteImageFlagsForce).first);
             }
 
             std::error_code ec;
@@ -1528,9 +1626,7 @@ class WSLCTests
             std::error_code ec;
             std::filesystem::remove_all(contextDir, ec);
 
-            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-            WSLCDeleteImageOptions deleteOptions{.Image = "wslc-test-build:latest", .Flags = WSLCDeleteImageFlagsForce};
-            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-build:latest", WSLCDeleteImageFlagsForce).first);
         });
 
         {
@@ -1590,13 +1686,7 @@ class WSLCTests
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLCDeleteImageOptions deleteOptions{};
-                deleteOptions.Image = "debian:test-tag";
-                deleteOptions.Flags = WSLCDeleteImageFlagsNoPrune;
-
-                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-                VERIFY_SUCCEEDED(
-                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+                DeleteImage("debian:test-tag", WSLCDeleteImageFlagsNoPrune);
 
                 ExpectImagePresent(*m_defaultSession, "debian:test-tag", false);
                 ExpectImagePresent(*m_defaultSession, "debian:latest");
@@ -1636,13 +1726,7 @@ class WSLCTests
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLCDeleteImageOptions deleteOptions{};
-                deleteOptions.Image = "myrepo/myimage:v1.0.0";
-                deleteOptions.Flags = WSLCDeleteImageFlagsNoPrune;
-
-                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-                VERIFY_SUCCEEDED(
-                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+                DeleteImage("myrepo/myimage:v1.0.0", WSLCDeleteImageFlagsNoPrune);
 
                 ExpectImagePresent(*m_defaultSession, "myrepo/myimage:v1.0.0", false);
             });
@@ -1657,13 +1741,7 @@ class WSLCTests
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLCDeleteImageOptions deleteOptions{};
-                deleteOptions.Image = "debian:test-by-id";
-                deleteOptions.Flags = WSLCDeleteImageFlagsNoPrune;
-
-                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-                VERIFY_SUCCEEDED(
-                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+                DeleteImage("debian:test-by-id", WSLCDeleteImageFlagsNoPrune);
 
                 ExpectImagePresent(*m_defaultSession, "debian:test-by-id", false);
             });
@@ -1690,13 +1768,7 @@ class WSLCTests
         // Positive test: Overwrite existing tag.
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                WSLCDeleteImageOptions deleteOptions{};
-                deleteOptions.Image = "test:duplicate-tag";
-                deleteOptions.Flags = WSLCDeleteImageFlagsNoPrune;
-
-                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-                VERIFY_SUCCEEDED(
-                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+                DeleteImage("test:duplicate-tag", WSLCDeleteImageFlagsNoPrune);
 
                 ExpectImagePresent(*m_defaultSession, "test:duplicate-tag", false);
             });
@@ -2090,9 +2162,7 @@ class WSLCTests
                 VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
 
                 auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                    WSLCDeleteImageOptions options{.Image = "test-imported-container:latest", .Flags = WSLCDeleteImageFlagsNone};
-                    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
-                    LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+                    LOG_IF_FAILED(DeleteImageNoThrow("test-imported-container:latest", WSLCDeleteImageFlagsNone).first);
                 });
 
                 VERIFY_SUCCEEDED(m_defaultSession->ImportImage(
@@ -2326,6 +2396,12 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
         }
+
+        // Verify DNS resolution.
+        // Note: without DNS tunneling, NAT mode uses the ICS SharedAccess DNS proxy which only supports UDP.
+        // TCP DNS queries (dig +tcp) will time out without tunneling.
+        VerifyDigDnsResolution(session.get(), "getent ahosts bing.com");
+        VerifyDnsQueries(session.get(), mode, enableDnsTunneling);
     }
 
     TEST_METHOD(NATNetworking)
@@ -2342,6 +2418,53 @@ class WSLCTests
     TEST_METHOD(VirtioProxyNetworking)
     {
         ValidateNetworking(WSLCNetworkingModeVirtioProxy);
+    }
+
+    TEST_METHOD(VirtioProxyNetworkingWithDnsTunneling)
+    {
+        WINDOWS_11_TEST_ONLY();
+        ValidateNetworking(WSLCNetworkingModeVirtioProxy, true);
+    }
+
+    // DNS test helpers
+
+    void VerifyDigDnsResolution(IWSLCSession* session, const std::string& digCommandLine)
+    {
+        auto result = ExpectCommandResult(session, {"/bin/sh", "-c", digCommandLine}, 0);
+        VERIFY_IS_FALSE(result.Output[1].empty());
+    }
+
+    void VerifyDnsQueries(IWSLCSession* session, WSLCNetworkingMode mode, bool enableDnsTunneling)
+    {
+        // TCP DNS works except for NAT without tunneling (ICS SharedAccess DNS proxy is UDP-only).
+        const bool includeTcp = (mode != WSLCNetworkingModeNAT) || enableDnsTunneling;
+
+        // UDP queries for all record types
+        VerifyDigDnsResolution(session, "dig +short +time=5 A bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 AAAA bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 -x 8.8.8.8");
+        VerifyDigDnsResolution(session, "dig +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(session, "dig +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(session, "dig +time=5 CNAME bing.com");
+        VerifyDigDnsResolution(session, "dig +time=5 SRV bing.com");
+
+        if (includeTcp)
+        {
+            // ANY - dig expects a large response so it queries directly over TCP
+            VerifyDigDnsResolution(session, "dig +short +time=5 ANY bing.com");
+
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 A bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 AAAA bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 MX bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 NS bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 -x 8.8.8.8");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 SOA bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +short +time=5 TXT bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +time=5 CNAME bing.com");
+            VerifyDigDnsResolution(session, "dig +tcp +time=5 SRV bing.com");
+        }
     }
 
     void ValidatePortMapping(WSLCNetworkingMode networkingMode)
@@ -3609,6 +3732,13 @@ class WSLCTests
 
             // Validate that deleted containers can't be started.
             VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr), RPC_E_DISCONNECTED);
+        }
+
+        // Validate that invalid start flags are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-stop-start-invalid-flags", {"echo", "OK"});
+            auto container = launcher.Create(*m_defaultSession);
+            VERIFY_ARE_EQUAL(container.Get().Start(static_cast<WSLCContainerStartFlags>(0x2), nullptr), E_INVALIDARG);
         }
     }
 
@@ -5238,7 +5368,12 @@ class WSLCTests
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(containers.size(), 1);
-            VERIFY_ARE_EQUAL(containers[0].StateChangedAt, originalStateChangedAt);
+
+            // StateChangedAt may differ by ~1s between live (event time) and recovery (FinishedAt).
+            auto stateChangedAtDiff = (containers[0].StateChangedAt > originalStateChangedAt)
+                                          ? (containers[0].StateChangedAt - originalStateChangedAt)
+                                          : (originalStateChangedAt - containers[0].StateChangedAt);
+            VERIFY_IS_TRUE(stateChangedAtDiff <= 60);
             VERIFY_ARE_EQUAL(containers[0].CreatedAt, originalCreatedAt);
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
@@ -5601,6 +5736,16 @@ class WSLCTests
 
             expectLogs(container.Get(), "line1\nline2\n", "");
             expectLogs(container.Get(), "line1\nline2\n", "", WSLCLogsFlagsFollow);
+        }
+
+        // Validate that invalid logs flags are rejected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "logs-test-invalid-flags", {"/bin/bash", "-c", "echo OK"});
+            auto container = launcher.Create(*m_defaultSession);
+
+            COMOutputHandle stdoutHandle{};
+            COMOutputHandle stderrHandle{};
+            VERIFY_ARE_EQUAL(container.Get().Logs(static_cast<WSLCLogsFlags>(0x4), &stdoutHandle, &stderrHandle, 0, 0, 0), E_INVALIDARG);
         }
     }
 

@@ -28,56 +28,16 @@ using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
-
-DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
-
-static void SetContainerTTYOptions(WSLCProcessOptions& options)
-{
-    if (!WI_IsFlagSet(options.Flags, WSLCProcessFlagsTty))
-    {
-        return;
-    }
-
-    auto tryGetConsoleInfo = [](HANDLE handle, CONSOLE_SCREEN_BUFFER_INFOEX& info) -> bool {
-        info.cbSize = sizeof(info);
-        return ::GetConsoleScreenBufferInfoEx(handle, &info) != FALSE;
-    };
-
-    CONSOLE_SCREEN_BUFFER_INFOEX info{};
-    HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (tryGetConsoleInfo(stdoutHandle, info))
-    {
-        options.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
-        options.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
-        return;
-    }
-
-    HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD stdinMode = 0;
-    if (::GetConsoleMode(stdinHandle, &stdinMode))
-    {
-        wil::unique_hfile consoleOutput(CreateFileW(
-            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
-        if (consoleOutput && tryGetConsoleInfo(consoleOutput.get(), info))
-        {
-            options.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
-            options.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
-            return;
-        }
-    }
-
-    THROW_HR_WITH_USER_ERROR(E_FAIL, L"--tty requires stdin or stdout to be a console");
-}
 
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLCContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
+static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
 {
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
@@ -135,13 +95,19 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetEntrypoint(std::move(entrypoints));
     }
 
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        containerLauncher.SetUser(std::move(user));
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
         {
             // Attempt to pull the image if not found
             PullImageCallback callback;
-            PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
+            PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
             ImageService imageService;
             imageService.Pull(session, image, &callback);
         }
@@ -318,7 +284,7 @@ std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions, nullptr);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
 
@@ -342,7 +308,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
-    auto runningContainer = CreateInternal(session, image, runOptions, nullptr);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
@@ -434,9 +400,18 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLCProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
 
-    ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
+    auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        processLauncher.SetUser(std::move(user));
+    }
+    if (!options.WorkingDirectory.empty())
+    {
+        processLauncher.SetWorkingDirectory(std::move(options.WorkingDirectory));
+    }
+
+    return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)

@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Attach Command
@@ -33,12 +34,12 @@ std::vector<Argument> ContainerAttachCommand::GetArguments() const
 
 std::wstring ContainerAttachCommand::ShortDescription() const
 {
-    return {L"Attach to a container."};
+    return Localization::WSLCCLI_ContainerAttachDesc();
 }
 
 std::wstring ContainerAttachCommand::LongDescription() const
 {
-    return {L"Attaches to a container."};
+    return Localization::WSLCCLI_ContainerAttachLongDesc();
 }
 
 void ContainerAttachCommand::ExecuteInternal(CLIExecutionContext& context) const

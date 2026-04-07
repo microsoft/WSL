@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Run Command
@@ -50,7 +51,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Session),
         // Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
-        // Argument::Create(ArgType::User),
+        Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, false, NO_LIMIT),
         // Argument::Create(ArgType::Virtual),
     };
@@ -59,12 +60,12 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
 
 std::wstring ContainerRunCommand::ShortDescription() const
 {
-    return {L"Run a container."};
+    return Localization::WSLCCLI_ContainerRunDesc();
 }
 
 std::wstring ContainerRunCommand::LongDescription() const
 {
-    return {L"Runs a container. By default, the container is started in the background; use --detach to run in the foreground."};
+    return Localization::WSLCCLI_ContainerRunLongDesc();
 }
 
 // clang-format off

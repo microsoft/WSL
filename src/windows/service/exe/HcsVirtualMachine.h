@@ -20,6 +20,7 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "Dmesg.h"
 #include "INetworkingEngine.h"
+#include "WslCoreConfig.h"
 #include <filesystem>
 #include <map>
 
@@ -79,6 +80,7 @@ private:
     wil::unique_socket m_listenSocket;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
+    std::optional<wsl::core::Config> m_natConfig;
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};

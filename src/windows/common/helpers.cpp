@@ -475,6 +475,29 @@ bool wsl::windows::common::helpers::IsServicePresent(_In_ LPCWSTR ServiceName)
     return !!service;
 }
 
+bool wsl::windows::common::helpers::IsServiceRunning(_In_ LPCWSTR ServiceName)
+{
+    const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    if (!manager)
+    {
+        return false;
+    }
+
+    const wil::unique_schandle service{OpenServiceW(manager.get(), ServiceName, SERVICE_QUERY_STATUS)};
+    if (!service)
+    {
+        return false;
+    }
+
+    SERVICE_STATUS status;
+    if (!QueryServiceStatus(service.get(), &status))
+    {
+        return false;
+    }
+
+    return status.dwCurrentState != SERVICE_STOPPED;
+}
+
 bool wsl::windows::common::helpers::IsVirtioSerialConsoleSupported()
 {
     // See if the Windows version has the required platform change.
