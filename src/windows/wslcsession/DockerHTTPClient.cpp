@@ -172,7 +172,7 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PushImage(
-    const std::string& ImageName, const std::optional<std::string>& tag, const std::optional<std::string>& registryAuth)
+    const std::string& ImageName, const std::optional<std::string>& tag, std::string& registryAuth)
 {
     auto url = URL::Create("/images/{}/push", ImageName);
 
@@ -181,13 +181,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PushImag
         url.SetParameter("tag", tag.value());
     }
 
-    std::map<std::string, std::string> customHeaders;
-
-    if (registryAuth.has_value())
-    {
-        customHeaders["X-Registry-Auth"] = registryAuth.value();
-    }
-
+    std::map<std::string, std::string> customHeaders = {{"X-Registry-Auth", registryAuth}};
     return SendRequestImpl(verb::post, url, {}, {}, customHeaders);
 }
 

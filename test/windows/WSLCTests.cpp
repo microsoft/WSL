@@ -92,6 +92,11 @@ class WSLCTests
             LoadTestImage("hello-world:latest");
         }
 
+        if (!hasImage("alpine:latest"))
+        {
+            LoadTestImage("alpine:latest");
+        }
+
         if (!hasImage("wslc-registry:latest"))
         {
             LoadTestImage("wslc-registry:latest");
@@ -179,7 +184,7 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    void PushImageToRegistry(IWSLCSession& session, const std::string& imageName, const char* registryAddress, const std::string& registryAuth)
+    void PushImageToRegistry(IWSLCSession& session, const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
     {
         auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(imageName);
         auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
@@ -453,27 +458,29 @@ class WSLCTests
         WSL2_TEST_ONLY();
 
         {
-            HRESULT pullResult = m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr);
+            // Start a local registry without auth and push hello-world:latest to it.
+            auto registry = wsl::windows::common::WSLCLocalRegistry::Start(*m_defaultSession);
+            auto registryAddress = registry.GetServerAddress();
 
-            // Skip test if error is due to rate limit.
-            if (pullResult == E_FAIL)
-            {
-                auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-                if (comError.has_value())
-                {
-                    if (wcsstr(comError->Message.get(), L"toomanyrequests") != nullptr)
-                    {
-                        LogWarning("Skipping PullImage test due to rate limiting.");
-                        return;
-                    }
-                }
-            }
+            // Wait for the registry to be ready.
+            auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
+            ExpectHttpResponse(registryUrl.c_str(), 200, true);
 
-            VERIFY_SUCCEEDED(pullResult);
+            auto auth = wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress);
+            PushImageToRegistry(*m_defaultSession, "hello-world:latest", registryAddress, auth);
+
+            auto image = std::format("{}/hello-world:latest", registryAddress);
+
+            // Delete the image if it already exists locally, so the pull is a real pull.
+            WSLCDeleteImageOptions deleteOptions{.Image = image.c_str(), .Flags = WSLCDeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
+
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr));
 
             // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:linux");
-            WSLCContainerLauncher launcher("hello-world:linux", "wslc-pull-image-container");
+            ExpectImagePresent(*m_defaultSession, image.c_str());
+            WSLCContainerLauncher launcher(image, "wslc-pull-image-container");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto result = container.GetInitProcess().WaitAndCaptureOutput();
@@ -488,10 +495,7 @@ class WSLCTests
                 L"access to the resource is denied";
 
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
-            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-            VERIFY_IS_TRUE(comError.has_value());
-
-            VERIFY_ARE_EQUAL(expectedError, comError->Message.get());
+            ValidateCOMErrorMessage(expectedError.c_str());
         }
 
         // Validate that PullImage() returns the appropriate error if the session is terminated.
@@ -510,71 +514,55 @@ class WSLCTests
     {
         WSL2_TEST_ONLY();
 
-        // TODO: Enable once custom registries are supported, to avoid hitting public registry rate limits.
-        SKIP_TEST_UNSTABLE();
+        // Start a local registry without auth to avoid Docker Hub rate limits.
+        auto registry = wsl::windows::common::WSLCLocalRegistry::Start(*m_defaultSession);
+        auto registryAddress = registry.GetServerAddress();
 
-        auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage(Image.c_str(), nullptr, nullptr));
+        // Wait for the registry to be ready.
+        auto registryUrl = std::format(L"http://{}/v2/", registryAddress);
+        ExpectHttpResponse(registryUrl.c_str(), 200, true);
 
-            auto cleanup = wil::scope_exit(
-                [&]() { LOG_IF_FAILED(DeleteImageNoThrow(ExpectedTag.value_or(Image), WSLCDeleteImageFlagsForce).first); });
+        auto validatePull = [&](const std::string& sourceImage, const std::string& registryTag) {
+            // Push the source image to the local registry.
+            auto auth = wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress);
+            PushImageToRegistry(*m_defaultSession, sourceImage, registryAddress, auth);
 
-            if (!ExpectedTag.has_value())
-            {
-                wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
-                VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+            auto registryImage = std::format("{}/{}", registryAddress, registryTag);
 
-                for (const auto& e : images)
-                {
-                    wil::unique_cotaskmem_ansistring json;
-                    VERIFY_SUCCEEDED(m_defaultSession->InspectImage(e.Hash, &json));
+            // Delete the image locally so the pull is a real pull.
+            WSLCDeleteImageOptions deleteOptions{.Image = registryImage.c_str(), .Flags = WSLCDeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&deleteOptions, &deletedImages, deletedImages.size_address<ULONG>()));
 
-                    auto parsed = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectImage>(json.get());
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(registryImage.c_str(), nullptr, nullptr));
 
-                    for (const auto& repoTag : parsed.RepoDigests.value_or({}))
-                    {
-                        if (Image == repoTag)
-                        {
-                            return;
-                        }
-                    }
-                }
+            auto cleanup =
+                wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsForce).first); });
 
-                LogError("Expected digest '%hs' not found ", Image.c_str());
-
-                VERIFY_FAIL();
-            }
-            else
-            {
-                ExpectImagePresent(*m_defaultSession, ExpectedTag->c_str());
-            }
+            ExpectImagePresent(*m_defaultSession, registryImage.c_str());
         };
 
-        validatePull("ubuntu@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30", {});
-        validatePull("ubuntu", "ubuntu:latest");
-        validatePull("debian:bookworm", "debian:bookworm");
-        validatePull("pytorch/pytorch", "pytorch/pytorch:latest");
-        validatePull("registry.k8s.io/pause:3.2", "registry.k8s.io/pause:3.2");
+        validatePull("debian:latest", "debian:latest");
+        validatePull("alpine:latest", "alpine:latest");
+        validatePull("hello-world:latest", "hello-world:latest");
+    }
 
-        // Validate that PullImage() fails appropriately when the session runs out of space.
+    TEST_METHOD(PushImage)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate that pushing a non-existent image fails.
         {
-            auto settings = GetDefaultSessionSettings(L"wslc-pull-image-out-of-space", false);
-            settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
-            settings.MemoryMb = 1024;
-            auto session = CreateSession(settings);
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", nullptr, nullptr), E_INVALIDARG);
+        }
 
-            VERIFY_ARE_EQUAL(session->PullImage("pytorch/pytorch", nullptr, nullptr), E_FAIL);
+        // Validate that PushImage() returns the appropriate error if the session is terminated.
+        {
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
-            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-            VERIFY_IS_TRUE(comError.has_value());
+            auto cleanup = wil::scope_exit([&]() { ResetTestSession(); });
 
-            // The error message can't be compared directly because it contains an unpredicable path:
-            // "write /var/lib/docker/tmp/GetImageBlob1760660623: no space left on device"
-            if (StrStrW(comError->Message.get(), L"no space left on device") == nullptr)
-            {
-                LogError("Unexpected error message: %ls", comError->Message.get());
-                VERIFY_FAIL();
-            }
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("hello-world:latest", nullptr, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 

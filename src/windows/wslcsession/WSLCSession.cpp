@@ -1297,19 +1297,13 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, Image);
+    RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
-
-    std::optional<std::string> registryAuth;
-
-    if (RegistryAuthenticationInformation != nullptr && *RegistryAuthenticationInformation != '\0')
-    {
-        registryAuth = std::string(RegistryAuthenticationInformation);
-    }
-
+    std::string registryAuth = RegistryAuthenticationInformation;
     auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 
