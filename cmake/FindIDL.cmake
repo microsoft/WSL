@@ -63,13 +63,6 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
 
     endforeach()
 
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}
-        COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}"
-        DEPENDS ${TARGET_OUTPUTS}
-        VERBATIM
-    )
-
-    add_custom_target(${target} DEPENDS ${TARGET_OUTPUTS} ${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target} SOURCES ${idl_files_with_proxy} ${idl_files_no_proxy})
+    add_custom_target(${target} DEPENDS ${TARGET_OUTPUTS} SOURCES ${idl_files_with_proxy} ${idl_files_no_proxy})
 
 endfunction()
