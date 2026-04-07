@@ -139,7 +139,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
         customHeaders["X-Registry-Auth"] = registryAuth.value();
     }
 
-    return SendRequestImpl(verb::post, url, {}, {}, customHeaders);
+    return SendRequestImpl(verb::post, url, {}, customHeaders);
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)
@@ -148,7 +148,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImag
         verb::post,
         URL::Create("/images/load"),
         {},
-        {{http::field::content_type, "application/x-tar"}, {http::field::content_length, std::to_string(ContentLength)}});
+        {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength)
@@ -159,7 +159,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportIm
     url.SetParameter("fromSrc", "-");
 
     return SendRequestImpl(
-        verb::post, url, {}, {{http::field::content_type, "application/x-tar"}, {http::field::content_length, std::to_string(ContentLength)}});
+        verb::post, url, {}, {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
 }
 
 void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag)
@@ -182,7 +182,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PushImag
     }
 
     std::map<std::string, std::string> customHeaders = {{"X-Registry-Auth", registryAuth}};
-    return SendRequestImpl(verb::post, url, {}, {}, customHeaders);
+    return SendRequestImpl(verb::post, url, {}, customHeaders);
 }
 
 std::string DockerHTTPClient::Authenticate(const std::string& serverAddress, const std::string& username, const std::string& password)
@@ -347,8 +347,8 @@ docker_schema::InspectExec DockerHTTPClient::InspectExec(const std::string& Id)
 
 wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys)
 {
-    std::map<boost::beast::http::field, std::string> headers{
-        {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
+    std::map<std::string, std::string> headers{
+        {"Upgrade", "tcp"}, {"Connection", "upgrade"}};
 
     auto url = URL::Create("/containers/{}/attach", Id);
     url.SetParameter("stream", true);
@@ -444,8 +444,8 @@ docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string
 
 wil::unique_socket DockerHTTPClient::StartExec(const std::string& Id, const common::docker_schema::StartExec& Request)
 {
-    std::map<boost::beast::http::field, std::string> headers{
-        {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
+    std::map<std::string, std::string> headers{
+        {"Upgrade", "tcp"}, {"Connection", "upgrade"}};
 
     auto url = URL::Create("/exec/{}/start", Id);
 
@@ -665,8 +665,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
     verb Method,
     const URL& Url,
     const std::string& Body,
-    const std::map<boost::beast::http::field, std::string>& Headers,
-    const std::map<std::string, std::string>& CustomHeaders)
+    const std::map<std::string, std::string>& Headers)
 {
     auto context = std::make_unique<DockerHTTPClient::HTTPRequestContext>(ConnectSocket());
 
@@ -684,12 +683,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
     req.set(http::field::connection, "close");
     req.set(http::field::accept, "application/json");
 
-    for (const auto& [field, value] : Headers)
-    {
-        req.set(field, value);
-    }
-
-    for (const auto& [name, value] : CustomHeaders)
+    for (const auto& [name, value] : Headers)
     {
         req.set(name, value);
     }
@@ -711,7 +705,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
 }
 
 std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::SendRequest(
-    verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers)
+    verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers)
 {
     // Write the request
     auto context = SendRequestImpl(Method, Url, Body, Headers);

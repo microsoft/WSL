@@ -230,14 +230,13 @@ private:
         boost::beast::http::verb Method,
         const URL& Url,
         const std::string& Body,
-        const std::map<boost::beast::http::field, std::string>& Headers = {},
-        const std::map<std::string, std::string>& CustomHeaders = {});
+        const std::map<std::string, std::string>& Headers = {});
 
     std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");
 
     std::pair<HTTPResponse, wil::unique_socket> SendRequest(
-        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers = {});
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers = {});
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
     auto Transaction(boost::beast::http::verb Method, const URL& Url, const TRequest& RequestObject = {})
