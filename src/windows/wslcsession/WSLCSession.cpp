@@ -1303,8 +1303,7 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
-    std::string registryAuth = RegistryAuthenticationInformation;
-    auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, registryAuth);
+    auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, RegistryAuthenticationInformation);
     StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
 
     return S_OK;

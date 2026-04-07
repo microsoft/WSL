@@ -172,7 +172,7 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PushImage(
-    const std::string& ImageName, const std::optional<std::string>& tag, std::string& registryAuth)
+    const std::string& ImageName, const std::optional<std::string>& tag, const std::string& registryAuth)
 {
     auto url = URL::Create("/images/{}/push", ImageName);
 
