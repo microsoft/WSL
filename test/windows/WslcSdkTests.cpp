@@ -1024,11 +1024,7 @@ class WslcSdkTests
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
             mapping.windowsAddress = &badAddr;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings5, &mapping, 1));
-
-            WslcContainer rawContainer = nullptr;
-            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings5, &rawContainer, nullptr), E_INVALIDARG);
-            VERIFY_IS_NULL(rawContainer);
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsPortMappings(&containerSettings5, &mapping, 1), E_INVALIDARG);
         }
     }
 
