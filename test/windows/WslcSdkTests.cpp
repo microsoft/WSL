@@ -527,9 +527,6 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
-        // Setup: load hello-world:latest so we have something to delete.
-        LoadTestImage("hello-world:latest");
-
         VERIFY_IS_TRUE(HasImage("hello-world:latest"));
 
         // Positive: delete an existing image.
@@ -538,6 +535,9 @@ class WslcSdkTests
 
         // Verify the image is no longer present in the list.
         VERIFY_IS_FALSE(HasImage("hello-world:latest"));
+
+        // Reload the image for subsequent tests.
+        LoadTestImage("hello-world:latest");
 
         // Negative: null name must fail.
         VERIFY_ARE_EQUAL(WslcDeleteSessionImage(m_defaultSession, nullptr, nullptr), E_POINTER);
@@ -1990,6 +1990,8 @@ class WslcSdkTests
     std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
         const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
     {
+        VERIFY_IS_TRUE(HasImage("wslc-registry:latest"));
+
         std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
         if (!username.empty())
         {
@@ -2020,6 +2022,8 @@ class WslcSdkTests
         auto imageName = std::format("{}:{}", repo, tag);
         auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag);
         auto registryRepo = std::format("{}/{}", registryAddress, repo);
+
+        VERIFY_IS_TRUE(HasImage(imageName));
 
         // Tag the image with the registry address so it can be pushed.
         WslcTagImageOptions tagOptions{};
