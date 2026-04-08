@@ -5022,6 +5022,28 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(result, E_INVALIDARG);
         }
+
+        // Validate that access denied errors are propagated when the host volume folder can't be created.
+        {
+            SetPathAccess(hostFolder, FILE_GENERIC_WRITE, DENY_ACCESS);
+
+            // Restore the original DACL on cleanup so the folder can be deleted.
+            auto restoreAccess =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { SetPathAccess(hostFolder, FILE_GENERIC_WRITE, GRANT_ACCESS); });
+
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-7", {"echo", "OK"});
+            launcher.AddVolume((hostFolder / "subfolder").wstring(), "/volume", false);
+
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, E_ACCESSDENIED);
+
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+
+            VerifyPatternMatch(
+                wsl::shared::string::WideToMultiByte(comError->Message.get()),
+                "Failed to create volume '*test-volume\\subfolder': Access is denied. .");
+        }
     }
 
     void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)

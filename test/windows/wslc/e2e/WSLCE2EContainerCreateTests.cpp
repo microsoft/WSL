@@ -346,7 +346,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume \"C:/hostPath\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Path is not absolute: 'C'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -357,9 +357,10 @@ class WSLCE2EContainerCreateTests
         }
 
         {
+            // TODO: This specific error should be handled better once relative path handling is supported in the CLI.
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume \"::\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Unspecified error \r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Path is not absolute: ':'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 

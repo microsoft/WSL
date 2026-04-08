@@ -47,6 +47,7 @@ using wsl::windows::service::wslc::WSLCVolumeMount;
 using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
 using namespace std::chrono_literals;
+using wsl::shared::Localization;
 
 namespace wslc_schema = wsl::windows::common::wslc_schema;
 
@@ -145,7 +146,12 @@ auto MountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& par
         // Create a new directory if it doesn't exist.
         if (!std::filesystem::exists(volume.HostPath))
         {
-            std::filesystem::create_directories(volume.HostPath);
+            auto result = wil::CreateDirectoryDeepNoThrow(volume.HostPath.c_str());
+            if (FAILED(result))
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    result, Localization::MessageWslcFailedToMountVolume(volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
+            }
         }
 
         auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
@@ -257,7 +263,7 @@ void ProcessNamedVolumes(
         std::string volumeName = nv.Name;
 
         THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_VOLUME_NOT_FOUND, wsl::shared::Localization::MessageWslcVolumeNotFound(nv.Name), !sessionVolumes.contains(volumeName));
+            WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(nv.Name), !sessionVolumes.contains(volumeName));
 
         wsl::windows::common::docker_schema::Mount mount{};
         mount.Source = std::move(volumeName);
@@ -280,7 +286,7 @@ void ValidateNamedVolumes(
         {
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLC_E_VOLUME_NOT_FOUND,
-                wsl::shared::Localization::MessageWslcVolumeNotFound(mount.Name),
+                Localization::MessageWslcVolumeNotFound(mount.Name),
                 !sessionVolumes.contains(mount.Name) && !anonymousVolumes.contains(mount.Name));
         }
     }
@@ -1151,7 +1157,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
 
         std::filesystem::path hostPath = volume.HostPath;
-        THROW_HR_IF_MSG(E_INVALIDARG, !hostPath.is_absolute(), "Path is not absolute. Volumes[%lu].HostPath: '%ls'", i, volume.HostPath);
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(volume.HostPath), !hostPath.is_absolute());
 
         std::wstring sourceFilename;
 
@@ -1178,8 +1184,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 }
                 else
                 {
-                    THROW_HR_WITH_USER_ERROR(
-                        E_FAIL, shared::Localization::MessageWslcFailedToMountVolume(volume.HostPath, strerror(ec.value())));
+                    THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(volume.HostPath, strerror(ec.value())));
                 }
             }
         }
