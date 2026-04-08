@@ -1184,7 +1184,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 }
                 else
                 {
-                    THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(volume.HostPath, strerror(ec.value())));
+                    THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(volume.HostPath, ec.message()));
                 }
             }
         }

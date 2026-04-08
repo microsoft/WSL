@@ -5015,7 +5015,7 @@ class WSLCTests
 
         // Validate that invalid paths are rejected
         {
-            WSLCContainerLauncher launcher("debian:latest", "test-volumes-6", {});
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-7", {});
             launcher.AddVolume(L":", "/volume", false);
 
             auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
@@ -5027,11 +5027,10 @@ class WSLCTests
         {
             SetPathAccess(hostFolder, FILE_GENERIC_WRITE, DENY_ACCESS);
 
-            // Restore the original DACL on cleanup so the folder can be deleted.
             auto restoreAccess =
                 wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { SetPathAccess(hostFolder, FILE_GENERIC_WRITE, GRANT_ACCESS); });
 
-            WSLCContainerLauncher launcher("debian:latest", "test-volumes-7", {"echo", "OK"});
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-8", {"echo", "OK"});
             launcher.AddVolume((hostFolder / "subfolder").wstring(), "/volume", false);
 
             auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
@@ -5042,7 +5041,7 @@ class WSLCTests
 
             VerifyPatternMatch(
                 wsl::shared::string::WideToMultiByte(comError->Message.get()),
-                "Failed to create volume '*test-volume\\subfolder': Access is denied. .");
+                "Failed to create volume '*test-volume\\subfolder': Access is denied. ");
         }
     }
 
