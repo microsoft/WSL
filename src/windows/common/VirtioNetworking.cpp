@@ -88,9 +88,11 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
 }
 
 void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)
+try
 {
     static_cast<VirtioNetworking*>(context)->RefreshGuestConnection();
 }
+CATCH_LOG()
 
 HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
 {
@@ -180,8 +182,7 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
     return 0;
 }
 
-void VirtioNetworking::RefreshGuestConnection() noexcept
-try
+void VirtioNetworking::RefreshGuestConnection()
 {
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
@@ -231,7 +232,6 @@ try
     // Add virtio net adapter to guest. If the adapter already exists update adapter state.
     if (device_options != m_trackedDeviceOptions)
     {
-        m_trackedDeviceOptions = device_options;
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
@@ -245,6 +245,8 @@ try
                 LOG_IF_FAILED(server->AddSharePath(c_eth0DeviceName, device_options.c_str(), 0));
             }
         }
+
+        m_trackedDeviceOptions = device_options;
     }
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
@@ -260,7 +262,6 @@ try
 
     m_networkSettings = std::move(networkSettings);
 }
-CATCH_LOG();
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
