@@ -326,6 +326,9 @@ endif()
 # Generate the clang-format script which contains a path to clang-format.exe
 configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/FormatSource.ps1.in ${CMAKE_BINARY_DIR}/FormatSource.ps1)
 
+# Generate the pre-commit hook with the resolved clang-format path
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit.in ${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit)
+
 cmake_path(COMPARE "${wsl_SOURCE_DIR}" EQUAL "${wsl_BINARY_DIR}" BUILD_IN_SOURCE)
 if (NOT ${BUILD_IN_SOURCE}) # Testing on 3.26 project_type_DIR paths appear canonicalized
     file(CREATE_LINK ${LLVM_INSTALL_DIR}/clang-format.exe ${wsl_SOURCE_DIR}/tools/clang-format.exe COPY_ON_ERROR)

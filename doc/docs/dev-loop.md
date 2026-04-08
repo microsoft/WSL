@@ -126,4 +126,5 @@ Also see:
 Every pull request needs to be clang-formatted before it can be merged.
 
 The code can be manually formatted by running: `powershell .\FormatSource.ps1 -ModifiedOnly $false`.
-To automatically check formatting when creating a commit, run: `tools\SetupClangFormat.bat`
+
+To automatically check formatting before each commit, run `cmake .` and then: `tools\SetupClangFormat.bat`
