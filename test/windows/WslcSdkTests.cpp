@@ -2002,7 +2002,6 @@ class WslcSdkTests
         launcher.AddPort(port, port, AF_INET);
 
         // Get the IWSLCSession COM object from the SDK session handle.
-        // GetInternalType is not exported from the SDK DLL, so cast the opaque handle directly.
         auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
         auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
 
