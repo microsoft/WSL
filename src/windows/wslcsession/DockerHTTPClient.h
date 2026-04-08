@@ -227,10 +227,7 @@ private:
     wil::unique_socket ConnectSocket();
 
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
-        boost::beast::http::verb Method,
-        const URL& Url,
-        const std::string& Body,
-        const std::map<std::string, std::string>& Headers = {});
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers = {});
 
     std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");

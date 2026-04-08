@@ -1312,8 +1312,7 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    return errorInfoWrapper.CaptureResult(
-        internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get()));
 }
 CATCH_RETURN();
 

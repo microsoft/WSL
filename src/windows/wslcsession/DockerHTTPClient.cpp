@@ -145,10 +145,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)
 {
     return SendRequestImpl(
-        verb::post,
-        URL::Create("/images/load"),
-        {},
-        {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
+        verb::post, URL::Create("/images/load"), {}, {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength)
@@ -158,8 +155,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportIm
     url.SetParameter("repo", Repo);
     url.SetParameter("fromSrc", "-");
 
-    return SendRequestImpl(
-        verb::post, url, {}, {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
+    return SendRequestImpl(verb::post, url, {}, {{"Content-Type", "application/x-tar"}, {"Content-Length", std::to_string(ContentLength)}});
 }
 
 void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag)
@@ -347,8 +343,7 @@ docker_schema::InspectExec DockerHTTPClient::InspectExec(const std::string& Id)
 
 wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys)
 {
-    std::map<std::string, std::string> headers{
-        {"Upgrade", "tcp"}, {"Connection", "upgrade"}};
+    std::map<std::string, std::string> headers{{"Upgrade", "tcp"}, {"Connection", "upgrade"}};
 
     auto url = URL::Create("/containers/{}/attach", Id);
     url.SetParameter("stream", true);
@@ -444,8 +439,7 @@ docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string
 
 wil::unique_socket DockerHTTPClient::StartExec(const std::string& Id, const common::docker_schema::StartExec& Request)
 {
-    std::map<std::string, std::string> headers{
-        {"Upgrade", "tcp"}, {"Connection", "upgrade"}};
+    std::map<std::string, std::string> headers{{"Upgrade", "tcp"}, {"Connection", "upgrade"}};
 
     auto url = URL::Create("/exec/{}/start", Id);
 
@@ -662,10 +656,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnResponseBytes(const gsl::span
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequestImpl(
-    verb Method,
-    const URL& Url,
-    const std::string& Body,
-    const std::map<std::string, std::string>& Headers)
+    verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers)
 {
     auto context = std::make_unique<DockerHTTPClient::HTTPRequestContext>(ConnectSocket());
 
