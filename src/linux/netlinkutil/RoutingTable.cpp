@@ -197,8 +197,8 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.to.value().Addr().c_str(),
+        route.via.value().Addr().c_str(),
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
@@ -269,8 +269,8 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        "[empty]",
+        route.via.value().Addr().c_str(),
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
@@ -300,15 +300,15 @@ void RoutingTable::ModifyLinkLocalRouteImpl(const Route& route, int operation, i
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.to.value().Addr().c_str(),
+        "[empty]",
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
             "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
-            route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
+            route.to.value().Addr().c_str(),
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
@@ -336,16 +336,16 @@ void RoutingTable::ModifyOfflinkRouteImpl(const Route& route, int operation, int
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.to.value().Addr().c_str(),
+        route.via.value().Addr().c_str(),
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
             "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
-            route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-            route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+            route.to.value().Addr().c_str(),
+            route.via.value().Addr().c_str(),
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
         utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);
