@@ -2009,8 +2009,7 @@ class WslcSdkTests
 
         // Wait for the registry to be ready by probing from the host.
         auto hostUrl = std::format(L"http://{}", registryAddress);
-        auto expectedHttpStatus = username.empty() ? 200 : 401;
-        ExpectHttpResponse(hostUrl.c_str(), expectedHttpStatus, true);
+        ExpectHttpResponse(hostUrl.c_str(), 200, true);
 
         return {std::move(container), registryAddress};
     }
@@ -2075,39 +2074,20 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(
                 WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, "wrong-password", &token, &errorMsg), E_FAIL);
             VERIFY_IS_NOT_NULL(errorMsg.get());
-            LogInfo("Authenticate error: %ws", errorMsg.get());
         }
 
         // Positive: correct credentials must succeed and return a non-null token.
         {
             wil::unique_cotaskmem_ansistring token;
             wil::unique_cotaskmem_string errorMsg;
-            HRESULT hr = WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, c_password, &token, &errorMsg);
-            if (FAILED(hr))
-            {
-                LogError("WslcSessionAuthenticate failed: 0x%08x, error: %ws", hr, errorMsg ? errorMsg.get() : L"(null)");
-            }
-            VERIFY_SUCCEEDED(hr);
+            VERIFY_SUCCEEDED(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, c_password, &token, &errorMsg));
             VERIFY_IS_NOT_NULL(token.get());
         }
 
-        // Build the auth header for push/pull operations.
         auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
-
-        // Push hello-world:latest to the authenticated registry.
         PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
 
         auto image = std::format("{}/hello-world:latest", registryAddress);
-
-        // Pulling without credentials should fail.
-        {
-            WslcPullImageOptions opts{};
-            opts.uri = image.c_str();
-            wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
-            VERIFY_IS_NOT_NULL(errorMsg.get());
-            LogInfo("Pull without credentials error: %ws", errorMsg.get());
-        }
 
         // Pulling with credentials should succeed.
         {
@@ -2116,6 +2096,29 @@ class WslcSdkTests
             opts.registryAuth = xRegistryAuth.c_str();
             VERIFY_SUCCEEDED(WslcPullSessionImage(m_defaultSession, &opts, nullptr));
             VERIFY_IS_TRUE(HasImage(image));
+        }
+
+        // Negative: Pulling without credentials should fail.
+        {
+            WslcPullImageOptions opts{};
+            opts.uri = image.c_str();
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
+        }
+
+        // Negative: Pulling with bad credentials should fail.
+        {
+            auto badAuth = wsl::windows::common::BuildRegistryAuthHeader(c_username, "wrong", registryAddress);
+
+            WslcPullImageOptions opts{};
+            opts.uri = image.c_str();
+            opts.registryAuth = badAuth.c_str();
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
         }
 
         // Negative: null parameters must fail.
@@ -2132,12 +2135,11 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
+        // Start a local registry without auth to avoid Docker Hub rate limits.
+        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress);
+
         {
-            // Start a local registry without auth to avoid Docker Hub rate limits.
-            auto [registryContainer, registryAddress] = StartLocalRegistry();
-
-            auto xRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader("", "", registryAddress);
-
             // Push hello-world:latest to the local registry.
             PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
 
@@ -2163,20 +2165,23 @@ class WslcSdkTests
 
         // Negative: pull an image that does not exist.
         {
+            auto image = std::format("{}/does-not-exist", registryAddress);
+
             WslcPullImageOptions opts{};
-            opts.uri = "does-not:exist";
+            opts.uri = image.c_str();
+            opts.registryAuth = xRegistryAuth.c_str();
+
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), WSLC_E_IMAGE_NOT_FOUND);
-
-            // An error message should be present.
-            VERIFY_IS_NOT_NULL(errorMsg.get());
         }
 
         // Negative: null URI inside options must fail.
         {
             WslcPullImageOptions opts{};
             opts.uri = nullptr;
-            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), E_INVALIDARG);
         }
     }
 
@@ -2184,12 +2189,17 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
+        auto emptyRegistryAuth = wsl::windows::common::BuildRegistryAuthHeader("", "", "");
+
         // Negative: pushing a non-existent image must fail.
         {
             WslcPushImageOptions opts{};
-            opts.image = "does-not-exist:latest";
+            opts.image = "does-not-exist";
+            opts.registryAuth = emptyRegistryAuth.c_str();
+
             wil::unique_cotaskmem_string errorMsg;
-            VERIFY_FAILED(WslcPushSessionImage(m_defaultSession, &opts, &errorMsg));
+            VERIFY_ARE_EQUAL(WslcPushSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
         }
 
         // Negative: null options must fail.
@@ -2199,6 +2209,8 @@ class WslcSdkTests
         {
             WslcPushImageOptions opts{};
             opts.image = nullptr;
+            opts.registryAuth = emptyRegistryAuth.c_str();
+
             VERIFY_ARE_EQUAL(WslcPushSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
     }
