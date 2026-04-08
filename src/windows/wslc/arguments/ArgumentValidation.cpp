@@ -103,15 +103,19 @@ void ValidateVolumeMount(const std::vector<std::wstring>& values)
     }
 }
 
-void ValidateCidFile(const std::wstring& value)
+void ValidateCidFile(const std::wstring& cidFile)
 {
     std::error_code ec;
-    if (std::filesystem::exists(std::filesystem::path{value}, ec))
+    if (std::filesystem::exists(std::filesystem::path{cidFile}, ec))
     {
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), std::format(L"CID file '{}' already exists", value));
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), Localization::WSLCCLI_CIDFileAlreadyExistsError(cidFile));
     }
 
-    THROW_HR_IF(E_INVALIDARG, ec.value() != 0);
+    if (ec)
+    {
+        const auto errorMessage = MultiByteToWide(ec.message());
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(ec.value()), Localization::MessageWslcFailedToOpenFile(cidFile, errorMessage));
+    }
 }
 
 // Convert string to WSLCSignal enum - accepts either signal name (e.g., "SIGKILL") or number (e.g., "9")

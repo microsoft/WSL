@@ -284,7 +284,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --cidfile         Write the container ID to the file\r\n"
+                << L"  --cidfile         Write the container ID to the provided path\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"

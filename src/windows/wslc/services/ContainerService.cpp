@@ -46,17 +46,26 @@ static void WriteContainerIdToFile(const std::optional<std::wstring>& cidFilePat
         return;
     }
 
-    std::ofstream file(std::filesystem::path{*cidFilePath}, std::ios::out | std::ios::binary | std::ios::trunc);
-    if (!file.is_open() || !file.good())
+    const auto path = std::filesystem::path(cidFilePath.value());
+    HANDLE file = ::CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"CID file '{}' cannot be opened for writing", *cidFilePath));
+        const auto error = ::GetLastError();
+        const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(error));
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::MessageWslcFailedToOpenFile(*cidFilePath, errorMessage));
     }
 
-    file << containerId;
-    if (!file.good())
+    DWORD bytesWritten{};
+    const bool writeSuccess = ::WriteFile(file, containerId.data(), static_cast<DWORD>(containerId.size()), &bytesWritten, nullptr) != FALSE;
+    const HRESULT closeResult = ::CloseHandle(file) ? S_OK : HRESULT_FROM_WIN32(GetLastError());
+    if (!writeSuccess || bytesWritten != containerId.size())
     {
-        THROW_HR_WITH_USER_ERROR(E_FAIL, std::format(L"Failed to write container ID to CID file '{}'", *cidFilePath));
+        const auto error = writeSuccess ? ERROR_WRITE_FAULT : ::GetLastError();
+        const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(error));
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::MessageWslcFailedToOpenFile(*cidFilePath, errorMessage));
     }
+
+    THROW_IF_FAILED(closeResult);
 }
 
 static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
