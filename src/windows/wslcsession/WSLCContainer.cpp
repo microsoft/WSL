@@ -1274,10 +1274,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         {
             auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 
-            THROW_HR_WITH_USER_ERROR_IF(
+            THROW_HR_IF_MSG(
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                std::format(L"Port {} is already in use, cannot open container {}", e.VmPort, dockerContainer.Id),
-                !allocation);
+                !allocation,
+                "Port %hu is in use, cannot open container %hs",
+                e.VmPort,
+                dockerContainer.Id.c_str());
 
             inserted.VmMapping.AssignVmPort(allocation);
         }
@@ -1443,7 +1445,8 @@ void WSLCContainerImpl::MapPorts()
 
                 THROW_HR_WITH_USER_ERROR_IF(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    std::format(L"Port {} is already in use, cannot start container {}", e.VmMapping.HostPort(), m_id),
+                    wsl::shared::Localization::MessageWslcPortInUse(
+                        std::format("{}:{}/{}", e.VmMapping.BindingAddressString(), e.VmMapping.HostPort(), e.ProtocolString()), m_id),
                     !allocatedPort);
 
                 e.VmMapping.AssignVmPort(allocatedPort);
@@ -1462,7 +1465,8 @@ void WSLCContainerImpl::MapPorts()
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    std::format(L"Port {} is already in use, cannot start container {}", e.VmMapping.HostPort(), m_id));
+                    wsl::shared::Localization::MessageWslcPortInUse(
+                        std::format("{}:{}/{}", e.VmMapping.BindingAddressString(), e.VmMapping.HostPort(), e.ProtocolString()), m_id));
             }
             throw;
         }
