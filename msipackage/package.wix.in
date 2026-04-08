@@ -160,8 +160,8 @@
                 <RegistryKey Root="HKCR" Key="AppID\{370121D2-AA7E-4608-A86D-0BBAB9DA1A60}">
 
                     <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
-                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
-                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="AccessPermission" Value="${DCOM_PERMISSION}" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="${DCOM_PERMISSION}" Type="binary" />
                     <RegistryValue Name="LocalService" Value="WSLService" Type="string" />
                 </RegistryKey>
 
@@ -182,8 +182,8 @@
                     <RegistryValue Name="AppIDFlags" Value="2048" Type="integer" />
 
                     <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
-                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
-                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="AccessPermission" Value="${DCOM_PERMISSION}" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="${DCOM_PERMISSION}" Type="binary" />
                 </RegistryKey>
 
                 <!-- WslDeviceHost_VirtioPmem -->
@@ -244,8 +244,8 @@
                 <!-- WSLC COM app - activated through WSLService -->
                 <RegistryKey Root="HKCR" Key="AppID\{E9B79997-57E3-4201-AECC-6A464E530DD2}">
                     <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
-                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
-                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="AccessPermission" Value="${DCOM_PERMISSION}" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="${DCOM_PERMISSION}" Type="binary" />
                     <RegistryValue Name="LocalService" Value="WSLService" Type="string" />
                 </RegistryKey>
 
@@ -268,7 +268,13 @@
                 </RegistryKey>
 
                 <!-- WSLCSessionFactory - COM server in per-user process -->
+                <RegistryKey Root="HKCR" Key="AppID\{1FAB86C3-F4DF-4271-8E63-6F071C4F708A}">
+                    <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
+                    <RegistryValue Name="AccessPermission" Value="${DCOM_PERMISSION}" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="${DCOM_PERMISSION}" Type="binary" />
+                </RegistryKey>
                 <RegistryKey Root="HKCR" Key="CLSID\{9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3}">
+                    <RegistryValue Name="AppId" Value="{1FAB86C3-F4DF-4271-8E63-6F071C4F708A}" Type="string" />
                     <RegistryValue Value="WSLCSessionFactory" Type="string" />
                     <RegistryKey Key="LocalServer32">
                         <RegistryValue Value='"[INSTALLDIR]wslcsession.exe"' Type="string" />
