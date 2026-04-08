@@ -293,6 +293,46 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::DNS))
+    {
+        auto dnsServers = context.Args.GetAll<ArgType::DNS>();
+        options.DnsServers.reserve(options.DnsServers.size() + dnsServers.size());
+        for (const auto& value : dnsServers)
+        {
+            options.DnsServers.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::DNSDomain))
+    {
+        options.DnsDomain = WideToMultiByte(context.Args.Get<ArgType::DNSDomain>());
+    }
+
+    if (context.Args.Contains(ArgType::DNSOption))
+    {
+        auto dnsOptions = context.Args.GetAll<ArgType::DNSOption>();
+        options.DnsOptions.reserve(options.DnsOptions.size() + dnsOptions.size());
+        for (const auto& value : dnsOptions)
+        {
+            options.DnsOptions.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::DNSSearch))
+    {
+        auto dnsSearchDomains = context.Args.GetAll<ArgType::DNSSearch>();
+        options.DnsSearchDomains.reserve(options.DnsSearchDomains.size() + dnsSearchDomains.size());
+        for (const auto& value : dnsSearchDomains)
+        {
+            options.DnsSearchDomains.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::NoDNS))
+    {
+        options.NoDns = true;
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();

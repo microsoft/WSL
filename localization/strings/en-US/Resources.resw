@@ -2505,4 +2505,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Requested load but no input provided.</value>
   </data>
+  <data name="WSLCCLI_NoDNSConflictError" xml:space="preserve">
+    <value>Cannot use --no-dns with --dns, --dns-domain, --dns-option, or --dns-search</value>
+    <comment>{Locked="--no-dns"}{Locked="--dns"}{Locked="--dns-domain"}{Locked="--dns-option"}{Locked="--dns-search"}Command line arguments should not be translated</comment>
+  </data>
 </root>

@@ -47,6 +47,16 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
 
+    case ArgType::NoDNS:
+    {
+        if (execArgs.Contains(ArgType::DNS) || execArgs.Contains(ArgType::DNSDomain) ||
+            execArgs.Contains(ArgType::DNSOption) || execArgs.Contains(ArgType::DNSSearch))
+        {
+            throw ArgumentException(Localization::WSLCCLI_NoDNSConflictError());
+        }
+        break;
+    }
+
     case ArgType::WorkDir:
     {
         const auto& value = execArgs.Get<ArgType::WorkDir>();

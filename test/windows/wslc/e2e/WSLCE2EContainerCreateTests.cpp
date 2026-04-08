@@ -1081,6 +1081,82 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS_SingleServer)
+    {
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns 8.8.8.8 {} cat /etc/resolv.conf", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS_MultipleServers)
+    {
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns 8.8.8.8 --dns 8.8.4.4 {} cat /etc/resolv.conf",
+            WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.4.4") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS_Search)
+    {
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns-search example.com {} cat /etc/resolv.conf",
+            WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"search example.com") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS_Option)
+    {
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns-option ndots:5 {} cat /etc/resolv.conf",
+            WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS_AllOptions)
+    {
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns 1.1.1.1 --dns-search test.local --dns-option ndots:3 {} cat /etc/resolv.conf",
+            WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"search test.local") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:3") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_NoDNS_ConflictWithDNS_Fails)
+    {
+
+        auto result = RunWslc(std::format(
+            L"container create --name {} --no-dns --dns 8.8.8.8 {} echo test",
+            WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"Cannot use --no-dns with --dns, --dns-domain, --dns-option, or --dns-search\r\n", .ExitCode = 1});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -1146,11 +1222,16 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
+                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
+                << L"  --dns-domain      Set the default DNS Domain\r\n"
+                << L"  --dns-option      Set DNS options\r\n"
+                << L"  --dns-search      Set DNS search domains\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
+                << L"  --no-dns          No configuration of DNS in the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"

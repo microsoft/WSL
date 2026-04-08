@@ -42,6 +42,11 @@ struct ContainerOptions
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
     std::vector<std::string> Tmpfs;
+    std::vector<std::string> DnsServers;
+    std::string DnsDomain;
+    std::vector<std::string> DnsOptions;
+    std::vector<std::string> DnsSearchDomains;
+    bool NoDns = false;
 };
 
 struct CreateContainerResult

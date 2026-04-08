@@ -107,6 +107,30 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
     }
 
+    if (!options.DnsServers.empty())
+    {
+        auto dnsServers = options.DnsServers;
+        containerLauncher.SetDnsServers(std::move(dnsServers));
+    }
+
+    if (!options.DnsDomain.empty())
+    {
+        auto domainname = options.DnsDomain;
+        containerLauncher.SetDomainname(std::move(domainname));
+    }
+
+    if (!options.DnsOptions.empty())
+    {
+        auto dnsOptions = options.DnsOptions;
+        containerLauncher.SetDnsOptions(std::move(dnsOptions));
+    }
+
+    if (!options.DnsSearchDomains.empty())
+    {
+        auto dnsSearchDomains = options.DnsSearchDomains;
+        containerLauncher.SetDnsSearchDomains(std::move(dnsSearchDomains));
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
