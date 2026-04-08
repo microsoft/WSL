@@ -110,7 +110,7 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command --f -z forward hello wo
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command forward hello world)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command forward"hello world")") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command f="hello world" forward echo)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -v image1 command f="hello world" forward echo)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose image1 command f="hello world" forward echo)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 \\command\\?"" --f -z forward hello world)") \
 \
 /* Once the image name is parsed, the next token becomes the optional <command> positional \
