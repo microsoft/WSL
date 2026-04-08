@@ -208,15 +208,16 @@ HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
     {
         return S_OK;
     }
-
-    switch (errno)
+    const int wsaError = WSAGetLastError();
+    switch (wsaError)
     {
-    case EAFNOSUPPORT:
+    case WSAEAFNOSUPPORT:
+    case WSAEINVAL:
         return E_INVALIDARG;
-    case ENOSPC:
-        return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+    case WSAEFAULT:
+        return ((dst == nullptr) || (dstCount == 0)) ? E_INVALIDARG : HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
     default:
-        return E_FAIL;
+        return HRESULT_FROM_WIN32(wsaError);
     }
 }
 
