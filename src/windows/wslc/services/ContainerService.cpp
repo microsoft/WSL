@@ -51,6 +51,11 @@ static void WriteContainerIdToFile(const std::optional<std::wstring>& cidFilePat
     if (file == INVALID_HANDLE_VALUE)
     {
         const auto error = ::GetLastError();
+        if (error == ERROR_FILE_EXISTS || error == ERROR_ALREADY_EXISTS)
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::WSLCCLI_CIDFileAlreadyExistsError(*cidFilePath));
+        }
+
         const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(error));
         THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::MessageWslcFailedToOpenFile(*cidFilePath, errorMessage));
     }
@@ -62,7 +67,7 @@ static void WriteContainerIdToFile(const std::optional<std::wstring>& cidFilePat
     {
         const auto error = writeSuccess ? ERROR_WRITE_FAULT : ::GetLastError();
         const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(error));
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::MessageWslcFailedToOpenFile(*cidFilePath, errorMessage));
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::MessageWslcFailedToWriteFile(*cidFilePath, errorMessage));
     }
 
     THROW_IF_FAILED(closeResult);

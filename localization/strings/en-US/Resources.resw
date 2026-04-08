@@ -2118,6 +2118,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Failed to open '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
+    <value>Failed to write to '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcBuildFileNotFound" xml:space = "preserve" >
     <value>No Containerfile or Dockerfile found in '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
