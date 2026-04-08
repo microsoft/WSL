@@ -248,6 +248,18 @@ class WSLCTests
         }
     }
 
+    void ValidateContainerOutput(RunningWSLCContainer& container, const std::map<int, std::string>& expectedOutput, int expectedResult = 0, DWORD timeout = INFINITE)
+    {
+        auto initProcess = container.GetInitProcess();
+        ValidateProcessOutput(initProcess, expectedOutput, expectedResult, timeout);
+    }
+
+    void ValidateContainerOutput(WSLCContainerLauncher& launcher, const std::map<int, std::string>& expectedOutput, int expectedResult = 0, DWORD timeout = INFINITE)
+    {
+        auto container = launcher.Launch(*m_defaultSession);
+        ValidateContainerOutput(container, expectedOutput, expectedResult, timeout);
+    }
+
     void ExpectMount(IWSLCSession* session, const std::string& target, const std::optional<std::string>& options)
     {
         auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
@@ -4927,6 +4939,89 @@ class WSLCTests
     TEST_METHOD(ContainerVolumeVirtioFs)
     {
         ValidateContainerVolumes(true);
+    }
+
+    TEST_METHOD(ContainerVolumesAdvanced)
+    {
+        WSL2_TEST_ONLY();
+
+        auto hostFolder = std::filesystem::current_path() / "test-volume";
+        auto symlinkFolder = std::filesystem::current_path() / "test-volume-symlink";
+        std::filesystem::create_directories(hostFolder);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+            std::filesystem::remove_all(symlinkFolder, ec);
+        });
+
+        VERIFY_IS_TRUE((std::ofstream(hostFolder / "file.txt") << "OK").good());
+        std::filesystem::create_symlink("file.txt", hostFolder / "symlink");
+
+        // N.B. std::filesystem::create_symlink doesn't correctly handle folder symlinks.
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLink(symlinkFolder.c_str(), hostFolder.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY));
+
+        // Validate a simple folder mount.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-1", {"cat", "/volume/file.txt"});
+            launcher.AddVolume(hostFolder.wstring(), "/volume", false);
+
+            ValidateContainerOutput(launcher, {{1, "OK"}});
+        }
+
+        // Validate that files can be mounted too.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-2", {"cat", "/volume"});
+            launcher.AddVolume((hostFolder / "file.txt").wstring(), "/volume", false);
+            ValidateContainerOutput(launcher, {{1, "OK"}});
+        }
+
+        // Validate that file symlinks work as expected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-3", {"cat", "/volume"});
+            launcher.AddVolume((hostFolder / "symlink").wstring(), "/volume", false);
+            ValidateContainerOutput(launcher, {{1, "OK"}});
+        }
+
+        // Validate that folder symlinks work as expected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-4", {"cat", "/volume/file.txt", "/volume/symlink"});
+            launcher.AddVolume(symlinkFolder.wstring(), "/volume", false);
+
+            ValidateContainerOutput(launcher, {{1, "OKOK"}});
+        }
+
+        // Validate that folders are created if they don't exist.
+        {
+            {
+                WSLCContainerLauncher launcher(
+                    "debian:latest", "test-volumes-5", {"/bin/sh", "-c", "echo created > /volume/new-file"});
+                launcher.AddVolume((hostFolder / "should-be-created").wstring(), "/volume", false);
+                ValidateContainerOutput(launcher, {{1, ""}});
+            }
+
+            VERIFY_ARE_EQUAL(ReadFileContent(hostFolder / "should-be-created" / "new-file"), L"created\n");
+        }
+
+        // Validate that relative paths are rejected
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-6", {});
+            launcher.AddVolume(L"relative-path", "/volume", false);
+
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
+        }
+
+        // Validate that invalid paths are rejected
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-6", {});
+            launcher.AddVolume(L":", "/volume", false);
+
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
+        }
     }
 
     void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)
