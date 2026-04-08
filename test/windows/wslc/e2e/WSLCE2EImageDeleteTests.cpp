@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageDeleteTests
 {
@@ -142,7 +143,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Removes images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageRemoveLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

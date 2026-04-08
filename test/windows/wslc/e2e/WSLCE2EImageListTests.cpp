@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace wsl::windows::wslc::models;
 
@@ -155,7 +156,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Lists images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageListLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -172,12 +173,12 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --format      Output formatting (json or table) (Default:table)\r\n"
-                << L"  --no-trunc    Do not truncate output\r\n"
-                << L"  -q,--quiet    Outputs the container IDs only\r\n"
-                << L"  --session     Specify the session to use\r\n"
-                << L"  -v,--verbose  Output verbose details\r\n"
-                << L"  -h,--help     Shows help about the selected command\r\n"
+                << L"  --format    " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
+                << L"  --no-trunc  Do not truncate output\r\n"
+                << L"  -q,--quiet  Outputs the container IDs only\r\n"
+                << L"  --session   Specify the session to use\r\n"
+                << L"  --verbose   Output verbose details\r\n"
+                << L"  -h,--help   Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

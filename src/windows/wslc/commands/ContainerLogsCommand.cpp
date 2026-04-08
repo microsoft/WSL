@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Logs Command
@@ -34,12 +35,12 @@ std::vector<Argument> ContainerLogsCommand::GetArguments() const
 
 std::wstring ContainerLogsCommand::ShortDescription() const
 {
-    return {L"View container logs."};
+    return Localization::WSLCCLI_ContainerLogsDesc();
 }
 
 std::wstring ContainerLogsCommand::LongDescription() const
 {
-    return {L"View logs for a container."};
+    return Localization::WSLCCLI_ContainerLogsLongDesc();
 }
 
 void ContainerLogsCommand::ExecuteInternal(CLIExecutionContext& context) const

@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Kill Command
@@ -28,18 +29,18 @@ std::vector<Argument> ContainerKillCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
         Argument::Create(ArgType::Session),
-        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGKILL)"),
+        Argument::Create(ArgType::Signal),
     };
 }
 
 std::wstring ContainerKillCommand::ShortDescription() const
 {
-    return {L"Kill containers."};
+    return Localization::WSLCCLI_ContainerKillDesc();
 }
 
 std::wstring ContainerKillCommand::LongDescription() const
 {
-    return {L"Kills containers."};
+    return Localization::WSLCCLI_ContainerKillLongDesc();
 }
 
 // clang-format off

@@ -163,7 +163,7 @@ void LoadImage(CLIExecutionContext& context)
     }
 
     // TODO Read from stdin if no input argument is provided.
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Requested load but no input provided.");
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageLoadNoInputError());
 }
 
 void InspectImages(CLIExecutionContext& context)

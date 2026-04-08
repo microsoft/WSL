@@ -373,6 +373,11 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
             "Failed to attach vhd: %ls",
             m_storageVhdPath.c_str());
 
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND),
+            Localization::MessageWslcSessionStorageNotFound(Settings.StoragePath),
+            WI_IsFlagSet(Settings.StorageFlags, WSLCSessionStorageFlagsNoCreate));
+
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
 
@@ -996,8 +1001,6 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
 }
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);
-
 HRESULT WSLCSession::ListImages(const WSLCListImageOptions* Options, WSLCImageInformation** Images, ULONG* Count)
 try
 {
@@ -1161,8 +1164,6 @@ try
 }
 CATCH_RETURN();
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteImageFlags);
-
 HRESULT WSLCSession::DeleteImage(const WSLCDeleteImageOptions* Options, WSLCDeletedImageInformation** DeletedImages, ULONG* Count)
 try
 {
@@ -1171,6 +1172,11 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
     RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLC_MAX_IMAGE_NAME_LENGTH);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(static_cast<WSLCDeleteImageFlags>(Options->Flags), ~WSLCDeleteImageFlagsValid),
+        "Invalid flags: 0x%x",
+        Options->Flags);
     RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
     RETURN_HR_IF_NULL(E_POINTER, Count);
 
@@ -1417,13 +1423,15 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListContainers(WSLCContainerEntry** Containers, ULONG* Count)
+HRESULT WSLCSession::ListContainers(WSLCContainerEntry** Containers, ULONG* Count, WSLCContainerPortMapping** Ports, ULONG* PortsCount)
 try
 {
     COMServiceExecutionContext context;
 
     *Count = 0;
     *Containers = nullptr;
+    *Ports = nullptr;
+    *PortsCount = 0;
 
     auto lock = m_lock.lock_shared();
     std::lock_guard containersLock{m_containersLock};
@@ -1432,6 +1440,7 @@ try
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslcContainerStateDeleted; });
 
     auto output = wil::make_unique_cotaskmem<WSLCContainerEntry[]>(m_containers.size());
+    std::vector<WSLCContainerPortMapping> allPorts;
 
     size_t index = 0;
     for (const auto& e : m_containers)
@@ -1442,11 +1451,34 @@ try
         e->GetState(&output[index].State);
         e->GetStateChangedAt(&output[index].StateChangedAt);
         e->GetCreatedAt(&output[index].CreatedAt);
+
+        for (const auto& port : e->GetPorts())
+        {
+            WSLCContainerPortMapping mapping{};
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.Id, e->ID().c_str()) != 0);
+            mapping.PortMapping.HostPort = port.HostPort;
+            mapping.PortMapping.ContainerPort = port.ContainerPort;
+            mapping.PortMapping.Family = port.Family;
+            mapping.PortMapping.Protocol = port.Protocol;
+            THROW_HR_IF(E_UNEXPECTED, port.BindingAddress.size() > WSLC_MAX_BINDING_ADDRESS_LENGTH);
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(mapping.PortMapping.BindingAddress, port.BindingAddress.c_str()) != 0);
+            allPorts.push_back(mapping);
+        }
+
         index++;
     }
 
     *Count = static_cast<ULONG>(m_containers.size());
     *Containers = output.release();
+
+    if (!allPorts.empty())
+    {
+        auto portsOutput = wil::make_unique_cotaskmem<WSLCContainerPortMapping[]>(allPorts.size());
+        memcpy(portsOutput.get(), allPorts.data(), allPorts.size() * sizeof(WSLCContainerPortMapping));
+        *PortsCount = static_cast<ULONG>(allPorts.size());
+        *Ports = portsOutput.release();
+    }
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -2002,6 +2034,7 @@ void WSLCSession::RecoverExistingContainers()
                 *this,
                 m_virtualMachine.value(),
                 m_volumes,
+                m_anonymousVolumes,
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
@@ -2035,6 +2068,7 @@ void WSLCSession::RecoverExistingVolumes()
     {
         if (!volume.Labels.contains(WSLCVolumeMetadataLabel))
         {
+            m_anonymousVolumes.insert(volume.Name);
             continue;
         }
 

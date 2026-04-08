@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageSaveTests
 {
@@ -125,7 +126,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Saves images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageSaveLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

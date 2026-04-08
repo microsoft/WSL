@@ -265,7 +265,8 @@ void ProcessNamedVolumes(
 
 void ValidateNamedVolumes(
     const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes)
+    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_set<std::string>& anonymousVolumes)
 {
     for (const auto& mount : mounts)
     {
@@ -274,7 +275,7 @@ void ValidateNamedVolumes(
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLC_E_VOLUME_NOT_FOUND,
                 wsl::shared::Localization::MessageWslcVolumeNotFound(mount.Name),
-                !sessionVolumes.contains(mount.Name));
+                !sessionVolumes.contains(mount.Name) && !anonymousVolumes.contains(mount.Name));
         }
     }
 }
@@ -419,6 +420,23 @@ const std::string& WSLCContainerImpl::Image() const noexcept
 const std::string& WSLCContainerImpl::Name() const noexcept
 {
     return m_name;
+}
+
+std::vector<WSLCPortMapping> WSLCContainerImpl::GetPorts() const
+{
+    auto lock = m_lock.lock_shared();
+    if (m_state != WslcContainerStateRunning)
+    {
+        return {};
+    }
+
+    std::vector<WSLCPortMapping> result;
+    result.reserve(m_mappedPorts.size());
+    for (const auto& port : m_mappedPorts)
+    {
+        result.push_back(port.Serialize());
+    }
+    return result;
 }
 
 void WSLCContainerImpl::GetStateChangedAt(ULONGLONG* Result)
@@ -1019,8 +1037,16 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.OpenStdin = true;
     }
 
-    request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
-    request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
+    if (containerOptions.InitProcessOptions.CommandLine.Count > 0)
+    {
+        request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
+    }
+
+    if (containerOptions.Entrypoint.Count > 0)
+    {
+        request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
+    }
+
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
 
     if (containerOptions.StopSignal != WSLCSignalNone)
@@ -1220,6 +1246,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_set<std::string>& anonymousVolumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1228,7 +1255,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes);
+    ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes, anonymousVolumes);
 
     auto labels(dockerContainer.Labels);
     auto metadataIt = labels.find(WSLCContainerMetadataLabel);
@@ -1624,11 +1651,15 @@ HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
 }
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
+try
 {
     COMServiceExecutionContext context;
 
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
+
     return CallImpl(&WSLCContainerImpl::Start, Flags, DetachKeys);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Inspect(LPSTR* Output)
 {
@@ -1644,7 +1675,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: %i", Flags);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
 
     // Special case for Delete(): If deletion is successful, notify the WSLCSession that the container has been deleted.
     auto [lock, impl] = LockImpl();
@@ -1679,15 +1710,19 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 }
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+try
 {
     COMServiceExecutionContext context;
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
+
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: 0x%x", Flags);
 
     *Stdout = {};
     *Stderr = {};
 
     return CallImpl(&WSLCContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::GetId(WSLCContainerId Id)
 try
