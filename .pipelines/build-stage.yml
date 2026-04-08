@@ -143,8 +143,6 @@ stages:
     - template: package-stage.yml
       parameters:
         isRelease: ${{ parameters.isRelease }}
-        isNightly: ${{ parameters.isNightly }}
-        packageVersion: ${{ parameters.packageVersion }}
         pool: ${{ parameters.pool }}
         esrp: ${{ parameters.esrp }}
         nugetPackages: ${{ parameters.nugetPackages }}

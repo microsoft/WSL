@@ -3,14 +3,6 @@ parameters:
     type: boolean
     default: true
 
-  - name: packageVersion
-    type: string
-    default: ""
-
-  - name: isNightly
-    type: boolean
-    default: false
-
   - name: nugetPackages
     type: object
     default:
@@ -53,26 +45,18 @@ stages:
           ob_outputDirectory: '$(Build.SourcesDirectory)\out'
           ob_artifactBaseName: 'drop_wsl'
           ob_artifactSuffix: '_package'
+          buildStagePackageVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_PACKAGE_VERSION'] ]
+          buildStageNugetVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_NUGET_PACKAGE_VERSION'] ]
 
         steps:
           - task: PowerShell@2
-            displayName: "Compute package version"
+            displayName: "Set package version from build stage"
             name: version
             inputs:
               targetType: inline
-              ${{ if eq(parameters.packageVersion, '') }}:
-                script: |
-                  $gitversion_version = (Select-Xml -Path packages.config  -XPath '/packages/package[@id=''GitVersion.CommandLine'']/@version').Node.Value
-                  $env:path = "packages/GitVersion.CommandLine.$gitversion_version/tools;$env:path"
-                  . .\tools\devops\version_functions.ps1
-                  $version = Get-VersionInfo -Nightly $${{ parameters.isNightly }}
-                  Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$($version.MsixVersion)"
-                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$($version.NugetVersion)"
-
-              ${{ else }}:
-                script: |
-                  Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}' + '.0'))"
-                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}'))"
+              script: |
+                Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$(buildStagePackageVersion)"
+                Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$(buildStageNugetVersion)"
 
           - task: DownloadPipelineArtifact@2
             displayName: Download x64 build artifact

@@ -20,13 +20,17 @@ endif()
 # Passed down to test-setup.ps1 to determine if -AllowUnsigned should be passed to Add-AppxPackage
 if (OFFICIAL_BUILD)
     set(ALLOW_UNSIGNED_PACKAGE "0")
-    # Release builds test the real signed bundle from the package stage
+else()
+    set(ALLOW_UNSIGNED_PACKAGE "1")
+endif()
+
+# When the package stage is included (release + nightly), test the real bundle from that stage.
+# PR builds test the installer.msix directly from the build artifact (no bundle needed).
+if (INCLUDE_PACKAGE_STAGE)
     set(TEST_PACKAGE_PROVIDER "[package]")
     set(TEST_PACKAGE_PATH "bundle\\Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle")
     set(TEST_PACKAGE_FILE "Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle")
 else()
-    set(ALLOW_UNSIGNED_PACKAGE "1")
-    # PR builds test the installer.msix directly from the build artifact (no bundle needed)
     set(TEST_PACKAGE_PROVIDER "[drop]")
     set(TEST_PACKAGE_PATH "testbin\\x64\\release\\installer.msix")
     set(TEST_PACKAGE_FILE "installer.msix")
