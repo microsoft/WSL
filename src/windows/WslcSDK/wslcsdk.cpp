@@ -728,11 +728,18 @@ try
                     // Reject unsupported or malformed address families
                     THROW_HR(E_INVALIDARG);
                 }
-                HRESULT hr = strncpy_s(convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress), addrBuf, _TRUNCATE);
-
-                if (hr == STRUNCATE)
+                errno_t copyErr = strncpy_s(convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress), addrBuf, _TRUNCATE);
+                if (copyErr == 0)
                 {
-                    // Log this as a warning since the address is valid but was truncated to fit in the buffer, which means the port mapping may not work as expected.
+                    // Address copied successfully.
+                }
+                else if (copyErr == STRUNCATE)
+                {
+                    THROW_HR(HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER));
+                }
+                else
+                {
+                    THROW_HR(HRESULT_FROM_WIN32(copyErr));
                 }
             }
             else
