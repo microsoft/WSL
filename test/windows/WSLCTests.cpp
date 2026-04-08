@@ -6655,7 +6655,7 @@ class WSLCTests
                 WSLCPruneImagesOptions options{};
                 options.Flags = flags;
                 options.Until = until;
-                options.Labels = labels.empty() ? nullptr : const_cast<WSLCPruneImageLabelFilter*>(labels.data());
+                options.Labels = labels.empty() ? nullptr : labels.data();
                 options.LabelsCount = static_cast<ULONG>(labels.size());
 
                 VERIFY_SUCCEEDED(m_defaultSession->PruneImages(&options, &result.result));

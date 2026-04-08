@@ -569,7 +569,7 @@ typedef struct _WSLCPruneImagesOptions
 {
     DWORD Flags; // WSLCPruneImagesFlags
     ULONGLONG Until;
-    [unique, size_is(LabelsCount)] WSLCPruneImageLabelFilter* Labels;
+    [unique, size_is(LabelsCount)] const WSLCPruneImageLabelFilter* Labels;
     ULONG LabelsCount;
 } WSLCPruneImagesOptions;
 

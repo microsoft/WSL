@@ -1015,6 +1015,7 @@ try
     if (Options != nullptr)
     {
         RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingFalse));
+        RETURN_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
         RETURN_HR_IF(E_INVALIDARG, Options->Reference != nullptr && strlen(Options->Reference) > WSLC_MAX_IMAGE_NAME_LENGTH);
     }
 
