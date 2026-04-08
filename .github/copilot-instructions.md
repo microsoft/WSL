@@ -255,7 +255,8 @@ Test execution:
 - **Requires Administrator privileges**
 
 Test debugging:
-- Wait for debugger: `/waitfordebugger`
+- Attach WinDbgX automatically: `/attachdebugger`
+- Wait for debugger (manual attach): `/waitfordebugger`
 - Break on failure: `/breakonfailure`
 - Run in-process: `/inproc`
 
