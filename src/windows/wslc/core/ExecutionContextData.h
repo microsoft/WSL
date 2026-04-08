@@ -16,6 +16,7 @@ Abstract:
 #include "ContainerModel.h"
 #include "ImageModel.h"
 #include "SessionModel.h"
+#include "VolumeModel.h"
 
 #include <string>
 
@@ -36,6 +37,7 @@ enum class Data : size_t
     Containers,
     ContainerOptions,
     Images,
+    Volumes,
 
     Max
 };
@@ -50,6 +52,7 @@ namespace details {
     DEFINE_DATA_MAPPING(Containers, std::vector<wsl::windows::wslc::models::ContainerInformation>);
     DEFINE_DATA_MAPPING(ContainerOptions, wsl::windows::wslc::models::ContainerOptions);
     DEFINE_DATA_MAPPING(Images, std::vector<wsl::windows::wslc::models::ImageInformation>);
+    DEFINE_DATA_MAPPING(Volumes, std::vector<wsl::windows::wslc::models::VolumeInformation>);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

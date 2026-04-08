@@ -1081,6 +1081,73 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_NamedVolume_WriteFromContainerReadFromContainer)
+    {
+
+        const std::wstring volumeName = L"wslc-test-vol-create";
+
+        // Cleanup any pre-existing volume
+        RunWslc(std::format(L"volume rm {}", volumeName));
+
+        // Create the named volume
+        auto result = RunWslc(std::format(L"volume create {}", volumeName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Write data to the volume using a container
+        result = RunWslc(std::format(
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'named_volume_data' > /data/testfile\"",
+            volumeName,
+            AlpineImage.NameAndTag()));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+
+        // Read data back from the volume using another container
+        result = RunWslc(std::format(
+            L"container run --rm --volume {}:/data {} cat /data/testfile",
+            volumeName,
+            AlpineImage.NameAndTag()));
+        result.Verify({.Stdout = L"named_volume_data", .Stderr = L"", .ExitCode = S_OK});
+
+        // Cleanup
+        RunWslc(std::format(L"volume rm {}", volumeName));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_NamedVolume_PersistsBetweenContainers)
+    {
+
+        const std::wstring volumeName = L"wslc-test-vol-persist";
+
+        // Cleanup any pre-existing volume
+        RunWslc(std::format(L"volume rm {}", volumeName));
+
+        // Create the named volume
+        auto result = RunWslc(std::format(L"volume create {}", volumeName));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Write data using first container
+        result = RunWslc(std::format(
+            L"container create --name {} --volume {}:/data {} sh -c \"echo -n 'persist_test' > /data/testfile\"",
+            WslcContainerName,
+            volumeName,
+            AlpineImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+
+        // Remove first container
+        RunWslc(std::format(L"container rm {}", WslcContainerName));
+
+        // Read data using second container
+        result = RunWslc(std::format(
+            L"container run --rm --volume {}:/data {} cat /data/testfile",
+            volumeName,
+            AlpineImage.NameAndTag()));
+        result.Verify({.Stdout = L"persist_test", .Stderr = L"", .ExitCode = S_OK});
+
+        // Cleanup
+        RunWslc(std::format(L"volume rm {}", volumeName));
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";

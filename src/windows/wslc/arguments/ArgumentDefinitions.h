@@ -83,5 +83,7 @@ _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        L
 _(Version,        "version",             L"v",              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       Localization::WSLCCLI_VolumeArgDescription()) \
+_(VolumeDriver,   "driver",              L"d",              Kind::Value,       Localization::WSLCCLI_VolumeDriverArgDescription()) \
+_(VolumeName,     "volume-name",         NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_VolumeNameArgDescription()) \
 _(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkingDirArgDescription()) \
 // clang-format on
