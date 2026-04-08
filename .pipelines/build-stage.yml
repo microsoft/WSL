@@ -152,9 +152,6 @@ stages:
             env:
                 config: '${{ parameters.traceLoggingConfig }}'
 
-          - script: echo "Build requested for email - $(Build.RequestedForEmail)"
-            displayName: "Log build requested for email"
-
           - task: PowerShell@2
             displayName: "Compute package version"
             name: version
