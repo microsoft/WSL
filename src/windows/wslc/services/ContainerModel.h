@@ -42,6 +42,7 @@ struct ContainerOptions
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
     std::vector<std::string> Tmpfs;
+    std::optional<std::wstring> CidFile{};
 };
 
 struct CreateContainerResult

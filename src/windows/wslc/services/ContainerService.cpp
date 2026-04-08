@@ -20,6 +20,8 @@ Abstract:
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
+#include <filesystem>
+#include <fstream>
 #include <unordered_map>
 #include <wslc.h>
 
@@ -35,6 +37,27 @@ using namespace std::chrono_literals;
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
+}
+
+
+static void WriteContainerIdToFile(const std::optional<std::wstring>& cidFilePath, const std::string& containerId)
+{
+    if (!cidFilePath.has_value())
+    {
+        return;
+    }
+
+    std::ofstream file(std::filesystem::path{*cidFilePath}, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!file.is_open() || !file.good())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, std::format(L"CID file '{}' cannot be opened for writing", *cidFilePath));
+    }
+
+    file << containerId;
+    if (!file.good())
+    {
+        THROW_HR_WITH_USER_ERROR(E_FAIL, std::format(L"Failed to write container ID to CID file '{}'", *cidFilePath));
+    }
 }
 
 static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
@@ -294,6 +317,10 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
 
+    WSLCContainerId containerId{};
+    THROW_IF_FAILED(container.GetId(containerId));
+    WriteContainerIdToFile(runOptions.CidFile, containerId);
+
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
@@ -306,8 +333,6 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
         return consoleService.AttachToCurrentConsole(runningContainer.GetInitProcess());
     }
 
-    WSLCContainerId containerId{};
-    THROW_IF_FAILED(container.GetId(containerId));
     PrintMessage(L"%hs", stdout, containerId);
     return 0;
 }
@@ -319,6 +344,7 @@ CreateContainerResult ContainerService::Create(Session& session, const std::stri
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
     THROW_IF_FAILED(container.GetId(id));
+    WriteContainerIdToFile(runOptions.CidFile, id);
     return {.Id = id};
 }
 

@@ -197,6 +197,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
 {
     ContainerOptions options;
 
+    if (context.Args.Contains(ArgType::CIDFile))
+    {
+        options.CidFile = context.Args.Get<ArgType::CIDFile>();
+    }
+
     if (context.Args.Contains(ArgType::Name))
     {
         options.Name = WideToMultiByte(context.Args.Get<ArgType::Name>());

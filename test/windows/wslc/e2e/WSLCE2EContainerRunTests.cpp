@@ -62,6 +62,45 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsListed(WslcContainerName, L"exited");
     }
 
+    TEST_METHOD(WSLCE2E_Container_Run_CIDFile_Valid)
+    {
+        WSL2_TEST_ONLY();
+
+        // Prepare a CID file path that does not exist
+        const auto cidFilePath = wsl::windows::common::filesystem::GetTempFilename();
+        VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str()));
+        auto deleteCidFile = wil::scope_exit([&]() { VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str())); });
+
+        auto result = RunWslc(std::format(
+            L"container run -d --cidfile \"{}\" --name {} {} sleep infinity",
+            EscapePath(cidFilePath.wstring()),
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_TRUE(std::filesystem::exists(cidFilePath));
+        VERIFY_ARE_EQUAL(containerId, ReadFileContent(cidFilePath.wstring()));
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_CIDFile_AlreadyExists)
+    {
+        WSL2_TEST_ONLY();
+
+        const auto cidFilePath = wsl::windows::common::filesystem::GetTempFilename();
+        auto deleteCidFile = wil::scope_exit([&]() { VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str())); });
+
+        auto result = RunWslc(std::format(
+            L"container run --cidfile \"{}\" --name {} {}",
+            EscapePath(cidFilePath.wstring()),
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_ALREADY_EXISTS\r\n", EscapePath(cidFilePath.wstring())), .ExitCode = 1});
+
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     TEST_METHOD(WSLCE2E_Container_Run_Entrypoint)
     {
         WSL2_TEST_ONLY();
@@ -247,6 +286,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
+                << L"  --cidfile         Write the container ID to the file\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
