@@ -91,12 +91,10 @@ class WSLCE2EContainerRunTests
         auto deleteCidFile = wil::scope_exit([&]() { VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str())); });
 
         auto result = RunWslc(std::format(
-            L"container run --cidfile \"{}\" --name {} {}",
-            EscapePath(cidFilePath.wstring()),
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+            L"container run --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_ALREADY_EXISTS\r\n", EscapePath(cidFilePath.wstring())), .ExitCode = 1});
+            {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_ALREADY_EXISTS\r\n", EscapePath(cidFilePath.wstring())),
+             .ExitCode = 1});
 
         VerifyContainerIsNotListed(WslcContainerName);
     }

@@ -39,7 +39,6 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-
 static void WriteContainerIdToFile(const std::optional<std::wstring>& cidFilePath, const std::string& containerId)
 {
     if (!cidFilePath.has_value())
