@@ -1065,16 +1065,15 @@ try
             for (ULONG i = 0; i < Options->LabelsCount; ++i)
             {
                 const auto& label = Options->Labels[i];
-                if (label.Key != nullptr)
+                RETURN_HR_IF_NULL(E_INVALIDARG, label.Key);
+
+                std::string labelFilter = label.Key;
+                if (label.Value != nullptr)
                 {
-                    std::string labelFilter = label.Key;
-                    if (label.Value != nullptr)
-                    {
-                        labelFilter += "=";
-                        labelFilter += label.Value;
-                    }
-                    filters.labels.push_back(labelFilter);
+                    labelFilter += "=";
+                    labelFilter += label.Value;
                 }
+                filters.labels.push_back(labelFilter);
             }
         }
     }
@@ -1318,15 +1317,17 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneImages(const WSLCPruneImagesOptions* Options, WSLCPruneImagesResults* Result)
+HRESULT WSLCSession::PruneImages(const WSLCPruneImagesOptions* Options, WSLCDeletedImageInformation** DeletedImages, ULONG* DeletedImagesCount, ULONGLONG* SpaceReclaimed)
 try
 {
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF_NULL(E_POINTER, Result);
-    Result->DeletedImages = nullptr;
-    Result->DeletedCount = 0;
-    Result->SpaceReclaimed = 0;
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImagesCount);
+    RETURN_HR_IF_NULL(E_POINTER, SpaceReclaimed);
+    *DeletedImages = nullptr;
+    *DeletedImagesCount = 0;
+    *SpaceReclaimed = 0;
 
     if (Options != nullptr)
     {
@@ -1360,23 +1361,22 @@ try
             for (ULONG i = 0; i < Options->LabelsCount; ++i)
             {
                 const auto& filter = Options->Labels[i];
-                if (filter.Label.Key != nullptr)
-                {
-                    std::string labelFilter = filter.Label.Key;
-                    if (filter.Label.Value != nullptr)
-                    {
-                        labelFilter += "=";
-                        labelFilter += filter.Label.Value;
-                    }
+                RETURN_HR_IF_NULL(E_INVALIDARG, filter.Key);
 
-                    if (filter.Present)
-                    {
-                        filters.presentLabels.push_back(std::move(labelFilter));
-                    }
-                    else
-                    {
-                        filters.absentLabels.push_back(std::move(labelFilter));
-                    }
+                std::string labelFilter = filter.Key;
+                if (filter.Value != nullptr)
+                {
+                    labelFilter += "=";
+                    labelFilter += filter.Value;
+                }
+
+                if (filter.Present)
+                {
+                    filters.presentLabels.push_back(std::move(labelFilter));
+                }
+                else
+                {
+                    filters.absentLabels.push_back(std::move(labelFilter));
                 }
             }
         }
@@ -1389,7 +1389,7 @@ try
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune images");
 
-    Result->SpaceReclaimed = pruneResult.SpaceReclaimed;
+    *SpaceReclaimed = pruneResult.SpaceReclaimed;
 
     if (pruneResult.ImagesDeleted.has_value() && !pruneResult.ImagesDeleted->empty())
     {
@@ -1414,8 +1414,8 @@ try
             index++;
         }
 
-        Result->DeletedImages = output.release();
-        Result->DeletedCount = static_cast<ULONG>(pruneResult.ImagesDeleted->size());
+        *DeletedImages = output.release();
+        *DeletedImagesCount = static_cast<ULONG>(pruneResult.ImagesDeleted->size());
     }
 
     return S_OK;
@@ -1588,7 +1588,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneContainers(_In_opt_ WSLCContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result)
+HRESULT WSLCSession::PruneContainers(_In_opt_ WSLCPruneLabelFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result)
 try
 {
     COMServiceExecutionContext context;

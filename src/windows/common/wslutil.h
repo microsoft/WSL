@@ -152,38 +152,6 @@ struct PruneResult
     }
 };
 
-struct ImagePruneResult
-{
-    NON_COPYABLE(ImagePruneResult);
-    WSLCPruneImagesResults result{};
-
-    ImagePruneResult() = default;
-
-    ImagePruneResult(ImagePruneResult&& other)
-    {
-        *this = std::move(other);
-    }
-
-    ImagePruneResult& operator=(ImagePruneResult&& other)
-    {
-        CoTaskMemFree(result.DeletedImages);
-        result.DeletedImages = other.result.DeletedImages;
-        result.DeletedCount = other.result.DeletedCount;
-        result.SpaceReclaimed = other.result.SpaceReclaimed;
-
-        other.result.DeletedImages = nullptr;
-        other.result.DeletedCount = 0;
-        other.result.SpaceReclaimed = 0;
-
-        return *this;
-    }
-
-    ~ImagePruneResult()
-    {
-        CoTaskMemFree(result.DeletedImages);
-    }
-};
-
 class StopWatch
 {
     NON_COPYABLE(StopWatch);

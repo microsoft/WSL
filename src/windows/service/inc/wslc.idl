@@ -547,11 +547,32 @@ typedef struct _WSLCTagImageOptions
     LPCSTR Tag;   // Target tag name.
 } WSLCTagImageOptions;
 
-typedef struct _WSLCPruneImageLabelFilter
+typedef struct _WSLCVolumeOptions
 {
-    WSLCLabel Label;
-    BOOL Present; // If true, filter:{label=key(=value)}, if false filter:{label!=key(=value)}
-} WSLCPruneImageLabelFilter;
+    LPCSTR Name;
+    LPCSTR Type;
+    [unique] LPCSTR Options;
+} WSLCVolumeOptions;
+
+typedef struct _WSLCVolumeInformation
+{
+    char Name[WSLC_MAX_VOLUME_NAME_LENGTH + 1];
+    char Type[64];
+} WSLCVolumeInformation;
+
+typedef struct _WSLCPruneLabelFilter
+{
+    LPCSTR Key;
+    [unique] LPCSTR Value;
+    BOOL Present;
+} WSLCPruneLabelFilter;
+
+typedef struct _WSLCPruneContainersResults
+{
+    [unique, size_is(ContainersCount)] WSLCContainerId* Containers;
+    ULONG ContainersCount;
+    ULONGLONG SpaceReclaimed;
+} WSLCPruneContainersResults;
 
 typedef enum _WSLCPruneImagesFlags
 {
@@ -569,43 +590,9 @@ typedef struct _WSLCPruneImagesOptions
 {
     DWORD Flags; // WSLCPruneImagesFlags
     ULONGLONG Until;
-    [unique, size_is(LabelsCount)] const WSLCPruneImageLabelFilter* Labels;
+    [unique, size_is(LabelsCount)] const WSLCPruneLabelFilter* Labels;
     ULONG LabelsCount;
 } WSLCPruneImagesOptions;
-
-typedef struct _WSLCPruneImagesResults
-{
-    [unique, size_is(DeletedCount)] WSLCDeletedImageInformation* DeletedImages;
-    ULONG DeletedCount;
-    ULONGLONG SpaceReclaimed;
-} WSLCPruneImagesResults;
-
-typedef struct _WSLCVolumeOptions
-{
-    LPCSTR Name;
-    LPCSTR Type;
-    [unique] LPCSTR Options;
-} WSLCVolumeOptions;
-
-typedef struct _WSLCVolumeInformation
-{
-    char Name[WSLC_MAX_VOLUME_NAME_LENGTH + 1];
-    char Type[64];
-} WSLCVolumeInformation;
-
-typedef struct _WSLCContainerPruneFilter
-{
-    LPCSTR Key;
-    [unique] LPCSTR Value;
-    BOOL Present;
-} WSLCContainerPruneFilter;
-
-typedef struct _WSLCPruneContainersResults
-{
-    [unique, size_is(ContainersCount)] WSLCContainerId* Containers;
-    ULONG ContainersCount;
-    ULONGLONG SpaceReclaimed;
-} WSLCPruneContainersResults;
 
 typedef enum _WSLCSessionState
 {
@@ -648,7 +635,7 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
     HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
-    HRESULT PruneImages([in, unique] const WSLCPruneImagesOptions* Options, [out] WSLCPruneImagesResults* Result);
+    HRESULT PruneImages([in, unique] const WSLCPruneImagesOptions* Options, [out, size_is(, *DeletedImagesCount)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* DeletedImagesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
@@ -657,7 +644,7 @@ interface IWSLCSession : IUnknown
                                             [out] ULONG* Count,
                                             [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports,
                                             [out] ULONG* PortsCount);
-    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLCContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLCPruneContainersResults* Result);
+    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLCPruneLabelFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [out] IWSLCProcess** Process, [out] int* Errno);
