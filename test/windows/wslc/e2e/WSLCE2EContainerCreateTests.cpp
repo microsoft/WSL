@@ -147,7 +147,6 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(
             L"container create --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
-        result.Dump();
         result.Verify(
             {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_ALREADY_EXISTS\r\n", EscapePath(cidFilePath.wstring())),
              .ExitCode = 1});
