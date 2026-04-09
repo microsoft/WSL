@@ -18,8 +18,10 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace wsl::windows::wslc::models;
+using namespace wsl::windows::common::string;
 
 class WSLCE2EContainerListTests
 {
@@ -46,16 +48,14 @@ class WSLCE2EContainerListTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container list --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_AllOption)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_AllOption)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create a container
@@ -65,7 +65,7 @@ class WSLCE2EContainerListTests
         VERIFY_IS_FALSE(containerId.empty());
 
         // Find container in list output
-        result = RunWslc(L"container list --all");
+        result = RunWslc(L"container list --no-trunc --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto outputLines = result.GetStdoutLines();
         std::optional<std::wstring> foundContainerLine{};
@@ -83,15 +83,14 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"created"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_NoOptions_RunningContainers)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_NoOptions_RunningContainers)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto containerId = result.GetStdoutOneLine();
+        auto containerId = TruncateId(result.GetStdoutOneLine());
         VERIFY_IS_FALSE(containerId.empty());
 
         // Find container in list output with no options
@@ -113,15 +112,14 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"running"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_NoOptions_ExcludesCreatedContainers)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_NoOptions_ExcludesCreatedContainers)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create (but do not start) a container.
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto containerId = result.GetStdoutOneLine();
+        const auto containerId = TruncateId(result.GetStdoutOneLine());
         VERIFY_IS_FALSE(containerId.empty());
 
         // Default list should only show running containers.
@@ -140,9 +138,8 @@ class WSLCE2EContainerListTests
         VERIFY_IS_FALSE(isListed);
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_QuietOption_OutputsIdsOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_QuietOption_OutputsIdsOnly)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -157,17 +154,14 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_EQUAL(containerId, outputLine);
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"container list --format invalid");
         result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create a container
@@ -227,7 +221,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Lists containers. By default, only running containers are shown; use --all to include all containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerListLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -245,7 +239,8 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -a,--all    Show all regardless of state.\r\n"
-                << L"  --format    Output formatting (json or table) (Default:table)\r\n"
+                << L"  --format    " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
+                << L"  --no-trunc  Do not truncate output\r\n"
                 << L"  -q,--quiet  Outputs the container IDs only\r\n"
                 << L"  --session   Specify the session to use\r\n"
                 << L"  -h,--help   Shows help about the selected command\r\n"

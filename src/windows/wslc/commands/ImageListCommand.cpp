@@ -20,23 +20,29 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
 // Image List Command
 std::vector<Argument> ImageListCommand::GetArguments() const
 {
-    return {Argument::Create(ArgType::Format), Argument::Create(ArgType::Quiet), Argument::Create(ArgType::Session), Argument::Create(ArgType::Verbose)};
+    return {
+        Argument::Create(ArgType::Format),
+        Argument::Create(ArgType::NoTrunc),
+        Argument::Create(ArgType::Quiet),
+        Argument::Create(ArgType::Session),
+        Argument::Create(ArgType::Verbose)};
 }
 
 std::wstring ImageListCommand::ShortDescription() const
 {
-    return {L"List images."};
+    return Localization::WSLCCLI_ImageListDesc();
 }
 
 std::wstring ImageListCommand::LongDescription() const
 {
-    return {L"Lists images."};
+    return Localization::WSLCCLI_ImageListLongDesc();
 }
 
 void ImageListCommand::ExecuteInternal(CLIExecutionContext& context) const

@@ -20,6 +20,7 @@ Abstract:
 #include "wslutil.h"
 
 using namespace std::string_view_literals;
+using namespace wsl::windows::common::wslutil;
 
 namespace {
 constexpr uint32_t s_DefaultCPUCount = 2;
@@ -417,7 +418,6 @@ try
     WSLCSessionSettings runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
-    // TODO: Is this the intended use for vhdRequirements.sizeInBytes?
     runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeInBytes / _1MB;
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
@@ -431,16 +431,6 @@ try
     }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
-
-    // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
-    // runtimeSettings.DmesgOutput;
-
-    // TODO: VHD overrides; I'm not sure if we intend these to be provided.
-    // runtimeSettings.RootVhdOverride = internalType->vhdRequirements.path;
-    // TODO: I don't think that this VHD type override can be reused from the VHD requirements type
-    //       Tracking the code suggests that this is the `filesystemtype` to the linux `mount` function.
-    //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
-    // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, &result->session))))
     {
@@ -480,23 +470,54 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    UNREFERENCED_PARAMETER(errorMessage);
-    return E_NOTIMPL;
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
+    RETURN_HR_IF(E_INVALIDARG, options->sizeInBytes == 0);
+    RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
+
+    WSLCVolumeOptions volumeOptions{};
+    volumeOptions.Name = options->name;
+    // Only supported value currently
+    volumeOptions.Type = "vhd";
+
+    auto dynamicOptions = std::format(R"({{ "SizeBytes": "{}" }})", options->sizeInBytes);
+    volumeOptions.Options = dynamicOptions.c_str();
+
+    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions));
 }
 CATCH_RETURN();
 
-STDAPI WslcSetSessionSettingsVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
+STDAPI WslcDeleteSessionVhdVolume(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, name);
+
+    return errorInfoWrapper.CaptureResult(internalType->session->DeleteVolume(name));
+}
+CATCH_RETURN();
+
+STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_opt_ const WslcVhdRequirements* vhdRequirements)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     if (vhdRequirements)
     {
+        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeInBytes == 0);
+        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
+
         internalType->vhdRequirements = *vhdRequirements;
     }
     else
@@ -621,6 +642,23 @@ try
         containerOptions.VolumesCount = static_cast<ULONG>(internalContainerSettings->volumesCount);
     }
 
+    std::unique_ptr<WSLCNamedVolume[]> convertedNamedVolumes;
+    if (internalContainerSettings->namedVolumes && internalContainerSettings->namedVolumesCount)
+    {
+        convertedNamedVolumes = std::make_unique<WSLCNamedVolume[]>(internalContainerSettings->namedVolumesCount);
+        for (uint32_t i = 0; i < internalContainerSettings->namedVolumesCount; ++i)
+        {
+            const WslcContainerNamedVolume& internalVolume = internalContainerSettings->namedVolumes[i];
+            WSLCNamedVolume& convertedVolume = convertedNamedVolumes[i];
+
+            convertedVolume.Name = internalVolume.name;
+            convertedVolume.ContainerPath = internalVolume.containerPath;
+            convertedVolume.ReadOnly = internalVolume.readOnly;
+        }
+        containerOptions.NamedVolumes = convertedNamedVolumes.get();
+        containerOptions.NamedVolumesCount = static_cast<ULONG>(internalContainerSettings->namedVolumesCount);
+    }
+
     std::unique_ptr<WSLCPortMapping[]> convertedPorts;
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
@@ -638,7 +676,7 @@ try
 
             // TODO: Consider using standard protocol numbers instead of our own enum.
             convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
-            convertedPort.BindingAddress = "127.0.0.1";
+            strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
         }
         containerOptions.Ports = convertedPorts.get();
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
@@ -804,6 +842,27 @@ try
 }
 CATCH_RETURN();
 
+STDAPI WslcSetContainerSettingsNamedVolumes(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes, _In_ uint32_t namedVolumeCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(E_INVALIDARG, (namedVolumes == nullptr && namedVolumeCount != 0) || (namedVolumes != nullptr && namedVolumeCount == 0));
+
+    for (uint32_t i = 0; i < namedVolumeCount; ++i)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, namedVolumes[i].name);
+        RETURN_HR_IF_NULL(E_INVALIDARG, namedVolumes[i].containerPath);
+        EnsureAbsolutePath(namedVolumes[i].containerPath, true);
+    }
+
+    internalType->namedVolumes = namedVolumes;
+    internalType->namedVolumesCount = namedVolumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
@@ -851,12 +910,21 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PCSTR* inspectData)
+STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR* inspectData)
 try
 {
-    UNREFERENCED_PARAMETER(container);
-    UNREFERENCED_PARAMETER(inspectData);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    RETURN_HR_IF_NULL(E_POINTER, inspectData);
+
+    *inspectData = nullptr;
+
+    wil::unique_cotaskmem_ansistring result;
+    RETURN_IF_FAILED(internalType->container->Inspect(&result));
+
+    *inspectData = result.release();
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1129,7 +1197,7 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1167,7 +1235,7 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcLoadSessionImage(
@@ -1316,3 +1384,22 @@ try
     return E_NOTIMPL;
 }
 CATCH_RETURN();
+
+EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
+{
+    wil::DLLMain(Instance, Reason, Reserved);
+
+    switch (Reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        wsl::windows::common::wslutil::InitializeWil();
+        WslTraceLoggingInitialize(WslcTelemetryProvider, false);
+        break;
+
+    case DLL_PROCESS_DETACH:
+        WslTraceLoggingUninitialize();
+        break;
+    }
+
+    return TRUE;
+}

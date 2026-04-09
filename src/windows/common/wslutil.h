@@ -72,6 +72,54 @@ struct COMErrorInfo
     wil::unique_bstr Source;
 };
 
+static_assert(sizeof(WSLCHandle::Handle) == sizeof(HANDLE));
+static_assert(sizeof(FILE_HANDLE) == sizeof(HANDLE));
+static_assert(sizeof(PIPE_HANDLE) == sizeof(HANDLE));
+static_assert(sizeof(SOCKET_HANDLE) == sizeof(HANDLE));
+
+struct COMOutputHandle : public WSLCHandle
+{
+    NON_COPYABLE(COMOutputHandle);
+    NON_MOVABLE(COMOutputHandle);
+    COMOutputHandle()
+    {
+        ZeroMemory(&Handle, sizeof(Handle));
+        Type = WSLCHandleTypeUnknown;
+    }
+
+    ~COMOutputHandle()
+    {
+        Reset();
+    }
+
+    void Reset() noexcept
+    {
+        if (!Empty())
+        {
+            LOG_IF_WIN32_BOOL_FALSE(CloseHandle(Handle.File));
+            Handle.File = nullptr;
+        }
+    }
+
+    [[nodiscard]] wil::unique_handle Release() noexcept
+    {
+        wil::unique_handle handle(Handle.File);
+        Handle.File = nullptr;
+
+        return handle;
+    }
+
+    HANDLE Get() const noexcept
+    {
+        return Handle.File;
+    }
+
+    bool Empty() const noexcept
+    {
+        return Handle.File == nullptr || Handle.File == INVALID_HANDLE_VALUE;
+    }
+};
+
 struct PruneResult
 {
     NON_COPYABLE(PruneResult);
@@ -170,6 +218,8 @@ std::wstring ErrorCodeToString(HRESULT Error);
 
 ErrorStrings ErrorToString(const Error& error);
 
+[[nodiscard]] HANDLE FromCOMInputHandle(WSLCHandle Handle);
+
 std::filesystem::path GetBasePath();
 
 std::optional<COMErrorInfo> GetCOMErrorInfo();
@@ -266,6 +316,10 @@ void SetCrtEncoding(int Mode);
 void SetThreadDescription(LPCWSTR Name);
 
 wil::unique_hlocal_string SidToString(_In_ PSID Sid);
+
+WSLCHandle ToCOMInputHandle(HANDLE Handle);
+[[nodiscard]] WSLCHandle ToCOMOutputHandle(HANDLE Handle, DWORD Access);
+[[nodiscard]] WSLCHandle ToCOMOutputHandle(HANDLE Handle, DWORD Access, WSLCHandleType Type);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 

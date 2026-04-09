@@ -23,6 +23,7 @@ Abstract:
 #include "lxinitshared.h"
 
 using namespace wsl::windows::common;
+using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VmPortAllocation;
 using wsl::windows::service::wslc::VMPortMapping;
 using wsl::windows::service::wslc::WSLCProcess;
@@ -143,6 +144,7 @@ void VMPortMapping::Unmap()
 {
     if (Vm)
     {
+        auto clearVm = wil::scope_exit([&] { Vm = nullptr; });
         Vm->UnmapPort(*this);
     }
 }
@@ -703,7 +705,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
 
     wil::unique_socket ttyControlHandle;
 
-    std::map<ULONG, wil::unique_handle> stdHandles;
+    std::map<ULONG, TypedHandle> stdHandles;
     for (auto& [fd, handle] : sockets)
     {
         if (ttyControl != nullptr && fd == ttyControl->Fd)
@@ -712,7 +714,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
             continue;
         }
 
-        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(handle.release()));
+        stdHandles.emplace(fd, TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(handle.release())}, WSLCHandleTypeSocket});
     }
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));

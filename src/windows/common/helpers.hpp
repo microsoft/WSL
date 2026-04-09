@@ -153,6 +153,8 @@ bool IsPackageInstalled(_In_ LPCWSTR PackageFamilyName);
 
 bool IsServicePresent(_In_ LPCWSTR ServiceName);
 
+bool IsServiceRunning(_In_ LPCWSTR ServiceName);
+
 bool IsVirtioSerialConsoleSupported();
 
 bool IsVmemmSuffixSupported();

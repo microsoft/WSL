@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 using namespace wsl::windows::wslc::models;
 
@@ -39,22 +40,19 @@ class WSLCE2EImageListTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         const auto result = RunWslc(L"image list --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : result.GetStdoutLines())
         {
-            if (line.find(DebianImage.NameAndTag()) != std::wstring::npos)
+            if (line.find(DebianImage.Name) != std::wstring::npos && line.find(DebianImage.Tag) != std::wstring::npos)
             {
                 return;
             }
@@ -63,10 +61,8 @@ class WSLCE2EImageListTests
         VERIFY_FAIL(L"Failed to find the loaded image in the output");
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsNamesOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsNamesOnly)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list --quiet");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -83,18 +79,14 @@ class WSLCE2EImageListTests
         VERIFY_IS_TRUE(imageFound);
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list --format invalid");
         result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -105,11 +97,35 @@ class WSLCE2EImageListTests
         std::vector<std::wstring> imageNames;
         for (const auto& image : images)
         {
-            imageNames.push_back(wsl::shared::string::MultiByteToWide(image.Name));
+            auto nameAndTag = std::format(
+                L"{}:{}",
+                wsl::shared::string::MultiByteToWide(image.Repository.value_or("<untagged>")),
+                wsl::shared::string::MultiByteToWide(image.Tag.value_or("<untagged>")));
+            imageNames.push_back(nameAndTag);
         }
 
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), DebianImage.NameAndTag()));
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), AlpineImage.NameAndTag()));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_TableFormat_HasExpectedColumns)
+    {
+        const auto result = RunWslc(L"image list");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        bool foundHeader = false;
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line.find(L"REPOSITORY") != std::wstring::npos && line.find(L"TAG") != std::wstring::npos &&
+                line.find(L"IMAGE ID") != std::wstring::npos && line.find(L"CREATED") != std::wstring::npos &&
+                line.find(L"SIZE") != std::wstring::npos)
+            {
+                foundHeader = true;
+                break;
+            }
+        }
+
+        VERIFY_IS_TRUE(foundHeader, L"Expected table header with REPOSITORY, TAG, IMAGE ID, CREATED, SIZE columns");
     }
 
 private:
@@ -129,7 +145,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Lists images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageListLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -146,11 +162,12 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  --format      Output formatting (json or table) (Default:table)\r\n"
-                << L"  -q,--quiet    Outputs the container IDs only\r\n"
-                << L"  --session     Specify the session to use\r\n"
-                << L"  -v,--verbose  Output verbose details\r\n"
-                << L"  -h,--help     Shows help about the selected command\r\n"
+                << L"  --format    " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
+                << L"  --no-trunc  Do not truncate output\r\n"
+                << L"  -q,--quiet  Outputs the container IDs only\r\n"
+                << L"  --session   Specify the session to use\r\n"
+                << L"  --verbose   Output verbose details\r\n"
+                << L"  -h,--help   Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

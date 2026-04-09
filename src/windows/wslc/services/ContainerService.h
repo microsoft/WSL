@@ -21,6 +21,7 @@ struct ContainerService
 {
     static std::wstring ContainerStateToString(WSLCContainerState state, ULONGLONG stateChangedAt = 0);
     static std::wstring FormatRelativeTime(ULONGLONG timestamp);
+    static std::wstring FormatPorts(WSLCContainerState state, const std::vector<models::PortInformation>& ports);
     static int Attach(models::Session& session, const std::string& id);
     static int Run(models::Session& session, const std::string& image, models::ContainerOptions options);
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options);

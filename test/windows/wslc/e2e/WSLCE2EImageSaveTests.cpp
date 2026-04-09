@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageSaveTests
 {
@@ -41,42 +42,32 @@ class WSLCE2EImageSaveTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Image_Save_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Save_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image save --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Save_MissingImageName)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Save_MissingImageName)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(std::format(L"image save --output \"{}\"", SavedArchivePath.wstring()));
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Save_MissingOutputPath)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Save_MissingOutputPath)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(std::format(L"image save {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Required argument not provided: 'output'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Save_ImageNotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Save_ImageNotFound)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), InvalidImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"reference does not exist\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Save_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Save_Success)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
@@ -86,10 +77,8 @@ class WSLCE2EImageSaveTests
         VERIFY_ARE_EQUAL(sourceFileSize, archiveFileSize);
     }
 
-    TEST_METHOD(WSLCE2E_Image_Save_Load)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Save_Load)
     {
-        WSL2_TEST_ONLY();
-
         // Save source image
         auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
@@ -125,7 +114,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Saves images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageSaveLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

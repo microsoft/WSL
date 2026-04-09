@@ -54,6 +54,11 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     // Ensure that the session display name is non-null and not too long.
     THROW_HR_IF(E_INVALIDARG, Settings->DisplayName == nullptr);
     THROW_HR_IF(E_INVALIDARG, wcslen(Settings->DisplayName) >= std::size(WSLCSessionInformation{}.DisplayName));
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
+        "Invalid storage flags: %i",
+        Settings->StorageFlags);
 
     auto tokenInfo = GetCallingProcessTokenInfo();
 
@@ -120,11 +125,14 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     WSL_LOG_TELEMETRY(
         "WSLCCreateSession",
-        PDT_ProductAndServiceUsage,
+        PDT_ProductAndServicePerformance,
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(Settings->DisplayName, "Name"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
         TraceLoggingValue(creationResult, "Result"),
-        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"));
+        TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
+        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"),
+        TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
     THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", Settings->DisplayName);
 }
@@ -211,6 +219,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(_In_ ULONG
     sessionSettings.NetworkingMode = Settings->NetworkingMode;
     sessionSettings.FeatureFlags = Settings->FeatureFlags;
     sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
+    sessionSettings.StorageFlags = Settings->StorageFlags;
     return sessionSettings;
 }
 

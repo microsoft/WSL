@@ -15,11 +15,12 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "BuildImageCallback.h"
 #include "CLIExecutionContext.h"
+#include "ContainerService.h"
 #include "ImageModel.h"
 #include "ImageService.h"
 #include "ImageTasks.h"
 #include "PullImageCallback.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include "Task.h"
 #include <format>
 
@@ -72,7 +73,7 @@ void ListImages(CLIExecutionContext& context)
         // Print only the image names.
         for (const auto& image : images)
         {
-            PrintMessage(MultiByteToWide(image.Name));
+            PrintMessage(MultiByteToWide(image.Repository.value_or("<untagged>") + ":" + image.Tag.value_or("<untagged>")));
         }
 
         return;
@@ -94,13 +95,31 @@ void ListImages(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        // Create table — only IMAGE ID uses fixed width; other columns auto-size.
+        // When --no-trunc is passed, IMAGE ID also shows full length via TruncateId().
+        auto table = trunc ? wsl::windows::wslc::TableOutput<5>(
+                                 {{{L"REPOSITORY", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"TAG", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"IMAGE ID", {12, 12, false}},
+                                   {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
+                                   {L"SIZE", {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<5>({L"REPOSITORY", L"TAG", L"IMAGE ID", L"CREATED", L"SIZE"});
+
         for (const auto& image : images)
         {
-            tablePrinter.AddRow({MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
+            table.OutputLine({
+                MultiByteToWide(image.Repository.value_or("<untagged>")),
+                MultiByteToWide(image.Tag.value_or("<untagged>")),
+                MultiByteToWide(TruncateId(image.Id, trunc)),
+                ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
+            });
         }
 
-        tablePrinter.Print();
+        table.Complete();
         break;
     }
     default:
@@ -144,7 +163,7 @@ void LoadImage(CLIExecutionContext& context)
     }
 
     // TODO Read from stdin if no input argument is provided.
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Requested load but no input provided.");
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageLoadNoInputError());
 }
 
 void InspectImages(CLIExecutionContext& context)

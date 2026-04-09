@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Create Command
@@ -47,9 +48,9 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Remove),
         // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::Session),
-        // Argument::Create(ArgType::TMPFS),
+        Argument::Create(ArgType::TMPFS, false, NO_LIMIT),
         Argument::Create(ArgType::TTY),
-        // Argument::Create(ArgType::User),
+        Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, false, NO_LIMIT),
         // Argument::Create(ArgType::Virtual),
     };
@@ -58,12 +59,12 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
 
 std::wstring ContainerCreateCommand::ShortDescription() const
 {
-    return {L"Create a container."};
+    return Localization::WSLCCLI_ContainerCreateDesc();
 }
 
 std::wstring ContainerCreateCommand::LongDescription() const
 {
-    return {L"Creates a container."};
+    return Localization::WSLCCLI_ContainerCreateLongDesc();
 }
 
 // clang-format off

@@ -65,7 +65,7 @@ struct Volume
     std::string Name;
     std::string Driver;
     std::string Mountpoint;
-    std::map<std::string, std::string> Options;
+    std::optional<std::map<std::string, std::string>> Options;
     std::map<std::string, std::string> Labels;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
@@ -145,8 +145,8 @@ struct CreateContainer
     std::string Domainname;
     std::optional<std::string> StopSignal;
     std::optional<std::string> WorkingDir;
-    std::vector<std::string> Cmd;
-    std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
     std::map<std::string, std::string> Labels;

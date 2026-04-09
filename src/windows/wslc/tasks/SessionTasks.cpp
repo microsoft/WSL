@@ -16,11 +16,13 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "SessionTasks.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include "Task.h"
 
 using namespace wsl::shared;
-using namespace wsl::windows::common;
+using namespace wsl::shared::string;
+using namespace wsl::windows::common::string;
+using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::services;
 using wsl::windows::wslc::models::SessionOptions;
@@ -71,19 +73,56 @@ void ListSessions(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Verbose))
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
+        PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
     }
 
-    utils::TablePrinter tablePrinter(
+    TableOutput<3> table(
         {Localization::MessageWslcHeaderId(), Localization::MessageWslcHeaderCreatorPid(), Localization::MessageWslcHeaderDisplayName()});
+
     for (const auto& session : sessions)
     {
-        tablePrinter.AddRow({
+        table.OutputLine({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
             session.DisplayName,
         });
     }
-    tablePrinter.Print();
+
+    table.Complete();
 }
+
+void TerminateSession(CLIExecutionContext& context)
+{
+    std::wstring sessionId;
+    if (context.Args.Contains(ArgType::SessionId))
+    {
+        sessionId = context.Args.Get<ArgType::SessionId>();
+    }
+    else
+    {
+        sessionId = SessionOptions::GetDefaultSessionName();
+    }
+
+    context.ExitCode = SessionService::TerminateSession(sessionId);
+}
+
+void EnterSession(CLIExecutionContext& context)
+{
+    auto storagePath = std::filesystem::absolute(context.Args.Get<ArgType::StoragePath>());
+
+    std::wstring sessionName;
+    if (context.Args.Contains(ArgType::Name))
+    {
+        sessionName = context.Args.Get<ArgType::Name>();
+    }
+    else
+    {
+        GUID guid{};
+        THROW_IF_FAILED(CoCreateGuid(&guid));
+        sessionName = wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::None);
+    }
+
+    context.ExitCode = SessionService::Enter(storagePath.wstring(), sessionName);
+}
+
 } // namespace wsl::windows::wslc::task
