@@ -4832,10 +4832,8 @@ class WSLCTests
         ValidateContainerVolumes(true);
     }
 
-    TEST_METHOD(ContainerVolumesAdvanced)
+    WSLC_TEST_METHOD(ContainerVolumesAdvanced)
     {
-        WSL2_TEST_ONLY();
-
         auto hostFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume");
         auto symlinkFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume-symlink");
         std::filesystem::create_directories(hostFolder);
