@@ -141,7 +141,7 @@ function(wslc_add_image _target_name)
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
         COMMAND ${CMAKE_COMMAND} -E touch "${_stamp}"
         DEPENDS ${_resolved_sources} "${_dockerfile_path}"
-        COMMENT "WSLC: Building image '${_image_ref}' -- use WslcCliSession API to access it at runtime."
+        COMMENT "WSLC: Building image '${_image_ref}' -- use WslcGetCliSession() to access it at runtime."
         VERBATIM
     )
 

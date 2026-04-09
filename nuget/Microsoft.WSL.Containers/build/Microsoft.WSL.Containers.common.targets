@@ -110,7 +110,7 @@
         <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).built" AlwaysCreate="true" />
 
         <Message Importance="high"
-                 Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully." />
+                 Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully. Use WslcGetCliSession() to access it at runtime." />
     </Target>
 
     <!-- Clean container artifacts -->
