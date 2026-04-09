@@ -38,10 +38,8 @@ class WSLCE2ESessionEnterTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_SessionEnter_WithName)
+    WSLC_TEST_METHOD(WSLCE2E_SessionEnter_WithName)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto sessionName = L"test-wslc-session-enter";
 
         // Run an interactive session enter with an explicit name.
@@ -73,10 +71,8 @@ class WSLCE2ESessionEnterTests
         VERIFY_IS_FALSE(listResult.Stdout->find(sessionName) != std::wstring::npos);
     }
 
-    TEST_METHOD(WSLCE2E_SessionEnter_WithoutName_GeneratesGuid)
+    WSLC_TEST_METHOD(WSLCE2E_SessionEnter_WithoutName_GeneratesGuid)
     {
-        WSL2_TEST_ONLY();
-
         auto session = RunWslcInteractive(std::format(L"session enter \"{}\"", SessionOptions::GetStoragePath()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
@@ -86,10 +82,8 @@ class WSLCE2ESessionEnterTests
         VERIFY_ARE_EQUAL(session.Exit(), 0);
     }
 
-    TEST_METHOD(WSLCE2E_SessionEnter_StoragePathNotFound)
+    WSLC_TEST_METHOD(WSLCE2E_SessionEnter_StoragePathNotFound)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"session enter does-not-exist");
         result.Verify({
             .Stderr = L"The system cannot find the path specified. \r\nError code: ERROR_PATH_NOT_FOUND\r\n",
