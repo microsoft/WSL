@@ -97,7 +97,7 @@
     <Target Name="_WslcBuildSingleImage"
             DependsOnTargets="_WslcCollectSources"
             Inputs="@(_WslcSourceFiles)"
-            Outputs="$(_WslcIntDir)wslc_$(_WslcName).marker">
+            Outputs="$(_WslcIntDir)wslc_$(_WslcName).built">
 
         <MakeDir Directories="$(_WslcIntDir)" />
 
@@ -107,7 +107,7 @@
         <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
-        <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
+        <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).built" AlwaysCreate="true" />
 
         <Message Importance="high"
                  Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully." />
@@ -118,7 +118,7 @@
             AfterTargets="Clean"
             Condition="'@(WslcImage)' != ''">
 
-        <Delete Files="$(_WslcIntDir)wslc_%(WslcImage.Identity).marker" />
+        <Delete Files="$(_WslcIntDir)wslc_%(WslcImage.Identity).built" />
     </Target>
 
 </Project>
