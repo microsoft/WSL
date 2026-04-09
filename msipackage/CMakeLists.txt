@@ -27,6 +27,9 @@ foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
 endforeach()
 
+# Shell script for WSL interop (allows running 'wslc' without the .exe extension inside WSL)
+list(APPEND BINARIES_DEPENDENCIES "${CMAKE_SOURCE_DIR}/src/windows/wslc/wslc")
+
 set(LINUX_BINARIES init;initrd.img)
 foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")

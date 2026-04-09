@@ -1,0 +1,2 @@
+# Shell scripts must keep Unix (LF) line endings to work in WSL
+wslc text eol=lf

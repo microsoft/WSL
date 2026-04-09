@@ -294,5 +294,14 @@ class SimpleTests
         VERIFY_IS_TRUE(output.find(L"/mnt/c/Program Files (x86)/Common Files") != std::wstring::npos);
         VERIFY_IS_TRUE(output.find(L"/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin") != std::wstring::npos);
     }
+
+    TEST_METHOD(WslcShellScript)
+    {
+        // Verify that the 'wslc' shell script (no .exe extension) invokes wslc.exe
+        // and produces the same output as calling wslc.exe directly.
+        auto [exeOutput, exeErr] = LxsstuLaunchWslAndCaptureOutput(L"wslc.exe version");
+        auto [scriptOutput, scriptErr] = LxsstuLaunchWslAndCaptureOutput(L"wslc version");
+        VERIFY_ARE_EQUAL(exeOutput, scriptOutput);
+    }
 };
 } // namespace SimpleTests
