@@ -48,7 +48,25 @@ if ($Fast)
     $SetupScript = $null
 }
 
-te.exe $TestDllPath /p:SetupScript=$SetupScript /p:Version=$Version /p:DistroPath=$DistroPath /p:TestDataPath=$TestDataPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
+$HasUserSelection = $false
+foreach ($arg in $TeArgs)
+{
+    if ($arg -like '/name:*' -or $arg -like '/select:*' -or $arg -like '-name:*' -or $arg -like '-select:*')
+    {
+        $HasUserSelection = $true
+        break
+    }
+}
+
+if ($HasUserSelection)
+{
+    te.exe $TestDllPath /p:SetupScript=$SetupScript /p:Version=$Version /p:DistroPath=$DistroPath /p:TestDataPath=$TestDataPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
+}
+else
+{
+    $env:TAEF_SELECT = "@WSLVersion='$Version' or not(@WSLVersion='*')"
+    te.exe $TestDllPath /p:SetupScript=$SetupScript /p:Version=$Version /p:DistroPath=$DistroPath /p:TestDataPath=$TestDataPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs --% /select:"%TAEF_SELECT%"
+}
 
 if (!$?)
 {

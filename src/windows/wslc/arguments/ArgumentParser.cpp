@@ -173,7 +173,10 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     if ((m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit()) ||
         (m_anchorPositional.value().Limit() == NO_LIMIT))
     {
-        // validate that we dont have any invalid argument specifiers.
+        // Validate that we don't have any invalid argument specifiers.
+        // Anchor positionals with multiple values should be order-independent, which means a
+        // '-' at the start of the first one would be invalid, so it should also be invalid for
+        // all other anchor positionals of the same type.
         if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
         {
             return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
@@ -192,12 +195,6 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     const Argument* nextPositional = NextPositional();
     if (nextPositional)
     {
-        // validate that we dont have any invalid argument specifiers.
-        if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
-        {
-            return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
-        }
-
         m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
         return {};
     }
