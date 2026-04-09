@@ -66,34 +66,30 @@ unset(_wslcsdk_lib_dir)
 # Usage:
 #   find_package(Microsoft.WSL.Containers REQUIRED)
 #
-#   wslc_add_image(
-#       NAME        my-server
+#   wslc_add_image(my-server
+#       IMAGE       ghcr.io/myorg/my-server
 #       DOCKERFILE  container/Dockerfile
 #       CONTEXT     container/
 #       SOURCES     container/src/*.cpp container/src/*.h
 #       TAG         latest
 #   )
 #
-#   # With explicit image registry/name (IMAGE defaults to NAME if omitted):
-#   wslc_add_image(
-#       NAME        my-server
-#       IMAGE       ghcr.io/myorg/my-server
-#       TAG         v1.2.3
-#       DOCKERFILE  container/Dockerfile
-#       CONTEXT     container/
-#   )
+#   add_dependencies(my_app my-server)
+#
+# The first positional argument is the CMake target name.
+# IMAGE is the container image reference (required).
 
-function(wslc_add_image)
+function(wslc_add_image _target_name)
     cmake_parse_arguments(
-        PARSE_ARGV 0 ARG
+        PARSE_ARGV 1 ARG
         ""                                      # options (none)
-        "NAME;IMAGE;TAG;DOCKERFILE;CONTEXT"        # one-value keywords
+        "IMAGE;TAG;DOCKERFILE;CONTEXT"           # one-value keywords
         "SOURCES"                                # multi-value keywords
     )
 
     # Validate required arguments
-    if(NOT ARG_NAME)
-        message(FATAL_ERROR "wslc_add_image: NAME is required")
+    if(NOT ARG_IMAGE)
+        message(FATAL_ERROR "wslc_add_image: IMAGE is required")
     endif()
     if(NOT ARG_DOCKERFILE)
         message(FATAL_ERROR "wslc_add_image: DOCKERFILE is required")
@@ -103,9 +99,6 @@ function(wslc_add_image)
     endif()
 
     # Defaults
-    if(NOT ARG_IMAGE)
-        set(ARG_IMAGE "${ARG_NAME}")
-    endif()
     if(NOT ARG_TAG)
         set(ARG_TAG "latest")
     endif()
@@ -118,10 +111,10 @@ function(wslc_add_image)
         endif()
     endif()
 
-    # Validate NAME is usable as a CMake target name
-    string(REGEX MATCH "[^a-zA-Z0-9_.-]" _bad_char "${ARG_NAME}")
+    # Validate target name
+    string(REGEX MATCH "[^a-zA-Z0-9_.-]" _bad_char "${_target_name}")
     if(_bad_char)
-        message(FATAL_ERROR "wslc_add_image: NAME '${ARG_NAME}' contains invalid character '${_bad_char}'. Use IMAGE for the full registry/name reference.")
+        message(FATAL_ERROR "wslc_add_image: '${_target_name}' is not a valid CMake target name (contains '${_bad_char}').")
     endif()
 
     # Normalize paths to be independent of the build directory
@@ -129,7 +122,7 @@ function(wslc_add_image)
     get_filename_component(_context_path "${ARG_CONTEXT}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
     set(_image_ref "${ARG_IMAGE}:${ARG_TAG}")
-    set(_marker "${CMAKE_CURRENT_BINARY_DIR}/wslc_${ARG_NAME}.marker")
+    set(_stamp "${CMAKE_CURRENT_BINARY_DIR}/wslc_${_target_name}.built")
 
     # Resolve source globs to file lists; default to CONTEXT contents if SOURCES omitted
     if(ARG_SOURCES)
@@ -144,15 +137,15 @@ function(wslc_add_image)
     endif()
 
     add_custom_command(
-        OUTPUT "${_marker}"
+        OUTPUT "${_stamp}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
-        COMMAND ${CMAKE_COMMAND} -E touch "${_marker}"
+        COMMAND ${CMAKE_COMMAND} -E touch "${_stamp}"
         DEPENDS ${_resolved_sources} "${_dockerfile_path}"
-        COMMENT "WSLC: Building image '${_image_ref}'..."
+        COMMENT "WSLC: Building image '${_image_ref}' -- use WslcCliSession API to access it at runtime."
         VERBATIM
     )
 
-    add_custom_target(wslc_image_${ARG_NAME} ALL
-        DEPENDS "${_marker}"
+    add_custom_target(${_target_name} ALL
+        DEPENDS "${_stamp}"
     )
 endfunction()

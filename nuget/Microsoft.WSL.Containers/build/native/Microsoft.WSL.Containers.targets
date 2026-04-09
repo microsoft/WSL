@@ -47,7 +47,7 @@
 
         <PropertyGroup>
             <_WslcDockerfileFullPath>$([System.IO.Path]::GetFullPath('$(_WslcDockerfile)'))</_WslcDockerfileFullPath>
-            <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).marker'))</_WslcMarkerFullPath>
+            <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).built'))</_WslcMarkerFullPath>
         </PropertyGroup>
 
         <WriteLinesToFile
