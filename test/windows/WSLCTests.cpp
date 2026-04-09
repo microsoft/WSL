@@ -595,7 +595,15 @@ class WSLCTests
 
     WSLC_TEST_METHOD(PushImage)
     {
+        auto emptyAuth = BuildRegistryAuthHeader("", "", "");
+
         // Validate that pushing a non-existent image fails.
+        {
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), nullptr), E_FAIL);
+            ValidateCOMErrorMessage(L"An image does not exist locally with the tag: does-not-exist");
+        }
+
+        // Validate passing empty auth string returns an appropriate error.
         {
             VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", "", nullptr), E_INVALIDARG);
         }
@@ -603,10 +611,9 @@ class WSLCTests
         // Validate that PushImage() returns the appropriate error if the session is terminated.
         {
             VERIFY_SUCCEEDED(m_defaultSession->Terminate());
-
             auto cleanup = wil::scope_exit([&]() { ResetTestSession(); });
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("hello-world:latest", "", nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("hello-world:latest", emptyAuth.c_str(), nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
 
