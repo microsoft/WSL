@@ -219,6 +219,16 @@ std::string ExtractContainerName(const std::vector<std::string>& names, const st
     return CleanContainerName(names[0]);
 }
 
+std::string FormatPortEndpoint(const ContainerPortMapping& portMapping)
+{
+    auto addr = portMapping.VmMapping.BindingAddressString();
+    return std::format(
+        "{}:{}/{}",
+        (addr.find(':') != std::string::npos) ? std::format("[{}]", addr) : addr,
+        portMapping.VmMapping.HostPort(),
+        portMapping.ProtocolString());
+}
+
 WSLCContainerMetadataV1 ParseContainerMetadata(const std::string& json)
 {
     auto wrapper = wsl::shared::FromJson<WSLCContainerMetadata>(json.c_str());
@@ -1453,8 +1463,7 @@ void WSLCContainerImpl::MapPorts()
 
                 THROW_HR_WITH_USER_ERROR_IF(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    wsl::shared::Localization::MessageWslcPortInUse(
-                        std::format("{}:{}/{}", e.VmMapping.BindingAddressString(), e.VmMapping.HostPort(), e.ProtocolString()), m_id),
+                    wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id),
                     !allocatedPort);
 
                 e.VmMapping.AssignVmPort(allocatedPort);
@@ -1472,9 +1481,7 @@ void WSLCContainerImpl::MapPorts()
             if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || ex.GetErrorCode() == HRESULT_FROM_WIN32(WSAEADDRINUSE))
             {
                 THROW_HR_WITH_USER_ERROR(
-                    HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    wsl::shared::Localization::MessageWslcPortInUse(
-                        std::format("{}:{}/{}", e.VmMapping.BindingAddressString(), e.VmMapping.HostPort(), e.ProtocolString()), m_id));
+                    HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
             }
             throw;
         }

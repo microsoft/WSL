@@ -932,7 +932,6 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortAlreadyInUse)
     {
         // Bug: https://github.com/microsoft/WSL/issues/14448
-        WSL2_TEST_ONLY();
 
         // Start a container with a simple server listening on a port
         auto result1 = RunWslc(std::format(
