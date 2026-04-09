@@ -324,7 +324,7 @@ class WslcSdkTests
     // -----------------------------------------------------------------------
     // Image tests
     // -----------------------------------------------------------------------
-    
+
     WSLC_TEST_METHOD(ImageList)
     {
         // Positive: session has images pre-loaded — list must return at least one entry.

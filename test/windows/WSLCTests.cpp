@@ -220,9 +220,8 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
         // Ensures the tag is removed to allow tests to try to push or pull the same image again.
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsNone).first);
-        });
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsNone).first); });
 
         VERIFY_SUCCEEDED(m_defaultSession->PushImage(registryImage.c_str(), registryAuth.c_str(), nullptr));
 
