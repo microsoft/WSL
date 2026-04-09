@@ -34,12 +34,12 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcWriteSingleTlog"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSourceDir=%(WslcImage.Sources);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
     <Target Name="_WslcWriteSingleTlog">
         <ItemGroup>
-            <_WslcTlogSourceDirs Include="$(_WslcSourceDir.Split(';'))" />
+            <_WslcTlogSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" />
             <_WslcTlogInputs Include="$(_WslcDockerfile)" />
             <_WslcTlogInputs Condition="'%(_WslcTlogSourceDirs.Identity)' != ''" Include="%(_WslcTlogSourceDirs.Identity)\**\*" />
         </ItemGroup>
@@ -47,7 +47,6 @@
         <PropertyGroup>
             <_WslcDockerfileFullPath>$([System.IO.Path]::GetFullPath('$(_WslcDockerfile)'))</_WslcDockerfileFullPath>
             <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(IntDir)wslc_$(_WslcName).marker'))</_WslcMarkerFullPath>
-            <_WslcTarFullPath>$([System.IO.Path]::GetFullPath('$(WslcImageOutputDir)$(_WslcName).tar'))</_WslcTarFullPath>
         </PropertyGroup>
 
         <WriteLinesToFile
@@ -58,7 +57,7 @@
 
         <WriteLinesToFile
             File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
-            Lines="^$(_WslcDockerfileFullPath);$(_WslcMarkerFullPath);$(_WslcTarFullPath)"
+            Lines="^$(_WslcDockerfileFullPath);$(_WslcMarkerFullPath)"
             Overwrite="true"
             Encoding="Unicode" />
     </Target>

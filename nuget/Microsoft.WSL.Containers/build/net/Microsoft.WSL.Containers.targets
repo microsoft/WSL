@@ -15,17 +15,13 @@
     <!-- C# specific: CPS Up-to-Date Check for container source files       -->
     <!-- ================================================================== -->
 
-    <!-- Register marker files as build outputs for CPS up-to-date check -->
-    <ItemGroup Condition="'$(UsingMicrosoftNETSdk)' == 'true'">
-        <UpToDateCheckBuilt Include="$(IntDir)wslc_%(WslcImage.Identity).marker" />
-    </ItemGroup>
-
-    <!-- Expand multi-directory Sources into UpToDateCheckInput at target time -->
+    <!-- Register marker and source files for CPS up-to-date check -->
     <Target Name="_WslcRegisterUpToDateCheckInputs"
             BeforeTargets="CollectUpToDateCheckBuiltDesignTime"
             Condition="'$(UsingMicrosoftNETSdk)' == 'true' AND '@(WslcImage)' != ''">
         <ItemGroup>
-            <_WslcUpToDateDirs Include="%(WslcImage.Sources)" Separator=";" />
+            <UpToDateCheckBuilt Include="$(IntDir)wslc_%(WslcImage.Identity).marker" />
+            <_WslcUpToDateDirs Include="%(WslcImage.Sources)" />
             <UpToDateCheckInput Include="%(_WslcUpToDateDirs.Identity)\**\*" Condition="'%(_WslcUpToDateDirs.Identity)' != ''" />
         </ItemGroup>
     </Target>
