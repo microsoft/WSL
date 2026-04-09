@@ -46,18 +46,9 @@ public:
     void FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message) override;
     void StartPortTracker(wil::unique_socket&& socket) override;
 
-    HRESULT MapPort(
-        _In_ USHORT HostPort,
-        _In_ USHORT GuestPort,
-        _In_ int Protocol,
-        _In_ PCSTR ListenAddress,
-        _Out_ USHORT* AllocatedHostPort) const;
+    HRESULT MapPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ PCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort) const;
 
-    HRESULT UnmapPort(
-        _In_ USHORT HostPort,
-        _In_ USHORT GuestPort,
-        _In_ int Protocol,
-        _In_ PCSTR ListenAddress) const;
+    HRESULT UnmapPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ PCSTR ListenAddress) const;
 
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);

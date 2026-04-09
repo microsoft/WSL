@@ -66,8 +66,8 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         for (uint16_t i = 0; i < containerPort.Count(); ++i)
         {
             auto currentContainerPort = static_cast<uint16_t>(containerPort.Start() + i);
-            auto currentHostPort =
-                portMapping.HostPort().IsEphemeral() ? static_cast<uint16_t>(WSLC_EPHEMERAL_PORT) : static_cast<uint16_t>(portMapping.HostPort().Start() + i);
+            auto currentHostPort = portMapping.HostPort().IsEphemeral() ? static_cast<uint16_t>(WSLC_EPHEMERAL_PORT)
+                                                                        : static_cast<uint16_t>(portMapping.HostPort().Start() + i);
             containerLauncher.AddPort(currentHostPort, currentContainerPort, family, protocol, bindAddress);
         }
     }

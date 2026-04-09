@@ -581,12 +581,7 @@ try
 }
 CATCH_RETURN()
 
-HRESULT HcsVirtualMachine::MapVirtioNetPort(
-    _In_ USHORT HostPort,
-    _In_ USHORT GuestPort,
-    _In_ int Protocol,
-    _In_ LPCSTR ListenAddress,
-    _Out_ USHORT* AllocatedHostPort)
+HRESULT HcsVirtualMachine::MapVirtioNetPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort)
 try
 {
     RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr || ListenAddress == nullptr);
@@ -602,11 +597,7 @@ try
 }
 CATCH_RETURN()
 
-HRESULT HcsVirtualMachine::UnmapVirtioNetPort(
-    _In_ USHORT HostPort,
-    _In_ USHORT GuestPort,
-    _In_ int Protocol,
-    _In_ LPCSTR ListenAddress)
+HRESULT HcsVirtualMachine::UnmapVirtioNetPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress)
 try
 {
     RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
