@@ -138,6 +138,11 @@ function(wslc_add_image)
         file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS "${_context_path}/*")
     endif()
 
+    # Ensure dotfiles (e.g., .dockerignore) are tracked for incremental rebuilds
+    if(EXISTS "${_context_path}/.dockerignore")
+        list(APPEND _resolved_sources "${_context_path}/.dockerignore")
+    endif()
+
     add_custom_command(
         OUTPUT "${_marker}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
