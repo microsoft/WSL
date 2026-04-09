@@ -46,16 +46,9 @@ public:
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(MapVirtioNetPort)
-    (_In_ USHORT HostPort,
-     _In_ USHORT GuestPort,
-     _In_ int Protocol,
-     _In_ LPCSTR ListenAddress,
-     _Out_ USHORT* AllocatedHostPort) override;
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort) override;
     IFACEMETHOD(UnmapVirtioNetPort)
-    (_In_ USHORT HostPort,
-     _In_ USHORT GuestPort,
-     _In_ int Protocol,
-     _In_ LPCSTR ListenAddress) override;
+    (_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress) override;
 
 private:
     struct DiskInfo
