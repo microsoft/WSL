@@ -302,6 +302,7 @@ class SimpleTests
         auto [exeOutput, exeErr] = LxsstuLaunchWslAndCaptureOutput(L"wslc.exe version");
         auto [scriptOutput, scriptErr] = LxsstuLaunchWslAndCaptureOutput(L"wslc version");
         VERIFY_ARE_EQUAL(exeOutput, scriptOutput);
+        VERIFY_ARE_EQUAL(exeErr, scriptErr);
     }
 };
 } // namespace SimpleTests
