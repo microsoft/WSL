@@ -14,7 +14,7 @@ struct Route
     int metric = 0;
     bool isLoopbackRoute = false;
 
-    Route(int family, const std::optional<Address>& via, int dev, bool defaultRoute, const std::optional<Address>& to, int metric);
+    Route(int family, const std::optional<Address>& nextHop, int dev, bool defaultRoute, const std::optional<Address>& to, int metric);
 
     bool IsOnlink() const;
     bool IsMulticast() const;

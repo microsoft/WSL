@@ -4,14 +4,12 @@
 #include "Utils.h"
 
 Route::Route(int family, const std::optional<Address>& via, int dev, bool defaultRoute, const std::optional<Address>& to, int metric) :
-    family(family), via(via), dev(dev), defaultRoute(defaultRoute), to(to), metric(metric)
+    family(family), via(nextHop), dev(dev), defaultRoute(defaultRoute), to(to), metric(metric)
 {
-    // When the route is created, the via field may be "0.0.0.0" or "::", which is checked by
-    // IsOnlink(). Clear the via field in this case, which still preserves the return value of future
-    // IsOnlink() calls but makes the Route object cleaner.
-    if (IsOnlink())
+    // For onlink routes, ensure the via field is empty
+    if (via.has_value() && ((family == AF_INET && via->Addr() == "0.0.0.0") || (family == AF_INET6 && via->Addr() == "::")))
     {
-        this->via.reset();
+        via.reset();
     }
 }
 
@@ -37,7 +35,7 @@ std::ostream& operator<<(std::ostream& out, const Route& route)
 
 bool Route::IsOnlink() const
 {
-    return !via.has_value() || (family == AF_INET && via->Addr() == "0.0.0.0") || (family == AF_INET6 && via->Addr() == "::");
+    return !via.has_value();
 }
 
 bool Route::IsMulticast() const
