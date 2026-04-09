@@ -27,6 +27,36 @@ if (NOT ${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION} STREQUAL ${CMAKE_SYSTEM_VERS
     message(FATAL_ERROR "Incorrect Windows SDK version: ${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}, requires ${CMAKE_SYSTEM_VERSION}")
 endif()
 
+# Default to debug build if unspecified (pipeline always passes -DCMAKE_BUILD_TYPE=Release)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
+# Only generate the build configuration that CMake is configured for
+set(CMAKE_CONFIGURATION_TYPES "${CMAKE_BUILD_TYPE}" CACHE STRING "" FORCE)
+
+# Configure output directories
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
+
+# BUNDLE_ONLY mode: skip all source builds; only configure the msixbundle target and nuspec files.
+# Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
+option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
+if (BUNDLE_ONLY)
+    if (NOT PACKAGE_VERSION)
+        message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
+    endif()
+
+    if (NOT PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+        message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'")
+    endif()
+
+    set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
+
+    add_subdirectory(nuget)
+    add_subdirectory(msixinstaller)
+    return()
+endif()
+
 include(FetchContent)
 
 # Import GSL and nlohmannjson
@@ -103,11 +133,6 @@ find_nuget_package(WinUIEx WINUIEX /)
 
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
-# Default to debug build if unspecified
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Debug")
-endif()
-
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
@@ -120,17 +145,14 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
-# Only generate the build configuration that CMake is configured for
-set(CMAKE_CONFIGURATION_TYPES "${CMAKE_BUILD_TYPE}" CACHE STRING "" FORCE)
-
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
     find_version(PACKAGE_VERSION WSL_NUGET_PACKAGE_VERSION) # Fetch the package version from git if not specified
 endif ()
 
-if (NOT PACKAGE_VERSION MATCHES "^([0-9]+).([0-9]+).([0-9]+).([0-9]+)$")
-    message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'. Needs to match '([0-9]+).([0-9]+).([0-9]+).([0-9]+)'")
+if (NOT PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+    message(FATAL_ERROR "PACKAGE_VERSION must be four dot-separated numeric components (e.g., '1.2.3.4'): got '${PACKAGE_VERSION}'")
 endif()
 
 set(PACKAGE_VERSION_MAJOR ${CMAKE_MATCH_1})
@@ -138,12 +160,11 @@ set(PACKAGE_VERSION_MINOR ${CMAKE_MATCH_2})
 set(PACKAGE_VERSION_REVISION ${CMAKE_MATCH_3})
 
 # The store requires the revision number to be 0, so enforce this on official builds
-if (OFFICIAL_BUILD AND NOT PACKAGE_VERSION MATCHES "^([0-9]+).([0-9]+).([0-9]+).0$")
+if (OFFICIAL_BUILD AND NOT PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.0$")
     message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'. Needs to match '([0-9]+).([0-9]+).([0-9]+).0' for official builds")
 endif()
 
-# Configure output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
+# Configure per-config output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release)
 
