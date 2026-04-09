@@ -565,7 +565,7 @@ try
     auto [Plan9Options, MountOptions] = ConvertDrvfsMountOptionsToPlan9(Options ? Options : "", Config);
     if (WSL_USE_VIRTIO_FS_DAX())
     {
-        MountOptions += "dax,";
+        MountOptions += "dax=inode,";
     }
 
     LOG_INFO(
