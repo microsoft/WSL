@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <!-- If we have a RuntimeIdentifier, the DLL is referenced automatically.
+         If it is missing, we fall back to PlatformTarget to reference it manually. -->
+    <Choose>
+        <When Condition="'$(RuntimeIdentifier)' != ''">
+            <PropertyGroup>
+                <_wslcSdkPlatform Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x64</_wslcSdkPlatform>
+                <_wslcSdkPlatform Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</_wslcSdkPlatform>
+                <_wslcSdkInvalidPlatformProperty Condition="'$(_wslcSdkPlatform)' == ''">RuntimeIdentifier</_wslcSdkInvalidPlatformProperty>
+                <_wslcSdkInvalidPlatform Condition="'$(_wslcSdkPlatform)' == ''">$(RuntimeIdentifier)</_wslcSdkInvalidPlatform>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <_wslcSdkPlatform Condition="'$(PlatformTarget)' == 'x64'">x64</_wslcSdkPlatform>
+                <_wslcSdkPlatform Condition="'$(PlatformTarget)' == 'arm64'">arm64</_wslcSdkPlatform>
+                <_wslcSdkInvalidPlatformProperty Condition="'$(_wslcSdkPlatform)' == ''">PlatformTarget</_wslcSdkInvalidPlatformProperty>
+                <_wslcSdkInvalidPlatform Condition="'$(_wslcSdkPlatform)' == ''">$(PlatformTarget)</_wslcSdkInvalidPlatform>
+            </PropertyGroup>
+
+            <ItemGroup Condition="'$(_wslcSdkPlatform)' != ''">
+                <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(_wslcSdkPlatform)\native\wslcsdk.dll" />
+            </ItemGroup>
+        </Otherwise>
+    </Choose>
+
+    <Target Name="WSLCSDK_ErrorPlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcSdkInvalidPlatform)' != ''">
+        <Error Text="wslcsdk.dll could not be copied because the $(_wslcSdkInvalidPlatformProperty) '$(_wslcSdkInvalidPlatform)' is not supported." />
+    </Target>
+</Project>

@@ -81,6 +81,7 @@ find_package(NUGET REQUIRED)
 find_package(VERSION REQUIRED)
 find_package(MC REQUIRED)
 find_package(Appx REQUIRED)
+find_package(CSharp REQUIRED)
 
 # Download nuget packages
 restore_nuget_packages()
@@ -490,6 +491,7 @@ add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
+add_subdirectory(src/windows/WslcSDK/csharp)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)
