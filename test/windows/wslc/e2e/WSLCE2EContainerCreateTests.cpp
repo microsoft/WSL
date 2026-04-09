@@ -357,7 +357,7 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
     }
 
-    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_TTY)
+    WSLC_TEST_METHOD(WSLCE2E_Container_CreateStartAttach_TTY)
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
@@ -429,7 +429,7 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_UserOption_UidRoot)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_UserOption_UidRoot)
     {
         auto result = RunWslc(
             std::format(L"container create --name {} -u 0 {} sh -c \"id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
@@ -460,10 +460,8 @@ class WSLCE2EContainerCreateTests
             {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Tmpfs)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container create --name {} --tmpfs /wslc-tmpfs {} sh -c \"echo -n 'tmpfs_test' > /wslc-tmpfs/data && cat "
             L"/wslc-tmpfs/data\"",
@@ -475,10 +473,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"tmpfs_test", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_With_Options)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_With_Options)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container create --name {} --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs ' "
             L"&& echo mounted\"",
@@ -490,10 +486,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_Multiple_With_Options)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_Multiple_With_Options)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container create --name {} --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | grep -q "
             L"' on /wslc-tmpfs1 type tmpfs ' && mount | grep -q ' on /wslc-tmpfs2 type tmpfs ' && echo mounted\"",
@@ -505,19 +499,15 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_RelativePath_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_RelativePath_Fails)
     {
-        WSL2_TEST_ONLY();
-
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs wslc-tmpfs {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_EmptyDestination_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs_EmptyDestination_Fails)
     {
-        WSL2_TEST_ONLY();
-
         auto result =
             RunWslc(std::format(L"container create --name {} --tmpfs :size=64k {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});

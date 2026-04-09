@@ -41,17 +41,14 @@ class WSLCE2EContainerAttachTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Attach_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Attach_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"container attach --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Attach_TTY)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Attach_TTY)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         const auto& prompt = ">";
@@ -85,9 +82,8 @@ class WSLCE2EContainerAttachTests
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Attach_NoTTY)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Attach_NoTTY)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -110,18 +106,14 @@ class WSLCE2EContainerAttachTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Container_Attach_MissingContainerId)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Attach_MissingContainerId)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"container attach");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'container-id'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Attach_ContainerNotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Attach_ContainerNotFound)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container attach {}", WslcContainerName));
         result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
     }

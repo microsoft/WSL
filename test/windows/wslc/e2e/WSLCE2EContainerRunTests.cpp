@@ -113,9 +113,8 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsListed(WslcContainerName, L"running");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Remove)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Remove)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Run the container with a valid image
@@ -126,9 +125,8 @@ class WSLCE2EContainerRunTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvOption)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
@@ -138,9 +136,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=A", HostEnvVariableName)));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MultipleValues)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MultipleValues)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
@@ -155,9 +152,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=B", HostEnvVariableName2)));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_UsesHostValue)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_UsesHostValue)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
@@ -167,9 +163,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_MultipleValues_UsesHostValues)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_MultipleValues_UsesHostValues)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
@@ -184,9 +179,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}={}", HostEnvVariableName2, HostEnvVariableValue2)));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_EmptyValue)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_EmptyValue)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
@@ -196,9 +190,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(std::format(L"{}=", HostEnvVariableName)));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvFile)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_A=env-file-a", "WSLC_TEST_ENV_FILE_B=env-file-b"});
@@ -214,9 +207,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_FILE_B=env-file-b"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MixedWithEnvFile)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MixedWithEnvFile)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_ENV_MIX_FILE_B=from-file-b"});
@@ -233,9 +225,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_MIX_CLI=from-cli"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MultipleFiles)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MultipleFiles)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_ENV_FILE_MULTI_B=file1-b"});
@@ -256,9 +247,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_FILE_MULTI_D=file2-d"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MissingFile)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MissingFile)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(
@@ -267,9 +257,8 @@ class WSLCE2EContainerRunTests
             {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_InvalidContent)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_InvalidContent)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_VALID=ok", "BAD KEY=value"});
@@ -282,9 +271,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_DuplicateKeys_Precedence)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_DuplicateKeys_Precedence)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_DUP=from-file-1"});
@@ -314,9 +302,8 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_DUP=from-cli"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_EnvFile_ValueContainsEquals)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_ValueContainsEquals)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_EQUALS=value=with=equals"});
@@ -331,7 +318,7 @@ class WSLCE2EContainerRunTests
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"WSLC_TEST_ENV_EQUALS=value=with=equals"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_UserOption_NameRoot)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_UserOption_NameRoot)
     {
         auto result = RunWslc(std::format(L"container run --rm -u root {} sh -c \"id -un; id -u; id -g\"", DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
@@ -375,10 +362,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"nobody\n65534\n65534\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_PortMultipleMappings)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortMultipleMappings)
     {
-        WSL2_TEST_ONLY();
-
         // Start a container with a simple server listening on a port
         // Map two host ports to the same container port
         auto result = RunWslc(std::format(
@@ -397,12 +382,10 @@ class WSLCE2EContainerRunTests
         ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort2).c_str(), HTTP_STATUS_OK, true);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_PortAlreadyInUse)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortAlreadyInUse)
     {
         // Bug: https://github.com/microsoft/WSL/issues/14448
         SKIP_TEST_NOT_IMPL();
-
-        WSL2_TEST_ONLY();
 
         // Start a container with a simple server listening on a port
         auto result1 = RunWslc(std::format(
@@ -420,36 +403,28 @@ class WSLCE2EContainerRunTests
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral_NotSupported)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run -p 80 {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
     {
-        WSL2_TEST_ONLY();
-
         // Start a container with a simple server listening on a port
         auto result = RunWslc(std::format(
             L"container run -d --name {} -p {}:{} {} {}",
@@ -474,9 +449,8 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Interactive_TTY)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Interactive_TTY)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         const auto& prompt = ">";
@@ -501,9 +475,8 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Interactive_NoTTY)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Interactive_NoTTY)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto session = RunWslcInteractive(std::format(L"container run -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
@@ -523,10 +496,8 @@ class WSLCE2EContainerRunTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container run --rm --tmpfs /wslc-tmpfs {} sh -c \"echo -n 'tmpfs_test' > /wslc-tmpfs/data && cat "
             L"/wslc-tmpfs/data\"",
@@ -534,10 +505,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"tmpfs_test", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_With_Options)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_With_Options)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container run --rm --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs ' && echo "
             L"mounted\"",
@@ -545,10 +514,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_Multiple_With_Options)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_Multiple_With_Options)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container run --rm --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | grep -q ' on "
             L"/wslc-tmpfs1 type tmpfs ' && mount | grep -q ' on /wslc-tmpfs2 type tmpfs ' && echo mounted\"",
@@ -556,18 +523,14 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_RelativePath_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_RelativePath_Fails)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run --rm --tmpfs wslc-tmpfs {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_EmptyDestination_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_EmptyDestination_Fails)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run --rm --tmpfs :size=64k {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
