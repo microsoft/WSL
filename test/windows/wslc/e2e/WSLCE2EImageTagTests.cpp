@@ -40,43 +40,33 @@ class WSLCE2EImageTagTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image tag --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_MissingSourceAndTarget)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_MissingSourceAndTarget)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image tag");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'source'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_MissingTarget)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_MissingTarget)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image tag {}", DebianImage.NameAndTag()));
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'target'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_SourceImageNotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_SourceImageNotFound)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image tag {} {}", InvalidImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
         auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_TargetImageWithDigest_Fail)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_TargetImageWithDigest_Fail)
     {
-        WSL2_TEST_ONLY();
-
         auto imageWithDigest = L"debian-mock:tag@sha256:11111111111111111111111111111111";
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), imageWithDigest));
         auto errorMessage =
@@ -84,10 +74,8 @@ class WSLCE2EImageTagTests
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_Success)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
@@ -107,10 +95,8 @@ class WSLCE2EImageTagTests
         VERIFY_ARE_EQUAL(sourceInspect, targetInspect);
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_SourceAndTargetAreTheSame_Noop)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_SourceAndTargetAreTheSame_Noop)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
@@ -121,10 +107,8 @@ class WSLCE2EImageTagTests
         VERIFY_ARE_EQUAL(imageInspect.RepoTags->at(0), WideToMultiByte(DebianImage.NameAndTag()));
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_TargetAlreadyExists_OverwritesTarget)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_TargetAlreadyExists_OverwritesTarget)
     {
-        WSL2_TEST_ONLY();
-
         {
             auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
@@ -160,10 +144,8 @@ class WSLCE2EImageTagTests
         }
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_DeleteSourceImage_TargetRemains)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_DeleteSourceImage_TargetRemains)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
@@ -171,10 +153,8 @@ class WSLCE2EImageTagTests
         VerifyImageIsListed(DebianTaggedImage);
     }
 
-    TEST_METHOD(WSLCE2E_Image_Tag_DeleteTargetImage_SourceRemains)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Tag_DeleteTargetImage_SourceRemains)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), DebianTaggedImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
