@@ -125,12 +125,14 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     WSL_LOG_TELEMETRY(
         "WSLCCreateSession",
-        PDT_ProductAndServiceUsage,
+        PDT_ProductAndServicePerformance,
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
         TraceLoggingValue(Settings->DisplayName, "Name"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
-        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"));
+        TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"),
+        TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
     THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", Settings->DisplayName);
 }

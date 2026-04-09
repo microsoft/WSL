@@ -2313,6 +2313,12 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SettingsResetConfirm" xml:space="preserve">
     <value>Settings reset to defaults.</value>
   </data>
+  <data name="WSLCCLI_VersionDesc" xml:space="preserve">
+    <value>Show version information.</value>
+  </data>
+  <data name="WSLCCLI_VersionLongDesc" xml:space="preserve">
+    <value>Show version information for this tool.</value>
+  </data>
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
     <value>Show all regardless of state.</value>
   </data>

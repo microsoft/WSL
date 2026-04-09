@@ -549,6 +549,55 @@ class WSLCE2EContainerRunTests
         session.VerifyNoErrors();
     }
 
+    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --tmpfs /wslc-tmpfs {} sh -c \"echo -n 'tmpfs_test' > /wslc-tmpfs/data && cat "
+            L"/wslc-tmpfs/data\"",
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"tmpfs_test", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_With_Options)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs ' && echo "
+            L"mounted\"",
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_Multiple_With_Options)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | grep -q ' on "
+            L"/wslc-tmpfs1 type tmpfs ' && mount | grep -q ' on /wslc-tmpfs2 type tmpfs ' && echo mounted\"",
+            DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_RelativePath_Fails)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm --tmpfs wslc-tmpfs {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_EmptyDestination_Fails)
+    {
+        WSL2_TEST_ONLY();
+
+        auto result = RunWslc(std::format(L"container run --rm --tmpfs :size=64k {}", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -618,6 +667,7 @@ private:
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
+                << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
