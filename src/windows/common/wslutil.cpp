@@ -1243,7 +1243,7 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
-std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input)
+std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input, EnumReferenceFormat* Format)
 {
     static const auto regex = BuildImageReferenceRegex();
     std::smatch match;
@@ -1258,18 +1258,25 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
 
     THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
 
+    EnumReferenceFormat referenceFormat = EnumReferenceFormat::None;
+    std::optional<std::string> tagOrDigest;
     if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
     {
-        return {repo.str(), digest.str()};
+        tagOrDigest = digest.str();
+        referenceFormat = EnumReferenceFormat::Digest;
     }
     else if (tag.matched) // <repo>:<tag>
     {
-        return {repo.str(), tag.str()}; // <repo>
+        tagOrDigest = tag.str();
+        referenceFormat = EnumReferenceFormat::Tag;
     }
-    else
+
+    if (Format)
     {
-        return {repo.str(), std::nullopt};
+        *Format = referenceFormat;
     }
+
+    return {repo.str(), std::move(tagOrDigest)};
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)

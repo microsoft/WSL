@@ -160,4 +160,19 @@ struct ImageSaveCommand final : public Command
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
+
+// Tag Command
+struct ImageTagCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"tag";
+    ImageTagCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
 } // namespace wsl::windows::wslc
