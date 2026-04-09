@@ -21,8 +21,10 @@
             Condition="'$(UsingMicrosoftNETSdk)' == 'true' AND '@(WslcImage)' != ''">
         <ItemGroup>
             <UpToDateCheckBuilt Include="$(_WslcIntDir)wslc_%(WslcImage.Identity).marker" />
-            <_WslcUpToDateDirs Include="%(WslcImage.Sources.Split(';'))" />
+            <UpToDateCheckInput Include="%(WslcImage.Dockerfile)" Condition="'%(WslcImage.Dockerfile)' != ''" />
+            <_WslcUpToDateDirs Include="@(WslcImage->'%(Sources)')" Condition="'%(WslcImage.Sources)' != ''" />
             <UpToDateCheckInput Include="%(_WslcUpToDateDirs.Identity)\**\*" Condition="'%(_WslcUpToDateDirs.Identity)' != ''" />
+            <UpToDateCheckInput Include="%(WslcImage.Context)\**\*" Condition="'%(WslcImage.Sources)' == '' AND '%(WslcImage.Context)' != ''" />
         </ItemGroup>
     </Target>
 
