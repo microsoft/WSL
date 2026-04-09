@@ -38,19 +38,29 @@ using namespace std::chrono_literals;
 
 #define LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE L"-u root -e rm /etc/wsl.conf"
 
-#define WSL1_TEST_ONLY() \
-    if (LxsstuVmMode()) \
-    { \
-        LogSkipped("This test is only applicable to WSL1"); \
-        return; \
-    }
+//
+// Test method declaration macros that tag tests with TAEF metadata for version-based selection.
+// Use these instead of TEST_METHOD() for tests that only apply to a specific WSL version.
+// When run via run-tests.ps1 or CloudTest, inapplicable tests are excluded from the run
+// entirely (no "skipped" noise) via TAEF /select: queries.
+//
+#define WSL1_TEST_METHOD(_name) \
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
+    TEST_METHOD_PROPERTY(L"WSLVersion", L"1") \
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
+    TEST_METHOD(_name)
 
-#define WSL2_TEST_ONLY() \
-    if (!LxsstuVmMode()) \
-    { \
-        LogSkipped("This test is only applicable to WSL2"); \
-        return; \
-    }
+#define WSL2_TEST_METHOD(_name) \
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
+    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
+    TEST_METHOD(_name)
+
+#define WSLC_TEST_METHOD(_name) \
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
+    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
+    TEST_METHOD(_name)
 
 // macro for skipping tests that are currently failing due to not yet being fully implemented
 #define SKIP_TEST_NOT_IMPL() \
