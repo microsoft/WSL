@@ -581,6 +581,45 @@ try
 }
 CATCH_RETURN()
 
+HRESULT HcsVirtualMachine::MapVirtioNetPort(
+    _In_ USHORT HostPort,
+    _In_ USHORT GuestPort,
+    _In_ int Protocol,
+    _In_ LPCSTR ListenAddress,
+    _Out_ USHORT* AllocatedHostPort)
+try
+{
+    RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr || ListenAddress == nullptr);
+
+    *AllocatedHostPort = 0;
+
+    std::lock_guard lock(m_lock);
+
+    auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
+
+    return virtioNet->MapPort(HostPort, GuestPort, Protocol, ListenAddress, AllocatedHostPort);
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::UnmapVirtioNetPort(
+    _In_ USHORT HostPort,
+    _In_ USHORT GuestPort,
+    _In_ int Protocol,
+    _In_ LPCSTR ListenAddress)
+try
+{
+    RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
+
+    std::lock_guard lock(m_lock);
+
+    auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
+
+    return virtioNet->UnmapPort(HostPort, GuestPort, Protocol, ListenAddress);
+}
+CATCH_RETURN()
+
 void CALLBACK HcsVirtualMachine::OnVmExitCallback(HCS_EVENT* Event, void* Context)
 try
 {

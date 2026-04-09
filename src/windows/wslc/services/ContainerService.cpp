@@ -54,27 +54,21 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     {
         auto portMapping = PublishPort::Parse(port);
 
+        const int protocol = portMapping.PortProtocol() == PublishPort::Protocol::UDP ? IPPROTO_UDP : IPPROTO_TCP;
+        const int family = (portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6()) ? AF_INET6 : AF_INET;
+        std::optional<std::string> bindAddress;
+        if (portMapping.HostIP().has_value())
         {
-            // https://github.com/microsoft/WSL/issues/14433
-            // The following scenarios are currently not implemented:
-            // - Ephemeral host port mappings
-            // - Host port mappings with a specific host IP
-            // - Host port mappings with UDP protocol
-            if (portMapping.HostPort().IsEphemeral() || portMapping.HostIP().has_value() ||
-                portMapping.PortProtocol() == PublishPort::Protocol::UDP)
-            {
-                THROW_HR_WITH_USER_ERROR(
-                    HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-                    "Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported");
-            }
+            bindAddress = portMapping.HostIP()->IP();
         }
 
         auto containerPort = portMapping.ContainerPort();
         for (uint16_t i = 0; i < containerPort.Count(); ++i)
         {
             auto currentContainerPort = static_cast<uint16_t>(containerPort.Start() + i);
-            auto currentHostPort = static_cast<uint16_t>(portMapping.HostPort().Start() + i);
-            containerLauncher.AddPort(currentHostPort, currentContainerPort, AF_INET);
+            auto currentHostPort =
+                portMapping.HostPort().IsEphemeral() ? static_cast<uint16_t>(WSLC_EPHEMERAL_PORT) : static_cast<uint16_t>(portMapping.HostPort().Start() + i);
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, family, protocol, bindAddress);
         }
     }
 

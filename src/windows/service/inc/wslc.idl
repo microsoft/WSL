@@ -25,12 +25,14 @@ cpp_quote("#endif")
 #define WSLC_MAX_VOLUME_NAME_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
+#define WSLC_EPHEMERAL_PORT 0
 
 cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
+cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
 
 typedef
 struct _WSLCVersion {
@@ -425,6 +427,25 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Removes a previously added filesystem share.
     HRESULT RemoveShare([in] REFGUID ShareId);
+
+    // Maps a port via VirtioNetworking.
+    // For anonymous binds (HostPort == WSLC_EPHEMERAL_PORT), the networking engine allocates a host port
+    // and returns it in AllocatedHostPort.
+    // Protocol must be IPPROTO_TCP or IPPROTO_UDP.
+    // ListenAddress is the IP address to bind on (e.g. "127.0.0.1", "0.0.0.0", "::1").
+    HRESULT MapVirtioNetPort(
+        [in] USHORT HostPort,
+        [in] USHORT GuestPort,
+        [in] int Protocol,
+        [in] LPCSTR ListenAddress,
+        [out, retval] USHORT* AllocatedHostPort);
+
+    // Unmaps a port previously mapped via MapVirtioNetPort.
+    HRESULT UnmapVirtioNetPort(
+        [in] USHORT HostPort,
+        [in] USHORT GuestPort,
+        [in] int Protocol,
+        [in] LPCSTR ListenAddress);
 }
 
 typedef enum _WSLCSessionStorageFlags

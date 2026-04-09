@@ -180,6 +180,19 @@ uint16_t VMPortMapping::HostPort() const
     }
 }
 
+void VMPortMapping::SetHostPort(uint16_t port)
+{
+    if (BindAddress.si_family == AF_INET6)
+    {
+        BindAddress.Ipv6.sin6_port = htons(port);
+    }
+    else
+    {
+        WI_ASSERT(BindAddress.si_family == AF_INET);
+        BindAddress.Ipv4.sin_port = htons(port);
+    }
+}
+
 std::string VMPortMapping::BindingAddressString() const
 {
     char buffer[INET6_ADDRSTRLEN]{};
@@ -890,15 +903,15 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        // TODO: Switch to using the native virtionet relay.
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-            !Mapping.IsLocalhost() || Mapping.Protocol != IPPROTO_TCP,
-            "Unsupported port mapping for virtionet mode: %hs, protocol: %i",
-            Mapping.BindingAddressString().c_str(),
-            Mapping.Protocol);
+        USHORT allocatedHostPort = 0;
+        THROW_IF_FAILED(m_vm->MapVirtioNetPort(
+            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str(), &allocatedHostPort));
 
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), false);
+        // For anonymous binds, write back the allocated host port.
+        if (Mapping.HostPort() == WSLC_EPHEMERAL_PORT && allocatedHostPort != 0)
+        {
+            Mapping.SetHostPort(allocatedHostPort);
+        }
     }
     else
     {
@@ -922,8 +935,8 @@ void WSLCVirtualMachine::UnmapPort(VMPortMapping& Mapping)
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        // TODO: Switch to using the native virtionet relay.
-        MapRelayPort(Mapping.BindAddress.si_family, Mapping.HostPort(), Mapping.VmPort->Port(), true);
+        THROW_IF_FAILED(m_vm->UnmapVirtioNetPort(
+            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str()));
     }
     else
     {
