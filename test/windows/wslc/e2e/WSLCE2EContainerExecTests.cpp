@@ -176,7 +176,7 @@ class WSLCE2EContainerExecTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile)
     {
-        WriteFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a", "WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a", "WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -227,7 +227,7 @@ class WSLCE2EContainerExecTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_MixedWithEnvFile)
     {
-        WriteFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -253,8 +253,8 @@ class WSLCE2EContainerExecTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MultipleFiles)
     {
-        WriteFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_EXEC_ENV_FILE_MULTI_B=file1-b"});
-        WriteFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_EXEC_ENV_FILE_MULTI_D=file2-d"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_EXEC_ENV_FILE_MULTI_B=file1-b"});
+        WriteTestFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_EXEC_ENV_FILE_MULTI_D=file2-d"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -271,7 +271,7 @@ class WSLCE2EContainerExecTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_InvalidContent)
     {
-        WriteFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_VALID=ok", "BAD KEY=value"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_VALID=ok", "BAD KEY=value"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -282,8 +282,8 @@ class WSLCE2EContainerExecTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_DuplicateKeys_Precedence)
     {
-        WriteFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_DUP=from-file-1"});
-        WriteFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_DUP=from-file-2"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_DUP=from-file-1"});
+        WriteTestFile(EnvTestFile2, {"WSLC_TEST_EXEC_ENV_DUP=from-file-2"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -308,7 +308,7 @@ class WSLCE2EContainerExecTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_ValueContainsEquals)
     {
-        WriteFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_EQUALS=value=with=equals"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_EQUALS=value=with=equals"});
 
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});

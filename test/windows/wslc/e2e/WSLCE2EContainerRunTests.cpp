@@ -194,7 +194,7 @@ class WSLCE2EContainerRunTests
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_A=env-file-a", "WSLC_TEST_ENV_FILE_B=env-file-b"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_A=env-file-a", "WSLC_TEST_ENV_FILE_B=env-file-b"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} {} env",
@@ -211,7 +211,7 @@ class WSLCE2EContainerRunTests
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_ENV_MIX_FILE_B=from-file-b"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_ENV_MIX_FILE_B=from-file-b"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} -e WSLC_TEST_ENV_MIX_CLI=from-cli --env-file {} {} env",
@@ -229,9 +229,9 @@ class WSLCE2EContainerRunTests
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_ENV_FILE_MULTI_B=file1-b"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_ENV_FILE_MULTI_B=file1-b"});
 
-        WriteFile(EnvTestFile2, {"WSLC_TEST_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_ENV_FILE_MULTI_D=file2-d"});
+        WriteTestFile(EnvTestFile2, {"WSLC_TEST_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_ENV_FILE_MULTI_D=file2-d"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} --env-file {} {} env",
@@ -261,7 +261,7 @@ class WSLCE2EContainerRunTests
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_VALID=ok", "BAD KEY=value"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_VALID=ok", "BAD KEY=value"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} {} env",
@@ -275,9 +275,9 @@ class WSLCE2EContainerRunTests
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_DUP=from-file-1"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_DUP=from-file-1"});
 
-        WriteFile(EnvTestFile2, {"WSLC_TEST_ENV_DUP=from-file-2"});
+        WriteTestFile(EnvTestFile2, {"WSLC_TEST_ENV_DUP=from-file-2"});
 
         // Later --env-file should win over earlier --env-file for duplicate keys
         auto result = RunWslc(std::format(
@@ -306,7 +306,7 @@ class WSLCE2EContainerRunTests
     {
         VerifyContainerIsNotListed(WslcContainerName);
 
-        WriteFile(EnvTestFile1, {"WSLC_TEST_ENV_EQUALS=value=with=equals"});
+        WriteTestFile(EnvTestFile1, {"WSLC_TEST_ENV_EQUALS=value=with=equals"});
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --env-file {} {} env",
