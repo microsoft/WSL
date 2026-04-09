@@ -662,3 +662,5 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
         VERIFY_FAIL();
     }
 }
+
+void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);
