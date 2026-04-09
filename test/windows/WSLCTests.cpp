@@ -4945,8 +4945,8 @@ class WSLCTests
     {
         WSL2_TEST_ONLY();
 
-        auto hostFolder = std::filesystem::current_path() / "test-volume";
-        auto symlinkFolder = std::filesystem::current_path() / "test-volume-symlink";
+        auto hostFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume");
+        auto symlinkFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume-symlink");
         std::filesystem::create_directories(hostFolder);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -5042,6 +5042,32 @@ class WSLCTests
             VerifyPatternMatch(
                 wsl::shared::string::WideToMultiByte(comError->Message.get()),
                 "Failed to create volume '*test-volume\\subfolder': Access is denied. ");
+        }
+
+        // Validate that files mounts are correctly recovered when a container is loaded from storage
+        {
+            auto validateInspect = [&](auto& container) {
+                auto inspect = container.Inspect();
+                VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1);
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, "/volume");
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Source, (hostFolder / "file.txt").string());
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].ReadWrite, true);
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "bind");
+            };
+
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-8", {"/bin/cat", "/volume"});
+            launcher.AddVolume((hostFolder / "file.txt").wstring(), "/volume", false);
+            auto container = launcher.Create(*m_defaultSession);
+            validateInspect(container);
+
+            ResetTestSession();
+            container.SetDeleteOnClose(false);
+
+            auto openedContainer = OpenContainer(m_defaultSession.get(), "test-volumes-8");
+            VERIFY_SUCCEEDED(openedContainer.Get().Start(WSLCContainerStartFlagsAttach, nullptr));
+            validateInspect(openedContainer);
+
+            ValidateContainerOutput(openedContainer, {{1, "OK"}});
         }
     }
 
