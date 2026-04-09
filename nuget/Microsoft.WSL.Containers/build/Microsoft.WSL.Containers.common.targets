@@ -81,12 +81,15 @@
         Wildcards are expanded here in ItemGroup Include (not in Inputs attribute or MSBuild task Properties,
         where they get escaped). Sources can be semicolon separated directory paths;
         each is expanded with **\* to collect all files recursively.
+        If Sources is omitted, fall back to tracking the full Context directory so changes to
+        .dockerignore and other Docker build inputs still invalidate the marker.
     -->
     <Target Name="_WslcCollectSources" BeforeTargets="_WslcBuildSingleImage">
         <ItemGroup>
-            <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" />
+            <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
             <_WslcSourceFiles Include="$(_WslcDockerfile)" />
             <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" Condition="'%(_WslcSourceDirs.Identity)' != ''" />
+            <_WslcSourceFiles Include="$(_WslcContext)\**\*" Condition="'$(_WslcSourceDir)' == '' AND '$(_WslcContext)' != ''" />
         </ItemGroup>
     </Target>
 

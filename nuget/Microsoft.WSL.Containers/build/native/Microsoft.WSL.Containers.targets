@@ -34,14 +34,15 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcWriteSingleTlog"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
     <Target Name="_WslcWriteSingleTlog">
         <ItemGroup>
-            <_WslcTlogSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" />
+            <_WslcTlogSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
             <_WslcTlogInputs Include="$(_WslcDockerfile)" />
             <_WslcTlogInputs Condition="'%(_WslcTlogSourceDirs.Identity)' != ''" Include="%(_WslcTlogSourceDirs.Identity)\**\*" />
+            <_WslcTlogInputs Include="$(_WslcContext)\**\*" Condition="'$(_WslcSourceDir)' == '' AND '$(_WslcContext)' != ''" />
         </ItemGroup>
 
         <PropertyGroup>
