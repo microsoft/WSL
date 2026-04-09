@@ -6,6 +6,13 @@
 Route::Route(int family, const std::optional<Address>& via, int dev, bool defaultRoute, const std::optional<Address>& to, int metric) :
     family(family), via(via), dev(dev), defaultRoute(defaultRoute), to(to), metric(metric)
 {
+    // When the route is created, the via field may be "0.0.0.0" or "::", which is checked by
+    // IsOnlink(). Clear the via field in this case, which still preserves the return value of future
+    // IsOnlink() calls but makes the Route object cleaner.
+    if (IsOnlink())
+    {
+        this->via.reset();
+    }
 }
 
 std::ostream& operator<<(std::ostream& out, const Route& route)

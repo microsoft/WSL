@@ -185,7 +185,7 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 {
     if (!route.to.has_value() || !route.via.has_value())
     {
-        throw RuntimeErrorWithSourceLocation(std::format("Loopback route {} missing destination or gateway address", utils::Stringify(route)));
+        throw RuntimeErrorWithSourceLocation(std::format("Loopback route {} missing destination or next hop", utils::Stringify(route)));
     }
 
     struct Message : RouteMessage
@@ -237,6 +237,15 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 template <typename TAddr>
 void RoutingTable::ModifyDefaultLinkLocalRouteImpl(const Route& route, int operation, int flags)
 {
+    if (route.via.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Default route has unexpected next hop");
+    }
+    if (route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Default route has unexpected destination address");
+    }
+
     struct Message : RouteMessage
     {
         utils::IntegerAttribute metric;
@@ -258,7 +267,11 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 {
     if (!route.via.has_value())
     {
-        throw RuntimeErrorWithSourceLocation("Default route is missing its gateway address");
+        throw RuntimeErrorWithSourceLocation("Default route is missing its next hop");
+    }
+    if (route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Default route has unexpected destination address");
     }
 
     struct Message : RouteMessage
@@ -290,6 +303,10 @@ void RoutingTable::ModifyLinkLocalRouteImpl(const Route& route, int operation, i
     if (!route.to.has_value())
     {
         throw RuntimeErrorWithSourceLocation("Link-local route is missing its destination address");
+    }
+    if (route.via.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Link-local route has unexpected next hop");
     }
 
     struct Message : RouteMessage
