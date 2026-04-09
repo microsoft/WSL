@@ -14,7 +14,6 @@
 
     <!-- Default properties -->
     <PropertyGroup>
-        <WslcImageOutputDir Condition="'$(WslcImageOutputDir)' == ''">$(OutDir)</WslcImageOutputDir>
         <WslcCliPath Condition="'$(WslcCliPath)' == '' AND Exists('$(ProgramW6432)\WSL\wslc.exe')">$(ProgramW6432)\WSL\wslc.exe</WslcCliPath>
         <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
     </PropertyGroup>
@@ -23,29 +22,13 @@
     <ItemDefinitionGroup>
         <WslcImage>
             <Tag>latest</Tag>
-            <OutputDir>$(WslcImageOutputDir)</OutputDir>
         </WslcImage>
     </ItemDefinitionGroup>
-
-    <!-- Auto-detection fallback: if no WslcImage declared, detect container/Dockerfile -->
-    <ItemGroup Condition="'@(WslcImage)' == '' AND Exists('$(ProjectDir)container\Dockerfile')">
-        <WslcImage Include="$(MSBuildProjectName)"
-                   Dockerfile="$(ProjectDir)container\Dockerfile"
-                   Context="$(ProjectDir)container"
-                   Sources="$(ProjectDir)container" />
-    </ItemGroup>
-
-    <ItemGroup Condition="'@(WslcImage)' == '' AND Exists('$(ProjectDir)docker\Dockerfile')">
-        <WslcImage Include="$(MSBuildProjectName)"
-                   Dockerfile="$(ProjectDir)docker\Dockerfile"
-                   Context="$(ProjectDir)docker"
-                   Sources="$(ProjectDir)docker" />
-    </ItemGroup>
 
     <!-- Check that wslc CLI is installed -->
     <Target Name="WslcCheckDependencies"
             BeforeTargets="WslcBuildAllImages"
-            Condition="'@(WslcImage)' != ''">
+            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
 
         <Exec Command="&quot;$(WslcCliPath)&quot; --version"
               IgnoreExitCode="true"
@@ -57,18 +40,18 @@
 
         <Error Condition="'$(_WslcExitCode)' != '0'"
                Code="WSLC0001"
-               Text="The WSLC runtime was not found. Install WSL by running: wsl --install --no-distribution" />
+               Text="The wslc CLI at '$(WslcCliPath)' could not be found or did not run successfully. Install WSL by running: wsl --install --no-distribution" />
     </Target>
 
     <!-- Outer target: dispatch each WslcImage to inner target via MSBuild task -->
     <Target Name="WslcBuildAllImages"
             AfterTargets="Build"
             DependsOnTargets="WslcCheckDependencies"
-            Condition="'@(WslcImage)' != ''">
+            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=%(WslcImage.Sources);_WslcOutput=%(WslcImage.OutputDir)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'))" />
     </Target>
 
     <!--
@@ -79,7 +62,7 @@
     -->
     <Target Name="_WslcCollectSources" BeforeTargets="_WslcBuildSingleImage">
         <ItemGroup>
-            <_WslcSourceDirs Include="$(_WslcSourceDir.Split(';'))" />
+            <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" />
             <_WslcSourceFiles Include="$(_WslcDockerfile)" />
             <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" Condition="'%(_WslcSourceDirs.Identity)' != ''" />
         </ItemGroup>
@@ -99,15 +82,10 @@
         <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
-        <MakeDir Directories="$(_WslcOutput)" />
-
-        <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcOutput)\$(_WslcName).tar&quot; &quot;$(_WslcName):$(_WslcTag)&quot;"
-              ConsoleToMSBuild="true" />
-
         <Touch Files="$(IntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
 
         <Message Importance="high"
-                 Text="WSLC: [$(_WslcName)] Image '$(_WslcName):$(_WslcTag)' saved to '$(_WslcOutput)\$(_WslcName).tar'." />
+                 Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully." />
     </Target>
 
     <!-- Clean container artifacts -->
@@ -116,7 +94,6 @@
             Condition="'@(WslcImage)' != ''">
 
         <Delete Files="$(IntDir)wslc_%(WslcImage.Identity).marker" />
-        <Delete Files="%(WslcImage.OutputDir)\%(WslcImage.Identity).tar" />
     </Target>
 
 </Project>

@@ -72,7 +72,6 @@ unset(_wslcsdk_lib_dir)
 #       CONTEXT     container/
 #       SOURCES     container/src/*.cpp container/src/*.h
 #       TAG         latest
-#       OUTPUT      ${CMAKE_BINARY_DIR}/images
 #   )
 #
 #   # With explicit image registry/name (IMAGE defaults to NAME if omitted):
@@ -88,7 +87,7 @@ function(wslc_add_image)
     cmake_parse_arguments(
         PARSE_ARGV 0 ARG
         ""                                      # options (none)
-        "NAME;IMAGE;TAG;DOCKERFILE;CONTEXT;OUTPUT" # one-value keywords
+        "NAME;IMAGE;TAG;DOCKERFILE;CONTEXT"        # one-value keywords
         "SOURCES"                                # multi-value keywords
     )
 
@@ -110,9 +109,6 @@ function(wslc_add_image)
     if(NOT ARG_TAG)
         set(ARG_TAG "latest")
     endif()
-    if(NOT ARG_OUTPUT)
-        set(ARG_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}")
-    endif()
 
     # Find wslc CLI
     if(NOT WSLC_CLI_PATH)
@@ -122,21 +118,32 @@ function(wslc_add_image)
         endif()
     endif()
 
+    # Validate NAME is usable as a CMake target name
+    string(REGEX MATCH "[^a-zA-Z0-9_.-]" _bad_char "${ARG_NAME}")
+    if(_bad_char)
+        message(FATAL_ERROR "wslc_add_image: NAME '${ARG_NAME}' contains invalid character '${_bad_char}'. Use IMAGE for the full registry/name reference.")
+    endif()
+
+    # Normalize paths to be independent of the build directory
+    get_filename_component(_dockerfile_path "${ARG_DOCKERFILE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    get_filename_component(_context_path "${ARG_CONTEXT}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
     set(_image_ref "${ARG_IMAGE}:${ARG_TAG}")
     set(_marker "${CMAKE_CURRENT_BINARY_DIR}/wslc_${ARG_NAME}.marker")
-    set(_tar_output "${ARG_OUTPUT}/${ARG_NAME}.tar")
 
-    # Resolve source globs to file lists
-    file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS ${ARG_SOURCES})
+    # Resolve source globs to file lists; default to CONTEXT contents if SOURCES omitted
+    if(ARG_SOURCES)
+        file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS ${ARG_SOURCES})
+    else()
+        file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS "${_context_path}/*")
+    endif()
 
     add_custom_command(
         OUTPUT "${_marker}"
-        COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${ARG_DOCKERFILE}" "${ARG_CONTEXT}"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${ARG_OUTPUT}"
-        COMMAND "${WSLC_CLI_PATH}" image save -o "${_tar_output}" "${_image_ref}"
+        COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
         COMMAND ${CMAKE_COMMAND} -E touch "${_marker}"
-        DEPENDS ${_resolved_sources} "${ARG_DOCKERFILE}"
-        COMMENT "WSLC: Building and saving image '${_image_ref}' to '${_tar_output}'..."
+        DEPENDS ${_resolved_sources} "${_dockerfile_path}"
+        COMMENT "WSLC: Building image '${_image_ref}'..."
         VERBATIM
     )
 
