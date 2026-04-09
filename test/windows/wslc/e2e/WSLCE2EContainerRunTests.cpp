@@ -131,10 +131,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"nobody\n65534\n65534\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container run --rm --tmpfs /wslc-tmpfs {} sh -c \"echo -n 'tmpfs_test' > /wslc-tmpfs/data && cat "
             L"/wslc-tmpfs/data\"",
@@ -142,10 +140,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"tmpfs_test", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_With_Options)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_With_Options)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container run --rm --tmpfs /wslc-tmpfs:size=64k {} sh -c \"mount | grep -q ' on /wslc-tmpfs type tmpfs ' && echo "
             L"mounted\"",
@@ -153,10 +149,8 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_Multiple_With_Options)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_Multiple_With_Options)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container run --rm --tmpfs /wslc-tmpfs1:size=64k --tmpfs /wslc-tmpfs2:size=128k {} sh -c \"mount | grep -q ' on "
             L"/wslc-tmpfs1 type tmpfs ' && mount | grep -q ' on /wslc-tmpfs2 type tmpfs ' && echo mounted\"",
@@ -164,18 +158,14 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"mounted\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_RelativePath_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_RelativePath_Fails)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run --rm --tmpfs wslc-tmpfs {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"invalid mount path: 'wslc-tmpfs' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_EmptyDestination_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Tmpfs_EmptyDestination_Fails)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run --rm --tmpfs :size=64k {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
