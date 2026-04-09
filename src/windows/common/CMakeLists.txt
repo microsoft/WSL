@@ -35,7 +35,6 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     WSLCContainerLauncher.cpp
-    WslcCredentialStore.cpp
     VirtioNetworking.cpp
     WSLCProcessLauncher.cpp
     WslClient.cpp
@@ -117,7 +116,6 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     WSLCContainerLauncher.h
-    WslcCredentialStore.h
     VirtioNetworking.h
     WSLCProcessLauncher.h
     WslClient.h

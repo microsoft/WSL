@@ -326,4 +326,12 @@ winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 std::string Base64Encode(const std::string& input);
 std::string Base64Decode(const std::string& encoded);
 
+// Builds the base64-encoded X-Registry-Auth header value used by Docker APIs
+// (PullImage, PushImage, etc.) from the given credentials.
+std::string BuildRegistryAuthHeader(const std::string& username, const std::string& password, const std::string& serverAddress);
+
+// Builds the base64-encoded X-Registry-Auth header value from an identity token
+// returned by Authenticate().
+std::string BuildRegistryAuthHeader(const std::string& identityToken, const std::string& serverAddress);
+
 } // namespace wsl::windows::common::wslutil

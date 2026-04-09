@@ -1445,3 +1445,17 @@ std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encod
     result.resize(size);
     return result;
 }
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& username, const std::string& password, const std::string& serverAddress)
+{
+    nlohmann::json authJson = {{"username", username}, {"password", password}, {"serveraddress", serverAddress}};
+
+    return Base64Encode(authJson.dump());
+}
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& identityToken, const std::string& serverAddress)
+{
+    nlohmann::json authJson = {{"identitytoken", identityToken}, {"serveraddress", serverAddress}};
+
+    return Base64Encode(authJson.dump());
+}
