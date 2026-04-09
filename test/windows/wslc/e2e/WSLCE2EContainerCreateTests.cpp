@@ -70,23 +70,20 @@ class WSLCE2EContainerCreateTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container create --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container create --name " + WslcContainerName);
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + InvalidImage.NameAndTag());
         std::wstringstream expectedError;
         expectedError << L"Image '" << InvalidImage.NameAndTag() << L"' not found, pulling\r\n"
@@ -96,9 +93,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Valid)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Valid)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
@@ -110,9 +106,8 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsListed(containerId, L"created");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_DuplicateContainerName)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DuplicateContainerName)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
@@ -127,10 +122,8 @@ class WSLCE2EContainerCreateTests
              .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromHostReadFromContainer)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromHostReadFromContainer)
     {
-        WSL2_TEST_ONLY();
-
         // Write to a temp file that we will mount as a volume to the container
         const std::wstring tempFile = VolumeTestFile1.wstring();
         std::wofstream out(tempFile);
@@ -149,10 +142,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermissionByDefault)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermissionByDefault)
     {
-        WSL2_TEST_ONLY();
-
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
         auto result = RunWslc(std::format(
@@ -168,10 +159,8 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(L"WSLC Volume Test", content);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermission)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermission)
     {
-        WSL2_TEST_ONLY();
-
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
         auto result = RunWslc(std::format(
@@ -189,10 +178,8 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(L"WSLC Volume Test", buffer.str());
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadOnlyPermission_Fail)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadOnlyPermission_Fail)
     {
-        WSL2_TEST_ONLY();
-
         auto hostDirectory = VolumeTestFile1.parent_path();
         auto fileName = VolumeTestFile1.filename().wstring();
         auto result = RunWslc(std::format(
@@ -205,10 +192,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Volume_Multiple_WriteFromContainerReadFromHost_ReadWritePermission)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_Multiple_WriteFromContainerReadFromHost_ReadWritePermission)
     {
-        WSL2_TEST_ONLY();
-
         // Mount multiple volumes to the container
         auto hostDirectory1 = VolumeTestFile1.parent_path();
         auto fileName1 = VolumeTestFile1.filename().wstring();
@@ -239,10 +224,8 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(L"Test2", buffer2.str());
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Volume_Invalid)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_Invalid)
     {
-        WSL2_TEST_ONLY();
-
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume :/containerPath {}", WslcContainerName, AlpineImage.NameAndTag()));
@@ -319,13 +302,11 @@ class WSLCE2EContainerCreateTests
         }
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Volume_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_NotSupported)
     {
         // Commands tested in this method are not currently supported in WSLC,
         // so we just verify that they fail with the expected error message.
         // https://github.com/microsoft/WSL/issues/14432
-        WSL2_TEST_ONLY();
-
         {
             auto result = RunWslc(
                 std::format(L"container run --name {} --volume \"C:\\hostPath\" {}", WslcContainerName, AlpineImage.NameAndTag()));
@@ -361,9 +342,8 @@ class WSLCE2EContainerCreateTests
         }
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_Remove)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Remove)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
@@ -379,7 +359,6 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_CreateStartAttach_TTY)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         const auto& prompt = ">";
@@ -410,9 +389,8 @@ class WSLCE2EContainerCreateTests
         VERIFY_ARE_EQUAL(0, exitCode);
     }
 
-    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_NoTTY)
+    WSLC_TEST_METHOD(WSLCE2E_Container_CreateStartAttach_NoTTY)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container create -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -436,9 +414,8 @@ class WSLCE2EContainerCreateTests
         session.VerifyNoErrors();
     }
 
-    TEST_METHOD(WSLCE2E_Container_CreateStartAttach_ShortRunningInitProcess)
+    WSLC_TEST_METHOD(WSLCE2E_Container_CreateStartAttach_ShortRunningInitProcess)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         constexpr auto ExpectedExitCode = 37;
@@ -454,8 +431,6 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_UserOption_UidRoot)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(
             std::format(L"container create --name {} -u 0 {} sh -c \"id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -464,10 +439,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_UserOption_NameGroupRoot)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_UserOption_NameGroupRoot)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(
             L"container create --name {} -u root:root {} sh -c \"id -un; id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -476,10 +449,8 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_UserOption_UnknownUser_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_UserOption_UnknownUser_Fails)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(
             std::format(L"container create --name {} -u user_does_not_exist {} id -u", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});

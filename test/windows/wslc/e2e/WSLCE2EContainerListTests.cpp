@@ -48,16 +48,14 @@ class WSLCE2EContainerListTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"container list --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_AllOption)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_AllOption)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create a container
@@ -85,9 +83,8 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"created"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_NoOptions_RunningContainers)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_NoOptions_RunningContainers)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Run a container in the background
@@ -115,9 +112,8 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_NOT_EQUAL(std::wstring::npos, foundContainerLine->find(L"running"));
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_NoOptions_ExcludesCreatedContainers)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_NoOptions_ExcludesCreatedContainers)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create (but do not start) a container.
@@ -142,9 +138,8 @@ class WSLCE2EContainerListTests
         VERIFY_IS_FALSE(isListed);
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_QuietOption_OutputsIdsOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_QuietOption_OutputsIdsOnly)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -159,17 +154,14 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_EQUAL(containerId, outputLine);
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"container list --format invalid");
         result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create a container

@@ -39,34 +39,28 @@ class WSLCE2EGlobalTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         RunWslcAndVerify(L"--help", {.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_InvalidCommand_DisplaysErrorMessage)
+    WSLC_TEST_METHOD(WSLCE2E_InvalidCommand_DisplaysErrorMessage)
     {
-        WSL2_TEST_ONLY();
         RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_VersionCommand)
+    WSLC_TEST_METHOD(WSLCE2E_VersionCommand)
     {
-        WSL2_TEST_ONLY();
         RunWslcAndVerify(L"version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_VersionFlag)
+    WSLC_TEST_METHOD(WSLCE2E_VersionFlag)
     {
-        WSL2_TEST_ONLY();
         RunWslcAndVerify(L"--version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Session_DefaultElevated)
+    WSLC_TEST_METHOD(WSLCE2E_Session_DefaultElevated)
     {
-        WSL2_TEST_ONLY();
-
         // Run container list to create the default elevated session
         auto result = RunWslc(L"container list", ElevationType::Elevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -79,10 +73,8 @@ class WSLCE2EGlobalTests
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli-admin") != std::wstring::npos);
     }
 
-    TEST_METHOD(WSLCE2E_Session_DefaultNonElevated)
+    WSLC_TEST_METHOD(WSLCE2E_Session_DefaultNonElevated)
     {
-        WSL2_TEST_ONLY();
-
         // Run container list non-elevated to create the default non-elevated session
         auto result = RunWslc(L"container list", ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -97,10 +89,8 @@ class WSLCE2EGlobalTests
         VERIFY_IS_TRUE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
 
-    TEST_METHOD(WSLCE2E_Session_NonElevatedCannotAccessAdminSession)
+    WSLC_TEST_METHOD(WSLCE2E_Session_NonElevatedCannotAccessAdminSession)
     {
-        WSL2_TEST_ONLY();
-
         // First ensure admin session is created by running container list.
         auto result = RunWslc(L"container list", ElevationType::Elevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -112,10 +102,8 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Session_ElevatedCanAccessNonElevatedSession)
+    WSLC_TEST_METHOD(WSLCE2E_Session_ElevatedCanAccessNonElevatedSession)
     {
-        WSL2_TEST_ONLY();
-
         // First ensure non-elevated session is created by running container list.
         auto result = RunWslc(L"container list", ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -127,10 +115,8 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Session_CreateMixedElevation_Fails)
+    WSLC_TEST_METHOD(WSLCE2E_Session_CreateMixedElevation_Fails)
     {
-        WSL2_TEST_ONLY();
-
         EnsureSessionIsTerminated(L"wslc-cli");
         EnsureSessionIsTerminated(L"wslc-cli-admin");
 
@@ -143,10 +129,8 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Session_Terminate_Implicit)
+    WSLC_TEST_METHOD(WSLCE2E_Session_Terminate_Implicit)
     {
-        WSL2_TEST_ONLY();
-
         // Run container list to create the default session if it does not already exist
         auto result = RunWslc(L"container list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -190,10 +174,8 @@ class WSLCE2EGlobalTests
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
 
-    TEST_METHOD(WSLCE2E_Session_Terminate_Explicit)
+    WSLC_TEST_METHOD(WSLCE2E_Session_Terminate_Explicit)
     {
-        WSL2_TEST_ONLY();
-
         // Run container list to create the default session if it does not already exist
         auto result = RunWslc(L"container list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -237,10 +219,8 @@ class WSLCE2EGlobalTests
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
 
-    TEST_METHOD(WSLCE2E_Session_Terminate_MixedElevation)
+    WSLC_TEST_METHOD(WSLCE2E_Session_Terminate_MixedElevation)
     {
-        WSL2_TEST_ONLY();
-
         // Run container list to create the default sessions if they do not already exist.
         auto result = RunWslc(L"container list", ElevationType::Elevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -269,10 +249,8 @@ class WSLCE2EGlobalTests
         VERIFY_IS_FALSE(result.Stdout->find(L"wslc-cli\r\n") != std::wstring::npos);
     }
 
-    TEST_METHOD(WSLCE2E_Session_Targeting)
+    WSLC_TEST_METHOD(WSLCE2E_Session_Targeting)
     {
-        WSL2_TEST_ONLY();
-
         // Generate a unique session name to avoid conflicts with previous runs or concurrent tests.
         // Use only a short portion of the GUID to avoid MAX_PATH issues.
         GUID sessionGuid;
@@ -315,10 +293,8 @@ class WSLCE2EGlobalTests
         VerifyContainerIsNotListed(L"test-cont");
     }
 
-    TEST_METHOD(WSLCE2E_Session_Shell)
+    WSLC_TEST_METHOD(WSLCE2E_Session_Shell)
     {
-        WSL2_TEST_ONLY();
-
         // Ensure sessions are created by running container list elevated and non-elevated.
         auto result = RunWslc(L"container list", ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});

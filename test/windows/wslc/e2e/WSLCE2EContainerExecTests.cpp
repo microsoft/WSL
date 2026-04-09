@@ -60,8 +60,6 @@ class WSLCE2EContainerExecTests
 
     TEST_METHOD(WSLCE2E_Container_Exec_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"container exec --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
@@ -423,8 +421,6 @@ class WSLCE2EContainerExecTests
 
     TEST_METHOD(WSLCE2E_Container_Exec_WorkDir)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -432,10 +428,8 @@ class WSLCE2EContainerExecTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Exec_WorkDir_ShortAlias)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_WorkDir_ShortAlias)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
