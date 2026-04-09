@@ -16,6 +16,10 @@
     <PropertyGroup>
         <WslcCliPath Condition="'$(WslcCliPath)' == '' AND Exists('$(ProgramW6432)\WSL\wslc.exe')">$(ProgramW6432)\WSL\wslc.exe</WslcCliPath>
         <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
+        <!-- Unified intermediate directory: $(IntDir) for C++, $(IntermediateOutputPath) for .NET -->
+        <_WslcIntDir Condition="'$(IntDir)' != ''">$(IntDir)</_WslcIntDir>
+        <_WslcIntDir Condition="'$(_WslcIntDir)' == '' AND '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</_WslcIntDir>
+        <_WslcIntDir Condition="'$(_WslcIntDir)' == ''">obj\</_WslcIntDir>
     </PropertyGroup>
 
     <!-- Default metadata for WslcImage items -->
@@ -69,7 +73,7 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'))" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
     </Target>
 
     <!--
@@ -90,9 +94,9 @@
     <Target Name="_WslcBuildSingleImage"
             DependsOnTargets="_WslcCollectSources"
             Inputs="@(_WslcSourceFiles)"
-            Outputs="$(IntDir)wslc_$(_WslcName).marker">
+            Outputs="$(_WslcIntDir)wslc_$(_WslcName).marker">
 
-        <MakeDir Directories="$(IntDir)" />
+        <MakeDir Directories="$(_WslcIntDir)" />
 
         <Message Importance="high"
                  Text="WSLC: Building image '$(_WslcName):$(_WslcTag)'..." />
@@ -100,7 +104,7 @@
         <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
-        <Touch Files="$(IntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
+        <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).marker" AlwaysCreate="true" />
 
         <Message Importance="high"
                  Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully." />
@@ -111,7 +115,7 @@
             AfterTargets="Clean"
             Condition="'@(WslcImage)' != ''">
 
-        <Delete Files="$(IntDir)wslc_%(WslcImage.Identity).marker" />
+        <Delete Files="$(_WslcIntDir)wslc_%(WslcImage.Identity).marker" />
     </Target>
 
 </Project>
