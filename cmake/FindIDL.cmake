@@ -11,6 +11,7 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
     endforeach()
 
     string(TOLOWER ${TARGET_PLATFORM} IDL_ENV)
+    set(PREVIOUS_OUTPUT "")
 
     foreach(idl_file ${idl_files_with_proxy})
 
@@ -27,14 +28,15 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
         set(MIDL_OUTPUT ${IDL_HEADER} ${IDL_I} ${IDL_P} ${IDL_DLLDATA})
 
         add_custom_command(
-            OUTPUT ${MIDL_OUTPUT} ${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}
+            OUTPUT ${MIDL_OUTPUT}
             COMMAND midl /nologo /target NT100 /env "${IDL_ENV}" /Zp8 /char unsigned /ms_ext /c_ext /h ${IDL_HEADER} /iid ${IDL_I} /proxy ${IDL_P} /dlldata ${IDL_DLLDATA} ${idl_file} ${IDL_DEFINITIONS}
-            COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}"
             WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-            DEPENDS ${idl_file}
+            DEPENDS ${idl_file} ${PREVIOUS_OUTPUT}
             MAIN_DEPENDENCY ${idl_file}
             VERBATIM
         )
+
+        set(PREVIOUS_OUTPUT ${IDL_HEADER})
 
         set_source_files_properties(${MIDL_OUTPUT} PROPERTIES GENERATED TRUE)
         list(APPEND TARGET_OUTPUTS ${MIDL_OUTPUT})
@@ -48,9 +50,8 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
         set(IDL_HEADER ${OUTPUT_DIR}/${IDL_NAME}.h)
 
         add_custom_command(
-            OUTPUT ${IDL_HEADER} ${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}
+            OUTPUT ${IDL_HEADER}
             COMMAND midl /nologo /target NT100 /env "${IDL_ENV}" /Zp8 /char unsigned /ms_ext /c_ext /h ${IDL_HEADER} ${idl_file} ${IDL_DEFINITIONS}
-            COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/CmakeFiles/${target}"
             WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
             DEPENDS ${idl_file}
             MAIN_DEPENDENCY ${idl_file}
