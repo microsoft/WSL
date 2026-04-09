@@ -127,4 +127,10 @@ Every pull request needs to be clang-formatted before it can be merged.
 
 The code can be manually formatted by running: `powershell .\FormatSource.ps1 -ModifiedOnly $false`.
 
-To automatically check formatting before each commit, run `cmake .` and then: `tools\SetupClangFormat.bat`
+To automatically check formatting before each commit, run CMake configure (e.g. `cmake .`) and then: `tools\SetupClangFormat.bat`
+
+The pre-commit hook behavior can be configured by setting `WSL_PRE_COMMIT_MODE` in `UserConfig.cmake`:
+
+- `warn` (default) – report formatting issues without blocking the commit
+- `error` – block the commit when formatting issues are found
+- `fix` – automatically fix formatting and re-stage files
