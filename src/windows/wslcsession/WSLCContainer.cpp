@@ -1037,8 +1037,16 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.OpenStdin = true;
     }
 
-    request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
-    request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
+    if (containerOptions.InitProcessOptions.CommandLine.Count > 0)
+    {
+        request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
+    }
+
+    if (containerOptions.Entrypoint.Count > 0)
+    {
+        request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
+    }
+
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
 
     if (containerOptions.StopSignal != WSLCSignalNone)
@@ -1656,11 +1664,15 @@ HRESULT WSLCContainer::Kill(_In_ WSLCSignal Signal)
 }
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
+try
 {
     COMServiceExecutionContext context;
 
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
+
     return CallImpl(&WSLCContainerImpl::Start, Flags, DetachKeys);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::Inspect(LPSTR* Output)
 {
@@ -1676,7 +1688,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: %i", Flags);
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
 
     // Special case for Delete(): If deletion is successful, notify the WSLCSession that the container has been deleted.
     auto [lock, impl] = LockImpl();
@@ -1711,15 +1723,19 @@ HRESULT WSLCContainer::Export(WSLCHandle TarHandle)
 }
 
 HRESULT WSLCContainer::Logs(WSLCLogsFlags Flags, WSLCHandle* Stdout, WSLCHandle* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+try
 {
     COMServiceExecutionContext context;
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
+
+    THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCLogsFlagsValid), "Invalid flags: 0x%x", Flags);
 
     *Stdout = {};
     *Stderr = {};
 
     return CallImpl(&WSLCContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }
+CATCH_RETURN();
 
 HRESULT WSLCContainer::GetId(WSLCContainerId Id)
 try

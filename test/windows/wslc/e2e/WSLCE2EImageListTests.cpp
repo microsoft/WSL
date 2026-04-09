@@ -40,17 +40,14 @@ class WSLCE2EImageListTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         const auto result = RunWslc(L"image list --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_DisplayLoadedImage)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         for (const auto& line : result.GetStdoutLines())
@@ -64,10 +61,8 @@ class WSLCE2EImageListTests
         VERIFY_FAIL(L"Failed to find the loaded image in the output");
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsNamesOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_QuietOption_OutputsNamesOnly)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list --quiet");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -84,18 +79,14 @@ class WSLCE2EImageListTests
         VERIFY_IS_TRUE(imageFound);
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list --format invalid");
         result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -117,10 +108,8 @@ class WSLCE2EImageListTests
         VERIFY_ARE_NOT_EQUAL(imageNames.end(), std::find(imageNames.begin(), imageNames.end(), AlpineImage.NameAndTag()));
     }
 
-    TEST_METHOD(WSLCE2E_Image_List_TableFormat_HasExpectedColumns)
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_TableFormat_HasExpectedColumns)
     {
-        WSL2_TEST_ONLY();
-
         const auto result = RunWslc(L"image list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 

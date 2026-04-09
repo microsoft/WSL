@@ -18,6 +18,7 @@ Abstract:
 #include "ImageCommand.h"
 #include "SessionCommand.h"
 #include "SettingsCommand.h"
+#include "VersionCommand.h"
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
@@ -47,6 +48,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ImageSaveCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
+    commands.push_back(std::make_unique<VersionCommand>(FullName()));
     return commands;
 }
 
@@ -71,7 +73,7 @@ void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (context.Args.Contains(ArgType::Version))
     {
-        wsl::windows::common::wslutil::PrintMessage(std::format(L"{} v{}", s_ExecutableName, WSL_PACKAGE_VERSION));
+        VersionCommand::PrintVersion();
         return;
     }
 

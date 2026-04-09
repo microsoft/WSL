@@ -32,8 +32,6 @@ using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
-
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
@@ -101,6 +99,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     {
         auto user = options.User.value();
         containerLauncher.SetUser(std::move(user));
+    }
+
+    for (const auto& tmpfsSpec : options.Tmpfs)
+    {
+        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
+        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
     }
 
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());

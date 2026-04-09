@@ -1001,8 +1001,6 @@ void WSLCSession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
 }
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCListImagesFlags);
-
 HRESULT WSLCSession::ListImages(const WSLCListImageOptions* Options, WSLCImageInformation** Images, ULONG* Count)
 try
 {
@@ -1166,8 +1164,6 @@ try
 }
 CATCH_RETURN();
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteImageFlags);
-
 HRESULT WSLCSession::DeleteImage(const WSLCDeleteImageOptions* Options, WSLCDeletedImageInformation** DeletedImages, ULONG* Count)
 try
 {
@@ -1176,6 +1172,11 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
     RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLC_MAX_IMAGE_NAME_LENGTH);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(static_cast<WSLCDeleteImageFlags>(Options->Flags), ~WSLCDeleteImageFlagsValid),
+        "Invalid flags: 0x%x",
+        Options->Flags);
     RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
     RETURN_HR_IF_NULL(E_POINTER, Count);
 

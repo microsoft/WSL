@@ -283,6 +283,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
     }
 
+    if (context.Args.Contains(ArgType::TMPFS))
+    {
+        auto tmpfs = context.Args.GetAll<ArgType::TMPFS>();
+        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
+        for (const auto& value : tmpfs)
+        {
+            options.Tmpfs.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();
