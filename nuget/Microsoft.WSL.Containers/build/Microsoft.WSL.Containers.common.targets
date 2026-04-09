@@ -43,6 +43,24 @@
                Text="The wslc CLI at '$(WslcCliPath)' could not be found or did not run successfully. Install WSL by running: wsl --install --no-distribution" />
     </Target>
 
+    <!-- Validate required metadata on WslcImage items -->
+    <Target Name="_WslcValidateItems"
+            BeforeTargets="WslcBuildAllImages"
+            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
+
+        <Error Condition="'%(WslcImage.Dockerfile)' == ''"
+               Code="WSLC0002"
+               Text="WslcImage '%(WslcImage.Identity)' is missing required Dockerfile metadata." />
+
+        <Error Condition="'%(WslcImage.Context)' == ''"
+               Code="WSLC0003"
+               Text="WslcImage '%(WslcImage.Identity)' is missing required Context metadata." />
+
+        <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
+               Code="WSLC0004"
+               Text="WslcImage '%(WslcImage.Identity)' contains characters not valid in file names. Use a simple name as the item identity and pass the full image reference via Tag metadata." />
+    </Target>
+
     <!-- Outer target: dispatch each WslcImage to inner target via MSBuild task -->
     <Target Name="WslcBuildAllImages"
             AfterTargets="Build"
