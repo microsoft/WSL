@@ -386,6 +386,10 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
         in_port_t port = ntohs(inAddr->sin_port);
         if (port == 0)
         {
+            // TODO(debug): Revert port-0 tracking to 2.7.0 behavior to triage #40109.
+            // The deferred fd duplication may cause socket lifecycle issues.
+            return {{{}, {}, CallId}}; // If port is 0, just let the call go through
+#if 0
             // Port 0 means the kernel will assign an ephemeral port. We can't know
             // the port until after the bind() completes, so duplicate the socket fd
             // now (while the process is still stopped by seccomp) and defer the
@@ -408,6 +412,7 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
             {
                 return {{{}, {}, CallId}}; // Can't determine protocol, just let it through
             }
+#endif
         }
 
         in6_addr storedAddress = {};
