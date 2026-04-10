@@ -368,6 +368,24 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Start_AlreadyRunning)
+    {
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        VerifyContainerIsListed(containerId, L"running");
+
+        // Start again - should succeed without error
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Verify the container is still running
+        VerifyContainerIsListed(containerId, L"running");
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Remove)
     {
         VerifyContainerIsNotListed(WslcContainerName);

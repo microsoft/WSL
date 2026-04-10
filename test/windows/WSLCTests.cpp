@@ -3954,7 +3954,7 @@ class WSLCTests
 
             // Validate that running containers can't be deleted.
             auto id = container.Id();
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_NOT_RUNNING);
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
             ValidateCOMErrorMessage(
                 std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
 
@@ -4066,7 +4066,8 @@ class WSLCTests
 
             auto id = container.Id();
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
-            ValidateCOMErrorMessage(std::format(L"Container '{}' is running.", id));
+            ValidateCOMErrorMessage(
+                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
 
             // Verify that a running container can be deleted with the force flag.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
