@@ -966,6 +966,10 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>업데이트하지 못했습니다(종료 코드: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{}은(는) 인수를 받지 않습니다. 배포 등록을 취소하려면 대신 {}을(를) 사용하세요.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>제거하지 못했습니다(종료 코드: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

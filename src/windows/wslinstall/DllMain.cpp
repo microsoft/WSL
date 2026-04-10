@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "install.h"
 #include <msiquery.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -24,6 +25,7 @@ using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &
 
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::common::install;
 
 static constexpr auto c_progIdPrefix{L"App."};
 static constexpr auto c_protocolProgIdSuffix{L".Protocol"};

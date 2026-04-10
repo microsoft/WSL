@@ -3,6 +3,9 @@ trigger:
     include:
     - master
 
+variables:
+  targetBranch: ${{ variables['Build.SourceBranchName'] }}
+
 pool:
     vmImage: 'windows-latest'
 
@@ -25,9 +28,10 @@ steps:
 
 - powershell: |
             pip install --user -r tools/devops/requirements.txt
-            python tools/devops/create-change.py . "$env:token" "WSL notice"  "Notice change from build: $env:buildId" "user/notice/$env:buildId"
+            python tools/devops/create-change.py . "$env:token" "WSL notice"  "Notice change from build: $env:buildId" "user/notice/$env:buildId" "$env:targetBranch"
 
   displayName: Create pull request
   env:
       token: $(GithubPRToken)
       buildId: $(Build.BuildId)
+      targetBranch: $(targetBranch)

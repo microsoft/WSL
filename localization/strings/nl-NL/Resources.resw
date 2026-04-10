@@ -960,6 +960,10 @@ Terugvallen op NAT-netwerken.</value>
     <value>Bijwerken is mislukt (afsluitcode: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} neemt geen argumenten aan. Gebruik in plaats daarvan {} om een distributie uit te schrijven.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Installatie ongedaan maken is mislukt (afsluitcode: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

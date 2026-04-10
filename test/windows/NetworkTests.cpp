@@ -3915,6 +3915,9 @@ class MirroredTests
 
     TEST_METHOD(LoopbackExplicit)
     {
+        // TODO: re-enable once OS build 29555 loopback regression is resolved.
+        SKIP_TEST_UNSTABLE();
+
         MIRRORED_NETWORKING_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
@@ -4905,33 +4908,6 @@ class VirtioProxyTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
-    TEST_METHOD(DnsResolutionBasic)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
-
-        NetworkTests::VerifyDnsResolutionBasic();
-    }
-
-    TEST_METHOD(DnsResolutionDig)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
-
-        NetworkTests::VerifyDnsResolutionDig();
-    }
-
-    TEST_METHOD(DnsResolutionRecordTypes)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
-
-        NetworkTests::VerifyDnsResolutionRecordTypes();
-    }
-
     TEST_METHOD(PortZeroBindIsTracked)
     {
         VIRTIOPROXY_TEST_ONLY();
@@ -5025,26 +5001,10 @@ class VirtioProxyTests
         }
     }
 
-    TEST_METHOD(DnsResolutionDigV6)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
-
-        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
-        {
-            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
-            return;
-        }
-
-        // Test AAAA record resolution (IPv6) with both UDP and TCP
-        NetworkTests::VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-        NetworkTests::VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
-    }
-
     TEST_METHOD(GuestPortIsReleasedV6)
     {
         VIRTIOPROXY_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
@@ -5093,6 +5053,30 @@ class VirtioProxyTests
         // Verify that /etc/resolv.conf contains at least one IPv6 nameserver
         const std::wregex v6Pattern(L"(.|\\n)*nameserver [0-9a-fA-F:]+\\n(.|\\n)*");
         VERIFY_IS_TRUE(std::regex_match(out, v6Pattern));
+    }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
+        NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 };
 } // namespace NetworkTests

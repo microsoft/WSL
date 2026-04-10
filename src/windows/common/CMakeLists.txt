@@ -45,6 +45,7 @@ set(SOURCES
     WslTelemetry.cpp
     VirtioNetworking.cpp
     wslutil.cpp
+    install.cpp
     notifications.cpp)
 
 set(HEADERS

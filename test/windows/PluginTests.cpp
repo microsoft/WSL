@@ -159,8 +159,8 @@ class PluginTests
             VM created (settings->CustomConfigurationFlags=0)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -182,8 +182,8 @@ class PluginTests
             VM created (settings->CustomConfigurationFlags=0)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -200,8 +200,8 @@ class PluginTests
             VM created (settings->CustomConfigurationFlags=0)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -259,8 +259,8 @@ class PluginTests
             VM created (settings->CustomConfigurationFlags=2)
             Folder mounted (* -> /test-plugin)
             Process created
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         WslConfigChange config(LxssGenerateTestConfig({.vmIdleTimeout = 1, .kernelCommandLine = L"custom"}));
@@ -277,13 +277,13 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=10
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             OnDistroStarted: received same GUID
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::SameDistroId);
@@ -301,11 +301,11 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=14
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             Distribution Stopping, name=test_distro, package=, PidNs=*
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             Init's pid is different (* ! = *)
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::InitPidIsDifferent);
@@ -341,8 +341,8 @@ class PluginTests
             LR"(Plugin loaded. TestMode=7
             VM created (settings->CustomConfigurationFlags=0)
             API error tests passed
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping)";
 
         ConfigurePlugin(PluginTestType::ApiErrors);
@@ -442,8 +442,8 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=5
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             VM Stopping
             OnVmStopping: E_UNEXPECTED)";
 
@@ -459,7 +459,7 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=4
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             OnDistroStarted: E_UNEXPECTED
             VM Stopping)";
 
@@ -479,8 +479,8 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=6
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+            Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
             OnDistroStopping: E_UNEXPECTED
             VM Stopping)";
 
@@ -515,7 +515,7 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=12
             VM created (settings->CustomConfigurationFlags=0)
-            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+            Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
             OnDistroStarted: E_FAIL
             VM Stopping)";
 
@@ -543,8 +543,8 @@ class PluginTests
                 VM created (settings->CustomConfigurationFlags=0)
                 Folder mounted (* -> /test-plugin)
                 Process created
-                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=12
-                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=13
+                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 VM Stopping)";
 
         ValidateLogFile(ExpectedOutput);
@@ -568,14 +568,14 @@ class PluginTests
                 VM created (settings->CustomConfigurationFlags=0)
                 Folder mounted (* -> /test-plugin)
                 Process created
-                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 VM Stopping
-                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 VM created (settings->CustomConfigurationFlags=0)
                 Folder mounted (* -> /test-plugin)
                 Process created
-                Distribution registered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=12
-                Distribution unregistered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=13
+                Distribution unregistered, name=plugin-test-distro-vhd, package=, Flavor=debian, Version=13
                 VM Stopping)";
 
         ValidateLogFile(ExpectedOutput);
@@ -593,9 +593,9 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=15
                 VM created (settings->CustomConfigurationFlags=0)
-                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 OnDistributionRegistered: E_UNEXPECTED
-                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=12
+                Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=13
                 OnDistributionUnregistered: E_UNEXPECTED
                 VM Stopping)";
 
@@ -611,11 +611,11 @@ class PluginTests
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=16
                 VM created (settings->CustomConfigurationFlags=0)
-                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
                 Process created
                 Failed process launch returned:  -2147467259
                 Invalid distro launch returned:  -2147220717
-                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
                 VM Stopping)";
 
         StartWsl(0);
@@ -632,8 +632,8 @@ class PluginTests
             LR"(Plugin loaded. TestMode=17
                 VM created (settings->CustomConfigurationFlags=0)
                 Username: *
-                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=12
-                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=12
+                Distribution started, name=test_distro, package=, PidNs=*, InitPid=*, Flavor=debian, Version=13
+                Distribution Stopping, name=test_distro, package=, PidNs=*, Flavor=debian, Version=13
                 VM Stopping)";
 
         StartWsl(0);
