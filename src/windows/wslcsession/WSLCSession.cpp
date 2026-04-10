@@ -1005,6 +1005,7 @@ try
     if (Options != nullptr)
     {
         RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCListImagesFlagsDanglingFalse));
+        RETURN_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
         RETURN_HR_IF(E_INVALIDARG, Options->Reference != nullptr && strlen(Options->Reference) > WSLC_MAX_IMAGE_NAME_LENGTH);
     }
 
@@ -1054,16 +1055,15 @@ try
             for (ULONG i = 0; i < Options->LabelsCount; ++i)
             {
                 const auto& label = Options->Labels[i];
-                if (label.Key != nullptr)
+                RETURN_HR_IF_NULL(E_POINTER, label.Key);
+
+                std::string labelFilter = label.Key;
+                if (label.Value != nullptr)
                 {
-                    std::string labelFilter = label.Key;
-                    if (label.Value != nullptr)
-                    {
-                        labelFilter += "=";
-                        labelFilter += label.Value;
-                    }
-                    filters.labels.push_back(labelFilter);
+                    labelFilter += "=";
+                    labelFilter += label.Value;
                 }
+                filters.labels.push_back(labelFilter);
             }
         }
     }
@@ -1355,6 +1355,111 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::PruneImages(const WSLCPruneImagesOptions* Options, WSLCDeletedImageInformation** DeletedImages, ULONG* DeletedImagesCount, ULONGLONG* SpaceReclaimed)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImagesCount);
+    RETURN_HR_IF_NULL(E_POINTER, SpaceReclaimed);
+    *DeletedImages = nullptr;
+    *DeletedImagesCount = 0;
+    *SpaceReclaimed = 0;
+
+    if (Options != nullptr)
+    {
+        RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingFalse));
+        RETURN_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(static_cast<WSLCPruneImagesFlags>(Options->Flags), ~WSLCPruneImagesFlagsValid));
+    }
+
+    auto lock = m_lock.lock_shared();
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    DockerHTTPClient::PruneImagesFilters filters;
+
+    if (Options != nullptr)
+    {
+        if (WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingTrue))
+        {
+            filters.dangling = true;
+        }
+        else if (WI_IsFlagSet(Options->Flags, WSLCPruneImagesFlagsDanglingFalse))
+        {
+            filters.dangling = false;
+        }
+
+        if (Options->Until > 0)
+        {
+            filters.until = Options->Until;
+        }
+
+        if (Options->Labels != nullptr && Options->LabelsCount > 0)
+        {
+            for (ULONG i = 0; i < Options->LabelsCount; ++i)
+            {
+                const auto& filter = Options->Labels[i];
+                RETURN_HR_IF_NULL(E_POINTER, filter.Key);
+
+                std::string labelFilter = filter.Key;
+                if (filter.Value != nullptr)
+                {
+                    labelFilter += "=";
+                    labelFilter += filter.Value;
+                }
+
+                if (filter.Present)
+                {
+                    filters.presentLabels.emplace_back(std::move(labelFilter));
+                }
+                else
+                {
+                    filters.absentLabels.emplace_back(std::move(labelFilter));
+                }
+            }
+        }
+    }
+
+    docker_schema::PruneImageResult pruneResult;
+    try
+    {
+        pruneResult = m_dockerClient->PruneImages(filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune images");
+
+    *SpaceReclaimed = pruneResult.SpaceReclaimed;
+
+    if (pruneResult.ImagesDeleted.has_value() && !pruneResult.ImagesDeleted->empty())
+    {
+        auto output = wil::make_unique_cotaskmem<WSLCDeletedImageInformation[]>(pruneResult.ImagesDeleted->size());
+        size_t index = 0;
+        for (const auto& image : pruneResult.ImagesDeleted.value())
+        {
+            THROW_HR_IF(
+                E_UNEXPECTED, (image.Deleted.empty() && image.Untagged.empty()) || (!image.Deleted.empty() && !image.Untagged.empty()));
+
+            if (!image.Deleted.empty())
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Deleted.c_str()) != 0);
+                output[index].Type = WSLCDeletedImageTypeDeleted;
+            }
+            else
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Untagged.c_str()) != 0);
+                output[index].Type = WSLCDeletedImageTypeUntagged;
+            }
+
+            index++;
+        }
+
+        *DeletedImages = output.release();
+        *DeletedImagesCount = static_cast<ULONG>(pruneResult.ImagesDeleted->size());
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLCSession::CreateContainer(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
 try
 {
@@ -1521,18 +1626,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneContainers(_In_opt_ WSLCContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result)
+HRESULT WSLCSession::PruneContainers(_In_opt_ WSLCPruneLabelFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result)
 try
 {
     COMServiceExecutionContext context;
 
-    std::optional<docker_schema::PruneContainerLabelFilter> filters;
+    DockerHTTPClient::PruneContainersFilters filters;
 
-    if (Until > 0 || FiltersCount > 0)
+    if (FiltersCount > 0)
     {
         THROW_HR_IF(E_POINTER, FiltersCount > 0 && Filters == nullptr);
-
-        filters.emplace();
 
         for (DWORD i = 0; i < FiltersCount; ++i)
         {
@@ -1547,18 +1650,18 @@ try
 
             if (Filters[i].Present)
             {
-                filters->presentLabels.emplace(std::move(labelFilter), true);
+                filters.presentLabels.emplace_back(std::move(labelFilter));
             }
             else
             {
-                filters->absentLabels.emplace(std::move(labelFilter), true);
+                filters.absentLabels.emplace_back(std::move(labelFilter));
             }
         }
+    }
 
-        if (Until > 0)
-        {
-            filters->until = Until;
-        }
+    if (Until > 0)
+    {
+        filters.until = Until;
     }
 
     auto lock = m_lock.lock_shared();
@@ -1853,6 +1956,7 @@ try
         }
 
         WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));
+        m_dockerdProcess.reset();
     }
 
     if (m_virtualMachine)

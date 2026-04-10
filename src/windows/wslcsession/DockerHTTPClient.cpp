@@ -53,6 +53,37 @@ bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_typ
 
     return true;
 }
+template <typename TFilters>
+nlohmann::json PruneFiltersToJson(const TFilters& filters)
+{
+    nlohmann::json j;
+
+    if constexpr (requires { filters.dangling; })
+    {
+        if (filters.dangling.has_value())
+        {
+            j["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
+        }
+    }
+
+    if (filters.until.has_value())
+    {
+        j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
+    }
+
+    if (!filters.presentLabels.empty())
+    {
+        j["label"] = filters.presentLabels;
+    }
+
+    if (!filters.absentLabels.empty())
+    {
+        j["label!"] = filters.absentLabels;
+    }
+
+    return j;
+}
+
 } // namespace
 
 DockerHTTPClient::URL::URL(std::string&& Path) : m_path(std::move(Path))
@@ -253,6 +284,19 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::s
     return {response.result_int(), std::move(socket)};
 }
 
+docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const PruneImagesFilters& filters)
+{
+    auto url = URL::Create("/images/prune");
+
+    auto filtersJson = PruneFiltersToJson(filters);
+    if (!filtersJson.empty())
+    {
+        url.SetParameter("filters", filtersJson.dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneImageResult>(verb::post, url);
+}
+
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
 {
     auto url = URL::Create("/containers/json");
@@ -421,12 +465,14 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLo
     return std::move(socket);
 }
 
-docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const std::optional<docker_schema::PruneContainerLabelFilter>& Filter)
+docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const PruneContainersFilters& filters)
 {
     auto url = URL::Create("/containers/prune");
-    if (Filter.has_value())
+
+    auto filtersJson = PruneFiltersToJson(filters);
+    if (!filtersJson.empty())
     {
-        url.SetParameter("filters", shared::ToJson(Filter.value()));
+        url.SetParameter("filters", filtersJson.dump());
     }
 
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneContainerResult>(verb::post, url);

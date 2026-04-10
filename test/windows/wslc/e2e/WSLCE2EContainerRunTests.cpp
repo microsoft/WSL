@@ -187,8 +187,8 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Runs a container. By default, the container is started in the background; use --detach to run in the "
-               L"foreground.\r\n\r\n";
+        return L"Runs a container. By default, the container is started in the foreground; use --detach to run in the "
+               L"background.\r\n\r\n";
     }
 
     std::wstring GetUsage() const

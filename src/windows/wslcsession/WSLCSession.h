@@ -84,12 +84,17 @@ public:
     IFACEMETHOD(PushImage)(_In_ LPCSTR Image, _In_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
     IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken) override;
+    IFACEMETHOD(PruneImages)(
+        _In_opt_ const WSLCPruneImagesOptions* Options,
+        _Out_ WSLCDeletedImageInformation** DeletedImages,
+        _Out_ ULONG* DeletedImagesCount,
+        _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLCContainerEntry** Containers, _Out_ ULONG* Count, _Out_ WSLCContainerPortMapping** Ports, _Out_ ULONG* PortsCount) override;
-    IFACEMETHOD(PruneContainers)(_In_opt_ WSLCContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result) override;
+    IFACEMETHOD(PruneContainers)(_In_opt_ WSLCPruneLabelFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
