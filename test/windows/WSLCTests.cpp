@@ -6637,10 +6637,8 @@ class WSLCTests
         }
     }
 
-    TEST_METHOD(ImagePrune)
+    WSLC_TEST_METHOD(ImagePrune)
     {
-        WSL2_TEST_ONLY();
-
         auto pruneImages =
             [this](DWORD flags = WSLCPruneImagesFlagsNone, uint64_t until = 0, const std::vector<WSLCPruneLabelFilter>& labels = {}) {
                 wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
