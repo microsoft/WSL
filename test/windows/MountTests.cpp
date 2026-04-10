@@ -438,10 +438,9 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + absolutePath.wstring()), (DWORD)0);
     }
 
-    TEST_METHOD(AbsolutePathVhdUnmountAfterVMTimeout)
+    WSL2_TEST_METHOD(AbsolutePathVhdUnmountAfterVMTimeout)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
 
         WslKeepAlive keepAlive;
 
