@@ -209,7 +209,7 @@ STDAPI WslcReleaseContainer(_In_ WslcContainer container);
 
 #define WSLC_CONTAINER_ID_BUFFER_SIZE 65 // 64 hex chars + null terminator
 
-STDAPI WslcGetContainerID(WslcContainer container, CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE]);
+STDAPI WslcGetContainerID(_In_ WslcContainer container, _Out_writes_(WSLC_CONTAINER_ID_BUFFER_SIZE) CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE]);
 
 STDAPI WslcGetContainerInitProcess(_In_ WslcContainer container, _Out_ WslcProcess* initProcess);
 
@@ -289,7 +289,7 @@ typedef enum WslcProcessIOHandle
 // Parameters:
 //   ioHandle
 //       The WslcProcessIOHandle that the IO callback is for.
-//       Only STDOUT and STDERR will recieve callbacks.
+//       Only STDOUT and STDERR will receive callbacks.
 //
 //   data
 //       Pointer to a buffer containing the bytes read. The buffer is owned
@@ -455,7 +455,7 @@ typedef struct WslcImageInfo
     uint64_t createdTimestamp;
 } WslcImageInfo;
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Retrieves the list of container images
 // Parameters:
