@@ -997,7 +997,7 @@ class WSLCTests
             if (Expected.has_value())
             {
                 LogError(
-                    "Expected COM error: '%ls' but none was set. Source: Source: %hs",
+                    "Expected COM error: '%ls' but none was set. Source: %hs",
                     Expected->c_str(),
                     std::format("{}", Source).c_str());
                 VERIFY_FAIL();
@@ -6408,7 +6408,7 @@ class WSLCTests
         {
             // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
             auto [result, _] = WSLCProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WSLC_E_CONTAINER_NOT_RUNNING));
+            VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
         }
     }
 

@@ -16,7 +16,16 @@ Abstract:
 
 #if defined(_MSC_VER)
 #define THROW_INVALID_ARG_IF(condition) THROW_HR_IF(E_INVALIDARG, condition)
-#define THROW_IF_FAILED_EXCEPT(result, accepted) THROW_HR_IF((result), FAILED(result) && (result) != (accepted))
+
+#define THROW_IF_FAILED_EXCEPT(result, accepted) \
+    do \
+    { \
+        auto _result = (result); \
+        if (FAILED(_result) && _result != (accepted)) \
+        { \
+            THROW_HR(_result); \
+        } \
+    } while (0)
 
 #elif defined(__GNUC__)
 #define THROW_INVALID_ARG_IF(condition) THROW_ERRNO_IF(EINVAL, condition)
