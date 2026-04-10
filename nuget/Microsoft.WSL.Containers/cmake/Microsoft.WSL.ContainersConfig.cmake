@@ -117,9 +117,9 @@ function(wslc_add_image _target_name)
     endif()
 
     # Validate target name
-    string(REGEX MATCH "[^a-zA-Z0-9_.-]" _bad_char "${_target_name}")
+    string(REGEX MATCH "[^a-zA-Z0-9_.+-]" _bad_char "${_target_name}")
     if(_bad_char)
-        message(FATAL_ERROR "wslc_add_image: '${_target_name}' is not a valid CMake target name (contains '${_bad_char}').")
+        message(FATAL_ERROR "wslc_add_image: '${_target_name}' contains unsupported character '${_bad_char}'. Supported characters are letters, digits, '_', '.', '+', and '-'.")
     endif()
 
     # Normalize paths to be independent of the build directory
