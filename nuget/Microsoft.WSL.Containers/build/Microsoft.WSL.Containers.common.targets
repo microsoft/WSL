@@ -60,7 +60,7 @@
              XML entities: &quot; = "  &lt; = <  &gt; = >  -->
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
-               Text="WslcImage '%(WslcImage.Identity)' contains characters not valid in file names. Use a simple, file-name-safe value for the item identity. If needed, specify only the image tag suffix via Tag metadata." />
+               Text="WslcImage The item value '%(WslcImage.Identity)' must be a valid file name." />
     </Target>
 
     <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:
