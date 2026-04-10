@@ -1815,6 +1815,7 @@ try
         }
 
         WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));
+        m_dockerdProcess.reset();
     }
 
     if (m_virtualMachine)

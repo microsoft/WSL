@@ -2110,6 +2110,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Volume '{}' is in use.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslcFailedToMountVolume" xml:space = "preserve" >
+    <value>Failed to create volume '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcPortInUse" xml:space = "preserve" >
     <value>Port {} is already in use, cannot start container {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2128,6 +2132,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcSessionStorageNotFound" xml:space = "preserve" >
     <value>No WSLC session found in '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
+    <value>Invalid image tag format: '{}'. Expected format is 'name:tag'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
@@ -2262,6 +2270,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ImageSaveLongDesc" xml:space="preserve">
     <value>Saves images.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
+    <value>Tag an image.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagLongDesc" xml:space="preserve">
+    <value>Tags an image.</value>
   </data>
   <data name="WSLCCLI_SessionCommandDesc" xml:space="preserve">
     <value>Manage sessions.</value>
@@ -2407,8 +2421,14 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Signal to send (default: {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
+    <value>Current or existing image reference in the image-name[:tag] format</value>
+  </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
+  </data>
+  <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
+    <value>New image reference in the image-name[:tag] format</value>
   </data>
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
     <value>Time in seconds to wait before executing (default 5)</value>
