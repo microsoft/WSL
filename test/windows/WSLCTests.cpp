@@ -996,10 +996,7 @@ class WSLCTests
         {
             if (Expected.has_value())
             {
-                LogError(
-                    "Expected COM error: '%ls' but none was set. Source: %hs",
-                    Expected->c_str(),
-                    std::format("{}", Source).c_str());
+                LogError("Expected COM error: '%ls' but none was set. Source: %hs", Expected->c_str(), std::format("{}", Source).c_str());
                 VERIFY_FAIL();
             }
         }
