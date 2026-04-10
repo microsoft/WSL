@@ -1263,16 +1263,16 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
-    RETURN_HR_IF_NULL(E_POINTER, NameOrId);
+    RETURN_HR_IF_NULL(E_POINTER, nameOrId);
 
     WSLCDeleteImageOptions options{};
-    options.Image = NameOrId;
+    options.Image = nameOrId;
     // TODO: Flags? (Force and NoPrune)
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImageInformation;
