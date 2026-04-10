@@ -342,8 +342,10 @@ class WSLCE2EContainerExecTests
         auto result = RunWslc(std::format(L"container run --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
+        auto inspect = InspectContainer(WslcContainerName);
         result = RunWslc(std::format(L"container exec {} echo should-fail", WslcContainerName));
-        result.Verify({.Stderr = L"The group or resource is not in the correct state to perform the requested operation. \r\nError code: ERROR_INVALID_STATE\r\n", .ExitCode = 1});
+        auto errorMessage = std::format(L"Container '{}' is not running.\r\nError code: WSLC_E_CONTAINER_NOT_RUNNING\r\n", inspect.Id);
+        result.Verify({.Stderr = errorMessage, .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_UserOption_UidRoot)
