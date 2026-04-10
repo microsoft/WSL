@@ -13,6 +13,11 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
     string(TOLOWER ${TARGET_PLATFORM} IDL_ENV)
     set(PREVIOUS_OUTPUT "")
 
+    set(IDL_DLLDATA ${OUTPUT_DIR}/dlldata_${TARGET_PLATFORM}.c)
+
+    list(LENGTH idl_files_with_proxy PROXY_IDL_COUNT)
+    set(PROXY_IDL_INDEX 0)
+
     foreach(idl_file ${idl_files_with_proxy})
 
         cmake_path(GET idl_file STEM IDL_NAME)
@@ -24,8 +29,14 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
         # "fatal error LNK1112: module machine type 'x64' conflicts with target machine type 'ARM64'"
         set(IDL_I ${OUTPUT_DIR}/${IDL_NAME}_i_${TARGET_PLATFORM}.c)
         set(IDL_P ${OUTPUT_DIR}/${IDL_NAME}_p_${TARGET_PLATFORM}.c)
-        set(IDL_DLLDATA ${OUTPUT_DIR}/dlldata_${TARGET_PLATFORM}.c)
-        set(MIDL_OUTPUT ${IDL_HEADER} ${IDL_I} ${IDL_P} ${IDL_DLLDATA})
+
+        # Only list dlldata as a tracked output of the last MIDL command.
+        math(EXPR PROXY_IDL_INDEX "${PROXY_IDL_INDEX} + 1")
+        if(PROXY_IDL_INDEX EQUAL PROXY_IDL_COUNT)
+            set(MIDL_OUTPUT ${IDL_HEADER} ${IDL_I} ${IDL_P} ${IDL_DLLDATA})
+        else()
+            set(MIDL_OUTPUT ${IDL_HEADER} ${IDL_I} ${IDL_P})
+        endif()
 
         add_custom_command(
             OUTPUT ${MIDL_OUTPUT}
@@ -51,7 +62,7 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
 
         add_custom_command(
             OUTPUT ${IDL_HEADER}
-            COMMAND midl /nologo /target NT100 /env "${IDL_ENV}" /Zp8 /char unsigned /ms_ext /c_ext /h ${IDL_HEADER} ${idl_file} ${IDL_DEFINITIONS}
+            COMMAND midl /nologo /target NT100 /env "${IDL_ENV}" /Zp8 /char unsigned /ms_ext /c_ext /h ${IDL_HEADER} /iid nul /proxy nul /dlldata nul ${idl_file} ${IDL_DEFINITIONS}
             WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
             DEPENDS ${idl_file}
             MAIN_DEPENDENCY ${idl_file}
@@ -63,6 +74,11 @@ function(add_idl target idl_files_with_proxy idl_files_no_proxy)
 
     endforeach()
 
-    add_custom_target(${target} DEPENDS ${TARGET_OUTPUTS} SOURCES ${idl_files_with_proxy} ${idl_files_no_proxy})
+    # Touch the stamp file so Visual Studio's incremental build can track the
+    # target as up-to-date. 
+    add_custom_target(${target}
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${target}
+        DEPENDS ${TARGET_OUTPUTS}
+        SOURCES ${idl_files_with_proxy} ${idl_files_no_proxy})
 
 endfunction()
