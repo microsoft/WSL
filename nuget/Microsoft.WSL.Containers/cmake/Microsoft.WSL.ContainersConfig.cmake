@@ -91,10 +91,13 @@ function(wslc_add_image _target_name)
     if(NOT ARG_IMAGE)
         message(FATAL_ERROR "wslc_add_image: IMAGE is required")
     endif()
-    # IMAGE must not contain a tag — use the TAG parameter instead
-    string(FIND "${ARG_IMAGE}" ":" _colon_pos)
-    if(NOT _colon_pos EQUAL -1)
-        message(FATAL_ERROR "wslc_add_image: IMAGE '${ARG_IMAGE}' contains ':'. Specify the tag separately with the TAG parameter.")
+    # IMAGE must not contain a tag — use the TAG parameter instead.
+    # Allow ':' in the registry host portion (for example, localhost:5000/myimg)
+    # and only reject ':' when it appears after the last '/'.
+    string(FIND "${ARG_IMAGE}" "/" _last_slash_pos REVERSE)
+    string(FIND "${ARG_IMAGE}" ":" _last_colon_pos REVERSE)
+    if(_last_colon_pos GREATER _last_slash_pos)
+        message(FATAL_ERROR "wslc_add_image: IMAGE '${ARG_IMAGE}' contains a tag. Specify the tag separately with the TAG parameter.")
     endif()
     if(NOT ARG_DOCKERFILE)
         message(FATAL_ERROR "wslc_add_image: DOCKERFILE is required")
