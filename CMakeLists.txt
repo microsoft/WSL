@@ -192,7 +192,7 @@ if (${SKIP_PACKAGE_SIGNING})
 else()
     if (NOT EXISTS ${PACKAGE_CERTIFICATE})
         execute_process(
-            COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive ${CMAKE_CURRENT_LIST_DIR}/tools/create-dev-cert.ps1 -OutputPath ${PACKAGE_CERTIFICATE}
+            COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive -File "${CMAKE_CURRENT_LIST_DIR}/tools/create-dev-cert.ps1" -OutputPath "${PACKAGE_CERTIFICATE}"
             COMMAND_ERROR_IS_FATAL ANY)
     endif()
 
