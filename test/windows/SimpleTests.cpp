@@ -295,12 +295,16 @@ class SimpleTests
         VERIFY_IS_TRUE(output.find(L"/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin") != std::wstring::npos);
     }
 
-    TEST_METHOD(WslcShellScript)
+    WSLC_TEST_METHOD(WslcShellScript)
     {
         // Verify that the 'wslc' shell script (no .exe extension) invokes wslc.exe
         // and produces the same output as calling wslc.exe directly.
-        auto [exeOutput, exeErr] = LxsstuLaunchWslAndCaptureOutput(L"wslc.exe version");
-        auto [scriptOutput, scriptErr] = LxsstuLaunchWslAndCaptureOutput(L"wslc version");
+        // Use the full install path since the MSI directory may not be on %PATH% in CI.
+        auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath().value();
+        auto exeCmd = std::format(L"$(wslpath '{}wslc.exe') version", installPath);
+        auto scriptCmd = std::format(L"$(wslpath '{}wslc') version", installPath);
+        auto [exeOutput, exeErr] = LxsstuLaunchWslAndCaptureOutput(exeCmd);
+        auto [scriptOutput, scriptErr] = LxsstuLaunchWslAndCaptureOutput(scriptCmd);
         VERIFY_ARE_EQUAL(exeOutput, scriptOutput);
         VERIFY_ARE_EQUAL(exeErr, scriptErr);
     }

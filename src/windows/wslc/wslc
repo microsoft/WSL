@@ -8,5 +8,4 @@
 WSL_PATH="$(dirname "$(realpath "$0")")"
 WSLC_EXE="$WSL_PATH/wslc.exe"
 
-"$WSLC_EXE" "$@"
-exit $?
+exec "$WSLC_EXE" "$@"
