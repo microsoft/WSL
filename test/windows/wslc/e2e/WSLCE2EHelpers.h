@@ -18,6 +18,7 @@ Abstract:
 #include <chrono>
 #include <wslc_schema.h>
 #include <ContainerModel.h>
+#include <WSLCContainerLauncher.h>
 
 namespace WSLCE2ETests {
 
@@ -176,4 +177,16 @@ inline void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
     VerifyContainerIsNotListed(containerNameOrId, std::chrono::milliseconds(0), std::chrono::milliseconds(0));
 }
+
+wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
+
+// Starts a local registry container with host networking using the COM API.
+// Returns the running container (holds it alive) and the registry address (e.g. "127.0.0.1:PORT").
+std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username = "", const std::string& password = "", USHORT port = 5000);
+
+// TODO: Replace with RunWslc("image tag ...") once the 'image tag' CLI command is implemented.
+// Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
+std::string TagImageForRegistry(IWSLCSession& session, const std::string& imageName, const std::string& registryAddress);
+
 } // namespace WSLCE2ETests

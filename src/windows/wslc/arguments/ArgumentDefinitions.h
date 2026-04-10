@@ -63,6 +63,8 @@ _(Name,           "name",                NO_ALIAS,          Kind::Value,       L
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
 _(Output,         "output",              L"o",              Kind::Value,       Localization::WSLCCLI_OutputArgDescription()) \
+_(Password,       "password",            L"p",              Kind::Value,       Localization::WSLCCLI_LoginPasswordArgDescription()) \
+_(PasswordStdin,  "password-stdin",      NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_LoginPasswordStdinArgDescription()) \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_PathArgDescription()) \
 /*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ProgressArgDescription())*/ \
 _(Publish,        "publish",             L"p",              Kind::Value,       Localization::WSLCCLI_PublishArgDescription()) \
@@ -70,6 +72,7 @@ _(Publish,        "publish",             L"p",              Kind::Value,       L
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        Localization::WSLCCLI_QuietArgDescription()) \
 _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_RemoveArgDescription()) \
 /*_(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SchemeArgDescription())*/ \
+_(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SessionIdPositionalArgDescription()) \
 _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
@@ -79,6 +82,7 @@ _(Time,           "time",                L"t",              Kind::Value,       L
 _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        Localization::WSLCCLI_TTYArgDescription()) \
 _(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription()) \
+_(Username,       "username",            L"u",              Kind::Value,       Localization::WSLCCLI_LoginUsernameArgDescription()) \
 _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \
 _(Version,        "version",             L"v",              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \

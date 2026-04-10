@@ -489,8 +489,7 @@ class WSLCTests
 
         {
             std::wstring expectedError =
-                L"pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
-                L"access to the resource is denied";
+                L" repository does not exist or may require 'docker login': denied: requested access to the resource is denied";
 
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
             ValidateCOMErrorMessage(expectedError.c_str());

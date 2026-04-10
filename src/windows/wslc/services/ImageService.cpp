@@ -12,7 +12,9 @@ Abstract:
 
 --*/
 #include "ImageService.h"
+#include "RegistryService.h"
 #include "SessionService.h"
+#include "UserSettings.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 
@@ -196,7 +198,11 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
+    auto server = GetServerFromImage(image);
+    auto storedAuth = RegistryService::Get(settings::User().Get<settings::Setting::CredentialStore>(), server);
+    auto auth = storedAuth.has_value() ? storedAuth->c_str() : nullptr;
+
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth, callback));
 }
 
 InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
@@ -206,8 +212,33 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push()
+void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
+    auto server = GetServerFromImage(image);
+    auto storedAuth = RegistryService::Get(settings::User().Get<settings::Setting::CredentialStore>(), server);
+    auto auth = storedAuth.value_or(BuildRegistryAuthHeader("", server));
+
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));
+}
+
+std::string ImageService::GetServerFromImage(const std::string& image)
+{
+    // Extract the registry domain from an image reference.
+    // Follows the same logic as Docker's splitDockerDomain in distribution/reference:
+    // If the part before the first '/' contains a '.' or ':', or is "localhost",
+    // it's treated as a registry domain. Otherwise it's a Docker Hub repo path.
+    auto slash = image.find('/');
+    if (slash != std::string::npos)
+    {
+        auto candidate = image.substr(0, slash);
+        if (candidate.find('.') != std::string::npos || candidate.find(':') != std::string::npos || candidate == "localhost")
+        {
+            return candidate;
+        }
+    }
+
+    // TODO: Get default server from the daemon's /info through the wslc session
+    return std::string(RegistryService::DefaultServer);
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)

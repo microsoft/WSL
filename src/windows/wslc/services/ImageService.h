@@ -36,8 +36,12 @@ public:
     static void Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune);
     static wsl::windows::common::wslc_schema::InspectImage Inspect(wsl::windows::wslc::models::Session& session, const std::string& image);
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    static void Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent = nullptr);
-    void Push();
+
+    // Extracts the registry server address from an image reference.
+    // Returns the default Docker Hub server if no explicit server is present.
+    static std::string GetServerFromImage(const std::string& image);
     void Tag();
     void Prune();
 };

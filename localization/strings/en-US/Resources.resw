@@ -2247,6 +2247,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ImagePullLongDesc" xml:space="preserve">
     <value>Pulls images.</value>
   </data>
+  <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
+    <value>Upload an image to a registry.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
+    <value>Upload an image to a registry.</value>
+  </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Remove images.</value>
   </data>
@@ -2258,6 +2264,47 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ImageSaveLongDesc" xml:space="preserve">
     <value>Saves images.</value>
+  </data>
+  <data name="WSLCCLI_LoginDesc" xml:space="preserve">
+    <value>Log in to a registry.</value>
+  </data>
+  <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
+    <value>Log in to a registry. If no server is specified, the default is defined by the session.</value>
+  </data>
+  <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
+    <value>Log out from a registry.</value>
+  </data>
+  <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
+    <value>Log out from a registry. If no server is specified, the default is defined by the session.</value>
+  </data>
+  <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
+    <value>Login Succeeded</value>
+  </data>
+  <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
+    <value>Removing login credentials for {}</value>
+  </data>
+  <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
+    <value>Not logged in to {}</value>
+  </data>
+  <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
+    <value>Password or Personal Access Token (PAT)</value>
+    <comment>{Locked="PAT"}Acronym should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
+    <value>Take the Password or Personal Access Token (PAT) from stdin</value>
+    <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
+    <value>Manage registry credentials.</value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
+    <value>Manage registry credentials, including logging in and out of container registries.</value>
   </data>
   <data name="WSLCCLI_SessionCommandDesc" xml:space="preserve">
     <value>Manage sessions.</value>
