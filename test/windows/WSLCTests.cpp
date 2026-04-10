@@ -6532,7 +6532,7 @@ class WSLCTests
                                const std::source_location& source = std::source_location::current()) {
             PruneResult result;
 
-            std::vector<WSLCContainerPruneFilter> labelsFilter;
+            std::vector<WSLCPruneLabelFilter> labelsFilter;
             for (const auto& e : labels)
             {
                 labelsFilter.push_back({e.first.c_str(), e.second.first, e.second.second});
@@ -6629,11 +6629,157 @@ class WSLCTests
 
         // Validate error paths.
         {
-            WSLCContainerPruneFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
+            WSLCPruneLabelFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
             PruneResult result;
 
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+        }
+    }
+
+    WSLC_TEST_METHOD(ImagePrune)
+    {
+        auto pruneImages =
+            [this](DWORD flags = WSLCPruneImagesFlagsNone, uint64_t until = 0, const std::vector<WSLCPruneLabelFilter>& labels = {}) {
+                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+                ULONGLONG spaceReclaimed = 0;
+                WSLCPruneImagesOptions options{};
+                options.Flags = flags;
+                options.Until = until;
+                options.Labels = labels.empty() ? nullptr : labels.data();
+                options.LabelsCount = static_cast<ULONG>(labels.size());
+
+                VERIFY_SUCCEEDED(m_defaultSession->PruneImages(
+                    &options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+                return std::make_pair(std::move(deletedImages), spaceReclaimed);
+            };
+
+        // Helper to create a dangling image using only test-local tags:
+        // Load alpine and hello-world under unique tags, then overwrite one with the other.
+        auto createDanglingImage = [this]() {
+            LoadTestImage("alpine:latest");
+            WSLCTagImageOptions tagA{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagA));
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
+
+            LoadTestImage("hello-world:latest");
+            WSLCTagImageOptions tagB{.Image = "hello-world:latest", .Repo = "prune-test-b", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagB));
+            DeleteImage("hello-world:latest", WSLCDeleteImageFlagsNone);
+
+            // Overwrite prune-test-a with prune-test-b's image, making original alpine dangling.
+            WSLCTagImageOptions overwrite{.Image = "prune-test-b:v1", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&overwrite));
+        };
+
+        auto cleanupDanglingImage = [this, &pruneImages]() {
+            pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            LOG_IF_FAILED(DeleteImageNoThrow("prune-test-a:v1", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("prune-test-b:v1", WSLCDeleteImageFlagsNone).first);
+        };
+
+        // Clean up any stale dangling images from prior tests.
+        pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+
+        // Prune with no unused images returns empty.
+        {
+            auto [deletedImages, spaceReclaimed] = pruneImages();
+            VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
+        }
+
+        // Validate dangling prune: create a dangling image by re-tagging, then prune it.
+        {
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            // DanglingTrue should prune the now-dangling original alpine image.
+            auto [deletedImages, spaceReclaimed] = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            VERIFY_IS_TRUE(deletedImages.size() > 0);
+
+            // A second prune should find nothing.
+            auto [deletedImages2, spaceReclaimed2] = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            VERIFY_ARE_EQUAL(deletedImages2.size(), 0u);
+        }
+
+        // Validate 'until' filter.
+        {
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            // Docker's 'until' filter uses the image's original Created timestamp, not load time.
+            // Use timestamp 1 (near epoch) which is before any real image was built.
+            auto [deletedImages, spaceReclaimed] = pruneImages(WSLCPruneImagesFlagsNone, 1);
+            VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
+
+            // Use a timestamp far in the future to ensure the dangling image is pruned.
+            auto future = static_cast<uint64_t>(time(nullptr)) + 3600;
+            auto [deletedImages2, spaceReclaimed2] = pruneImages(WSLCPruneImagesFlagsNone, future);
+            VERIFY_IS_TRUE(deletedImages2.size() > 0);
+        }
+
+        // Validate label filters.
+        {
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            // Prune with a label filter that no dangling image has - should not prune anything.
+            auto [deletedImages, spaceReclaimed] =
+                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = true}});
+            VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
+
+            // Prune with absent label filter - dangling image doesn't have the label, so it matches.
+            auto [deletedImages2, spaceReclaimed2] =
+                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = false}});
+            VERIFY_IS_TRUE(deletedImages2.size() > 0);
+        }
+
+        // Validate null Options uses defaults (dangling-only prune).
+        {
+            LoadTestImage("alpine:latest");
+            WSLCTagImageOptions renameOptions{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&renameOptions));
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            ExpectImagePresent(*m_defaultSession, "prune-test-a:v1");
+
+            // Null options should not prune tagged images.
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            ULONGLONG spaceReclaimed = 0;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneImages(nullptr, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+            ExpectImagePresent(*m_defaultSession, "prune-test-a:v1");
+        }
+
+        // Validate error paths.
+        {
+            // Null output pointers - RPC rejects null [out] pointers before our code runs.
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            ULONGLONG spaceReclaimed = 0;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(nullptr, nullptr, deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+
+            // Mutually exclusive dangling flags.
+            WSLCPruneImagesOptions invalidOptions{};
+            invalidOptions.Flags = WSLCPruneImagesFlagsDanglingTrue | WSLCPruneImagesFlagsDanglingFalse;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                E_INVALIDARG);
+
+            // Invalid flags.
+            invalidOptions.Flags = 0x4;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                E_INVALIDARG);
+
+            // Null label key.
+            WSLCPruneLabelFilter nullKeyFilter{.Key = nullptr, .Value = nullptr, .Present = false};
+            invalidOptions.Flags = WSLCPruneImagesFlagsNone;
+            invalidOptions.Labels = &nullKeyFilter;
+            invalidOptions.LabelsCount = 1;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                E_POINTER);
         }
     }
 
