@@ -2,22 +2,35 @@
 
 ## Prerequisites 
 
-The following tools are required to build WSL: 
+All prerequisites can be installed automatically by running:
+
+```
+tools\setup-dev-env.ps1
+```
+
+This uses [WinGet Configuration](https://learn.microsoft.com/windows/package-manager/configuration/) to install Developer Mode, CMake, Visual Studio 2022, and the required workloads from [`.vsconfig`](https://github.com/microsoft/WSL/blob/master/.vsconfig). If VS 2022 is already installed, the script detects your edition (Community, Professional, or Enterprise) and uses the matching configuration. If no VS 2022 is found, it defaults to Community.
+
+You can also run a WinGet configuration directly for your edition:
+
+```
+winget configure -f .config/configuration.winget                   # Community (default)
+winget configure -f .config/configuration.vsProfessional.winget    # Professional
+winget configure -f .config/configuration.vsEnterprise.winget      # Enterprise
+```
+
+<details>
+<summary>Manual installation</summary>
+
+If you prefer to install prerequisites manually:
 
 - CMake >= 3.25
     - Can be installed with `winget install Kitware.CMake`
-- Visual Studio with the following components:
-    - Windows SDK 26100
-    - MSBuild
-    - Universal Windows platform support for v143 build tools (X64 and ARM64)
-    - MSVC v143 - VS 2022 C++ ARM64 build tools (Latest + Spectre) (X64 and ARM64)
-    - C++ core features
-    - C++ ATL for latest v143 tools (X64 and ARM64)
-    - C++ Clang compiler for Windows
-    - .NET desktop development
-    - .NET WinUI app development tools
+- Visual Studio 2022 with the required components:
+    - Use VS Installer → More → Import configuration and select [`.vsconfig`](https://github.com/microsoft/WSL/blob/master/.vsconfig)
+    - Or: `winget install Microsoft.VisualStudio.2022.Community --override "--wait --quiet --config .vsconfig"`
+- Enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) in Windows Settings, or run builds with Administrator privileges (required for symbolic link support)
 
-- Building WSL requires support for symbolic links. To ensure this capability, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) in Windows Settings or execute the build process with Administrator privileges.
+</details>
 
 ### ARM64 development
 
