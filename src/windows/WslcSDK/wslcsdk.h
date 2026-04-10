@@ -10,6 +10,11 @@ Abstract:
 
     This file contains the public WSL Container SDK api definitions.
 
+    PREVIEW NOTICE: This API is currently in preview and is subject to breaking
+    changes in future releases without prior notice. Do not rely on API stability
+    for production workloads. Features, function signatures, and behaviors may
+    change between releases during the preview period.
+
 --*/
 #pragma once
 #include <winsock2.h>
