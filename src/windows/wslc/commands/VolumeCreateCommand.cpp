@@ -27,8 +27,9 @@ namespace wsl::windows::wslc {
 std::vector<Argument> VolumeCreateCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::VolumeName, true),
-        Argument::Create(ArgType::VolumeDriver),
+        Argument::Create(ArgType::VolumeName),
+        Argument::Create(ArgType::Driver),
+        Argument::Create(ArgType::Options),
         Argument::Create(ArgType::Session),
     };
 }

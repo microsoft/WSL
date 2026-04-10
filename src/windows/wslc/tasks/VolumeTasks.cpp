@@ -32,16 +32,21 @@ namespace wsl::windows::wslc::task {
 void CreateVolume(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::VolumeName));
 
     auto name = WideToMultiByte(context.Args.Get<ArgType::VolumeName>());
     std::string type = "vhd";
-    if (context.Args.Contains(ArgType::VolumeDriver))
+    if (context.Args.Contains(ArgType::Driver))
     {
-        type = WideToMultiByte(context.Args.Get<ArgType::VolumeDriver>());
+        type = WideToMultiByte(context.Args.Get<ArgType::Driver>());
     }
 
-    VolumeService::Create(context.Data.Get<Data::Session>(), name, type);
+    std::string options{};
+    if(context.Args.Contains(ArgType::Options))
+    {   
+        options = WideToMultiByte(context.Args.Get<ArgType::Options>());
+    }
+
+    VolumeService::Create(context.Data.Get<Data::Session>(), name, type, options);
     PrintMessage(MultiByteToWide(name));
 }
 

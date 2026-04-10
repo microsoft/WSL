@@ -19,13 +19,12 @@ using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
-void VolumeService::Create(models::Session& session, const std::string& name, const std::string& type)
+void VolumeService::Create(models::Session& session, const std::string& name, const std::string& type, const std::string& opt)
 {
     WSLCVolumeOptions options{};
     options.Name = name.c_str();
     options.Type = type.c_str();
-    options.Options = nullptr;
-
+    options.Options = opt.c_str();
     THROW_IF_FAILED(session.Get()->CreateVolume(&options));
 }
 

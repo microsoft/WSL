@@ -45,6 +45,7 @@ _(Detach,         "detach",              L"d",              Kind::Flag,        L
 /*_(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSDomainArgDescription())*/ \
 /*_(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSOptionArgDescription())*/ \
 /*_(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSSearchArgDescription())*/ \
+_(Driver,         "driver",              L"d",              Kind::Value,       L"Specify volume driver name (default vhd)") \
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EntrypointArgDescription()) \
 _(Env,            "env",                 L"e",              Kind::Value,       Localization::WSLCCLI_EnvArgDescription()) \
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EnvFileArgDescription()) \
@@ -62,6 +63,7 @@ _(Name,           "name",                NO_ALIAS,          Kind::Value,       L
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
+_(Options,        "opt",                 L"o",              Kind::Value,       L"Set driver specific options") \
 _(Output,         "output",              L"o",              Kind::Value,       Localization::WSLCCLI_OutputArgDescription()) \
 _(Path,           "path",                NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_PathArgDescription()) \
 /*_(Progress,       "progress",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ProgressArgDescription())*/ \
@@ -83,7 +85,6 @@ _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        L
 _(Version,        "version",             L"v",              Kind::Flag,        Localization::WSLCCLI_VersionArgDescription()) \
 /*_(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_VirtualArgDescription())*/ \
 _(Volume,         "volume",              L"v",              Kind::Value,       Localization::WSLCCLI_VolumeArgDescription()) \
-_(VolumeDriver,   "driver",              L"d",              Kind::Value,       Localization::WSLCCLI_VolumeDriverArgDescription()) \
 _(VolumeName,     "volume-name",         NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_VolumeNameArgDescription()) \
 _(WorkDir,        "workdir",             L"w",              Kind::Value,       Localization::WSLCCLI_WorkingDirArgDescription()) \
 // clang-format on

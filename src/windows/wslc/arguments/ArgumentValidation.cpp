@@ -47,8 +47,8 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
 
-    case ArgType::VolumeDriver:
-        validation::ValidateVolumeDriver(execArgs.GetAll<ArgType::VolumeDriver>(), m_name);
+    case ArgType::Driver:
+        // validation::ValidateVolumeDriver(execArgs.GetAll<ArgType::Driver>(), m_name);
         break;
 
     case ArgType::WorkDir:
