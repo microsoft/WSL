@@ -1,0 +1,162 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WslPluginHost.idl
+
+Abstract:
+
+    This file contains the COM interface definitions for out-of-process
+    plugin hosting. IWslPluginHost is implemented by the plugin host process
+    and called by the service. IWslPluginHostCallback is implemented by the
+    service and called by the plugin host when a plugin invokes API functions.
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+
+cpp_quote("const GUID CLSID_WslPluginHost = {0x7a1d2c3e, 0x4b5f, 0x6a7d, {0x8e, 0x9f, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f}};")
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("class DECLSPEC_UUID(\"7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f\") WslPluginHost;")
+cpp_quote("#endif")
+
+//
+// IWslPluginHostCallback - implemented by the service, called by the plugin host
+// when a plugin invokes WSLPluginAPIV1 functions (MountFolder, ExecuteBinary, etc.)
+//
+
+[
+    uuid(A2B3C4D5-E6F7-4890-AB12-CD34EF56A789),
+    pointer_default(unique),
+    object
+]
+interface IWslPluginHostCallback : IUnknown
+{
+    HRESULT MountFolder(
+        [in] DWORD SessionId,
+        [in, string] LPCWSTR WindowsPath,
+        [in, string] LPCWSTR LinuxPath,
+        [in] BOOL ReadOnly,
+        [in, string] LPCWSTR Name);
+
+    HRESULT ExecuteBinary(
+        [in] DWORD SessionId,
+        [in, string] LPCSTR Path,
+        [in] DWORD ArgumentCount,
+        [in, unique, size_is(ArgumentCount), string] LPCSTR* Arguments,
+        [out, system_handle(sh_socket)] HANDLE* Socket);
+
+    HRESULT ExecuteBinaryInDistribution(
+        [in] DWORD SessionId,
+        [in] const GUID* DistributionId,
+        [in, string] LPCSTR Path,
+        [in] DWORD ArgumentCount,
+        [in, unique, size_is(ArgumentCount), string] LPCSTR* Arguments,
+        [out, system_handle(sh_socket)] HANDLE* Socket);
+
+    HRESULT PluginError(
+        [in, string] LPCWSTR UserMessage);
+};
+
+//
+// IWslPluginHost - implemented by the plugin host process, called by the service
+// to deliver lifecycle notifications to the plugin.
+//
+
+[
+    uuid(B3C4D5E6-F7A8-4901-BC23-DE45FA67B890),
+    pointer_default(unique),
+    object
+]
+interface IWslPluginHost : IUnknown
+{
+    //
+    // Initialize the plugin host: load the plugin DLL and call its entry point.
+    // The Callback interface is used by the plugin to call back into the service.
+    //
+
+    HRESULT Initialize(
+        [in] IWslPluginHostCallback* Callback,
+        [in, string] LPCWSTR PluginPath,
+        [in, string] LPCWSTR PluginName);
+
+    //
+    // Returns a handle to this COM server process. Used by the service to add
+    // the plugin host to a job object for automatic cleanup on service exit.
+    //
+
+    HRESULT GetProcessHandle(
+        [out, system_handle(sh_process)] HANDLE* ProcessHandle);
+
+    //
+    // Lifecycle hook dispatchers - mirror WSLPluginHooksV1.
+    // UserToken is duplicated into the host process by the service before calling.
+    // UserSid is serialized as a byte array.
+    //
+
+    HRESULT OnVMStarted(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] DWORD CustomConfigurationFlags,
+        [out, string] LPWSTR* ErrorMessage);
+
+    HRESULT OnVMStopping(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData);
+
+    HRESULT OnDistributionStarted(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in] ULONGLONG PidNamespace,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in] DWORD InitPid,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version,
+        [out, string] LPWSTR* ErrorMessage);
+
+    HRESULT OnDistributionStopping(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in] ULONGLONG PidNamespace,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in] DWORD InitPid,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version);
+
+    HRESULT OnDistributionRegistered(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version);
+
+    HRESULT OnDistributionUnregistered(
+        [in] DWORD SessionId,
+        [in, system_handle(sh_token)] HANDLE UserToken,
+        [in] DWORD SidSize,
+        [in, size_is(SidSize)] BYTE* SidData,
+        [in] const GUID* DistributionId,
+        [in, string] LPCWSTR DistributionName,
+        [in, unique, string] LPCWSTR PackageFamilyName,
+        [in, unique, string] LPCWSTR Flavor,
+        [in, unique, string] LPCWSTR Version);
+};

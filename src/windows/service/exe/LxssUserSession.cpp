@@ -2631,13 +2631,18 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     registration.Write(Property::OsVersion, distributionInfo->Version);
                 }
 
-                // This needs to be done before plugins are notifed because they might try to run a command inside the distribution.
-                m_runningInstances[registration.Id()] = instance;
+                // This needs to be done before plugins are notified because they might try to run a command inside the distribution.
+                {
+                    std::unique_lock callbackLock(m_callbackLock);
+                    m_runningInstances[registration.Id()] = instance;
+                }
 
                 if (version == LXSS_WSL_VERSION_2)
                 {
-                    auto cleanupOnFailure =
-                        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_runningInstances.erase(registration.Id()); });
+                    auto cleanupOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                        std::unique_lock callbackLock(m_callbackLock);
+                        m_runningInstances.erase(registration.Id());
+                    });
                     m_pluginManager.OnDistributionStarted(&m_session, instance->DistributionInformation());
                     cleanupOnFailure.release();
                 }
@@ -3607,14 +3612,18 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
                 instance->second->Stop();
 
                 const auto clientId = instance->second->GetClientId();
-                {
-                    auto lock = m_terminatedInstanceLock.lock_exclusive();
-                    m_terminatedInstances.push_back(std::move(instance->second));
-                }
 
                 m_lifetimeManager.RemoveCallback(clientKey);
 
-                m_runningInstances.erase(instance);
+                {
+                    std::unique_lock callbackLock(m_callbackLock);
+                    {
+                        auto lock = m_terminatedInstanceLock.lock_exclusive();
+                        m_terminatedInstances.push_back(std::move(instance->second));
+                    }
+
+                    m_runningInstances.erase(instance);
+                }
 
                 // If the instance that was terminated was a WSL2 instance,
                 // check if the VM is now idle.
@@ -3642,7 +3651,10 @@ void LxssUserSessionImpl::_UpdateInit(_In_ const LXSS_DISTRO_CONFIGURATION& Conf
 
 HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
 {
-    std::lock_guard lock(m_instanceLock);
+    // Shared lock prevents _VmTerminate from destroying the VM while we use it.
+    // Do NOT acquire m_instanceLock — callbacks arrive on a different COM thread
+    // from the notification thread that holds m_instanceLock.
+    std::shared_lock lock(m_callbackLock);
     RETURN_HR_IF(E_NOT_VALID_STATE, !m_utilityVm);
 
     m_utilityVm->MountRootNamespaceFolder(HostPath, GuestPath, ReadOnly, Name);
@@ -3651,7 +3663,9 @@ HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In
 
 HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket)
 {
-    std::lock_guard lock(m_instanceLock);
+    // Shared lock prevents _VmTerminate from destroying the VM or instances
+    // while we use them. See MountRootNamespaceFolder for rationale.
+    std::shared_lock lock(m_callbackLock);
     RETURN_HR_IF(E_NOT_VALID_STATE, !m_utilityVm);
 
     if (Distro == nullptr)
@@ -3898,7 +3912,12 @@ void LxssUserSessionImpl::_VmTerminate()
         m_telemetryThread.join();
     }
 
-    m_utilityVm.reset();
+    // Acquire exclusive callback lock to wait for any in-flight plugin callbacks
+    // (MountRootNamespaceFolder, CreateLinuxProcess) to complete before destroying the VM.
+    {
+        std::unique_lock callbackLock(m_callbackLock);
+        m_utilityVm.reset();
+    }
     m_vmId.store(GUID_NULL);
 
     // Reset the user's token since its lifetime is tied to the VM.
