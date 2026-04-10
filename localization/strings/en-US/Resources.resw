@@ -1958,11 +1958,11 @@ Usage:
   </data>
   <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
     <value>Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="(-f)"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotRunning" xml:space="preserve">
     <value>Container '{}' is not running.</value>
-    <comment>{FixedPlaceholder="{}"}}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerIsRunning" xml:space="preserve">
     <value>Container '{}' is running.</value>
