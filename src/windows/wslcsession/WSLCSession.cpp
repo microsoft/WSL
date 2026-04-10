@@ -1065,7 +1065,7 @@ try
             for (ULONG i = 0; i < Options->LabelsCount; ++i)
             {
                 const auto& label = Options->Labels[i];
-                RETURN_HR_IF_NULL(E_INVALIDARG, label.Key);
+                RETURN_HR_IF_NULL(E_POINTER, label.Key);
 
                 std::string labelFilter = label.Key;
                 if (label.Value != nullptr)
@@ -1361,7 +1361,7 @@ try
             for (ULONG i = 0; i < Options->LabelsCount; ++i)
             {
                 const auto& filter = Options->Labels[i];
-                RETURN_HR_IF_NULL(E_INVALIDARG, filter.Key);
+                RETURN_HR_IF_NULL(E_POINTER, filter.Key);
 
                 std::string labelFilter = filter.Key;
                 if (filter.Value != nullptr)
@@ -1372,11 +1372,11 @@ try
 
                 if (filter.Present)
                 {
-                    filters.presentLabels.push_back(std::move(labelFilter));
+                    filters.presentLabels.emplace_back(std::move(labelFilter));
                 }
                 else
                 {
-                    filters.absentLabels.push_back(std::move(labelFilter));
+                    filters.absentLabels.emplace_back(std::move(labelFilter));
                 }
             }
         }
@@ -1593,13 +1593,11 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::optional<docker_schema::PruneContainerLabelFilter> filters;
+    DockerHTTPClient::PruneContainersFilters filters;
 
-    if (Until > 0 || FiltersCount > 0)
+    if (FiltersCount > 0)
     {
         THROW_HR_IF(E_POINTER, FiltersCount > 0 && Filters == nullptr);
-
-        filters.emplace();
 
         for (DWORD i = 0; i < FiltersCount; ++i)
         {
@@ -1614,18 +1612,18 @@ try
 
             if (Filters[i].Present)
             {
-                filters->presentLabels.emplace(std::move(labelFilter), true);
+                filters.presentLabels.emplace_back(std::move(labelFilter));
             }
             else
             {
-                filters->absentLabels.emplace(std::move(labelFilter), true);
+                filters.absentLabels.emplace_back(std::move(labelFilter));
             }
         }
+    }
 
-        if (Until > 0)
-        {
-            filters->until = Until;
-        }
+    if (Until > 0)
+    {
+        filters.until = Until;
     }
 
     auto lock = m_lock.lock_shared();
