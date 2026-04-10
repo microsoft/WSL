@@ -1352,25 +1352,12 @@ Return Value:
         return;
     }
 
-    wil::unique_fd NetlinkSocket{};
     wil::unique_fd BpfFd{};
     wil::unique_fd GuestRelayFd{};
     switch (Type)
     {
     case LxMiniInitPortTrackerTypeMirrored:
     {
-
-        //
-        // Create a netlink socket before registering the bpf filter so creation of the socket
-        // does not trigger the filter.
-        //
-
-        NetlinkSocket = CreateNetlinkSocket();
-        if (!NetlinkSocket)
-        {
-            return;
-        }
-
         BpfFd = RegisterSeccompHook();
         if (!BpfFd)
         {
@@ -1398,7 +1385,6 @@ Return Value:
     UtilCreateChildProcess(
         "PortTracker",
         [PortTrackerFd = std::move(PortTrackerFd),
-         NetlinkSocket = std::move(NetlinkSocket),
          BpfFd = std::move(BpfFd),
          GuestRelayFd = std::move(GuestRelayFd)]() {
             execl(
@@ -1408,8 +1394,6 @@ Return Value:
                 std::format("{}", PortTrackerFd.get()).c_str(),
                 INIT_BPF_FD_ARG,
                 std::format("{}", BpfFd.get()).c_str(),
-                INIT_NETLINK_FD_ARG,
-                std::format("{}", NetlinkSocket.get()).c_str(),
                 INIT_PORT_TRACKER_LOCALHOST_RELAY,
                 std::format("{}", GuestRelayFd.get()).c_str(),
                 NULL);
@@ -3540,7 +3524,7 @@ wil::unique_fd RegisterSeccompHook()
 
 Routine Description:
 
-    Register a seccomp notification for bind() & ioctl(*, TUNSETIFF, *) calls.
+    Register a seccomp notification for ioctl(*, TUNSETIFF, *) calls.
 
 Arguments:
 
@@ -3563,12 +3547,9 @@ Return Value:
         // 64bit:
         // If syscall_arch & __AUDIT_ARCH_64BIT then continue else goto :32bit
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arch),
-        // For now, notify on all non-native arch
-        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 7),
-        // If syscall_nr == __NR_bind then goto user_notify: else continue
+        BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, __AUDIT_ARCH_64BIT, 0, 5),
+        // If syscall_nr == __NR_ioctl then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 3, 0),
-        // if (syscall_nr == __NR_bind) then continue else goto allow:
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_ioctl, 0, 3),
         // if (syscall arg1 == SIOCSIFFLAGS) goto user_notify else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(1)),
@@ -3580,34 +3561,10 @@ Return Value:
         //     return SECCOMP_RET_ALLOW;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 
-    // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND to make bind system call.
-#ifdef __x86_64__
-        // 32bit:
-        // If syscall_nr == __NR_socketcall then continue else goto allow:
-        BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 3),
-        // if syscall arg0 == SYS_BIND then goto user_notify: else goto allow:
-        BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(0)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_BIND, 0, 1),
-        // user_notify:
-        //     return SECCOMP_RET_USER_NOTIF;
-        BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
+        // 32bit: no ioctl interception needed for 32-bit processes.
         // allow:
         //     return SECCOMP_RET_ALLOW;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
-#else
-        // 32bit:
-        // If syscall_nr == __NR_bind then goto user_notify: else goto allow:
-        BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARMV7_NR_bind, 0, 1),
-        // user_notify:
-        //     return SECCOMP_RET_USER_NOTIF;
-        BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_USER_NOTIF),
-        // allow:
-        //     return SECCOMP_RET_ALLOW;
-        BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
-#endif
     };
 
     struct sock_fprog Prog = {

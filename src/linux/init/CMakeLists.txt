@@ -46,7 +46,14 @@ set(HEADERS
     wslpath.h)
 
 set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil")
+set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${WSL_BPF_SOURCE_DIR}/bind_monitor/${TARGET_PLATFORM}/include")
+set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${WSL_BPF_SOURCE_DIR}/libbpf/${TARGET_PLATFORM}/include")
 set(INIT_LIBRARIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)
+set(INIT_EXTRA_LIBS
+    ${WSL_BPF_SOURCE_DIR}/libbpf/${TARGET_PLATFORM}/lib/libbpf.a
+    ${WSL_BPF_SOURCE_DIR}/libbpf/${TARGET_PLATFORM}/lib/libelf.a
+    ${WSL_BPF_SOURCE_DIR}/libbpf/${TARGET_PLATFORM}/lib/libz.a)
+set(LINUX_LDFLAGS ${LINUX_LDFLAGS} ${INIT_EXTRA_LIBS})
 add_linux_executable(init "${SOURCES}" "${HEADERS};${COMMON_LINUX_HEADERS}" "${INIT_LIBRARIES}")
 add_dependencies(init localization)
 
