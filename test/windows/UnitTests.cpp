@@ -2801,6 +2801,80 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
+    TEST_METHOD(MoveVhdOwnership)
+    {
+        constexpr auto name = L"move-owner-test-distro";
+        constexpr auto moveElevatedFolder = L"move-owner-elevated";
+        constexpr auto moveNonElevatedFolder = L"move-owner-non-elevated";
+
+        // Import a WSL2 distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            std::filesystem::remove_all(moveElevatedFolder);
+            std::filesystem::remove_all(moveNonElevatedFolder);
+        });
+
+        auto verifyVhdOwner = [](const std::wstring& path) {
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                path.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+
+            auto userToken = wil::open_current_access_token(TOKEN_QUERY);
+            auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
+
+            VERIFY_IS_TRUE(EqualSid(ownerSid, tokenUser->User.Sid));
+        };
+
+        const auto nonElevatedToken = GetNonElevatedToken();
+
+        // Move as elevated, launch as non-elevated.
+        // This is the primary bug scenario: MoveFileEx sets owner to BUILTIN\Administrators,
+        // then HcsGrantVmAccess fails with E_ACCESSDENIED when impersonating the non-elevated user.
+        {
+            WslShutdown();
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, moveElevatedFolder)), 0L);
+
+            auto vhdPath = std::format(L"{}\\ext4.vhdx", moveElevatedFolder);
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+            verifyVhdOwner(vhdPath);
+
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+
+        // Move as non-elevated, launch as elevated.
+        {
+            WslShutdown();
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(
+                    std::format(L"--manage {} --move {}", name, moveNonElevatedFolder),
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nonElevatedToken.get()),
+                0L);
+
+            auto vhdPath = std::format(L"{}\\ext4.vhdx", moveNonElevatedFolder);
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+            verifyVhdOwner(vhdPath);
+
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+
+        // Also launch as non-elevated after the non-elevated move.
+        {
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+    }
+
     WSL2_TEST_METHOD(Resize)
     {
         constexpr auto name = L"resize-test-distro";
