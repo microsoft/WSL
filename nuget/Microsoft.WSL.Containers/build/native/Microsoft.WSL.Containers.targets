@@ -49,18 +49,19 @@
 
         <PropertyGroup>
             <_WslcDockerfileFullPath>$([System.IO.Path]::GetFullPath('$(_WslcDockerfile)'))</_WslcDockerfileFullPath>
+            <_WslcTlogToolPath>$([System.IO.Path]::GetFullPath('$(WslcCliPath)'))</_WslcTlogToolPath>
             <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).built'))</_WslcMarkerFullPath>
         </PropertyGroup>
 
         <WriteLinesToFile
             File="$(_WslcTlogDir)wslc.$(_WslcName).read.1.tlog"
-            Lines="^$(_WslcDockerfileFullPath);@(_WslcTlogInputs->'%(FullPath)')"
+            Lines="^$(_WslcTlogToolPath);@(_WslcTlogInputs->'%(FullPath)')"
             Overwrite="true"
             Encoding="Unicode" />
 
         <WriteLinesToFile
             File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
-            Lines="^$(_WslcDockerfileFullPath);$(_WslcMarkerFullPath)"
+            Lines="^$(_WslcTlogToolPath);$(_WslcMarkerFullPath)"
             Overwrite="true"
             Encoding="Unicode" />
     </Target>
