@@ -73,11 +73,9 @@ class PolicyTest
         }
     };
 
-    TEST_METHOD(MountPolicyAllowed)
+    WSL2_TEST_METHOD(MountPolicyAllowed)
     {
         SKIP_TEST_ARM64();
-        WSL2_TEST_ONLY();
-
         auto revert = SetPolicy(c_allowDiskMount, 1);
         ValidateOutput(
             L"--mount DoesNotExist",
@@ -85,11 +83,9 @@ class PolicyTest
             L"Error code: Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND\r\n");
     }
 
-    TEST_METHOD(MountPolicyDisabled)
+    WSL2_TEST_METHOD(MountPolicyDisabled)
     {
         SKIP_TEST_ARM64();
-        WSL2_TEST_ONLY();
-
         auto revert = SetPolicy(c_allowDiskMount, 0);
         ValidateOutput(
             L"--mount DoesNotExist",
@@ -128,10 +124,8 @@ class PolicyTest
         }
     }
 
-    TEST_METHOD(KernelCommandLine)
+    WSL2_TEST_METHOD(KernelCommandLine)
     {
-        WSL2_TEST_ONLY();
-
         auto validate = [](DWORD policyValue) {
             auto [commandLine, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/cmdline");
 
@@ -152,10 +146,9 @@ class PolicyTest
             validate);
     }
 
-    TEST_METHOD(NestedVirtualization)
+    WSL2_TEST_METHOD(NestedVirtualization)
     {
         SKIP_TEST_ARM64();
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         ValidatePolicy(
@@ -164,10 +157,8 @@ class PolicyTest
             L"wsl: The .wslconfig setting 'wsl2.nestedVirtualization' is disabled by the computer policy.\r\n");
     }
 
-    TEST_METHOD(KernelDebugging)
+    WSL2_TEST_METHOD(KernelDebugging)
     {
-        WSL2_TEST_ONLY();
-
         WINDOWS_11_TEST_ONLY();
 
         ValidatePolicy(
@@ -176,10 +167,8 @@ class PolicyTest
             L"wsl: The .wslconfig setting 'wsl2.kernelDebugPort' is disabled by the computer policy.\r\n");
     }
 
-    TEST_METHOD(CustomKernel)
+    WSL2_TEST_METHOD(CustomKernel)
     {
-        WSL2_TEST_ONLY();
-
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
         const std::wstring nonExistentFile = L"DoesNotExist";
         WslConfigChange config(LxssGenerateTestConfig({.kernel = nonExistentFile.c_str(), .kernelModules = nonExistentFile.c_str()}));
@@ -215,10 +204,8 @@ class PolicyTest
         }
     }
 
-    TEST_METHOD(CustomSystemDistro)
+    WSL2_TEST_METHOD(CustomSystemDistro)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig() + L"systemDistro=DoesNotExist");
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
 
@@ -241,10 +228,8 @@ class PolicyTest
         }
     }
 
-    TEST_METHOD(CustomNetworkingMode)
+    WSL2_TEST_METHOD(CustomNetworkingMode)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         {
@@ -274,10 +259,8 @@ class PolicyTest
         }
     }
 
-    TEST_METHOD(DebugShell)
+    WSL2_TEST_METHOD(DebugShell)
     {
-        WSL2_TEST_ONLY();
-
         auto revert = SetPolicy(c_allowDebugShellUserSetting, 0);
         WslShutdown();
 
@@ -388,10 +371,8 @@ class PolicyTest
         testPolicy(wsl::windows::policies::c_allowWSL, HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), false);
     }
 
-    TEST_METHOD(DefaultNetworkingMode)
+    WSL2_TEST_METHOD(DefaultNetworkingMode)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig());
 
         {

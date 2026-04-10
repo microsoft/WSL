@@ -150,10 +150,8 @@ class PluginTests
         }
     }
 
-    TEST_METHOD(Success)
+    WSL2_TEST_METHOD(Success)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=0)
@@ -168,10 +166,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(CustomKernelOverriddenByPolicy)
+    WSL2_TEST_METHOD(CustomKernelOverriddenByPolicy)
     {
-        WSL2_TEST_ONLY();
-
         RegistryKeyChange policy(
             HKEY_LOCAL_MACHINE, wsl::windows::policies::c_registryKey, wsl::windows::policies::c_allowCustomKernelUserSetting, static_cast<DWORD>(0));
 
@@ -191,10 +187,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DuplicatedPlugin)
+    WSL2_TEST_METHOD(DuplicatedPlugin)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=0)
@@ -217,10 +211,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(CustomKernel)
+    WSL2_TEST_METHOD(CustomKernel)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=1)
@@ -250,10 +242,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(CustomKernelCommandLine)
+    WSL2_TEST_METHOD(CustomKernelCommandLine)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=1
             VM created (settings->CustomConfigurationFlags=2)
@@ -270,10 +260,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DistroIdStaysTheSame)
+    WSL2_TEST_METHOD(DistroIdStaysTheSame)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=10
             VM created (settings->CustomConfigurationFlags=0)
@@ -294,10 +282,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(InitPidIsDifferent)
+    WSL2_TEST_METHOD(InitPidIsDifferent)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=14
             VM created (settings->CustomConfigurationFlags=0)
@@ -316,10 +302,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(PluginUpdateRequired)
+    WSL2_TEST_METHOD(PluginUpdateRequired)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=9
             OnLoad: WSL_E_PLUGINREQUIRESUPDATE)";
@@ -333,10 +317,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(APIErrors)
+    WSL2_TEST_METHOD(APIErrors)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=7
             VM created (settings->CustomConfigurationFlags=0)
@@ -350,10 +332,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(SuccessWSL1)
+    WSL1_TEST_METHOD(SuccessWSL1)
     {
-        WSL1_TEST_ONLY();
-
         constexpr auto ExpectedOutput = LR"(Plugin loaded. TestMode=1)";
 
         ConfigurePlugin(PluginTestType::Success);
@@ -361,9 +341,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(LoadFailureFatalWSL2)
+    WSL2_TEST_METHOD(LoadFailureFatalWSL2)
     {
-        WSL2_TEST_ONLY();
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=2
             OnLoad: E_UNEXPECTED)";
@@ -376,10 +355,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(LoadFailureNonFatalWSL1)
+    WSL1_TEST_METHOD(LoadFailureNonFatalWSL1)
     {
-        WSL1_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=2
             OnLoad: E_UNEXPECTED)";
@@ -389,10 +366,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(VmStartFailure)
+    WSL2_TEST_METHOD(VmStartFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=3
             VM created (settings->CustomConfigurationFlags=0)
@@ -407,10 +382,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(VmStartFailureWithPluginErrorTwice)
+    WSL2_TEST_METHOD(VmStartFailureWithPluginErrorTwice)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=13
             VM created (settings->CustomConfigurationFlags=0)
@@ -435,10 +408,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(VmStopFailure)
+    WSL2_TEST_METHOD(VmStopFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=5
             VM created (settings->CustomConfigurationFlags=0)
@@ -452,10 +423,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DistributionStartFailure)
+    WSL2_TEST_METHOD(DistributionStartFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=4
             VM created (settings->CustomConfigurationFlags=0)
@@ -472,10 +441,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(DistributionStopFailure)
+    WSL2_TEST_METHOD(DistributionStopFailure)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=6
             VM created (settings->CustomConfigurationFlags=0)
@@ -489,10 +456,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ErrorMessageStartVm)
+    WSL2_TEST_METHOD(ErrorMessageStartVm)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=11
             VM created (settings->CustomConfigurationFlags=0)
@@ -508,10 +473,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ErrorMessageStartDistro)
+    WSL2_TEST_METHOD(ErrorMessageStartDistro)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto ExpectedOutput =
             LR"(Plugin loaded. TestMode=12
             VM created (settings->CustomConfigurationFlags=0)
@@ -529,10 +492,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(RegisterSuccess)
+    WSL2_TEST_METHOD(RegisterSuccess)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::Success);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
@@ -550,10 +511,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ImportInplaceSuccess)
+    WSL2_TEST_METHOD(ImportInplaceSuccess)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::Success);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
@@ -581,10 +540,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(RegisterUnregisterFail)
+    WSL2_TEST_METHOD(RegisterUnregisterFail)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::FailToRegisterUnregisterDistro);
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--import plugin-test-distro . \"" + g_testDistroPath + L"\" --version 2"), 0L);
@@ -602,10 +559,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(ExecuteDistroCommand)
+    WSL2_TEST_METHOD(ExecuteDistroCommand)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::RunDistroCommand);
 
         constexpr auto ExpectedOutput =
@@ -622,10 +577,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(PluginToken)
+    WSL2_TEST_METHOD(PluginToken)
     {
-        WSL2_TEST_ONLY();
-
         ConfigurePlugin(PluginTestType::GetUsername);
 
         constexpr auto ExpectedOutput =
@@ -640,10 +593,8 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
     // This test must run last so it doesn't break test cases that depends on plugin signature.
-    TEST_METHOD(InvalidPluginSignature)
+    WSL2_TEST_METHOD(InvalidPluginSignature)
     {
-        WSL2_TEST_ONLY();
-
         if constexpr (!wsl::shared::OfficialBuild)
         {
             LogSkipped("This test only applies to signed builds");
