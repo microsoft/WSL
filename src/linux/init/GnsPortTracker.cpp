@@ -92,8 +92,3 @@ void GnsPortTracker::Run()
         THROW_LAST_ERROR_IF(err < 0);
     }
 }
-
-std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& entry)
-{
-    return out << "Port=" << entry.Port << ", Family=" << entry.Family << ", Protocol=" << entry.Protocol;
-}
