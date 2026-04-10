@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "WSLCSessionDefaults.h"
 #include "Argument.h"
 
 using namespace WEX::Logging;
@@ -127,6 +128,88 @@ class WSLCE2EGlobalTests
         // Ensure non-elevated cannot create the elevated session.
         result = RunWslc(L"container list --session wslc-cli-admin", ElevationType::NonElevated);
         result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+    }
+
+    // Regression test for session name squatting vulnerability.
+    //
+    // Validates that a process cannot create a session with the reserved default
+    // session names ("wslc-cli" or "wslc-cli-admin") via the COM API. These names
+    // are assigned server-side when the client passes null Settings to CreateSession,
+    // preventing a malicious process from squatting on the name and blocking
+    // legitimate wslc.exe clients.
+    WSLC_TEST_METHOD(WSLCE2E_Session_NameSquatting_ElevatedCannotBlockNonElevated)
+    {
+        // Ensure no existing sessions with default names.
+        EnsureSessionIsTerminated(wsl::windows::wslc::DefaultSessionName);
+        EnsureSessionIsTerminated(wsl::windows::wslc::DefaultAdminSessionName);
+
+        // Attack: attempt to create a session with the reserved non-admin default
+        // name directly through the COM API from this elevated process.
+        // The service should reject this because reserved default session names
+        // cannot be explicitly created.
+        {
+            wil::com_ptr<IWSLCSessionManager> sessionManager;
+            VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+            WSLCSessionSettings settings{};
+            settings.DisplayName = wsl::windows::wslc::DefaultSessionName;
+            settings.StoragePath = L"C:\\dummy";
+            settings.CpuCount = 4;
+            settings.MemoryMb = 2048;
+            settings.BootTimeoutMs = 30000;
+            settings.MaximumStorageSizeMb = 4096;
+
+            wil::com_ptr<IWSLCSession> session;
+            HRESULT hr = sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session);
+            VERIFY_ARE_EQUAL(hr, E_ACCESSDENIED);
+        }
+
+        // Also verify that the admin reserved name is rejected.
+        {
+            wil::com_ptr<IWSLCSessionManager> sessionManager;
+            VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+            WSLCSessionSettings settings{};
+            settings.DisplayName = wsl::windows::wslc::DefaultAdminSessionName;
+            settings.StoragePath = L"C:\\dummy";
+            settings.CpuCount = 4;
+            settings.MemoryMb = 2048;
+            settings.BootTimeoutMs = 30000;
+            settings.MaximumStorageSizeMb = 4096;
+
+            wil::com_ptr<IWSLCSession> session;
+            HRESULT hr = sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session);
+            VERIFY_ARE_EQUAL(hr, E_ACCESSDENIED);
+        }
+
+        // Non-elevated wslc.exe should still be able to create and use its default
+        // session (which now passes null Settings, resolved entirely server-side).
+        auto result = RunWslc(L"container list", ElevationType::NonElevated);
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        // Verify that case variations of reserved names are also rejected,
+        // preventing bypass on case-insensitive filesystems (NTFS).
+        {
+            wil::com_ptr<IWSLCSessionManager> sessionManager;
+            VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+            WSLCSessionSettings settings{};
+            settings.DisplayName = L"WSLC-CLI";
+            settings.StoragePath = L"C:\\dummy";
+            settings.CpuCount = 4;
+            settings.MemoryMb = 2048;
+            settings.BootTimeoutMs = 30000;
+            settings.MaximumStorageSizeMb = 4096;
+
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_ACCESSDENIED);
+
+            settings.DisplayName = L"Wslc-Cli-Admin";
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_ACCESSDENIED);
+        }
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Session_Terminate_Implicit)

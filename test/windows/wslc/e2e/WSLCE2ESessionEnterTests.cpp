@@ -16,13 +16,34 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
-#include "SessionModel.h"
+#include "WSLCSessionDefaults.h"
+#include "WSLCUserSettings.h"
 
 using namespace WEX::Logging;
 
-using wsl::windows::wslc::models::SessionOptions;
-
 namespace WSLCE2ETests {
+
+namespace {
+
+    const std::filesystem::path& GetDefaultStoragePath()
+    {
+        auto isElevated = wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token(TOKEN_QUERY).get());
+        std::wstring name = isElevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+
+        const auto& userSettings = wsl::windows::wslc::settings::User();
+        auto customPath = userSettings.Get<wsl::windows::wslc::settings::Setting::SessionStoragePath>();
+
+        static const std::filesystem::path basePath =
+            customPath.empty() ? (wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / wsl::windows::wslc::DefaultStorageSubPath)
+                               : std::filesystem::path{customPath};
+
+        static const std::filesystem::path storagePathNonAdmin = basePath / std::wstring{wsl::windows::wslc::DefaultSessionName};
+        static const std::filesystem::path storagePathAdmin = basePath / std::wstring{wsl::windows::wslc::DefaultAdminSessionName};
+
+        return isElevated ? storagePathAdmin : storagePathNonAdmin;
+    }
+
+} // namespace
 
 class WSLCE2ESessionEnterTests
 {
@@ -43,7 +64,7 @@ class WSLCE2ESessionEnterTests
         constexpr auto sessionName = L"test-wslc-session-enter";
 
         // Run an interactive session enter with an explicit name.
-        auto session = RunWslcInteractive(std::format(L"session enter \"{}\" --name {}", SessionOptions::GetStoragePath(), sessionName));
+        auto session = RunWslcInteractive(std::format(L"session enter \"{}\" --name {}", GetDefaultStoragePath(), sessionName));
         VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
         session.ExpectStdout(VT::SESSION_PROMPT);
@@ -73,7 +94,7 @@ class WSLCE2ESessionEnterTests
 
     WSLC_TEST_METHOD(WSLCE2E_SessionEnter_WithoutName_GeneratesGuid)
     {
-        auto session = RunWslcInteractive(std::format(L"session enter \"{}\"", SessionOptions::GetStoragePath()));
+        auto session = RunWslcInteractive(std::format(L"session enter \"{}\"", GetDefaultStoragePath()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
         session.ExpectStderr("Created session: ");

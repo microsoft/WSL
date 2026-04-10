@@ -29,12 +29,73 @@ Abstract:
 
 #include "WSLCSessionManager.h"
 #include "HcsVirtualMachine.h"
+#include "WSLCUserSettings.h"
+#include "WSLCSessionDefaults.h"
 #include "wslutil.h"
+#include "filesystem.hpp"
 
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 namespace wslutil = wsl::windows::common::wslutil;
+namespace settings = wsl::windows::wslc::settings;
+
+namespace {
+
+// Session settings built server-side from the caller's settings.yaml.
+struct SessionSettings
+{
+    std::wstring DisplayName;
+    std::wstring StoragePath;
+    WSLCSessionSettings Settings{};
+
+    NON_COPYABLE(SessionSettings);
+    NON_MOVABLE(SessionSettings);
+
+    // Default session: name and storage path determined from caller's token.
+    static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, bool Elevated)
+    {
+        auto localAppData = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
+        settings::UserSettings userSettings(localAppData / L"wslc");
+
+        std::wstring name = Elevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+
+        auto customPath = userSettings.Get<settings::Setting::SessionStoragePath>();
+        std::filesystem::path basePath =
+            customPath.empty() ? (localAppData / wsl::windows::wslc::DefaultStorageSubPath) : std::filesystem::path{customPath};
+        auto storagePath = (basePath / name).wstring();
+
+        return std::unique_ptr<SessionSettings>(
+            new SessionSettings(std::move(name), std::move(storagePath), WSLCSessionStorageFlagsNone, userSettings));
+    }
+
+    // Custom session: caller provides name and storage path.
+    static SessionSettings Custom(HANDLE UserToken, LPCWSTR Name, LPCWSTR Path, WSLCSessionStorageFlags StorageFlags = WSLCSessionStorageFlagsNone)
+    {
+        auto localAppData = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
+        settings::UserSettings userSettings(localAppData / L"wslc");
+        return SessionSettings(Name, Path, StorageFlags, userSettings);
+    }
+
+private:
+    SessionSettings(std::wstring name, std::wstring path, WSLCSessionStorageFlags storageFlags, const settings::UserSettings& userSettings) :
+        DisplayName(std::move(name)), StoragePath(std::move(path))
+    {
+        Settings.DisplayName = DisplayName.c_str();
+        Settings.StoragePath = StoragePath.c_str();
+        Settings.CpuCount = userSettings.Get<settings::Setting::SessionCpuCount>();
+        Settings.MemoryMb = userSettings.Get<settings::Setting::SessionMemoryMb>();
+        Settings.MaximumStorageSizeMb = userSettings.Get<settings::Setting::SessionStorageSizeMb>();
+        Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
+        Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
+        Settings.FeatureFlags = WslcFeatureFlagsNone;
+        WI_SetFlagIf(Settings.FeatureFlags, WslcFeatureFlagsDnsTunneling, userSettings.Get<settings::Setting::SessionDnsTunneling>());
+        WI_SetFlagIf(Settings.FeatureFlags, WslcFeatureFlagsVirtioFs, userSettings.Get<settings::Setting::SessionHostFileShareMode>() == HostFileShareMode::VirtioFs);
+        Settings.StorageFlags = storageFlags;
+    }
+};
+
+} // namespace
 
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
@@ -51,22 +112,42 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 
 void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
 {
-    // Ensure that the session display name is non-null and not too long.
-    THROW_HR_IF(E_INVALIDARG, Settings->DisplayName == nullptr);
-    THROW_HR_IF(E_INVALIDARG, wcslen(Settings->DisplayName) >= std::size(WSLCSessionInformation{}.DisplayName));
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
-        "Invalid storage flags: %i",
-        Settings->StorageFlags);
-
     auto tokenInfo = GetCallingProcessTokenInfo();
+    const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+
+    // Resolve display name upfront (for both default and custom sessions).
+    std::wstring resolvedDisplayName;
+    if (Settings == nullptr)
+    {
+        // Default session: name determined from token.
+        resolvedDisplayName = tokenInfo.Elevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+        Flags = WSLCSessionFlagsOpenExisting | WSLCSessionFlagsPersistent;
+    }
+    else
+    {
+        THROW_HR_IF(E_INVALIDARG, Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
+        THROW_HR_IF(E_INVALIDARG, Settings->StoragePath != nullptr && wcslen(Settings->StoragePath) == 0);
+        THROW_HR_IF(E_INVALIDARG, wcslen(Settings->DisplayName) >= std::size(WSLCSessionInformation{}.DisplayName));
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
+            "Invalid storage flags: %i",
+            Settings->StorageFlags);
+
+        // Reserved names can only be assigned server-side via null Settings.
+        THROW_HR_IF(
+            E_ACCESSDENIED,
+            wsl::shared::string::IsEqual(Settings->DisplayName, wsl::windows::wslc::DefaultSessionName, true) ||
+                wsl::shared::string::IsEqual(Settings->DisplayName, wsl::windows::wslc::DefaultAdminSessionName, true));
+
+        resolvedDisplayName = Settings->DisplayName;
+    }
 
     std::lock_guard lock(m_wslcSessionsLock);
 
     // Check for an existing session first.
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
-        if (!wsl::shared::string::IsEqual(entry.DisplayName.c_str(), Settings->DisplayName))
+        if (!wsl::shared::string::IsEqual(entry.DisplayName.c_str(), resolvedDisplayName.c_str()))
         {
             return {};
         }
@@ -88,6 +169,14 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     wslutil::StopWatch stopWatch;
 
+    // Initialize settings for the default session.
+    std::unique_ptr<SessionSettings> defaultSettings;
+    if (Settings == nullptr)
+    {
+        defaultSettings = SessionSettings::Default(callerToken.get(), tokenInfo.Elevated);
+        Settings = &defaultSettings->Settings;
+    }
+
     HRESULT creationResult = wil::ResultFromException([&]() {
         // Get caller info.
         const auto callerProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
@@ -103,13 +192,13 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         AddSessionProcessToJobObject(factory.get());
 
         // Create the session via the factory.
-        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings);
+        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), &session, &serviceRef));
 
         // Track the session via its service ref, along with metadata and security info.
-        m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, Settings->DisplayName, std::move(tokenInfo)});
+        m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -122,19 +211,18 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     });
 
     // This telemetry event is used to keep track of session creation performance (via CreationTimeMs) and failure reasons (via Result).
-
     WSL_LOG_TELEMETRY(
         "WSLCCreateSession",
         PDT_ProductAndServicePerformance,
         TraceLoggingKeyword(MICROSOFT_KEYWORD_CRITICAL_DATA),
-        TraceLoggingValue(Settings->DisplayName, "Name"),
+        TraceLoggingValue(resolvedDisplayName.c_str(), "Name"),
         TraceLoggingValue(stopWatch.ElapsedMilliseconds(), "CreationTimeMs"),
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
         TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"),
         TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
-    THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", Settings->DisplayName);
+    THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", resolvedDisplayName.c_str());
 }
 
 void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
@@ -159,6 +247,14 @@ void WSLCSessionManagerImpl::OpenSession(ULONG Id, IWSLCSession** Session)
 void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession** Session)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
+
+    // Null name = default session, resolved from caller's token.
+    std::wstring resolvedName;
+    if (DisplayName == nullptr)
+    {
+        resolvedName = tokenInfo.Elevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+        DisplayName = resolvedName.c_str();
+    }
 
     auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
         if (!wsl::shared::string::IsEqual(entry.DisplayName.c_str(), DisplayName))
@@ -207,12 +303,23 @@ void WSLCSessionManagerImpl::GetVersion(_Out_ WSLCVersion* Version)
     Version->Revision = WSL_PACKAGE_VERSION_REVISION;
 }
 
-WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLCSessionSettings* Settings)
+void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
+{
+    THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
+    THROW_HR_IF(E_INVALIDARG, DisplayName[0] == L'\0' || StoragePath[0] == L'\0');
+
+    const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    auto sessionSettings = SessionSettings::Custom(callerToken.get(), DisplayName, StoragePath, WSLCSessionStorageFlagsNoCreate);
+    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WslcSession);
+}
+
+WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
+    _In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName)
 {
     WSLCSessionInitSettings sessionSettings{};
     sessionSettings.SessionId = SessionId;
     sessionSettings.CreatorPid = CreatorPid;
-    sessionSettings.DisplayName = Settings->DisplayName;
+    sessionSettings.DisplayName = ResolvedDisplayName;
     sessionSettings.StoragePath = Settings->StoragePath;
     sessionSettings.MaximumStorageSizeMb = Settings->MaximumStorageSizeMb;
     sessionSettings.BootTimeoutMs = Settings->BootTimeoutMs;
@@ -290,6 +397,11 @@ HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
 HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
 {
     return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WslcSession);
+}
+
+HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
+{
+    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WslcSession);
 }
 
 HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount)

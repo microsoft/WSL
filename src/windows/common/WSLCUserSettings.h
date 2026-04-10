@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    UserSettings.h
+    WSLCUserSettings.h
 
 Abstract:
 
@@ -156,9 +156,7 @@ public:
     // Overwrites the settings file with the commented-out defaults template.
     void Reset() const;
 
-protected:
-    // Loads settings from an explicit directory. Used by the singleton (via
-    // the private zero-arg constructor) and by test subclasses.
+    // Loads settings from an explicit directory.
     explicit UserSettings(const std::filesystem::path& settingsDir);
     ~UserSettings() = default;
 

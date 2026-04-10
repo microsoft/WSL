@@ -2195,7 +2195,18 @@ class WSLCTests
 
             std::thread thread(readDmesg); // Needs to be created before the VM starts, to avoid a pipe deadlock.
 
+            // Ensure the thread is joined even if CreateSession throws, to avoid std::terminate.
+            auto threadGuard = wil::scope_exit([&]() {
+                write.reset();
+                if (thread.joinable())
+                {
+                    thread.join();
+                }
+            });
+
             auto session = CreateSession(settings);
+            threadGuard.release(); // CreateSession succeeded, detach scope_exit below takes over.
+
             auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 session.reset();
                 if (thread.joinable())

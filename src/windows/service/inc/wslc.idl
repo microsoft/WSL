@@ -749,10 +749,11 @@ interface IWSLCSessionManager : IUnknown
     HRESULT GetVersion([out] WSLCVersion* Version);
 
     // Session management.
-    HRESULT CreateSession([in, ref] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
+    HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
+    HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [out] IWSLCSession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLCSessionInformation** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLCSession** Session);
-    HRESULT OpenSessionByName([in, ref] LPCWSTR DisplayName, [out] IWSLCSession** Session);
+    HRESULT OpenSessionByName([in, unique] LPCWSTR DisplayName, [out] IWSLCSession** Session);
 }
 
 cpp_quote("#define WSLC_E_BASE (0x0600)")
