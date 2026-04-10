@@ -6664,22 +6664,28 @@ class WSLCTests
                 return std::make_pair(std::move(deletedImages), spaceReclaimed);
             };
 
-        // Helper to create a dangling image: load alpine, then retag it to a temp name
-        // so the original alpine image ID becomes dangling.
-        auto createDanglingAlpine = [this]() {
+        // Helper to create a dangling image using only test-local tags:
+        // Load alpine and hello-world under unique tags, then overwrite one with the other.
+        auto createDanglingImage = [this]() {
             LoadTestImage("alpine:latest");
-            WSLCTagImageOptions tagOptions{.Image = "alpine:latest", .Repo = "alpine-prune-temp", .Tag = "latest"};
-            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
-            // Remove the original tag, leaving the image dangling if it has a different ID than the temp tag.
-            // Actually: tag alpine:latest with a temp name, then overwrite alpine:latest with debian to make the original dangling.
-            WSLCTagImageOptions overwriteOptions{.Image = "debian:latest", .Repo = "alpine", .Tag = "latest"};
-            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&overwriteOptions));
+            WSLCTagImageOptions tagA{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagA));
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
+
+            LoadTestImage("hello-world:latest");
+            WSLCTagImageOptions tagB{.Image = "hello-world:latest", .Repo = "prune-test-b", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagB));
+            DeleteImage("hello-world:latest", WSLCDeleteImageFlagsNone);
+
+            // Overwrite prune-test-a with prune-test-b's image, making original alpine dangling.
+            WSLCTagImageOptions overwrite{.Image = "prune-test-b:v1", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&overwrite));
         };
 
-        auto cleanupAlpine = [this, &pruneImages]() {
+        auto cleanupDanglingImage = [this, &pruneImages]() {
             pruneImages(WSLCPruneImagesFlagsDanglingTrue);
-            LOG_IF_FAILED(DeleteImageNoThrow("alpine:latest", WSLCDeleteImageFlagsNone).first);
-            LOG_IF_FAILED(DeleteImageNoThrow("alpine-prune-temp:latest", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("prune-test-a:v1", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("prune-test-b:v1", WSLCDeleteImageFlagsNone).first);
         };
 
         // Clean up any stale dangling images from prior tests.
@@ -6693,8 +6699,8 @@ class WSLCTests
 
         // Validate dangling prune: create a dangling image by re-tagging, then prune it.
         {
-            createDanglingAlpine();
-            auto cleanup = wil::scope_exit([&]() { cleanupAlpine(); });
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
 
             // DanglingTrue should prune the now-dangling original alpine image.
             auto [deletedImages, spaceReclaimed] = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
@@ -6707,8 +6713,8 @@ class WSLCTests
 
         // Validate 'until' filter.
         {
-            createDanglingAlpine();
-            auto cleanup = wil::scope_exit([&]() { cleanupAlpine(); });
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
 
             // Docker's 'until' filter uses the image's original Created timestamp, not load time.
             // Use timestamp 1 (near epoch) which is before any real image was built.
@@ -6723,8 +6729,8 @@ class WSLCTests
 
         // Validate label filters.
         {
-            createDanglingAlpine();
-            auto cleanup = wil::scope_exit([&]() { cleanupAlpine(); });
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
 
             // Prune with a label filter that no dangling image has - should not prune anything.
             auto [deletedImages, spaceReclaimed] =
@@ -6740,15 +6746,18 @@ class WSLCTests
         // Validate null Options uses defaults (dangling-only prune).
         {
             LoadTestImage("alpine:latest");
-            auto cleanup = wil::scope_exit([&]() { cleanupAlpine(); });
+            WSLCTagImageOptions renameOptions{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&renameOptions));
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
 
-            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+            ExpectImagePresent(*m_defaultSession, "prune-test-a:v1");
 
             // Null options should not prune tagged images.
             wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
             ULONGLONG spaceReclaimed = 0;
             VERIFY_SUCCEEDED(m_defaultSession->PruneImages(nullptr, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
-            ExpectImagePresent(*m_defaultSession, "alpine:latest");
+            ExpectImagePresent(*m_defaultSession, "prune-test-a:v1");
         }
 
         // Validate error paths.
@@ -6780,7 +6789,7 @@ class WSLCTests
             invalidOptions.LabelsCount = 1;
             VERIFY_ARE_EQUAL(
                 m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
-                E_INVALIDARG);
+                E_POINTER);
         }
     }
 
