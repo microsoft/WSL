@@ -14,8 +14,8 @@
 
     <!-- Default properties -->
     <PropertyGroup>
+        <!-- Auto-detect wslc CLI from MSI install path. Override with WslcCliPath property if needed. -->
         <WslcCliPath Condition="'$(WslcCliPath)' == '' AND Exists('$(ProgramW6432)\WSL\wslc.exe')">$(ProgramW6432)\WSL\wslc.exe</WslcCliPath>
-        <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
         <!-- Unified intermediate directory: $(IntDir) for C++, $(IntermediateOutputPath) for .NET -->
         <_WslcIntDir Condition="'$(IntDir)' != ''">$(IntDir)</_WslcIntDir>
         <_WslcIntDir Condition="'$(_WslcIntDir)' == '' AND '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</_WslcIntDir>
@@ -29,10 +29,8 @@
         </WslcImage>
     </ItemDefinitionGroup>
 
-    <!-- Check that wslc CLI is installed -->
-    <Target Name="WslcCheckDependencies"
-            BeforeTargets="WslcBuildAllImages"
-            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
+    <!-- Check that wslc CLI is installed (invoked via DependsOnTargets from WslcBuildAllImages) -->
+    <Target Name="WslcCheckDependencies">
 
         <Exec Command="&quot;$(WslcCliPath)&quot; --version"
               IgnoreExitCode="true"
@@ -47,10 +45,8 @@
                Text="The wslc CLI at '$(WslcCliPath)' could not be found or did not run successfully. Install WSL by running: wsl --install --no-distribution" />
     </Target>
 
-    <!-- Validate required metadata on WslcImage items -->
-    <Target Name="_WslcValidateItems"
-            BeforeTargets="WslcBuildAllImages"
-            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
+    <!-- Validate required metadata on WslcImage items (invoked via DependsOnTargets from WslcBuildAllImages) -->
+    <Target Name="_WslcValidateItems">
 
         <Error Condition="'%(WslcImage.Dockerfile)' == ''"
                Code="WSLC0002"
@@ -60,15 +56,20 @@
                Code="WSLC0003"
                Text="WslcImage '%(WslcImage.Identity)' is missing required Context metadata." />
 
+        <!-- Check for characters invalid in Windows file names: / \ : * ? " < > |
+             XML entities: &quot; = "  &lt; = <  &gt; = >  -->
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
                Text="WslcImage '%(WslcImage.Identity)' contains characters not valid in file names. Use a simple name as the item identity and pass the full image reference via Tag metadata." />
     </Target>
 
-    <!-- Outer target: dispatch each WslcImage to inner target via MSBuild task -->
+    <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:
+         1. Sources may contain semicolons (multi-directory) which conflict with Properties syntax
+         2. Wildcard expansion in Inputs requires an intermediate ItemGroup (_WslcCollectSources)
+            that must run per-image in a separate evaluation context -->
     <Target Name="WslcBuildAllImages"
             AfterTargets="Build"
-            DependsOnTargets="WslcCheckDependencies"
+            DependsOnTargets="WslcCheckDependencies;_WslcValidateItems"
             Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
@@ -110,7 +111,7 @@
         <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).built" AlwaysCreate="true" />
 
         <Message Importance="high"
-                 Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully. Use WslcGetCliSession() to access it at runtime." />
+                 Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully." />
     </Target>
 
     <!-- Clean container artifacts -->

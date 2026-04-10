@@ -91,6 +91,11 @@ function(wslc_add_image _target_name)
     if(NOT ARG_IMAGE)
         message(FATAL_ERROR "wslc_add_image: IMAGE is required")
     endif()
+    # IMAGE must not contain a tag — use the TAG parameter instead
+    string(FIND "${ARG_IMAGE}" ":" _colon_pos)
+    if(NOT _colon_pos EQUAL -1)
+        message(FATAL_ERROR "wslc_add_image: IMAGE '${ARG_IMAGE}' contains ':'. Specify the tag separately with the TAG parameter.")
+    endif()
     if(NOT ARG_DOCKERFILE)
         message(FATAL_ERROR "wslc_add_image: DOCKERFILE is required")
     endif()
@@ -131,17 +136,12 @@ function(wslc_add_image _target_name)
         file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS "${_context_path}/*")
     endif()
 
-    # Ensure dotfiles (e.g., .dockerignore) are tracked for incremental rebuilds
-    if(EXISTS "${_context_path}/.dockerignore")
-        list(APPEND _resolved_sources "${_context_path}/.dockerignore")
-    endif()
-
     add_custom_command(
         OUTPUT "${_stamp}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
         COMMAND ${CMAKE_COMMAND} -E touch "${_stamp}"
         DEPENDS ${_resolved_sources} "${_dockerfile_path}"
-        COMMENT "WSLC: Building image '${_image_ref}' -- use WslcGetCliSession() to access it at runtime."
+        COMMENT "WSLC: Building image '${_image_ref}'..."
         VERBATIM
     )
 

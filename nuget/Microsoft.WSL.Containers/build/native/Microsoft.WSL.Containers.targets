@@ -37,6 +37,8 @@
                  Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
+    <!-- Collect tlog inputs (mirrors _WslcCollectSources logic — cannot reuse directly
+         because this runs in a separate MSBuild evaluation context dispatched by _WslcWriteAllTlogs) -->
     <Target Name="_WslcWriteSingleTlog">
         <ItemGroup>
             <_WslcTlogSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
