@@ -13,6 +13,7 @@ Abstract:
 
 #include "precomp.h"
 #include "SessionModel.h"
+#include "ImageModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -192,6 +193,23 @@ void VerifyImageIsNotUsed(const TestImage& image)
             VERIFY_FAIL(std::format(L"Image '{}' found in container list output", image.NameAndTag()).c_str());
         }
     }
+}
+
+void VerifyImageIsListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
+    {
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
 }
 
 std::string GetHashId(const std::string& id, bool fullId)

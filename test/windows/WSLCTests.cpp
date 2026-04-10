@@ -246,6 +246,18 @@ class WSLCTests
         }
     }
 
+    void ValidateContainerOutput(RunningWSLCContainer& container, const std::map<int, std::string>& expectedOutput, int expectedResult = 0, DWORD timeout = INFINITE)
+    {
+        auto initProcess = container.GetInitProcess();
+        ValidateProcessOutput(initProcess, expectedOutput, expectedResult, timeout);
+    }
+
+    void ValidateContainerOutput(WSLCContainerLauncher& launcher, const std::map<int, std::string>& expectedOutput, int expectedResult = 0, DWORD timeout = INFINITE)
+    {
+        auto container = launcher.Launch(*m_defaultSession);
+        ValidateContainerOutput(container, expectedOutput, expectedResult, timeout);
+    }
+
     void ExpectMount(IWSLCSession* session, const std::string& target, const std::optional<std::string>& options)
     {
         auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
@@ -966,7 +978,7 @@ class WSLCTests
         }
     }
 
-    void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected)
+    void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current())
     {
         auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
 
@@ -974,7 +986,7 @@ class WSLCTests
         {
             if (!Expected.has_value())
             {
-                LogError("Unexpected COM error: '%ls'", comError->Message.get());
+                LogError("Unexpected COM error: '%ls'. Source: %hs", comError->Message.get(), std::format("{}", Source).c_str());
                 VERIFY_FAIL();
             }
 
@@ -984,7 +996,7 @@ class WSLCTests
         {
             if (Expected.has_value())
             {
-                LogError("Expected COM error: '%ls' but none was set", Expected->c_str());
+                LogError("Expected COM error: '%ls' but none was set. Source: %hs", Expected->c_str(), std::format("{}", Source).c_str());
                 VERIFY_FAIL();
             }
         }
@@ -3853,7 +3865,10 @@ class WSLCTests
             auto container = launcher.Create(*m_defaultSession);
 
             // Validate that a created container cannot be stopped.
-            VERIFY_ARE_EQUAL(container.Get().Stop(WSLCSignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Stop(WSLCSignalSIGKILL, 0), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Verify that the container is in running state.
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
@@ -3878,7 +3893,9 @@ class WSLCTests
             auto container = launcher.Create(*m_defaultSession);
 
             // Validate that a created container cannot be killed.
-            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
@@ -3888,7 +3905,8 @@ class WSLCTests
             expectContainerList({{"test-container-kill", "debian:latest", WslcContainerStateExited}});
 
             // Validate that killing a non-running container fails (unlike Stop())
-            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Verify that deleting a container stopped via Kill() works.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
@@ -3932,7 +3950,10 @@ class WSLCTests
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that running containers can't be deleted.
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
+            ValidateCOMErrorMessage(
+                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
 
             // Kill the container.
             auto initProcess = container.GetInitProcess();
@@ -3984,7 +4005,9 @@ class WSLCTests
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsNone, nullptr));
 
             // Verify that Start() can't be called again on a running container.
-            VERIFY_ARE_EQUAL(container->Get().Start(WSLCContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container->Id();
+            VERIFY_ARE_EQUAL(container->Get().Start(WSLCContainerStartFlagsNone, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is running.", id));
 
             VERIFY_ARE_EQUAL(container->State(), WslcContainerStateRunning);
 
@@ -4037,7 +4060,11 @@ class WSLCTests
             // Verify that a running container can't be deleted by default.
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
+            ValidateCOMErrorMessage(
+                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
 
             // Verify that a running container can be deleted with the force flag.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
@@ -4433,8 +4460,11 @@ class WSLCTests
 
         // Validate that processes can't be launched in stopped containers.
         {
+            auto id = container.Id();
             auto [result, _] = WSLCProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
         }
     }
 
@@ -4818,6 +4848,134 @@ class WSLCTests
     TEST_METHOD(ContainerVolumeVirtioFs)
     {
         ValidateContainerVolumes(true);
+    }
+
+    WSLC_TEST_METHOD(ContainerVolumesAdvanced)
+    {
+        auto hostFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume");
+        auto symlinkFolder = std::filesystem::weakly_canonical(std::filesystem::current_path() / "test-volume-symlink");
+        std::filesystem::create_directories(hostFolder);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+            std::filesystem::remove_all(symlinkFolder, ec);
+        });
+
+        VERIFY_IS_TRUE((std::ofstream(hostFolder / "file.txt") << "OK").good());
+        std::filesystem::create_symlink("file.txt", hostFolder / "symlink");
+
+        // N.B. std::filesystem::create_symlink doesn't correctly handle folder symlinks.
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLink(symlinkFolder.c_str(), hostFolder.c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY));
+
+        // Validate a simple folder mount.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-1", {"cat", "/volume/file.txt"});
+            launcher.AddVolume(hostFolder.wstring(), "/volume", false);
+
+            ValidateContainerOutput(launcher, {{1, "OK"}});
+        }
+
+        // Validate that files can be mounted too.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-2", {"cat", "/volume"});
+            launcher.AddVolume((hostFolder / "file.txt").wstring(), "/volume", false);
+            ValidateContainerOutput(launcher, {{1, "OK"}});
+        }
+
+        // Validate that file symlinks work as expected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-3", {"cat", "/volume"});
+            launcher.AddVolume((hostFolder / "symlink").wstring(), "/volume", false);
+            ValidateContainerOutput(launcher, {{1, "OK"}});
+        }
+
+        // Validate that folder symlinks work as expected.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-4", {"cat", "/volume/file.txt", "/volume/symlink"});
+            launcher.AddVolume(symlinkFolder.wstring(), "/volume", false);
+
+            ValidateContainerOutput(launcher, {{1, "OKOK"}});
+        }
+
+        // Validate that folders are created if they don't exist.
+        {
+            {
+                WSLCContainerLauncher launcher(
+                    "debian:latest", "test-volumes-5", {"/bin/sh", "-c", "echo created > /volume/new-file"});
+                launcher.AddVolume((hostFolder / "should-be-created").wstring(), "/volume", false);
+                ValidateContainerOutput(launcher, {{1, ""}});
+            }
+
+            VERIFY_ARE_EQUAL(ReadFileContent(hostFolder / "should-be-created" / "new-file"), L"created\n");
+        }
+
+        // Validate that relative paths are rejected
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-6", {});
+            launcher.AddVolume(L"relative-path", "/volume", false);
+
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
+        }
+
+        // Validate that invalid paths are rejected
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-7", {});
+            launcher.AddVolume(L":", "/volume", false);
+
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(result, E_INVALIDARG);
+        }
+
+        // Validate that access denied errors are propagated when the host volume folder can't be created.
+        {
+            SetPathAccess(hostFolder, FILE_GENERIC_WRITE, DENY_ACCESS);
+
+            auto restoreAccess =
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { SetPathAccess(hostFolder, FILE_GENERIC_WRITE, GRANT_ACCESS); });
+
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-8", {"echo", "OK"});
+            launcher.AddVolume((hostFolder / "subfolder").wstring(), "/volume", false);
+
+            auto [result, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, E_ACCESSDENIED);
+
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+
+            VerifyPatternMatch(
+                wsl::shared::string::WideToMultiByte(comError->Message.get()),
+                "Failed to create volume '*test-volume\\subfolder': Access is denied. ");
+        }
+
+        // Validate that files mounts are correctly recovered when a container is loaded from storage
+        {
+            auto validateInspect = [&](auto& container) {
+                auto inspect = container.Inspect();
+                VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1);
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Destination, "/volume");
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Source, (hostFolder / "file.txt").string());
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].ReadWrite, true);
+                VERIFY_ARE_EQUAL(inspect.Mounts[0].Type, "bind");
+            };
+
+            WSLCContainerLauncher launcher("debian:latest", "test-volumes-8", {"/bin/cat", "/volume"});
+            launcher.AddVolume((hostFolder / "file.txt").wstring(), "/volume", false);
+            auto container = launcher.Create(*m_defaultSession);
+            validateInspect(container);
+
+            ResetTestSession();
+            container.SetDeleteOnClose(false);
+
+            auto openedContainer = OpenContainer(m_defaultSession.get(), "test-volumes-8");
+            VERIFY_SUCCEEDED(openedContainer.Get().Start(WSLCContainerStartFlagsAttach, nullptr));
+            validateInspect(openedContainer);
+
+            ValidateContainerOutput(openedContainer, {{1, "OK"}});
+        }
     }
 
     void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)
@@ -5727,7 +5885,9 @@ class WSLCTests
             COMOutputHandle stdinHandle{};
             COMOutputHandle stdoutHandle{};
             COMOutputHandle stderrHandle{};
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container->Id();
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Start the container.
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsAttach, nullptr));
@@ -5781,7 +5941,8 @@ class WSLCTests
             stdinHandle.Reset();
             stdoutHandle.Reset();
             stderrHandle.Reset();
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Validate that attaching to a deleted container fails.
             VERIFY_SUCCEEDED(container->Get().Delete(WSLCDeleteFlagsNone));
@@ -6244,7 +6405,7 @@ class WSLCTests
         {
             // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
             auto [result, _] = WSLCProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
         }
     }
 
@@ -6392,7 +6553,7 @@ class WSLCTests
                                const std::source_location& source = std::source_location::current()) {
             PruneResult result;
 
-            std::vector<WSLCContainerPruneFilter> labelsFilter;
+            std::vector<WSLCPruneLabelFilter> labelsFilter;
             for (const auto& e : labels)
             {
                 labelsFilter.push_back({e.first.c_str(), e.second.first, e.second.second});
@@ -6489,11 +6650,157 @@ class WSLCTests
 
         // Validate error paths.
         {
-            WSLCContainerPruneFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
+            WSLCPruneLabelFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
             PruneResult result;
 
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+        }
+    }
+
+    WSLC_TEST_METHOD(ImagePrune)
+    {
+        auto pruneImages =
+            [this](DWORD flags = WSLCPruneImagesFlagsNone, uint64_t until = 0, const std::vector<WSLCPruneLabelFilter>& labels = {}) {
+                wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+                ULONGLONG spaceReclaimed = 0;
+                WSLCPruneImagesOptions options{};
+                options.Flags = flags;
+                options.Until = until;
+                options.Labels = labels.empty() ? nullptr : labels.data();
+                options.LabelsCount = static_cast<ULONG>(labels.size());
+
+                VERIFY_SUCCEEDED(m_defaultSession->PruneImages(
+                    &options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+                return std::make_pair(std::move(deletedImages), spaceReclaimed);
+            };
+
+        // Helper to create a dangling image using only test-local tags:
+        // Load alpine and hello-world under unique tags, then overwrite one with the other.
+        auto createDanglingImage = [this]() {
+            LoadTestImage("alpine:latest");
+            WSLCTagImageOptions tagA{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagA));
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
+
+            LoadTestImage("hello-world:latest");
+            WSLCTagImageOptions tagB{.Image = "hello-world:latest", .Repo = "prune-test-b", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagB));
+            DeleteImage("hello-world:latest", WSLCDeleteImageFlagsNone);
+
+            // Overwrite prune-test-a with prune-test-b's image, making original alpine dangling.
+            WSLCTagImageOptions overwrite{.Image = "prune-test-b:v1", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&overwrite));
+        };
+
+        auto cleanupDanglingImage = [this, &pruneImages]() {
+            pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            LOG_IF_FAILED(DeleteImageNoThrow("prune-test-a:v1", WSLCDeleteImageFlagsNone).first);
+            LOG_IF_FAILED(DeleteImageNoThrow("prune-test-b:v1", WSLCDeleteImageFlagsNone).first);
+        };
+
+        // Clean up any stale dangling images from prior tests.
+        pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+
+        // Prune with no unused images returns empty.
+        {
+            auto [deletedImages, spaceReclaimed] = pruneImages();
+            VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
+        }
+
+        // Validate dangling prune: create a dangling image by re-tagging, then prune it.
+        {
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            // DanglingTrue should prune the now-dangling original alpine image.
+            auto [deletedImages, spaceReclaimed] = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            VERIFY_IS_TRUE(deletedImages.size() > 0);
+
+            // A second prune should find nothing.
+            auto [deletedImages2, spaceReclaimed2] = pruneImages(WSLCPruneImagesFlagsDanglingTrue);
+            VERIFY_ARE_EQUAL(deletedImages2.size(), 0u);
+        }
+
+        // Validate 'until' filter.
+        {
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            // Docker's 'until' filter uses the image's original Created timestamp, not load time.
+            // Use timestamp 1 (near epoch) which is before any real image was built.
+            auto [deletedImages, spaceReclaimed] = pruneImages(WSLCPruneImagesFlagsNone, 1);
+            VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
+
+            // Use a timestamp far in the future to ensure the dangling image is pruned.
+            auto future = static_cast<uint64_t>(time(nullptr)) + 3600;
+            auto [deletedImages2, spaceReclaimed2] = pruneImages(WSLCPruneImagesFlagsNone, future);
+            VERIFY_IS_TRUE(deletedImages2.size() > 0);
+        }
+
+        // Validate label filters.
+        {
+            createDanglingImage();
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            // Prune with a label filter that no dangling image has - should not prune anything.
+            auto [deletedImages, spaceReclaimed] =
+                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = true}});
+            VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
+
+            // Prune with absent label filter - dangling image doesn't have the label, so it matches.
+            auto [deletedImages2, spaceReclaimed2] =
+                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = false}});
+            VERIFY_IS_TRUE(deletedImages2.size() > 0);
+        }
+
+        // Validate null Options uses defaults (dangling-only prune).
+        {
+            LoadTestImage("alpine:latest");
+            WSLCTagImageOptions renameOptions{.Image = "alpine:latest", .Repo = "prune-test-a", .Tag = "v1"};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&renameOptions));
+            DeleteImage("alpine:latest", WSLCDeleteImageFlagsNone);
+            auto cleanup = wil::scope_exit([&]() { cleanupDanglingImage(); });
+
+            ExpectImagePresent(*m_defaultSession, "prune-test-a:v1");
+
+            // Null options should not prune tagged images.
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            ULONGLONG spaceReclaimed = 0;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneImages(nullptr, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed));
+            ExpectImagePresent(*m_defaultSession, "prune-test-a:v1");
+        }
+
+        // Validate error paths.
+        {
+            // Null output pointers - RPC rejects null [out] pointers before our code runs.
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            ULONGLONG spaceReclaimed = 0;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(nullptr, nullptr, deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+
+            // Mutually exclusive dangling flags.
+            WSLCPruneImagesOptions invalidOptions{};
+            invalidOptions.Flags = WSLCPruneImagesFlagsDanglingTrue | WSLCPruneImagesFlagsDanglingFalse;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                E_INVALIDARG);
+
+            // Invalid flags.
+            invalidOptions.Flags = 0x4;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                E_INVALIDARG);
+
+            // Null label key.
+            WSLCPruneLabelFilter nullKeyFilter{.Key = nullptr, .Value = nullptr, .Present = false};
+            invalidOptions.Flags = WSLCPruneImagesFlagsNone;
+            invalidOptions.Labels = &nullKeyFilter;
+            invalidOptions.LabelsCount = 1;
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->PruneImages(&invalidOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), &spaceReclaimed),
+                E_POINTER);
         }
     }
 

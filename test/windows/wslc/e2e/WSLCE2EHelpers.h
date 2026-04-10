@@ -119,6 +119,7 @@ private:
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
+void VerifyImageIsListed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);

@@ -2903,3 +2903,26 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
         sendRequest();
     }
 }
+
+void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)
+{
+    auto [everyoneSid, everyoneSidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
+
+    EXPLICIT_ACCESSW ea{};
+    ea.grfAccessPermissions = Permissions;
+    ea.grfAccessMode = Mode;
+    ea.grfInheritance = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea.Trustee.ptstrName = static_cast<LPWSTR>(everyoneSid);
+
+    PACL acl = nullptr;
+    wil::unique_hlocal descriptor;
+    THROW_IF_WIN32_ERROR(
+        GetNamedSecurityInfoW(path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
+
+    wsl::windows::common::security::unique_acl newAcl;
+    THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &ea, acl, &newAcl));
+
+    THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+        const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
+}
