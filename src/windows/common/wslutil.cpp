@@ -522,10 +522,42 @@ wsl::windows::common::wslutil::GetDefaultVersion(void)
     return version;
 }
 
+namespace
+{
+
+// Returns true if the current process is running as a shadow admin under
+// Windows Admin Protection. Caches the DLL lookup on first call.
+bool IsAdminProtectionEnabled()
+{
+    const auto token = wil::open_current_access_token();
+    if (!wsl::windows::common::security::IsTokenElevated(token.get()))
+    {
+        return false;
+    }
+
+    using ShadowAdminEnabledFn = BOOL(WINAPI)();
+    static std::optional<LxssDynamicFunction<ShadowAdminEnabledFn>> s_fn;
+    static std::once_flag s_initFlag;
+
+    std::call_once(s_initFlag, []()
+    {
+        LxssDynamicFunction<ShadowAdminEnabledFn> fn{DynamicFunctionErrorLogs::None};
+        if (SUCCEEDED(fn.load(L"SecurityHealthUdk.dll", "Shield_LUAIsShadowAdminEnabled")))
+        {
+            s_fn.emplace(std::move(fn));
+        }
+    });
+
+    return s_fn.has_value() && (*s_fn)();
+}
+
+} // anonymous namespace
+
 std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
 {
     ULONG buildNumber = 0;
     std::wstring kbUrl;
+    std::wstring errorString;
 
     switch (result)
     {
@@ -545,14 +577,16 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
         return Localization::MessageHigherIntegrity();
 
     case WSL_E_DEFAULT_DISTRO_NOT_FOUND:
-        return Localization::MessageNoDefaultDistro();
+        errorString = Localization::MessageNoDefaultDistro();
+        break;
 
     case HRESULT_FROM_WIN32(WSAECONNABORTED):
     case HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS):
         return Localization::MessageInstanceTerminated();
 
     case WSL_E_DISTRO_NOT_FOUND:
-        return Localization::MessageDistroNotFound();
+        errorString = Localization::MessageDistroNotFound();
+        break;
 
     case HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS):
         return Localization::MessageDistroNameAlreadyExists();
@@ -695,7 +729,26 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     }
     }
 
-    return GetSystemErrorString(result);
+    if (errorString.empty())
+    {
+        return GetSystemErrorString(result);
+    }
+
+    // If Admin Protection is enabled, prepend an informational message for
+    // errors that may be caused by the shadow admin's separate registry hive.
+    try
+    {
+        if (IsAdminProtectionEnabled())
+        {
+            auto message = Localization::MessageAdminProtectionEnabled();
+            message += L"\n\n";
+            message += errorString;
+            return message;
+        }
+    }
+    CATCH_LOG()
+
+    return errorString;
 }
 
 std::optional<std::pair<std::wstring, GitHubReleaseAsset>> wsl::windows::common::wslutil::GetGitHubAssetFromRelease(const GitHubRelease& Release)
