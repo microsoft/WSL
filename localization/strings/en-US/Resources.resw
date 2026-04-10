@@ -2202,7 +2202,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Run a container.</value>
   </data>
   <data name="WSLCCLI_ContainerRunLongDesc" xml:space="preserve">
-    <value>Runs a container. By default, the container is started in the background; use --detach to run in the foreground.</value>
+    <value>Runs a container. By default, the container is started in the foreground; use --detach to run in the background.</value>
     <comment>{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerStartDesc" xml:space="preserve">
