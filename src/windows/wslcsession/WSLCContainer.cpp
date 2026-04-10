@@ -476,12 +476,7 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 {
     auto lock = m_lock.lock_shared();
 
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslcContainerStateRunning,
-        "Cannot attach to container '%hs', state: %i",
-        m_id.c_str(),
-        m_state);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id.c_str()), m_state != WslcContainerStateRunning);
 
     wil::unique_socket ioHandle;
 
@@ -532,11 +527,13 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     // Acquire an exclusive lock since this method modifies m_initProcessControl, m_initProcess and m_state.
     auto lock = m_lock.lock_exclusive();
 
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
+
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
         m_state != WslcContainerStateCreated && m_state != WslcContainerStateExited,
-        "Cannot start container '%hs', state: %i",
-        m_name.c_str(),
+        "Cannot start container '%hs', state %i",
+        m_id.c_str(),
         m_state);
 
     // Attach to the container's init process so no IO is lost.
@@ -660,9 +657,9 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
     else if (m_state != WslcContainerStateRunning)
     {
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-            m_state != WslcContainerStateRunning,
+        THROW_HR_WITH_USER_ERROR_MSG(
+            WSLC_E_CONTAINER_NOT_RUNNING,
+            Localization::MessageWslcContainerNotRunning(m_id),
             "Cannot stop container '%hs', state: %i",
             m_id.c_str(),
             m_state);
@@ -760,12 +757,13 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
 {
     // Validate that the container is not running or already deleted.
+    THROW_HR_WITH_USER_ERROR_IF(
+        WSLC_E_CONTAINER_IS_RUNNING,
+        Localization::MessageWslcCannotRemoveRunningContainer(m_id),
+        m_state == WslcContainerStateRunning && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce));
+
     THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        (m_state == WslcContainerStateRunning && WI_IsFlagClear(Flags, WSLCDeleteFlagsForce)) || m_state == WslcContainerStateDeleted,
-        "Cannot delete container '%hs', state: %i",
-        m_name.c_str(),
-        m_state);
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_state == WslcContainerStateDeleted, "Container %hs is already deleted", m_id.c_str());
 
     WI_ASSERT(m_state != WslcContainerStateInvalid);
 
@@ -784,12 +782,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     auto lock = m_lock.lock_shared();
 
     // Validate that the container is not in the running state.
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state == WslcContainerStateRunning,
-        "Cannot export container '%hs', state: %i",
-        m_name.c_str(),
-        m_state);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_IS_RUNNING, Localization::MessageWslcContainerIsRunning(m_id), m_state == WslcContainerStateRunning);
 
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     SocketCodePair = m_dockerClient.ExportContainer(m_id);
@@ -858,12 +851,7 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
 
     auto lock = m_lock.lock_shared();
 
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslcContainerStateRunning,
-        "Container %hs is not running. State: %i",
-        m_name.c_str(),
-        m_state);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_RUNNING, Localization::MessageWslcContainerNotRunning(m_id), m_state != WslcContainerStateRunning);
 
     common::docker_schema::CreateExec request{};
     request.AttachStdout = true;

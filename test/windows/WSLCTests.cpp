@@ -978,7 +978,7 @@ class WSLCTests
         }
     }
 
-    void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected)
+    void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected, const std::source_location& Source = std::source_location::current())
     {
         auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
 
@@ -986,7 +986,7 @@ class WSLCTests
         {
             if (!Expected.has_value())
             {
-                LogError("Unexpected COM error: '%ls'", comError->Message.get());
+                LogError("Unexpected COM error: '%ls'. Source: %hs", comError->Message.get(), std::format("{}", Source).c_str());
                 VERIFY_FAIL();
             }
 
@@ -996,7 +996,7 @@ class WSLCTests
         {
             if (Expected.has_value())
             {
-                LogError("Expected COM error: '%ls' but none was set", Expected->c_str());
+                LogError("Expected COM error: '%ls' but none was set. Source: %hs", Expected->c_str(), std::format("{}", Source).c_str());
                 VERIFY_FAIL();
             }
         }
@@ -3865,7 +3865,10 @@ class WSLCTests
             auto container = launcher.Create(*m_defaultSession);
 
             // Validate that a created container cannot be stopped.
-            VERIFY_ARE_EQUAL(container.Get().Stop(WSLCSignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Stop(WSLCSignalSIGKILL, 0), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Verify that the container is in running state.
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
@@ -3890,7 +3893,9 @@ class WSLCTests
             auto container = launcher.Create(*m_defaultSession);
 
             // Validate that a created container cannot be killed.
-            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr));
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
@@ -3900,7 +3905,8 @@ class WSLCTests
             expectContainerList({{"test-container-kill", "debian:latest", WslcContainerStateExited}});
 
             // Validate that killing a non-running container fails (unlike Stop())
-            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container.Get().Kill(WSLCSignalNone), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Verify that deleting a container stopped via Kill() works.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
@@ -3944,7 +3950,10 @@ class WSLCTests
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that running containers can't be deleted.
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
+            ValidateCOMErrorMessage(
+                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
 
             // Kill the container.
             auto initProcess = container.GetInitProcess();
@@ -3996,7 +4005,9 @@ class WSLCTests
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsNone, nullptr));
 
             // Verify that Start() can't be called again on a running container.
-            VERIFY_ARE_EQUAL(container->Get().Start(WSLCContainerStartFlagsNone, nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container->Id();
+            VERIFY_ARE_EQUAL(container->Get().Start(WSLCContainerStartFlagsNone, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is running.", id));
 
             VERIFY_ARE_EQUAL(container->State(), WslcContainerStateRunning);
 
@@ -4049,7 +4060,11 @@ class WSLCTests
             // Verify that a running container can't be deleted by default.
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
-            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            auto id = container.Id();
+            VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), WSLC_E_CONTAINER_IS_RUNNING);
+            ValidateCOMErrorMessage(
+                std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
 
             // Verify that a running container can be deleted with the force flag.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
@@ -4445,8 +4460,11 @@ class WSLCTests
 
         // Validate that processes can't be launched in stopped containers.
         {
+            auto id = container.Id();
             auto [result, _] = WSLCProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
         }
     }
 
@@ -5867,7 +5885,9 @@ class WSLCTests
             COMOutputHandle stdinHandle{};
             COMOutputHandle stdoutHandle{};
             COMOutputHandle stderrHandle{};
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            auto id = container->Id();
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Start the container.
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsAttach, nullptr));
@@ -5921,7 +5941,8 @@ class WSLCTests
             stdinHandle.Reset();
             stdoutHandle.Reset();
             stderrHandle.Reset();
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
+            ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Validate that attaching to a deleted container fails.
             VERIFY_SUCCEEDED(container->Get().Delete(WSLCDeleteFlagsNone));
@@ -6384,7 +6405,7 @@ class WSLCTests
         {
             // Exec() fails because the container is not running. This call just validates that Exec() doesn't get stuck.
             auto [result, _] = WSLCProcessLauncher({}, {"echo", "OK"}).LaunchNoThrow(container.Get());
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(result, WSLC_E_CONTAINER_NOT_RUNNING);
         }
     }
 
