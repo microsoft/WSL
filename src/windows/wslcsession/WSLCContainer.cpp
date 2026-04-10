@@ -47,6 +47,7 @@ using wsl::windows::service::wslc::WSLCVolumeMount;
 using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
 using namespace std::chrono_literals;
+using wsl::shared::Localization;
 
 namespace wslc_schema = wsl::windows::common::wslc_schema;
 
@@ -142,6 +143,17 @@ auto MountVolumes(std::vector<WSLCVolumeMount>& volumes, WSLCVirtualMachine& par
 
     for (auto& volume : volumes)
     {
+        // Create a new directory if it doesn't exist.
+        if (!std::filesystem::exists(volume.HostPath))
+        {
+            auto result = wil::CreateDirectoryDeepNoThrow(volume.HostPath.c_str());
+            if (FAILED(result))
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    result, Localization::MessageWslcFailedToMountVolume(volume.HostPath, wsl::windows::common::wslutil::GetErrorString(result)));
+            }
+        }
+
         auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
         THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
         volume.Mounted = true;
@@ -251,7 +263,7 @@ void ProcessNamedVolumes(
         std::string volumeName = nv.Name;
 
         THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_VOLUME_NOT_FOUND, wsl::shared::Localization::MessageWslcVolumeNotFound(nv.Name), !sessionVolumes.contains(volumeName));
+            WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(nv.Name), !sessionVolumes.contains(volumeName));
 
         wsl::windows::common::docker_schema::Mount mount{};
         mount.Source = std::move(volumeName);
@@ -274,7 +286,7 @@ void ValidateNamedVolumes(
         {
             THROW_HR_WITH_USER_ERROR_IF(
                 WSLC_E_VOLUME_NOT_FOUND,
-                wsl::shared::Localization::MessageWslcVolumeNotFound(mount.Name),
+                Localization::MessageWslcVolumeNotFound(mount.Name),
                 !sessionVolumes.contains(mount.Name) && !anonymousVolumes.contains(mount.Name));
         }
     }
@@ -990,7 +1002,19 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslc_schema::InspectMount mountInfo{};
         // TODO: Support different mount types (plan9/VHD) when VHD volumes are implemented.
         mountInfo.Type = "bind";
-        mountInfo.Source = wsl::shared::string::WideToMultiByte(volume.HostPath);
+
+        // For file mounts, reconstruct the original host path from the parent directory and filename.
+        if (volume.SourceFilename.empty())
+        {
+            mountInfo.Source = wsl::shared::string::WideToMultiByte(volume.HostPath);
+        }
+        else
+        {
+            std::filesystem::path fullPath(volume.HostPath);
+            fullPath /= volume.SourceFilename;
+            mountInfo.Source = fullPath.string();
+        }
+
         mountInfo.Destination = volume.ContainerPath;
         mountInfo.ReadWrite = !volume.ReadOnly;
         wslcInspect.Mounts.push_back(std::move(mountInfo));
@@ -1132,10 +1156,44 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.HostPath, "Volumes[%lu].HostPath is null", i);
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
 
-        volumes.push_back(WSLCVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
+        std::filesystem::path hostPath = volume.HostPath;
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(volume.HostPath), !hostPath.is_absolute());
+
+        std::wstring sourceFilename;
+
+        {
+            // Resolve symlinks.
+            std::error_code ec;
+            hostPath = std::filesystem::canonical(hostPath, ec);
+            if (!ec)
+            {
+                // When the host path is a file, mount the parent directory in the VM
+                // and bind only the specific file into the container via Docker.
+                if (std::filesystem::is_regular_file(hostPath))
+                {
+                    sourceFilename = hostPath.filename().wstring();
+                    hostPath = hostPath.parent_path();
+                }
+            }
+            else
+            {
+                if (ec == std::errc::no_such_file_or_directory)
+                {
+                    // Path doesn't exist, assume directory.
+                    hostPath = volume.HostPath;
+                }
+                else
+                {
+                    THROW_HR_WITH_USER_ERROR(E_FAIL, Localization::MessageWslcFailedToMountVolume(volume.HostPath, ec.message()));
+                }
+            }
+        }
+
+        volumes.push_back(WSLCVolumeMount{hostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly), sourceFilename});
 
         auto options = volume.ReadOnly ? "ro" : "rw";
-        auto bind = std::format("{}:{}:{}", parentVMPath, volume.ContainerPath, options);
+        auto bindSource = sourceFilename.empty() ? parentVMPath : std::format("{}/{}", parentVMPath, sourceFilename);
+        auto bind = std::format("{}:{}:{}", bindSource, volume.ContainerPath, options);
 
         binds.push_back(std::move(bind));
     }

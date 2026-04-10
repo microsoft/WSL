@@ -101,6 +101,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetUser(std::move(user));
     }
 
+    for (const auto& tmpfsSpec : options.Tmpfs)
+    {
+        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
+        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {

@@ -283,4 +283,19 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(const std::wstring& fil
 
     return envVars;
 }
+
+TmpfsMount TmpfsMount::Parse(const std::string& value)
+{
+    TmpfsMount result{};
+    auto colonPos = value.find(':');
+    if (colonPos == std::string::npos)
+    {
+        result.m_containerPath = value;
+        return result;
+    }
+
+    result.m_containerPath = value.substr(0, colonPos);
+    result.m_options = value.substr(colonPos + 1);
+    return result;
+}
 } // namespace wsl::windows::wslc::models
