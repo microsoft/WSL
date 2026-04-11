@@ -25,6 +25,7 @@
     <!-- Default metadata for WslcImage items -->
     <ItemDefinitionGroup>
         <WslcImage>
+            <Image></Image>
             <Tag>latest</Tag>
         </WslcImage>
     </ItemDefinitionGroup>
@@ -74,7 +75,7 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
     </Target>
 
     <!--
@@ -85,7 +86,7 @@
         If Sources is omitted, fall back to tracking the full Context directory so changes to
         .dockerignore and other Docker build inputs still invalidate the marker.
     -->
-    <Target Name="_WslcCollectSources" BeforeTargets="_WslcBuildSingleImage">
+    <Target Name="_WslcCollectSources">
         <ItemGroup>
             <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
             <_WslcSourceFiles Include="$(_WslcDockerfile)" />
@@ -102,16 +103,22 @@
 
         <MakeDir Directories="$(_WslcIntDir)" />
 
-        <Message Importance="high"
-                 Text="WSLC: Building image '$(_WslcName):$(_WslcTag)'..." />
+        <!-- Resolve image reference: use Image metadata if set, otherwise fall back to Identity -->
+        <PropertyGroup>
+            <_WslcImageRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcImageRef>
+            <_WslcImageRef Condition="'$(_WslcImageRef)' == ''">$(_WslcName)</_WslcImageRef>
+        </PropertyGroup>
 
-        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcName):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+        <Message Importance="high"
+                 Text="WSLC: Building image '$(_WslcImageRef):$(_WslcTag)'..." />
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcImageRef):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
         <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).built" AlwaysCreate="true" />
 
         <Message Importance="high"
-                 Text="WSLC: Image '$(_WslcName):$(_WslcTag)' built successfully." />
+                 Text="WSLC: Image '$(_WslcImageRef):$(_WslcTag)' built successfully." />
     </Target>
 
     <!-- Clean container artifacts -->

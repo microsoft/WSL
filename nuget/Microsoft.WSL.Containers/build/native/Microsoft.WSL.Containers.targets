@@ -34,19 +34,11 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcWriteSingleTlog"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
-    <!-- Collect tlog inputs (mirrors _WslcCollectSources logic — cannot reuse directly
-         because this runs in a separate MSBuild evaluation context dispatched by _WslcWriteAllTlogs) -->
-    <Target Name="_WslcWriteSingleTlog">
-        <ItemGroup>
-            <_WslcTlogSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
-            <_WslcTlogInputs Include="$(_WslcDockerfile)" />
-            <_WslcTlogInputs Condition="'%(_WslcTlogSourceDirs.Identity)' != ''" Include="%(_WslcTlogSourceDirs.Identity)\**\*" />
-            <_WslcTlogInputs Include="$(_WslcContext)\**\*" Condition="'$(_WslcSourceDir)' == '' AND '$(_WslcContext)' != ''" />
-        </ItemGroup>
-
+    <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles) -->
+    <Target Name="_WslcWriteSingleTlog" DependsOnTargets="_WslcCollectSources">
         <PropertyGroup>
             <_WslcTlogToolPath>$([System.IO.Path]::GetFullPath('$(WslcCliPath)'))</_WslcTlogToolPath>
             <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).built'))</_WslcMarkerFullPath>
@@ -54,7 +46,7 @@
 
         <WriteLinesToFile
             File="$(_WslcTlogDir)wslc.$(_WslcName).read.1.tlog"
-            Lines="^$(_WslcTlogToolPath);@(_WslcTlogInputs->'%(FullPath)')"
+            Lines="^$(_WslcTlogToolPath);@(_WslcSourceFiles->'%(FullPath)')"
             Overwrite="true"
             Encoding="Unicode" />
 
