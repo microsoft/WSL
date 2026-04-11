@@ -853,6 +853,10 @@ For information please visit https://aka.ms/wslinstall</value>
     <value>Failed to create the swap disk in '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+    <data name="MessagedFailedToCreateDisk" xml:space="preserve">
+    <value>Failed to create disk '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Nested virtualization is not supported on this machine.</value>
   </data>

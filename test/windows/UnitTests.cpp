@@ -960,7 +960,7 @@ class UnitTests
             VERIFY_IS_FALSE(!vhdFile);
         }
 
-        auto validateOutput = [](LPCWSTR commandLine, LPCWSTR expectedOutput, DWORD expectedExitCode = -1) {
+        auto validateOutput = [](LPCWSTR commandLine, const std::wstring& expectedOutput, DWORD expectedExitCode = -1) {
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(commandLine, expectedExitCode);
             VERIFY_ARE_EQUAL(expectedOutput, out);
             VERIFY_ARE_EQUAL(L"", err);
@@ -970,8 +970,10 @@ class UnitTests
         auto commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, tarFileName, version);
         validateOutput(
             commandLine.c_str(),
-            L"The supplied install location is already in use.\r\n"
-            L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+            std::format(
+                L"Failed to create disk '{}ext4.vhdx': The file exists. \r\n"
+                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n",
+                LXSST_IMPORT_DISTRO_TEST_DIR));
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
         validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
@@ -983,6 +985,25 @@ class UnitTests
                 commandLine.c_str(),
                 L"This operation is only supported by WSL2.\r\n"
                 L"Error code: Wsl/Service/RegisterDistro/WSL_E_WSL2_NEEDED\r\n");
+        }
+
+        //
+        // Verify that importing a distribution with a different name into the same path as an
+        // already registered distribution (test_distro) returns the path-already-exists error.
+        //
+
+        {
+            const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+            VERIFY_IS_TRUE(!!distroKey);
+
+            auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+            VERIFY_IS_FALSE(basePath.empty());
+
+            commandLine = std::format(L"--import path-conflict-distro {} {} --version {}", basePath, tarFileName, version);
+            validateOutput(
+                commandLine.c_str(),
+                L"The supplied install location is already in use.\r\n"
+                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
         }
 
         //
