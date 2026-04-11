@@ -999,7 +999,7 @@ class UnitTests
             auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
             VERIFY_IS_FALSE(basePath.empty());
 
-            commandLine = std::format(L"--import path-conflict-distro {} {} --version {}", basePath, tarFileName, version);
+            commandLine = std::format(L"--import path-conflict-distro \"{}\" \"{}\" --version {}", basePath, tarFileName, version);
             validateOutput(
                 commandLine.c_str(),
                 L"The supplied install location is already in use.\r\n"
