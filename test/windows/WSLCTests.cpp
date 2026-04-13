@@ -402,7 +402,7 @@ class WSLCTests
         {
             auto settings = GetDefaultSessionSettings(nullptr);
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject DisplayName at exact boundary (no room for null terminator).
@@ -410,7 +410,7 @@ class WSLCTests
             std::wstring boundaryName(std::size(WSLCSessionInformation{}.DisplayName), L'x');
             auto settings = GetDefaultSessionSettings(boundaryName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject too long DisplayName.
@@ -418,7 +418,7 @@ class WSLCTests
             std::wstring longName(std::size(WSLCSessionInformation{}.DisplayName) + 1, L'x');
             auto settings = GetDefaultSessionSettings(longName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Validate that creating a session on a non-existing storage fails if WSLCSessionStorageFlagsNoCreate is set.
@@ -501,7 +501,8 @@ class WSLCTests
 
         {
             std::wstring expectedError =
-                L" repository does not exist or may require 'docker login': denied: requested access to the resource is denied";
+                L"pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
+                L"access to the resource is denied";
 
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
             ValidateCOMErrorMessage(expectedError.c_str());
@@ -2324,7 +2325,18 @@ class WSLCTests
 
             std::thread thread(readDmesg); // Needs to be created before the VM starts, to avoid a pipe deadlock.
 
+            // Ensure the thread is joined even if CreateSession throws, to avoid std::terminate.
+            auto threadGuard = wil::scope_exit([&]() {
+                write.reset();
+                if (thread.joinable())
+                {
+                    thread.join();
+                }
+            });
+
             auto session = CreateSession(settings);
+            threadGuard.release(); // CreateSession succeeded, detach scope_exit below takes over.
+
             auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 session.reset();
                 if (thread.joinable())
