@@ -375,7 +375,7 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(L"wslc-cli-admin", &session));
+    VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(nullptr, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     return std::move(session);
