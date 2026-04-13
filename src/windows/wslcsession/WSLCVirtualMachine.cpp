@@ -167,6 +167,11 @@ bool VMPortMapping::IsLocalhost() const
     }
 }
 
+bool VMPortMapping::IsIPv6() const
+{
+    return BindAddress.si_family == AF_INET6;
+}
+
 uint16_t VMPortMapping::HostPort() const
 {
     if (BindAddress.si_family == AF_INET6)
