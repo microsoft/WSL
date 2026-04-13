@@ -21,6 +21,8 @@ Abstract:
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
 
+static constexpr auto WinCredPrefix = L"wslc-credential/";
+
 namespace {
 
 wil::unique_hfile OpenJsonFileExclusive(const std::filesystem::path& path)
@@ -124,9 +126,14 @@ std::vector<std::string> RegistryService::List()
 
 // --- WinCred backend ---
 
+std::wstring RegistryService::WinCredTargetName(const std::string& serverAddress)
+{
+    return std::wstring(WinCredPrefix) + wsl::shared::string::MultiByteToWide(serverAddress);
+}
+
 void RegistryService::WinCredStoreCredential(const std::string& serverAddress, const std::string& credential)
 {
-    auto targetName = wsl::shared::string::MultiByteToWide(serverAddress);
+    auto targetName = WinCredTargetName(serverAddress);
 
     CREDENTIALW cred{};
     cred.Type = CRED_TYPE_GENERIC;
@@ -140,7 +147,7 @@ void RegistryService::WinCredStoreCredential(const std::string& serverAddress, c
 
 std::optional<std::string> RegistryService::WinCredGetCredential(const std::string& serverAddress)
 {
-    auto targetName = wsl::shared::string::MultiByteToWide(serverAddress);
+    auto targetName = WinCredTargetName(serverAddress);
 
     PCREDENTIALW cred = nullptr;
     if (!CredReadW(targetName.c_str(), CRED_TYPE_GENERIC, 0, &cred))
@@ -165,7 +172,7 @@ std::optional<std::string> RegistryService::WinCredGetCredential(const std::stri
 
 void RegistryService::WinCredEraseCredential(const std::string& serverAddress)
 {
-    auto targetName = wsl::shared::string::MultiByteToWide(serverAddress);
+    auto targetName = WinCredTargetName(serverAddress);
 
     if (!CredDeleteW(targetName.c_str(), CRED_TYPE_GENERIC, 0))
     {
@@ -179,9 +186,12 @@ void RegistryService::WinCredEraseCredential(const std::string& serverAddress)
 
 std::vector<std::string> RegistryService::WinCredListCredentials()
 {
+    auto prefix = std::wstring(WinCredPrefix);
+    auto filter = prefix + L"*";
+
     DWORD count = 0;
     PCREDENTIALW* creds = nullptr;
-    if (!CredEnumerateW(nullptr, 0, &count, &creds))
+    if (!CredEnumerateW(filter.c_str(), 0, &count, &creds))
     {
         if (GetLastError() == ERROR_NOT_FOUND)
         {
@@ -195,9 +205,12 @@ std::vector<std::string> RegistryService::WinCredListCredentials()
 
     std::vector<std::string> result;
     result.reserve(count);
+
     for (DWORD i = 0; i < count; ++i)
     {
-        result.push_back(wsl::shared::string::WideToMultiByte(creds[i]->TargetName));
+        // Strip the prefix to return the bare server address.
+        std::wstring_view name(creds[i]->TargetName);
+        result.push_back(wsl::shared::string::WideToMultiByte(std::wstring(name.substr(prefix.size()))));
     }
 
     return result;

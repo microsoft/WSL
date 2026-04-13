@@ -39,6 +39,8 @@ public:
     static constexpr auto DefaultServer = "https://index.docker.io/v1/";
 
 private:
+    static std::wstring WinCredTargetName(const std::string& serverAddress);
+
     // WinCred helpers
     static void WinCredStoreCredential(const std::string& serverAddress, const std::string& credential);
     static std::optional<std::string> WinCredGetCredential(const std::string& serverAddress);
