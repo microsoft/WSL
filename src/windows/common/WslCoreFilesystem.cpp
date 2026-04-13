@@ -73,7 +73,7 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     if (FAILED(result))
     {
         THROW_HR_WITH_USER_ERROR(
-            result, shared::Localization::MessagedFailedToCreateDisk(target, windows::common::wslutil::GetErrorString(result)));
+            result, shared::Localization::MessageFailedToCreateDisk(target, windows::common::wslutil::GetErrorString(result)));
     }
 }
 
