@@ -977,7 +977,7 @@ class WslcSdkTests
             ExpectHttpResponse(L"http://[::1]:12344", 200);
         }
 
-        // Negative: unsupported address family must fail at container creation.
+        // Negative: unsupported address family must fail when setting container portmapping values.
         {
             WslcContainerSettings containerSettings5;
             VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings5));
