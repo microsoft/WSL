@@ -522,8 +522,7 @@ wsl::windows::common::wslutil::GetDefaultVersion(void)
     return version;
 }
 
-namespace
-{
+namespace {
 
 // Returns true if the current process is running as a shadow admin under
 // Windows Admin Protection. Caches the DLL lookup on first call.
@@ -539,8 +538,7 @@ bool IsAdminProtectionEnabled()
     static std::optional<LxssDynamicFunction<ShadowAdminEnabledFn>> s_fn;
     static std::once_flag s_initFlag;
 
-    std::call_once(s_initFlag, []()
-    {
+    std::call_once(s_initFlag, []() {
         LxssDynamicFunction<ShadowAdminEnabledFn> fn{DynamicFunctionErrorLogs::None};
         if (SUCCEEDED(fn.load(L"SecurityHealthUdk.dll", "Shield_LUAIsShadowAdminEnabled")))
         {
