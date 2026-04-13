@@ -95,8 +95,7 @@ void RegistryService::Store(const std::string& serverAddress, const std::string&
     THROW_HR_IF(E_INVALIDARG, credential.empty());
 
     auto backend = settings::User().Get<settings::Setting::CredentialStore>();
-    backend == CredentialStoreType::File ? FileStoreCredential(serverAddress, credential)
-                                         : WinCredStoreCredential(serverAddress, credential);
+    backend == CredentialStoreType::File ? FileStoreCredential(serverAddress, credential) : WinCredStoreCredential(serverAddress, credential);
 }
 
 std::optional<std::string> RegistryService::Get(const std::string& serverAddress)

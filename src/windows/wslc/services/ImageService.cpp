@@ -252,7 +252,7 @@ void ImageService::Push(wsl::windows::wslc::models::Session& session, const std:
 {
     auto server = GetServerFromImage(image);
     auto storedAuth = RegistryService::Get(server);
-    auto auth = storedAuth.value_or(BuildRegistryAuthHeader("","", server));
+    auto auth = storedAuth.value_or(BuildRegistryAuthHeader("", "", server));
 
     THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));
 }

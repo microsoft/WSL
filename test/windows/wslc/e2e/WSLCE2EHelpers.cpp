@@ -386,7 +386,7 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
     EnsureImageIsLoaded({L"wslc-registry", L"latest", GetTestImagePath("wslc-registry:latest")});
 
     std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
-    
+
     if (!username.empty())
     {
         env.push_back(std::format("USERNAME={}", username));

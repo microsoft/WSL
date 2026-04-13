@@ -76,9 +76,7 @@ class WSLCE2EPushPullTests
             auto registryImage = TagImageForRegistry(*session, "debian:latest", registryAddress);
             auto registryImageW = string::MultiByteToWide(registryImage);
 
-            auto tagCleanup = wil::scope_exit([&]() {
-                RunWslc(std::format(L"image delete --force {}", registryImageW));
-            });
+            auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImageW)); });
 
             // Push should succeed.
             auto result = RunWslc(std::format(L"push {}", registryImageW));
@@ -95,7 +93,6 @@ class WSLCE2EPushPullTests
             result.Verify({.Stderr = L"", .ExitCode = 0});
             VERIFY_IS_TRUE(result.Stdout.has_value());
             VERIFY_IS_TRUE(result.Stdout->find(registryImageW) != std::wstring::npos);
-
         }
     }
 
