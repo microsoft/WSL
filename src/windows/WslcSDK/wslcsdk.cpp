@@ -703,7 +703,6 @@ try
                     HRESULT hr = InetNtopToHresult(AF_INET, &addr4->sin_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
                     if (FAILED(hr))
                     {
-                        const auto& b = addr4->sin_addr.S_un.S_un_b;
                         THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET address");
                     }
                     convertedPort.Family = AF_INET;
@@ -716,7 +715,6 @@ try
                     HRESULT hr = InetNtopToHresult(AF_INET6, &addr6->sin6_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
                     if (FAILED(hr))
                     {
-                        const auto* b = addr6->sin6_addr.u.Byte;
                         THROW_HR_MSG(hr,"inet_ntop() failed for AF_INET6 address");
                     }
                     convertedPort.Family = AF_INET6;
