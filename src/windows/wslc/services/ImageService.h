@@ -38,11 +38,7 @@ public:
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent = nullptr);
-
-    // Extracts the registry server address from an image reference.
-    // Returns the default Docker Hub server if no explicit server is present.
-    static std::string GetServerFromImage(const std::string& image);
-    void Tag();
+    static void Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage);
     void Prune();
 };
 } // namespace wsl::windows::wslc::services

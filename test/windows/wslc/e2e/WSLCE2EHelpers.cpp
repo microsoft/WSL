@@ -13,6 +13,7 @@ Abstract:
 
 #include "precomp.h"
 #include "SessionModel.h"
+#include "ImageModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -193,6 +194,23 @@ void VerifyImageIsNotUsed(const TestImage& image)
             VERIFY_FAIL(std::format(L"Image '{}' found in container list output", image.NameAndTag()).c_str());
         }
     }
+}
+
+void VerifyImageIsListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
+    {
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
 }
 
 std::string GetHashId(const std::string& id, bool fullId)
@@ -399,4 +417,20 @@ std::string TagImageForRegistry(IWSLCSession& session, const std::string& imageN
     return registryImage;
 }
 
+void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& lines)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    VERIFY_IS_TRUE(file.is_open());
+    for (const auto& line : lines)
+    {
+        file << line << "\n";
+    }
+
+    VERIFY_IS_TRUE(file.good());
+}
+
+std::wstring GetPythonHttpServerScript(uint16_t port)
+{
+    return std::format(L"python3 -m http.server {}", port);
+}
 } // namespace WSLCE2ETests

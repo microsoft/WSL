@@ -327,7 +327,7 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
-    THROW_IF_FAILED(container->Start(flags, nullptr));
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
@@ -349,7 +349,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Stop(options.Signal, options.Timeout));
+    THROW_IF_FAILED_EXCEPT(container->Stop(options.Signal, options.Timeout), WSLC_E_CONTAINER_NOT_RUNNING);
 }
 
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)

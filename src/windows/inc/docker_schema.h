@@ -225,34 +225,6 @@ struct InspectExec
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectExec, Pid, ExitCode, Running);
 };
 
-struct PruneContainerLabelFilter
-{
-    std::map<std::string, bool> presentLabels;
-    std::map<std::string, bool> absentLabels;
-    std::optional<std::uint64_t> until;
-};
-
-inline void to_json(nlohmann::json& j, const PruneContainerLabelFilter& object)
-{
-    j = nlohmann::json{};
-    if (!object.presentLabels.empty())
-    {
-        j["label"] = object.presentLabels;
-    }
-
-    if (!object.absentLabels.empty())
-    {
-        j["label!"] = object.absentLabels;
-    }
-
-    // This is required because docker crashes if 'until' is null.
-    // TODO: Open a PR to fix this directly in moby.
-    if (object.until.has_value())
-    {
-        j["until"] = nlohmann::json{{std::to_string(object.until.value()), true}};
-    }
-}
-
 struct PruneContainerResult
 {
     std::optional<std::vector<std::string>> ContainersDeleted; // Null if no containers were deleted.
@@ -279,6 +251,14 @@ struct DeletedImage
     std::string Deleted;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeletedImage, Untagged, Deleted);
+};
+
+struct PruneImageResult
+{
+    std::optional<std::vector<DeletedImage>> ImagesDeleted;
+    uint64_t SpaceReclaimed{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneImageResult, ImagesDeleted, SpaceReclaimed);
 };
 
 struct ImportStatus

@@ -30,6 +30,7 @@ std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePushCommand>(FullName()));
     commands.push_back(std::make_unique<ImageSaveCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageTagCommand>(FullName()));
     return commands;
 }
 

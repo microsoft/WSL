@@ -2196,4 +2196,119 @@ class WslcSdkTests
     {
         VERIFY_ARE_EQUAL(WslcInstallWithDependencies(nullptr, nullptr), E_NOTIMPL);
     }
+
+    // Negative tests: handle lifecycle and invalid state transitions
+
+    WSLC_TEST_METHOD(ReleaseNullSessionHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseSession(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(TerminateNullSessionHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcTerminateSession(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(ReleaseNullContainerHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseContainer(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(ReleaseNullProcessHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseProcess(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(CreateContainerWithNullSession)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcContainer container = nullptr;
+        VERIFY_ARE_EQUAL(WslcCreateContainer(nullptr, &containerSettings, &container, nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(StopContainerWithInvalidSignal)
+    {
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        // Wait for the short-lived init process to exit
+        UniqueProcess initProcess;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &initProcess));
+        HANDLE exitEvent = nullptr;
+        VERIFY_SUCCEEDED(WslcGetProcessExitEvent(initProcess.get(), &exitEvent));
+        VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(exitEvent, 30000));
+
+        // Attempting to exec on a stopped container should fail
+        WslcProcessSettings execSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&execSettings));
+        PCSTR execArgv[] = {"/bin/echo", "should-fail"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&execSettings, execArgv, ARRAYSIZE(execArgv)));
+
+        UniqueProcess execProcess;
+        VERIFY_ARE_EQUAL(WslcCreateContainerProcess(container.get(), &execSettings, &execProcess, nullptr), WSLC_E_CONTAINER_NOT_RUNNING);
+    }
+
+    WSLC_TEST_METHOD(DuplicateContainerName)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsName(&containerSettings, "duplicate-name-test"));
+
+        UniqueContainer container1;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container1, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container1.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        // Creating a second container with the same name should fail
+        UniqueContainer container2;
+        VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container2, nullptr), static_cast<HRESULT>(0x800700b7)); // ERROR_ALREADY_EXISTS
+    }
+
+    WSLC_TEST_METHOD(DeleteRunningContainerWithoutForce)
+    {
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        // Deleting a running container without force flag should fail
+        VERIFY_ARE_EQUAL(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+    }
+
+    WSLC_TEST_METHOD(DeleteNonExistentImage)
+    {
+        VERIFY_ARE_EQUAL(WslcDeleteSessionImage(m_defaultSession, "nonexistent-image:this-tag-does-not-exist", nullptr), WSLC_E_IMAGE_NOT_FOUND);
+    }
+
+    WSLC_TEST_METHOD(PullInvalidImageUri)
+    {
+        WslcPullImageOptions pullOptions = {};
+        pullOptions.uri = "///invalid-registry-url///";
+        VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &pullOptions, nullptr), E_INVALIDARG);
+    }
 };
