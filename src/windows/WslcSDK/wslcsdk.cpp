@@ -203,22 +203,8 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
 
 HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
 {
-    const char* result = inet_ntop(af, src, dst, dstCount);
-    if (result)
-    {
-        return S_OK;
-    }
-    const int wsaError = WSAGetLastError();
-    switch (wsaError)
-    {
-    case WSAEAFNOSUPPORT:
-    case WSAEINVAL:
-        return E_INVALIDARG;
-    case WSAEFAULT:
-        return ((dst == nullptr) || (dstCount == 0)) ? E_INVALIDARG : HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
-    default:
-        return HRESULT_FROM_WIN32(wsaError);
-    }
+    THROW_WIN32_IF(static_cast<unsigned long>(WSAGetLastError()), inet_ntop(af, src, dst, dstCount) == nullptr);
+    return S_OK;
 }
 
 bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
@@ -697,17 +683,16 @@ try
             // Validate IP address if provided and if valid, copy to runtime structure.
             if (internalPort.windowsAddress != nullptr)
             {
-                char addrBuf[INET6_ADDRSTRLEN]{};
                 switch (internalPort.windowsAddress->ss_family)
                 {
                 case AF_INET:
                 {
                     const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
-
-                    HRESULT hr = InetNtopToHresult(AF_INET, &addr4->sin_addr, addrBuf, sizeof(addrBuf));
+                    HRESULT hr = InetNtopToHresult(AF_INET, &addr4->sin_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
                     if (FAILED(hr))
                     {
-                        THROW_HR_MSG(hr, "inet_ntop() failed for address family AF_INET");
+                        const auto& b = addr4->sin_addr.S_un.S_un_b;
+                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET address: %u.%u.%u.%u", b.s_b1, b.s_b2, b.s_b3, b.s_b4);
                     }
                     convertedPort.Family = AF_INET;
                     break;
@@ -716,36 +701,41 @@ try
                 case AF_INET6:
                 {
                     const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
-                    HRESULT hr = InetNtopToHresult(AF_INET6, &addr6->sin6_addr, addrBuf, sizeof(addrBuf));
+                    HRESULT hr = InetNtopToHresult(AF_INET6, &addr6->sin6_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
                     if (FAILED(hr))
                     {
-                        THROW_HR_MSG(hr, "inet_ntop() failed for address family AF_INET6");
+                        const auto* b = addr6->sin6_addr.u.Byte;
+                        THROW_HR_MSG(
+                            hr,
+                            "inet_ntop() failed for AF_INET6 address: % 02x % 02x : % 02x % 02x : % 02x % 02x : % 02x % 02x : % "
+                            "02x % 02x : % 02x % 02x : % 02x % 02x : % 02x %02x ",
+                            b[0],
+                            b[1],
+                            b[2],
+                            b[3],
+                            b[4],
+                            b[5],
+                            b[6],
+                            b[7],
+                            b[8],
+                            b[9],
+                            b[10],
+                            b[11],
+                            b[12],
+                            b[13],
+                            b[14],
+                            b[15]);
                     }
                     convertedPort.Family = AF_INET6;
                     break;
                 }
 
                 default:
-                    // Reject unsupported or malformed address families
-                    THROW_HR(E_INVALIDARG);
-                }
-                errno_t copyErr = strncpy_s(convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress), addrBuf, _TRUNCATE);
-                if (copyErr == 0)
-                {
-                    // Address copied successfully.
-                }
-                else if (copyErr == STRUNCATE)
-                {
-                    THROW_HR(HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER));
-                }
-                else
-                {
-                    THROW_HR(HRESULT_FROM_WIN32(copyErr));
+                    THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", internalPort.windowsAddress->ss_family);
                 }
             }
             else
             {
-                // If no binding address is provided, default to local host.
                 convertedPort.Family = AF_INET;
                 strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
             }
@@ -884,11 +874,12 @@ try
         if (portMappings[i].windowsAddress != nullptr)
         {
             const auto family = portMappings[i].windowsAddress->ss_family;
-            RETURN_HR_IF(E_INVALIDARG, family != AF_INET && family != AF_INET6);
+            RETURN_HR_IF_MSG(
+                E_INVALIDARG, family != AF_INET && family != AF_INET6, "Unsupported address family: %d at port mapping index %u", family, i);
         }
-        RETURN_HR_IF(E_NOTIMPL, portMappings[i].protocol != 0);
+        RETURN_HR_IF_MSG(
+            E_NOTIMPL, portMappings[i].protocol != 0, "Unsupported protocol: %d at port mapping index %u", portMappings[i].protocol, i);
     }
-
     internalType->ports = portMappings;
     internalType->portsCount = portMappingCount;
 
