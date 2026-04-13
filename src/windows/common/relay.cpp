@@ -38,6 +38,128 @@ LARGE_INTEGER InitializeFileOffset(HANDLE File)
     return Offset;
 }
 
+// Types and helpers for the IOCP-based BidirectionalRelay.
+
+enum class IoOp
+{
+    Read,
+    Write
+};
+
+// Extended OVERLAPPED for IOCP dispatch. OVERLAPPED must be
+// the first member so that reinterpret_cast<IoContext*>(overlapped)
+// is valid when recovering context from GetQueuedCompletionStatus.
+struct IoContext
+{
+    OVERLAPPED Overlapped;
+    int DirIndex;
+    IoOp Op;
+};
+
+// Per-direction state for the bidirectional relay. Each direction has
+// its own buffer, pending I/O tracking, and file offsets. The read
+// limit is reduced by the amount of data pending from an incomplete
+// write, establishing back-pressure through TCP flow control.
+struct RelayDirection
+{
+    HANDLE SrcHandle;
+    HANDLE DstHandle;
+    std::vector<gsl::byte> Buffer;
+    size_t Head = 0;
+    size_t Tail = 0;
+    IoContext ReadCtx{};
+    IoContext WriteCtx{};
+    LARGE_INTEGER ReadOffset{};
+    LARGE_INTEGER WriteOffset{};
+    bool ReadPending = false;
+    bool WritePending = false;
+    bool SrcEof = false;
+    bool Done = false;
+    bool DstIsSocket = false;
+
+    size_t Pending() const { return Tail - Head; }
+    size_t Available() const { return Buffer.size() - Tail; }
+};
+
+void TryIssueRead(RelayDirection& d)
+{
+    if (d.ReadPending || d.SrcEof || d.Done || d.Available() == 0)
+    {
+        return;
+    }
+
+    d.ReadCtx.Overlapped = {};
+    d.ReadCtx.Overlapped.Offset = d.ReadOffset.LowPart;
+    d.ReadCtx.Overlapped.OffsetHigh = d.ReadOffset.HighPart;
+
+    DWORD bytesRead = 0;
+    if (!ReadFile(d.SrcHandle, d.Buffer.data() + d.Tail, gsl::narrow_cast<DWORD>(d.Available()), &bytesRead, &d.ReadCtx.Overlapped))
+    {
+        const auto error = GetLastError();
+        if (error == ERROR_IO_PENDING)
+        {
+            d.ReadPending = true;
+            return;
+        }
+
+        if (error == ERROR_HANDLE_EOF || error == ERROR_BROKEN_PIPE)
+        {
+            d.SrcEof = true;
+            return;
+        }
+
+        THROW_WIN32(error);
+    }
+
+    d.ReadPending = true;
+}
+
+void TryIssueWrite(RelayDirection& d)
+{
+    if (d.WritePending || d.Done || d.Pending() == 0)
+    {
+        return;
+    }
+
+    d.WriteCtx.Overlapped = {};
+    d.WriteCtx.Overlapped.Offset = d.WriteOffset.LowPart;
+    d.WriteCtx.Overlapped.OffsetHigh = d.WriteOffset.HighPart;
+
+    DWORD bytesWritten = 0;
+    if (!WriteFile(d.DstHandle, d.Buffer.data() + d.Head, gsl::narrow_cast<DWORD>(d.Pending()), &bytesWritten, &d.WriteCtx.Overlapped))
+    {
+        const auto error = GetLastError();
+        if (error == ERROR_IO_PENDING)
+        {
+            d.WritePending = true;
+            return;
+        }
+
+        if (error == ERROR_NO_DATA || error == ERROR_BROKEN_PIPE)
+        {
+            d.Done = true;
+            return;
+        }
+
+        THROW_WIN32(error);
+    }
+
+    d.WritePending = true;
+}
+
+void CheckDirectionDone(RelayDirection& d)
+{
+    if (!d.Done && d.SrcEof && d.Pending() == 0 && !d.WritePending && !d.ReadPending)
+    {
+        if (d.DstIsSocket)
+        {
+            LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(d.DstHandle), SD_SEND) == SOCKET_ERROR);
+        }
+
+        d.Done = true;
+    }
+}
+
 } // namespace
 
 std::thread wsl::windows::common::relay::CreateThread(_In_ HANDLE InputHandle, _In_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
@@ -257,128 +379,167 @@ wsl::windows::common::relay::InterruptableWrite(
 
 void wsl::windows::common::relay::BidirectionalRelay(_In_ HANDLE LeftHandle, _In_ HANDLE RightHandle, _In_ size_t BufferSize, _In_ RelayFlags Flags)
 {
-    std::vector<gsl::byte> leftBuffer(BufferSize);
-    const auto leftReadSpan = gsl::make_span(leftBuffer);
-    OVERLAPPED leftOverlapped = {0};
-    const wil::unique_event leftOverlappedEvent(wil::EventOptions::None);
-    leftOverlapped.hEvent = leftOverlappedEvent.get();
-    LARGE_INTEGER leftOffset{};
+    // Create a completion port and associate both handles.
+    wil::unique_handle iocp(CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1));
+    THROW_LAST_ERROR_IF(!iocp);
+    THROW_LAST_ERROR_IF_NULL(CreateIoCompletionPort(LeftHandle, iocp.get(), 0, 0));
+    THROW_LAST_ERROR_IF_NULL(CreateIoCompletionPort(RightHandle, iocp.get(), 0, 0));
 
-    std::vector<gsl::byte> rightBuffer(BufferSize);
-    const auto rightReadSpan = gsl::make_span(rightBuffer);
-    OVERLAPPED rightOverlapped = {0};
-    const wil::unique_event rightOverlappedEvent(wil::EventOptions::None);
-    rightOverlapped.hEvent = rightOverlappedEvent.get();
-    LARGE_INTEGER rightOffset{};
+    // Initialize per-direction state.
+    RelayDirection dirs[2] = {};
 
-    bool leftReadPending = false;
-    bool rightReadPending = false;
-    auto cancelReads = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        DWORD bytes;
-        if (leftReadPending)
+    // Direction 0: Left → Right.
+    dirs[0].SrcHandle = LeftHandle;
+    dirs[0].DstHandle = RightHandle;
+    dirs[0].Buffer.resize(BufferSize);
+    dirs[0].ReadCtx.DirIndex = 0;
+    dirs[0].ReadCtx.Op = IoOp::Read;
+    dirs[0].WriteCtx.DirIndex = 0;
+    dirs[0].WriteCtx.Op = IoOp::Write;
+    dirs[0].ReadOffset = InitializeFileOffset(LeftHandle);
+    dirs[0].WriteOffset = InitializeFileOffset(RightHandle);
+    dirs[0].DstIsSocket = WI_IsFlagSet(Flags, RelayFlags::RightIsSocket);
+
+    // Direction 1: Right → Left.
+    dirs[1].SrcHandle = RightHandle;
+    dirs[1].DstHandle = LeftHandle;
+    dirs[1].Buffer.resize(BufferSize);
+    dirs[1].ReadCtx.DirIndex = 1;
+    dirs[1].ReadCtx.Op = IoOp::Read;
+    dirs[1].WriteCtx.DirIndex = 1;
+    dirs[1].WriteCtx.Op = IoOp::Write;
+    dirs[1].ReadOffset = InitializeFileOffset(RightHandle);
+    dirs[1].WriteOffset = InitializeFileOffset(LeftHandle);
+    dirs[1].DstIsSocket = WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket);
+
+    // Cancel all pending I/O and drain completions on exit.
+    auto cancelPending = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        int pendingCount = 0;
+        for (auto& d : dirs)
         {
-            CancelIoEx(LeftHandle, &leftOverlapped);
-            GetOverlappedResult(LeftHandle, &leftOverlapped, &bytes, TRUE);
+            if (d.ReadPending)
+            {
+                CancelIoEx(d.SrcHandle, &d.ReadCtx.Overlapped);
+                pendingCount++;
+            }
+
+            if (d.WritePending)
+            {
+                CancelIoEx(d.DstHandle, &d.WriteCtx.Overlapped);
+                pendingCount++;
+            }
         }
 
-        if (rightReadPending)
+        for (int i = 0; i < pendingCount; i++)
         {
-            CancelIoEx(RightHandle, &rightOverlapped);
-            GetOverlappedResult(RightHandle, &rightOverlapped, &bytes, TRUE);
+            DWORD bytes = 0;
+            ULONG_PTR key = 0;
+            LPOVERLAPPED ov = nullptr;
+            GetQueuedCompletionStatus(iocp.get(), &bytes, &key, &ov, INFINITE);
         }
     });
 
-    DWORD bytesWritten;
-    const HANDLE waitObjects[] = {leftOverlapped.hEvent, rightOverlapped.hEvent};
+    // Issue initial reads.
+    for (auto& d : dirs)
+    {
+        TryIssueRead(d);
+        CheckDirectionDone(d);
+    }
+
     for (;;)
     {
-        if ((LeftHandle == nullptr) || (RightHandle == nullptr))
+        if (dirs[0].Done && dirs[1].Done)
         {
             break;
         }
 
-        DWORD leftBytesRead = 0;
-        if (!leftReadPending && LeftHandle)
+        // If no operations are pending, nothing to wait for.
+        bool anyPending = false;
+        for (const auto& d : dirs)
         {
-            if (!ReadFile(LeftHandle, leftReadSpan.data(), gsl::narrow_cast<DWORD>(leftReadSpan.size()), &leftBytesRead, &leftOverlapped))
+            if (d.ReadPending || d.WritePending)
             {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
+                anyPending = true;
+                break;
             }
-
-            leftReadPending = true;
         }
 
-        DWORD rightBytesRead = 0;
-        if (!rightReadPending && RightHandle)
+        if (!anyPending)
         {
-            if (!ReadFile(RightHandle, rightReadSpan.data(), gsl::narrow_cast<DWORD>(rightReadSpan.size()), &rightBytesRead, &rightOverlapped))
-            {
-                THROW_LAST_ERROR_IF(GetLastError() != ERROR_IO_PENDING);
-            }
-
-            rightReadPending = true;
+            break;
         }
 
-        const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitObjects), waitObjects, FALSE, INFINITE);
-        if (waitResult == WAIT_OBJECT_0)
+        DWORD bytesTransferred = 0;
+        ULONG_PTR completionKey = 0;
+        LPOVERLAPPED overlapped = nullptr;
+        const BOOL success = GetQueuedCompletionStatus(iocp.get(), &bytesTransferred, &completionKey, &overlapped, INFINITE);
+
+        if (!overlapped)
         {
-            LOG_LAST_ERROR_IF_MSG(
-                !GetOverlappedResult(LeftHandle, &leftOverlapped, &leftBytesRead, FALSE), "WSAGetLastError %d", WSAGetLastError());
-
-            leftReadPending = false;
-            if (leftBytesRead == 0)
-            {
-                LeftHandle = nullptr;
-                if (WI_IsFlagSet(Flags, RelayFlags::RightIsSocket))
-                {
-                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(RightHandle), SD_SEND) == SOCKET_ERROR);
-                }
-            }
-            else if (RightHandle != nullptr)
-            {
-                auto writeSpan = leftReadSpan.first(leftBytesRead);
-                bytesWritten = InterruptableWrite(RightHandle, writeSpan, {}, &leftOverlapped);
-                if (bytesWritten == 0)
-                {
-                    break;
-                }
-
-                leftOffset.QuadPart += leftBytesRead;
-                leftOverlapped.Offset = leftOffset.LowPart;
-                leftOverlapped.OffsetHigh = leftOffset.HighPart;
-            }
+            THROW_LAST_ERROR();
         }
-        else if (waitResult == (WAIT_OBJECT_0 + 1))
-        {
-            LOG_LAST_ERROR_IF_MSG(
-                !GetOverlappedResult(RightHandle, &rightOverlapped, &rightBytesRead, FALSE), "WSAGetLastError %d", WSAGetLastError());
 
-            rightReadPending = false;
-            if (rightBytesRead == 0)
+        auto* ctx = reinterpret_cast<IoContext*>(overlapped);
+        auto& d = dirs[ctx->DirIndex];
+        const DWORD error = success ? ERROR_SUCCESS : GetLastError();
+
+        if (ctx->Op == IoOp::Read)
+        {
+            d.ReadPending = false;
+
+            if (!success)
             {
-                RightHandle = nullptr;
-                if (WI_IsFlagSet(Flags, RelayFlags::LeftIsSocket))
+                if (error == ERROR_HANDLE_EOF || error == ERROR_BROKEN_PIPE || error == ERROR_OPERATION_ABORTED)
                 {
-                    LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(LeftHandle), SD_SEND) == SOCKET_ERROR);
+                    d.SrcEof = true;
+                }
+                else
+                {
+                    LOG_WIN32_MSG(error, "Read completion failed");
+                    d.SrcEof = true;
                 }
             }
-            else if (LeftHandle != nullptr)
+            else if (bytesTransferred == 0)
             {
-                auto writeSpan = rightReadSpan.first(rightBytesRead);
-                bytesWritten = InterruptableWrite(LeftHandle, writeSpan, {}, &rightOverlapped);
-                if (bytesWritten == 0)
-                {
-                    break;
-                }
-
-                rightOffset.QuadPart += rightBytesRead;
-                rightOverlapped.Offset = rightOffset.LowPart;
-                rightOverlapped.OffsetHigh = rightOffset.HighPart;
+                d.SrcEof = true;
+            }
+            else
+            {
+                d.Tail += bytesTransferred;
+                d.ReadOffset.QuadPart += bytesTransferred;
             }
         }
         else
         {
-            THROW_HR_MSG(E_FAIL, "WaitForMultipleObjects %d", waitResult);
+            d.WritePending = false;
+
+            if (!success)
+            {
+                LOG_WIN32_MSG(error, "Write completion failed");
+                d.Done = true;
+            }
+            else
+            {
+                d.Head += bytesTransferred;
+                d.WriteOffset.QuadPart += bytesTransferred;
+
+                if (d.Pending() == 0 && !d.ReadPending)
+                {
+                    d.Head = d.Tail = 0;
+                }
+            }
+        }
+
+        // Advance all directions: issue writes first to free buffer
+        // space, then reads, then check for completion.
+        for (auto& dir : dirs)
+        {
+            if (!dir.Done)
+            {
+                TryIssueWrite(dir);
+                TryIssueRead(dir);
+                CheckDirectionDone(dir);
+            }
         }
     }
 }
