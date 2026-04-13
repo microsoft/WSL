@@ -939,13 +939,20 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
         THROW_WIN32(error.value());
     }
 
+    // Read the original VHD owner before the move so we can restore it after.
+    // Cross-volume MoveFileEx may set the owner to BUILTIN\Administrators for
+    // elevated callers, which breaks HcsGrantVmAccess (needs WRITE_DAC via
+    // ownership) from non-elevated contexts.
+    PSID originalOwner = nullptr;
+    wil::unique_hlocal originalDescriptor;
+    THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+        distro.VhdFilePath.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &originalOwner, nullptr, nullptr, nullptr, &originalDescriptor));
+
     // Move the VHD to the new location.
     THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
 
-    // Set the VHD owner to the user's SID. Cross-volume MoveFileEx sets the
-    // owner to BUILTIN\Administrators for elevated callers, which breaks
-    // HcsGrantVmAccess (needs WRITE_DAC via ownership) from non-elevated contexts.
-    auto setVhdOwner = [this](const std::filesystem::path& vhdPath) {
+    // Restore the original VHD owner on the moved file.
+    auto setVhdOwner = [&originalOwner](const std::filesystem::path& vhdPath) {
         wil::unique_hfile vhdHandle(CreateFileW(
             vhdPath.c_str(), WRITE_OWNER, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
         THROW_LAST_ERROR_IF(!vhdHandle);
@@ -953,7 +960,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
         auto runAsSelf = wil::run_as_self();
         auto privileges = wsl::windows::common::security::AcquirePrivilege(SE_RESTORE_NAME);
         THROW_IF_WIN32_ERROR(
-            ::SetSecurityInfo(vhdHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, GetUserSid(), nullptr, nullptr, nullptr));
+            ::SetSecurityInfo(vhdHandle.get(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, originalOwner, nullptr, nullptr, nullptr));
     };
 
     setVhdOwner(newVhdPath);
