@@ -12,7 +12,6 @@ Abstract:
 
 --*/
 
-#include "precomp.h"
 #include "WSLCContainerLauncher.h"
 
 using wsl::windows::common::ClientRunningWSLCProcess;
