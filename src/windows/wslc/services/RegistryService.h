@@ -14,7 +14,7 @@ Abstract:
 #pragma once
 
 #include "SessionModel.h"
-#include "UserSettings.h"
+#include "WSLCUserSettings.h"
 
 namespace wsl::windows::wslc::services {
 
@@ -25,10 +25,10 @@ using wsl::windows::wslc::settings::CredentialStoreType;
 class RegistryService
 {
 public:
-    static void Store(CredentialStoreType backend, const std::string& serverAddress, const std::string& credential);
-    static std::optional<std::string> Get(CredentialStoreType backend, const std::string& serverAddress);
-    static void Erase(CredentialStoreType backend, const std::string& serverAddress);
-    static std::vector<std::string> List(CredentialStoreType backend);
+    static void Store(const std::string& serverAddress, const std::string& credential);
+    static std::optional<std::string> Get(const std::string& serverAddress);
+    static void Erase(const std::string& serverAddress);
+    static std::vector<std::string> List();
 
     // Authenticates with a registry via the session's Docker engine.
     // Returns a base64-encoded auth header ready to store and pass to push/pull.

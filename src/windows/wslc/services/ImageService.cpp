@@ -14,7 +14,6 @@ Abstract:
 #include "ImageService.h"
 #include "RegistryService.h"
 #include "SessionService.h"
-#include "UserSettings.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
 
@@ -219,7 +218,7 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
     auto server = GetServerFromImage(image);
-    auto storedAuth = RegistryService::Get(settings::User().Get<settings::Setting::CredentialStore>(), server);
+    auto storedAuth = RegistryService::Get(server);
     auto auth = storedAuth.has_value() ? storedAuth->c_str() : nullptr;
 
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth, callback));
@@ -252,7 +251,7 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
 void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
     auto server = GetServerFromImage(image);
-    auto storedAuth = RegistryService::Get(settings::User().Get<settings::Setting::CredentialStore>(), server);
+    auto storedAuth = RegistryService::Get(server);
     auto auth = storedAuth.value_or(BuildRegistryAuthHeader("","", server));
 
     THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));

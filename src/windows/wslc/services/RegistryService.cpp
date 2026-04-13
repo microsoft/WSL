@@ -87,34 +87,38 @@ void WriteJsonFile(const wil::unique_hfile& handle, const nlohmann::json& data)
 
 namespace wsl::windows::wslc::services {
 
-void RegistryService::Store(CredentialStoreType backend, const std::string& serverAddress, const std::string& credential)
+void RegistryService::Store(const std::string& serverAddress, const std::string& credential)
 {
     THROW_HR_IF(E_INVALIDARG, serverAddress.empty());
     THROW_HR_IF(E_INVALIDARG, credential.empty());
 
+    auto backend = settings::User().Get<settings::Setting::CredentialStore>();
     backend == CredentialStoreType::File ? FileStoreCredential(serverAddress, credential)
                                          : WinCredStoreCredential(serverAddress, credential);
 }
 
-std::optional<std::string> RegistryService::Get(CredentialStoreType backend, const std::string& serverAddress)
+std::optional<std::string> RegistryService::Get(const std::string& serverAddress)
 {
     if (serverAddress.empty())
     {
         return std::nullopt;
     }
 
+    auto backend = settings::User().Get<settings::Setting::CredentialStore>();
     return backend == CredentialStoreType::File ? FileGetCredential(serverAddress) : WinCredGetCredential(serverAddress);
 }
 
-void RegistryService::Erase(CredentialStoreType backend, const std::string& serverAddress)
+void RegistryService::Erase(const std::string& serverAddress)
 {
     THROW_HR_IF(E_INVALIDARG, serverAddress.empty());
 
+    auto backend = settings::User().Get<settings::Setting::CredentialStore>();
     backend == CredentialStoreType::File ? FileEraseCredential(serverAddress) : WinCredEraseCredential(serverAddress);
 }
 
-std::vector<std::string> RegistryService::List(CredentialStoreType backend)
+std::vector<std::string> RegistryService::List()
 {
+    auto backend = settings::User().Get<settings::Setting::CredentialStore>();
     return backend == CredentialStoreType::File ? FileListCredentials() : WinCredListCredentials();
 }
 

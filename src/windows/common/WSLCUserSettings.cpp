@@ -4,18 +4,23 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    UserSettings.cpp
+    WSLCUserSettings.cpp
 
 Abstract:
 
     Implementation of UserSettings — YAML loading and validation.
 
 --*/
-#include "UserSettings.h"
+#include "precomp.h"
+#include "WSLCUserSettings.h"
 #include "filesystem.hpp"
 #include "string.hpp"
 #include "wslutil.h"
+
+#pragma warning(push)
+#pragma warning(disable : 4251 4275)
 #include <yaml-cpp/yaml.h>
+#pragma warning(pop)
 #include <algorithm>
 #include <format>
 #include <fstream>
@@ -25,7 +30,6 @@ using namespace wsl::windows::common::string;
 
 namespace wsl::windows::wslc::settings {
 
-// Default settings file template — written on first run.
 // All entries are commented out; the values shown are the built-in defaults.
 // TODO: localization for comments needed?
 static constexpr std::string_view s_DefaultSettingsTemplate =
