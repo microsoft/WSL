@@ -203,13 +203,13 @@ class MountTests
     }
 
     // Attach a vhd, but don't mount it
-    TEST_METHOD(TestBareMountVhd)
+    WSL2_TEST_METHOD(TestBareMountVhd)
     {
         TestBareMountImpl(true);
     }
 
     // Mount one partition using --vhd and validate that options are correctly applied
-    TEST_METHOD(TestMountOnePartitionVhd)
+    WSL2_TEST_METHOD(TestMountOnePartitionVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -217,7 +217,7 @@ class MountTests
     }
 
     // Mount two partitions using --vhd on the same disk
-    TEST_METHOD(TestMountTwoPartitionsVhd)
+    WSL2_TEST_METHOD(TestMountTwoPartitionsVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -225,7 +225,7 @@ class MountTests
     }
 
     // Run a bare mount using --vhd and then mount a partition
-    TEST_METHOD(TestAttachThenMountVhd)
+    WSL2_TEST_METHOD(TestAttachThenMountVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -233,7 +233,7 @@ class MountTests
     }
 
     // Mount the disk directly
-    TEST_METHOD(TestMountWholeDiskVhd)
+    WSL2_TEST_METHOD(TestMountWholeDiskVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -241,49 +241,49 @@ class MountTests
     }
 
     // Test that mount state is deleted on shutdown (--vhd)
-    TEST_METHOD(TestMountStateIsDeletedOnShutdownVhd)
+    WSL2_TEST_METHOD(TestMountStateIsDeletedOnShutdownVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestMountStateIsDeletedOnShutdownImpl(true);
     }
 
-    TEST_METHOD(TestFilesystemDetectionWholeDisk)
+    WSL2_TEST_METHOD(TestFilesystemDetectionWholeDisk)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestFilesystemDetectionWholeDiskImpl(false);
     }
 
-    TEST_METHOD(TestFilesystemDetectionWholeDiskVhd)
+    WSL2_TEST_METHOD(TestFilesystemDetectionWholeDiskVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestFilesystemDetectionWholeDiskImpl(true);
     }
 
-    TEST_METHOD(TestMountTwoPartitionsWithDetection)
+    WSL2_TEST_METHOD(TestMountTwoPartitionsWithDetection)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestMountTwoPartitionsWithDetectionImpl(false);
     }
 
-    TEST_METHOD(TestMountTwoPartitionsWithDetectionVhd)
+    WSL2_TEST_METHOD(TestMountTwoPartitionsWithDetectionVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestMountTwoPartitionsWithDetectionImpl(true);
     }
 
-    TEST_METHOD(TestFilesystemDetectionFail)
+    WSL2_TEST_METHOD(TestFilesystemDetectionFail)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestFilesystemDetectionFailImpl(false);
     }
 
-    TEST_METHOD(TestFilesystemDetectionFailVhd)
+    WSL2_TEST_METHOD(TestFilesystemDetectionFailVhd)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -291,11 +291,9 @@ class MountTests
     }
 
     // Test specifying a mount name for a vhd
-    TEST_METHOD(SpecifyMountName)
+    WSL2_TEST_METHOD(SpecifyMountName)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         const auto mountCommand = L"--mount " + VhdDevice + L" --vhd --name " + TEST_MOUNT_NAME;
 
         WslKeepAlive keepAlive;
@@ -344,11 +342,9 @@ class MountTests
     }
 
     // Test ensuring that name collision detection works in --mount --name
-    TEST_METHOD(SpecifyMountNameCollision)
+    WSL2_TEST_METHOD(SpecifyMountNameCollision)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         const auto mountCommand = L"--mount " + VhdDevice + L" --vhd --name " + TEST_MOUNT_NAME;
 
         WslKeepAlive keepAlive;
@@ -372,11 +368,9 @@ class MountTests
     }
 
     // Test that multiple partitions can be mounted with --name
-    TEST_METHOD(SpecifyMountNameTwoPartitions)
+    WSL2_TEST_METHOD(SpecifyMountNameTwoPartitions)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         const auto mountCommandOne = L"--mount " + VhdDevice + L" --vhd --name " + TEST_MOUNT_NAME + L"p1";
         const auto mountCommandTwo = L"--mount " + VhdDevice + L" --vhd --name " + TEST_MOUNT_NAME + L"p2";
 
@@ -403,11 +397,9 @@ class MountTests
     }
 
     // Test relative mount/unmounting of a --vhd
-    TEST_METHOD(RelativePathUnmount)
+    WSL2_TEST_METHOD(RelativePathUnmount)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
         const auto disk = GetBlockDeviceInWsl();
@@ -417,11 +409,9 @@ class MountTests
     }
 
     // Test relative mount/unmounting of a --vhd that does not exist
-    TEST_METHOD(RelativePathUnmountNoFileExists)
+    WSL2_TEST_METHOD(RelativePathUnmountNoFileExists)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
         const auto disk = GetBlockDeviceInWsl();
@@ -431,11 +421,9 @@ class MountTests
         VERIFY_ARE_NOT_EQUAL(LxsstuLaunchWsl(L"--unmount " TEST_UNMOUNT_VHD_DNE), (DWORD)0);
     }
 
-    TEST_METHOD(AbsolutePathVhdUnmount)
+    WSL2_TEST_METHOD(AbsolutePathVhdUnmount)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
 
         const auto disk = GetBlockDeviceInWsl();
@@ -450,10 +438,9 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + absolutePath.wstring()), (DWORD)0);
     }
 
-    TEST_METHOD(AbsolutePathVhdUnmountAfterVMTimeout)
+    WSL2_TEST_METHOD(AbsolutePathVhdUnmountAfterVMTimeout)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
 
         WslKeepAlive keepAlive;
 
@@ -474,7 +461,7 @@ class MountTests
     }
 
     // Attach a disk, but don't mount it
-    TEST_METHOD(TestBareMount)
+    WSL2_TEST_METHOD(TestBareMount)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -483,11 +470,9 @@ class MountTests
 
     // Validate that attached disks that were offline when attached
     // are still offline when detached
-    TEST_METHOD(TestOfflineDiskStaysOffline)
+    WSL2_TEST_METHOD(TestOfflineDiskStaysOffline)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         auto diskHandle = wsl::windows::common::disk::OpenDevice(DiskDevice.c_str(), GENERIC_ALL, c_diskOpenTimeoutMs);
@@ -516,7 +501,7 @@ class MountTests
     }
 
     // Mount one partition and validate that options are correctly applied
-    TEST_METHOD(TestMountOnePartition)
+    WSL2_TEST_METHOD(TestMountOnePartition)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -524,7 +509,7 @@ class MountTests
     }
 
     // Mount two partitions on the same disk
-    TEST_METHOD(TestMountTwoPartitions)
+    WSL2_TEST_METHOD(TestMountTwoPartitions)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -532,11 +517,9 @@ class MountTests
     }
 
     // Mount a fat partition
-    TEST_METHOD(TestMountFatPartition)
+    WSL2_TEST_METHOD(TestMountFatPartition)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         // Create a MBR disk with 1 ntfs partition
@@ -562,14 +545,14 @@ class MountTests
     }
 
     // Mount the disk directly
-    TEST_METHOD(TestMountWholeDisk)
+    WSL2_TEST_METHOD(TestMountWholeDisk)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
         TestMountWholeDiskImpl(false);
     }
 
-    TEST_METHOD(TestMountStateIsDeletedOnShutdown)
+    WSL2_TEST_METHOD(TestMountStateIsDeletedOnShutdown)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -577,11 +560,9 @@ class MountTests
     }
 
     // Validate that a failure to mount a disk isn't fatal
-    TEST_METHOD(TestMountFailuresArentFatal)
+    WSL2_TEST_METHOD(TestMountFailuresArentFatal)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         // Create a MBR disk with 1 ext4 partition
@@ -638,20 +619,16 @@ class MountTests
     }
 
     // wsl --unmount should succeed even when no disk is mounted
-    TEST_METHOD(UnmountWithoutAnyDisk)
+    WSL2_TEST_METHOD(UnmountWithoutAnyDisk)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount"), (DWORD)0);
     }
 
     // Mount two partitions on the same disk and validate that the mount is restored
-    TEST_METHOD(TestMountTwoPartitionsAfterTimeout)
+    WSL2_TEST_METHOD(TestMountTwoPartitionsAfterTimeout)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         // Create a MBR disk with 1 ext4 partition and one fat partitions
@@ -679,11 +656,9 @@ class MountTests
     }
 
     // Validate that non-admin can remount saved disks
-    TEST_METHOD(TestMount1PartitionAndRemountAsNonAdmin)
+    WSL2_TEST_METHOD(TestMount1PartitionAndRemountAsNonAdmin)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         FormatDisk({L"ext4"}, false);
@@ -718,7 +693,7 @@ class MountTests
     }
 
     // Run a bare mount and then mount a partition
-    TEST_METHOD(TestAttachThenMount)
+    WSL2_TEST_METHOD(TestAttachThenMount)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
 
@@ -726,11 +701,9 @@ class MountTests
     }
 
     // Validate that unmounting works when the UVM is not running
-    TEST_METHOD(TestMountOnePartitionAfterTimeout)
+    WSL2_TEST_METHOD(TestMountOnePartitionAfterTimeout)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         // Create a MBR disk with 1 ext4 partition
@@ -758,11 +731,9 @@ class MountTests
     }
 
     // Validate that the proper mount error is returned if the filesystem type is wrong
-    TEST_METHOD(TestMountPartitionWithWrongFs)
+    WSL2_TEST_METHOD(TestMountPartitionWithWrongFs)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         // Create a MBR disk with 1 ext4 partition
@@ -782,11 +753,9 @@ class MountTests
     }
 
     // Validate that the proper mount error is returned if the partition can't be found
-    TEST_METHOD(TestMountPartitionWithBadPartitionIndex)
+    WSL2_TEST_METHOD(TestMountPartitionWithBadPartitionIndex)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         // Create a MBR disk with 1 fat partition
@@ -806,11 +775,9 @@ class MountTests
     }
 
     // Validate that disk aren't detached if in use by other processes
-    TEST_METHOD(TestDeviceCantBeMountedIfInUse)
+    WSL2_TEST_METHOD(TestDeviceCantBeMountedIfInUse)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         {
             // Format-Volume fails without automount enabled
             SetAutoMountPolicy AutoMountPolicy{true};
@@ -859,11 +826,9 @@ class MountTests
         VERIFY_ARE_EQUAL(output, wsl::shared::string::MultiByteToWide(fileContent));
     }
 
-    TEST_METHOD(TestMountWithFlagOption)
+    WSL2_TEST_METHOD(TestMountWithFlagOption)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         // Create a MBR disk with 1 ext4 partition
@@ -902,21 +867,17 @@ class MountTests
         WaitForDiskReady();
     }
 
-    TEST_METHOD(TestAttachFailsWithoutWsl2Distro)
+    WSL1_TEST_METHOD(TestAttachFailsWithoutWsl2Distro)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL1_TEST_ONLY();
-
         // Attempt to mount a disk with only a WSL1 distro
         wsl::windows::common::SvcComm service;
         VERIFY_ARE_EQUAL(service.AttachDisk(L"Dummy", LXSS_ATTACH_MOUNT_FLAGS_PASS_THROUGH), WSL_E_WSL2_NEEDED);
     }
 
-    TEST_METHOD(VhdWithSpaces)
+    WSL2_TEST_METHOD(VhdWithSpaces)
     {
         SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
-        WSL2_TEST_ONLY();
-
         LxsstuLaunchPowershellAndCaptureOutput(L"New-Vhd -Path 'vhd with spaces.vhdx' -SizeBytes 20MB");
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
@@ -1211,8 +1172,6 @@ class MountTests
 
     void TestBareMountImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         WslKeepAlive keepAlive;
 
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
@@ -1246,8 +1205,6 @@ class MountTests
 
     void TestMountOnePartitionImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 
@@ -1302,8 +1259,6 @@ class MountTests
 
     void TestMountTwoPartitionsImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 
@@ -1338,8 +1293,6 @@ class MountTests
 
     void TestAttachThenMountImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 
@@ -1369,8 +1322,6 @@ class MountTests
 
     void TestMountWholeDiskImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 
@@ -1404,8 +1355,6 @@ class MountTests
 
     void TestMountStateIsDeletedOnShutdownImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 
@@ -1437,8 +1386,6 @@ class MountTests
 
     void TestFilesystemDetectionWholeDiskImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 
@@ -1472,8 +1419,6 @@ class MountTests
 
     void TestMountTwoPartitionsWithDetectionImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 
@@ -1508,8 +1453,6 @@ class MountTests
 
     void TestFilesystemDetectionFailImpl(bool isVhd)
     {
-        WSL2_TEST_ONLY();
-
         const auto deviceName = (isVhd) ? VhdDevice : DiskDevice;
         const auto mountCommand = (isVhd) ? (L"--mount " + deviceName + L" --vhd") : (L"--mount " + deviceName);
 

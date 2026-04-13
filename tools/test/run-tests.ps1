@@ -67,8 +67,25 @@ if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
     }
 }
 
+# If the user provided a /name: or /select: filter, don't add automatic version filtering.
+$HasUserSelection = $false
+foreach ($arg in $TeArgs)
+{
+    if ($arg -like '/name:*' -or $arg -like '/select:*' -or $arg -like '-name:*' -or $arg -like '-select:*')
+    {
+        $HasUserSelection = $true
+        break
+    }
+}
+
 $teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath",
     "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
+
+if (-not $HasUserSelection)
+{
+    $teArgList += "/select:`"@WSLVersion='$Version' or not(@WSLVersion='*')`""
+}
+
 $teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
 
 if ($AttachDebugger)
