@@ -40,6 +40,7 @@ class WSLCE2EContainerRunTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(PythonImage);
 
@@ -54,6 +55,7 @@ class WSLCE2EContainerRunTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
 
         EnvTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
         EnvTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
@@ -394,8 +396,6 @@ class WSLCE2EContainerRunTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result1.Verify({.Stderr = L"", .ExitCode = 0});
 
-        auto containersBefore = ListAllContainers().size();
-
         // Create a second container mapping the same host port to validate the full error message
         auto createResult =
             RunWslc(std::format(L"container create -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
@@ -413,11 +413,11 @@ class WSLCE2EContainerRunTests
         RunWslc(std::format(L"container rm {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify 'container run' auto-cleans up on port conflict (no ghost container)
-        auto runResult = RunWslc(std::format(L"container run -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+        auto runResult = RunWslc(std::format(
+            L"container run --name {} -p {}:{} {}", WslcContainerName2, HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
         runResult.Verify({.ExitCode = 1});
 
-        auto containersAfter = ListAllContainers().size();
-        VERIFY_ARE_EQUAL(containersBefore, containersAfter);
+        VerifyContainerIsNotListed(WslcContainerName2);
     }
 
     // https://github.com/microsoft/WSL/issues/14433
@@ -556,6 +556,7 @@ class WSLCE2EContainerRunTests
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring WslcContainerName2 = L"wslc-test-container-2";
 
     // Test environment variables
     const std::wstring HostEnvVariableName = L"WSLC_TEST_HOST_ENV";

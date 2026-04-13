@@ -236,7 +236,7 @@ std::string FormatPortEndpoint(const ContainerPortMapping& portMapping)
     auto addr = portMapping.VmMapping.BindingAddressString();
     return std::format(
         "{}:{}/{}",
-        portMapping.VmMapping.IsIpv6() ? std::format("[{}]", addr) : addr,
+        portMapping.VmMapping.IsIPv6() ? std::format("[{}]", addr) : addr,
         portMapping.VmMapping.HostPort(),
         portMapping.ProtocolString());
 }
