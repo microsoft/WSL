@@ -81,6 +81,18 @@ Below is a brief overview:
 
 ### Writing the Test
 
+For tests that only apply to a specific WSL version, use the version-specific test method macros instead of `TEST_METHOD`:
+
+- `WSL2_TEST_METHOD(Name)` — test only runs on WSL2
+- `WSL1_TEST_METHOD(Name)` — test only runs on WSL1
+- `WSLC_TEST_METHOD(Name)` — test only runs on WSL2 (for use in WSLC test classes)
+- `TEST_METHOD(Name)` — test runs on both WSL1 and WSL2
+
+These macros use TAEF metadata properties to tag tests with their required WSL version.
+When tests are run via `run-tests.ps1` or CloudTest, a `/select:` query automatically
+filters out tests that don't match the target version—so they don't appear in results at all
+(no "skipped" noise).
+
 For example, consider the file below, named `ExampleTest.cpp`:
 
 ```cpp
@@ -96,12 +108,18 @@ For example, consider the file below, named `ExampleTest.cpp`:
         {
             TEST_CLASS(ExampleTest) // define this as a test class
 
-            // add tests via test methods of the test class
-            TEST_METHOD(HelloWorldTest) // ExampleTest::ExampleTest::HelloWorldTest
+            // runs on both WSL1 and WSL2
+            TEST_METHOD(HelloWorldTest)
             {
                 std::wstring outputExpected = L"Linux on Windows Rocks!\n";
                 auto [output, __] = LxsstuLaunchWslAndCaptureOutput(L"echo Linux on Windows Rocks!"); // from /test/Common.h
                 VERIFY_ARE_EQUAL(output, outputExpected); // TAEF test method that passes if both are equal, and fails otherwise.
+            }
+
+            // only runs on WSL2
+            WSL2_TEST_METHOD(Wsl2OnlyTest)
+            {
+                // ...
             }
         };
     } //namespace ExampleTest

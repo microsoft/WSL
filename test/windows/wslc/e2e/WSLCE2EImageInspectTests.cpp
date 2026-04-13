@@ -36,35 +36,27 @@ class WSLCE2EImageInspectTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image inspect --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_MissingImageName)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_MissingImageName)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image inspect");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image inspect {}", InvalidImage.NameAndTag()));
         auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_Success)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto inspectData =

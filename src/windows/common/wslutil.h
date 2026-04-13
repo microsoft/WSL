@@ -48,6 +48,13 @@ inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
 inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLC: Does this apply to WSLC ?
 
+enum class EnumReferenceFormat
+{
+    None,
+    Tag,
+    Digest
+};
+
 struct GitHubReleaseAsset
 {
     std::wstring url;
@@ -276,7 +283,7 @@ void ParseIpv6Address(const char* Address, in_addr6& Result);
 
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input);
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input, EnumReferenceFormat* Format = nullptr);
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 

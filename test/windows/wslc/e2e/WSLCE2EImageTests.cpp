@@ -24,23 +24,20 @@ class WSLCE2EImageTests
 {
     WSLC_TEST_CLASS(WSLCE2EImageTests)
 
-    TEST_METHOD(WSLCE2E_Image_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"image --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_NoSubcommand_ShowsHelp)
+    WSLC_TEST_METHOD(WSLCE2E_Image_NoSubcommand_ShowsHelp)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"image");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_InvalidCommand_DisplaysErrorMessage)
+    WSLC_TEST_METHOD(WSLCE2E_Image_InvalidCommand_DisplaysErrorMessage)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"image INVALID_CMD");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
@@ -77,6 +74,7 @@ private:
             {L"load", Localization::WSLCCLI_ImageLoadDesc()},
             {L"pull", Localization::WSLCCLI_ImagePullDesc()},
             {L"save", Localization::WSLCCLI_ImageSaveDesc()},
+            {L"tag", Localization::WSLCCLI_ImageTagDesc()},
         };
 
         size_t maxLen = 0;
