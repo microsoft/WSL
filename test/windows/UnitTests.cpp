@@ -970,8 +970,8 @@ class UnitTests
         auto commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, tarFileName, version);
         validateOutput(
             commandLine.c_str(),
-            L"The file exists. \r\n"
-            L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+            std::format(L"Failed to create disk '{}ext4.vhdx': The file exists. \r\n"
+            L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n", LXSST_IMPORT_DISTRO_TEST_DIR));
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
         validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
