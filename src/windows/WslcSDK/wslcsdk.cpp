@@ -200,7 +200,7 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
         THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
 }
-HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
+static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
 {
     if (inet_ntop(af, src, dst, dstCount) == nullptr)
     {
@@ -715,7 +715,7 @@ try
                     HRESULT hr = InetNtopToHresult(AF_INET6, &addr6->sin6_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
                     if (FAILED(hr))
                     {
-                        THROW_HR_MSG(hr,"inet_ntop() failed for AF_INET6 address");
+                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET6 address");
                     }
                     convertedPort.Family = AF_INET6;
                     break;
