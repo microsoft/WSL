@@ -704,7 +704,7 @@ try
                     if (FAILED(hr))
                     {
                         const auto& b = addr4->sin_addr.S_un.S_un_b;
-                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET address: %u.%u.%u.%u", b.s_b1, b.s_b2, b.s_b3, b.s_b4);
+                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET address");
                     }
                     convertedPort.Family = AF_INET;
                     break;
@@ -717,26 +717,7 @@ try
                     if (FAILED(hr))
                     {
                         const auto* b = addr6->sin6_addr.u.Byte;
-                        THROW_HR_MSG(
-                            hr,
-                            "inet_ntop() failed for AF_INET6 address: % 02x % 02x : % 02x % 02x : % 02x % 02x : % 02x % 02x : % "
-                            "02x % 02x : % 02x % 02x : % 02x % 02x : % 02x %02x ",
-                            b[0],
-                            b[1],
-                            b[2],
-                            b[3],
-                            b[4],
-                            b[5],
-                            b[6],
-                            b[7],
-                            b[8],
-                            b[9],
-                            b[10],
-                            b[11],
-                            b[12],
-                            b[13],
-                            b[14],
-                            b[15]);
+                        THROW_HR_MSG(hr,"inet_ntop() failed for AF_INET6 address");
                     }
                     convertedPort.Family = AF_INET6;
                     break;
