@@ -85,6 +85,7 @@ Abstract:
 #define KERNEL_MODULES_PATH "/lib/modules"
 #define KERNEL_MODULES_VHD_PATH "/modules"
 #define KERNEL_MODULES_OVERLAY "/modules_overlay"
+#define KERNEL_HEADERS_MOUNT_PATH "/kernel_headers"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -112,6 +113,7 @@ struct VmConfiguration
     bool EnableSafeMode = false;
     bool EnableSystemDistro = false;
     bool EnableCrashDumpCollection = false;
+    bool KernelHeadersAvailable = false;
     std::string KernelModulesPath;
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
@@ -1878,6 +1880,21 @@ try
     }
 
     //
+    // If kernel headers are mounted, move to a temporary location for distro init.
+    //
+
+    if (Config.KernelHeadersAvailable)
+    {
+        utsname unameBuffer{};
+        if (uname(&unameBuffer) >= 0)
+        {
+            auto headersTarget = std::format("{}/{}-{}", LXSS_KERNEL_HEADERS_PREFIX, "linux-headers", std::string(unameBuffer.release));
+            AddTemporaryMount(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV, KERNEL_HEADERS_MOUNT_PATH, MS_MOVE);
+            AddEnvironmentVariable(LX_WSL2_KERNEL_HEADERS_PATH_ENV, headersTarget.c_str());
+        }
+    }
+
+    //
     // Bind mount the init daemon into the distro namespace.
     //
 
@@ -3481,6 +3498,19 @@ try
         Config.EnableInboxGpuLibs = ConfigMessage->EnableInboxGpuLibs;
         Config.EnableGpuSupport = ConfigMessage->MountGpuShares;
         Config.EnableGuiApps = ConfigMessage->EnableGuiApps;
+
+        //
+        // Mount kernel headers share if available. Failure is not fatal.
+        //
+
+        if (ConfigMessage->MountKernelHeaders)
+        {
+            if (MountPlan9(LXSS_KERNEL_HEADERS_SHARE, KERNEL_HEADERS_MOUNT_PATH, true) >= 0)
+            {
+                Config.KernelHeadersAvailable = true;
+            }
+        }
+
         return 0;
     }
     case LxMiniInitMessageMount:

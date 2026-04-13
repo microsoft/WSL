@@ -294,6 +294,7 @@ private:
     bool m_tempDirectoryCreated;
     bool m_enableInboxGpuLibs;
     bool m_defaultKernel = true;
+    std::wstring m_kernelHeadersPath;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;
     ULONG m_systemDistroDeviceId = ULONG_MAX;
     ULONG m_kernelModulesDeviceId = ULONG_MAX;

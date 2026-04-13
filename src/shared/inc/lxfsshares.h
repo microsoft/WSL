@@ -33,3 +33,10 @@ typedef struct _LXSS_SHARED_DIRECTORY
 //
 
 constexpr LXSS_SHARED_DIRECTORY g_gpuShares[] = {{LXSS_GPU_DRIVERS_SHARE, LXSS_LIB_PREFIX "/drivers"}, {LXSS_GPU_LIB_SHARE, LXSS_LIB_PATH}};
+
+//
+// Kernel headers share for building kernel modules (DKMS, etc.).
+//
+
+#define LXSS_KERNEL_HEADERS_SHARE "kernel_headers"
+#define LXSS_KERNEL_HEADERS_PREFIX "/usr/src"

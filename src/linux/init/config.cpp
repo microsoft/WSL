@@ -1119,6 +1119,53 @@ Return Value:
     CATCH_LOG()
 
     //
+    // Move kernel headers mount to final location.
+    //
+
+    try
+    {
+        auto tempMount = RemoveMountAndEnvironmentOnScopeExit(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV);
+        if (tempMount)
+        {
+            auto target = getenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
+            if (target)
+            {
+                unsetenv(LX_WSL2_KERNEL_HEADERS_PATH_ENV);
+                tempMount.MoveMount(target);
+            }
+        }
+    }
+    CATCH_LOG()
+
+    //
+    // Create /lib/modules/<release>/build symlink pointing to the kernel headers
+    // so that DKMS and `make -C /lib/modules/$(uname -r)/build` work.
+    //
+    // N.B. This runs after both modules and headers mounts are in their final
+    //      locations inside the distro namespace.
+    //
+
+    try
+    {
+        utsname unameBuffer{};
+        if (uname(&unameBuffer) >= 0)
+        {
+            auto release = std::string(unameBuffer.release);
+            auto headersPath = std::format("{}/linux-headers-{}", LXSS_KERNEL_HEADERS_PREFIX, release);
+            auto buildLink = std::format("/lib/modules/{}/build", release);
+            if (access(headersPath.c_str(), F_OK) == 0)
+            {
+                unlink(buildLink.c_str());
+                if (symlink(headersPath.c_str(), buildLink.c_str()) < 0 && errno != EEXIST)
+                {
+                    LOG_ERROR("symlink({}, {}) failed {}", headersPath.c_str(), buildLink.c_str(), errno);
+                }
+            }
+        }
+    }
+    CATCH_LOG()
+
+    //
     // Change the permission of some devtmpfs devices to be more permissive.
     //
     // N.B. These devices may not be present with a custom kernel config.

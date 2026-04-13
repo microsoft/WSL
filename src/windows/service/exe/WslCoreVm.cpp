@@ -260,6 +260,25 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         }
     }
 
+    // Resolve kernel headers path for the default kernel.
+    if (m_defaultKernel)
+    {
+#ifdef WSL_KERNEL_HEADERS_PATH
+
+        m_kernelHeadersPath = std::wstring(TEXT(WSL_KERNEL_HEADERS_PATH));
+
+#else
+
+        m_kernelHeadersPath = m_installPath / L"linux-headers";
+
+#endif
+
+        if (!wsl::windows::common::filesystem::FileExists(m_kernelHeadersPath.c_str()))
+        {
+            m_kernelHeadersPath.clear();
+        }
+    }
+
     // If debug console was requested, create a randomly-named pipe and spawn a wslhost process to read from the pipe.
     //
     // N.B. wslhost.exe is launched at medium integrity level and its lifetime
@@ -410,6 +429,14 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 #endif
 
         addShare(TEXT(LXSS_GPU_PACKAGED_LIB_SHARE), path.c_str());
+    }
+
+    // Add a read-only 9p share for kernel headers if available.
+    if (!m_kernelHeadersPath.empty())
+    {
+        constexpr auto flags = (hcs::Plan9ShareFlags::ReadOnly | hcs::Plan9ShareFlags::AllowOptions);
+        wsl::windows::common::hcs::AddPlan9Share(
+            m_system.get(), TEXT(LXSS_KERNEL_HEADERS_SHARE), TEXT(LXSS_KERNEL_HEADERS_SHARE), m_kernelHeadersPath.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT, flags);
     }
 
     // Asynchronously add drvfs devices if supported.
@@ -1829,6 +1856,7 @@ void WslCoreVm::InitializeGuest()
     message->EnableGuiApps = LXSS_ENABLE_GUI_APPS();
     message->MountGpuShares = m_vmConfig.EnableGpuSupport;
     message->EnableInboxGpuLibs = m_enableInboxGpuLibs;
+    message->MountKernelHeaders = !m_kernelHeadersPath.empty();
     if (m_networkingEngine)
     {
         m_networkingEngine->FillInitialConfiguration(message->NetworkingConfiguration);
