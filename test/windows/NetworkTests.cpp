@@ -3848,7 +3848,7 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(LoopbackExplicit)
+    WSL2_TEST_METHOD(LoopbackExplicit)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
