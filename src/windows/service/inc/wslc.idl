@@ -560,12 +560,12 @@ typedef struct _WSLCVolumeInformation
     char Type[64];
 } WSLCVolumeInformation;
 
-typedef struct _WSLCContainerPruneFilter
+typedef struct _WSLCPruneLabelFilter
 {
     LPCSTR Key;
     [unique] LPCSTR Value;
     BOOL Present;
-} WSLCContainerPruneFilter;
+} WSLCPruneLabelFilter;
 
 typedef struct _WSLCPruneContainersResults
 {
@@ -573,6 +573,26 @@ typedef struct _WSLCPruneContainersResults
     ULONG ContainersCount;
     ULONGLONG SpaceReclaimed;
 } WSLCPruneContainersResults;
+
+typedef enum _WSLCPruneImagesFlags
+{
+    WSLCPruneImagesFlagsNone = 0,
+    WSLCPruneImagesFlagsDanglingTrue = 1,  // Only prune dangling (untagged) images.
+    WSLCPruneImagesFlagsDanglingFalse = 2, // Prune all images not used by any container.
+    // Note: If neither dangling flag is set, no dangling filter is passed (Docker defaults to dangling-only).
+} WSLCPruneImagesFlags;
+
+cpp_quote("#define WSLCPruneImagesFlagsValid (WSLCPruneImagesFlagsDanglingTrue | WSLCPruneImagesFlagsDanglingFalse)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCPruneImagesFlags);")
+
+typedef struct _WSLCPruneImagesOptions
+{
+    DWORD Flags; // WSLCPruneImagesFlags
+    ULONGLONG Until;
+    [unique, size_is(LabelsCount)] const WSLCPruneLabelFilter* Labels;
+    ULONG LabelsCount;
+} WSLCPruneImagesOptions;
 
 typedef enum _WSLCSessionState
 {
@@ -615,6 +635,7 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteImage([in] const WSLCDeleteImageOptions* Options, [out, size_is(, *Count)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const WSLCTagImageOptions* Options);
     HRESULT InspectImage([in] LPCSTR ImageNameOrId, [out] LPSTR* Output);
+    HRESULT PruneImages([in, unique] const WSLCPruneImagesOptions* Options, [out, size_is(, *DeletedImagesCount)] WSLCDeletedImageInformation** DeletedImages, [out] ULONG* DeletedImagesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Container management.
     HRESULT CreateContainer([in] const WSLCContainerOptions* Options, [out] IWSLCContainer** Container);
@@ -623,7 +644,7 @@ interface IWSLCSession : IUnknown
                                             [out] ULONG* Count,
                                             [out, size_is(, *PortsCount)] WSLCContainerPortMapping** Ports,
                                             [out] ULONG* PortsCount);
-    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLCContainerPruneFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLCPruneContainersResults* Result);
+    HRESULT PruneContainers([in, unique, size_is(FiltersCount)] WSLCPruneLabelFilter* Filters, [in] DWORD FiltersCount, [in] ULONGLONG Until, [out] WSLCPruneContainersResults* Result);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const WSLCProcessOptions* Options, [out] IWSLCProcess** Process, [out] int* Errno);
@@ -739,3 +760,5 @@ cpp_quote("#define WSLC_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_
 cpp_quote("#define WSLC_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 2) /* 0x80040602 */")
 cpp_quote("#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 3) /* 0x80040603 */")
 cpp_quote("#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4) /* 0x80040604 */")
+cpp_quote("#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5) /* 0x80040605 */")
+cpp_quote("#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6) /* 0x80040606 */")
