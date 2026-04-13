@@ -119,6 +119,7 @@ private:
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
+void VerifyImageIsListed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
@@ -130,6 +131,9 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
+
+void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
+std::wstring GetPythonHttpServerScript(uint16_t port);
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>

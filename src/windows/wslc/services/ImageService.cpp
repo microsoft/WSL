@@ -199,6 +199,23 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
+void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
+{
+    EnumReferenceFormat format;
+    auto [repo, tag] = ParseImage(targetImage, &format);
+    if (format == EnumReferenceFormat::Digest)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
+    }
+
+    WSLCTagImageOptions options{};
+    options.Image = sourceImage.c_str();
+    options.Repo = repo.c_str();
+    options.Tag = tag ? tag->c_str() : "";
+
+    THROW_IF_FAILED(session.Get()->TagImage(&options));
+}
+
 InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
 {
     wil::unique_cotaskmem_ansistring inspectData;
@@ -219,10 +236,6 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
     wsl::windows::common::HandleConsoleProgressBar progressBar(
         outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
     THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
-}
-
-void ImageService::Tag()
-{
 }
 
 void ImageService::Prune()

@@ -32,16 +32,10 @@ class WSLCE2EContainerCreateTests
     {
         EnsureImageIsLoaded(AlpineImage);
         EnsureImageIsLoaded(DebianImage);
-        EnsureImageIsLoaded(PythonImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), HostEnvVariableValue.c_str()));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), HostEnvVariableValue2.c_str()));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(MissingHostEnvVariableName.c_str(), nullptr));
-
-        // Initialize Winsock for loopback connectivity tests
-        WSADATA wsaData{};
-        const int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        THROW_HR_IF(HRESULT_FROM_WIN32(result), result != 0);
         return true;
     }
 
@@ -50,14 +44,10 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureImageIsDeleted(AlpineImage);
         EnsureImageIsDeleted(DebianImage);
-        EnsureImageIsDeleted(PythonImage);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), nullptr));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(MissingHostEnvVariableName.c_str(), nullptr));
-
-        // Cleanup Winsock
-        WSACleanup();
         return true;
     }
 
@@ -83,7 +73,7 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
         auto result = RunWslc(L"container create --help");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
@@ -109,7 +99,7 @@ class WSLCE2EContainerCreateTests
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         std::wstring containerId = result.GetStdoutOneLine();
 
         // Verify the container is listed with the correct status
@@ -122,7 +112,7 @@ class WSLCE2EContainerCreateTests
 
         // Create the container with a valid image
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         // Attempt to create another container with the same name
@@ -149,7 +139,7 @@ class WSLCE2EContainerCreateTests
             hostDirectory.wstring(),
             AlpineImage.NameAndTag(),
             fileName));
-        result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"WSLC Volume Test", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_WriteFromContainerReadFromHost_ReadWritePermissionByDefault)
@@ -162,7 +152,7 @@ class WSLCE2EContainerCreateTests
             hostDirectory.wstring(),
             AlpineImage.NameAndTag(),
             fileName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read all file content
         auto content = ReadFileContent(VolumeTestFile1.wstring());
@@ -179,7 +169,7 @@ class WSLCE2EContainerCreateTests
             hostDirectory.wstring(),
             AlpineImage.NameAndTag(),
             fileName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read all file content
         std::wifstream in(VolumeTestFile1);
@@ -327,7 +317,7 @@ class WSLCE2EContainerCreateTests
         {
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume \"C:/hostPath\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"The parameter is incorrect. \r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Path is not absolute: 'C'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -338,9 +328,10 @@ class WSLCE2EContainerCreateTests
         }
 
         {
+            // TODO: This specific error should be handled better once relative path handling is supported in the CLI.
             auto result =
                 RunWslc(std::format(L"container run --name {} --volume \"::\" {}", WslcContainerName, AlpineImage.NameAndTag()));
-            result.Verify({.Stderr = L"Unspecified error \r\nError code: E_FAIL\r\n", .ExitCode = 1});
+            result.Verify({.Stderr = L"Path is not absolute: ':'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
             EnsureContainerDoesNotExist(WslcContainerName);
         }
 
@@ -357,458 +348,32 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Start the container.
         result = RunWslc(std::format(L"container start {}", WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify with retry timeout of 1 minute.
         VerifyContainerIsNotListed(WslcContainerName, std::chrono::seconds(2), std::chrono::minutes(1));
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Remove)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        // Run the container with a valid image
-        auto result = RunWslc(std::format(L"container run --rm --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        // Run should be deleted on return so no retry.
-        VerifyContainerIsNotListed(WslcContainerName);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e {}=A {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=A", HostEnvVariableName)));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MultipleValues)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e {}=A -e {}=B {} env",
-            WslcContainerName,
-            HostEnvVariableName,
-            HostEnvVariableName2,
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=A", HostEnvVariableName)));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=B", HostEnvVariableName2)));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_UsesHostValue)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e {} {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_KeyOnly_MultipleValues_UsesHostValues)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e {} -e {} {} env",
-            WslcContainerName,
-            HostEnvVariableName,
-            HostEnvVariableName2,
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName2, HostEnvVariableValue2)));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_EmptyValue)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e {}= {} env", WslcContainerName, HostEnvVariableName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=", HostEnvVariableName)));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_A=env-file-a", "WSLC_TEST_ENV_FILE_B=env-file-b"});
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} --env-file {} {} env",
-            WslcContainerName,
-            EscapePath(EnvTestFile1.wstring()),
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_A=env-file-a"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_B=env-file-b"));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvOption_MixedWithEnvFile)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_ENV_MIX_FILE_B=from-file-b"});
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} -e WSLC_TEST_ENV_MIX_CLI=from-cli --env-file {} {} env",
-            WslcContainerName,
-            EscapePath(EnvTestFile1.wstring()),
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_MIX_FILE_A=from-file-a"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_MIX_FILE_B=from-file-b"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_MIX_CLI=from-cli"));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MultipleFiles)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_FILE_MULTI_A=file1-a", "WSLC_TEST_ENV_FILE_MULTI_B=file1-b"});
-
-        WriteEnvFile(EnvTestFile2, {"WSLC_TEST_ENV_FILE_MULTI_C=file2-c", "WSLC_TEST_ENV_FILE_MULTI_D=file2-d"});
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} --env-file {} --env-file {} {} env",
-            WslcContainerName,
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_A=file1-a"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_B=file1-b"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_C=file2-c"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_FILE_MULTI_D=file2-d"));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_MissingFile)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify(
-            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_InvalidContent)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_VALID=ok", "BAD KEY=value"});
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} --env-file {} {} env",
-            WslcContainerName,
-            EscapePath(EnvTestFile1.wstring()),
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Environment variable key 'BAD KEY' cannot contain whitespace\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_DuplicateKeys_Precedence)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_DUP=from-file-1"});
-
-        WriteEnvFile(EnvTestFile2, {"WSLC_TEST_ENV_DUP=from-file-2"});
-
-        // Later --env-file should win over earlier --env-file for duplicate keys
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} --env-file {} --env-file {} {} env",
-            WslcContainerName,
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_DUP=from-file-2"));
-
-        // Explicit -e should win over env-file value for duplicate keys
-        result = RunWslc(std::format(
-            L"container run --rm --name {} -e WSLC_TEST_ENV_DUP=from-cli --env-file {} --env-file {} {} env",
-            WslcContainerName,
-            EscapePath(EnvTestFile1.wstring()),
-            EscapePath(EnvTestFile2.wstring()),
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_DUP=from-cli"));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_EnvFile_ValueContainsEquals)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_ENV_EQUALS=value=with=equals"});
-
-        auto result = RunWslc(std::format(
-            L"container run --rm --name {} --env-file {} {} env",
-            WslcContainerName,
-            EscapePath(EnvTestFile1.wstring()),
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_ENV_EQUALS=value=with=equals"));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvOption)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Start_AlreadyRunning)
     {
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        result = RunWslc(std::format(L"container exec -e {}=A {} env", HostEnvVariableName, WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}=A", HostEnvVariableName)));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_KeyOnly_UsesHostValue)
-    {
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec -e {} {} env", HostEnvVariableName, WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, std::format(L"{}={}", HostEnvVariableName, HostEnvVariableValue)));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile)
-    {
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a", "WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"});
-
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_A=exec-env-file-a"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_FILE_B=exec-env-file-b"));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvOption_MixedWithEnvFile)
-    {
-        WriteEnvFile(EnvTestFile1, {"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a", "WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"});
-
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(
-            L"container exec -e WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli --env-file {} {} env", EscapePath(EnvTestFile1.wstring()), WslcContainerName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        const auto outputLines = result.GetStdoutLines();
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_MIX_FILE_A=from-file-a"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_MIX_FILE_B=from-file-b"));
-        VERIFY_IS_TRUE(ContainsOutputLine(outputLines, L"WSLC_TEST_EXEC_ENV_MIX_CLI=from-cli"));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_EnvFile_MissingFile)
-    {
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec --env-file ENV_FILE_NOT_FOUND {} env", WslcContainerName));
-        result.Verify(
-            {.Stderr = L"Environment file 'ENV_FILE_NOT_FOUND' cannot be opened for reading\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_RunInteractive_TTY)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        const auto& prompt = ">";
-        auto session = RunWslcInteractive(
-            std::format(L"container run -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
-        session.ExpectStdout(expectedPrompt);
-
-        session.WriteLine("echo hello");
-        session.ExpectCommandEcho("echo hello");
-        session.ExpectStdout("hello\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        session.WriteLine("whoami");
-        session.ExpectCommandEcho("whoami");
-        session.ExpectStdout("root\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        auto exitCode = session.ExitAndVerifyNoErrors();
-        VERIFY_ARE_EQUAL(0, exitCode);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_RunInteractive_NoTTY)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        auto session = RunWslcInteractive(std::format(L"container run -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-
-        session.WriteLine("test line 1");
-        session.ExpectStdout("test line 1\n");
-        session.WriteLine("test line 2");
-        session.ExpectStdout("test line 2\n");
-
-        // Close stdin to signal EOF to cat
-        session.CloseStdin();
-
-        // Wait for cat to exit with code 0
-        auto exitCode = session.Wait(10000);
-        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
-        session.VerifyNoErrors();
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_RunAttach_TTY)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        const auto& prompt = ">";
-        auto result = RunWslc(std::format(
-            L"container run -itd -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
 
-        const auto& expectedAttachPrompt = VT::BuildContainerAttachPrompt(prompt);
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
+        VerifyContainerIsListed(containerId, L"running");
 
-        auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
+        // Start again - should succeed without error
+        result = RunWslc(std::format(L"container start {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // The container attach prompt appears twice.
-        session.ExpectStdout(expectedAttachPrompt);
-        session.ExpectStdout(expectedAttachPrompt);
-
-        session.WriteLine("echo hello");
-        session.ExpectCommandEcho("echo hello");
-        session.ExpectStdout("hello\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        session.WriteLine("whoami");
-        session.ExpectCommandEcho("whoami");
-        session.ExpectStdout("root\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
-        VERIFY_ARE_EQUAL(0, exitCode);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_RunAttach_NoTTY)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container run -id --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-        auto containerId = result.GetStdoutOneLine();
-
-        auto session = RunWslcInteractive(std::format(L"container attach {}", containerId));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-
-        session.WriteLine("test line 1");
-        session.ExpectStdout("test line 1\n");
-        session.WriteLine("test line 2");
-        session.ExpectStdout("test line 2\n");
-
-        // Close stdin to signal EOF to cat
-        session.CloseStdin();
-
-        // Wait for cat to exit with code 0
-        auto exitCode = session.Wait(10000);
-        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
-        session.VerifyNoErrors();
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_ExecInteractive_TTY)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-
-        const auto& prompt = ">";
-        auto result =
-            RunWslc(std::format(L"container run -itd -e PS1={} --name {} {}", prompt, WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-        auto containerId = result.GetStdoutOneLine();
-
-        const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
-
-        auto session = RunWslcInteractive(std::format(L"container exec -it {} /bin/bash --norc", containerId));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-
-        session.ExpectStdout(expectedPrompt);
-
-        session.WriteLine("echo hello");
-        session.ExpectCommandEcho("echo hello");
-        session.ExpectStdout("hello\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        session.WriteLine("whoami");
-        session.ExpectCommandEcho("whoami");
-        session.ExpectStdout("root\r\n");
-        session.ExpectStdout(expectedPrompt);
-
-        session.ExitAndVerifyNoErrors();
-        auto exitCode = session.Wait();
-        VERIFY_ARE_EQUAL(0, exitCode);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_ExecInteractive_NoTTY)
-    {
-        VerifyContainerIsNotListed(WslcContainerName);
-        auto result = RunWslc(std::format(L"container run -id --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-        auto containerId = result.GetStdoutOneLine();
-
-        auto session = RunWslcInteractive(std::format(L"container exec -i {} cat", containerId));
-        VERIFY_IS_TRUE(session.IsRunning(), L"Container session should be running");
-
-        session.WriteLine("test line 1");
-        session.ExpectStdout("test line 1\n");
-        session.WriteLine("test line 2");
-        session.ExpectStdout("test line 2\n");
-
-        // Close stdin to signal EOF to cat
-        session.CloseStdin();
-
-        // Wait for cat to exit with code 0
-        auto exitCode = session.Wait(10000);
-        VERIFY_ARE_EQUAL(0, exitCode, L"Cat should exit with code 0 after receiving EOF");
-        session.VerifyNoErrors();
+        // Verify the container is still running
+        VerifyContainerIsListed(containerId, L"running");
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_CreateStartAttach_TTY)
@@ -818,7 +383,7 @@ class WSLCE2EContainerCreateTests
         const auto& prompt = ">";
         auto result = RunWslc(std::format(
             L"container create -it -e PS1={} --name {} {} bash --norc", prompt, WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         const auto& expectedPrompt = VT::BuildContainerPrompt(prompt);
@@ -847,7 +412,7 @@ class WSLCE2EContainerCreateTests
     {
         VerifyContainerIsNotListed(WslcContainerName);
         auto result = RunWslc(std::format(L"container create -i --name {} {} cat", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
 
         // Start with attach
@@ -877,117 +442,30 @@ class WSLCE2EContainerCreateTests
         auto result = RunWslc(std::format(
             L"container create --name {} {} sh -c \"echo lifecycle works; exit {}\"", WslcContainerName, AlpineImage.NameAndTag(), ExpectedExitCode));
 
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify({.Stdout = L"lifecycle works\n", .Stderr = L"", .ExitCode = ExpectedExitCode});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
-    {
-        // Start a container with a simple server listening on a port
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} -p {}:{} {} {}",
-            WslcContainerName,
-            HostTestPort1,
-            ContainerTestPort,
-            PythonImage.NameAndTag(),
-            GetPythonHttpServerScript(ContainerTestPort)));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Verify we can connect to the server from the host side
-        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
-
-        // Verify the port mapping is correct in the container inspect data
-        auto inspectContainer = InspectContainer(WslcContainerName);
-        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
-        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
-
-        auto portBindings = inspectContainer.Ports[portKey];
-        VERIFY_ARE_EQUAL(1u, portBindings.size());
-        VERIFY_ARE_EQUAL(std::to_string(HostTestPort1), portBindings[0].HostPort);
-        VERIFY_ARE_EQUAL("127.0.0.1", portBindings[0].HostIp);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortMultipleMappings)
-    {
-        // Start a container with a simple server listening on a port
-        // Map two host ports to the same container port
-        auto result = RunWslc(std::format(
-            L"container run -d --name {} -p {}:{} -p {}:{} {} {}",
-            WslcContainerName,
-            HostTestPort1,
-            ContainerTestPort,
-            HostTestPort2,
-            ContainerTestPort,
-            PythonImage.NameAndTag(),
-            GetPythonHttpServerScript(ContainerTestPort)));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // From the host side, verify we can connect to both ports
-        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort1).c_str(), HTTP_STATUS_OK, true);
-        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", HostTestPort2).c_str(), HTTP_STATUS_OK, true);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortAlreadyInUse)
-    {
-        // Bug: https://github.com/microsoft/WSL/issues/14448
-        SKIP_TEST_NOT_IMPL();
-
-        // Start a container with a simple server listening on a port
-        auto result1 = RunWslc(std::format(
-            L"container run -d --name {} -p {}:{} {} {}",
-            WslcContainerName,
-            HostTestPort1,
-            ContainerTestPort,
-            PythonImage.NameAndTag(),
-            GetPythonHttpServerScript(ContainerTestPort)));
-        result1.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Attempt to start another container mapping the same host port
-        auto result2 = RunWslc(std::format(L"container run -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
-        result2.Verify({.ExitCode = 1});
-    }
-
-    // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral_NotSupported)
-    {
-        auto result = RunWslc(std::format(L"container run -p 80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
-    }
-
-    // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
-    {
-        auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
-    }
-
-    // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
-    {
-        auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_UserOption_UidRoot)
     {
         auto result = RunWslc(
             std::format(L"container create --name {} -u 0 {} sh -c \"id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_UserOption_NameGroupRoot)
     {
         auto result = RunWslc(std::format(
             L"container create --name {} -u root:root {} sh -c \"id -un; id -u; id -g\"", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_UserOption_UnknownUser_Fails)
@@ -999,33 +477,6 @@ class WSLCE2EContainerCreateTests
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify(
             {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_UserOption_UidRoot)
-    {
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec -u 0 {} sh -c \"id -u; id -g\"", WslcContainerName));
-        result.Verify({.Stdout = L"0\n0\n", .Stderr = L"", .ExitCode = S_OK});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_UserOption_NameGroupRoot)
-    {
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec -u root:root {} sh -c \"id -un; id -u; id -g\"", WslcContainerName));
-        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = S_OK});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_UserOption_InvalidGroup_Fails)
-    {
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec -u root:badgid {} id -u", WslcContainerName));
-        result.Verify({.Stdout = L"unable to find group badgid: no matching entries in group file\r\n", .ExitCode = 126});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs)
@@ -1166,13 +617,7 @@ private:
     // Test images
     const TestImage& AlpineImage = AlpineTestImage();
     const TestImage& DebianImage = DebianTestImage();
-    const TestImage& PythonImage = PythonTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
-
-    // Test ports
-    const uint16_t ContainerTestPort = 8080;
-    const uint16_t HostTestPort1 = 1234;
-    const uint16_t HostTestPort2 = 1235;
 
     // Test volume files
     std::filesystem::path VolumeTestFile1;
@@ -1228,35 +673,6 @@ private:
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
-    }
-
-    void WriteEnvFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines) const
-    {
-        std::ofstream envFile(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
-        VERIFY_IS_TRUE(envFile.is_open());
-        for (const auto& line : envVariableLines)
-        {
-            envFile << line << "\n";
-        }
-        VERIFY_IS_TRUE(envFile.good());
-    }
-
-    bool ContainsOutputLine(const std::vector<std::wstring>& outputLines, const std::wstring& expectedLine) const
-    {
-        for (const auto& line : outputLines)
-        {
-            if (line == expectedLine)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    std::wstring GetPythonHttpServerScript(uint16_t port)
-    {
-        return std::format(L"python3 -m http.server {}", port);
     }
 };
 } // namespace WSLCE2ETests
