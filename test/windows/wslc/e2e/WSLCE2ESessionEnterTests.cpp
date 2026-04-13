@@ -28,7 +28,6 @@ namespace {
     const std::filesystem::path& GetDefaultStoragePath()
     {
         auto isElevated = wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token(TOKEN_QUERY).get());
-        std::wstring name = isElevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
 
         const auto& userSettings = wsl::windows::wslc::settings::User();
         auto customPath = userSettings.Get<wsl::windows::wslc::settings::Setting::SessionStoragePath>();
@@ -37,8 +36,16 @@ namespace {
             customPath.empty() ? (wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / wsl::windows::wslc::DefaultStorageSubPath)
                                : std::filesystem::path{customPath};
 
-        static const std::filesystem::path storagePathNonAdmin = basePath / std::wstring{wsl::windows::wslc::DefaultSessionName};
-        static const std::filesystem::path storagePathAdmin = basePath / std::wstring{wsl::windows::wslc::DefaultAdminSessionName};
+        // Session names are now qualified with the username (e.g. "wslc-cli-alice").
+        wchar_t username[256 + 1] = {};
+        DWORD usernameLen = ARRAYSIZE(username);
+        THROW_IF_WIN32_BOOL_FALSE(GetUserNameW(username, &usernameLen));
+
+        auto adminName = std::format(L"{}-{}", wsl::windows::wslc::DefaultAdminSessionName, username);
+        auto nonAdminName = std::format(L"{}-{}", wsl::windows::wslc::DefaultSessionName, username);
+
+        static const std::filesystem::path storagePathNonAdmin = basePath / nonAdminName;
+        static const std::filesystem::path storagePathAdmin = basePath / adminName;
 
         return isElevated ? storagePathAdmin : storagePathNonAdmin;
     }

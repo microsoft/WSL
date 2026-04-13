@@ -341,7 +341,7 @@ class WSLCTests
         {
             auto settings = GetDefaultSessionSettings(nullptr);
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject DisplayName at exact boundary (no room for null terminator).
@@ -349,7 +349,7 @@ class WSLCTests
             std::wstring boundaryName(std::size(WSLCSessionInformation{}.DisplayName), L'x');
             auto settings = GetDefaultSessionSettings(boundaryName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject too long DisplayName.
@@ -357,7 +357,7 @@ class WSLCTests
             std::wstring longName(std::size(WSLCSessionInformation{}.DisplayName) + 1, L'x');
             auto settings = GetDefaultSessionSettings(longName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Validate that creating a session on a non-existing storage fails if WSLCSessionStorageFlagsNoCreate is set.

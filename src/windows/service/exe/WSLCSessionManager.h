@@ -79,6 +79,13 @@ public:
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session);
 
 private:
+    // Resolves the default session name for a caller: appends the username
+    // from the token SID so different users don't collide.
+    static std::wstring ResolveDefaultSessionName(const CallingProcessTokenInfo& TokenInfo);
+
+    // Returns true if the name matches a reserved default session prefix.
+    static bool IsReservedSessionName(LPCWSTR Name);
+
     // Iterates over all sessions, cleaning up released sessions.
     // The routine receives a SessionEntry& and can return an optional<T> to stop iteration.
     template <typename T>
