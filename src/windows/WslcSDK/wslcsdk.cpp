@@ -200,10 +200,12 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
         THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
 }
-
 HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
 {
-    THROW_WIN32_IF(static_cast<unsigned long>(WSAGetLastError()), inet_ntop(af, src, dst, dstCount) == nullptr);
+    if (inet_ntop(af, src, dst, dstCount) == nullptr)
+    {
+        return HRESULT_FROM_WIN32(WSAGetLastError());
+    }
     return S_OK;
 }
 
@@ -679,7 +681,17 @@ try
             convertedPort.ContainerPort = internalPort.containerPort;
 
             // TODO: Consider using standard protocol numbers instead of our own enum.
-            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
+            switch (internalPort.protocol)
+            {
+            case WSLC_PORT_PROTOCOL_TCP:
+                convertedPort.Protocol = IPPROTO_TCP;
+                break;
+            case WSLC_PORT_PROTOCOL_UDP:
+                convertedPort.Protocol = IPPROTO_UDP;
+                break;
+            default:
+                THROW_HR_MSG(E_INVALIDARG, "Unsupported port protocol: %u", internalPort.protocol);
+            }
             // Validate IP address if provided and if valid, copy to runtime structure.
             if (internalPort.windowsAddress != nullptr)
             {
