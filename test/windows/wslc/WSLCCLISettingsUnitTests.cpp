@@ -16,7 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
-#include "UserSettings.h"
+#include "WSLCUserSettings.h"
 
 #include <atomic>
 #include <fstream>
