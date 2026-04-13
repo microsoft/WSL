@@ -77,8 +77,14 @@ struct RelayDirection
     bool Done = false;
     bool DstIsSocket = false;
 
-    size_t Pending() const { return Tail - Head; }
-    size_t Available() const { return Buffer.size() - Tail; }
+    size_t Pending() const
+    {
+        return Tail - Head;
+    }
+    size_t Available() const
+    {
+        return Buffer.size() - Tail;
+    }
 };
 
 void TryIssueRead(RelayDirection& d)

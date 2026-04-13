@@ -45,8 +45,14 @@ struct RelayDirection
     bool srcEof;
     bool done;
 
-    size_t Pending() const { return tail - head; }
-    size_t Available() const { return buf.size() - tail; }
+    size_t Pending() const
+    {
+        return tail - head;
+    }
+    size_t Available() const
+    {
+        return buf.size() - tail;
+    }
 
     void Compact()
     {
