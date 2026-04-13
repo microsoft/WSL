@@ -2048,7 +2048,7 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&execSettings, execArgv, ARRAYSIZE(execArgv)));
 
         UniqueProcess execProcess;
-        VERIFY_ARE_EQUAL(WslcCreateContainerProcess(container.get(), &execSettings, &execProcess, nullptr), static_cast<HRESULT>(0x8007139f)); // ERROR_CONTAINER_STOPPED
+        VERIFY_ARE_EQUAL(WslcCreateContainerProcess(container.get(), &execSettings, &execProcess, nullptr), static_cast<HRESULT>(WSLC_E_CONTAINER_NOT_RUNNING));
     }
 
     WSLC_TEST_METHOD(DuplicateContainerName)
@@ -2088,7 +2088,7 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
 
         // Deleting a running container without force flag should fail
-        VERIFY_ARE_EQUAL(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr), static_cast<HRESULT>(0x8007139f)); // ERROR_CONTAINER_STOPPED
+        VERIFY_ARE_EQUAL(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr), static_cast<HRESULT>(WSLC_E_CONTAINER_IS_RUNNING));
     }
 
     WSLC_TEST_METHOD(DeleteNonExistentImage)
