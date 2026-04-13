@@ -86,6 +86,7 @@ struct VMPortMapping
     void Unmap();
     void Release();
     bool IsLocalhost() const;
+    bool IsIpv6() const;
     std::string BindingAddressString() const;
     void Attach(WSLCVirtualMachine& Vm);
     void Detach();

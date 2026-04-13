@@ -236,7 +236,7 @@ std::string FormatPortEndpoint(const ContainerPortMapping& portMapping)
     auto addr = portMapping.VmMapping.BindingAddressString();
     return std::format(
         "{}:{}/{}",
-        (addr.find(':') != std::string::npos) ? std::format("[{}]", addr) : addr,
+        portMapping.VmMapping.IsIpv6() ? std::format("[{}]", addr) : addr,
         portMapping.VmMapping.HostPort(),
         portMapping.ProtocolString());
 }
@@ -1534,9 +1534,10 @@ void WSLCContainerImpl::MapPorts()
         {
             m_virtualMachine.MapPort(e.VmMapping);
         }
-        catch (const wil::ResultException& ex)
+        catch (...)
         {
-            if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || ex.GetErrorCode() == HRESULT_FROM_WIN32(WSAEADDRINUSE))
+            auto result = wil::ResultFromCaughtException();
+            if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || result == HRESULT_FROM_WIN32(WSAEADDRINUSE))
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
