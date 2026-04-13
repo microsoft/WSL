@@ -970,10 +970,8 @@ class UnitTests
         auto commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, tarFileName, version);
         validateOutput(
             commandLine.c_str(),
-            std::format(
-                L"Failed to create disk '{}ext4.vhdx': The file exists. \r\n"
-                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n",
-                LXSST_IMPORT_DISTRO_TEST_DIR));
+            L"The file exists. \r\n"
+            L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
         validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
@@ -5382,7 +5380,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Cannot create a file when that file already exists. \r\n"
                     L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
 
                 VERIFY_ARE_EQUAL(err, L"");
@@ -5393,7 +5391,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Cannot create a file when that file already exists. \r\n"
                     L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
 
                 VERIFY_ARE_EQUAL(err, L"");
