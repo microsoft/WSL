@@ -946,12 +946,26 @@ class WSLCE2EContainerCreateTests
 
         auto containersBefore = ListAllContainers().size();
 
-        // Attempt to start another container mapping the same host port
-        auto result2 = RunWslc(std::format(L"container run -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
-        result2.Verify({.ExitCode = 1});
-        VERIFY_IS_TRUE(result2.Stderr.has_value() && result2.Stderr.value().find(L"is already in use") != std::wstring::npos);
+        // Create a second container mapping the same host port to validate the full error message
+        auto createResult =
+            RunWslc(std::format(L"container create -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = createResult.GetStdoutOneLine();
 
-        // Verify the failed container was not left behind
+        // Attempt to start should fail with port conflict
+        auto startResult = RunWslc(std::format(L"container start {}", containerId));
+        startResult.Verify(
+            {.Stderr = std::format(
+                 L"Port 127.0.0.1:{}/tcp is already in use, cannot start container {}\r\nError code: ERROR_ALREADY_EXISTS\r\n", HostTestPort1, containerId),
+             .ExitCode = 1});
+
+        // Clean up the created container
+        RunWslc(std::format(L"container rm {}", containerId));
+
+        // Verify 'container run' auto-cleans up on port conflict
+        auto runResult = RunWslc(std::format(L"container run -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+        runResult.Verify({.ExitCode = 1});
+
         auto containersAfter = ListAllContainers().size();
         VERIFY_ARE_EQUAL(containersBefore, containersAfter);
     }
