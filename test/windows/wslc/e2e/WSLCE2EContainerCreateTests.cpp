@@ -960,7 +960,7 @@ class WSLCE2EContainerCreateTests
              .ExitCode = 1});
 
         // Clean up the created container
-        RunWslc(std::format(L"container rm {}", containerId));
+        RunWslc(std::format(L"container rm {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify 'container run' auto-cleans up on port conflict
         auto runResult = RunWslc(std::format(L"container run -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
