@@ -34,15 +34,13 @@ class WSLCE2EContainerTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
+    WSLC_TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
     {
-        WSL2_TEST_ONLY();
         RunWslc(L"container INVALID_CMD").Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 

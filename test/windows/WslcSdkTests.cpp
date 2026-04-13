@@ -236,10 +236,8 @@ class WslcSdkTests
     // Session tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(CreateSession)
+    WSLC_TEST_METHOD(CreateSession)
     {
-        WSL2_TEST_ONLY();
-
         std::filesystem::path extraStorage = m_storagePath / "wslc-extra-session-storage";
 
         WslcSessionSettings sessionSettings;
@@ -265,10 +263,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcCreateSession(nullptr, &session2, nullptr), E_POINTER);
     }
 
-    TEST_METHOD(TerminationCallbackViaTerminate)
+    WSLC_TEST_METHOD(TerminationCallbackViaTerminate)
     {
-        WSL2_TEST_ONLY();
-
         std::promise<WslcSessionTerminationReason> promise;
 
         auto callback = [](WslcSessionTerminationReason reason, PVOID context) {
@@ -294,10 +290,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(future.get(), WSLC_SESSION_TERMINATION_REASON_SHUTDOWN);
     }
 
-    TEST_METHOD(TerminationCallbackViaRelease)
+    WSLC_TEST_METHOD(TerminationCallbackViaRelease)
     {
-        WSL2_TEST_ONLY();
-
         std::promise<WslcSessionTerminationReason> promise;
 
         auto callback = [](WslcSessionTerminationReason reason, PVOID context) {
@@ -329,10 +323,8 @@ class WslcSdkTests
     // Image tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(PullImage)
+    WSLC_TEST_METHOD(PullImage)
     {
-        WSL2_TEST_ONLY();
-
         // Positive: pull a well-known image.
         {
             WslcPullImageOptions opts{};
@@ -385,10 +377,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ImageList)
+    WSLC_TEST_METHOD(ImageList)
     {
-        WSL2_TEST_ONLY();
-
         // Positive: session has images pre-loaded — list must return at least one entry.
         {
             WslcImageInfo* images = nullptr;
@@ -424,10 +414,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(LoadImage)
+    WSLC_TEST_METHOD(LoadImage)
     {
-        WSL2_TEST_ONLY();
-
         // Positive: load a saved image tar and verify the image can be run.
         {
             // Remove the image first (ignore failure if it wasn't present).
@@ -478,10 +466,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcLoadSessionImageFromFile(m_defaultSession, nullptr, &opts, nullptr), E_POINTER);
     }
 
-    TEST_METHOD(ImportImage)
+    WSLC_TEST_METHOD(ImportImage)
     {
-        WSL2_TEST_ONLY();
-
         const auto exportedImageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         constexpr auto c_handleImportedImageName = "my-hello-world-handle:test";
         constexpr auto c_pathImportedImageName = "my-hello-world-path:test";
@@ -533,9 +519,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcImportSessionImage(m_defaultSession, "zero-length:test", GetCurrentThreadEffectiveToken(), 0, &opts, nullptr), E_INVALIDARG);
     }
 
-    TEST_METHOD(LoadImageNonTar)
+    WSLC_TEST_METHOD(LoadImageNonTar)
     {
-        WSL2_TEST_ONLY();
         // The load should fail but it just silently ignores the load currently.
         SKIP_TEST_NOT_IMPL();
 
@@ -556,10 +541,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ImportImageNonTar)
+    WSLC_TEST_METHOD(ImportImageNonTar)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: attempt to load a non-tar file.
         {
             std::filesystem::path pathToSelf = wil::QueryFullProcessImageNameW<std::wstring>(GetCurrentProcess());
@@ -580,10 +563,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ImageDelete)
+    WSLC_TEST_METHOD(ImageDelete)
     {
-        WSL2_TEST_ONLY();
-
         auto checkForImage = [this](std::string_view image) -> bool {
             WslcImageInfo* images = nullptr;
             uint32_t count = 0;
@@ -621,10 +602,8 @@ class WslcSdkTests
     // Container lifecycle tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(CreateContainer)
+    WSLC_TEST_METHOD(CreateContainer)
     {
-        WSL2_TEST_ONLY();
-
         // Simple echo — verify stdout is captured correctly.
         {
             auto output = RunContainerAndCapture(m_defaultSession, "debian:latest", {"/bin/echo", "OK"});
@@ -670,10 +649,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerGetID)
+    WSLC_TEST_METHOD(ContainerGetID)
     {
-        WSL2_TEST_ONLY();
-
         UniqueContainer container;
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
@@ -690,10 +667,8 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
-    TEST_METHOD(ContainerGetState)
+    WSLC_TEST_METHOD(ContainerGetState)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -737,10 +712,8 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
-    TEST_METHOD(ContainerStopAndDelete)
+    WSLC_TEST_METHOD(ContainerStopAndDelete)
     {
-        WSL2_TEST_ONLY();
-
         // Build a long-running container.
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
@@ -769,10 +742,8 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
-    TEST_METHOD(ProcessIOHandles)
+    WSLC_TEST_METHOD(ProcessIOHandles)
     {
-        WSL2_TEST_ONLY();
-
         // Verify that stdout and stderr can each be read, and are independent streams.
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
@@ -811,10 +782,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WaitForSingleObject(exitEvent, 60 * 1000), WAIT_OBJECT_0);
     }
 
-    TEST_METHOD(ContainerNetworkingMode)
+    WSLC_TEST_METHOD(ContainerNetworkingMode)
     {
-        WSL2_TEST_ONLY();
-
         // BRIDGED: container should have an eth0 interface in sysfs.
         {
             auto output = RunContainerAndCapture(
@@ -849,10 +818,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerPortMapping)
+    WSLC_TEST_METHOD(ContainerPortMapping)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: null mappings with nonzero count must fail.
         {
             WslcContainerSettings containerSettings;
@@ -1028,10 +995,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerVolumeUnit)
+    WSLC_TEST_METHOD(ContainerVolumeUnit)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: null volumes with nonzero count must fail.
         {
             WslcContainerSettings containerSettings;
@@ -1096,10 +1061,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerVolumeFunctional)
+    WSLC_TEST_METHOD(ContainerVolumeFunctional)
     {
-        WSL2_TEST_ONLY();
-
         // Functional: mount a read-write and a read-only directory into the container.
         {
             auto hostRwDir = std::filesystem::current_path() / "wslc-test-vol-rw";
@@ -1169,10 +1132,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerInspect)
+    WSLC_TEST_METHOD(ContainerInspect)
     {
-        WSL2_TEST_ONLY();
-
         UniqueContainer container;
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
@@ -1191,10 +1152,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
     }
 
-    TEST_METHOD(ContainerExec)
+    WSLC_TEST_METHOD(ContainerExec)
     {
-        WSL2_TEST_ONLY();
-
         // Start a long-running container so we can exec into it.
         WslcProcessSettings initProcSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&initProcSettings));
@@ -1242,10 +1201,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerHostName)
+    WSLC_TEST_METHOD(ContainerHostName)
     {
-        WSL2_TEST_ONLY();
-
         // Unit: setting a hostname succeeds.
         {
             WslcContainerSettings containerSettings;
@@ -1270,10 +1227,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerDomainName)
+    WSLC_TEST_METHOD(ContainerDomainName)
     {
-        WSL2_TEST_ONLY();
-
         // Unit: setting a domain name succeeds.
         {
             WslcContainerSettings containerSettings;
@@ -1298,10 +1253,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessEnvVariables)
+    WSLC_TEST_METHOD(ProcessEnvVariables)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: null pointer with nonzero count must fail.
         {
             WslcProcessSettings procSettings;
@@ -1342,10 +1295,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessSignal)
+    WSLC_TEST_METHOD(ProcessSignal)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -1375,10 +1326,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcSignalProcess(nullptr, WSLC_SIGNAL_SIGKILL), E_POINTER);
     }
 
-    TEST_METHOD(ProcessGetPid)
+    WSLC_TEST_METHOD(ProcessGetPid)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -1408,10 +1357,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcGetProcessPid(nullProcess, &pid), E_POINTER);
     }
 
-    TEST_METHOD(ProcessGetExitCode)
+    WSLC_TEST_METHOD(ProcessGetExitCode)
     {
-        WSL2_TEST_ONLY();
-
         auto RunAndGetProcess = [&](int exitCodeArg) -> UniqueProcess {
             std::string script = "exit " + std::to_string(exitCodeArg);
             const char* argv[] = {"/bin/sh", "-c", script.c_str()};
@@ -1464,10 +1411,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessGetState)
+    WSLC_TEST_METHOD(ProcessGetState)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -1523,10 +1468,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessCurrentDirectory)
+    WSLC_TEST_METHOD(ProcessCurrentDirectory)
     {
-        WSL2_TEST_ONLY();
-
         // Unit: setting a current directory returns S_OK.
         {
             WslcProcessSettings procSettings;
@@ -1561,10 +1504,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(GetVersion)
+    WSLC_TEST_METHOD(GetVersion)
     {
-        WSL2_TEST_ONLY();
-
         // Positive: returns S_OK and fills in a non-zero version.
         {
             WslcVersion version{};
@@ -1576,10 +1517,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcGetVersion(nullptr), E_POINTER);
     }
 
-    TEST_METHOD(CanRun)
+    WSLC_TEST_METHOD(CanRun)
     {
-        WSL2_TEST_ONLY();
-
         BOOL canRun = FALSE;
         WslcComponentFlags missing{};
         VERIFY_SUCCEEDED(WslcCanRun(&canRun, &missing));
@@ -1594,10 +1533,8 @@ class WslcSdkTests
     // WslcSetProcessSettingsCallbacks tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(ProcessIoCallbackUnit)
+    WSLC_TEST_METHOD(ProcessIoCallbackUnit)
     {
-        WSL2_TEST_ONLY();
-
         auto noopIoCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID) {};
         auto noopExitCb = [](INT32, PVOID) {};
 
@@ -1683,10 +1620,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessIoCallbackInitProcess)
+    WSLC_TEST_METHOD(ProcessIoCallbackInitProcess)
     {
-        WSL2_TEST_ONLY();
-
         struct IOContext
         {
             std::string stdoutData;
@@ -1735,10 +1670,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(ioContext.stderrData, "STDERR\n");
     }
 
-    TEST_METHOD(ProcessIoCallbackExecProcess)
+    WSLC_TEST_METHOD(ProcessIoCallbackExecProcess)
     {
-        WSL2_TEST_ONLY();
-
         // Start a long-running container so we can exec into it.
         WslcProcessSettings initProcSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&initProcSettings));
@@ -1790,10 +1723,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(ioContext.stderrData, "EXEC_ERR\n");
     }
 
-    TEST_METHOD(ProcessIoCallbackHandleExclusion)
+    WSLC_TEST_METHOD(ProcessIoCallbackHandleExclusion)
     {
-        WSL2_TEST_ONLY();
-
         // Register a stdout callback only. IOCallback always acquires ALL pipe handles
         // (draining uncallbacked streams to prevent deadlock), so both stdout and stderr
         // handles are consumed and neither can be obtained via WslcGetProcessIOHandle.
@@ -1832,10 +1763,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessIoCallbackExitCallback)
+    WSLC_TEST_METHOD(ProcessIoCallbackExitCallback)
     {
-        WSL2_TEST_ONLY();
-
         // Verify the onExit callback fires with the correct exit code after IO has been flushed.
         // We test both exit 0 and a non-zero exit code.
         auto RunAndCaptureExit = [&](int exitCodeArg) -> std::pair<INT32, std::string> {
@@ -1900,10 +1829,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessIoCallbackCancelOnRelease)
+    WSLC_TEST_METHOD(ProcessIoCallbackCancelOnRelease)
     {
-        WSL2_TEST_ONLY();
-
         // Verify that releasing the process handle while an exec'd process is still running
         // and writing IO cancels the IOCallback pump:
         //   - No IO callbacks arrive after the handle is released.
@@ -1972,10 +1899,8 @@ class WslcSdkTests
         VERIFY_IS_FALSE(ctx.exitFired.load());
     }
 
-    TEST_METHOD(ProcessIoCallbackLargeOutput)
+    WSLC_TEST_METHOD(ProcessIoCallbackLargeOutput)
     {
-        WSL2_TEST_ONLY();
-
         // Generate ~1 MiB of stdout via: dd if=/dev/zero bs=1024 count=1024 | base64
         // 1,048,576 zero bytes → base64 output is 1,398,104 bytes (ceil(1048576/3)*4).
         static constexpr size_t c_expectedBytes = 1'398'104;
@@ -2022,10 +1947,8 @@ class WslcSdkTests
     // Storage tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(SessionCreateVhd)
+    WSLC_TEST_METHOD(SessionCreateVhd)
     {
-        WSL2_TEST_ONLY();
-
         constexpr auto c_volumeName = "wslc-test-data-vol";
         constexpr auto c_vhdSizeBytes = _1GB;
 
@@ -2159,10 +2082,123 @@ class WslcSdkTests
     // should be updated to exercise the real behaviour.
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(InstallWithDependenciesNotImplemented)
+    WSLC_TEST_METHOD(InstallWithDependenciesNotImplemented)
     {
-        WSL2_TEST_ONLY();
-
         VERIFY_ARE_EQUAL(WslcInstallWithDependencies(nullptr, nullptr), E_NOTIMPL);
+    }
+
+    // Negative tests: handle lifecycle and invalid state transitions
+
+    WSLC_TEST_METHOD(ReleaseNullSessionHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseSession(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(TerminateNullSessionHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcTerminateSession(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(ReleaseNullContainerHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseContainer(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(ReleaseNullProcessHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseProcess(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(CreateContainerWithNullSession)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcContainer container = nullptr;
+        VERIFY_ARE_EQUAL(WslcCreateContainer(nullptr, &containerSettings, &container, nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(StopContainerWithInvalidSignal)
+    {
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        // Wait for the short-lived init process to exit
+        UniqueProcess initProcess;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &initProcess));
+        HANDLE exitEvent = nullptr;
+        VERIFY_SUCCEEDED(WslcGetProcessExitEvent(initProcess.get(), &exitEvent));
+        VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(exitEvent, 30000));
+
+        // Attempting to exec on a stopped container should fail
+        WslcProcessSettings execSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&execSettings));
+        PCSTR execArgv[] = {"/bin/echo", "should-fail"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&execSettings, execArgv, ARRAYSIZE(execArgv)));
+
+        UniqueProcess execProcess;
+        VERIFY_ARE_EQUAL(WslcCreateContainerProcess(container.get(), &execSettings, &execProcess, nullptr), WSLC_E_CONTAINER_NOT_RUNNING);
+    }
+
+    WSLC_TEST_METHOD(DuplicateContainerName)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsName(&containerSettings, "duplicate-name-test"));
+
+        UniqueContainer container1;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container1, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container1.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        // Creating a second container with the same name should fail
+        UniqueContainer container2;
+        VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container2, nullptr), static_cast<HRESULT>(0x800700b7)); // ERROR_ALREADY_EXISTS
+    }
+
+    WSLC_TEST_METHOD(DeleteRunningContainerWithoutForce)
+    {
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        // Deleting a running container without force flag should fail
+        VERIFY_ARE_EQUAL(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+    }
+
+    WSLC_TEST_METHOD(DeleteNonExistentImage)
+    {
+        VERIFY_ARE_EQUAL(WslcDeleteSessionImage(m_defaultSession, "nonexistent-image:this-tag-does-not-exist", nullptr), WSLC_E_IMAGE_NOT_FOUND);
+    }
+
+    WSLC_TEST_METHOD(PullInvalidImageUri)
+    {
+        WslcPullImageOptions pullOptions = {};
+        pullOptions.uri = "///invalid-registry-url///";
+        VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &pullOptions, nullptr), E_INVALIDARG);
     }
 };

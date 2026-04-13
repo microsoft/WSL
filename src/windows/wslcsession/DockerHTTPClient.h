@@ -122,6 +122,13 @@ public:
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
     // Container management.
+    struct PruneContainersFilters
+    {
+        std::optional<std::uint64_t> until;
+        std::vector<std::string> presentLabels;
+        std::vector<std::string> absentLabels;
+    };
+
     std::vector<common::docker_schema::ContainerInfo> ListContainers(bool all = false);
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
@@ -134,7 +141,7 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
-    common::docker_schema::PruneContainerResult PruneContainers(const std::optional<common::docker_schema::PruneContainerLabelFilter>& Filter);
+    common::docker_schema::PruneContainerResult PruneContainers(const PruneContainersFilters& filters = {});
 
     // Volume management.
     void CreateVolume(const common::docker_schema::CreateVolume& Request);
@@ -151,6 +158,14 @@ public:
         std::vector<std::string> labels;
     };
 
+    struct PruneImagesFilters
+    {
+        std::optional<bool> dangling;
+        std::optional<std::uint64_t> until;
+        std::vector<std::string> presentLabels;
+        std::vector<std::string> absentLabels;
+    };
+
     std::unique_ptr<HTTPRequestContext> PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
@@ -159,6 +174,7 @@ public:
     common::docker_schema::InspectImage InspectImage(const std::string& NameOrId);
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
     std::pair<uint32_t, wil::unique_socket> SaveImage(const std::string& NameOrId);
+    common::docker_schema::PruneImageResult PruneImages(const PruneImagesFilters& filters = {});
 
     // Exec.
     common::docker_schema::CreateExecResponse CreateExec(const std::string& Container, const common::docker_schema::CreateExec& Request);

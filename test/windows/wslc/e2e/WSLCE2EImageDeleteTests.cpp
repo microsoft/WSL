@@ -37,35 +37,27 @@ class WSLCE2EImageDeleteTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Image_Delete_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Delete_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image delete --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Delete_ImageNotFound)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image delete {}", InvalidImage.Name));
         auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Delete_MissingImageName)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Delete_MissingImageName)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image delete");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Delete_UnusedImage_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UnusedImage_Success)
     {
-        WSL2_TEST_ONLY();
-
         EnsureImageIsLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
@@ -73,10 +65,8 @@ class WSLCE2EImageDeleteTests
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Delete_UsedImage_Failure)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Delete_UsedImage_Failure)
     {
-        WSL2_TEST_ONLY();
-
         EnsureImageIsLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
@@ -100,10 +90,8 @@ class WSLCE2EImageDeleteTests
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_DeleteForce_UsedImage_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Image_DeleteForce_UsedImage_Success)
     {
-        WSL2_TEST_ONLY();
-
         EnsureImageIsLoaded(DebianImage);
         VerifyImageIsNotUsed(DebianImage);
 
@@ -116,10 +104,8 @@ class WSLCE2EImageDeleteTests
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)
+    WSLC_TEST_METHOD(WSLCE2E_Image_DeleteNoPrune)
     {
-        WSL2_TEST_ONLY();
-
         // TODO: Implement once 'image tag' is implemented
         SKIP_TEST_NOT_IMPL();
     }
