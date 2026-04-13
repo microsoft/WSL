@@ -48,6 +48,25 @@ struct EmptyRequest
     using TResponse = void;
 };
 
+struct AuthRequest
+{
+    using TResponse = struct AuthResponse;
+
+    std::string username;
+    std::string password;
+    std::string serveraddress;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(AuthRequest, username, password, serveraddress);
+};
+
+struct AuthResponse
+{
+    std::string Status;
+    std::optional<std::string> IdentityToken;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AuthResponse, Status, IdentityToken);
+};
+
 struct CreateVolume
 {
     using TResponse = void;

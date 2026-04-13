@@ -36,7 +36,8 @@ target_link_libraries(wsltests
                       VirtDisk.lib
                       Wer.lib
                       Dbghelp.lib
-                      sfc.lib)
+                      sfc.lib
+                      Crypt32.lib)
 
 add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk)
 add_subdirectory(testplugin)

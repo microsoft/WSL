@@ -677,6 +677,9 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteVolume([in] LPCSTR Name);
     HRESULT ListVolumes([out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
+
+    HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
 }
 
 //
