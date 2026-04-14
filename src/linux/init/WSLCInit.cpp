@@ -409,6 +409,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_FORK& Mes
 
     {
         auto childLogic = [ListenSocketFd = ListenSocket.get(), SocketAddress, &Channel, &Message, &childPid]() mutable {
+            bool futureSet = false;
             try
             {
                 wil::unique_fd ListenSocket;
@@ -430,6 +431,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_FORK& Mes
                 // ListenSocket should only be assigned after this thread is guaranteed to have its own fd table (either via unshare() or a child process).
                 ListenSocket.reset(ListenSocketFd);
                 childPid.set_value(getpid());
+                futureSet = true;
 
                 wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
                 THROW_LAST_ERROR_IF(!ProcessSocket);
@@ -439,7 +441,14 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_FORK& Mes
                 auto subChannel = wsl::shared::SocketChannel{std::move(ProcessSocket), "ForkedChannel"};
                 ProcessMessages(subChannel);
             }
-            CATCH_LOG();
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+                if (!futureSet)
+                {
+                    childPid.set_exception(std::current_exception());
+                }
+            }
         };
 
         if (Message.ForkType == WSLC_FORK::Thread)
