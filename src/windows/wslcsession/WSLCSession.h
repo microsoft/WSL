@@ -48,6 +48,24 @@ private:
     HANDLE m_handle{};
 };
 
+class UserCOMCallback
+{
+    NON_COPYABLE(UserCOMCallback);
+
+public:
+    UserCOMCallback(WSLCSession& Session);
+    UserCOMCallback(UserCOMCallback&& Other);
+
+    ~UserCOMCallback();
+
+    UserCOMCallback& operator=(UserCOMCallback&& Other);
+    void Reset();
+
+private:
+    WSLCSession* m_session{};
+    DWORD m_threadId{};
+};
+
 //
 // WSLCSession - Implements IWSLCSession for container management.
 // Runs in a per-user COM server process for security isolation.
@@ -125,10 +143,14 @@ public:
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);
 
+    UserCOMCallback RegisterUserCOMCallback();
+    void UnregisterUserCOMCallback(DWORD ThreadId);
+
 private:
     ULONG m_id = 0;
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
+    __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
@@ -168,6 +190,11 @@ private:
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
     __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
+
+    // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
+    // Used by Terminate() to cancel stuck cross-process calls via CoCancelCall().
+    std::mutex m_userCOMCallbacksLock;
+    __guarded_by(m_userCOMCallbacksLock) std::vector<DWORD> m_userCOMCallbackThreads;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;

@@ -21,6 +21,7 @@ Abstract:
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
 using wsl::shared::Localization;
+using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -218,6 +219,48 @@ UserHandle::~UserHandle()
 HANDLE UserHandle::Get() const noexcept
 {
     return m_handle;
+}
+
+UserCOMCallback::UserCOMCallback(WSLCSession& Session) : m_session(&Session), m_threadId(GetCurrentThreadId())
+{
+    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
+}
+
+UserCOMCallback::UserCOMCallback(UserCOMCallback&& Other)
+{
+    *this = std::move(Other);
+}
+
+UserCOMCallback& UserCOMCallback::operator=(UserCOMCallback&& Other)
+{
+    if (this != &Other)
+    {
+        Reset();
+        m_session = Other.m_session;
+        m_threadId = Other.m_threadId;
+
+        Other.m_threadId = 0;
+        Other.m_session = nullptr;
+    }
+    return *this;
+}
+
+void UserCOMCallback::Reset()
+{
+    if (m_threadId != 0)
+    {
+        WI_ASSERT(m_session != nullptr);
+
+        m_session->UnregisterUserCOMCallback(m_threadId);
+        m_threadId = 0;
+
+        THROW_IF_FAILED(CoDisableCallCancellation(nullptr));
+    }
+}
+
+UserCOMCallback::~UserCOMCallback()
+{
+    Reset();
 }
 
 HRESULT WSLCSession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
@@ -443,6 +486,12 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         bool isJson = false;
     };
 
+    std::optional<UserCOMCallback> comCall;
+    if (ProgressCallback != nullptr)
+    {
+        comCall = RegisterUserCOMCallback();
+    }
+
     std::optional<Response> httpResponse;
 
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
@@ -588,6 +637,12 @@ try
         Options->Flags);
 
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
+
+    std::optional<UserCOMCallback> comCall;
+    if (ProgressCallback != nullptr)
+    {
+        comCall = RegisterUserCOMCallback();
+    }
 
     auto lock = m_lock.lock_shared();
 
@@ -1918,6 +1973,14 @@ try
         CancelUserHandleIO();
     }
 
+    {
+        std::lock_guard comLock(m_userCOMCallbacksLock);
+
+        // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
+        // to unblock operations waiting for cross-process COM responses.
+        CancelUserCOMCallbacks();
+    }
+
     // Acquire an exclusive lock to ensure that no operation is running.
     auto lock = m_lock.lock_exclusive();
     std::lock_guard containersLock(m_containersLock);
@@ -2151,6 +2214,38 @@ void WSLCSession::CancelUserHandleIO()
         {
             LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
         }
+    }
+}
+
+UserCOMCallback WSLCSession::RegisterUserCOMCallback()
+{
+    std::lock_guard lock(m_userCOMCallbacksLock);
+
+    // Don't allow new COM calls if the session is terminating.
+    // N.B. This check must happen under m_userCOMCallbacksLock to synchronize with Terminate().
+    THROW_HR_IF_MSG(
+        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
+
+    m_userCOMCallbackThreads.emplace_back(GetCurrentThreadId());
+
+    return UserCOMCallback{*this};
+}
+
+void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
+{
+    std::lock_guard lock(m_userCOMCallbacksLock);
+
+    auto it = std::ranges::find(m_userCOMCallbackThreads, ThreadId);
+    WI_ASSERT(it != m_userCOMCallbackThreads.end());
+
+    m_userCOMCallbackThreads.erase(it);
+}
+
+void WSLCSession::CancelUserCOMCallbacks()
+{
+    for (auto threadId : m_userCOMCallbackThreads)
+    {
+        LOG_IF_FAILED(CoCancelCall(threadId, 0));
     }
 }
 
