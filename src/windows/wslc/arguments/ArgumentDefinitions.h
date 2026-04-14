@@ -60,6 +60,7 @@ _(Input,          "input",               L"i",              Kind::Value,       L
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
 /*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
+_(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
 _(Output,         "output",              L"o",              Kind::Value,       Localization::WSLCCLI_OutputArgDescription()) \

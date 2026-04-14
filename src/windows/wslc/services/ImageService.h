@@ -27,7 +27,7 @@ public:
         const std::vector<std::wstring>& tags,
         const std::vector<std::wstring>& buildArgs,
         const std::wstring& dockerfilePath,
-        bool verbose,
+        WSLCBuildImageFlags flags,
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);
 
