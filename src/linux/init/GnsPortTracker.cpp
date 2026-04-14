@@ -6,24 +6,21 @@
 #include "common.h"
 #include "GnsPortTracker.h"
 #include "lxinitshared.h"
+#include "bind_monitor.h"
 #include "bind_monitor.skel.h"
 
 namespace {
 
 extern "C" int OnBindMonitorEvent(void* ctx, void* data, size_t dataSz) noexcept
+try
 {
     auto* tracker = static_cast<GnsPortTracker*>(ctx);
-    const auto* event = static_cast<const bind_event*>(data);
-
-    try
-    {
-        tracker->RequestPort(*event);
-    }
-    catch (...)
-    {
-        LOG_CAUGHT_EXCEPTION_MSG("Error processing bind monitor event");
-    }
-
+    tracker->RequestPort(data);
+    return 0;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION_MSG("Error processing bind monitor event");
     return 0;
 }
 
@@ -34,34 +31,36 @@ GnsPortTracker::GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSoc
 {
 }
 
-void GnsPortTracker::RequestPort(const bind_event& Event)
+void GnsPortTracker::RequestPort(void* Data)
 {
+    const auto* Event = static_cast<const bind_event*>(Data);
+
     LX_GNS_PORT_ALLOCATION_REQUEST request{};
     request.Header.MessageType = LxGnsMessagePortMappingRequest;
     request.Header.MessageSize = sizeof(request);
-    request.Af = Event.family;
-    request.Protocol = Event.protocol;
-    request.Port = Event.port;
-    request.Allocate = Event.is_bind;
+    request.Af = Event->family;
+    request.Protocol = Event->protocol;
+    request.Port = Event->port;
+    request.Allocate = Event->is_bind;
 
     static_assert(sizeof(request.Address32) == 16);
-    if (Event.family == AF_INET)
+    if (Event->family == AF_INET)
     {
-        request.Address32[0] = Event.addr4;
+        request.Address32[0] = Event->addr4;
     }
     else
     {
-        memcpy(request.Address32, Event.addr6, sizeof(request.Address32));
+        memcpy(request.Address32, Event->addr6, sizeof(request.Address32));
     }
 
     const auto& response = m_hvSocketChannel->Transaction(request);
 
     GNS_LOG_INFO(
         "Port {} request: family ({}) port ({}) protocol ({}) result ({})",
-        Event.is_bind ? "allocate" : "release",
-        Event.family,
-        Event.port,
-        Event.protocol,
+        Event->is_bind ? "allocate" : "release",
+        Event->family,
+        Event->port,
+        Event->protocol,
         response.Result);
 }
 

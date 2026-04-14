@@ -4,7 +4,6 @@
 #include <memory>
 #include "SocketChannel.h"
 #include "util.h"
-#include "bind_monitor.h"
 
 class GnsPortTracker
 {
@@ -16,7 +15,7 @@ public:
 
     void Run();
 
-    void RequestPort(const bind_event& Event);
+    void RequestPort(void* data);
 
 private:
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
