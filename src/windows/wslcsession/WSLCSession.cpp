@@ -1950,12 +1950,23 @@ try
 
             if (auto it = options.find("Internal"); it != options.end())
             {
-                request.Internal = it->is_boolean() ? it->get<bool>() : (it->get<std::string>() == "true");
+                if (it->is_boolean())
+                {
+                    request.Internal = it->get<bool>();
+                }
+                else if (it->is_string())
+                {
+                    request.Internal = (it->get<std::string>() == "true");
+                }
+                else
+                {
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidNetworkOptions(Options->Options));
+                }
             }
 
             THROW_HR_WITH_USER_ERROR_IF(
                 E_INVALIDARG,
-                Localization::MessageWslcInvalidNetworkOptions("Gateway requires Subnet"),
+                Localization::MessageWslcInvalidNetworkOptions(Options->Options),
                 options.contains("Gateway") && !options.contains("Subnet"));
 
             if (auto it = options.find("Subnet"); it != options.end())
@@ -1973,7 +1984,7 @@ try
                 ipam.Config.emplace().push_back(std::move(ipamConfig));
             }
         }
-        catch (...)
+        catch (const nlohmann::json::exception&)
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidNetworkOptions(Options->Options));
         }
