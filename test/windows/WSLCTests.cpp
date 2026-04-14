@@ -983,13 +983,17 @@ class WSLCTests
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-        WSLCContainerLauncher launcher("hello-world:latest", "wslc-load-image-container");
 
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+        // Validate container launch from the loaded image
+        {
+            WSLCContainerLauncher launcher("hello-world:latest", "wslc-load-image-container");
 
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
 
         // Validate that invalid tars fail with proper error message and code.
         {
@@ -1073,13 +1077,15 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
         // Validate that containers can be started from the imported image.
-        WSLCContainerLauncher launcher("my-hello-world:test", "wslc-import-image-container", {"/hello"});
+        {
+            WSLCContainerLauncher launcher("my-hello-world:test", "wslc-import-image-container", {"/hello"});
 
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
 
         // Validate that ImportImage fails if no tag is passed
         {
