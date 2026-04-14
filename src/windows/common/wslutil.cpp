@@ -1462,7 +1462,6 @@ std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::st
     return Base64Encode(authJson.dump());
 }
 
-
 std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValuePairs(const KeyValuePair* pairs, ULONG count, LPCSTR reservedKey)
 {
     std::map<std::string, std::string> result;
