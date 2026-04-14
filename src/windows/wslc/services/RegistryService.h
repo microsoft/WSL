@@ -51,7 +51,7 @@ private:
     static std::string Protect(const std::string& plaintext);
     static std::string Unprotect(const std::string& cipherBase64);
 
-    static void ModifyFileStore(const std::function<bool(nlohmann::json&)>& modifier);
+    static void ModifyFileStore(wil::unique_hfile handle, const std::function<bool(nlohmann::json&)>& modifier);
     static nlohmann::json ReadFileStore();
 
     static void FileStoreCredential(const std::string& serverAddress, const std::string& credential);

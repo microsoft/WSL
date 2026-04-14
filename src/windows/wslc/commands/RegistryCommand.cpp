@@ -138,6 +138,11 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
         {
             std::wstring line;
             std::getline(std::wcin, line);
+            if (!line.empty() && line.back() == L'\r')
+            {
+                line.pop_back();
+            }
+
             context.Args.Add(ArgType::Password, std::move(line));
         }
         else
