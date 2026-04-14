@@ -97,6 +97,56 @@ struct ListVolumesResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ListVolumesResponse, Volumes);
 };
 
+struct IPAMConfig
+{
+    std::string Subnet;
+    std::string Gateway;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway);
+};
+
+struct IPAM
+{
+    std::string Driver;
+    std::optional<std::vector<IPAMConfig>> Config;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAM, Driver, Config);
+};
+
+struct CreateNetworkResponse
+{
+    std::string Id;
+    std::string Warning;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetworkResponse, Id, Warning);
+};
+
+struct CreateNetwork
+{
+    using TResponse = CreateNetworkResponse;
+
+    std::string Name;
+    std::string Driver;
+    bool Internal{};
+    IPAM IPAM;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Labels);
+};
+
+struct Network
+{
+    std::string Id;
+    std::string Name;
+    std::string Driver;
+    std::string Scope;
+    bool Internal{};
+    IPAM IPAM;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
+};
+
 struct EmptyObject
 {
 };

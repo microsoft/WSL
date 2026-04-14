@@ -148,6 +148,11 @@ public:
     void RemoveVolume(const std::string& Name);
     std::vector<common::docker_schema::Volume> ListVolumes();
 
+    // Network management.
+    common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
+    void RemoveNetwork(const std::string& Name);
+    std::vector<common::docker_schema::Network> ListNetworks();
+
     // Image management.
     struct ListImagesFilters
     {

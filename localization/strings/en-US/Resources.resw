@@ -2132,6 +2132,26 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Volume '{}' is in use.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslcNetworkNotFound" xml:space = "preserve" >
+    <value>Network not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcInvalidNetworkDriver" xml:space = "preserve" >
+    <value>Unsupported network driver: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcNetworkInUse" xml:space = "preserve" >
+    <value>Network '{}' has active endpoints.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcNetworkAlreadyExists" xml:space = "preserve" >
+    <value>Network '{}' already exists.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcInvalidNetworkOptions" xml:space = "preserve" >
+    <value>Invalid network options: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcFailedToMountVolume" xml:space = "preserve" >
     <value>Failed to create volume '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

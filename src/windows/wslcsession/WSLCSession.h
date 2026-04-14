@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainer.h"
 #include "WSLCVhdVolume.h"
 #include "WSLCVolumeMetadata.h"
+#include "WSLCNetworkMetadata.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
@@ -109,6 +110,11 @@ public:
     IFACEMETHOD(ListVolumes)(_Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
+    // Network management.
+    IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
+    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
+    IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
+
     IFACEMETHOD(Terminate()) override;
 
     // ISupportErrorInfo
@@ -138,6 +144,7 @@ private:
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingVolumes();
+    void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
@@ -149,7 +156,7 @@ private:
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
 
-    // N.B. m_lock must be acquired before acquiring m_volumesLock or m_containersLock.
+    // N.B. m_lock must be acquired before acquiring m_volumesLock, m_containersLock, or m_networksLock.
     // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.
     // This allows independent operations to proceed while volume/container bookkeeping remains synchronized.
     std::mutex m_containersLock;
@@ -157,6 +164,8 @@ private:
     std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
     std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>> m_volumes;
     std::unordered_set<std::string> m_anonymousVolumes; // TODO: Implement proper anonymous volume support.
+    std::mutex m_networksLock;
+    std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;
