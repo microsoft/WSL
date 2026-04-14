@@ -49,6 +49,7 @@ set(SOURCES
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
+    WSLCUserSettings.cpp
     )
 
 set(HEADERS
@@ -130,11 +131,19 @@ set(HEADERS
     WslSecurity.h
     WslTelemetry.h
     wslutil.h
+    EnumVariantMap.h
+    WSLCUserSettings.h
+    WSLCSessionDefaults.h
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl)
+add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl yaml-cpp)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+
+# WSLCUserSettings.cpp uses yaml-cpp headers.
+set_source_files_properties(WSLCUserSettings.cpp PROPERTIES
+    INCLUDE_DIRECTORIES "${yaml-cpp_SOURCE_DIR}/include"
+    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE")
