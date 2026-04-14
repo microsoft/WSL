@@ -25,35 +25,32 @@ using namespace wsl::shared;
 
 namespace {
 
+auto MaskInput()
+{
+    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode = 0;
+
+    if ((input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &mode))
+    {
+        SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT);
+        return wil::scope_exit(std::function<void()>([input, mode] {
+            SetConsoleMode(input, mode);
+            std::wcerr << L'\n';
+        }));
+    }
+
+    return wil::scope_exit(std::function<void()>([] {}));
+}
+
 std::wstring Prompt(const std::wstring& label, bool maskInput)
 {
     // Write without a trailing newline so the cursor stays inline (matching Docker's behavior).
-    fputws(label.c_str(), stderr);
-    fflush(stderr);
+    std::wcerr << label;
+
+    auto restoreConsole = maskInput ? MaskInput() : wil::scope_exit(std::function<void()>([] {}));
 
     std::wstring value;
-    if (!maskInput)
-    {
-        std::getline(std::wcin, value);
-        return value;
-    }
-
-    HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode = 0;
-    const bool canMask = (input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &mode);
-
-    if (canMask)
-    {
-        SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT);
-    }
-
     std::getline(std::wcin, value);
-
-    if (canMask)
-    {
-        SetConsoleMode(input, mode);
-        fputws(L"\n", stderr);
-    }
 
     return value;
 }
@@ -113,6 +110,19 @@ std::wstring RegistryLoginCommand::LongDescription() const
     return Localization::WSLCCLI_LoginLongDesc();
 }
 
+void RegistryLoginCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+{
+    if (execArgs.Contains(ArgType::Password) && execArgs.Contains(ArgType::PasswordStdin))
+    {
+        throw CommandException(Localization::WSLCCLI_LoginPasswordAndStdinMutuallyExclusive());
+    }
+
+    if (execArgs.Contains(ArgType::PasswordStdin) && !execArgs.Contains(ArgType::Username))
+    {
+        throw CommandException(Localization::WSLCCLI_LoginPasswordStdinRequiresUsername());
+    }
+}
+
 void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     // Prompt for username if not provided.
@@ -126,9 +136,9 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         if (context.Args.Contains(ArgType::PasswordStdin))
         {
-            std::string line;
-            std::getline(std::cin, line);
-            context.Args.Add(ArgType::Password, wsl::shared::string::MultiByteToWide(line));
+            std::wstring line;
+            std::getline(std::wcin, line);
+            context.Args.Add(ArgType::Password, std::move(line));
         }
         else
         {

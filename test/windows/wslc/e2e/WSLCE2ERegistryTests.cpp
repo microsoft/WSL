@@ -35,6 +35,11 @@ namespace {
         VERIFY_IS_TRUE(result.Stderr->find(L"no basic auth credentials") != std::wstring::npos);
     }
 
+    void VerifyLogoutSucceeds(const std::wstring& registryAddress)
+    {
+        auto result = RunWslc(std::format(L"logout {}", registryAddress));
+        result.Verify({.Stdout = Localization::WSLCCLI_LogoutSucceeded(registryAddress) + L"\r\n", .Stderr = L"", .ExitCode = 0});
+    }
 } // namespace
 
 class WSLCE2ERegistryTests
@@ -60,15 +65,11 @@ class WSLCE2ERegistryTests
         auto session = OpenDefaultElevatedSession();
 
         {
-            Log::Comment(L"Starting local registry with auth");
             auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15001);
             auto registryAddressW = string::MultiByteToWide(registryAddress);
-            Log::Comment(std::format(L"Registry started at {}", registryAddressW).c_str());
 
-            Log::Comment(L"Tagging image for registry");
             auto registryImageName = TagImageForRegistry(*session, "debian:latest", registryAddress);
             auto registryImageNameW = string::MultiByteToWide(registryImageName);
-            Log::Comment(std::format(L"Tagged image: {}", registryImageNameW).c_str());
 
             auto cleanup = wil::scope_exit([&]() {
                 RunWslc(std::format(L"image delete --force {}", registryImageNameW));
@@ -76,7 +77,6 @@ class WSLCE2ERegistryTests
             });
 
             // Negative path before login: push and pull should fail.
-            Log::Comment(L"Testing push without login");
             auto result = RunWslc(std::format(L"push {}", registryImageNameW));
             VerifyAuthFailure(result);
 
@@ -86,38 +86,30 @@ class WSLCE2ERegistryTests
             VerifyAuthFailure(result);
 
             // Login and verify that saved credentials are used for push/pull.
-            Log::Comment(L"Logging in");
             result = RunWslc(std::format(
                 L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
             result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
 
-            Log::Comment(L"Re-tagging and pushing with auth");
             registryImageName = TagImageForRegistry(*session, "debian:latest", registryAddress);
             result = RunWslc(std::format(L"push {}", registryImageNameW));
             result.Verify({.ExitCode = 0});
 
-            Log::Comment(L"Deleting and pulling with auth");
             RunWslcAndVerify(std::format(L"image delete --force {}", registryImageNameW), {.ExitCode = 0});
             result = RunWslc(std::format(L"pull {}", registryImageNameW));
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             // Logout and verify both pull and push fail again.
-            Log::Comment(L"Logging out");
-            result = RunWslc(std::format(L"logout {}", registryAddressW));
-            result.Verify({.Stdout = Localization::WSLCCLI_LogoutSucceeded(registryAddressW) + L"\r\n", .Stderr = L"", .ExitCode = 0});
+            VerifyLogoutSucceeds(registryAddressW);
 
-            Log::Comment(L"Verifying pull fails after logout");
             RunWslcAndVerify(std::format(L"image delete --force {}", registryImageNameW), {.ExitCode = 0});
             result = RunWslc(std::format(L"pull {}", registryImageNameW));
             VerifyAuthFailure(result);
 
-            Log::Comment(L"Verifying push fails after logout");
             registryImageName = TagImageForRegistry(*session, "debian:latest", registryAddress);
             result = RunWslc(std::format(L"push {}", registryImageNameW));
             VerifyAuthFailure(result);
 
             // Negative path for logout command: second logout should fail.
-            Log::Comment(L"Verifying second logout fails");
             result = RunWslc(std::format(L"logout {}", registryAddressW));
             VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
             VERIFY_IS_TRUE(result.Stderr.has_value());
@@ -135,6 +127,66 @@ class WSLCE2ERegistryTests
     {
         auto result = RunWslc(L"registry logout --help");
         result.Verify({.Stdout = GetLogoutHelpMessage(), .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Registry_Login_PasswordAndStdinMutuallyExclusive)
+    {
+        auto result = RunWslc(L"login -u testuser -p testpass --password-stdin localhost:15099");
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(L"--password and --password-stdin are mutually exclusive") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Registry_Login_PasswordStdinRequiresUsername)
+    {
+        auto result = RunWslc(L"login --password-stdin localhost:15099");
+        VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+        VERIFY_IS_TRUE(result.Stderr.has_value());
+        VERIFY_IS_TRUE(result.Stderr->find(L"Must provide --username with --password-stdin") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Registry_Login_CredentialInputMethods)
+    {
+        auto session = OpenDefaultElevatedSession();
+        
+        {
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15002);
+            auto registryAddressW = string::MultiByteToWide(registryAddress);
+            auto usernameW = string::MultiByteToWide(c_username);
+            auto passwordW = string::MultiByteToWide(c_password);
+
+            // Login with -u and -p flags.
+            {
+                auto result = RunWslc(std::format(L"login -u {} -p {} {}", usernameW, passwordW, registryAddressW));
+                result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
+
+                VerifyLogoutSucceeds(registryAddressW);
+            }
+
+            // Login with -u and --password-stdin.
+            {
+                auto interactive = RunWslcInteractive(std::format(L"login -u {} --password-stdin {}", usernameW, registryAddressW));
+                interactive.WriteLine(c_password);
+                interactive.CloseStdin();
+                auto exitCode = interactive.Wait();
+                VERIFY_ARE_EQUAL(0, exitCode, L"Login with --password-stdin should succeed");
+
+                VerifyLogoutSucceeds(registryAddressW);
+            }
+
+            // Login with interactive prompts (no flags).
+            {
+                auto interactive = RunWslcInteractive(std::format(L"login {}", registryAddressW));
+                interactive.ExpectStderr("Username: ");
+                interactive.WriteLine(c_username);
+                interactive.ExpectStderr("Password: ");
+                interactive.WriteLine(c_password);
+                auto exitCode = interactive.Wait();
+                VERIFY_ARE_EQUAL(0, exitCode, L"Interactive login should succeed");
+
+                VerifyLogoutSucceeds(registryAddressW);
+            }
+        }
     }
 
 private:

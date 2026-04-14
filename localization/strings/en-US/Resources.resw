@@ -2333,6 +2333,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Take the Password or Personal Access Token (PAT) from stdin</value>
     <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
   </data>
+  <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
+    <value>--password and --password-stdin are mutually exclusive</value>
+    <comment>{Locked="--password"}{Locked="--password-stdin"}CLI flag names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
+    <value>Must provide --username with --password-stdin</value>
+    <comment>{Locked="--username"}{Locked="--password-stdin"}CLI flag names should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
     <value>Manage registry credentials.</value>
   </data>
