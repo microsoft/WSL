@@ -128,7 +128,7 @@ struct CreateNetwork
     std::string Name;
     std::string Driver;
     bool Internal{};
-    IPAM IPAM;
+    std::optional<IPAM> IPAM;
     std::map<std::string, std::string> Labels;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Labels);

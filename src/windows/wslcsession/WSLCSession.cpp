@@ -1943,31 +1943,39 @@ try
 
     if (Options->Options)
     {
-        auto options = nlohmann::json::parse(Options->Options);
-        THROW_HR_IF(E_INVALIDARG, !options.is_object());
-
-        if (auto it = options.find("Internal"); it != options.end())
+        try
         {
-            request.Internal = it->is_boolean() ? it->get<bool>() : (it->get<std::string>() == "true");
-        }
+            auto options = nlohmann::json::parse(Options->Options);
+            THROW_HR_IF(E_INVALIDARG, !options.is_object());
 
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG,
-            Localization::MessageWslcInvalidNetworkOptions("Gateway requires Subnet"),
-            options.contains("Gateway") && !options.contains("Subnet"));
-
-        if (auto it = options.find("Subnet"); it != options.end())
-        {
-            docker_schema::IPAMConfig ipamConfig;
-            ipamConfig.Subnet = it->get<std::string>();
-
-            if (auto gw = options.find("Gateway"); gw != options.end())
+            if (auto it = options.find("Internal"); it != options.end())
             {
-                ipamConfig.Gateway = gw->get<std::string>();
+                request.Internal = it->is_boolean() ? it->get<bool>() : (it->get<std::string>() == "true");
             }
 
-            request.IPAM.Driver = "default";
-            request.IPAM.Config.emplace().push_back(std::move(ipamConfig));
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG,
+                Localization::MessageWslcInvalidNetworkOptions("Gateway requires Subnet"),
+                options.contains("Gateway") && !options.contains("Subnet"));
+
+            if (auto it = options.find("Subnet"); it != options.end())
+            {
+                docker_schema::IPAMConfig ipamConfig;
+                ipamConfig.Subnet = it->get<std::string>();
+
+                if (auto gw = options.find("Gateway"); gw != options.end())
+                {
+                    ipamConfig.Gateway = gw->get<std::string>();
+                }
+
+                auto& ipam = request.IPAM.emplace();
+                ipam.Driver = "default";
+                ipam.Config.emplace().push_back(std::move(ipamConfig));
+            }
+        }
+        catch (...)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidNetworkOptions(Options->Options));
         }
     }
 
