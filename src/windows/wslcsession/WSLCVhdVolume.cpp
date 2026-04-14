@@ -44,8 +44,7 @@ namespace {
     ULONGLONG ParseSizeBytes(std::map<std::string, std::string>& DriverOpts)
     {
         const auto it = DriverOpts.find("SizeBytes");
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcInvalidVolumeOptions("SizeBytes"), it == DriverOpts.end());
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOptions("SizeBytes"), it == DriverOpts.end());
 
         auto& value = it->second;
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), value.empty() || value[0] == '-');
@@ -57,6 +56,7 @@ namespace {
 
         return sizeBytes;
     }
+
 } // namespace
 
 WSLCVhdVolumeImpl::WSLCVhdVolumeImpl(
@@ -198,15 +198,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
 
     auto volume = std::make_unique<WSLCVhdVolumeImpl>(
-        std::string{Volume.Name},
-        std::move(hostPath),
-        sizeBytes,
-        lun,
-        std::move(virtualMachinePath),
-        std::move(driverOpts),
-        std::move(userLabels),
-        VirtualMachine,
-        DockerClient);
+        std::string{Volume.Name}, std::move(hostPath), sizeBytes, lun, std::move(virtualMachinePath), std::move(driverOpts), std::move(userLabels), VirtualMachine, DockerClient);
     volume->m_createdAt = Volume.CreatedAt;
 
     mountCleanup.release();
