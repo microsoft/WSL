@@ -73,11 +73,19 @@ public:
 
     void GetVersion(_Out_ WSLCVersion* Version);
     void CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession);
+    void EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession);
     void ListSessions(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount);
     void OpenSession(_In_ ULONG Id, _Out_ IWSLCSession** Session);
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session);
 
 private:
+    // Resolves the default session name for a caller: appends the username
+    // from the token SID so different users don't collide.
+    static std::wstring ResolveDefaultSessionName(const CallingProcessTokenInfo& TokenInfo);
+
+    // Returns true if the name matches a reserved default session prefix.
+    static bool IsReservedSessionName(LPCWSTR Name);
+
     // Iterates over all sessions, cleaning up released sessions.
     // The routine receives a SessionEntry& and can return an optional<T> to stop iteration.
     template <typename T>
@@ -138,7 +146,8 @@ private:
     }
 
     void AddSessionProcessToJobObject(_In_ IWSLCSessionFactory* Factory);
-    WSLCSessionInitSettings CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLCSessionSettings* Settings);
+    WSLCSessionInitSettings CreateSessionSettings(
+        _In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
     void EnsureJobObjectCreated();
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
@@ -173,6 +182,7 @@ public:
 
     IFACEMETHOD(GetVersion)(_Out_ WSLCVersion* Version) override;
     IFACEMETHOD(CreateSession)(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession) override;
+    IFACEMETHOD(EnterSession)(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLCSession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session) override;

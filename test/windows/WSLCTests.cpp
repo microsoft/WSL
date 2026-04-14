@@ -85,6 +85,21 @@ class WSLCTests
             LoadTestImage("python:3.12-alpine");
         }
 
+        if (!hasImage("hello-world:latest"))
+        {
+            LoadTestImage("hello-world:latest");
+        }
+
+        if (!hasImage("alpine:latest"))
+        {
+            LoadTestImage("alpine:latest");
+        }
+
+        if (!hasImage("wslc-registry:latest"))
+        {
+            LoadTestImage("wslc-registry:latest");
+        }
+
         PruneResult result;
         VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
         if (result.result.ContainersCount > 0)
@@ -165,6 +180,52 @@ class WSLCTests
         VERIFY_SUCCEEDED(session->OpenContainer(name.c_str(), &rawContainer));
 
         return RunningWSLCContainer(std::move(rawContainer), {});
+    }
+
+    std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(const std::string& username = {}, const std::string& password = {}, USHORT port = 5000)
+    {
+        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
+        if (!username.empty())
+        {
+            env.push_back(std::format("USERNAME={}", username));
+            env.push_back(std::format("PASSWORD={}", password));
+        }
+
+        WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+        launcher.SetEntrypoint({"/entrypoint.sh"});
+        launcher.AddPort(port, port, AF_INET);
+
+        auto container = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+
+        auto registryAddress = std::format("127.0.0.1:{}", port);
+        auto registryUrl = std::format(L"http://{}", registryAddress);
+        ExpectHttpResponse(registryUrl.c_str(), 200, true);
+
+        return {std::move(container), std::move(registryAddress)};
+    }
+
+    std::string PushImageToRegistry(const std::string& imageName, const std::string& registryAddress, const std::string& registryAuth)
+    {
+        auto [repo, tag] = ParseImage(imageName);
+        auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
+        auto registryRepo = std::format("{}/{}", registryAddress, repo);
+        auto registryTag = tag.value_or("latest");
+
+        WSLCTagImageOptions tagOptions{};
+        tagOptions.Image = imageName.c_str();
+        tagOptions.Repo = registryRepo.c_str();
+        tagOptions.Tag = registryTag.c_str();
+
+        // Tag the image with the registry address so it can be pushed.
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+
+        // Ensures the tag is removed to allow tests to try to push or pull the same image again.
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsNone).first); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->PushImage(registryImage.c_str(), registryAuth.c_str(), nullptr));
+
+        return registryImage;
     }
 
     WSLC_TEST_METHOD(GetVersion)
@@ -341,7 +402,7 @@ class WSLCTests
         {
             auto settings = GetDefaultSessionSettings(nullptr);
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject DisplayName at exact boundary (no room for null terminator).
@@ -349,7 +410,7 @@ class WSLCTests
             std::wstring boundaryName(std::size(WSLCSessionInformation{}.DisplayName), L'x');
             auto settings = GetDefaultSessionSettings(boundaryName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject too long DisplayName.
@@ -357,7 +418,7 @@ class WSLCTests
             std::wstring longName(std::size(WSLCSessionInformation{}.DisplayName) + 1, L'x');
             auto settings = GetDefaultSessionSettings(longName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Validate that creating a session on a non-existing storage fails if WSLCSessionStorageFlagsNoCreate is set.
@@ -418,27 +479,18 @@ class WSLCTests
     WSLC_TEST_METHOD(PullImage)
     {
         {
-            HRESULT pullResult = m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr);
+            // Start a local registry without auth and push hello-world:latest to it.
+            auto [registryContainer, registryAddress] = StartLocalRegistry();
 
-            // Skip test if error is due to rate limit.
-            if (pullResult == E_FAIL)
-            {
-                auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-                if (comError.has_value())
-                {
-                    if (wcsstr(comError->Message.get(), L"toomanyrequests") != nullptr)
-                    {
-                        LogWarning("Skipping PullImage test due to rate limiting.");
-                        return;
-                    }
-                }
-            }
+            auto image = PushImageToRegistry("hello-world:latest", registryAddress, BuildRegistryAuthHeader("", "", registryAddress));
+            ExpectImagePresent(*m_defaultSession, image.c_str(), false);
 
-            VERIFY_SUCCEEDED(pullResult);
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr));
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(image, WSLCDeleteImageFlagsForce).first); });
 
             // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:linux");
-            WSLCContainerLauncher launcher("hello-world:linux", "wslc-pull-image-container");
+            ExpectImagePresent(*m_defaultSession, image.c_str());
+            WSLCContainerLauncher launcher(image, "wslc-pull-image-container");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto result = container.GetInitProcess().WaitAndCaptureOutput();
@@ -453,10 +505,7 @@ class WSLCTests
                 L"access to the resource is denied";
 
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLC_E_IMAGE_NOT_FOUND);
-            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-            VERIFY_IS_TRUE(comError.has_value());
-
-            VERIFY_ARE_EQUAL(expectedError, comError->Message.get());
+            ValidateCOMErrorMessage(expectedError.c_str());
         }
 
         // Validate that PullImage() returns the appropriate error if the session is terminated.
@@ -473,7 +522,30 @@ class WSLCTests
 
     WSLC_TEST_METHOD(PullImageAdvanced)
     {
-        // TODO: Enable once custom registries are supported, to avoid hitting public registry rate limits.
+        // Start a local registry without auth to avoid Docker Hub rate limits.
+        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto auth = BuildRegistryAuthHeader("", "", registryAddress);
+
+        auto validatePull = [&](const std::string& sourceImage) {
+            // Push the source image to the local registry.
+            auto registryImage = PushImageToRegistry(sourceImage, registryAddress, auth);
+            ExpectImagePresent(*m_defaultSession, registryImage.c_str(), false);
+
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage(registryImage.c_str(), nullptr, nullptr));
+
+            auto cleanup =
+                wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsForce).first); });
+
+            ExpectImagePresent(*m_defaultSession, registryImage.c_str());
+        };
+
+        validatePull("debian:latest");
+        validatePull("alpine:latest");
+        validatePull("hello-world:latest");
+    }
+
+    WSLC_TEST_METHOD(PullImageFromDockerHub)
+    {
         SKIP_TEST_UNSTABLE();
 
         auto validatePull = [&](const std::string& Image, const std::optional<std::string>& ExpectedTag = {}) {
@@ -528,17 +600,58 @@ class WSLCTests
 
             VERIFY_ARE_EQUAL(session->PullImage("pytorch/pytorch", nullptr, nullptr), E_FAIL);
 
-            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-            VERIFY_IS_TRUE(comError.has_value());
-
-            // The error message can't be compared directly because it contains an unpredicable path:
-            // "write /var/lib/docker/tmp/GetImageBlob1760660623: no space left on device"
-            if (StrStrW(comError->Message.get(), L"no space left on device") == nullptr)
-            {
-                LogError("Unexpected error message: %ls", comError->Message.get());
-                VERIFY_FAIL();
-            }
+            ValidateCOMErrorMessageContains(L"no space left on device");
         }
+    }
+
+    WSLC_TEST_METHOD(PushImage)
+    {
+        auto emptyAuth = BuildRegistryAuthHeader("", "", "");
+
+        // Validate that pushing a non-existent image fails.
+        {
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", emptyAuth.c_str(), nullptr), E_FAIL);
+            ValidateCOMErrorMessage(L"An image does not exist locally with the tag: does-not-exist");
+        }
+
+        // Validate passing empty auth string returns an appropriate error.
+        {
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("does-not-exist:latest", "", nullptr), E_INVALIDARG);
+        }
+
+        // Validate that PushImage() returns the appropriate error if the session is terminated.
+        {
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+            auto cleanup = wil::scope_exit([&]() { ResetTestSession(); });
+
+            VERIFY_ARE_EQUAL(m_defaultSession->PushImage("hello-world:latest", emptyAuth.c_str(), nullptr), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+    }
+
+    WSLC_TEST_METHOD(Authenticate)
+    {
+        constexpr auto c_username = "wslctest";
+        constexpr auto c_password = "password";
+
+        auto [registryContainer, registryAddress] = StartLocalRegistry(c_username, c_password);
+
+        wil::unique_cotaskmem_ansistring token;
+        VERIFY_ARE_EQUAL(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, "wrong-password", &token), E_FAIL);
+        ValidateCOMErrorMessageContains(L"failed with status: 401 Unauthorized");
+
+        VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, c_password, &token));
+        VERIFY_IS_NOT_NULL(token.get());
+
+        auto xRegistryAuth = BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        auto image = PushImageToRegistry("hello-world:latest", registryAddress, xRegistryAuth);
+
+        // Pulling without credentials should fail.
+        VERIFY_ARE_EQUAL(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr), E_FAIL);
+        ValidateCOMErrorMessageContains(L"no basic auth credentials");
+
+        // Pulling with credentials should succeed.
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), xRegistryAuth.c_str(), nullptr));
+        ExpectImagePresent(*m_defaultSession, image.c_str());
     }
 
     WSLC_TEST_METHOD(ListImages)
@@ -999,6 +1112,31 @@ class WSLCTests
                 LogError("Expected COM error: '%ls' but none was set. Source: %hs", Expected->c_str(), std::format("{}", Source).c_str());
                 VERIFY_FAIL();
             }
+        }
+    }
+
+    void ValidateCOMErrorMessageContains(const std::wstring& ExpectedSubstring)
+    {
+        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+        if (comError.has_value())
+        {
+            if (!comError->Message)
+            {
+                LogError("Expected COM error containing: '%ls', but COM error message was null", ExpectedSubstring.c_str());
+                VERIFY_FAIL();
+            }
+
+            if (wcsstr(comError->Message.get(), ExpectedSubstring.c_str()) == nullptr)
+            {
+                LogError("Expected COM error containing: '%ls', but got: '%ls'", ExpectedSubstring.c_str(), comError->Message.get());
+                VERIFY_FAIL();
+            }
+        }
+        else
+        {
+            LogError("Expected COM error containing: '%ls' but none was set", ExpectedSubstring.c_str());
+            VERIFY_FAIL();
         }
     }
 
@@ -1578,16 +1716,8 @@ class WSLCTests
         VERIFY_ARE_EQUAL(E_ABORT, result.get_future().get());
     }
 
-    TEST_METHOD(AnonymousVolumes)
+    WSLC_TEST_METHOD(AnonymousVolumes)
     {
-        // TODO: Add more test coverage once anonymous volumes are fully supported and switch to using -v instead of building an image.
-
-        if (!LxsstuVmMode())
-        {
-            LogSkipped("This test is only applicable to WSL2");
-            return;
-        }
-
         auto contextDir = std::filesystem::current_path() / "build-context";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -2195,7 +2325,18 @@ class WSLCTests
 
             std::thread thread(readDmesg); // Needs to be created before the VM starts, to avoid a pipe deadlock.
 
+            // Ensure the thread is joined even if CreateSession throws, to avoid std::terminate.
+            auto threadGuard = wil::scope_exit([&]() {
+                write.reset();
+                if (thread.joinable())
+                {
+                    thread.join();
+                }
+            });
+
             auto session = CreateSession(settings);
+            threadGuard.release(); // CreateSession succeeded, detach scope_exit below takes over.
+
             auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 session.reset();
                 if (thread.joinable())

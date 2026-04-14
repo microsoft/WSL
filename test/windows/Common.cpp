@@ -2843,6 +2843,10 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     {
         result /= L"HelloWorldSaved.tar";
     }
+    else if (imageName == "wslc-registry:latest")
+    {
+        result /= L"wslc-registry.tar";
+    }
     else
     {
         THROW_HR_MSG(E_INVALIDARG, "Unknown test image: %hs", imageName.data());
