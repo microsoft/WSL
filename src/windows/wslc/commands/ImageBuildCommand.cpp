@@ -30,6 +30,7 @@ std::vector<Argument> ImageBuildCommand::GetArguments() const
         Argument::Create(ArgType::Path, true),
         Argument::Create(ArgType::BuildArg, false, NO_LIMIT),
         Argument::Create(ArgType::File),
+        Argument::Create(ArgType::NoCache),
         Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Tag, false, NO_LIMIT),
         Argument::Create(ArgType::Verbose),

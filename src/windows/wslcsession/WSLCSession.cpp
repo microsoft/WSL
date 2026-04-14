@@ -581,6 +581,11 @@ try
     RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(static_cast<WSLCBuildImageFlags>(Options->Flags), ~WSLCBuildImageFlagsValid),
+        "Invalid flags: 0x%x",
+        Options->Flags);
 
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
@@ -596,6 +601,10 @@ try
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
+    if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
+    {
+        buildArgs.push_back("--no-cache");
+    }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
         RETURN_HR_IF_NULL(E_INVALIDARG, Options->Tags.Values[i]);
@@ -625,7 +634,7 @@ try
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
         buildFileHandle.Get(), common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
-    bool verbose = Options->Verbose;
+    bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;

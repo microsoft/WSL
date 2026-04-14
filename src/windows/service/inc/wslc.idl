@@ -531,13 +531,24 @@ typedef struct _WSLCDeleteImageOptions
     // TODO: Platforms: a json array of OCI platform strings.
 } WSLCDeleteImageOptions;
 
+typedef enum _WSLCBuildImageFlags
+{
+    WSLCBuildImageFlagsNone = 0,
+    WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps and all statuses.
+    WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
+} WSLCBuildImageFlags;
+
+cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
+
 typedef struct _WSLCBuildImageOptions
 {
     LPCWSTR ContextPath;
     WSLCHandle DockerfileHandle;
     WSLCStringArray Tags;
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
-    BOOL Verbose; // Show all build progress including internal steps and all statuses.
+    WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
