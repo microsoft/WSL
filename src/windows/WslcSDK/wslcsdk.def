@@ -23,6 +23,7 @@ WslcSetSessionSettingsTimeout
 WslcSetSessionSettingsVhd
  
 WslcTerminateSession
+WslcSessionAuthenticate
 WslcPullSessionImage
 WslcImportSessionImage
 WslcImportSessionImageFromFile
@@ -32,6 +33,8 @@ WslcDeleteSessionImage
 WslcListSessionImages
 WslcCreateSessionVhdVolume
 WslcDeleteSessionVhdVolume
+WslcTagSessionImage
+WslcPushSessionImage
 
 WslcSetContainerSettingsDomainName
 WslcSetContainerSettingsName

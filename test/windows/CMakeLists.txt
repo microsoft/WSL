@@ -32,11 +32,13 @@ target_link_libraries(wsltests
                       ${COMMON_LINK_LIBRARIES}
                       ${MSI_LINK_LIBRARIES}
                       ${HCS_LINK_LIBRARIES}
+                      yaml-cpp
                       ${SERVICE_LINK_LIBRARIES}
                       VirtDisk.lib
                       Wer.lib
                       Dbghelp.lib
-                      sfc.lib)
+                      sfc.lib
+                      Crypt32.lib)
 
 add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk)
 add_subdirectory(testplugin)
