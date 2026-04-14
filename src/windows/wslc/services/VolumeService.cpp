@@ -58,5 +58,4 @@ wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::
     THROW_IF_FAILED(session.Get()->InspectVolume(name.c_str(), &output));
     return FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
 }
-
 } // namespace wsl::windows::wslc::services

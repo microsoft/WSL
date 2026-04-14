@@ -134,12 +134,12 @@ void ListVolumes(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
-        auto table = wsl::windows::wslc::TableOutput<2>({L"VOLUME NAME", L"DRIVER"});
+        auto table = wsl::windows::wslc::TableOutput<2>({L"DRIVER", L"VOLUME NAME"});
         for (const auto& volume : volumes)
         {
             table.OutputLine({
-                MultiByteToWide(volume.Name),
                 MultiByteToWide(volume.Type),
+                MultiByteToWide(volume.Name),
             });
         }
 
@@ -150,5 +150,4 @@ void ListVolumes(CLIExecutionContext& context)
         THROW_HR(E_UNEXPECTED);
     }
 }
-
 } // namespace wsl::windows::wslc::task

@@ -56,13 +56,10 @@ void VolumeListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
     }
 }
 
-// clang-format off
 void VolumeListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context
-        << CreateSession
-        << GetVolumes
-        << ListVolumes;
+    context << CreateSession //
+            << GetVolumes //
+            << ListVolumes;
 }
-// clang-format on
 } // namespace wsl::windows::wslc

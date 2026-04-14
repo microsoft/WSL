@@ -42,12 +42,9 @@ std::wstring VolumeInspectCommand::LongDescription() const
     return Localization::WSLCCLI_VolumeInspectLongDesc();
 }
 
-// clang-format off
 void VolumeInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context
-        << CreateSession
-        << InspectVolumes;
+    context << CreateSession //
+            << InspectVolumes;
 }
-// clang-format on
 } // namespace wsl::windows::wslc
