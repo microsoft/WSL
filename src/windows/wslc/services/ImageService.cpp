@@ -238,7 +238,32 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
 }
 
-void ImageService::Prune()
+models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
 {
+    WSLCPruneImagesOptions options{};
+    if (all)
+    {
+        options.Flags |= WSLCPruneImagesFlagsDanglingFalse;
+    }
+
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+    ULONGLONG spaceReclaimed = 0;
+    THROW_IF_FAILED(session.Get()->PruneImages(&options, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
+
+    models::PruneImagesResult result;
+    result.SpaceReclaimed = spaceReclaimed;
+    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    {
+        if (ptr->Type == WSLCDeletedImageTypeDeleted)
+        {
+            result.DeletedImages.push_back(ptr->Image);
+        }
+        else
+        {
+            result.UntaggedImages.push_back(ptr->Image);
+        }
+    }
+
+    return result;
 }
 } // namespace wsl::windows::wslc::services

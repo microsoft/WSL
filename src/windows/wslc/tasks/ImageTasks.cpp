@@ -203,4 +203,24 @@ void TagImage(CLIExecutionContext& context)
     auto& target = context.Args.Get<ArgType::Target>();
     services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
 }
+void PruneImages(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    bool all = context.Args.Contains(ArgType::All);
+    auto result = ImageService::Prune(session, all);
+
+    for (const auto& image : result.UntaggedImages)
+    {
+        PrintMessage(std::format(L"Untagged: {}\n", MultiByteToWide(image)), stdout);
+    }
+
+    for (const auto& image : result.DeletedImages)
+    {
+        PrintMessage(std::format(L"Deleted: {}\n", MultiByteToWide(image)), stdout);
+    }
+
+    PrintMessage(std::format(L"\nTotal reclaimed space: {:.2f} MB\n", static_cast<double>(result.SpaceReclaimed) / (1024 * 1024)), stdout);
+}
 } // namespace wsl::windows::wslc::task

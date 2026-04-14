@@ -2280,6 +2280,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ImagePullLongDesc" xml:space="preserve">
     <value>Pulls images.</value>
   </data>
+  <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
+    <value>Remove unused images.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
+    <value>Removes all dangling images. If --all is specified, removes all images not used by any container.</value>
+  </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Remove images.</value>
   </data>
