@@ -1140,7 +1140,7 @@ class WSLCTests
         }
     }
 
-    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options)
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options, IProgressCallback* callback = nullptr)
     {
         auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
 
@@ -1149,7 +1149,7 @@ class WSLCTests
         optionsCopy.ContextPath = contextPathStr.c_str();
         optionsCopy.DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get());
 
-        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, nullptr, nullptr);
+        auto buildResult = m_defaultSession->BuildImage(&optionsCopy, callback, nullptr);
 
         if (FAILED(buildResult))
         {
@@ -1714,6 +1714,80 @@ class WSLCTests
         cancelEvent.SetEvent();
 
         VERIFY_ARE_EQUAL(E_ABORT, result.get_future().get());
+    }
+
+    WSLC_TEST_METHOD(BuildImageNoCache)
+    {
+        class CapturingProgressCallback
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+        {
+        public:
+            CapturingProgressCallback(std::string& output) : m_output(output)
+            {
+            }
+
+            HRESULT OnProgress(LPCSTR status, LPCSTR, ULONGLONG, ULONGLONG) override
+            {
+                m_output.append(status);
+                return S_OK;
+            }
+
+        private:
+            std::string& m_output;
+        };
+
+        auto contextDir = std::filesystem::current_path() / "build-context-nocache";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-nocache:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "DockerFile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN echo -n Image && echo -n is && echo -n rebuilt\n";
+        }
+
+        // First build to populate cache.
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-nocache:latest"));
+
+        // Validate that the image isn't rebuilt when NoCache isn't set.
+        {
+            std::string output;
+            auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
+            LPCSTR tag = "wslc-test-nocache:latest";
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsVerbose};
+            VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
+            VERIFY_IS_TRUE(output.find("Imageisrebuilt") == std::string::npos);
+        }
+
+        // Validate that the image is rebuilt when WSLCBuildImageFlagsNoCache is set, and that the output from the RUN step appears in the progress callback.
+        {
+            std::string output;
+            auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
+            LPCSTR tag = "wslc-test-nocache:latest";
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsVerbose};
+            VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
+            VERIFY_IS_TRUE(output.find("Imageisrebuilt") != std::string::npos);
+        }
+    }
+
+    WSLC_TEST_METHOD(BuildImageInvalidFlags)
+    {
+        auto dummyDockerfile = wil::create_new_file(
+            (std::filesystem::current_path() / "Dockerfile").c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, FILE_FLAG_DELETE_ON_CLOSE);
+
+        auto contextDir = std::filesystem::current_path();
+
+        WSLCBuildImageOptions options{
+            .ContextPath = contextDir.c_str(),
+            .DockerfileHandle = ToCOMInputHandle(dummyDockerfile.get()),
+            .Flags = static_cast<WSLCBuildImageFlags>(0x4)};
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr));
     }
 
     WSLC_TEST_METHOD(AnonymousVolumes)
