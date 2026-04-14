@@ -42,11 +42,11 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
     commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
+    commands.push_back(std::make_unique<RegistryLoginCommand>(FullName()));
+    commands.push_back(std::make_unique<RegistryLogoutCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePushCommand>(FullName()));
-    commands.push_back(std::make_unique<RegistryLoginCommand>(FullName()));
-    commands.push_back(std::make_unique<RegistryLogoutCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<ImageRemoveCommand>(FullName(), true));
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
