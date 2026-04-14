@@ -1746,7 +1746,7 @@ class WSLCTests
         });
 
         {
-            std::ofstream dockerfile(contextDir / "DockerFile");
+            std::ofstream dockerfile(contextDir / "Dockerfile");
             dockerfile << "FROM debian:latest\n";
             dockerfile << "RUN echo -n Image && echo -n is && echo -n rebuilt\n";
         }
