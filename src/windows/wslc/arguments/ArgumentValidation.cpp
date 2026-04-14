@@ -47,10 +47,6 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
 
-    case ArgType::Driver:
-        // validation::ValidateVolumeDriver(execArgs.GetAll<ArgType::Driver>(), m_name);
-        break;
-
     case ArgType::WorkDir:
     {
         const auto& value = execArgs.Get<ArgType::WorkDir>();
@@ -98,29 +94,6 @@ void ValidateVolumeMount(const std::vector<std::wstring>& values)
     for (const auto& value : values)
     {
         std::ignore = models::VolumeMount::Parse(value);
-    }
-}
-
-void ValidateVolumeDriver(const std::vector<std::wstring>& values, const std::wstring& argName)
-{
-    static const std::vector<std::wstring> supportedDrivers = {L"vhd"};
-    for (const auto& value : values)
-    {
-        bool found = false;
-        for (const auto& driver : supportedDrivers)
-        {
-            if (IsEqual(value, driver))
-            {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found)
-        {
-            throw ArgumentException(std::format(
-                L"Invalid {} value: {} is not a recognized volume driver. Supported drivers are: vhd.", argName, value));
-        }
     }
 }
 

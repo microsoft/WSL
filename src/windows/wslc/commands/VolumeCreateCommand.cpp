@@ -27,9 +27,9 @@ namespace wsl::windows::wslc {
 std::vector<Argument> VolumeCreateCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::VolumeName),
+        Argument::Create(ArgType::VolumeName, true),
         Argument::Create(ArgType::Driver),
-        Argument::Create(ArgType::Options),
+        Argument::Create(ArgType::Options, false, NO_LIMIT),
         Argument::Create(ArgType::Session),
     };
 }
@@ -44,12 +44,10 @@ std::wstring VolumeCreateCommand::LongDescription() const
     return Localization::WSLCCLI_VolumeCreateLongDesc();
 }
 
-// clang-format off
 void VolumeCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
-        << CreateSession
+        << CreateSession //
         << CreateVolume;
 }
-// clang-format on
 } // namespace wsl::windows::wslc

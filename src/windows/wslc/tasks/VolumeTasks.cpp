@@ -29,24 +29,43 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
+static std::string OptionsToJson(const std::vector<std::wstring>& options)
+{
+    std::map<std::string, std::string> result{};
+    for (const auto& option : options)
+    {
+        auto pos = option.find('=');
+        if (pos == std::wstring::npos)
+        {
+            result[WideToMultiByte(option)] = {};
+        }
+        else
+        {
+            auto key = WideToMultiByte(option.substr(0, pos));
+            auto value = WideToMultiByte(option.substr(pos + 1));
+            result[key] = value;
+        }
+    }
+
+    return ToJson(result);
+}
+
 void CreateVolume(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::VolumeName));
 
     auto name = WideToMultiByte(context.Args.Get<ArgType::VolumeName>());
+
+    // Driver option (default "vhd")
     std::string type = "vhd";
     if (context.Args.Contains(ArgType::Driver))
     {
         type = WideToMultiByte(context.Args.Get<ArgType::Driver>());
     }
 
-    std::string options{};
-    if(context.Args.Contains(ArgType::Options))
-    {   
-        options = WideToMultiByte(context.Args.Get<ArgType::Options>());
-    }
-
-    VolumeService::Create(context.Data.Get<Data::Session>(), name, type, options);
+    auto optionsJson = OptionsToJson(context.Args.GetAll<ArgType::Options>());
+    VolumeService::Create(context.Data.Get<Data::Session>(), name, type, optionsJson);
     PrintMessage(MultiByteToWide(name));
 }
 
