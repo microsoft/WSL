@@ -48,16 +48,12 @@ struct EmptyRequest
     using TResponse = void;
 };
 
-struct CreateVolume
+struct VolumeUsageData
 {
-    using TResponse = void;
+    int64_t Size{-1};
+    int64_t RefCount{-1};
 
-    std::string Name;
-    std::string Driver;
-    std::map<std::string, std::string> DriverOpts;
-    std::map<std::string, std::string> Labels;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateVolume, Name, Driver, DriverOpts, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeUsageData, Size, RefCount);
 };
 
 struct Volume
@@ -65,10 +61,25 @@ struct Volume
     std::string Name;
     std::string Driver;
     std::string Mountpoint;
+    std::string CreatedAt;
     std::optional<std::map<std::string, std::string>> Options;
+    std::optional<std::map<std::string, std::string>> Labels;
+    std::optional<std::map<std::string, std::string>> Status;
+    std::optional<VolumeUsageData> UsageData;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, CreatedAt, Options, Labels, Status, UsageData);
+};
+
+struct CreateVolume
+{
+    using TResponse = Volume;
+
+    std::string Name;
+    std::string Driver;
+    std::map<std::string, std::string> DriverOpts;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateVolume, Name, Driver, DriverOpts, Labels);
 };
 
 struct ListVolumesResponse
@@ -240,6 +251,14 @@ struct PruneImageResult
     uint64_t SpaceReclaimed{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneImageResult, ImagesDeleted, SpaceReclaimed);
+};
+
+struct PruneVolumeResult
+{
+    std::optional<std::vector<std::string>> VolumesDeleted;
+    uint64_t SpaceReclaimed{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneVolumeResult, VolumesDeleted, SpaceReclaimed);
 };
 
 struct ImportStatus

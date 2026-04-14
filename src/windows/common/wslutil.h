@@ -330,4 +330,6 @@ WSLCHandle ToCOMInputHandle(HANDLE Handle);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 
+std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
+
 } // namespace wsl::windows::common::wslutil

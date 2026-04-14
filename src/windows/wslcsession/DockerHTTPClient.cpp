@@ -66,6 +66,14 @@ nlohmann::json PruneFiltersToJson(const TFilters& filters)
         }
     }
 
+    if constexpr (requires { filters.all; })
+    {
+        if (filters.all)
+        {
+            j["all"] = nlohmann::json::array({"true"});
+        }
+    }
+
     if (filters.until.has_value())
     {
         j["until"] = nlohmann::json::array({std::to_string(filters.until.value())});
@@ -392,9 +400,9 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
-void DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
+docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
 {
-    Transaction(verb::post, URL::Create("/volumes/create"), Request);
+    return Transaction<docker_schema::CreateVolume>(verb::post, URL::Create("/volumes/create"), Request);
 }
 
 void DockerHTTPClient::RemoveVolume(const std::string& Name)
@@ -406,6 +414,19 @@ std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
 {
     auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, URL::Create("/volumes"));
     return response.Volumes;
+}
+
+docker_schema::PruneVolumeResult DockerHTTPClient::PruneVolumes(const PruneVolumesFilters& filters)
+{
+    auto url = URL::Create("/volumes/prune");
+
+    auto filtersJson = PruneFiltersToJson(filters);
+    if (!filtersJson.empty())
+    {
+        url.SetParameter("filters", filtersJson.dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneVolumeResult>(verb::post, url);
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)

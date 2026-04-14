@@ -1423,3 +1423,25 @@ catch (...)
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
 }
+
+std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValuePairs(const KeyValuePair* pairs, ULONG count, LPCSTR reservedKey)
+{
+    std::map<std::string, std::string> result;
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Key, "Key at index %lu is null", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Value, "Value at index %lu is null", i);
+
+        if (reservedKey != nullptr)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, strcmp(pairs[i].Key, reservedKey) == 0, "Key '%hs' is reserved", reservedKey);
+        }
+
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), result.contains(pairs[i].Key), "Duplicate key: '%hs'", pairs[i].Key);
+
+        result[pairs[i].Key] = pairs[i].Value;
+    }
+
+    return result;
+}

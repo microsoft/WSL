@@ -102,10 +102,11 @@ public:
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
     // Volume management.
-    IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options) override;
+    IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListVolumes)(_Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(PruneVolumes)(_In_opt_ const WSLCPruneVolumesOptions* Options, _Out_ WSLCPruneVolumesResults* Results) override;
 
     IFACEMETHOD(Terminate()) override;
 

@@ -144,9 +144,18 @@ public:
     common::docker_schema::PruneContainerResult PruneContainers(const PruneContainersFilters& filters = {});
 
     // Volume management.
-    void CreateVolume(const common::docker_schema::CreateVolume& Request);
+    struct PruneVolumesFilters
+    {
+        std::optional<std::uint64_t> until;
+        std::vector<std::string> presentLabels;
+        std::vector<std::string> absentLabels;
+        bool all{};
+    };
+
+    common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
     void RemoveVolume(const std::string& Name);
     std::vector<common::docker_schema::Volume> ListVolumes();
+    common::docker_schema::PruneVolumeResult PruneVolumes(const PruneVolumesFilters& filters = {});
 
     // Image management.
     struct ListImagesFilters

@@ -29,6 +29,12 @@ namespace wsl::windows::service::wslc {
 class WSLCVirtualMachine;
 class DockerHTTPClient;
 
+enum class DetachVolumeFlags
+{
+    None = 0,
+    DeleteVhd = 1,
+};
+
 class WSLCVhdVolumeImpl
 {
 public:
@@ -41,13 +47,17 @@ public:
         ULONGLONG SizeBytes,
         ULONG Lun,
         std::string&& VirtualMachinePath,
+        std::map<std::string, std::string>&& DriverOpts,
+        std::map<std::string, std::string>&& Labels,
         WSLCVirtualMachine& VirtualMachine,
         DockerHTTPClient& DockerClient);
 
     ~WSLCVhdVolumeImpl();
 
     static std::unique_ptr<WSLCVhdVolumeImpl> Create(
-        _In_ const WSLCVolumeOptions& Options,
+        _In_opt_ LPCSTR Name,
+        _In_ std::map<std::string, std::string>&& DriverOpts,
+        _In_ std::map<std::string, std::string>&& Labels,
         _In_ const std::filesystem::path& StoragePath,
         _In_ WSLCVirtualMachine& VirtualMachine,
         _In_ DockerHTTPClient& DockerClient);
@@ -57,6 +67,7 @@ public:
 
     void Delete();
     std::string Inspect() const;
+    WSLCVolumeInformation GetVolumeInformation() const;
 
     const std::string& Name() const noexcept
     {
@@ -67,12 +78,15 @@ public:
         return m_virtualMachinePath;
     }
 
-private:
-    void Detach();
+    void Detach(DetachVolumeFlags flags = DetachVolumeFlags::None);
 
+private:
     std::string m_name;
     std::filesystem::path m_hostPath;
     std::string m_virtualMachinePath;
+    std::string m_createdAt;
+    std::map<std::string, std::string> m_driverOpts;
+    std::map<std::string, std::string> m_labels;
     ULONGLONG m_sizeBytes{};
     ULONG m_lun{};
     WSLCVirtualMachine& m_virtualMachine;
