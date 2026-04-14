@@ -18,6 +18,7 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
 #include "wslc_schema.h"
+#include "e2e/WSLCExecutor.h"
 #include <optional>
 
 extern std::wstring g_testDataPath;
@@ -41,6 +42,16 @@ void CloseSession(WslcSession session)
 }
 
 using UniqueSession = wil::unique_any<WslcSession, decltype(CloseSession), CloseSession>;
+
+void ReleaseSession(WslcSession session)
+{
+    if (session)
+    {
+        WslcReleaseSession(session);
+    }
+}
+
+using UniqueSessionRef = wil::unique_any<WslcSession, decltype(ReleaseSession), ReleaseSession>;
 
 void CloseContainer(WslcContainer container)
 {
@@ -263,6 +274,29 @@ class WslcSdkTests
         // Null settings pointer must fail.
         UniqueSession session2;
         VERIFY_ARE_EQUAL(WslcCreateSession(nullptr, &session2, nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(GetCliSession)
+    {
+        // Null output pointer must fail.
+        VERIFY_ARE_EQUAL(WslcGetCliSession(nullptr, nullptr), E_POINTER);
+
+        // Ensure no CLI session is running.
+        WSLCE2ETests::RunWslc(L"session terminate");
+
+        // WslcGetCliSession must return ERROR_NOT_FOUND when no CLI session exists.
+        UniqueSessionRef notFoundSession;
+        VERIFY_ARE_EQUAL(WslcGetCliSession(&notFoundSession, nullptr), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_IS_NULL(notFoundSession.get());
+
+        // Start the CLI session by running a wslc command.
+        auto result = WSLCE2ETests::RunWslc(L"container list");
+        VERIFY_ARE_EQUAL(result.ExitCode.value(), (DWORD)0);
+
+        // Now WslcGetCliSession should find the running CLI session.
+        UniqueSessionRef foundSession;
+        VERIFY_SUCCEEDED(WslcGetCliSession(&foundSession, nullptr));
+        VERIFY_IS_NOT_NULL(foundSession.get());
     }
 
     WSLC_TEST_METHOD(TerminationCallbackViaTerminate)
