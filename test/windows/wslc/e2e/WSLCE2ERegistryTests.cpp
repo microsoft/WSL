@@ -68,21 +68,20 @@ class WSLCE2ERegistryTests
             auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15001);
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
-            auto registryImageName = TagImageForRegistry(*session, "debian:latest", registryAddress);
-            auto registryImageNameW = string::MultiByteToWide(registryImageName);
+            auto registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
 
             auto cleanup = wil::scope_exit([&]() {
-                RunWslc(std::format(L"image delete --force {}", registryImageNameW));
+                RunWslc(std::format(L"image delete --force {}", registryImageName));
                 RunWslc(std::format(L"logout {}", registryAddressW));
             });
 
             // Negative path before login: push and pull should fail.
-            auto result = RunWslc(std::format(L"push {}", registryImageNameW));
+            auto result = RunWslc(std::format(L"push {}", registryImageName));
             VerifyAuthFailure(result);
 
             Log::Comment(L"Deleting tagged image and testing pull without login");
-            RunWslcAndVerify(std::format(L"image delete --force {}", registryImageNameW), {.ExitCode = 0});
-            result = RunWslc(std::format(L"pull {}", registryImageNameW));
+            RunWslcAndVerify(std::format(L"image delete --force {}", registryImageName), {.ExitCode = 0});
+            result = RunWslc(std::format(L"pull {}", registryImageName));
             VerifyAuthFailure(result);
 
             // Login and verify that saved credentials are used for push/pull.
@@ -90,23 +89,23 @@ class WSLCE2ERegistryTests
                 L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
             result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
 
-            registryImageName = TagImageForRegistry(*session, "debian:latest", registryAddress);
-            result = RunWslc(std::format(L"push {}", registryImageNameW));
+            registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
+            result = RunWslc(std::format(L"push {}", registryImageName));
             result.Verify({.ExitCode = 0});
 
-            RunWslcAndVerify(std::format(L"image delete --force {}", registryImageNameW), {.ExitCode = 0});
-            result = RunWslc(std::format(L"pull {}", registryImageNameW));
+            RunWslcAndVerify(std::format(L"image delete --force {}", registryImageName), {.ExitCode = 0});
+            result = RunWslc(std::format(L"pull {}", registryImageName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             // Logout and verify both pull and push fail again.
             VerifyLogoutSucceeds(registryAddressW);
 
-            RunWslcAndVerify(std::format(L"image delete --force {}", registryImageNameW), {.ExitCode = 0});
-            result = RunWslc(std::format(L"pull {}", registryImageNameW));
+            RunWslcAndVerify(std::format(L"image delete --force {}", registryImageName), {.ExitCode = 0});
+            result = RunWslc(std::format(L"pull {}", registryImageName));
             VerifyAuthFailure(result);
 
-            registryImageName = TagImageForRegistry(*session, "debian:latest", registryAddress);
-            result = RunWslc(std::format(L"push {}", registryImageNameW));
+            registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
+            result = RunWslc(std::format(L"push {}", registryImageName));
             VerifyAuthFailure(result);
 
             // Negative path for logout command: second logout should fail.
@@ -148,7 +147,7 @@ class WSLCE2ERegistryTests
     WSLC_TEST_METHOD(WSLCE2E_Registry_Login_CredentialInputMethods)
     {
         auto session = OpenDefaultElevatedSession();
-        
+
         {
             auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15002);
             auto registryAddressW = string::MultiByteToWide(registryAddress);

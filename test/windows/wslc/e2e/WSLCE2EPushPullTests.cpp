@@ -73,26 +73,25 @@ class WSLCE2EPushPullTests
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
             // Tag the image for the local registry.
-            auto registryImage = TagImageForRegistry(*session, "debian:latest", registryAddress);
-            auto registryImageW = string::MultiByteToWide(registryImage);
+            auto registryImage = TagImageForRegistry(L"debian:latest", registryAddressW);
 
-            auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImageW)); });
+            auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
             // Push should succeed.
-            auto result = RunWslc(std::format(L"push {}", registryImageW));
+            auto result = RunWslc(std::format(L"push {}", registryImage));
             result.Verify({.ExitCode = 0});
 
             // Delete the local copy and pull it back.
-            RunWslcAndVerify(std::format(L"image delete --force {}", registryImageW), {.ExitCode = 0});
+            RunWslcAndVerify(std::format(L"image delete --force {}", registryImage), {.ExitCode = 0});
 
-            result = RunWslc(std::format(L"pull {}", registryImageW));
+            result = RunWslc(std::format(L"pull {}", registryImage));
             result.Verify({.Stderr = L"", .ExitCode = 0});
 
             // Verify the image is now present.
             result = RunWslc(L"image list -q");
             result.Verify({.Stderr = L"", .ExitCode = 0});
             VERIFY_IS_TRUE(result.Stdout.has_value());
-            VERIFY_IS_TRUE(result.Stdout->find(registryImageW) != std::wstring::npos);
+            VERIFY_IS_TRUE(result.Stdout->find(registryImage) != std::wstring::npos);
         }
     }
 

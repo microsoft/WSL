@@ -408,19 +408,10 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& se
     return {std::move(container), std::move(address)};
 }
 
-// TODO: Replace with RunWslc("image tag ...") once the 'image tag' CLI command is implemented.
-std::string TagImageForRegistry(IWSLCSession& session, const std::string& imageName, const std::string& registryAddress)
+std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress)
 {
-    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(imageName);
-    const auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag.value_or("latest"));
-    const auto registryRepo = std::format("{}/{}", registryAddress, repo);
-
-    WSLCTagImageOptions tagOptions{};
-    tagOptions.Image = imageName.c_str();
-    tagOptions.Repo = registryRepo.c_str();
-    tagOptions.Tag = tag.value_or("latest").c_str();
-
-    VERIFY_SUCCEEDED(session.TagImage(&tagOptions));
+    auto registryImage = std::format(L"{}/{}", registryAddress, imageName);
+    RunWslcAndVerify(std::format(L"image tag {} {}", imageName, registryImage), {.ExitCode = 0});
     return registryImage;
 }
 

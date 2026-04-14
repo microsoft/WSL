@@ -28,7 +28,7 @@ public:
     static void Store(const std::string& serverAddress, const std::string& credential);
     static std::optional<std::string> Get(const std::string& serverAddress);
     static void Erase(const std::string& serverAddress);
-    static std::vector<std::string> List();
+    static std::vector<std::wstring> List();
 
     // Authenticates with a registry via the session's Docker engine.
     // Returns a base64-encoded auth header ready to store and pass to push/pull.
@@ -45,10 +45,9 @@ private:
     static void WinCredStoreCredential(const std::string& serverAddress, const std::string& credential);
     static std::optional<std::string> WinCredGetCredential(const std::string& serverAddress);
     static void WinCredEraseCredential(const std::string& serverAddress);
-    static std::vector<std::string> WinCredListCredentials();
+    static std::vector<std::wstring> WinCredListCredentials();
 
     // File backend helpers
-    static std::filesystem::path GetFilePath();
     static std::string Protect(const std::string& plaintext);
     static std::string Unprotect(const std::string& cipherBase64);
 
@@ -58,7 +57,7 @@ private:
     static void FileStoreCredential(const std::string& serverAddress, const std::string& credential);
     static std::optional<std::string> FileGetCredential(const std::string& serverAddress);
     static void FileEraseCredential(const std::string& serverAddress);
-    static std::vector<std::string> FileListCredentials();
+    static std::vector<std::wstring> FileListCredentials();
 };
 
 } // namespace wsl::windows::wslc::services

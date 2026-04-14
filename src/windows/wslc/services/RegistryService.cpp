@@ -15,6 +15,7 @@ Abstract:
 #include "RegistryService.h"
 #include <ExecutionContext.h>
 #include <Localization.h>
+#include <retryshared.h>
 #include <wslutil.h>
 #include <wincred.h>
 
@@ -23,25 +24,37 @@ using namespace wsl::windows::common::wslutil;
 
 static constexpr auto WinCredPrefix = L"wslc-credential/";
 
+using unique_credential = wil::unique_any<PCREDENTIALW, decltype(&CredFree), CredFree>;
+using unique_credential_array = wil::unique_any<PCREDENTIALW*, decltype(&CredFree), CredFree>;
+
 namespace {
 
-wil::unique_hfile OpenJsonFileExclusive(const std::filesystem::path& path)
+std::filesystem::path GetFilePath()
 {
-    std::filesystem::create_directories(path.parent_path());
+    return wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"registry-credentials.json";
+}
 
-    wil::unique_hfile handle(CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+wil::unique_hfile RetryOpenFileOnSharingViolation(const std::function<wil::unique_hfile()>& openFunc)
+{
+    return wsl::shared::retry::RetryWithTimeout<wil::unique_hfile>(openFunc, std::chrono::milliseconds(100), std::chrono::seconds(1), []() {
+        return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION);
+    });
+}
+
+wil::unique_hfile OpenFileExclusive()
+{
+    wil::unique_hfile handle(
+        CreateFileW(GetFilePath().c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     THROW_LAST_ERROR_IF(!handle.is_valid());
+
     return handle;
 }
 
-wil::unique_hfile OpenJsonFileShared(const std::filesystem::path& path)
+wil::unique_hfile OpenFileShared()
 {
-    wil::unique_hfile handle(CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-
-    if (!handle.is_valid())
-    {
-        THROW_LAST_ERROR_IF(GetLastError() != ERROR_FILE_NOT_FOUND);
-    }
+    wil::unique_hfile handle(CreateFileW(
+        GetFilePath().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    THROW_LAST_ERROR_IF(!handle.is_valid() && GetLastError() != ERROR_FILE_NOT_FOUND);
 
     return handle;
 }
@@ -117,7 +130,7 @@ void RegistryService::Erase(const std::string& serverAddress)
     backend == CredentialStoreType::File ? FileEraseCredential(serverAddress) : WinCredEraseCredential(serverAddress);
 }
 
-std::vector<std::string> RegistryService::List()
+std::vector<std::wstring> RegistryService::List()
 {
     auto backend = settings::User().Get<settings::Setting::CredentialStore>();
     return backend == CredentialStoreType::File ? FileListCredentials() : WinCredListCredentials();
@@ -148,25 +161,19 @@ std::optional<std::string> RegistryService::WinCredGetCredential(const std::stri
 {
     auto targetName = WinCredTargetName(serverAddress);
 
-    PCREDENTIALW cred = nullptr;
+    unique_credential cred;
     if (!CredReadW(targetName.c_str(), CRED_TYPE_GENERIC, 0, &cred))
     {
-        if (GetLastError() == ERROR_NOT_FOUND)
-        {
-            return std::nullopt;
-        }
-
-        THROW_LAST_ERROR();
+        THROW_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        return std::nullopt;
     }
 
-    auto cleanup = wil::scope_exit([&]() { CredFree(cred); });
-
-    if (cred->CredentialBlobSize == 0 || cred->CredentialBlob == nullptr)
+    if (cred.get()->CredentialBlobSize == 0 || cred.get()->CredentialBlob == nullptr)
     {
         return std::nullopt;
     }
 
-    return std::string(reinterpret_cast<const char*>(cred->CredentialBlob), cred->CredentialBlobSize);
+    return std::string(reinterpret_cast<const char*>(cred.get()->CredentialBlob), cred.get()->CredentialBlobSize);
 }
 
 void RegistryService::WinCredEraseCredential(const std::string& serverAddress)
@@ -183,33 +190,27 @@ void RegistryService::WinCredEraseCredential(const std::string& serverAddress)
     }
 }
 
-std::vector<std::string> RegistryService::WinCredListCredentials()
+std::vector<std::wstring> RegistryService::WinCredListCredentials()
 {
     auto prefix = std::wstring(WinCredPrefix);
     auto filter = prefix + L"*";
 
     DWORD count = 0;
-    PCREDENTIALW* creds = nullptr;
+    unique_credential_array creds;
     if (!CredEnumerateW(filter.c_str(), 0, &count, &creds))
     {
-        if (GetLastError() == ERROR_NOT_FOUND)
-        {
-            return {};
-        }
-
-        THROW_LAST_ERROR();
+        THROW_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        return {};
     }
 
-    auto cleanup = wil::scope_exit([&]() { CredFree(creds); });
-
-    std::vector<std::string> result;
+    std::vector<std::wstring> result;
     result.reserve(count);
 
     for (DWORD i = 0; i < count; ++i)
     {
         // Strip the prefix to return the bare server address.
-        std::wstring_view name(creds[i]->TargetName);
-        result.push_back(wsl::shared::string::WideToMultiByte(std::wstring(name.substr(prefix.size()))));
+        std::wstring_view name(creds.get()[i]->TargetName);
+        result.emplace_back(name.substr(prefix.size()));
     }
 
     return result;
@@ -217,14 +218,9 @@ std::vector<std::string> RegistryService::WinCredListCredentials()
 
 // --- File backend ---
 
-std::filesystem::path RegistryService::GetFilePath()
-{
-    return wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / L"wslc" / L"registry-credentials.json";
-}
-
 nlohmann::json RegistryService::ReadFileStore()
 {
-    auto handle = OpenJsonFileShared(GetFilePath());
+    auto handle = RetryOpenFileOnSharingViolation(OpenFileShared);
     if (!handle.is_valid())
     {
         return nlohmann::json::object();
@@ -235,7 +231,9 @@ nlohmann::json RegistryService::ReadFileStore()
 
 void RegistryService::ModifyFileStore(const std::function<bool(nlohmann::json&)>& modifier)
 {
-    auto handle = OpenJsonFileExclusive(GetFilePath());
+    auto handle = RetryOpenFileOnSharingViolation(OpenFileExclusive);
+    WI_VERIFY(handle.is_valid());
+
     auto data = ReadJsonFile(handle);
 
     if (modifier(data))
@@ -274,8 +272,18 @@ std::string RegistryService::Unprotect(const std::string& cipherBase64)
 
 void RegistryService::FileStoreCredential(const std::string& serverAddress, const std::string& credential)
 {
+    auto filePath = GetFilePath();
+
+    if (!std::filesystem::exists(filePath))
+    {
+        std::filesystem::create_directories(filePath.parent_path());
+
+        wil::unique_hfile credFile(CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(!credFile.is_valid());
+    }
+
     ModifyFileStore([&](nlohmann::json& data) {
-        data["registries"][serverAddress] = {{"credential", Protect(credential)}};
+        data[serverAddress] = Protect(credential);
         return true;
     });
 }
@@ -283,62 +291,36 @@ void RegistryService::FileStoreCredential(const std::string& serverAddress, cons
 std::optional<std::string> RegistryService::FileGetCredential(const std::string& serverAddress)
 {
     auto data = ReadFileStore();
-    const auto registries = data.find("registries");
-    if (registries == data.end() || !registries->is_object())
+
+    const auto entry = data.find(serverAddress);
+    if (entry == data.end() || !entry->is_string())
     {
         return std::nullopt;
     }
 
-    const auto entry = registries->find(serverAddress);
-    if (entry == registries->end() || !entry->is_object())
-    {
-        return std::nullopt;
-    }
-
-    const auto cred = entry->find("credential");
-    if (cred == entry->end() || !cred->is_string())
-    {
-        return std::nullopt;
-    }
-
-    try
-    {
-        return Unprotect(cred->get<std::string>());
-    }
-    catch (...)
-    {
-        LOG_CAUGHT_EXCEPTION_MSG("Failed to decrypt credential for %hs", serverAddress.c_str());
-        return std::nullopt;
-    }
+    return Unprotect(entry->get<std::string>());
 }
 
 void RegistryService::FileEraseCredential(const std::string& serverAddress)
 {
     bool erased = false;
     ModifyFileStore([&](nlohmann::json& data) {
-        auto registries = data.find("registries");
-        if (registries == data.end() || !registries->is_object())
-        {
-            return false;
-        }
-
-        erased = registries->erase(serverAddress) > 0;
+        erased = data.erase(serverAddress) > 0;
         return erased;
     });
 
     THROW_HR_WITH_USER_ERROR_IF(E_NOT_SET, Localization::WSLCCLI_LogoutNotFound(wsl::shared::string::MultiByteToWide(serverAddress)), !erased);
 }
 
-std::vector<std::string> RegistryService::FileListCredentials()
+std::vector<std::wstring> RegistryService::FileListCredentials()
 {
-    std::vector<std::string> result;
+    std::vector<std::wstring> result;
     auto data = ReadFileStore();
-    const auto registries = data.find("registries");
-    if (registries != data.end() && registries->is_object())
+    for (const auto& [key, value] : data.items())
     {
-        for (const auto& [key, _] : registries->items())
+        if (value.is_string())
         {
-            result.push_back(key);
+            result.push_back(wsl::shared::string::MultiByteToWide(key));
         }
     }
 
