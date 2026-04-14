@@ -61,7 +61,7 @@ static __always_inline int emit_event(struct sock *sk, __u8 is_bind, int ret)
 
     e->family = family;
     e->protocol = protocol;
-    e->port = bpf_ntohs(BPF_CORE_READ(sk, __sk_common.skc_num));
+    e->port = BPF_CORE_READ(sk, __sk_common.skc_num);
     e->is_bind = is_bind;
     e->pad = 0;
 
