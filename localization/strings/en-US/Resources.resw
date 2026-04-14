@@ -2315,9 +2315,11 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
     <value>Removing login credentials for {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
     <value>Not logged in to {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
     <value>Server</value>
@@ -2335,11 +2337,11 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
     <value>--password and --password-stdin are mutually exclusive</value>
-    <comment>{Locked="--password"}{Locked="--password-stdin"}CLI flag names should not be translated</comment>
+    <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
     <value>Must provide --username with --password-stdin</value>
-    <comment>{Locked="--username"}{Locked="--password-stdin"}CLI flag names should not be translated</comment>
+    <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
     <value>Manage registry credentials.</value>
