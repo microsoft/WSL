@@ -3370,23 +3370,27 @@ class WSLCTests
 
     WSLC_TEST_METHOD(NetworkCreateDeleteListTest)
     {
+        const std::string networkName = "test-network";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
         // List should start empty.
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, networks.size());
 
         WSLCNetworkOptions options{};
-        options.Name = "test-network";
+        options.Name = networkName.c_str();
         options.Driver = "bridge";
         options.Options = nullptr;
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
 
-        auto cleanup = wil::scope_exit([&]() { m_defaultSession->DeleteNetwork("test-network"); });
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         // Verify it appears in the list with correct fields.
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(std::string("test-network"), std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
         VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
         VERIFY_IS_TRUE(strlen(networks[0].Id) > 0);
 
@@ -3394,72 +3398,84 @@ class WSLCTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_defaultSession->CreateNetwork(&options));
 
         cleanup.release();
-        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork("test-network"));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
         // List should be empty again.
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, networks.size());
 
         // Delete non-existent should fail.
-        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork("test-network"));
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork(networkName.c_str()));
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithSubnetTest)
     {
+        const std::string networkName = "subnet-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
         WSLCNetworkOptions options{};
-        options.Name = "subnet-test-net";
+        options.Name = networkName.c_str();
         options.Driver = "bridge";
         options.Options = R"({"Subnet":"172.28.0.0/16","Gateway":"172.28.0.1"})";
 
-        auto cleanup = wil::scope_exit([&]() { m_defaultSession->DeleteNetwork("subnet-test-net"); });
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(std::string("subnet-test-net"), std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
     }
 
     WSLC_TEST_METHOD(NetworkCreateInternalTest)
     {
+        const std::string networkName = "internal-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
         WSLCNetworkOptions options{};
-        options.Name = "internal-test-net";
+        options.Name = networkName.c_str();
         options.Driver = "bridge";
         options.Options = R"({"Internal":true})";
 
-        auto cleanup = wil::scope_exit([&]() { m_defaultSession->DeleteNetwork("internal-test-net"); });
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(std::string("internal-test-net"), std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithLabelsTest)
     {
+        const std::string networkName = "labels-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
         WSLCLabel labels[] = {
             {const_cast<LPSTR>("com.example.env"), const_cast<LPSTR>("test")},
             {const_cast<LPSTR>("com.example.team"), const_cast<LPSTR>("infra")},
         };
 
         WSLCNetworkOptions options{};
-        options.Name = "labels-test-net";
+        options.Name = networkName.c_str();
         options.Driver = "bridge";
         options.Options = nullptr;
         options.Labels = labels;
         options.LabelsCount = ARRAYSIZE(labels);
 
-        auto cleanup = wil::scope_exit([&]() { m_defaultSession->DeleteNetwork("labels-test-net"); });
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(std::string("labels-test-net"), std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
     }
 
     WSLC_TEST_METHOD(NetworkCreateInvalidDriverTest)
@@ -3513,13 +3529,17 @@ class WSLCTests
 
     WSLC_TEST_METHOD(NetworkSessionRecoveryTest)
     {
+        const std::string networkName = "recovery-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
         WSLCNetworkOptions options{};
-        options.Name = "recovery-test-net";
+        options.Name = networkName.c_str();
         options.Driver = "bridge";
         options.Options = nullptr;
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
 
-        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork("recovery-test-net")); });
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
         // Reset the session (simulates session restart).
         ResetTestSession();
@@ -3527,33 +3547,41 @@ class WSLCTests
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, networks.size());
-        VERIFY_ARE_EQUAL(std::string("recovery-test-net"), std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
         VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
         VERIFY_IS_TRUE(strlen(networks[0].Id) > 0);
     }
 
     WSLC_TEST_METHOD(NetworkMultipleCreateListDeleteTest)
     {
+        const std::string networkNameA = "net-a";
+        const std::string networkNameB = "net-b";
+        const std::string networkNameC = "net-c";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameA.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameC.c_str()));
+
         auto cleanup = wil::scope_exit([&]() {
-            m_defaultSession->DeleteNetwork("net-a");
-            m_defaultSession->DeleteNetwork("net-b");
-            m_defaultSession->DeleteNetwork("net-c");
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameA.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameC.c_str()));
         });
 
         WSLCNetworkOptions optionsA{};
-        optionsA.Name = "net-a";
+        optionsA.Name = networkNameA.c_str();
         optionsA.Driver = "bridge";
         optionsA.Options = nullptr;
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsA));
 
         WSLCNetworkOptions optionsB{};
-        optionsB.Name = "net-b";
+        optionsB.Name = networkNameB.c_str();
         optionsB.Driver = "bridge";
         optionsB.Options = R"({"Subnet":"172.29.0.0/16"})";
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsB));
 
         WSLCNetworkOptions optionsC{};
-        optionsC.Name = "net-c";
+        optionsC.Name = networkNameC.c_str();
         optionsC.Driver = "bridge";
         optionsC.Options = R"({"Internal":"true"})";
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsC));
@@ -3562,7 +3590,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(3u, networks.size());
 
-        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork("net-b"));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
         VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, networks.size());
     }

@@ -2384,6 +2384,7 @@ void WSLCSession::RecoverExistingContainers()
 void WSLCSession::RecoverExistingNetworks()
 {
     WI_ASSERT(m_dockerClient.has_value());
+    WI_ASSERT(m_virtualMachine.has_value());
 
     auto networks = m_dockerClient->ListNetworks();
 
