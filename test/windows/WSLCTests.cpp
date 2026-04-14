@@ -1001,37 +1001,27 @@ class WSLCTests
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
         }
 
-        // Validate that LoadImage is aborted when the input data source pipe is broken and the session terminates.
-        // This simulates the scenario where the calling process exits during a LoadImage operation.
+        // Validate that LoadImage fails when the input pipe is closed during reading.
         {
             wil::unique_handle pipeRead;
             wil::unique_handle pipeWrite;
             VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
 
-            std::promise<HRESULT> processExitResult;
-            wil::unique_event testCompleted{wil::EventOptions::ManualReset};
+            std::promise<HRESULT> loadResult;
             std::thread operationThread([&]() {
-                processExitResult.set_value(m_defaultSession->LoadImage(ToCOMInputHandle(pipeRead.get()), nullptr, 1024 * 1024));
-                WI_ASSERT(testCompleted.is_signaled());
+                loadResult.set_value(m_defaultSession->LoadImage(ToCOMInputHandle(pipeRead.get()), nullptr, 1024 * 1024));
             });
 
             auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
 
-            // Write some data to validate that the service has started reading from the pipe (pipe buffer is 2 bytes).
+            // Write some data to ensure the service has started reading from the pipe (pipe buffer is 2 bytes).
             DWORD bytesWritten{};
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
 
-            testCompleted.SetEvent();
-
-            // Close the write end of the pipe to simulate the input process exiting,
-            // then terminate the session to cancel the synchronous IO in the service.
+            // Close the write end.
             pipeWrite.reset();
-            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
-            auto restore = ResetTestSession();
-
-            auto hr = processExitResult.get_future().get();
-            VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
+            VERIFY_ARE_EQUAL(E_FAIL, loadResult.get_future().get());
         }
 
         // Validate that LoadImage is aborted when the session terminates.
@@ -1112,38 +1102,27 @@ class WSLCTests
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
         }
 
-        // Validate that ImportImage is aborted when the input data source pipe is broken and the session terminates.
-        // This simulates the scenario where the calling process exits during an ImportImage operation.
+        // Validate that ImportImage fails when the input pipe is closed during reading.
         {
             wil::unique_handle pipeRead;
             wil::unique_handle pipeWrite;
             VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
 
-            std::promise<HRESULT> processExitResult;
-            wil::unique_event testCompleted{wil::EventOptions::ManualReset};
+            std::promise<HRESULT> importResult;
             std::thread operationThread([&]() {
-                processExitResult.set_value(
-                    m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "process-exit:test", nullptr, 1024 * 1024));
-                WI_ASSERT(testCompleted.is_signaled());
+                importResult.set_value(m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "broken-read:eof", nullptr, 1024 * 1024));
             });
 
             auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
 
-            // Write some data to validate that the service has started reading from the pipe (pipe buffer is 2 bytes).
+            // Write some data to ensure the service has started reading from the pipe (pipe buffer is 2 bytes).
             DWORD bytesWritten{};
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
 
-            testCompleted.SetEvent();
-
-            // Close the write end of the pipe to simulate the input process exiting,
-            // then terminate the session to cancel the synchronous IO in the service.
+            // Close the write end.
             pipeWrite.reset();
-            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
-            auto restore = ResetTestSession();
-
-            auto hr = processExitResult.get_future().get();
-            VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
+            VERIFY_ARE_EQUAL(E_FAIL, importResult.get_future().get());
         }
 
         // Validate that ImportImage is aborted when the session terminates.

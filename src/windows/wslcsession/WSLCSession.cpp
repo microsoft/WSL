@@ -912,8 +912,15 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
     };
 
+    // Shutdown the Docker stream's write side when the user pipe is closed.
+    // This is required for Docker to know when the request body is complete.
+    auto onInputComplete = [socket = Request.stream.native_handle()]() {
+        LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
+    };
+
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        userHandle.Get(), common::relay::HandleWrapper{Request.stream.native_handle()}));
+        common::relay::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
+        common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
