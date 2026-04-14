@@ -29,7 +29,7 @@ std::vector<Argument> VolumeListCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Format),
-        Argument::Create(ArgType::Quiet),
+        Argument::Create(ArgType::Quiet, false, std::nullopt, L"Outputs the volume names only"),
         Argument::Create(ArgType::Session),
     };
 }
@@ -59,7 +59,7 @@ void VolumeListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
 void VolumeListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context << CreateSession //
-            << GetVolumes //
+            << GetVolumes    //
             << ListVolumes;
 }
 } // namespace wsl::windows::wslc

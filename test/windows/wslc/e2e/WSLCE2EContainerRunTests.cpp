@@ -549,16 +549,11 @@ class WSLCE2EContainerRunTests
 
         // Write data to the named volume
         result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'run_vol_test' > /data/testfile\"",
-            volumeName,
-            DebianImage.NameAndTag()));
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'run_vol_test' > /data/testfile\"", volumeName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read data back from the named volume in a new container
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} cat /data/testfile",
-            volumeName,
-            DebianImage.NameAndTag()));
+        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"run_vol_test", .Stderr = L"", .ExitCode = 0});
 
         // Cleanup
@@ -579,23 +574,16 @@ class WSLCE2EContainerRunTests
 
         // Write data with first container
         result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'first' > /data/testfile\"",
-            volumeName,
-            DebianImage.NameAndTag()));
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'first' > /data/testfile\"", volumeName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Append data with second container
         result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} sh -c \"echo -n '_second' >> /data/testfile\"",
-            volumeName,
-            DebianImage.NameAndTag()));
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n '_second' >> /data/testfile\"", volumeName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read combined data with third container
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} cat /data/testfile",
-            volumeName,
-            DebianImage.NameAndTag()));
+        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"first_second", .Stderr = L"", .ExitCode = 0});
 
         // Cleanup

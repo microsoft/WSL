@@ -552,10 +552,7 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
 
         // Read data back from the volume using another container
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} cat /data/testfile",
-            volumeName,
-            AlpineImage.NameAndTag()));
+        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, AlpineImage.NameAndTag()));
         result.Verify({.Stdout = L"named_volume_data", .Stderr = L"", .ExitCode = S_OK});
 
         // Cleanup
@@ -589,10 +586,7 @@ class WSLCE2EContainerCreateTests
         RunWslc(std::format(L"container rm {}", WslcContainerName));
 
         // Read data using second container
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} cat /data/testfile",
-            volumeName,
-            AlpineImage.NameAndTag()));
+        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, AlpineImage.NameAndTag()));
         result.Verify({.Stdout = L"persist_test", .Stderr = L"", .ExitCode = S_OK});
 
         // Cleanup
