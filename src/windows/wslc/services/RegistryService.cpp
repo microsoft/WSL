@@ -55,8 +55,7 @@ wil::unique_hfile CreateFileExclusive()
     auto filePath = GetFilePath();
     std::filesystem::create_directories(filePath.parent_path());
 
-    wil::unique_hfile handle(
-        CreateFileW(filePath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+    wil::unique_hfile handle(CreateFileW(filePath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
     THROW_LAST_ERROR_IF(!handle.is_valid());
 
     return handle;
@@ -77,7 +76,7 @@ nlohmann::json ReadJsonFile(const wil::unique_hfile& handle)
     {
         return nlohmann::json::object();
     }
-    
+
     LARGE_INTEGER size{};
     THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(handle.get(), &size));
     if (size.QuadPart == 0)
