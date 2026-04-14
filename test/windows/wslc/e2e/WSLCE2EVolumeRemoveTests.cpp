@@ -82,7 +82,10 @@ class WSLCE2EVolumeRemoveTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_NotFound)
     {
         auto result = RunWslc(std::format(L"volume remove {}", TestVolumeName));
-        result.Verify({.Stdout = L"", .Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", TestVolumeName), .ExitCode = 1});
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", TestVolumeName),
+             .ExitCode = 1});
     }
 
 private:
@@ -120,8 +123,8 @@ private:
     std::wstring GetAvailableCommands() const
     {
         std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"        //
-                 << L"  volume-name    Volume name\r\n" //
+        commands << L"The following arguments are available:\r\n" //
+                 << L"  volume-name    Volume name\r\n"           //
                  << L"\r\n";
         return commands.str();
     }
@@ -129,7 +132,7 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"               //
+        options << L"The following options are available:\r\n"                   //
                 << L"  --session      Specify the session to use\r\n"            //
                 << L"  -h,--help      Shows help about the selected command\r\n" //
                 << L"\r\n";

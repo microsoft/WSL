@@ -58,7 +58,8 @@ class WSLCE2EVolumeInspectTests
 
         result = RunWslc(std::format(L"volume inspect {}", TestVolumeName1));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         auto inspect = inspectData[0];
 
@@ -77,7 +78,8 @@ class WSLCE2EVolumeInspectTests
 
         result = RunWslc(std::format(L"volume inspect {} {}", TestVolumeName1, TestVolumeName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(2u, inspectData.size());
 
         auto inspect1 = inspectData[0];
@@ -93,7 +95,9 @@ class WSLCE2EVolumeInspectTests
     {
         auto result = RunWslc(std::format(L"volume inspect {}", TestVolumeName1));
         result.Verify(
-            {.Stdout = L"", .Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", TestVolumeName1), .ExitCode = 1});
+            {.Stdout = L"",
+             .Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", TestVolumeName1),
+             .ExitCode = 1});
     }
 
 private:
@@ -125,8 +129,8 @@ private:
     std::wstring GetAvailableCommands() const
     {
         std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"         //
-                 << L"  volume-name    Volume name\r\n" //
+        commands << L"The following arguments are available:\r\n" //
+                 << L"  volume-name    Volume name\r\n"           //
                  << L"\r\n";
         return commands.str();
     }
@@ -134,7 +138,7 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"               //
+        options << L"The following options are available:\r\n"                   //
                 << L"  --session      Specify the session to use\r\n"            //
                 << L"  -h,--help      Shows help about the selected command\r\n" //
                 << L"\r\n";

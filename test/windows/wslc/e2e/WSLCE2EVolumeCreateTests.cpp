@@ -73,7 +73,8 @@ class WSLCE2EVolumeCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Create_InvalidDriver)
     {
-        auto result = RunWslc(std::format(L"volume create --driver invalid_driver --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        auto result =
+            RunWslc(std::format(L"volume create --driver invalid_driver --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
         result.Verify({.Stdout = L"", .Stderr = L"Unsupported volume type: 'invalid_driver'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
         VerifyVolumeIsNotListed(TestVolumeName);
     }
@@ -106,8 +107,8 @@ private:
     std::wstring GetAvailableCommands() const
     {
         std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"       //
-                 << L"  volume-name    Volume name\r\n" //
+        commands << L"The following arguments are available:\r\n" //
+                 << L"  volume-name    Volume name\r\n"           //
                  << L"\r\n";
         return commands.str();
     }
@@ -115,7 +116,7 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                     //
+        options << L"The following options are available:\r\n"                      //
                 << L"  -d,--driver    Specify volume driver name (default vhd)\r\n" //
                 << L"  -o,--opt       Set driver specific options\r\n"              //
                 << L"  --session      Specify the session to use\r\n"               //
