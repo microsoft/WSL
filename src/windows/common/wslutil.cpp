@@ -639,21 +639,11 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_DEFAULT_DISTRO_NOT_FOUND:
         return Localization::MessageNoDefaultDistro();
 
-    case HRESULT_FROM_WIN32(WSAECONNABORTED):
-    case HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS):
-        return Localization::MessageInstanceTerminated();
-
     case WSL_E_DISTRO_NOT_FOUND:
         return Localization::MessageDistroNotFound();
 
-    case HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS):
-        return Localization::MessageDistroNameAlreadyExists();
-
     case WSL_E_DISTRIBUTION_NAME_NEEDED:
         return Localization::MessageDistributionNameNeeded();
-
-    case HRESULT_FROM_WIN32(ERROR_FILE_EXISTS):
-        return Localization::MessageDistroInstallPathAlreadyExists();
 
     case WSL_E_TOO_MANY_DISKS_ATTACHED:
         return Localization::MessageTooManyDisks();

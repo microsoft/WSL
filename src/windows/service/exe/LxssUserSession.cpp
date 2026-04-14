@@ -3787,11 +3787,12 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Name != nullptr && wsl::shared::string::IsEqual(Name, configuration.Name, true))
         {
-            THROW_HR_MSG(
-                (configuration.State == LxssDistributionStateInstalled) ? HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) : E_ILLEGAL_STATE_CHANGE,
-                "%ls already registered (state = %d)",
-                Name,
-                configuration.State);
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                wsl::shared::Localization::MessageDistroNameAlreadyExists(),
+                configuration.State == LxssDistributionStateInstalled);
+
+            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, configuration.State);
         }
 
         if (Path != nullptr)
@@ -3803,8 +3804,9 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
             }
 
             // Ensure another distribution by a different name is not already registered to the same location.
-            THROW_HR_IF(
+            THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
                 wsl::windows::common::string::IsPathComponentEqual(error ? configuration.BasePath.native() : canonicalDistroPath.native(), Path));
         }
     }
