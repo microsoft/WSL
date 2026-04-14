@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "common.h"
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -403,9 +404,11 @@ int RunPortTracker(int Argc, char** Argv)
         return 1;
     }
 
+    auto channelMutex = std::make_shared<std::mutex>();
+
     auto seccompDispatcher = std::make_shared<SecCompDispatcher>(BpfFd);
 
-    seccompDispatcher->RegisterHandler(__NR_ioctl, [hvSocketChannel, seccompDispatcher](auto notification) -> int {
+    seccompDispatcher->RegisterHandler(__NR_ioctl, [hvSocketChannel, seccompDispatcher, channelMutex](auto notification) -> int {
         LX_GNS_TUN_BRIDGE_REQUEST request{};
         request.Header.MessageType = LxGnsMessageIfStateChangeRequest;
         request.Header.MessageSize = sizeof(request);
@@ -419,12 +422,14 @@ int RunPortTracker(int Argc, char** Argv)
         auto& ifRequest = *reinterpret_cast<ifreq*>(ifreqMemory->data());
         memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
         request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
+
+        std::lock_guard lock(*channelMutex);
         const auto& reply = hvSocketChannel->Transaction(request);
 
         return reply.Result;
     });
 
-    GnsPortTracker portTracker(hvSocketChannel);
+    GnsPortTracker portTracker(hvSocketChannel, channelMutex);
     try
     {
         portTracker.Run();

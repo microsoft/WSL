@@ -26,8 +26,8 @@ catch (...)
 
 } // namespace
 
-GnsPortTracker::GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel) :
-    m_hvSocketChannel(std::move(hvSocketChannel))
+GnsPortTracker::GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel, std::shared_ptr<std::mutex> channelMutex) :
+    m_hvSocketChannel(std::move(hvSocketChannel)), m_channelMutex(std::move(channelMutex))
 {
 }
 
@@ -53,7 +53,10 @@ void GnsPortTracker::RequestPort(void* Data)
         memcpy(request.Address32, Event->addr6, sizeof(request.Address32));
     }
 
-    const auto& response = m_hvSocketChannel->Transaction(request);
+    const auto& response = [&]() {
+        std::lock_guard lock(*m_channelMutex);
+        return m_hvSocketChannel->Transaction(request);
+    }();
 
     GNS_LOG_INFO(
         "Port {} request: family ({}) port ({}) protocol ({}) result ({})",
