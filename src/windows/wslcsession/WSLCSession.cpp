@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
-#include <wincrypt.h>
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -29,20 +28,6 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
-
-std::string Base64Decode(const std::string& encoded)
-{
-    DWORD size = 0;
-    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
-        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, nullptr, &size, nullptr, nullptr));
-
-    std::string result(size, '\0');
-    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
-        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr));
-
-    result.resize(size);
-    return result;
-}
 
 // Resolve \r overwrites: for each \n-delimited line, keep only the content after the last \r.
 // This collapses terminal progress updates (e.g. "50%\r75%\r100%") to their final state.
@@ -132,19 +117,6 @@ std::string IndentLines(const std::string& input, const std::string& prefix)
     }
 
     return result;
-}
-
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
-{
-    size_t separator = Input.find_last_of(':');
-    if (separator == std::string::npos)
-    {
-        return {Input, {}};
-    }
-
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidImage(Input), separator >= Input.size() - 1 || separator == 0);
-
-    return {Input.substr(0, separator), Input.substr(separator + 1)};
 }
 
 void ValidateName(LPCSTR Name)
@@ -461,26 +433,8 @@ void WSLCSession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLCSession::OnDockerdExited, this)));
 }
 
-HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
-try
+void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
 {
-    COMServiceExecutionContext context;
-
-    RETURN_HR_IF_NULL(E_POINTER, Image);
-    RETURN_HR_IF(E_NOTIMPL, RegistryAuthenticationInformation != nullptr && *RegistryAuthenticationInformation != '\0');
-
-    auto lock = m_lock.lock_shared();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
-
-    if (!tagOrDigest.has_value())
-    {
-        tagOrDigest = "latest";
-    }
-
-    auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest);
-
     auto io = CreateIOContext();
 
     struct Response
@@ -489,19 +443,22 @@ try
         bool isJson = false;
     };
 
-    std::optional<Response> pullResponse;
+    std::optional<Response> httpResponse;
 
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
-        WSL_LOG("PullHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+        WSL_LOG(
+            "ImageOperationHttpResponse",
+            TraceLoggingValue(OperationName, "Operation"),
+            TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
         auto it = response.find(boost::beast::http::field::content_type);
-        pullResponse.emplace(response.result(), it != response.end() && it->value().starts_with("application/json"));
+        httpResponse.emplace(response.result(), it != response.end() && it->value().starts_with("application/json"));
     };
 
     std::string errorJson;
     std::optional<std::string> reportedError;
     auto onChunk = [&](const gsl::span<char>& Content) {
-        if (pullResponse.has_value() && pullResponse->result != boost::beast::http::status::ok)
+        if (httpResponse.has_value() && httpResponse->result != boost::beast::http::status::ok)
         {
             // If the status code is an error, then this is an error message, not a progress update.
             errorJson.append(Content.data(), Content.size());
@@ -509,7 +466,11 @@ try
         }
 
         std::string contentString{Content.begin(), Content.end()};
-        WSL_LOG("ImagePullProgress", TraceLoggingValue(Image, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
+        WSL_LOG(
+            "ImageOperationProgress",
+            TraceLoggingValue(OperationName, "Operation"),
+            TraceLoggingValue(Image, "Image"),
+            TraceLoggingValue(contentString.c_str(), "Content"));
 
         auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
 
@@ -519,7 +480,8 @@ try
             {
                 LOG_HR_MSG(
                     E_UNEXPECTED,
-                    "Received multiple error messages during image pull. Previous: %hs, New: %hs",
+                    "Received multiple error messages during image %hs. Previous: %hs, New: %hs",
+                    OperationName,
                     reportedError->c_str(),
                     parsed.errorDetail->message.c_str());
             }
@@ -538,18 +500,18 @@ try
     auto onCompleted = [&]() { io.Cancel(); };
 
     io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+        requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
 
     io.Run({});
 
-    THROW_HR_IF(E_UNEXPECTED, !pullResponse.has_value());
+    THROW_HR_IF(E_UNEXPECTED, !httpResponse.has_value());
 
-    if (pullResponse->result != boost::beast::http::status::ok)
+    if (httpResponse->result != boost::beast::http::status::ok)
     {
         std::string errorMessage;
-        if (pullResponse->isJson)
+        if (httpResponse->isJson)
         {
-            // pull failed, parse the error message.
+            // operation failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
         }
         else
@@ -558,11 +520,11 @@ try
             errorMessage = errorJson;
         }
 
-        if (pullResponse->result == boost::beast::http::status::not_found)
+        if (httpResponse->result == boost::beast::http::status::not_found)
         {
             THROW_HR_WITH_USER_ERROR(WSLC_E_IMAGE_NOT_FOUND, errorMessage);
         }
-        else if (pullResponse->result == boost::beast::http::status::bad_request)
+        else if (httpResponse->result == boost::beast::http::status::bad_request)
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
         }
@@ -576,6 +538,34 @@ try
         // Can happen if an error is returned during progress after receiving an OK status.
         THROW_HR_WITH_USER_ERROR(E_FAIL, reportedError.value().c_str());
     }
+}
+
+HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Image);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+
+    if (!tagOrDigest.has_value())
+    {
+        tagOrDigest = "latest";
+    }
+
+    std::optional<std::string> registryAuth;
+
+    if (RegistryAuthenticationInformation != nullptr && *RegistryAuthenticationInformation != '\0')
+    {
+        registryAuth = std::string(RegistryAuthenticationInformation);
+    }
+
+    auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest, registryAuth);
+    StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
 
     return S_OK;
 }
@@ -591,6 +581,11 @@ try
     RETURN_HR_IF(E_INVALIDARG, *Options->ContextPath == L'\0');
     RETURN_HR_IF(E_INVALIDARG, Options->Tags.Count > 0 && Options->Tags.Values == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Options->BuildArgs.Count > 0 && Options->BuildArgs.Values == nullptr);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        WI_IsAnyFlagSet(static_cast<WSLCBuildImageFlags>(Options->Flags), ~WSLCBuildImageFlagsValid),
+        "Invalid flags: 0x%x",
+        Options->Flags);
 
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
@@ -606,6 +601,10 @@ try
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
+    if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
+    {
+        buildArgs.push_back("--no-cache");
+    }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
         RETURN_HR_IF_NULL(E_INVALIDARG, Options->Tags.Values[i]);
@@ -635,7 +634,7 @@ try
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
         buildFileHandle.Get(), common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
-    bool verbose = Options->Verbose;
+    bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
@@ -682,7 +681,7 @@ try
                 continue;
             }
 
-            std::string decoded = Base64Decode(log.data);
+            std::string decoded = wslutil::Base64Decode(log.data);
             if (!decoded.empty())
             {
                 auto& logBuffer = vertexLogs[log.vertex];
@@ -1274,6 +1273,25 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::PushImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Image);
+    RETURN_HR_IF_NULL(E_POINTER, RegistryAuthenticationInformation);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto [repo, tagOrDigest] = wslutil::ParseImage(Image);
+    auto requestContext = m_dockerClient->PushImage(repo, tagOrDigest, RegistryAuthenticationInformation);
+    StreamImageOperation(*requestContext, Image, "Push", ProgressCallback);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLCSession::InspectImage(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output)
 try
 {
@@ -1313,6 +1331,35 @@ try
     std::string wslcJson = wsl::shared::ToJson(wslcInspect);
     *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslcJson.c_str()).release();
 
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::Authenticate(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ServerAddress);
+    RETURN_HR_IF_NULL(E_POINTER, Username);
+    RETURN_HR_IF_NULL(E_POINTER, Password);
+    RETURN_HR_IF_NULL(E_POINTER, IdentityToken);
+
+    *IdentityToken = nullptr;
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    wil::unique_cotaskmem_ansistring token;
+
+    try
+    {
+        auto response = m_dockerClient->Authenticate(ServerAddress, Username, Password);
+        token = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(response.c_str());
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to authenticate with registry: %hs", ServerAddress);
+
+    *IdentityToken = token.release();
     return S_OK;
 }
 CATCH_RETURN();

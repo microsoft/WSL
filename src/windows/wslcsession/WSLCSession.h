@@ -81,7 +81,9 @@ public:
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImageOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLCDeleteImageOptions* Options, _Out_ WSLCDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCTagImageOptions* Options) override;
+    IFACEMETHOD(PushImage)(_In_ LPCSTR Image, _In_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken) override;
     IFACEMETHOD(PruneImages)(
         _In_opt_ const WSLCPruneImagesOptions* Options,
         _Out_ WSLCDeletedImageInformation** DeletedImages,
@@ -139,6 +141,7 @@ private:
     void RecoverExistingVolumes();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
+    void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;

@@ -539,13 +539,24 @@ typedef struct _WSLCDeleteImageOptions
     // TODO: Platforms: a json array of OCI platform strings.
 } WSLCDeleteImageOptions;
 
+typedef enum _WSLCBuildImageFlags
+{
+    WSLCBuildImageFlagsNone = 0,
+    WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps and all statuses.
+    WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
+} WSLCBuildImageFlags;
+
+cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
+
 typedef struct _WSLCBuildImageOptions
 {
     LPCWSTR ContextPath;
     WSLCHandle DockerfileHandle;
     WSLCStringArray Tags;
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
-    BOOL Verbose; // Show all build progress including internal steps and all statuses.
+    WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
 } WSLCBuildImageOptions;
 
 typedef struct _WSLCTagImageOptions
@@ -708,6 +719,9 @@ interface IWSLCSession : IUnknown
     HRESULT DeleteVolume([in] LPCSTR Name);
     HRESULT ListVolumes([out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
+
+    HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
+    HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT PruneVolumes([in, unique] const WSLCPruneVolumesOptions* Options, [out] WSLCPruneVolumesResults* Results);
 }
 
@@ -781,10 +795,11 @@ interface IWSLCSessionManager : IUnknown
     HRESULT GetVersion([out] WSLCVersion* Version);
 
     // Session management.
-    HRESULT CreateSession([in, ref] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
+    HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
+    HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [out] IWSLCSession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLCSessionInformation** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLCSession** Session);
-    HRESULT OpenSessionByName([in, ref] LPCWSTR DisplayName, [out] IWSLCSession** Session);
+    HRESULT OpenSessionByName([in, unique] LPCWSTR DisplayName, [out] IWSLCSession** Session);
 }
 
 cpp_quote("#define WSLC_E_BASE (0x0600)")
@@ -794,3 +809,5 @@ cpp_quote("#define WSLC_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACIL
 cpp_quote("#define WSLC_E_VOLUME_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 4) /* 0x80040604 */")
 cpp_quote("#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 5) /* 0x80040605 */")
 cpp_quote("#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6) /* 0x80040606 */")
+cpp_quote("#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7) /* 0x80040607 */")
+cpp_quote("#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8) /* 0x80040608 */")
