@@ -3372,10 +3372,16 @@ class WSLCTests
 
         // Missing SizeBytes.
         validateInvalidOptionsFailure(nullptr, 0, E_INVALIDARG, L"Missing required option: 'SizeBytes'");
+                
+        WSLCDriverOption wrongOption[] = {{"WrongOption", "value"}};
+        validateInvalidOptionsFailure(wrongOption, ARRAYSIZE(wrongOption), E_INVALIDARG, L"Missing required option: 'SizeBytes'");
 
         // Invalid SizeBytes values.
-        WSLCDriverOption invalidSize0[] = {{"SizeBytes", "0"}};
-        validateInvalidOptionsFailure(invalidSize0, ARRAYSIZE(invalidSize0), E_INVALIDARG, L"Invalid size: 0");
+        WSLCDriverOption emptySize[] = {{"SizeBytes", ""}};
+        validateInvalidOptionsFailure(emptySize, ARRAYSIZE(emptySize), E_INVALIDARG, L"Invalid size: ");
+
+        WSLCDriverOption zeroSize[] = {{"SizeBytes", "0"}};
+        validateInvalidOptionsFailure(zeroSize, ARRAYSIZE(zeroSize), E_INVALIDARG, L"Invalid size: 0");
 
         WSLCDriverOption invalidSizeAbc[] = {{"SizeBytes", "abc"}};
         validateInvalidOptionsFailure(invalidSizeAbc, ARRAYSIZE(invalidSizeAbc), E_INVALIDARG, L"Invalid size: abc");
@@ -3392,9 +3398,6 @@ class WSLCTests
 
         WSLCDriverOption invalidSizeNeg[] = {{"SizeBytes", "-1"}};
         validateInvalidOptionsFailure(invalidSizeNeg, ARRAYSIZE(invalidSizeNeg), E_INVALIDARG, L"Invalid size: -1");
-
-        // No driver opts at all.
-        validateInvalidOptionsFailure(nullptr, 0, E_INVALIDARG);
     }
 
     WSLC_TEST_METHOD(ListAndInspectNamedVolumesTest)

@@ -28,7 +28,8 @@ namespace wsl::windows::service::wslc {
 namespace {
     std::string GenerateName()
     {
-        const std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned short> random;
+        std::random_device rd;
+        std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned short> random(rd());
 
         std::array<unsigned short, 32> randomBytes;
         std::generate(randomBytes.begin(), randomBytes.end(), random);
