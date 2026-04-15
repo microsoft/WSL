@@ -155,26 +155,8 @@ void PublishPort::Validate() const
 // Source: https://github.com/moby/moby/blob/master/volume/validate.go
 bool VolumeMount::IsValidNamedVolumeName(const std::wstring& name)
 {
-    // Regex requires at least 2 characters.
-    if (name.size() < 2)
-    {
-        return false;
-    }
-
-    auto isAsciiAlphanumeric = [](wchar_t c) {
-        return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || (c >= L'0' && c <= L'9');
-    };
-
-    // First character must be alphanumeric.
-    if (!isAsciiAlphanumeric(name.front()))
-    {
-        return false;
-    }
-
-    // Subsequent characters are alphanumeric or contain '_', '-', or '.'.
-    return std::all_of(name.begin(), name.end(), [&isAsciiAlphanumeric](wchar_t c) {
-        return isAsciiAlphanumeric(c) || c == L'_' || c == L'-' || c == L'.';
-    });
+    static const std::wregex namedVolumeRegex(LR"(^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,}$)");
+    return std::regex_match(name, namedVolumeRegex);
 }
 
 VolumeMount VolumeMount::Parse(const std::wstring& value)
@@ -236,19 +218,12 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     }
 
     // Not a named volume, so it must be a path.
-    // Use GetFullPathNameW to resolve relative paths against the CWD.
-    DWORD size = ::GetFullPathNameW(rawHostPath.c_str(), 0, nullptr, nullptr);
-    if (size == 0)
+    // Use wil::GetFullPathNameW to resolve relative paths against the CWD.
+    std::wstring resolvedHostPath;
+    if (FAILED(wil::GetFullPathNameW(rawHostPath.c_str(), resolvedHostPath)))
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
     }
-
-    // The buffer size returned by the first call of GetFullPathNameW does not always match the actual
-    // characters written, and this results in extra null terminating characters in the buffer. To work
-    // around this safely, we will always resize the string after the call to the actual number of
-    // characters written so we do not rely on undocumented Windows behavior or risk buffer overflow.
-    std::wstring resolvedHostPath(size, L'\0');
-    resolvedHostPath.resize(::GetFullPathNameW(rawHostPath.c_str(), size, resolvedHostPath.data(), nullptr));
 
     // GetFileAttributesW validates the resolved path syntax without requiring existence.
     // ERROR_INVALID_NAME indicates illegal characters in the path (e.g. ":" as a component).

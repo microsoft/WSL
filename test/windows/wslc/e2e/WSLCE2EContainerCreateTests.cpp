@@ -226,19 +226,27 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Volume_RelativeHostPath)
     {
-        // Create a subdirectory relative to the CWD and pass it as a relative path to wslc.
+        // Create a uniquely-named subdirectory relative to the CWD and pass it as a relative path
+        // to wslc. Using a GUID suffix avoids collisions on parallel runs or after a prior crash.
         // Uses "./" prefix to disambiguate from a Docker named volume name.
-        const auto absoluteDir = std::filesystem::current_path() / L"wslc-vol-relpath-test";
+        GUID runId;
+        THROW_IF_FAILED(CoCreateGuid(&runId));
+        const auto dirName =
+            L"wslc-vol-relpath-" + wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None);
+        const auto absoluteDir = std::filesystem::current_path() / dirName;
         std::filesystem::create_directories(absoluteDir);
         auto cleanupDir = wil::scope_exit([&]() { std::filesystem::remove_all(absoluteDir); });
 
         const auto testFile = absoluteDir / L"reltest.txt";
-        const auto relativeDir = L"./wslc-vol-relpath-test";
+        const auto relativeDir = L"./" + dirName;
 
-        // Write a file from the host and verify the container can read it via the relative path mount
-        std::ofstream out(testFile);
-        out << "WSLC Relative Path Test";
-        out.close();
+        // Write a file from the host and verify the container can read it via the relative path mount.
+        {
+            std::ofstream out(testFile);
+            VERIFY_IS_TRUE(out.is_open(), L"Failed to open test file for writing (host -> container test)");
+            out << "WSLC Relative Path Test";
+            VERIFY_IS_TRUE(out.good(), L"Failed to write to test file (host -> container test)");
+        }
 
         auto result = RunWslc(std::format(
             L"container run --rm --name {} --volume \"{}:/data:ro\" {} cat /data/reltest.txt",
@@ -249,7 +257,7 @@ class WSLCE2EContainerCreateTests
 
         EnsureContainerDoesNotExist(WslcContainerName);
 
-        // Write a file from the container and verify the host can read it back via the relative path mount
+        // Write a file from the container and verify the host can read it back via the relative path mount.
         result = RunWslc(std::format(
             L"container run --rm --name {} --volume \"{}:/data:rw\" {} sh -c \"echo -n 'WSLC Relative Path Write Test' > "
             L"/data/reltest.txt\"",
@@ -259,8 +267,10 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         std::ifstream in(testFile);
+        VERIFY_IS_TRUE(in.is_open(), L"Failed to open test file for reading (container -> host test)");
         std::stringstream buffer;
         buffer << in.rdbuf();
+        VERIFY_IS_TRUE(in.good() || in.eof(), L"Failed to read test file (container -> host test)");
         VERIFY_ARE_EQUAL("WSLC Relative Path Write Test", buffer.str());
     }
 
