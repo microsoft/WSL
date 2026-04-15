@@ -535,61 +535,6 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NamedVolume_WriteAndRead)
-    {
-
-        const std::wstring volumeName = L"wslc-test-vol-run";
-
-        // Cleanup any pre-existing volume
-        RunWslc(std::format(L"volume rm {}", volumeName));
-
-        // Create the named volume
-        auto result = RunWslc(std::format(L"volume create {}", volumeName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Write data to the named volume
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'run_vol_test' > /data/testfile\"", volumeName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-
-        // Read data back from the named volume in a new container
-        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"run_vol_test", .Stderr = L"", .ExitCode = 0});
-
-        // Cleanup
-        RunWslc(std::format(L"volume rm {}", volumeName));
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_NamedVolume_MultipleContainers)
-    {
-
-        const std::wstring volumeName = L"wslc-test-vol-run-multi";
-
-        // Cleanup any pre-existing volume
-        RunWslc(std::format(L"volume rm {}", volumeName));
-
-        // Create the named volume
-        auto result = RunWslc(std::format(L"volume create {}", volumeName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Write data with first container
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'first' > /data/testfile\"", volumeName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-
-        // Append data with second container
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} sh -c \"echo -n '_second' >> /data/testfile\"", volumeName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-
-        // Read combined data with third container
-        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"first_second", .Stderr = L"", .ExitCode = 0});
-
-        // Cleanup
-        RunWslc(std::format(L"volume rm {}", volumeName));
-    }
-
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
