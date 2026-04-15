@@ -83,6 +83,16 @@ COMMAND_LINE_TEST_CASE(L"container start --attach cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"container start -a cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"create ubuntu:latest", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --workdir /app ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create -w /app ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --workdir /app ubuntu sh", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --workdir", L"create", false)             // Missing value for --workdir
+COMMAND_LINE_TEST_CASE(L"create --workdir \"\" ubuntu", L"create", false) // Empty working directory
+COMMAND_LINE_TEST_CASE(L"run --workdir /app ubuntu echo hello", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run -w /app ubuntu echo hello", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --workdir /app ubuntu sh", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --workdir", L"run", false)                        // Missing value for --workdir
+COMMAND_LINE_TEST_CASE(L"run --workdir \"\" ubuntu echo hello", L"run", false) // Empty working directory
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
