@@ -110,7 +110,7 @@ class WSLCE2EImageSaveTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ToStdout_Load)
     {
         // Save source image
-        auto saveResult = RunWslcAndRedirectToFile(std::format(L"image save {}", DebianImage.NameAndTag()), SavedArchivePath.wstring());
+        auto saveResult = RunWslcAndRedirectToFile(std::format(L"image save {}", DebianImage.NameAndTag()), SavedArchivePath);
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Delete source image

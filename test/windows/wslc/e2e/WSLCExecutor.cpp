@@ -180,7 +180,7 @@ WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, st
     THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
     wil::unique_hfile redirectedStdout;
-    HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE stdoutHandle = nullptr;
 
     std::wstring effectiveCommandLine = commandLine;
     if (outputPath.has_value())
@@ -192,7 +192,21 @@ WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, st
             outputPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ, &securityAttributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
         THROW_LAST_ERROR_IF(!redirectedStdout);
         stdoutHandle = redirectedStdout.get();
-        effectiveCommandLine = std::format(L"{} > {}", commandLine, outputPath->wstring());
+        effectiveCommandLine = std::format(L"{} > \"{}\"", commandLine, outputPath->wstring());
+    }
+    else
+    {
+        // Open CONOUT$ so the child process receives a real console handle regardless of
+        // how the test runner has configured its own stdout (e.g. piped in CI).  This
+        // makes IsConsoleHandle() return true inside wslc, which is the condition under
+        // test in WSLCE2E_Image_Save_ToTerminal_Fail.
+        SECURITY_ATTRIBUTES securityAttributes{};
+        securityAttributes.nLength = sizeof(securityAttributes);
+        securityAttributes.bInheritHandle = TRUE;
+        redirectedStdout.reset(
+            CreateFileW(L"CONOUT$", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &securityAttributes, OPEN_EXISTING, 0, nullptr));
+        THROW_LAST_ERROR_IF(!redirectedStdout);
+        stdoutHandle = redirectedStdout.get();
     }
 
     process.SetStdHandles(nullptr, stdoutHandle, childStderrWrite.get());
