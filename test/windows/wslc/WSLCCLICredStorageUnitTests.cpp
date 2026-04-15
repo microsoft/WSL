@@ -29,11 +29,6 @@ class WSLCCLICredStorageUnitTests
 {
     WSL_TEST_CLASS(WSLCCLICredStorageUnitTests)
     
-    TEST_CLASS_SETUP(TestClassSetup)
-    {
-        return true;
-    }
-
     FileCredStorage m_fileStorage;
     WinCredStorage m_winCredStorage;
 
