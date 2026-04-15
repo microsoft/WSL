@@ -573,6 +573,8 @@ try
     std::set<std::string> reportedSteps;
     std::set<std::string> reportedErrors;
     std::map<std::string, std::string> digestToStageName;
+    bool needsNewline = false; // true when the last log chunk didn't end with \n
+    std::string lastLogVertex; // digest of the vertex that produced the last log output
 
     // Extract the named build stage from a BuildKit vertex name. Vertices within the same named stage
     // (e.g. "[builder 1/3]" and "[builder 2/3]") share a key. Returns empty for unnamed stages.
@@ -618,6 +620,14 @@ try
         }
     };
 
+    auto flushLine = [&]() {
+        if (needsNewline)
+        {
+            reportProgress("\n");
+            needsNewline = false;
+        }
+    };
+
     // Accumulate lines and use accept() to detect complete JSON objects. Check for non-JSON lines between JSON objects and add
     // them to the output in case they contain helpful information about the build.
     auto captureOutput = [&](const gsl::span<char>& content) {
@@ -650,14 +660,17 @@ try
                 continue;
             }
 
+            digestToStageName.try_emplace(vertex.digest, getStageName(vertex.name));
+
             if (!vertex.started.empty() && reportedSteps.insert(vertex.digest).second)
             {
-                digestToStageName[vertex.digest] = getStageName(vertex.name);
+                flushLine();
                 reportProgress(vertex.name + "\n");
             }
 
             if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
             {
+                flushLine();
                 reportProgress(vertex.error + "\n");
             }
         }
@@ -669,7 +682,26 @@ try
                 std::string decoded = wslutil::Base64Decode(log.data);
                 if (!decoded.empty())
                 {
-                    reportProgress(IndentLines(decoded, logPrefix(it->second)));
+                    if (log.vertex != lastLogVertex && decoded[0] != '\n')
+                    {
+                        flushLine();
+                    }
+
+                    // When continuing an unterminated line, emit the leading \n or \r directly
+                    // so it terminates/overwrites cleanly without a spurious prefix.
+                    if (needsNewline && (decoded[0] == '\n' || decoded[0] == '\r'))
+                    {
+                        reportProgress(decoded.substr(0, 1));
+                        decoded.erase(0, 1);
+                    }
+
+                    if (!decoded.empty())
+                    {
+                        reportProgress(IndentLines(decoded, logPrefix(it->second)));
+                    }
+
+                    needsNewline = !decoded.empty() && decoded.back() != '\n';
+                    lastLogVertex = log.vertex;
                 }
             }
         }
@@ -679,6 +711,7 @@ try
             if (auto it = digestToStageName.find(entry.vertex);
                 it != digestToStageName.end() && !entry.id.empty() && reportedSteps.insert(entry.id).second)
             {
+                flushLine();
                 reportProgress(logPrefix(it->second) + entry.id + "\n");
             }
         }
