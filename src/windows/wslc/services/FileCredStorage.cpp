@@ -68,7 +68,7 @@ wil::unique_file CreateFileExclusive()
     // Use _wsopen_s with _O_CREAT to atomically create-or-open without truncation.
     int fd = -1;
     auto err = _wsopen_s(&fd, filePath.c_str(), _O_RDWR | _O_CREAT | _O_BINARY, _SH_DENYRW, _S_IREAD | _S_IWRITE);
-    THROW_IF_WIN32_ERROR(err);
+    THROW_WIN32_IF(_doserrno, err != 0);
 
     wil::unique_file f(_fdopen(fd, "r+b"));
     if (!f)
