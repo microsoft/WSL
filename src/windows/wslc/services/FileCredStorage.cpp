@@ -112,7 +112,14 @@ nlohmann::json ReadJsonFile(FILE* f)
         return nlohmann::json::object();
     }
 
-    return nlohmann::json::parse(f);
+    try
+    {
+        return nlohmann::json::parse(f);
+    }
+    catch (const nlohmann::json::parse_error&)
+    {
+        THROW_HR_WITH_USER_ERROR(WSL_E_INVALID_JSON,Localization::WSLCCLI_CredentialFileCorrupt(GetFilePath()));
+    }
 }
 
 void WriteJsonFile(FILE* f, const nlohmann::json& data)

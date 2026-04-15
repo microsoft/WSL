@@ -2322,6 +2322,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Not logged in to {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
+    <value>Failed to parse credentials file '{}': the file may be corrupted.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
     <value>Server</value>
   </data>
