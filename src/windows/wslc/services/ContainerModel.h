@@ -25,6 +25,7 @@ enum class FormatType
 {
     Table,
     Json,
+    Template,
 };
 
 struct ContainerOptions

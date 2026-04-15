@@ -158,15 +158,13 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     {
         return FormatType::Json;
     }
-    else if (IsEqual(input, L"table"))
+    
+    if (IsEqual(input, L"table"))
     {
         return FormatType::Table;
     }
-    else
-    {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
-    }
+
+    return FormatType::Template;
 }
 
 } // namespace wsl::windows::wslc::validation

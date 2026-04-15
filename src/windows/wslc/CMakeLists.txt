@@ -6,6 +6,33 @@ list(TRANSFORM WSLC_SUBDIR_PATHS APPEND /*.cpp OUTPUT_VARIABLE SOURCE_PATTERNS)
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS ${HEADER_PATTERNS})
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 
+# Build Go template renderer library
+set(GO_TEMPLATE_DIR ${CMAKE_CURRENT_BINARY_DIR}/tools/gotemplate)
+set(GO_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/gotemplate)
+
+if(CMAKE_GENERATOR_PLATFORM MATCHES "ARM64")
+    set(GO_ARCH arm64)
+    set(GO_LIB_MACHINE ARM64)
+else()
+    set(GO_ARCH amd64)
+    set(GO_LIB_MACHINE X64)
+endif()
+
+set(GO_OUTPUT_DLL ${GO_OUTPUT_DIR}/render.dll)
+set(GO_OUTPUT_LIB ${GO_OUTPUT_DIR}/render.lib)
+
+add_custom_command(
+    OUTPUT ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_OUTPUT_DIR}
+    COMMAND powershell -NoProfile -Command "cd '${GO_TEMPLATE_DIR}' ; \$env:GOOS='windows' ; \$env:GOARCH='${GO_ARCH}' ; \$env:CGO_ENABLED='1' ; go build -o '${GO_OUTPUT_DLL}' -buildmode=c-shared render.go"
+    COMMAND lib /def:${GO_TEMPLATE_DIR}/render.def /out:${GO_OUTPUT_LIB} /machine:${GO_LIB_MACHINE}
+    DEPENDS ${GO_TEMPLATE_DIR}/render.go ${GO_TEMPLATE_DIR}/go.mod ${GO_TEMPLATE_DIR}/render.def
+    COMMENT "Building Go template renderer library"
+    VERBATIM
+)
+
+add_custom_target(gotemplate_lib ALL DEPENDS ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB})
+
 # Object library for WSLC components.
 # Used to build the executable and also unit testing components.
 add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
@@ -14,7 +41,11 @@ target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUB
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}
                       yaml-cpp
-                      common)
+                      common
+                      ${GO_OUTPUT_LIB})
+
+# Add dependency on Go library
+add_dependencies(wslclib gotemplate_lib)
 
 target_precompile_headers(wslclib REUSE_FROM common)
 set_target_properties(wslclib PROPERTIES FOLDER windows)
@@ -23,6 +54,10 @@ set_target_properties(wslclib PROPERTIES FOLDER windows)
 add_executable(wslc $<TARGET_OBJECTS:wslclib>)
 
 target_link_libraries(wslc wslclib)
+
+add_custom_command(TARGET wslc POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GO_OUTPUT_DLL} $<TARGET_FILE_DIR:wslc>/render.dll
+)
 
 set_target_properties(wslc PROPERTIES FOLDER windows)
 

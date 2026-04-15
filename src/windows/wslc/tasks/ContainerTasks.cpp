@@ -11,6 +11,7 @@ Abstract:
     Implementation of container command related execution logic.
 
 --*/
+
 #include "Argument.h"
 #include "ArgumentValidation.h"
 #include "CLIExecutionContext.h"
@@ -20,6 +21,7 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
+#include "TemplateRenderer.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
@@ -165,6 +167,28 @@ void ListContainers(CLIExecutionContext& context)
         }
 
         table.Complete();
+        break;
+    }
+    case FormatType::Template:
+    {
+        WI_ASSERT(context.Args.Contains(ArgType::Format));
+        auto templateStr = WideToMultiByte(context.Args.Get<ArgType::Format>());
+
+        // Render the template using Go
+        try
+        {
+            for (const auto& container : containers)
+            {
+                auto json = ToJson(container, c_jsonPrettyPrintIndent);
+                auto result = wsl::windows::wslc::core::TemplateRenderer::Render(templateStr, json);
+                PrintMessage(result);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            PrintMessage(MultiByteToWide(std::string("Template rendering error: ") + e.what()));
+            context.ExitCode = 1;
+        }
         break;
     }
     default:
