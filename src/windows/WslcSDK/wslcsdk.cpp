@@ -17,6 +17,8 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
+#include "Localization.h"
+#include "WslInstall.h"
 #include "wslutil.h"
 
 using namespace std::string_view_literals;
@@ -1443,9 +1445,53 @@ CATCH_RETURN();
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 try
 {
-    UNREFERENCED_PARAMETER(progressCallback);
-    UNREFERENCED_PARAMETER(context);
-    return E_NOTIMPL;
+    bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
+    bool needsRuntime = NeedsWslRuntimeInstalled();
+
+    if (!needsVirtualMachine && !needsRuntime)
+    {
+        return S_OK;
+    }
+
+    // Installing these components requires elevation.
+    auto token = wil::open_current_access_token();
+    RETURN_HR_IF(E_ACCESSDENIED, !wsl::windows::common::security::IsTokenElevated(token.get()));
+
+    if (needsVirtualMachine)
+    {
+        if (progressCallback)
+        {
+            progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 0, 1, context);
+        }
+
+        auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameVmp, false);
+        if (exitCode != 0 && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED)
+        {
+            THROW_HR_WITH_USER_ERROR(
+                WSL_E_INSTALL_COMPONENT_FAILED,
+                wsl::shared::Localization::MessageOptionalComponentInstallFailed(WslInstall::c_optionalFeatureNameVmp, exitCode));
+        }
+
+        if (progressCallback)
+        {
+            progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 1, 1, context);
+        }
+    }
+
+    if (needsRuntime)
+    {
+        std::function<void(uint32_t, uint32_t)> callback;
+        if (progressCallback)
+        {
+            callback = [progressCallback, context](uint32_t progress, uint32_t total) {
+                progressCallback(WSLC_COMPONENT_FLAG_WSL_PACKAGE, progress, total, context);
+            };
+        }
+
+
+    }
+
+    return S_OK;
 }
 CATCH_RETURN();
 
