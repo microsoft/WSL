@@ -24,11 +24,6 @@ public:
     std::optional<std::string> Get(const std::string& serverAddress) override;
     void Erase(const std::string& serverAddress) override;
     std::vector<std::wstring> List() override;
-
-private:
-    static std::string Protect(const std::string& plaintext);
-    static std::string Unprotect(const std::string& cipherBase64);
-    static void ModifyFileStore(FILE* f, const std::function<bool(nlohmann::json&)>& modifier);
 };
 
 } // namespace wsl::windows::wslc::services

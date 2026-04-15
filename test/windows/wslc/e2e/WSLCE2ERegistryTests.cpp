@@ -68,7 +68,7 @@ class WSLCE2ERegistryTests
             auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15001);
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
-            auto registryImageName = TagImageForRegistry(L"debian:latest", registryAddressW);
+            auto registryImageName = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
 
             auto cleanup = wil::scope_exit([&]() {
                 RunWslc(std::format(L"image delete --force {}", registryImageName));
@@ -79,8 +79,8 @@ class WSLCE2ERegistryTests
             auto result = RunWslc(std::format(L"push {}", registryImageName));
             VerifyAuthFailure(result);
 
-            Log::Comment(L"Deleting tagged image and testing pull without login");
             RunWslcAndVerify(std::format(L"image delete --force {}", registryImageName), {.ExitCode = 0});
+
             result = RunWslc(std::format(L"pull {}", registryImageName));
             VerifyAuthFailure(result);
 

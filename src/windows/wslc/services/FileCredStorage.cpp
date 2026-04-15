@@ -132,11 +132,7 @@ void WriteJsonFile(FILE* f, const nlohmann::json& data)
     fflush(f);
 }
 
-} // namespace
-
-namespace wsl::windows::wslc::services {
-
-void FileCredStorage::ModifyFileStore(FILE* f, const std::function<bool(nlohmann::json&)>& modifier)
+void ModifyFileStore(FILE* f, const std::function<bool(nlohmann::json&)>& modifier)
 {
     WI_VERIFY(f != nullptr);
 
@@ -148,7 +144,7 @@ void FileCredStorage::ModifyFileStore(FILE* f, const std::function<bool(nlohmann
     }
 }
 
-std::string FileCredStorage::Protect(const std::string& plaintext)
+std::string Protect(const std::string& plaintext)
 {
     DATA_BLOB input{};
     input.cbData = static_cast<DWORD>(plaintext.size());
@@ -161,7 +157,7 @@ std::string FileCredStorage::Protect(const std::string& plaintext)
     return Base64Encode(std::string(reinterpret_cast<const char*>(output.pbData), output.cbData));
 }
 
-std::string FileCredStorage::Unprotect(const std::string& cipherBase64)
+std::string Unprotect(const std::string& cipherBase64)
 {
     auto decoded = Base64Decode(cipherBase64);
 
@@ -175,6 +171,10 @@ std::string FileCredStorage::Unprotect(const std::string& cipherBase64)
 
     return std::string(reinterpret_cast<const char*>(output.pbData), output.cbData);
 }
+
+} // namespace
+
+namespace wsl::windows::wslc::services {
 
 void FileCredStorage::Store(const std::string& serverAddress, const std::string& credential)
 {

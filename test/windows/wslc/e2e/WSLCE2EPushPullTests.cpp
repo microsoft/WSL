@@ -59,23 +59,21 @@ class WSLCE2EPushPullTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_PushPull)
     {
-        // Ensure the default elevated session exists.
-        RunWslcAndVerify(L"container list", {.Stderr = L"", .ExitCode = 0});
-
         const auto& debianImage = DebianTestImage();
         EnsureImageIsLoaded(debianImage);
+
+        // Ensure the default elevated session exists.
+        RunWslcAndVerify(L"container list", {.Stderr = L"", .ExitCode = 0});
 
         // Start a local registry without auth.
         auto session = OpenDefaultElevatedSession();
 
         {
-            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15002);
-
-            // Ensure the registry container is cleaned up after the test.
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, "", "", 15003);
             auto registryAddressW = string::MultiByteToWide(registryAddress);
 
             // Tag the image for the local registry.
-            auto registryImage = TagImageForRegistry(L"debian:latest", registryAddressW);
+            auto registryImage = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
 
             auto tagCleanup = wil::scope_exit([&]() { RunWslc(std::format(L"image delete --force {}", registryImage)); });
 
