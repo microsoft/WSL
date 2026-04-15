@@ -36,7 +36,6 @@ target_link_libraries(wsltests
                       ${SERVICE_LINK_LIBRARIES}
                       VirtDisk.lib
                       Wer.lib
-                      Dbghelp.lib
                       sfc.lib
                       Crypt32.lib)
 
