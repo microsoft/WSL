@@ -29,12 +29,6 @@ namespace wsl::windows::service::wslc {
 class WSLCVirtualMachine;
 class DockerHTTPClient;
 
-enum class DetachVolumeFlags
-{
-    None = 0,
-    DeleteVhd = 1,
-};
-
 class WSLCVhdVolumeImpl
 {
 public:
@@ -78,9 +72,10 @@ public:
         return m_virtualMachinePath;
     }
 
-    void Detach(DetachVolumeFlags flags = DetachVolumeFlags::None);
+    void OnDeleted();
 
 private:
+    void Detach();
     std::string m_name;
     std::filesystem::path m_hostPath;
     std::string m_virtualMachinePath;

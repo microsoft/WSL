@@ -1919,88 +1919,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* Options, WSLCPruneVolumesResults* Results)
-try
+HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WSLCPruneVolumesResults* /*Results*/)
 {
-    COMServiceExecutionContext context;
-
-    RETURN_HR_IF_NULL(E_POINTER, Results);
-    ZeroMemory(Results, sizeof(*Results));
-
-    // Build Docker prune filters from the WSLC options.
-    DockerHTTPClient::PruneVolumesFilters filters;
-
-    if (Options != nullptr)
-    {
-        filters.all = Options->All;
-
-        if (Options->Labels != nullptr && Options->LabelsCount > 0)
-        {
-            for (ULONG i = 0; i < Options->LabelsCount; ++i)
-            {
-                const auto& filter = Options->Labels[i];
-                RETURN_HR_IF_NULL(E_POINTER, filter.Key);
-
-                std::string labelFilter = filter.Key;
-                if (filter.Value != nullptr)
-                {
-                    labelFilter += "=";
-                    labelFilter += filter.Value;
-                }
-
-                if (filter.Present)
-                {
-                    filters.presentLabels.emplace_back(std::move(labelFilter));
-                }
-                else
-                {
-                    filters.absentLabels.emplace_back(std::move(labelFilter));
-                }
-            }
-        }
-    }
-
-    auto lock = m_lock.lock_shared();
-    std::lock_guard volumesLock(m_volumesLock);
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
-    docker_schema::PruneVolumeResult pruneResult;
-    try
-    {
-        pruneResult = m_dockerClient->PruneVolumes(filters);
-    }
-    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune volumes");
-
-    if (pruneResult.VolumesDeleted.has_value() && !pruneResult.VolumesDeleted->empty())
-    {
-        // Clean up WSLC-managed volumes that Docker pruned.
-        for (const auto& name : pruneResult.VolumesDeleted.value())
-        {
-            auto it = m_volumes.find(name);
-            if (it != m_volumes.end())
-            {
-                it->second->Detach(DetachVolumeFlags::DeleteVhd);
-                m_volumes.erase(it);
-            }
-        }
-    }
-
-    WSL_LOG("VolumesPruned", TraceLoggingValue(Results->VolumesCount, "PrunedCount"));
-
-    auto volumeCount = pruneResult.VolumesDeleted.has_value() ? pruneResult.VolumesDeleted->size() : 0;
-    auto output = wil::make_unique_cotaskmem<WSLCVolumeName[]>(volumeCount);
-    for (size_t i = 0; i < volumeCount; ++i)
-    {
-        strcpy_s(output[i], pruneResult.VolumesDeleted.value()[i].c_str());
-    }
-
-    Results->Volumes = output.release();
-    Results->VolumesCount = static_cast<ULONG>(volumeCount);
-    Results->SpaceReclaimed = pruneResult.SpaceReclaimed;
-
-    return S_OK;
+    // TODO: Implement volume pruning. Docker's volume prune API skips bind-mount volumes,
+    // so WSLC VHD volumes require custom handling.
+    return E_NOTIMPL;
 }
-CATCH_RETURN();
 
 HRESULT WSLCSession::Terminate()
 try

@@ -582,10 +582,6 @@ typedef struct _WSLCVolumeInformation
 {
     WSLCVolumeName Name;
     char Driver[WSLC_MAX_VOLUME_DRIVER_LENGTH + 1];
-    [unique, size_is(DriverOptsCount)] WSLCDriverOptionInformation* DriverOpts;
-    ULONG DriverOptsCount;
-    [unique, size_is(LabelsCount)] WSLCLabelInformation* Labels;
-    ULONG LabelsCount;
 } WSLCVolumeInformation;
 
 typedef struct _WSLCPruneVolumesResults

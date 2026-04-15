@@ -272,14 +272,6 @@ struct PruneImageResult
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneImageResult, ImagesDeleted, SpaceReclaimed);
 };
 
-struct PruneVolumeResult
-{
-    std::optional<std::vector<std::string>> VolumesDeleted;
-    uint64_t SpaceReclaimed{};
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneVolumeResult, VolumesDeleted, SpaceReclaimed);
-};
-
 struct ImportStatus
 {
     std::string status;

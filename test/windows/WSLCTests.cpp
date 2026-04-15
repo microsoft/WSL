@@ -3371,7 +3371,7 @@ class WSLCTests
         };
 
         // Missing SizeBytes.
-        validateInvalidOptionsFailure(nullptr, 0, E_INVALIDARG, L"Missing required option: SizeBytes");
+        validateInvalidOptionsFailure(nullptr, 0, E_INVALIDARG, L"Missing required option: 'SizeBytes'");
 
         // Invalid SizeBytes values.
         WSLCDriverOption invalidSize0[] = {{"SizeBytes", "0"}};

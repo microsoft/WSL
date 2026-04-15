@@ -28,14 +28,16 @@ namespace wsl::windows::service::wslc {
 namespace {
     std::string GenerateName()
     {
-        BYTE randomBytes[32];
-        THROW_IF_NTSTATUS_FAILED(BCryptGenRandom(nullptr, randomBytes, sizeof(randomBytes), BCRYPT_USE_SYSTEM_PREFERRED_RNG));
+        const std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned short> random;
+
+        std::array<unsigned short, 32> randomBytes;
+        std::generate(randomBytes.begin(), randomBytes.end(), random);
 
         std::string name;
-        name.reserve(64);
+        name.reserve(randomBytes.size() * 2);
         for (auto b : randomBytes)
         {
-            std::format_to(std::back_inserter(name), "{:02x}", b);
+            std::format_to(std::back_inserter(name), "{:02x}", static_cast<BYTE>(b));
         }
 
         return name;
@@ -44,10 +46,10 @@ namespace {
     ULONGLONG ParseSizeBytes(std::map<std::string, std::string>& DriverOpts)
     {
         const auto it = DriverOpts.find("SizeBytes");
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOptions("SizeBytes"), it == DriverOpts.end());
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption("SizeBytes"), it == DriverOpts.end());
 
         auto& value = it->second;
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), value.empty() || value[0] == '-');
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), value[0] == '-');
 
         errno = 0;
         char* end = nullptr;
@@ -221,8 +223,7 @@ void WSLCVhdVolumeImpl::Delete()
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete volume '%hs'", m_name.c_str());
     }
 
-    Detach();
-    LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_hostPath.c_str()));
+    OnDeleted();
 }
 
 std::string WSLCVhdVolumeImpl::Inspect() const
@@ -248,58 +249,16 @@ WSLCVolumeInformation WSLCVhdVolumeImpl::GetVolumeInformation() const
     THROW_HR_IF(E_UNEXPECTED, strcpy_s(Info.Name, m_name.c_str()) != 0);
     THROW_HR_IF(E_UNEXPECTED, strcpy_s(Info.Driver, WSLCVhdVolumeDriver) != 0);
 
-    std::vector<wil::unique_cotaskmem_ansistring> strings;
-    strings.reserve((m_driverOpts.size() + m_labels.size()) * 2);
-
-    wil::unique_cotaskmem_ptr<WSLCDriverOptionInformation[]> driverOptsArray;
-    if (!m_driverOpts.empty())
-    {
-        driverOptsArray = wil::make_unique_cotaskmem<WSLCDriverOptionInformation[]>(m_driverOpts.size());
-
-        size_t i = 0;
-        for (const auto& [key, value] : m_driverOpts)
-        {
-            strings.push_back(wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(key.c_str()));
-            driverOptsArray[i].Key = strings.back().get();
-
-            strings.push_back(wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()));
-            driverOptsArray[i].Value = strings.back().get();
-            i++;
-        }
-    }
-
-    wil::unique_cotaskmem_ptr<WSLCLabelInformation[]> labelsArray;
-    if (!m_labels.empty())
-    {
-        labelsArray = wil::make_unique_cotaskmem<WSLCLabelInformation[]>(m_labels.size());
-
-        size_t i = 0;
-        for (const auto& [key, value] : m_labels)
-        {
-            strings.push_back(wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(key.c_str()));
-            labelsArray[i].Key = strings.back().get();
-
-            strings.push_back(wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()));
-            labelsArray[i].Value = strings.back().get();
-            i++;
-        }
-    }
-
-    // No more allocations can fail — release all RAII ownership.
-    for (auto& s : strings)
-    {
-        s.release();
-    }
-
-    Info.DriverOptsCount = static_cast<ULONG>(m_driverOpts.size());
-    Info.DriverOpts = driverOptsArray.release();
-    Info.LabelsCount = static_cast<ULONG>(m_labels.size());
-    Info.Labels = labelsArray.release();
-
     return Info;
 }
 
-void WSLCVhdVolumeImpl::Detach(DetachVolumeFlags flags)
+void WSLCVhdVolumeImpl::OnDeleted()
+{
+    Detach();
+    LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_hostPath.c_str()));
+}
+
+void WSLCVhdVolumeImpl::Detach()
 try
 {
     if (!m_attached)
@@ -315,11 +274,6 @@ try
 
     m_virtualMachine.DetachDisk(m_lun);
     m_attached = false;
-
-    if (flags == DetachVolumeFlags::DeleteVhd)
-    {
-        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_hostPath.c_str()));
-    }
 }
 CATCH_LOG();
 
