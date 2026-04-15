@@ -411,6 +411,7 @@ private:
             {L"image", Localization::WSLCCLI_ImageCommandDesc()},
             {L"session", Localization::WSLCCLI_SessionCommandDesc()},
             {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},
+            {L"volume", Localization::WSLCCLI_VolumeCommandDesc()},
             {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
             {L"build", Localization::WSLCCLI_ImageBuildDesc()},
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
