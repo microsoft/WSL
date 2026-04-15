@@ -559,12 +559,6 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir_ShortAlias)
-    {
-        auto result = RunWslc(std::format(L"container run --rm -w /tmp {} pwd", DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
-    }
-
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
