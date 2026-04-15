@@ -446,15 +446,12 @@ void MirroredNetworking::AddNetworkEndpoint(const GUID& NetworkId) noexcept
         // HostComputeNetwork instead of VirtualNetwork in the endpoint settings.
         // See: https://github.com/microsoft/WSL/issues/14080
         const bool isLoopbackNetwork = properties.IsLoopback;
+
         if (isLoopbackNetwork)
         {
             WSL_LOG(
                 "MirroredNetworking::AddNetworkEndpoint [Loopback network - using simplified endpoint settings]",
                 TraceLoggingValue(NetworkId, "networkId"));
-        }
-
-        if (isLoopbackNetwork)
-        {
             // Loopback networks require HostComputeNetwork (not VirtualNetwork) and don't support policies
             hns::HostComputeEndpoint hnsEndpoint{};
             hnsEndpoint.HostComputeNetwork = NetworkId;
