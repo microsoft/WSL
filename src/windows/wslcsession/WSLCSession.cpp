@@ -2228,7 +2228,7 @@ UserCOMCallback WSLCSession::RegisterUserCOMCallback()
     THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
 
     auto [_, inserted] = m_userCOMCallbackThreads.insert(GetCurrentThreadId());
-    WI_ASSERT(inserted);
+    WI_VERIFY(inserted);
 
     return UserCOMCallback{*this};
 }
@@ -2237,8 +2237,8 @@ void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
 {
     std::lock_guard lock(m_userCOMCallbacksLock);
 
-    auto it = std::ranges::find(m_userCOMCallbackThreads, ThreadId);
-    WI_ASSERT(it != m_userCOMCallbackThreads.end());
+    auto it = m_userCOMCallbackThreads.find(ThreadId);
+    WI_VERIFY(it != m_userCOMCallbackThreads.end());
 
     m_userCOMCallbackThreads.erase(it);
 }
