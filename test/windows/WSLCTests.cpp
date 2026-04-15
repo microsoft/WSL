@@ -1759,7 +1759,7 @@ class WSLCTests
             std::string output;
             auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
-            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsVerbose};
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}};
             VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
             VERIFY_IS_TRUE(output.find("Imageisrebuilt") == std::string::npos);
         }
@@ -1769,7 +1769,7 @@ class WSLCTests
             std::string output;
             auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
-            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsVerbose};
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
             VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
             VERIFY_IS_TRUE(output.find("Imageisrebuilt") != std::string::npos);
         }
