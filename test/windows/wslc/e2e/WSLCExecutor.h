@@ -94,7 +94,10 @@ private:
 };
 
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
-WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, std::optional<std::filesystem::path> outputPath = std::nullopt, ElevationType elevationType = ElevationType::Elevated);
+WSLCExecutionResult RunWslcAndRedirectToFile(
+    const std::wstring& commandLine,
+    std::optional<std::filesystem::path> outputPath = std::nullopt,
+    ElevationType elevationType = ElevationType::Elevated);
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType = ElevationType::Elevated);
 
 std::wstring GetWslcHeader();

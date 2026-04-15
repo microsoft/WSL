@@ -188,7 +188,8 @@ WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, st
         SECURITY_ATTRIBUTES securityAttributes{};
         securityAttributes.nLength = sizeof(securityAttributes);
         securityAttributes.bInheritHandle = TRUE;
-        redirectedStdout.reset(CreateFileW(outputPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ, &securityAttributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        redirectedStdout.reset(CreateFileW(
+            outputPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ, &securityAttributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
         THROW_LAST_ERROR_IF(!redirectedStdout);
         stdoutHandle = redirectedStdout.get();
         effectiveCommandLine = std::format(L"{} > {}", commandLine, outputPath->wstring());
