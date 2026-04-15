@@ -21,14 +21,27 @@ namespace {
 
 std::string ResolveCredentialKey(const std::string& serverAddress)
 {
-    // Normalize known Docker Hub aliases to the canonical DefaultServer key,
-    // matching Docker CLI's getAuthConfigKey() behavior.
-    if (serverAddress == "docker.io" || serverAddress == "index.docker.io" || serverAddress == "registry-1.docker.io")
+    auto input = serverAddress;
+
+    // Strip scheme
+    if (auto pos = input.find("://"); pos != std::string::npos)
+    {
+        input = input.substr(pos + 3);
+    }
+
+    // Strip path
+    if (auto pos = input.find('/'); pos != std::string::npos)
+    {
+        input = input.substr(0, pos);
+    }
+
+    // Map Docker Hub aliases to canonical key.
+    if (input == "docker.io" || input == "index.docker.io")
     {
         return wsl::windows::wslc::services::RegistryService::DefaultServer;
     }
 
-    return serverAddress;
+    return input;
 }
 } // namespace
 
