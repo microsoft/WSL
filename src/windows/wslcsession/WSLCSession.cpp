@@ -221,17 +221,17 @@ HANDLE UserHandle::Get() const noexcept
     return m_handle;
 }
 
-UserCOMCallback::UserCOMCallback(WSLCSession& Session) : m_session(&Session), m_threadId(GetCurrentThreadId())
+UserCOMCallback::UserCOMCallback(WSLCSession& Session) noexcept : m_session(&Session), m_threadId(GetCurrentThreadId())
 {
-    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
+    LOG_IF_FAILED(CoEnableCallCancellation(nullptr));
 }
 
-UserCOMCallback::UserCOMCallback(UserCOMCallback&& Other)
+UserCOMCallback::UserCOMCallback(UserCOMCallback&& Other) noexcept
 {
     *this = std::move(Other);
 }
 
-UserCOMCallback& UserCOMCallback::operator=(UserCOMCallback&& Other)
+UserCOMCallback& UserCOMCallback::operator=(UserCOMCallback&& Other) noexcept
 {
     if (this != &Other)
     {
@@ -245,7 +245,7 @@ UserCOMCallback& UserCOMCallback::operator=(UserCOMCallback&& Other)
     return *this;
 }
 
-void UserCOMCallback::Reset()
+void UserCOMCallback::Reset() noexcept
 {
     if (m_threadId != 0)
     {
@@ -254,11 +254,11 @@ void UserCOMCallback::Reset()
         m_session->UnregisterUserCOMCallback(m_threadId);
         m_threadId = 0;
 
-        THROW_IF_FAILED(CoDisableCallCancellation(nullptr));
+        LOG_IF_FAILED(CoDisableCallCancellation(nullptr));
     }
 }
 
-UserCOMCallback::~UserCOMCallback()
+UserCOMCallback::~UserCOMCallback() noexcept
 {
     Reset();
 }
@@ -2226,7 +2226,8 @@ UserCOMCallback WSLCSession::RegisterUserCOMCallback()
     THROW_HR_IF_MSG(
         E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
 
-    m_userCOMCallbackThreads.emplace_back(GetCurrentThreadId());
+    auto [_, inserted] = m_userCOMCallbackThreads.insert(GetCurrentThreadId());
+    WI_ASSERT(inserted);
 
     return UserCOMCallback{*this};
 }

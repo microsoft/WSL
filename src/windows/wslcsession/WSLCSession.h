@@ -53,13 +53,13 @@ class UserCOMCallback
     NON_COPYABLE(UserCOMCallback);
 
 public:
-    UserCOMCallback(WSLCSession& Session);
-    UserCOMCallback(UserCOMCallback&& Other);
+    UserCOMCallback(WSLCSession& Session) noexcept;
+    UserCOMCallback(UserCOMCallback&& Other) noexcept;
 
-    ~UserCOMCallback();
+    ~UserCOMCallback() noexcept;
 
-    UserCOMCallback& operator=(UserCOMCallback&& Other);
-    void Reset();
+    UserCOMCallback& operator=(UserCOMCallback&& Other) noexcept;
+    void Reset() noexcept;
 
 private:
     WSLCSession* m_session{};
@@ -194,7 +194,7 @@ private:
     // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
     // Used by Terminate() to cancel stuck cross-process calls via CoCancelCall().
     std::mutex m_userCOMCallbacksLock;
-    __guarded_by(m_userCOMCallbacksLock) std::vector<DWORD> m_userCOMCallbackThreads;
+    __guarded_by(m_userCOMCallbacksLock) std::set<DWORD> m_userCOMCallbackThreads;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;

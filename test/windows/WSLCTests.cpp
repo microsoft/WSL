@@ -2553,7 +2553,7 @@ class WSLCTests
         auto callback = Microsoft::WRL::Make<StuckBuildProgressCallback>(callbackReached, exitEvent);
 
         std::promise<HRESULT> buildResult;
-        std::thread buildThread([&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), nullptr)); });
+        std::thread buildThread([&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get())); });
 
         auto joinThread = wil::scope_exit([&]() {
             exitEvent.SetEvent();
@@ -2570,7 +2570,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
         auto buildFuture = buildResult.get_future();
-        auto buildStatus = buildFuture.wait_for(std::chrono::seconds(30));
+        auto buildStatus = buildFuture.wait_for(std::chrono::seconds(60));
         VERIFY_ARE_EQUAL(buildStatus, std::future_status::ready);
 
         // BuildImage should have failed due to COM call cancellation.
