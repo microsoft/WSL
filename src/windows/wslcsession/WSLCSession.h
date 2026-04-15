@@ -192,8 +192,7 @@ private:
     __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
 
     // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
-    // Used by Terminate() to cancel stuck cross-process calls via CoCancelCall().
-    std::mutex m_userCOMCallbacksLock;
+    std::recursive_mutex m_userCOMCallbacksLock;
     __guarded_by(m_userCOMCallbacksLock) std::set<DWORD> m_userCOMCallbackThreads;
 
     // Used for testing only.

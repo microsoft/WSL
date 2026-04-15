@@ -223,7 +223,6 @@ HANDLE UserHandle::Get() const noexcept
 
 UserCOMCallback::UserCOMCallback(WSLCSession& Session) noexcept : m_session(&Session), m_threadId(GetCurrentThreadId())
 {
-    LOG_IF_FAILED(CoEnableCallCancellation(nullptr));
 }
 
 UserCOMCallback::UserCOMCallback(UserCOMCallback&& Other) noexcept
@@ -2225,6 +2224,8 @@ UserCOMCallback WSLCSession::RegisterUserCOMCallback()
     // N.B. This check must happen under m_userCOMCallbacksLock to synchronize with Terminate().
     THROW_HR_IF_MSG(
         E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
+
+    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
 
     auto [_, inserted] = m_userCOMCallbackThreads.insert(GetCurrentThreadId());
     WI_ASSERT(inserted);
