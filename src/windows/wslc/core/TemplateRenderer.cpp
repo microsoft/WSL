@@ -24,8 +24,8 @@ using namespace wsl::shared::string;
 
 // Forward declaration of C functions from Go library
 extern "C" {
-    char* RenderGoTemplate(char* templateStr, char* jsonData);
-    void FreeMemory(char* ptr);
+char* RenderGoTemplate(char* templateStr, char* jsonData);
+void FreeMemory(char* ptr);
 }
 
 std::wstring TemplateRenderer::Render(const std::string& templateStr, const std::string& jsonData)

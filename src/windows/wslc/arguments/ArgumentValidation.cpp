@@ -158,7 +158,7 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     {
         return FormatType::Json;
     }
-    
+
     if (IsEqual(input, L"table"))
     {
         return FormatType::Table;
