@@ -2344,6 +2344,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Must provide --username with --password-stdin</value>
     <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
+    <value>Username: </value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
+    <value>Password: </value>
+  </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
     <value>Manage registry credentials.</value>
   </data>

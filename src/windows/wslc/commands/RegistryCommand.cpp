@@ -32,7 +32,7 @@ auto MaskInput()
 
     if ((input != INVALID_HANDLE_VALUE) && GetConsoleMode(input, &mode))
     {
-        SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT);
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(input, mode & ~ENABLE_ECHO_INPUT));
         return wil::scope_exit(std::function<void()>([input, mode] {
             SetConsoleMode(input, mode);
             std::wcerr << L'\n';
@@ -128,7 +128,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
     // Prompt for username if not provided.
     if (!context.Args.Contains(ArgType::Username))
     {
-        context.Args.Add(ArgType::Username, Prompt(L"Username: ", false));
+        context.Args.Add(ArgType::Username, Prompt(Localization::WSLCCLI_LoginUsernamePrompt(), false));
     }
 
     // Resolve password: --password, --password-stdin, or interactive prompt.
@@ -147,7 +147,7 @@ void RegistryLoginCommand::ExecuteInternal(CLIExecutionContext& context) const
         }
         else
         {
-            context.Args.Add(ArgType::Password, Prompt(L"Password: ", true));
+            context.Args.Add(ArgType::Password, Prompt(Localization::WSLCCLI_LoginPasswordPrompt(), true));
         }
     }
 

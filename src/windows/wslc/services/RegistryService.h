@@ -13,15 +13,13 @@ Abstract:
 --*/
 #pragma once
 
+#include "ICredentialStorage.h"
 #include "SessionModel.h"
-#include "WSLCUserSettings.h"
 
 namespace wsl::windows::wslc::services {
 
-using wsl::windows::wslc::settings::CredentialStoreType;
-
-// Credential store that persists opaque credential strings keyed by server address.
-// Supports Windows Credential Manager and DPAPI-encrypted JSON file backends.
+// High-level registry authentication service.
+// Delegates credential persistence to ICredentialStorage (selected via OpenCredentialStorage).
 class RegistryService
 {
 public:
@@ -37,27 +35,6 @@ public:
 
     // Default registry server address used when no explicit server is provided.
     static constexpr auto DefaultServer = "https://index.docker.io/v1/";
-
-private:
-    static std::wstring WinCredTargetName(const std::string& serverAddress);
-
-    // WinCred helpers
-    static void WinCredStoreCredential(const std::string& serverAddress, const std::string& credential);
-    static std::optional<std::string> WinCredGetCredential(const std::string& serverAddress);
-    static void WinCredEraseCredential(const std::string& serverAddress);
-    static std::vector<std::wstring> WinCredListCredentials();
-
-    // File backend helpers
-    static std::string Protect(const std::string& plaintext);
-    static std::string Unprotect(const std::string& cipherBase64);
-
-    static void ModifyFileStore(wil::unique_hfile handle, const std::function<bool(nlohmann::json&)>& modifier);
-    static nlohmann::json ReadFileStore();
-
-    static void FileStoreCredential(const std::string& serverAddress, const std::string& credential);
-    static std::optional<std::string> FileGetCredential(const std::string& serverAddress);
-    static void FileEraseCredential(const std::string& serverAddress);
-    static std::vector<std::wstring> FileListCredentials();
 };
 
 } // namespace wsl::windows::wslc::services

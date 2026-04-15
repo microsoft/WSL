@@ -66,22 +66,9 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
 
 std::string GetServerFromImage(const std::string& image)
 {
-    // Extract the registry domain from an image reference.
-    // Follows the same logic as Docker's splitDockerDomain in distribution/reference:
-    // If the part before the first '/' contains a '.' or ':', or is "localhost",
-    // it's treated as a registry domain. Otherwise it's a Docker Hub repo path.
-    auto slash = image.find('/');
-    if (slash != std::string::npos)
-    {
-        auto candidate = image.substr(0, slash);
-        if (candidate.find('.') != std::string::npos || candidate.find(':') != std::string::npos || candidate == "localhost")
-        {
-            return candidate;
-        }
-    }
-
-    // TODO: Get default server from the daemon's /info through the wslc session
-    return std::string(wsl::windows::wslc::services::RegistryService::DefaultServer);
+    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
+    return server;
 }
 
 } // namespace
