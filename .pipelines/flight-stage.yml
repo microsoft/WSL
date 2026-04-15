@@ -14,9 +14,9 @@ parameters:
 stages:
   - stage: flight
     ${{ if eq(parameters.bypassTests, true) }}:
-        dependsOn: [build]
+        dependsOn: [package]
     ${{ else }}:
-        dependsOn: [test]
+        dependsOn: [test, package]
 
     jobs:
     - job: flight
@@ -30,7 +30,6 @@ stages:
         FlightId: $(StoreBrokerFlightId)
         StoreBrokerPath: $(Build.SourcesDirectory)\storebroker # location of StoreBroker information in the repo
         StoreBrokerPayloadPath: $(Build.ArtifactStagingDirectory)\StoreBrokerPayload # location of package created for flight
-        WSL_PACKAGE_VERSION: $[ dependencies.build.outputs['version.WSL_PACKAGE_VERSION'] ]
         ob_outputDirectory: '$(Build.SourcesDirectory)\out'
         ob_artifactBaseName: 'drop_wsl'
         ob_artifactSuffix: '_flight'
@@ -55,9 +54,9 @@ stages:
 
       # Download the build drop
       - task: DownloadPipelineArtifact@2
-        displayName: Download Bundle artifact
+        displayName: Download package artifact
         inputs:
-          artifact: "drop_wsl_build"
+          artifact: "drop_wsl_package"
           path: drop
 
       # copy the appxupload folder to the storebroker folder

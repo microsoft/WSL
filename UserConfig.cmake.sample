@@ -44,3 +44,9 @@ endif()
 
 # # Uncomment to reduce the verbosity of the appx package build
 # set(WSL_SILENT_APPX_BUILD true)
+
+# # Uncomment to change the pre-commit hook behavior (default: warn)
+# #   warn  - report formatting issues without blocking the commit
+# #   error - block the commit when formatting issues are found
+# #   fix   - automatically fix formatting and re-stage files
+# set(WSL_PRE_COMMIT_MODE "warn")
