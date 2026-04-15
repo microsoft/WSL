@@ -14,14 +14,15 @@ Abstract:
 #pragma once
 #include <windows.h>
 #include "wslcsdk.h"
-#include "wslaservice.h"
+#include "wslc.h"
+#include "IOCallback.h"
 #include <stdint.h>
 #include <wil/com.h> // COM helpers
 // #include <wil/resource.h> // handle wrappers
 // #include <wil/result.h>   // error handling
 
 // SESSION DEFINITIONS
-typedef struct WSLC_SESSION_OPTIONS_INTERNAL
+typedef struct WslcSessionOptionsInternal
 {
     PCWSTR displayName;
     PCWSTR storagePath;
@@ -34,42 +35,46 @@ typedef struct WSLC_SESSION_OPTIONS_INTERNAL
     WslcSessionFeatureFlags featureFlags;
     WslcSessionTerminationCallback terminationCallback;
     PVOID terminationCallbackContext;
-} WSLC_SESSION_OPTIONS_INTERNAL;
+} WslcSessionOptionsInternal;
 
-static_assert(sizeof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
+static_assert(sizeof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
 
 static_assert(
-    __alignof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_ALIGNMENT,
-    "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
+    __alignof(WslcSessionOptionsInternal) == WSLC_SESSION_OPTIONS_ALIGNMENT, "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
 
-static_assert(std::is_trivial_v<WSLC_SESSION_OPTIONS_INTERNAL>, "WSLC_SESSION_OPTIONS_INTERNAL must be trivial");
+static_assert(std::is_trivial_v<WslcSessionOptionsInternal>, "WSLC_SESSION_OPTIONS_INTERNAL must be trivial");
 
-WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings);
+WslcSessionOptionsInternal* GetInternalType(WslcSessionSettings* settings);
+
+struct WslcContainerProcessIOCallbackOptions : public WslcProcessCallbacks
+{
+    PVOID callbackContext;
+};
 
 // PROCESS DEFINITIONS
-typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
+typedef struct WslcContainerProcessOptionsInternal
 {
     PCSTR const* commandLine;
     uint32_t commandLineCount;
     PCSTR const* environment;
     uint32_t environmentCount;
     PCSTR currentDirectory;
-} WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL;
+    WslcContainerProcessIOCallbackOptions ioCallbacks;
+} WslcContainerProcessOptionsInternal;
 
 static_assert(
-    sizeof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
-    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 48 bytes");
+    sizeof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL size mismatch");
 static_assert(
-    __alignof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
-    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
+    __alignof(WslcContainerProcessOptionsInternal) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL alignment mismatch");
 
-static_assert(
-    std::is_trivial_v<WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
+static_assert(std::is_trivial_v<WslcContainerProcessOptionsInternal>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
 
-WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* GetInternalType(WslcProcessSettings* settings);
+WslcContainerProcessOptionsInternal* GetInternalType(WslcProcessSettings* settings);
 
 // CONTAINER DEFINITIONS
-typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
+typedef struct WslcContainerOptionsInternal
 {
     PCSTR image;       // Image name (repository:tag)
     PCSTR runtimeName; // Container runtime name (expected to allow DNS resolution between containers)
@@ -79,26 +84,29 @@ typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
     uint32_t portsCount;
     const WslcContainerVolume* volumes;
     uint32_t volumesCount;
-    const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions;
-    WslcContainerNetworkingMode networking;
+    const WslcContainerNamedVolume* namedVolumes;
+    uint32_t namedVolumesCount;
+    const WslcContainerProcessOptionsInternal* initProcessOptions;
+    WSLCContainerNetworkType networking;
     WslcContainerFlags containerFlags;
 
-} WSLC_CONTAINER_OPTIONS_INTERNAL;
+} WslcContainerOptionsInternal;
 
 static_assert(
-    sizeof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL must be 80 bytes");
+    sizeof(WslcContainerOptionsInternal) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL size mismatch");
 static_assert(
-    __alignof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
-    "WSLC_CONTAINER_OPTIONS_INTERNAL must be 8-byte aligned");
+    __alignof(WslcContainerOptionsInternal) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
+    "WSLC_CONTAINER_OPTIONS_INTERNAL alignment mismatch");
 
-static_assert(std::is_trivial_v<WSLC_CONTAINER_OPTIONS_INTERNAL>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
+static_assert(std::is_trivial_v<WslcContainerOptionsInternal>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
 
-WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings);
+WslcContainerOptionsInternal* GetInternalType(WslcContainerSettings* settings);
+const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings* settings);
 
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLASession> session;
+    wil::com_ptr<IWSLCSession> session;
     wil::com_ptr<ITerminationCallback> terminationCallback;
 };
 
@@ -106,14 +114,17 @@ WslcSessionImpl* GetInternalType(WslcSession handle);
 
 struct WslcContainerImpl
 {
-    wil::com_ptr<IWSLAContainer> container;
+    wil::com_ptr<IWSLCContainer> container;
+    WslcContainerProcessIOCallbackOptions ioCallbackOptions{};
+    std::atomic<std::shared_ptr<IOCallback>> ioCallbacks;
 };
 
 WslcContainerImpl* GetInternalType(WslcContainer handle);
 
 struct WslcProcessImpl
 {
-    wil::com_ptr<IWSLAProcess> process;
+    wil::com_ptr<IWSLCProcess> process;
+    std::shared_ptr<IOCallback> ioCallbacks;
 };
 
 WslcProcessImpl* GetInternalType(WslcProcess handle);

@@ -41,7 +41,7 @@ Notable ETL providers:
 - `Microsoft.Windows.Plan9.Server`: Logs from the Windows plan9 server (used when accessing /mnt/ shares and running Windows)
 
 
-On the Linux side, the easiest way to access logs is to look at `dmesg` or use the debug console, which can enabled by writing:
+On the Linux side, the easiest way to access logs is to look at `dmesg` or use the debug console, which can be enabled by writing:
 
 ```
 [wsl2]
@@ -65,7 +65,7 @@ Once started, just use `dir /path/to/wsl/source` in gdb to connect the source fi
 
 ## Root namespace debugging
 
-Some WSL process such as `gns` or `mini_init` aren't accessible from within WSL distributions. To attach a debugger to those, use the debug shell via:
+Some WSL processes such as `gns` or `mini_init` aren't accessible from within WSL distributions. To attach a debugger to those, use the debug shell via:
 
 ```
 wsl --debug-shell

@@ -12,16 +12,16 @@ Abstract:
 
 --*/
 #include <precomp.h>
-#include <WSLAProcessLauncher.h>
+#include <WSLCProcessLauncher.h>
 #include "ConsoleService.h"
 
 namespace wsl::windows::wslc::services {
 
-using wsl::windows::common::ClientRunningWSLAProcess;
+using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 
-static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh = false)
+bool ConsoleService::RelayInteractiveTty(ClientRunningWSLCProcess& Process, HANDLE Tty, bool triggerRefresh)
 {
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
@@ -39,6 +39,8 @@ static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
 
     wil::unique_event exitEvent(wil::EventOptions::ManualReset);
 
+    bool completed = false;
+
     // Create a thread to relay stdin to the pipe.
     std::thread inputThread([&]() {
         auto updateTerminal = [&console, &Process]() {
@@ -46,7 +48,11 @@ static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
             LOG_IF_FAILED(Process.Get().ResizeTty(windowSize.Y, windowSize.X));
         };
 
-        wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), Tty, updateTerminal, exitEvent.get());
+        // TODO: Make this configurable (default to ctrl-p, ctrl-q).
+        std::vector<char> detachSequence{0x10, 0x11};
+
+        completed = wsl::windows::common::relay::StandardInputRelay(
+            GetStdHandle(STD_INPUT_HANDLE), Tty, updateTerminal, exitEvent.get(), detachSequence);
     });
 
     auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -56,9 +62,13 @@ static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
 
     // Relay the contents of the pipe to stdout.
     wsl::windows::common::relay::InterruptableRelay(Tty, GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
+
+    joinThread.reset();
+
+    return completed;
 }
 
-static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
+void ConsoleService::RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
 {
     wsl::windows::common::relay::MultiHandleWait io;
 
@@ -77,25 +87,19 @@ static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& 
 
     if (Stdin.is_valid())
     {
-        // Required because ReadFile() blocks if stdin is a tty.
-        if (wsl::windows::common::wslutil::IsInteractiveConsole())
-        {
-            // TODO: Will output CR instead of LF's which can confuse the linux app.
-            // Consider a custom relay logic to fix this.
-            inputThread = std::thread{[&]() {
-                try
-                {
-                    wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
-                }
-                CATCH_LOG();
+        // Required because ReadFile() blocks if stdin doesn't support overlapped IO.
+        // This can create pipe deadlocks if we get blocked reading stdin while data is available on stdout / stderr.
+        // TODO: Will output CR instead of LF's which can confuse the linux app.
+        // Consider a custom relay logic to fix this.
+        inputThread = std::thread{[&]() {
+            try
+            {
+                wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
+            }
+            CATCH_LOG();
 
-                Stdin.reset();
-            }};
-        }
-        else
-        {
-            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), std::move(Stdin)));
-        }
+            Stdin.reset();
+        }};
     }
 
     io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
@@ -104,21 +108,25 @@ static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& 
     io.Run({});
 }
 
-int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWSLAProcess&& process)
+int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWSLCProcess&& process)
 {
-    if (WI_IsFlagSet(process.Flags(), WSLAProcessFlagsTty))
+    if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsTty))
     {
-        RelayInteractiveTty(process, process.GetStdHandle(WSLAFDTty).get());
+        if (!RelayInteractiveTty(process, process.GetStdHandle(WSLCFDTty).get()))
+        {
+            wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
+            return 0;
+        }
     }
     else
     {
         wil::unique_handle stdinHandle;
-        if (WI_IsFlagSet(process.Flags(), WSLAProcessFlagsStdin))
+        if (WI_IsFlagSet(process.Flags(), WSLCProcessFlagsStdin))
         {
-            stdinHandle = process.GetStdHandle(WSLAFDStdin);
+            stdinHandle = process.GetStdHandle(WSLCFDStdin);
         }
 
-        RelayNonTtyProcess(std::move(stdinHandle), process.GetStdHandle(WSLAFDStdout), process.GetStdHandle(WSLAFDStderr));
+        RelayNonTtyProcess(std::move(stdinHandle), process.GetStdHandle(WSLCFDStdout), process.GetStdHandle(WSLCFDStderr));
     }
 
     return process.Wait();

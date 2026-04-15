@@ -32,7 +32,7 @@ Thank you in advance for your contribution! We appreciate your help in making WS
 ## Notes for collecting WSL logs
 
 ### Important: Reporting BSODs and Security issues
-**Do not open GitHub issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
+**Do not open GitHub issues for Windows crashes (BSODs) or security issues.** Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
 See the `10) Reporting a Windows crash (BSOD)` section below for detailed instructions.
 
 ### Reporting issues in Windows Console or WSL text rendering/user experience
@@ -40,12 +40,12 @@ Note that WSL distro's launch in the Windows Console (unless you have taken step
 
 ### Collect WSL logs for networking issues
 
-Install tcpdump in your WSL distribution using the following commands.
+Install iptables and tcpdump in your WSL distribution using the following commands.
 Note: This will not work if WSL has Internet connectivity issues.
 
 ```
 # sudo apt-get update
-# sudo apt-get -y install tcpdump
+# sudo apt-get -y install iptables tcpdump
 ```
 
 Install [WPR](https://learn.microsoft.com/windows-hardware/test/wpt/windows-performance-recorder)

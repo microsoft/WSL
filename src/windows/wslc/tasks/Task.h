@@ -31,16 +31,18 @@ struct Task
     {
     }
 
+    Task() = default;
+    virtual ~Task() = default;
+
     Task(const Task&) = default;
     Task& operator=(const Task&) = default;
-
-    void operator()(CLIExecutionContext& context) const
+    virtual void operator()(CLIExecutionContext& context) const
     {
         m_func(context);
     }
 
 private:
-    Func m_func;
+    Func m_func = nullptr;
 };
 
 inline CLIExecutionContext& operator<<(CLIExecutionContext& context, const Task& task)

@@ -1,6 +1,6 @@
 # Relay
 
-Relay is a WSL2 linux process created by a [session leader](session-leader.md). Its job is to create a linux process on behalf of the user, and relay its output back to Windows. 
+Relay is a WSL2 Linux process created by a [session leader](session-leader.md). Its job is to create a Linux process on behalf of the user, and relay its output back to Windows. 
 
 ## Creating a user process
 
@@ -10,7 +10,7 @@ These channels are used to:
 
 - Relay standard file descriptors (stdin, stdout, stderr)
 - Relay information about the terminal (for instance when the terminal window is resized from Windows)
-- Notify Windows when the linux process exits
+- Notify Windows when the Linux process exits
 
 Once those channels are configured, the `relay` forks() into two processes: 
 

@@ -21,6 +21,7 @@ Abstract:
 #include "config.h"
 #include "message.h"
 #include <cassert>
+#include <filesystem>
 #include <optional>
 
 using namespace std::chrono_literals;
@@ -32,6 +33,8 @@ using namespace std::chrono_literals;
 #define PLAN9_SYMLINK_ROOT_OPTION "symlinkroot="
 #define PLAN9_UNC_PREFIX_LENGTH (2)
 
+#define VIRTIOFS_TAG_DIR "/run/wsl/virtiofs"
+
 #define LOG_STDERR(_errno) fprintf(stderr, "mount: %s\n", strerror(_errno))
 
 constexpr int c_exitCodeInvalidUsage = 1;
@@ -40,6 +43,62 @@ constexpr int c_exitCodeMountFail = 32;
 int MountFilesystem(const char* FsType, const char* Source, const char* Target, const char* Options, int* ExitCode = nullptr);
 
 int MountWithRetry(const char* Source, const char* Target, const char* FsType, const char* Options, int* ExitCode = nullptr);
+
+void SaveVirtiofsTagMapping(const char* Tag, const char* Source)
+
+/*++
+
+Routine Description:
+
+    This routine creates a symlink in VIRTIOFS_TAG_DIR that maps a virtiofs tag
+    to its Windows mount source path. This allows QueryVirtiofsMountSource to
+    resolve tags without talking to the service.
+
+Arguments:
+
+    Tag - Supplies the virtiofs tag.
+
+    Source - Supplies the Windows path the tag refers to.
+
+Return Value:
+
+    None.
+
+--*/
+
+{
+    //
+    // Validate the tag is a GUID to prevent path traversal.
+    //
+
+    const auto Guid = wsl::shared::string::ToGuid(Tag);
+    if (!Guid)
+    {
+        LOG_WARNING("Invalid virtiofs tag {}", Tag);
+        return;
+    }
+
+    //
+    // Canonicalize path separators to backslashes before persisting.
+    //
+
+    std::string CanonicalSource{Source};
+    UtilCanonicalisePathSeparator(CanonicalSource, PATH_SEP_NT);
+
+    UtilMkdirPath(VIRTIOFS_TAG_DIR, 0755);
+
+    auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
+
+    //
+    // Remove any existing symlink for this tag before creating a new one.
+    //
+
+    unlink(LinkPath.c_str());
+    if (symlink(CanonicalSource.c_str(), LinkPath.c_str()) < 0)
+    {
+        LOG_WARNING("Failed to create virtiofs tag symlink {} -> {}: {}", LinkPath, CanonicalSource, errno);
+    }
+}
 
 std::pair<std::string, std::string> ConvertDrvfsMountOptionsToPlan9(std::string_view Options, const wsl::linux::WslDistributionConfig& Config)
 
@@ -565,7 +624,18 @@ try
     //
 
     auto* Tag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
-    return MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode);
+    auto* ResponseSource = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
+    THROW_LAST_ERROR_IF(MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, MountOptions.c_str(), ExitCode) < 0);
+
+    //
+    // Save the tag mapping.
+    //
+    // N.B. Use the source path from the response since the service canonicalizes it.
+    //
+
+    SaveVirtiofsTagMapping(Tag, ResponseSource);
+
+    return 0;
 }
 CATCH_RETURN_ERRNO()
 
@@ -620,8 +690,13 @@ try
         return -1;
     }
 
-    Tag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
-    return MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, Options);
+    auto* NewTag = wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
+    auto* Source = wsl::shared::string::FromSpan(ResponseSpan, Response.SourceOffset);
+    THROW_LAST_ERROR_IF(MountWithRetry(NewTag, Target, VIRTIO_FS_TYPE, Options) < 0);
+
+    SaveVirtiofsTagMapping(NewTag, Source);
+
+    return 0;
 }
 CATCH_RETURN_ERRNO()
 
@@ -631,7 +706,8 @@ std::string QueryVirtiofsMountSource(const char* Tag)
 
 Routine Description:
 
-    This routine takes a virtiofs tag and determines the Windows path it refers to.
+    This routine takes a virtiofs tag and determines the Windows path it refers to
+    by reading the symlink created during mount.
 
 Arguments:
 
@@ -660,28 +736,12 @@ try
         return {};
     }
 
-    wsl::shared::MessageWriter<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE> QueryShare(LxInitMessageQueryVirtioFsDevice);
-    QueryShare.WriteString(QueryShare->TagOffset, Tag);
-
     //
-    // Connect to the host and send the query request.
+    // Read the symlink that maps this tag to its Windows source path.
     //
 
-    wsl::shared::SocketChannel Channel{UtilConnectVsock(LX_INIT_UTILITY_VM_VIRTIOFS_PORT, true), "QueryVirtioFs"};
-    if (Channel.Socket() < 0)
-    {
-        return {};
-    }
-
-    gsl::span<gsl::byte> ResponseSpan;
-    const auto& Response = Channel.Transaction<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE>(QueryShare.Span(), &ResponseSpan);
-    if (Response.Result != 0)
-    {
-        LOG_ERROR("Query virtiofs share for {} failed {}", Tag, Response.Result);
-        return {};
-    }
-
-    return wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
+    auto LinkPath = std::format("{}/{}", VIRTIOFS_TAG_DIR, Tag);
+    return std::filesystem::read_symlink(LinkPath).string();
 }
 catch (...)
 {

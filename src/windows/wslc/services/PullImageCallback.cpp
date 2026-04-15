@@ -15,15 +15,19 @@ Abstract:
 #include "precomp.h"
 #include "PullImageCallback.h"
 #include "ImageService.h"
-#include "TablePrinter.h"
 #include <format>
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 
-ChangeTerminalMode::ChangeTerminalMode(HANDLE console, bool cursorVisible)
+ChangeTerminalMode::ChangeTerminalMode(HANDLE console, bool cursorVisible) : m_console(console)
 {
-    m_console = console;
+    if (!wsl::windows::common::wslutil::IsConsoleHandle(console))
+    {
+        m_console = nullptr;
+        return;
+    }
+
     THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(console, &m_originalCursorInfo));
     CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
     newCursorInfo.bVisible = cursorVisible;
@@ -32,7 +36,10 @@ ChangeTerminalMode::ChangeTerminalMode(HANDLE console, bool cursorVisible)
 
 ChangeTerminalMode::~ChangeTerminalMode()
 {
-    LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    if (m_console)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    }
 }
 
 auto PullImageCallback::MoveToLine(SHORT line)
@@ -54,6 +61,11 @@ HRESULT PullImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG curren
 {
     try
     {
+        if (!m_terminalMode.IsConsole())
+        {
+            return S_OK;
+        }
+
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
             wprintf(L"%hs\n", status);

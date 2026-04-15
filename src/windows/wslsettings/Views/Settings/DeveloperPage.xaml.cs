@@ -33,6 +33,7 @@ public sealed partial class DeveloperPage : Page
 
     private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+        DeveloperPageRoot.Focus(FocusState.Programmatic);
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomKernelPathExpander", "CustomKernelPathTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomKernelModulesPathExpander", "CustomKernelModulesPathTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomSystemDistroPathExpander", "CustomSystemDistroPathTextBox");

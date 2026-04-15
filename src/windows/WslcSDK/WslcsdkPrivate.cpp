@@ -15,19 +15,24 @@ Abstract:
 
 #include "wslcsdkprivate.h"
 
-WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings)
+WslcSessionOptionsInternal* GetInternalType(WslcSessionSettings* settings)
 {
-    return reinterpret_cast<WSLC_SESSION_OPTIONS_INTERNAL*>(settings);
+    return reinterpret_cast<WslcSessionOptionsInternal*>(settings);
 }
 
-WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* GetInternalType(WslcProcessSettings* settings)
+WslcContainerProcessOptionsInternal* GetInternalType(WslcProcessSettings* settings)
 {
-    return reinterpret_cast<WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL*>(settings);
+    return reinterpret_cast<WslcContainerProcessOptionsInternal*>(settings);
 }
 
-WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings)
+WslcContainerOptionsInternal* GetInternalType(WslcContainerSettings* settings)
 {
-    return reinterpret_cast<WSLC_CONTAINER_OPTIONS_INTERNAL*>(settings);
+    return reinterpret_cast<WslcContainerOptionsInternal*>(settings);
+}
+
+const WslcContainerOptionsInternal* GetInternalType(const WslcContainerSettings* settings)
+{
+    return reinterpret_cast<const WslcContainerOptionsInternal*>(settings);
 }
 
 WslcSessionImpl* GetInternalType(WslcSession handle)

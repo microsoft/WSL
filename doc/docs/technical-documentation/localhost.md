@@ -1,6 +1,6 @@
 # Localhost
 
-`localhost` is a WSL2 linux process, created by [mini_init](mini_init.md). Its role is to forward network traffic between the WSL2 virtual machine, and Windows.
+`localhost` is a WSL2 Linux process, created by [mini_init](mini_init.md). Its role is to forward network traffic between the WSL2 virtual machine, and Windows.
 
 
 ## NAT networking 

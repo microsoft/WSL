@@ -2,7 +2,6 @@ import requests
 import json
 import sys
 import hashlib
-import base64
 import difflib
 from urllib.request import urlretrieve
 from xml.etree import ElementTree

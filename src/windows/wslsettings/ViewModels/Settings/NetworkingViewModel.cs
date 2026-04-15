@@ -136,7 +136,14 @@ public partial class NetworkingViewModel : WslConfigSettingViewModel
         {
             if (ValidateInput(value, Constants.IntegerRegex))
             {
-                Set(ref _initialAutoProxyTimeout!, Convert.ToInt32(value));
+                if (Int32.TryParse(value, out int parsedValue))
+                {
+                    Set(ref _initialAutoProxyTimeout!, parsedValue);
+                }
+                else
+                {
+                    OnPropertyChanged();
+                }
             }
         }
     }

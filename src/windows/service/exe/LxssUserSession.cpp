@@ -1737,11 +1737,15 @@ try
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
     const wil::unique_hfile vhd{::CreateFileW(configuration.VhdFilePath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
-    if (const DWORD err = GetLastError(); err == ERROR_SHARING_VIOLATION)
+    if (!vhd)
     {
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(err), wsl::shared::Localization::MessageVhdInUse());
+        const DWORD err = GetLastError();
+        if (err == ERROR_SHARING_VIOLATION)
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(err), wsl::shared::Localization::MessageVhdInUse());
+        }
+        THROW_WIN32(err);
     }
-    THROW_LAST_ERROR_IF(!vhd);
 
     FILE_SET_SPARSE_BUFFER buffer{
         .SetSparse = Sparse,
@@ -1949,7 +1953,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
             wsl::windows::common::relay::ScopedMultiRelay stdErrRelay(
-                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE*>(vmContext.errorSocket.get())}, onTarOutput);
+                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE>(vmContext.errorSocket.get())}, onTarOutput);
 
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
@@ -2014,7 +2018,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
             wsl::windows::common::relay::ScopedMultiRelay stdErrRelay(
-                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE*>(vmContext.errorSocket.get())}, onTarOutput);
+                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE>(vmContext.errorSocket.get())}, onTarOutput);
 
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
@@ -3783,11 +3787,12 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
 
         if (Name != nullptr && wsl::shared::string::IsEqual(Name, configuration.Name, true))
         {
-            THROW_HR_MSG(
-                (configuration.State == LxssDistributionStateInstalled) ? HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) : E_ILLEGAL_STATE_CHANGE,
-                "%ls already registered (state = %d)",
-                Name,
-                configuration.State);
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
+                wsl::shared::Localization::MessageDistroNameAlreadyExists(),
+                configuration.State == LxssDistributionStateInstalled);
+
+            THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "%ls already registered (state = %d)", Name, configuration.State);
         }
 
         if (Path != nullptr)
@@ -3799,8 +3804,9 @@ void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
             }
 
             // Ensure another distribution by a different name is not already registered to the same location.
-            THROW_HR_IF(
+            THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),
+                wsl::shared::Localization::MessageDistroInstallPathAlreadyExists(),
                 wsl::windows::common::string::IsPathComponentEqual(error ? configuration.BasePath.native() : canonicalDistroPath.native(), Path));
         }
     }

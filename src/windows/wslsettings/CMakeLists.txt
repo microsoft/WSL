@@ -19,6 +19,7 @@ file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/wslbw.ico ${BIN}/${TargetApp}/Assets
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEDockerIcon.png ${BIN}/${TargetApp}/Assets/SettingsOOBEDockerIcon.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEFileExplorerIcon.png ${BIN}/${TargetApp}/Assets/SettingsOOBEFileExplorerIcon.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEVSCodeIcon.png ${BIN}/${TargetApp}/Assets/SettingsOOBEVSCodeIcon.png)
+file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEVSIcon.png ${BIN}/${TargetApp}/Assets/SettingsOOBEVSIcon.png)
 
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBECrossOSFileAccess.gif ${BIN}/${TargetApp}/Assets/SettingsOOBECrossOSFileAccess.gif)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEDistroManagement.png ${BIN}/${TargetApp}/Assets/SettingsOOBEDistroManagement.png)
@@ -28,6 +29,7 @@ file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEGPUAcceleration.gif ${BI
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEGUIApps.png ${BIN}/${TargetApp}/Assets/SettingsOOBEGUIApps.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBENetworkingIntegration.png ${BIN}/${TargetApp}/Assets/SettingsOOBENetworkingIntegration.png)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEVSCodeIntegration.png ${BIN}/${TargetApp}/Assets/SettingsOOBEVSCodeIntegration.png)
+file(CREATE_LINK ${CMAKE_SOURCE_DIR}/images/SettingsOOBEVSIntegration.png ${BIN}/${TargetApp}/Assets/SettingsOOBEVSIntegration.png)
 
 file(GLOB STRINGS ${CMAKE_SOURCE_DIR}/localization/strings/**/*.resw)
 
@@ -83,6 +85,7 @@ add_executable(
   ViewModels/OOBE/GUIAppsViewModel.cs
   ViewModels/OOBE/NetworkingIntegrationViewModel.cs
   ViewModels/OOBE/VSCodeIntegrationViewModel.cs
+  ViewModels/OOBE/VSIntegrationViewModel.cs
   ViewModels/OOBE/WorkingAcrossFileSystemsViewModel.cs
   ViewModels/Settings/AboutViewModel.cs
   ViewModels/Settings/DeveloperViewModel.cs
@@ -108,6 +111,8 @@ add_executable(
   Views/OOBE/ShellPage.xaml.cs
   Views/OOBE/VSCodeIntegrationPage.xaml
   Views/OOBE/VSCodeIntegrationPage.xaml.cs
+  Views/OOBE/VSIntegrationPage.xaml
+  Views/OOBE/VSIntegrationPage.xaml.cs
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml.cs
   Views/Settings/AboutPage.xaml
@@ -158,6 +163,8 @@ csharp_set_xaml_cs_properties(
   Views/OOBE/ShellPage.xaml.cs
   Views/OOBE/VSCodeIntegrationPage.xaml
   Views/OOBE/VSCodeIntegrationPage.xaml.cs
+  Views/OOBE/VSIntegrationPage.xaml
+  Views/OOBE/VSIntegrationPage.xaml.cs
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml
   Views/OOBE/WorkingAcrossFileSystemsPage.xaml.cs
   Views/Settings/AboutPage.xaml

@@ -1,6 +1,6 @@
 # Plan 9
 
-Plan9 is a linux process that hosts a plan9 filesystem server for WSL1 and WSL2 distributions. It's created by [init](init.md) in each distribution.
+Plan9 is a Linux process that hosts a plan9 filesystem server for WSL1 and WSL2 distributions. It's created by [init](init.md) in each distribution.
 
 ## WSL 1 
 

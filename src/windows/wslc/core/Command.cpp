@@ -21,7 +21,6 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
-constexpr std::wstring_view s_ExecutableName = L"wslc";
 
 Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
     m_name(name), m_aliases(std::move(aliases))
@@ -39,17 +38,13 @@ Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliase
     }
 }
 
-// This is the header applied before every help output, for product and copyright information.
+// This is the header applied before every help output.
 // It is separate in case we need to show it in other contexts, such as error messages, or
 // during specific command executions.
 void Command::OutputIntroHeader() const
 {
-    // Placeholder header.
-    // TODO: Get better product version information dynamically instead of hardcoding it here.
-    // TODO: Strings should be in resources.
     std::wostringstream infoOut;
-    infoOut << L"Windows Subsystem for Linux Container CLI (Preview) v1.0.0" << std::endl;
-    infoOut << L"Copyright (c) Microsoft Corporation. All rights reserved." << std::endl;
+    infoOut << Localization::WSLCCLI_CopyrightHeader() << std::endl;
     PrintMessage(infoOut.str(), stdout);
 }
 

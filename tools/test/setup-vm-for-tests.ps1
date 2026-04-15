@@ -98,12 +98,12 @@ $Platform = switch ($Arch) {
 
 if ([string]::IsNullOrEmpty($TestDistroPath)) {
     $TestDistroVersion = (Select-Xml -Path "$PSScriptRoot\..\..\packages.config" -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
-    $TestDistroPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz"
+    $TestDistroPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestDistro.$TestDistroVersion\$Platform\test_distro.tar.xz"
 }
 
 if ([string]::IsNullOrEmpty($TestDataPath)) {
     $TestDataVersion = (Select-Xml -Path "$PSScriptRoot\..\..\packages.config" -XPath '/packages/package[@id=''Microsoft.WSL.TestData'']/@version').Node.Value
-    $TestDataPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestData.$TestDataVersion\build\native\bin\x64"
+    $TestDataPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestData.$TestDataVersion\$Platform"
 }
 
 if ([string]::IsNullOrEmpty($ArtifactFolder)) {
@@ -139,6 +139,7 @@ Invoke-Command -Session $Session -ArgumentList $RemoteFolder -ScriptBlock {
 }
 Copy-Item -ToSession $Session -Path "$Bin/installer.msix"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$Bin/wsltests.dll"  -Destination $RemoteFolder -Force
+Copy-Item -ToSession $Session -Path "$Bin/wslcsdk.dll"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$Bin/testplugin.dll"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$PSScriptRoot/test-setup.ps1"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$PSScriptRoot/run-tests.ps1"  -Destination $RemoteFolder -Force

@@ -24,7 +24,6 @@ Abstract:
 #include <gslhelpers.h>
 #include "registry.hpp"
 #include "versionhelpers.h"
-#include "hcs.hpp"
 #include <regstr.h>
 
 // Version numbers for various functionality that was backported.
@@ -275,16 +274,6 @@ wsl::windows::common::helpers::unique_proc_attribute_list wsl::windows::common::
     return List;
 }
 
-[[nodiscard]] HANDLE wsl::windows::common::helpers::DuplicateHandle(_In_ HANDLE Handle, _In_ DWORD DesiredAccess, _In_ BOOL InheritHandle, _In_ DWORD Options)
-{
-    // N.B. This function does not return a wil::unique_handle so that the caller
-    //      can pick its own desired type (e.g. wil::unique_event).
-    HANDLE Result;
-    THROW_IF_WIN32_BOOL_FALSE(::DuplicateHandle(GetCurrentProcess(), Handle, GetCurrentProcess(), &Result, DesiredAccess, InheritHandle, Options));
-
-    return Result;
-}
-
 std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessage(
     _In_ const std::wstring& DistributionName,
     _In_ ULONG FixedDrivesBitmap,
@@ -466,14 +455,6 @@ std::filesystem::path wsl::windows::common::helpers::GetWslConfigPath(_In_opt_ H
     return wsl::windows::common::helpers::GetUserProfilePath(userToken) / L".wslconfig";
 }
 
-bool wsl::windows::common::helpers::IsDisableVgpuSettingsSupported()
-{
-    static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
-
-    // See if the Windows version has the required platform change.
-    return ((wsl::windows::common::hcs::GetSchemaVersion() >= c_schemaVersionNickel) && (GetWindowsVersion().BuildNumber >= 22545));
-}
-
 bool wsl::windows::common::helpers::IsPackageInstalled(_In_ LPCWSTR PackageFamilyName)
 {
     UINT32 packageCount = 0;
@@ -492,6 +473,29 @@ bool wsl::windows::common::helpers::IsServicePresent(_In_ LPCWSTR ServiceName)
 
     const wil::unique_schandle service{OpenService(manager.get(), ServiceName, SERVICE_QUERY_CONFIG)};
     return !!service;
+}
+
+bool wsl::windows::common::helpers::IsServiceRunning(_In_ LPCWSTR ServiceName)
+{
+    const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    if (!manager)
+    {
+        return false;
+    }
+
+    const wil::unique_schandle service{OpenServiceW(manager.get(), ServiceName, SERVICE_QUERY_STATUS)};
+    if (!service)
+    {
+        return false;
+    }
+
+    SERVICE_STATUS status;
+    if (!QueryServiceStatus(service.get(), &status))
+    {
+        return false;
+    }
+
+    return status.dwCurrentState != SERVICE_STOPPED;
 }
 
 bool wsl::windows::common::helpers::IsVirtioSerialConsoleSupported()
@@ -708,3 +712,21 @@ bool wsl::windows::common::helpers::TryAttachConsole()
 
     return ReopenStdHandles();
 }
+
+void wsl::windows::common::helpers::RegisterWithDcat(_In_ bool IncludeVersionNumber)
+try
+{
+    std::wstring registeredVersion;
+    if (IncludeVersionNumber)
+    {
+        registeredVersion.assign(TEXT(WSL_PACKAGE_VERSION));
+    }
+    else
+    {
+        registeredVersion.assign(L"0.0.0.0");
+    }
+
+    wil::unique_hkey dcatKey = wsl::windows::common::registry::CreateKey(HKEY_LOCAL_MACHINE, TEXT(DCAT_REGISTRATION_KEY), KEY_SET_VALUE);
+    wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, L"Version", registeredVersion.c_str());
+}
+CATCH_LOG()

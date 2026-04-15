@@ -132,7 +132,7 @@ void LifetimeManager::RegisterCallback(_In_ ULONG64 ClientKey, _In_ const std::f
         if (proc == client->clientProcesses.end())
         {
             OwnedProcess newProcess{};
-            newProcess.process.reset(wsl::windows::common::helpers::DuplicateHandle(ClientProcess));
+            newProcess.process.reset(wsl::windows::common::wslutil::DuplicateHandle(ClientProcess));
             newProcess.InitializeListenForTermination(s_OnClientProcessTerminated, this);
             client->clientProcesses.emplace_back(std::move(newProcess));
             client->clientProcesses.back().ListenForTermination();

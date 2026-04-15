@@ -29,7 +29,7 @@ Once started, the `init` process performs various initialization tasks such as:
 
 ## Running the distribution
 
-Once ready, `init` establishes either an `lxbus` (WSL1) or an  `hvsocket` (WSL2) connection to [wslservice](wslservice.exe.md). This channel is used to transmit various commands to `init` (see `src/shared/inc/lxinitshared.h`), such as:
+Once ready, `init` establishes either an `lxbus` (WSL1) or an `hvsocket` (WSL2) connection to [wslservice](wslservice.exe.md). This channel is used to transmit various commands to `init` (see `src/shared/inc/lxinitshared.h`), such as:
 
 - `LxInitMessageInitialize`: Configure the distribution
 - `LxInitMessageCreateSession`: Create a new session leader. See [session leader](session-leader.md)

@@ -15,13 +15,29 @@ static constexpr auto c_eth0DeviceName = L"eth0";
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel,
+    VirtioNetworkingFlags flags,
+    LPCWSTR dnsOptions,
+    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+    wil::shared_handle userToken,
+    wil::unique_socket&& dnsHvsocket) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
     m_dnsOptions(dnsOptions)
 {
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        ((!!dnsHvsocket != WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket)) ||
+         (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket) && WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))),
+        "Incompatible DNS settings");
+
+    if (dnsHvsocket)
+    {
+        networking::DnsResolverFlags resolverFlags{};
+        m_dnsTunnelingResolver.emplace(std::move(dnsHvsocket), resolverFlags);
+    }
 }
 
 VirtioNetworking::~VirtioNetworking()
@@ -46,34 +62,19 @@ void VirtioNetworking::Initialize()
     THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&VirtioNetworking::OnNetworkConnectivityChange, this, TRUE, &m_networkNotifyHandle));
 }
 
-void VirtioNetworking::SetupLoopbackDevice()
+void VirtioNetworking::TraceLoggingRundown() noexcept
 {
-    m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
-        VIRTIO_NET_DEVICE_ID,
-        VIRTIO_NET_CLASS_ID,
-        c_loopbackDeviceName,
-        nullptr,
-        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
-        0,
-        m_userToken.get());
+    auto lock = m_lock.lock_exclusive();
 
-    // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.152, so assign loopback0 an
-    // address of 169.254.73.153 with a netmask of 30 so that the only addresses associated with this adapter are
-    // itself and the gateway.
-    // N.B. The MAC address is advertised with the virtio device so doesn't need to be explicitly set.
-    hns::HNSEndpoint endpointProperties;
-    endpointProperties.ID = m_localhostAdapterId.value();
-    endpointProperties.IPAddress = L"169.254.73.153";
-    endpointProperties.PrefixLength = 30;
-    endpointProperties.PortFriendlyName = c_loopbackDeviceName;
-    m_gnsChannel.SendEndpointState(endpointProperties);
+    WSL_LOG("VirtioNetworking::TraceLoggingRundown", TRACE_NETWORKSETTINGS_OBJECT(m_networkSettings));
+}
 
-    hns::CreateDeviceRequest createLoopbackDevice;
-    createLoopbackDevice.deviceName = c_loopbackDeviceName;
-    createLoopbackDevice.type = hns::DeviceType::Loopback;
-    createLoopbackDevice.lowerEdgeAdapterId = m_localhostAdapterId.value();
-    constexpr auto loopbackType = GnsMessageType(createLoopbackDevice);
-    m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
+void VirtioNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message)
+{
+    message.NetworkingMode = LxMiniInitNetworkingModeVirtioProxy;
+    message.DisableIpv6 = WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6);
+    message.EnableDhcpClient = false;
+    message.PortTrackerType = LX_MINI_INIT_PORT_TRACKER_TYPE::LxMiniInitPortTrackerTypeMirrored;
 }
 
 void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
@@ -86,8 +87,20 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
         [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
 
+void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)
+try
+{
+    static_cast<VirtioNetworking*>(context)->RefreshGuestConnection();
+}
+CATCH_LOG()
+
 HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
 {
+    if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6))
+    {
+        return S_OK;
+    }
+
     int result = 0;
     const auto ipAddress = (addr.si_family == AF_INET) ? reinterpret_cast<const void*>(&addr.Ipv4.sin_addr)
                                                        : reinterpret_cast<const void*>(&addr.Ipv6.sin6_addr);
@@ -142,19 +155,12 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
         LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported bind protocol %d", protocol);
         return 0;
     }
-    else if (addr.si_family == AF_INET6)
-    {
-        // The virtio net adapter does not yet support IPv6 packets, so any traffic would arrive via
-        // IPv4. If the caller wants IPv4 they will also likely listen on an IPv4 address, which will
-        // be handled as a separate callback to this same code.
-        return 0;
-    }
 
     auto lock = m_lock.lock_exclusive();
     const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
     if (server)
     {
-        std::wstring portString = std::format(L"tag={};port_number={}", tag, addr.Ipv4.sin_port);
+        std::wstring portString = std::format(L"tag={};port_number={}", tag, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)));
         if (protocol == IPPROTO_UDP)
         {
             portString += L";udp";
@@ -176,141 +182,229 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
     return 0;
 }
 
-void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)
+void VirtioNetworking::RefreshGuestConnection()
 {
-    static_cast<VirtioNetworking*>(context)->RefreshGuestConnection();
-}
+    // Query current networking information before acquiring the lock.
+    auto networkSettings = GetHostEndpointSettings();
 
-void VirtioNetworking::RefreshGuestConnection() noexcept
-try
-{
+    std::wstring device_options;
+    auto appendOption = [&device_options](std::wstring_view key, std::wstring_view value) {
+        if (!value.empty())
+        {
+            std::format_to(std::back_inserter(device_options), L"{}{}={}", device_options.empty() ? L"" : L";", key, value);
+        }
+    };
+
+    appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
+    appendOption(L"client_mac", networkSettings->MacAddress);
+
+    std::wstring default_route = networkSettings->GetBestGatewayAddressString();
+    appendOption(L"gateway_ip", default_route);
+    appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress(AF_INET));
+
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
+    {
+        appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
+        appendOption(L"gateway_mac_ipv6", networkSettings->GetBestGatewayMacAddress(AF_INET6));
+    }
+
+    networking::DnsInfo currentDns{};
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
+    {
+        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
+    }
+    else if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket))
+    {
+        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(TEXT(LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+    }
+    else
+    {
+        wsl::core::networking::DnsSettingsFlags dnsFlags = networking::DnsSettingsFlags::IncludeVpn;
+        WI_SetFlagIf(dnsFlags, networking::DnsSettingsFlags::IncludeIpv6Servers, WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
+        currentDns = networking::HostDnsInfo::GetDnsSettings(dnsFlags);
+    }
+
+    const auto minMtu = GetMinimumConnectedInterfaceMtu();
+
     // Acquire the lock and perform device updates.
     auto lock = m_lock.lock_exclusive();
 
-    m_networkSettings = GetHostEndpointSettings();
-
-    // TODO: Determine gateway MAC address
-    std::wstringstream device_options;
-    auto client_ip = m_networkSettings->PreferredIpAddress.AddressString;
-    if (!client_ip.empty())
+    // Add virtio net adapter to guest. If the adapter already exists update adapter state.
+    if (device_options != m_trackedDeviceOptions)
     {
-        if (device_options.tellp() > 0)
-        {
-            device_options << L";";
-        }
-        device_options << L"client_ip=" << client_ip;
-    }
-
-    if (!m_networkSettings->MacAddress.empty())
-    {
-        if (device_options.tellp() > 0)
-        {
-            device_options << L";";
-        }
-        device_options << L"client_mac=" << m_networkSettings->MacAddress;
-    }
-
-    std::wstring default_route = m_networkSettings->GetBestGatewayAddressString();
-    if (!default_route.empty())
-    {
-        if (device_options.tellp() > 0)
-        {
-            device_options << L";";
-        }
-        device_options << L"gateway_ip=" << default_route;
-    }
-
-    const auto newDeviceOptions = device_options.str();
-
-    if (newDeviceOptions != m_trackedDeviceOptions)
-    {
-        m_trackedDeviceOptions = newDeviceOptions;
-
-        // Add virtio net adapter to guest. If the adapter already exists update adapter state.
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
-                VIRTIO_NET_DEVICE_ID, VIRTIO_NET_CLASS_ID, c_eth0DeviceName, nullptr, newDeviceOptions.c_str(), 0, m_userToken.get());
+                VIRTIO_NET_DEVICE_ID, VIRTIO_NET_CLASS_ID, c_eth0DeviceName, nullptr, device_options.c_str(), 0, m_userToken.get());
         }
         else
         {
             const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
             if (server)
             {
-                LOG_IF_FAILED(server->AddSharePath(c_eth0DeviceName, newDeviceOptions.c_str(), 0));
+                LOG_IF_FAILED(server->AddSharePath(c_eth0DeviceName, device_options.c_str(), 0));
             }
         }
 
-        // N.B. The MAC address is advertised with the virtio device so doesn't need to be explicitly set.
-        hns::HNSEndpoint endpointProperties;
-        endpointProperties.ID = m_adapterId.value();
-        endpointProperties.IPAddress = m_networkSettings->PreferredIpAddress.AddressString;
-        endpointProperties.PrefixLength = m_networkSettings->PreferredIpAddress.PrefixLength;
-        m_gnsChannel.SendEndpointState(endpointProperties);
-
-        // Send the default route to GNS.
-        if (!default_route.empty())
-        {
-            wsl::shared::hns::Route route;
-            route.NextHop = default_route;
-            route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
-            route.Family = AF_INET;
-
-            hns::ModifyGuestEndpointSettingRequest<hns::Route> request;
-            request.RequestType = hns::ModifyRequestType::Add;
-            request.ResourceType = hns::GuestEndpointResourceType::Route;
-            request.Settings = route;
-            m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
-        }
+        m_trackedDeviceOptions = device_options;
     }
 
-    // Send DNS update if needed.
-    networking::DnsInfo currentDns{};
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
+    UpdateIpv4Address(networkSettings->PreferredIpAddress);
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {
-        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
-    }
-    else
-    {
-        currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+        UpdateIpv6Address(networkSettings->PreferredIpv6Address);
     }
 
-    if (currentDns != m_trackedDnsSettings)
-    {
-        m_trackedDnsSettings = currentDns;
-        hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
-        notification.RequestType = hns::ModifyRequestType::Update;
-        notification.ResourceType = hns::GuestEndpointResourceType::DNS;
-        notification.Settings = networking::BuildDnsNotification(currentDns, m_dnsOptions);
-        m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
-    }
+    UpdateDefaultRoute(default_route);
 
-    // Send MTU update if needed.
-    const auto minMtu = GetMinimumConnectedInterfaceMtu();
-    if (minMtu && minMtu.value() != m_networkMtu)
-    {
-        m_networkMtu = minMtu.value();
-        hns::ModifyGuestEndpointSettingRequest<hns::NetworkInterface> notification{};
-        notification.ResourceType = hns::GuestEndpointResourceType::Interface;
-        notification.RequestType = hns::ModifyRequestType::Update;
-        notification.Settings.Connected = true;
-        notification.Settings.NlMtu = m_networkMtu;
-        m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
-    }
-}
-CATCH_LOG();
+    UpdateDnsSettings(currentDns);
+    UpdateMtu(minMtu);
 
-void VirtioNetworking::TraceLoggingRundown() noexcept
-{
-    auto lock = m_lock.lock_exclusive();
-
-    WSL_LOG("VirtioNetworking::TraceLoggingRundown", TRACE_NETWORKSETTINGS_OBJECT(m_networkSettings));
+    m_networkSettings = std::move(networkSettings);
 }
 
-void VirtioNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message)
+void VirtioNetworking::SetupLoopbackDevice()
 {
-    message.NetworkingMode = LxMiniInitNetworkingModeVirtioProxy;
-    message.DisableIpv6 = false;
-    message.EnableDhcpClient = false;
-    message.PortTrackerType = LX_MINI_INIT_PORT_TRACKER_TYPE::LxMiniInitPortTrackerTypeMirrored;
+    m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
+        VIRTIO_NET_DEVICE_ID,
+        VIRTIO_NET_CLASS_ID,
+        c_loopbackDeviceName,
+        nullptr,
+        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
+        0,
+        m_userToken.get());
+
+    // The loopback gateway (see LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS) is 169.254.73.152, so assign loopback0 an
+    // address of 169.254.73.153 with a netmask of 30 so that the only addresses associated with this adapter are
+    // itself and the gateway.
+    // N.B. The MAC address is advertised with the virtio device so doesn't need to be explicitly set.
+    hns::HNSEndpoint endpointProperties;
+    endpointProperties.ID = m_localhostAdapterId.value();
+    endpointProperties.IPAddress = L"169.254.73.153";
+    endpointProperties.PrefixLength = 30;
+    endpointProperties.PortFriendlyName = c_loopbackDeviceName;
+    m_gnsChannel.SendEndpointState(endpointProperties);
+
+    hns::CreateDeviceRequest createLoopbackDevice;
+    createLoopbackDevice.deviceName = c_loopbackDeviceName;
+    createLoopbackDevice.type = hns::DeviceType::Loopback;
+    createLoopbackDevice.lowerEdgeAdapterId = m_localhostAdapterId.value();
+    constexpr auto loopbackType = GnsMessageType(createLoopbackDevice);
+    m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
+}
+
+void VirtioNetworking::SendDefaultRoute(const std::wstring& gateway, hns::ModifyRequestType requestType)
+{
+    if (gateway.empty() || !m_adapterId.has_value())
+    {
+        return;
+    }
+
+    wsl::shared::hns::Route route;
+    route.NextHop = gateway;
+    route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+    route.Family = AF_INET;
+
+    hns::ModifyGuestEndpointSettingRequest<hns::Route> request;
+    request.RequestType = requestType;
+    request.ResourceType = hns::GuestEndpointResourceType::Route;
+    request.Settings = route;
+    m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
+}
+
+void VirtioNetworking::UpdateDefaultRoute(const std::wstring& gateway)
+{
+    if (gateway == m_trackedDefaultRoute || !m_adapterId.has_value())
+    {
+        return;
+    }
+
+    SendDefaultRoute(m_trackedDefaultRoute, hns::ModifyRequestType::Remove);
+    m_trackedDefaultRoute = gateway;
+    SendDefaultRoute(gateway, hns::ModifyRequestType::Add);
+}
+
+void VirtioNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
+{
+    if (dns == m_trackedDnsSettings || !m_adapterId.has_value())
+    {
+        return;
+    }
+
+    m_trackedDnsSettings = dns;
+
+    hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
+    notification.RequestType = hns::ModifyRequestType::Update;
+    notification.ResourceType = hns::GuestEndpointResourceType::DNS;
+    notification.Settings = networking::BuildDnsNotification(dns, m_dnsOptions);
+    m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
+}
+
+void VirtioNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress)
+{
+    if (ipAddress == m_trackedIpv4Address || ipAddress.AddressString.empty() || !m_adapterId.has_value())
+    {
+        return;
+    }
+
+    m_trackedIpv4Address = ipAddress;
+
+    // N.B. SendEndpointState triggers SetAdapterConfiguration on the Linux side
+    // which brings the interface UP and configures the full adapter state.
+    hns::HNSEndpoint endpointProperties;
+    endpointProperties.ID = m_adapterId.value();
+    endpointProperties.IPAddress = ipAddress.AddressString;
+    endpointProperties.PrefixLength = ipAddress.PrefixLength;
+    m_gnsChannel.SendEndpointState(endpointProperties);
+}
+
+void VirtioNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAddress, hns::ModifyRequestType requestType)
+{
+    WI_ASSERT(WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
+
+    if (ipAddress.AddressString.empty() || !m_adapterId.has_value())
+    {
+        return;
+    }
+
+    // The HNSEndpoint schema doesn't support IPv6 addresses, so use ModifyGuestEndpointSettingRequest.
+    hns::ModifyGuestEndpointSettingRequest<hns::IPAddress> request;
+    request.RequestType = requestType;
+    request.ResourceType = hns::GuestEndpointResourceType::IPAddress;
+    request.Settings.Address = ipAddress.AddressString;
+    request.Settings.Family = ipAddress.Address.si_family;
+    request.Settings.OnLinkPrefixLength = ipAddress.PrefixLength;
+    request.Settings.PreferredLifetime = ULONG_MAX;
+    m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
+}
+
+void VirtioNetworking::UpdateIpv6Address(const networking::EndpointIpAddress& ipAddress)
+{
+    WI_ASSERT(WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6));
+
+    if (ipAddress == m_trackedIpv6Address || !m_adapterId.has_value())
+    {
+        return;
+    }
+
+    SendIpv6Address(m_trackedIpv6Address, hns::ModifyRequestType::Remove);
+    m_trackedIpv6Address = ipAddress;
+    SendIpv6Address(ipAddress, hns::ModifyRequestType::Add);
+}
+
+void VirtioNetworking::UpdateMtu(std::optional<ULONG> mtu)
+{
+    if (!mtu || mtu.value() == m_networkMtu || !m_adapterId.has_value())
+    {
+        return;
+    }
+
+    m_networkMtu = mtu.value();
+
+    hns::ModifyGuestEndpointSettingRequest<hns::NetworkInterface> notification{};
+    notification.ResourceType = hns::GuestEndpointResourceType::Interface;
+    notification.RequestType = hns::ModifyRequestType::Update;
+    notification.Settings.Connected = true;
+    notification.Settings.NlMtu = m_networkMtu;
+    m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
 }

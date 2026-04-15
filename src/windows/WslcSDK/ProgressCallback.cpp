@@ -26,7 +26,7 @@ WslcImageProgressStatus ConvertStatus(LPCSTR Status)
     }
 
     // TODO: Mapping engine strings to status values seems fragile.
-    //       WSLA is intentionally avoiding this kind of thing for localization of engine strings, which amounts to the same
+    //       WSLC is intentionally avoiding this kind of thing for localization of engine strings, which amounts to the same
     //       thing. If we keep this, a test should be added to explicitly validate that each status is returned properly.
     WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_PULLING, "Pulling fs layer");
     WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_WAITING, "Waiting");
@@ -59,16 +59,4 @@ HRESULT STDMETHODCALLTYPE ProgressCallback::OnProgress(LPCSTR Status, LPCSTR Id,
     }
 
     return S_OK;
-}
-
-winrt::com_ptr<ProgressCallback> ProgressCallback::CreateIf(const WslcPullImageOptions* options)
-{
-    if (options->progressCallback)
-    {
-        return winrt::make_self<ProgressCallback>(options->progressCallback, options->progressCallbackContext);
-    }
-    else
-    {
-        return nullptr;
-    }
 }

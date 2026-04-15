@@ -20,6 +20,9 @@ set(SOURCES
     WslMirroredNetworking.cpp
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
+    HcsVirtualMachine.cpp
+    WSLCSessionManager.cpp
+    WSLCSessionManagerFactory.cpp
     main.rc
     ${CMAKE_CURRENT_BINARY_DIR}/../mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wsleventschema.rc
     application.manifest)
@@ -47,23 +50,29 @@ set(HEADERS
     WslMirroredNetworking.h
     WslCoreNetworkEndpoint.h
     WslCoreTcpIpStateTracking.h
-    WslCoreVm.h)
+    WslCoreVm.h
+    HcsVirtualMachine.h
+    WSLCSessionManager.h
+    WSLCSessionManagerFactory.h)
 
 add_executable(wslservice ${SOURCES} ${HEADERS})
 add_dependencies(wslservice wslserviceidl wslservicemc)
 add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(__WRL_DISABLE_STATIC_INITIALIZE__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
-set_target_properties(wslservice PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /include:__minATLObjMap_LxssUserSession_COM")
+set_target_properties(wslservice PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /include:__minATLObjMap_LxssUserSession_COM /include:__minATLObjMap_WSLCSessionManager_COM")
 target_link_libraries(wslservice
                       ${COMMON_LINK_LIBRARIES}
-                      computecore
+                      ${MSI_LINK_LIBRARIES}
+                      ${HCS_LINK_LIBRARIES}
+                      ${SERVICE_LINK_LIBRARIES}
                       common
                       configfile
                       legacy_stdio_definitions
                       VirtDisk.lib
                       Winhttp.lib
-                      Synchronization.lib)
+                      Synchronization.lib
+                      yaml-cpp)
 
 target_precompile_headers(wslservice REUSE_FROM common)
 set_target_properties(wslservice PROPERTIES FOLDER windows)

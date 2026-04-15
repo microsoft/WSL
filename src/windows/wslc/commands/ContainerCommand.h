@@ -32,11 +32,11 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
-// Create Command
-struct ContainerCreateCommand final : public Command
+// Attach Command
+struct ContainerAttachCommand final : public Command
 {
-    constexpr static std::wstring_view CommandName = L"create";
-    ContainerCreateCommand(const std::wstring& parent) : Command(CommandName, parent)
+    constexpr static std::wstring_view CommandName = L"attach";
+    ContainerAttachCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -47,11 +47,11 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
-// Delete Command
-struct ContainerDeleteCommand final : public Command
+// Create Command
+struct ContainerCreateCommand final : public Command
 {
-    constexpr static std::wstring_view CommandName = L"delete";
-    ContainerDeleteCommand(const std::wstring& parent) : Command(CommandName, parent)
+    constexpr static std::wstring_view CommandName = L"create";
+    ContainerCreateCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -128,6 +128,21 @@ struct ContainerLogsCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"logs";
     ContainerLogsCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Remove Command
+struct ContainerRemoveCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"remove";
+    ContainerRemoveCommand(const std::wstring& parent) : Command(CommandName, {L"delete", L"rm"}, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

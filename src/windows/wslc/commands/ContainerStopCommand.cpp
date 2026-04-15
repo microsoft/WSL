@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Stop Command
@@ -28,19 +29,19 @@ std::vector<Argument> ContainerStopCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
         Argument::Create(ArgType::Session),
-        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGTERM)"),
+        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, Localization::WSLCCLI_SignalArgDescription(L"SIGTERM")),
         Argument::Create(ArgType::Time),
     };
 }
 
 std::wstring ContainerStopCommand::ShortDescription() const
 {
-    return {L"Stop containers"};
+    return Localization::WSLCCLI_ContainerStopDesc();
 }
 
 std::wstring ContainerStopCommand::LongDescription() const
 {
-    return {L"Stops containers."};
+    return Localization::WSLCCLI_ContainerStopLongDesc();
 }
 
 // clang-format off

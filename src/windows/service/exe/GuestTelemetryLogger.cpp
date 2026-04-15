@@ -51,7 +51,7 @@ void GuestTelemetryLogger::Start(const wil::unique_event& ExitEvent)
 
     THROW_LAST_ERROR_IF(!pipe);
 
-    wil::unique_handle exitEvent(wsl::windows::common::helpers::DuplicateHandle(ExitEvent.get()));
+    wil::unique_handle exitEvent(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
     m_thread = std::thread([Self = shared_from_this(), Pipe = std::move(pipe), ExitEvent = std::move(exitEvent)]() {
         try
         {

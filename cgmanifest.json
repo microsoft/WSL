@@ -41,6 +41,17 @@
                     "hash": "sha1:44500f8d6b279ec314a4cdce1290ddc30f530ed7"
                 }
             }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "yaml-cpp",
+                    "version": "0.9.0",
+                    "downloadUrl": "https://github.com/jbeder/yaml-cpp/releases/download/yaml-cpp-0.9.0/yaml-cpp-yaml-cpp-0.9.0.tar.gz",
+                    "hash": "sha256:298593d9c440fd9034b8b193d96318b76d49bc97c6ceadb7b0836edf0b6d7539"
+                }
+            }
         }
     ]
 }

@@ -4,6 +4,7 @@
 
 #include "INetworkingEngine.h"
 #include "GnsChannel.h"
+#include "DnsResolver.h"
 #include "WslCoreHostDnsInfo.h"
 #include "GnsPortTrackerChannel.h"
 #include "GuestDeviceManager.h"
@@ -15,13 +16,22 @@ enum class VirtioNetworkingFlags
     None = 0x0,
     LocalhostRelay = 0x1,
     DnsTunneling = 0x2,
+    Ipv6 = 0x4,
+    DnsTunnelingSocket = 0x8,
 };
 DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
 
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
+    VirtioNetworking(
+        GnsChannel&& gnsChannel,
+        VirtioNetworkingFlags flags,
+        LPCWSTR dnsOptions,
+        std::shared_ptr<GuestDeviceManager> guestDeviceManager,
+        wil::shared_handle userToken,
+        wil::unique_socket&& dnsHvsocket = {});
+
     ~VirtioNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -41,8 +51,15 @@ private:
 
     HRESULT HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept;
     int ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET& addr, _In_ int protocol, _In_ bool isOpen) const;
-    void RefreshGuestConnection() noexcept;
+    void RefreshGuestConnection();
     void SetupLoopbackDevice();
+    void SendDefaultRoute(const std::wstring& gateway, wsl::shared::hns::ModifyRequestType requestType);
+    void SendIpv6Address(const networking::EndpointIpAddress& ipAddress, wsl::shared::hns::ModifyRequestType requestType);
+    void UpdateDefaultRoute(const std::wstring& gateway);
+    void UpdateDnsSettings(const networking::DnsInfo& dns);
+    void UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress);
+    void UpdateIpv6Address(const networking::EndpointIpAddress& ipAddress);
+    void UpdateMtu(std::optional<ULONG> mtu);
 
     mutable wil::srwlock m_lock;
 
@@ -53,12 +70,16 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
+    std::optional<networking::DnsResolver> m_dnsTunnelingResolver;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
 
     ULONG m_networkMtu = 0;
     std::wstring m_trackedDeviceOptions;
-    networking::DnsInfo m_trackedDnsSettings;
+    networking::EndpointIpAddress m_trackedIpv4Address{};
+    networking::EndpointIpAddress m_trackedIpv6Address{};
+    std::wstring m_trackedDefaultRoute;
+    networking::DnsInfo m_trackedDnsSettings{};
 
     // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.
     networking::unique_notify_handle m_networkNotifyHandle;

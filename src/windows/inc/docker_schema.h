@@ -35,9 +35,66 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+struct ImageLoadResult
+{
+    std::optional<std::string> stream;
+    std::optional<ErrorResponse> errorDetail;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageLoadResult, stream, errorDetail);
+};
+
 struct EmptyRequest
 {
     using TResponse = void;
+};
+
+struct AuthRequest
+{
+    using TResponse = struct AuthResponse;
+
+    std::string username;
+    std::string password;
+    std::string serveraddress;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(AuthRequest, username, password, serveraddress);
+};
+
+struct AuthResponse
+{
+    std::string Status;
+    std::optional<std::string> IdentityToken;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AuthResponse, Status, IdentityToken);
+};
+
+struct CreateVolume
+{
+    using TResponse = void;
+
+    std::string Name;
+    std::string Driver;
+    std::map<std::string, std::string> DriverOpts;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateVolume, Name, Driver, DriverOpts, Labels);
+};
+
+struct Volume
+{
+    std::string Name;
+    std::string Driver;
+    std::string Mountpoint;
+    std::optional<std::map<std::string, std::string>> Options;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
+};
+
+struct ListVolumesResponse
+{
+    std::vector<Volume> Volumes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ListVolumesResponse, Volumes);
 };
 
 struct EmptyObject
@@ -46,17 +103,26 @@ struct EmptyObject
 
 inline void to_json(nlohmann::json& j, const EmptyObject& memory)
 {
+    UNREFERENCED_PARAMETER(memory);
     j = nlohmann::json::object();
+}
+
+inline void from_json(const nlohmann::json& j, EmptyObject& obj)
+{
+    // EmptyObject has no fields, so nothing to deserialize
+    UNREFERENCED_PARAMETER(j);
+    UNREFERENCED_PARAMETER(obj);
 }
 
 struct Mount
 {
+    std::string Name;
     std::string Source;
     std::string Target;
     std::string Type;
     bool ReadOnly{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Target, Source, Type, ReadOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly);
 };
 
 struct PortMapping
@@ -76,8 +142,10 @@ struct HostConfig
     std::optional<std::vector<std::string>> Dns;
     std::optional<std::vector<std::string>> DnsSearch;
     std::optional<std::vector<std::string>> DnsOptions;
+    std::optional<std::vector<std::string>> Binds;
+    std::map<std::string, std::string> Tmpfs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs);
 };
 
 struct CreateContainer
@@ -96,8 +164,8 @@ struct CreateContainer
     std::string Domainname;
     std::optional<std::string> StopSignal;
     std::optional<std::string> WorkingDir;
-    std::vector<std::string> Cmd;
-    std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
     std::map<std::string, std::string> Labels;
@@ -157,13 +225,24 @@ struct InspectExec
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectExec, Pid, ExitCode, Running);
 };
 
+struct PruneContainerResult
+{
+    std::optional<std::vector<std::string>> ContainersDeleted; // Null if no containers were deleted.
+    uint64_t SpaceReclaimed{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneContainerResult, ContainersDeleted, SpaceReclaimed);
+};
+
 struct Image
 {
     std::string Id;
     std::vector<std::string> RepoTags;
+    std::vector<std::string> RepoDigests;
     uint64_t Size{};
+    int64_t Created{};
+    std::string ParentId;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Image, Id, RepoTags, Size);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Image, Id, RepoTags, RepoDigests, Size, Created, ParentId);
 };
 
 struct DeletedImage
@@ -174,11 +253,74 @@ struct DeletedImage
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeletedImage, Untagged, Deleted);
 };
 
+struct PruneImageResult
+{
+    std::optional<std::vector<DeletedImage>> ImagesDeleted;
+    uint64_t SpaceReclaimed{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneImageResult, ImagesDeleted, SpaceReclaimed);
+};
+
 struct ImportStatus
 {
     std::string status;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImportStatus, status);
+};
+
+struct ImageConfig
+{
+    std::string User;
+    std::optional<std::map<std::string, EmptyObject>> ExposedPorts;
+    std::optional<std::vector<std::string>> Env;
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
+    std::optional<std::map<std::string, EmptyObject>> Volumes;
+    std::string WorkingDir;
+    std::optional<std::map<std::string, std::string>> Labels;
+    std::string StopSignal;
+    std::optional<std::vector<std::string>> Shell;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, User, ExposedPorts, Env, Cmd, Entrypoint, Volumes, WorkingDir, Labels, StopSignal, Shell);
+};
+
+struct RootFS
+{
+    std::string Type;
+    std::optional<std::vector<std::string>> Layers;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RootFS, Type, Layers);
+};
+
+struct GraphDriverData
+{
+    std::string Name;
+    std::optional<std::map<std::string, std::string>> Data;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GraphDriverData, Name, Data);
+};
+
+struct InspectImage
+{
+    std::string Id;
+    std::optional<std::vector<std::string>> RepoTags;
+    std::optional<std::vector<std::string>> RepoDigests;
+    std::string Parent;
+    std::string Comment;
+    std::string Created;
+    std::optional<ImageConfig> Config;
+    std::string Author;
+    std::string Architecture;
+    std::string Variant;
+    std::string Os;
+    std::string OsVersion;
+    uint64_t Size{};
+    std::optional<GraphDriverData> GraphDriver;
+    std::optional<RootFS> RootFS;
+    std::optional<std::map<std::string, std::string>> Metadata;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Config, Author, Architecture, Variant, Os, OsVersion, Size, GraphDriver, RootFS, Metadata);
 };
 
 struct CreateExecResponse
@@ -200,8 +342,9 @@ struct CreateExec
     std::vector<std::string> Env;
     std::optional<std::string> User;
     std::string WorkingDir;
+    std::optional<std::string> DetachKeys;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir, User);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir, User, DetachKeys);
 };
 
 struct StartExec
@@ -253,9 +396,12 @@ struct ContainerInfo
     std::string Image;
     std::map<std::string, std::string> Labels;
     std::vector<Port> Ports;
+    std::vector<Mount> Mounts;
     ContainerState State{ContainerState::Unknown};
+    int64_t Created{};
+    HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, Mounts, State, Created, HostConfig);
 };
 
 struct BuildKitVertex
@@ -268,11 +414,30 @@ struct BuildKitVertex
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
 };
 
+struct BuildKitStatus
+{
+    std::string id;
+    std::string vertex;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitStatus, id, vertex);
+};
+
+struct BuildKitLog
+{
+    std::string vertex;
+    std::string data; // base64-encoded output
+    int stream{};     // 1 = stdout, 2 = stderr
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitLog, vertex, data, stream);
+};
+
 struct BuildKitSolveStatus
 {
     std::vector<BuildKitVertex> vertexes;
+    std::vector<BuildKitStatus> statuses;
+    std::vector<BuildKitLog> logs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes, statuses, logs);
 };
 
 struct CreateImageProgressDetails
@@ -288,10 +453,11 @@ struct CreateImageProgress
 {
     std::string status;
     std::string id;
+    std::optional<ErrorResponse> errorDetail;
 
     CreateImageProgressDetails progressDetail;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail, errorDetail);
 };
 
 } // namespace wsl::windows::common::docker_schema

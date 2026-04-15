@@ -19,6 +19,7 @@ parameters:
     type: object
     default:
       - Microsoft.WSL.PluginApi.nuspec
+      - Microsoft.WSL.Containers.nuspec
 
   - name: traceLoggingConfig
     type: string
@@ -27,8 +28,8 @@ parameters:
   - name: targets
     type: object
     default:
-      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslaservice;wslaserviceproxystub;wsladiag;wslc;wsltests"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslaservice.exe,wslaserviceproxystub.dll,wsladiag.exe,wslc.exe"
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslcsession;wslc;wsltests;wslcsdk"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslcsession.exe,wslc.exe,wslcsdk.dll"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage"
@@ -386,7 +387,8 @@ stages:
           - powershell: |
               $taefVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.Taef'']/@version').Node.Value
               New-Item -ItemType Directory -Path "$(ob_outputDirectory)\bundle" -Force
-              foreach ($arch in @("x64", "ARM64"))
+              # TODO: Add "ARM64" to this list once arm64 testing is supported
+              foreach ($arch in @("x64"))
               {
                 mkdir $(ob_outputDirectory)\testbin\$arch\release
 
@@ -394,20 +396,24 @@ stages:
                 Move-Item -Path "bin\$arch\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\testplugin.dll"
                 Move-Item -Path "bin\$arch\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\wslcsdk.dll"
                 Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\$arch" -Destination "$(ob_outputDirectory)\testbin\$arch\release\taef"
+                Move-Item -Path "bin\$arch\cloudtest" -Destination "$(ob_outputDirectory)\testbin\$arch\cloudtest"
+
+                $TestDistroVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
+                Copy-Item "packages\Microsoft.WSL.TestDistro.$TestDistroVersion\$arch\test_distro.tar.xz" "$(ob_outputDirectory)\testbin\$arch"
               }
 
-              Move-Item -Path "bin\x64\cloudtest" -Destination "$(ob_outputDirectory)\testbin\x64\cloudtest"
               Move-Item -Path "tools\test\test-setup.ps1" -Destination "$(ob_outputDirectory)\testbin\test-setup.ps1"
               Move-Item -Path "tools\test\CloudTest-Setup.bat" -Destination "$(ob_outputDirectory)\testbin\CloudTest-Setup.bat"
               Move-Item -Path "diagnostics\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
               Move-Item -Path "test\linux\unit_tests" -Destination "$(ob_outputDirectory)\testbin\unit_tests"
 
               Move-Item -Path bundle\release\* -Destination $(ob_outputDirectory)\bundle
-              $TestDistroVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
-              Copy-Item "packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz" "$(ob_outputDirectory)\testbin\x64"
 
               $TestDataVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestData'']/@version').Node.Value
-              Copy-Item "packages\Microsoft.WSL.TestData.$TestDataVersion\build\native\bin\x64" "$(ob_outputDirectory)\testbin\x64\test_data" -Recurse -Force
+              foreach ($arch in @("x64"))
+              {
+                Copy-Item "packages\Microsoft.WSL.TestData.$TestDataVersion\$arch" "$(ob_outputDirectory)\testbin\$arch\test_data" -Recurse -Force
+              }
 
             displayName: Move artifacts to drop directory
 

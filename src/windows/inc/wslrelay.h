@@ -20,7 +20,7 @@ enum RelayMode
     Invalid = -1,
     DebugConsole,
     PortRelay,
-    WSLAPortRelay,
+    WSLCPortRelay,
     KdRelay
 };
 

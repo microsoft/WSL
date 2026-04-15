@@ -33,6 +33,7 @@ public sealed partial class MemAndProcPage : Page
 
     private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+        MemAndProcPageRoot.Focus(FocusState.Programmatic);
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "ProcCountExpander", "ProcCountTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "MemorySizeExpander", "MemorySizeTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "SwapSizeExpander", "SwapSizeTextBox");

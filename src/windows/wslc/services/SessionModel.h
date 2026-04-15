@@ -13,31 +13,22 @@ Abstract:
 --*/
 #pragma once
 
-#include <wslservice.h>
-#include <wslaservice.h>
+#include <wslc.h>
 
 namespace wsl::windows::wslc::models {
+
 struct Session
 {
-    explicit Session(wil::com_ptr<IWSLASession> session) : m_session(std::move(session))
+    explicit Session(wil::com_ptr<IWSLCSession> session) : m_session(std::move(session))
     {
     }
-    IWSLASession* Get() const noexcept
+    IWSLCSession* Get() const noexcept
     {
         return m_session.get();
     }
 
 private:
-    wil::com_ptr<IWSLASession> m_session;
+    wil::com_ptr<IWSLCSession> m_session;
 };
 
-struct SessionOptions
-{
-    static SessionOptions Default();
-    const WSLA_SESSION_SETTINGS* Get() const;
-
-private:
-    WSLA_SESSION_SETTINGS m_sessionSettings{};
-    inline static std::filesystem::path m_defaultPath = {wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / "wsla"};
-};
 } // namespace wsl::windows::wslc::models

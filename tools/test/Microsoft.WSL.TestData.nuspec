@@ -9,6 +9,7 @@
     <description>WSL Test Data Files</description>
   </metadata>
   <files>
-    <file src="**\*.*" target="" />
+    <file src="x64\**\*.*" target="x64" />
+    <file src="arm64\**\*.*" target="arm64" />
   </files>
 </package>

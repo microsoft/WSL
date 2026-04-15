@@ -33,12 +33,14 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-tmpfiles-setup-dev.service',
                             'tmp.mount',
                             'NetworkManager.service',
+                            'NetworkManager-wait-online.service',
                             'networking.service',
                             'hypervkvpd.service']
 
 WSL1_UNSUPPORTED_XATTRS = ['security.selinux', 'security.ima', 'security.evm']
 
-WSL_CONF_KEYS = ['automount.enabled',
+WSL_CONF_KEYS = ['automount.cgroups',
+                 'automount.enabled',
                  'automount.ldconfig',
                  'automount.mountfstab',
                  'automount.options',

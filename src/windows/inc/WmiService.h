@@ -760,7 +760,7 @@ public:
     }
 
     // Allows for executing a WMI query against the WMI service for an enumeration of WMI objects.
-    // Assumes the query of of the WQL query language.
+    // Assumes the query is of the WQL query language.
     const WmiEnumerate& query(_In_ PCWSTR query)
     {
         THROW_IF_FAILED(m_wbemServices->ExecQuery(

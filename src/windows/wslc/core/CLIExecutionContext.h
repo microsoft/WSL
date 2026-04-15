@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "ArgumentTypes.h"
 #include "ExecutionContextData.h"
+#include <optional>
 
 namespace wsl::windows::wslc::execution {
 // The context within which all commands execute.
@@ -25,9 +26,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     }
     ~CLIExecutionContext() override = default;
 
-    CLIExecutionContext(const CLIExecutionContext&) = default;
-    CLIExecutionContext& operator=(const CLIExecutionContext&) = default;
-
+    NON_COPYABLE(CLIExecutionContext);
     CLIExecutionContext(CLIExecutionContext&&) = default;
     CLIExecutionContext& operator=(CLIExecutionContext&&) = default;
 
@@ -35,5 +34,21 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Map of data stored in the context.
     DataMap Data;
+
+    // Process exit code set by tasks like Run/Exec. When set, CoreMain returns this
+    // instead of the HRESULT, enabling `wslc run ... && echo success` patterns.
+    std::optional<int> ExitCode;
+
+    // Event signaled when the user presses Ctrl-C. Starts null; long-running operations
+    // that support cancellation create it via CreateCancelEvent() before passing it to
+    // COM APIs that accept a CancelEvent handle.
+    wil::unique_event CancelEvent;
+
+    HANDLE CreateCancelEvent()
+    {
+        WI_ASSERT(!CancelEvent);
+        CancelEvent.create(wil::EventOptions::ManualReset);
+        return CancelEvent.get();
+    }
 };
 } // namespace wsl::windows::wslc::execution

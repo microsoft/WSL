@@ -1,6 +1,7 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
 using CommunityToolkit.WinUI.Controls;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -60,6 +61,7 @@ public sealed partial class FileSystemPage : Page
 
     private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+        FileSystemPageRoot.Focus(FocusState.Programmatic);
         var expander = this.FindName("DefaultVHDSizeExpander") as SettingsExpander;
         var textBox = this.FindName("DefaultVHDSizeTextBox") as TextBox;
 

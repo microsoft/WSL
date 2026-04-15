@@ -190,6 +190,73 @@ std::wstring wsl::windows::common::string::BytesToHex(const std::vector<BYTE>& b
     return str.str();
 }
 
+namespace {
+bool IsHexSpecifier(char first, char second)
+{
+    return first == '0' && tolower(static_cast<unsigned char>(second)) == 'x';
+}
+
+bool IsHexSpecifier(wchar_t first, wchar_t second)
+{
+    return first == L'0' && towlower(second) == L'x';
+}
+
+BYTE ConvertHexByte(const char* hex, char** endPtr)
+{
+    return static_cast<BYTE>(strtoul(hex, endPtr, 16));
+}
+
+BYTE ConvertHexByte(const wchar_t* hex, wchar_t** endPtr)
+{
+    return static_cast<BYTE>(wcstoul(hex, endPtr, 16));
+}
+
+template <typename T>
+std::vector<BYTE> HexToBytesT(std::basic_string_view<T> input)
+{
+    if (input.length() % 2 != 0)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(std::basic_string<T>{input}));
+    }
+
+    std::vector<BYTE> result;
+    result.reserve(input.length() / 2);
+    T currentHex[3]{};
+    for (size_t i = 0; i < input.size(); i += 2)
+    {
+        // Skip '0x', if any
+        if (i == 0 && IsHexSpecifier(input[0], input[1]))
+        {
+            continue;
+        }
+
+        currentHex[0] = input[i];
+        currentHex[1] = input[i + 1];
+        T* endPtr{};
+
+        const auto byte = ConvertHexByte(currentHex, &endPtr);
+        if (endPtr != currentHex + 2)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageInvalidHexString(std::basic_string<T>{input}));
+        }
+
+        result.push_back(byte);
+    }
+
+    return result;
+}
+} // namespace
+
+std::vector<BYTE> wsl::windows::common::string::HexToBytes(std::string_view input)
+{
+    return HexToBytesT(input);
+}
+
+std::vector<BYTE> wsl::windows::common::string::HexToBytes(std::wstring_view input)
+{
+    return HexToBytesT(input);
+}
+
 std::string wsl::windows::common::string::WideToMultiByte(_In_opt_ LPCWSTR Source, _In_ size_t CharacterCount)
 {
     if (CharacterCount == -1)
@@ -217,4 +284,14 @@ std::string wsl::windows::common::string::WideToMultiByte(_In_opt_ LPCWSTR Sourc
 std::string wsl::windows::common::string::WideToMultiByte(_In_ std::wstring_view Source)
 {
     return WideToMultiByte(Source.data(), Source.length());
+}
+
+std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
+{
+    return TruncateIdImpl(id, shortenLength);
+}
+
+std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, bool shortenLength)
+{
+    return TruncateIdImpl(id, shortenLength);
 }

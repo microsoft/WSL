@@ -13,14 +13,15 @@ Abstract:
 --*/
 #pragma once
 
-#include <docker_schema.h>
-
 namespace wsl::windows::wslc::models {
 struct ImageInformation
 {
-    std::string Name;
-    ULONGLONG Size;
+    std::optional<std::string> Repository;
+    std::optional<std::string> Tag;
+    std::string Id;
+    LONGLONG Created{};
+    ULONGLONG Size{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ImageInformation, Name, Size);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
 };
 } // namespace wsl::windows::wslc::models

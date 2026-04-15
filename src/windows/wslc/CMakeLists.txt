@@ -13,6 +13,7 @@ target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUB
 
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}
+                      yaml-cpp
                       common)
 
 target_precompile_headers(wslclib REUSE_FROM common)
