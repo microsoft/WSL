@@ -2578,4 +2578,8 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
     <value>Set driver specific options</value>
   </data>
+  <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
+    <value>Outputs the volume names only</value>
+  </data>
+
 </root>

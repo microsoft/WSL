@@ -29,7 +29,7 @@ std::vector<Argument> VolumeListCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Format),
-        Argument::Create(ArgType::Quiet, false, std::nullopt, L"Outputs the volume names only"),
+        Argument::Create(ArgType::Quiet, false, std::nullopt, Localization::WSLCCLI_VolumeListQuietArgDesc()),
         Argument::Create(ArgType::Session),
     };
 }
