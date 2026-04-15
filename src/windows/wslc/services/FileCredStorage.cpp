@@ -19,6 +19,7 @@ using wsl::shared::Localization;
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::wslc::services;
 
 namespace {
 
@@ -97,50 +98,52 @@ wil::unique_file OpenFileShared()
     THROW_WIN32(dosError);
 }
 
-nlohmann::json ReadJsonFile(FILE* f)
+CredentialFile ReadCredentialFile(FILE* f)
 {
-    if (!f)
-    {
-        return nlohmann::json::object();
-    }
+    WI_ASSERT(f != nullptr);
 
-    fseek(f, 0, SEEK_SET);
+    auto seekResult = fseek(f, 0, SEEK_SET);
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::MessageWslcFailedToOpenFile(GetFilePath(), _wcserror(errno)), seekResult != 0);
 
     // Handle newly created empty files (from CreateFileExclusive).
     if (_filelengthi64(_fileno(f)) <= 0)
     {
-        return nlohmann::json::object();
+        return {};
     }
 
     try
     {
-        return nlohmann::json::parse(f);
+        return nlohmann::json::parse(f).get<CredentialFile>();
     }
-    catch (const nlohmann::json::parse_error&)
+    catch (const nlohmann::json::exception&)
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_INVALID_JSON, Localization::WSLCCLI_CredentialFileCorrupt(GetFilePath()));
     }
 }
 
-void WriteJsonFile(FILE* f, const nlohmann::json& data)
+void WriteCredentialFile(FILE* f, const CredentialFile& data)
 {
-    fseek(f, 0, SEEK_SET);
-    _chsize_s(_fileno(f), 0);
+    auto error = fseek(f, 0, SEEK_SET);
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::MessageWslcFailedToOpenFile(GetFilePath(), _wcserror(errno)), error != 0);
 
-    auto content = data.dump(2);
-    fwrite(content.data(), 1, content.size(), f);
-    fflush(f);
+    error = _chsize_s(_fileno(f), 0);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(_doserrno),
+        Localization::MessageWslcFailedToOpenFile(GetFilePath(), GetSystemErrorString(HRESULT_FROM_WIN32(_doserrno))),
+        error != 0);
+
+    auto content = nlohmann::json(data).dump(2);
+    auto written = fwrite(content.data(), 1, content.size(), f);
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::MessageWslcFailedToOpenFile(GetFilePath(), _wcserror(errno)), written != content.size());
 }
 
-void ModifyFileStore(FILE* f, const std::function<bool(nlohmann::json&)>& modifier)
+void ModifyFileStore(FILE* f, const std::function<bool(CredentialFile&)>& modifier)
 {
-    WI_VERIFY(f != nullptr);
-
-    auto data = ReadJsonFile(f);
+    auto data =  ReadCredentialFile(f);
 
     if (modifier(data))
     {
-        WriteJsonFile(f, data);
+        WriteCredentialFile(f, data);
     }
 }
 
@@ -180,8 +183,8 @@ void FileCredStorage::Store(const std::string& serverAddress, const std::string&
 {
     auto file = RetryOpenFileOnSharingViolation(CreateFileExclusive);
 
-    ModifyFileStore(file.get(), [&](nlohmann::json& data) {
-        data[serverAddress] = Protect(credential);
+    ModifyFileStore(file.get(), [&](CredentialFile& data) {
+        data.Credentials[serverAddress] = CredentialEntry{Protect(credential)};
         return true;
     });
 }
@@ -189,30 +192,34 @@ void FileCredStorage::Store(const std::string& serverAddress, const std::string&
 std::optional<std::string> FileCredStorage::Get(const std::string& serverAddress)
 {
     auto file = RetryOpenFileOnSharingViolation(OpenFileShared);
-    auto data = ReadJsonFile(file.get());
-
-    const auto entry = data.find(serverAddress);
-    if (entry == data.end() || !entry->is_string())
+    if (!file)
     {
         return std::nullopt;
     }
 
-    return Unprotect(entry->get<std::string>());
+    auto data = ReadCredentialFile(file.get());
+    const auto entry = data.Credentials.find(serverAddress);
+    
+    if (entry == data.Credentials.end())
+    {
+        return std::nullopt;
+    }
+
+    return Unprotect(entry->second.RegistryAuthenticationInformation);
 }
 
 void FileCredStorage::Erase(const std::string& serverAddress)
 {
     auto file = RetryOpenFileOnSharingViolation(OpenFileExclusive);
-    if (!file)
-    {
-        THROW_HR_WITH_USER_ERROR(E_NOT_SET, Localization::WSLCCLI_LogoutNotFound(wsl::shared::string::MultiByteToWide(serverAddress)));
-    }
-
     bool erased = false;
-    ModifyFileStore(file.get(), [&](nlohmann::json& data) {
-        erased = data.erase(serverAddress) > 0;
-        return erased;
-    });
+
+    if (file)
+    {
+        ModifyFileStore(file.get(), [&](CredentialFile& data) {
+            erased = data.Credentials.erase(serverAddress) > 0;
+            return erased;
+        });
+    }
 
     THROW_HR_WITH_USER_ERROR_IF(E_NOT_SET, Localization::WSLCCLI_LogoutNotFound(wsl::shared::string::MultiByteToWide(serverAddress)), !erased);
 }
@@ -220,16 +227,18 @@ void FileCredStorage::Erase(const std::string& serverAddress)
 std::vector<std::wstring> FileCredStorage::List()
 {
     auto file = RetryOpenFileOnSharingViolation(OpenFileShared);
-    auto data = ReadJsonFile(file.get());
+    if (!file)
+    {
+        return {};
+    }
+
+    auto data = ReadCredentialFile(file.get());
 
     std::vector<std::wstring> result;
 
-    for (const auto& [key, value] : data.items())
+    for (const auto& [key, value] : data.Credentials)
     {
-        if (value.is_string())
-        {
-            result.push_back(wsl::shared::string::MultiByteToWide(key));
-        }
+        result.push_back(wsl::shared::string::MultiByteToWide(key));
     }
 
     return result;

@@ -144,6 +144,41 @@ class WSLCE2ERegistryTests
         VERIFY_IS_TRUE(result.Stderr->find(L"Must provide --username with --password-stdin") != std::wstring::npos);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Registry_Login_InvalidCredentials)
+    {
+        auto session = OpenDefaultElevatedSession();
+
+        {
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, c_username, c_password, 15003);
+            auto registryAddressW = string::MultiByteToWide(registryAddress);
+
+            // Login with wrong password should fail.
+            {
+                auto result = RunWslc(std::format(L"login -u {} -p wrongpassword {}", string::MultiByteToWide(c_username), registryAddressW));
+                VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+                VERIFY_IS_TRUE(result.Stderr.has_value());
+                VERIFY_IS_TRUE(result.Stderr->find(L"401 Unauthorized") != std::wstring::npos);
+            }
+
+            // Login with wrong username should fail.
+            {
+                auto result = RunWslc(std::format(L"login -u wronguser -p {} {}", string::MultiByteToWide(c_password), registryAddressW));
+                VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
+                VERIFY_IS_TRUE(result.Stderr.has_value());
+                VERIFY_IS_TRUE(result.Stderr->find(L"401 Unauthorized") != std::wstring::npos);
+            }
+
+            // Login with correct credentials should still succeed after failed attempts.
+            {
+                auto result = RunWslc(std::format(
+                    L"login -u {} -p {} {}", string::MultiByteToWide(c_username), string::MultiByteToWide(c_password), registryAddressW));
+                result.Verify({.Stdout = Localization::WSLCCLI_LoginSucceeded() + L"\r\n", .Stderr = L"", .ExitCode = 0});
+
+                VerifyLogoutSucceeds(registryAddressW);
+            }
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Registry_Login_CredentialInputMethods)
     {
         auto session = OpenDefaultElevatedSession();

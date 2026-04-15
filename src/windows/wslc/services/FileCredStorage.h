@@ -14,8 +14,25 @@ Abstract:
 #pragma once
 
 #include "ICredentialStorage.h"
+#include "JsonUtils.h"
 
 namespace wsl::windows::wslc::services {
+
+inline constexpr int CredentialFileVersion = 1;
+
+struct CredentialEntry
+{
+    std::string RegistryAuthenticationInformation;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CredentialEntry, RegistryAuthenticationInformation);
+};
+
+struct CredentialFile
+{
+    int Version = CredentialFileVersion;
+    std::map<std::string, CredentialEntry> Credentials;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CredentialFile, Version, Credentials);
+};
 
 class FileCredStorage final : public ICredentialStorage
 {
