@@ -2512,11 +2512,11 @@ Return Value:
 
             int Status{};
             auto Pid = waitpid(-1, &Status, WNOHANG);
-            if (Result == 0)
+            if (Pid == 0)
             {
                 continue;
             }
-            else if (Result > 0)
+            else if (Pid > 0)
             {
                 if (Pid == distroInitPid.value())
                 {
