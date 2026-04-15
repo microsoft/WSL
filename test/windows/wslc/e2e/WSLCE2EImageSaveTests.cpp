@@ -91,7 +91,7 @@ class WSLCE2EImageSaveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Save_ToStdout_Success)
     {
-        const auto result = RunWslcAndRedirectToFile(format(L"image save {}", DebianImage.NameAndTag()), SavedArchivePath);
+        const auto result = RunWslcAndRedirectToFile(std::format(L"image save {}", DebianImage.NameAndTag()), SavedArchivePath);
         result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(std::filesystem::exists(SavedArchivePath));
