@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "JsonUtils.h"
 #include <string>
 
 namespace wsl::windows::wslc::models {
