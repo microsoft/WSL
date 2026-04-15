@@ -47,11 +47,11 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
-// Delete Command
-struct VolumeDeleteCommand final : public Command
+// Remove Command
+struct VolumeRemoveCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"remove";
-    VolumeDeleteCommand(const std::wstring& parent) : Command(CommandName, {L"delete", L"rm"}, parent)
+    VolumeRemoveCommand(const std::wstring& parent) : Command(CommandName, {L"delete", L"rm"}, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

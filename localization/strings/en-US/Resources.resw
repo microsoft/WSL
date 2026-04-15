@@ -2550,10 +2550,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
     <value>Creates a named volume that can be attached to containers.</value>
   </data>
-  <data name="WSLCCLI_VolumeDeleteDesc" xml:space="preserve">
+  <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
     <value>Remove one or more volumes.</value>
   </data>
-  <data name="WSLCCLI_VolumeDeleteLongDesc" xml:space="preserve">
+  <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
     <value>Removes one or more volumes. A volume cannot be removed if it is in use by a container.</value>
   </data>
   <data name="WSLCCLI_VolumeInspectDesc" xml:space="preserve">

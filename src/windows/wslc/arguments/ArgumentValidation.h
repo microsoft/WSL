@@ -61,6 +61,5 @@ void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
-void ValidateVolumeDriver(const std::vector<std::wstring>& values, const std::wstring& argName);
 
 } // namespace wsl::windows::wslc::validation

@@ -68,7 +68,7 @@ private:
     {
         std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
             {L"create", Localization::WSLCCLI_VolumeCreateDesc()},
-            {L"remove", Localization::WSLCCLI_VolumeDeleteDesc()},
+            {L"remove", Localization::WSLCCLI_VolumeRemoveDesc()},
             {L"inspect", Localization::WSLCCLI_VolumeInspectDesc()},
             {L"list", Localization::WSLCCLI_VolumeListDesc()},
         };

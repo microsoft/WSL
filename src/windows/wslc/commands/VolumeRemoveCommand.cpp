@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    VolumeDeleteCommand.cpp
+    VolumeRemoveCommand.cpp
 
 Abstract:
 
@@ -24,7 +24,7 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Volume Delete Command
-std::vector<Argument> VolumeDeleteCommand::GetArguments() const
+std::vector<Argument> VolumeRemoveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::VolumeName, true, NO_LIMIT),
@@ -32,22 +32,19 @@ std::vector<Argument> VolumeDeleteCommand::GetArguments() const
     };
 }
 
-std::wstring VolumeDeleteCommand::ShortDescription() const
+std::wstring VolumeRemoveCommand::ShortDescription() const
 {
-    return Localization::WSLCCLI_VolumeDeleteDesc();
+    return Localization::WSLCCLI_VolumeRemoveDesc();
 }
 
-std::wstring VolumeDeleteCommand::LongDescription() const
+std::wstring VolumeRemoveCommand::LongDescription() const
 {
-    return Localization::WSLCCLI_VolumeDeleteLongDesc();
+    return Localization::WSLCCLI_VolumeRemoveLongDesc();
 }
 
-// clang-format off
-void VolumeDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
+void VolumeRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context
-        << CreateSession
-        << DeleteVolumes;
+    context << CreateSession //
+            << DeleteVolumes;
 }
-// clang-format on
 } // namespace wsl::windows::wslc

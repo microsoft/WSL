@@ -107,7 +107,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return Localization::WSLCCLI_VolumeDeleteLongDesc() + L"\r\n\r\n";
+        return Localization::WSLCCLI_VolumeRemoveLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
