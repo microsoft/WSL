@@ -118,7 +118,7 @@ nlohmann::json ReadJsonFile(FILE* f)
     }
     catch (const nlohmann::json::parse_error&)
     {
-        THROW_HR_WITH_USER_ERROR(WSL_E_INVALID_JSON,Localization::WSLCCLI_CredentialFileCorrupt(GetFilePath()));
+        THROW_HR_WITH_USER_ERROR(WSL_E_INVALID_JSON, Localization::WSLCCLI_CredentialFileCorrupt(GetFilePath()));
     }
 }
 
