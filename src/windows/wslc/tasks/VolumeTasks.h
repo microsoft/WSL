@@ -13,16 +13,12 @@ Abstract:
 --*/
 #pragma once
 #include "CLIExecutionContext.h"
-#include "Task.h"
-
-using wsl::windows::wslc::execution::CLIExecutionContext;
 
 namespace wsl::windows::wslc::task {
 
-void CreateVolume(CLIExecutionContext& context);
-void DeleteVolumes(CLIExecutionContext& context);
-void GetVolumes(CLIExecutionContext& context);
-void InspectVolumes(CLIExecutionContext& context);
-void ListVolumes(CLIExecutionContext& context);
-
+void CreateVolume(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void DeleteVolumes(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void GetVolumes(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void InspectVolumes(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void ListVolumes(wsl::windows::wslc::execution::CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

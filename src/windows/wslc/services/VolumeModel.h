@@ -14,7 +14,6 @@ Abstract:
 
 #pragma once
 
-#include <wslc.h>
 #include <string>
 
 namespace wsl::windows::wslc::models {

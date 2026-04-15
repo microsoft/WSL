@@ -542,18 +542,18 @@ class WSLCE2EContainerCreateTests
 
         // Create the named volume
         auto result = RunWslc(std::format(L"volume create {}", volumeName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Write data to the volume using a container
         result = RunWslc(std::format(
             L"container run --rm --volume {}:/data {} sh -c \"echo -n 'named_volume_data' > /data/testfile\"",
             volumeName,
             AlpineImage.NameAndTag()));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Read data back from the volume using another container
         result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, AlpineImage.NameAndTag()));
-        result.Verify({.Stdout = L"named_volume_data", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"named_volume_data", .Stderr = L"", .ExitCode = 0});
 
         // Cleanup
         RunWslc(std::format(L"volume rm {}", volumeName));
@@ -569,7 +569,7 @@ class WSLCE2EContainerCreateTests
 
         // Create the named volume
         auto result = RunWslc(std::format(L"volume create {}", volumeName));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Write data using first container
         result = RunWslc(std::format(
@@ -577,17 +577,17 @@ class WSLCE2EContainerCreateTests
             WslcContainerName,
             volumeName,
             AlpineImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Remove first container
         RunWslc(std::format(L"container rm {}", WslcContainerName));
 
         // Read data using second container
         result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/testfile", volumeName, AlpineImage.NameAndTag()));
-        result.Verify({.Stdout = L"persist_test", .Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stdout = L"persist_test", .Stderr = L"", .ExitCode = 0});
 
         // Cleanup
         RunWslc(std::format(L"volume rm {}", volumeName));
