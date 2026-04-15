@@ -62,8 +62,6 @@ try
     WslTraceLoggingInitialize(WslcTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanup = wil::scope_exit([] { WslTraceLoggingUninitialize(); });
 
-    wsl::windows::common::wslutil::ConfigureCrashHandler();
-
     // Don't kill the process on unknown C++ exceptions
     wil::g_fResultFailFastUnknownExceptions = false;
 
