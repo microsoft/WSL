@@ -154,7 +154,8 @@ class WSLCE2ERegistryTests
 
             // Login with wrong password should fail.
             {
-                auto result = RunWslc(std::format(L"login -u {} -p wrongpassword {}", string::MultiByteToWide(c_username), registryAddressW));
+                auto result =
+                    RunWslc(std::format(L"login -u {} -p wrongpassword {}", string::MultiByteToWide(c_username), registryAddressW));
                 VERIFY_ARE_EQUAL(1u, result.ExitCode.value_or(0));
                 VERIFY_IS_TRUE(result.Stderr.has_value());
                 VERIFY_IS_TRUE(result.Stderr->find(L"401 Unauthorized") != std::wstring::npos);
