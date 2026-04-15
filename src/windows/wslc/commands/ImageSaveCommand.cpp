@@ -28,7 +28,7 @@ std::vector<Argument> ImageSaveCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ImageId, true),
-        Argument::Create(ArgType::Output, true),
+        Argument::Create(ArgType::Output),
         Argument::Create(ArgType::Session),
     };
 }

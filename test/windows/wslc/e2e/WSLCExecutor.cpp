@@ -163,6 +163,48 @@ void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expect
     RunWslc(cmd, elevationType).Verify(expected);
 }
 
+WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, std::optional<std::filesystem::path> outputPath, ElevationType elevationType)
+{
+    auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
+    wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+
+    // If running non-elevated we need to keep the token alive until it completes.
+    wil::unique_handle nonElevatedToken;
+    if (elevationType == ElevationType::NonElevated)
+    {
+        nonElevatedToken = GetNonElevatedPrimaryToken();
+        process.SetToken(nonElevatedToken.get());
+    }
+
+    auto [parentStderrRead, childStderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+    wil::unique_hfile redirectedStdout;
+    HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    std::wstring effectiveCommandLine = commandLine;
+    if (outputPath.has_value())
+    {
+        SECURITY_ATTRIBUTES securityAttributes{};
+        securityAttributes.nLength = sizeof(securityAttributes);
+        securityAttributes.bInheritHandle = TRUE;
+        redirectedStdout.reset(CreateFileW(outputPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ, &securityAttributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(!redirectedStdout);
+        stdoutHandle = redirectedStdout.get();
+        effectiveCommandLine = std::format(L"{} > {}", commandLine, outputPath->wstring());
+    }
+
+    process.SetStdHandles(nullptr, stdoutHandle, childStderrWrite.get());
+
+    const auto processHandle = process.Start();
+    childStderrWrite.reset();
+
+    const auto exitCode = wsl::windows::common::SubProcess::GetExitCode(processHandle.get());
+    const auto stdErrOutput = wsl::shared::string::MultiByteToWide(ReadToString(parentStderrRead.get()));
+
+    return {.CommandLine = std::move(effectiveCommandLine), .Stdout = L"", .Stderr = stdErrOutput, .ExitCode = exitCode};
+}
+
 std::wstring GetWslcHeader()
 {
     std::wstringstream header;

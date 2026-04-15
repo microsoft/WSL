@@ -23,6 +23,7 @@ Abstract:
 #include "TableOutput.h"
 #include "Task.h"
 #include <format>
+#include <wslutil.h>
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::string;
@@ -190,11 +191,24 @@ void SaveImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
-    WI_ASSERT(context.Args.Contains(ArgType::Output));
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
-    auto& output = context.Args.Get<ArgType::Output>();
-    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+
+    if (context.Args.Contains(ArgType::Output))
+    {
+        auto& output = context.Args.Get<ArgType::Output>();
+        services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+    }
+    else
+    {
+        auto stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (wsl::windows::common::wslutil::IsConsoleHandle(stdoutHandle))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageSaveStdoutIsTerminalError());
+        }
+
+        services::ImageService::Save(session, WideToMultiByte(imageId), stdoutHandle, context.CreateCancelEvent());
+    }
 }
 
 void TagImage(CLIExecutionContext& context)

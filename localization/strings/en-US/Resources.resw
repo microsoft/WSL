@@ -2554,4 +2554,7 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
     <value>Requested load but no input provided.</value>
   </data>
+  <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
+    <value>Cannot write image to terminal. Use the -o flag or redirect stdout.</value>
+  </data>
 </root>
