@@ -1779,34 +1779,53 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateVolume(const WSLCVolumeOptions* Options)
+HRESULT WSLCSession::CreateVolume(const WSLCVolumeOptions* Options, WSLCVolumeInformation* VolumeInfo)
 try
 {
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
-    RETURN_HR_IF_NULL(E_POINTER, Options->Name);
-    RETURN_HR_IF_NULL(E_POINTER, Options->Type);
+    RETURN_HR_IF_NULL(E_POINTER, VolumeInfo);
+    ZeroMemory(VolumeInfo, sizeof(*VolumeInfo));
 
-    std::string name = Options->Name;
-    std::string type = Options->Type;
+    // Default driver to "vhd" if not specified. Currently only "vhd" is supported.
+    // TODO: Add support for docker's builtin volume drivers and change the default to "local"
+    // to match docker's behaviour.
+    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCVhdVolumeDriver;
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver);
 
-    ValidateName(name.c_str());
+    auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
+    auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCVolumeMetadataLabel);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     std::lock_guard volumesLock(m_volumesLock);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(type), type != WSLCVhdVolumeType);
 
-    auto volume = WSLCVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), m_virtualMachine.value(), m_dockerClient.value());
+    if (Options->Name != nullptr && Options->Name[0] != '\0')
+    {
+        ValidateName(Options->Name);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(Options->Name));
+    }
+
+    auto volume = WSLCVhdVolumeImpl::Create(
+        Options->Name,
+        std::move(driverOpts),
+        std::move(labels),
+        m_storageVhdPath.parent_path(),
+        m_virtualMachine.value(),
+        m_dockerClient.value());
+
+    const auto& name = volume->Name();
+    auto info = volume->GetVolumeInformation();
+
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
     WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"));
 
+    *VolumeInfo = info;
     return S_OK;
 }
 CATCH_RETURN();
@@ -1859,10 +1878,9 @@ try
     auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(m_volumes.size());
 
     ULONG index = 0;
-    for (const auto& [name, volume] : m_volumes)
+    for (const auto& [name, vol] : m_volumes)
     {
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Type, WSLCVhdVolumeType) != 0);
+        output[index] = vol->GetVolumeInformation();
         index++;
     }
 
@@ -1900,6 +1918,13 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WSLCPruneVolumesResults* /*Results*/)
+{
+    // TODO: Implement volume pruning. Docker's volume prune API skips bind-mount volumes,
+    // so WSLC VHD volumes require custom handling.
+    return E_NOTIMPL;
+}
 
 HRESULT WSLCSession::Terminate()
 try
@@ -2217,7 +2242,7 @@ void WSLCSession::RecoverExistingVolumes()
 
     for (const auto& volume : volumes)
     {
-        if (!volume.Labels.contains(WSLCVolumeMetadataLabel))
+        if (!volume.Labels.has_value() || !volume.Labels->contains(WSLCVolumeMetadataLabel))
         {
             m_anonymousVolumes.insert(volume.Name);
             continue;

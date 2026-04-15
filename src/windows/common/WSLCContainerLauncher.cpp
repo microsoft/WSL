@@ -11,7 +11,6 @@ Abstract:
     This file contains the implementation for WSLCContainerLauncher.
 
 --*/
-
 #include "precomp.h"
 #include "WSLCContainerLauncher.h"
 

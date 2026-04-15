@@ -341,4 +341,6 @@ std::string BuildRegistryAuthHeader(const std::string& username, const std::stri
 // returned by Authenticate().
 std::string BuildRegistryAuthHeader(const std::string& identityToken, const std::string& serverAddress);
 
+std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
+
 } // namespace wsl::windows::common::wslutil

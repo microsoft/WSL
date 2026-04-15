@@ -3189,12 +3189,17 @@ class WSLCTests
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
-        volumeOptions.Type = "vhd";
-        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
+
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
 
         // Create volume and validate duplicate volume name handling.
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
-        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        VERIFY_ARE_EQUAL(std::string(volInfo.Name), volumeName);
+        VERIFY_ARE_EQUAL(std::string(volInfo.Driver), std::string("vhd"));
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Verify volume VHD exists and mount point is present in the VM.
         VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
@@ -3277,10 +3282,13 @@ class WSLCTests
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
-        volumeOptions.Type = "vhd";
-        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
 
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
         VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
 
         // Create a container that uses the named volume and writes a marker.
@@ -3334,45 +3342,62 @@ class WSLCTests
     {
         const std::string volumeName = "wslc-volume-name";
 
-        auto validateInvalidOptionsFailure =
-            [&](const std::string& options, HRESULT expectedResult, const std::optional<std::wstring>& expectedMessage = std::nullopt) {
-                LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        auto validateInvalidOptionsFailure = [&](const WSLCDriverOption* opts,
+                                                 ULONG optsCount,
+                                                 HRESULT expectedResult,
+                                                 const std::optional<std::wstring>& expectedMessage = std::nullopt) {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
-                auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
-                WSLCVolumeOptions volumeOptions{};
-                volumeOptions.Name = volumeName.c_str();
-                volumeOptions.Type = "vhd";
-                volumeOptions.Options = options.c_str();
+            WSLCVolumeOptions volumeOptions{};
+            volumeOptions.Name = volumeName.c_str();
+            volumeOptions.DriverOpts = opts;
+            volumeOptions.DriverOptsCount = optsCount;
 
-                const auto result = m_defaultSession->CreateVolume(&volumeOptions);
+            WSLCVolumeInformation volInfo{};
+            const auto result = m_defaultSession->CreateVolume(&volumeOptions, &volInfo);
 
-                if (result != expectedResult)
-                {
-                    LogInfo(
-                        "CreateVolume mismatch options='%hs' result=0x%08x expected=0x%08x",
-                        options.c_str(),
-                        static_cast<unsigned int>(result),
-                        static_cast<unsigned int>(expectedResult));
-                }
+            if (result != expectedResult)
+            {
+                LogInfo("CreateVolume mismatch result=0x%08x expected=0x%08x", static_cast<unsigned int>(result), static_cast<unsigned int>(expectedResult));
+            }
 
-                VERIFY_ARE_EQUAL(result, expectedResult);
-                if (expectedMessage.has_value())
-                {
-                    ValidateCOMErrorMessage(expectedMessage);
-                }
-            };
+            VERIFY_ARE_EQUAL(result, expectedResult);
+            if (expectedMessage.has_value())
+            {
+                ValidateCOMErrorMessage(expectedMessage);
+            }
+        };
 
-        validateInvalidOptionsFailure("not-json", WSL_E_INVALID_JSON);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"abc"})", WSL_E_INVALID_JSON);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"+-1"})", WSL_E_INVALID_JSON);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"123abc"})", WSL_E_INVALID_JSON);
+        // Missing SizeBytes.
+        validateInvalidOptionsFailure(nullptr, 0, E_INVALIDARG, L"Missing required option: 'SizeBytes'");
 
-        validateInvalidOptionsFailure(R"({"SizeBytes":"18446744073709551616"})", E_INVALIDARG);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"-1"})", E_INVALIDARG);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"0"})", E_INVALIDARG, L"Invalid size: 0");
-        validateInvalidOptionsFailure("{}", E_INVALIDARG, L"Invalid volume options: '{}'");
-        validateInvalidOptionsFailure("", WSL_E_INVALID_JSON);
+        WSLCDriverOption wrongOption[] = {{"WrongOption", "value"}};
+        validateInvalidOptionsFailure(wrongOption, ARRAYSIZE(wrongOption), E_INVALIDARG, L"Missing required option: 'SizeBytes'");
+
+        // Invalid SizeBytes values.
+        WSLCDriverOption emptySize[] = {{"SizeBytes", ""}};
+        validateInvalidOptionsFailure(emptySize, ARRAYSIZE(emptySize), E_INVALIDARG, L"Invalid size: ");
+
+        WSLCDriverOption zeroSize[] = {{"SizeBytes", "0"}};
+        validateInvalidOptionsFailure(zeroSize, ARRAYSIZE(zeroSize), E_INVALIDARG, L"Invalid size: 0");
+
+        WSLCDriverOption invalidSizeAbc[] = {{"SizeBytes", "abc"}};
+        validateInvalidOptionsFailure(invalidSizeAbc, ARRAYSIZE(invalidSizeAbc), E_INVALIDARG, L"Invalid size: abc");
+
+        WSLCDriverOption invalidSizeMixed[] = {{"SizeBytes", "123abc"}};
+        validateInvalidOptionsFailure(invalidSizeMixed, ARRAYSIZE(invalidSizeMixed), E_INVALIDARG, L"Invalid size: 123abc");
+
+        WSLCDriverOption invalidSizeSign[] = {{"SizeBytes", "+-1"}};
+        validateInvalidOptionsFailure(invalidSizeSign, ARRAYSIZE(invalidSizeSign), E_INVALIDARG, L"Invalid size: +-1");
+
+        WSLCDriverOption invalidSizeOverflow[] = {{"SizeBytes", "18446744073709551616"}};
+        validateInvalidOptionsFailure(
+            invalidSizeOverflow, ARRAYSIZE(invalidSizeOverflow), E_INVALIDARG, L"Invalid size: 18446744073709551616");
+
+        WSLCDriverOption invalidSizeNeg[] = {{"SizeBytes", "-1"}};
+        validateInvalidOptionsFailure(invalidSizeNeg, ARRAYSIZE(invalidSizeNeg), E_INVALIDARG, L"Invalid size: -1");
     }
 
     WSLC_TEST_METHOD(ListAndInspectNamedVolumesTest)
@@ -3393,18 +3418,21 @@ class WSLCTests
         // Create first volume and verify list returns one entry.
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName1.c_str();
-        volumeOptions.Type = "vhd";
-        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
 
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
         VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName1);
-        VERIFY_ARE_EQUAL(std::string(volumes[0].Type), std::string("vhd"));
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Driver), std::string("vhd"));
 
         // Create second volume and verify list returns two entries.
         volumeOptions.Name = volumeName2.c_str();
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
 
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, volumes.size());
@@ -3413,7 +3441,7 @@ class WSLCTests
         for (const auto& v : volumes)
         {
             names.insert(v.Name);
-            VERIFY_ARE_EQUAL(std::string(v.Type), std::string("vhd"));
+            VERIFY_ARE_EQUAL(std::string(v.Driver), std::string("vhd"));
         }
 
         VERIFY_IS_TRUE(names.contains(volumeName1));
@@ -3426,10 +3454,8 @@ class WSLCTests
 
         auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, volumeName1);
-        VERIFY_ARE_EQUAL(inspect.Type, std::string("vhd"));
-        VERIFY_IS_TRUE(inspect.VhdVolume.has_value());
-        VERIFY_ARE_EQUAL(inspect.VhdVolume->SizeBytes, 1073741824ull);
-        VERIFY_IS_FALSE(inspect.VhdVolume->HostPath.empty());
+        VERIFY_ARE_EQUAL(inspect.Driver, std::string("vhd"));
+        VERIFY_IS_TRUE(inspect.DriverOpts.contains("SizeBytes"));
 
         // Verify InspectVolume fails for a non-existent volume.
         output.reset();

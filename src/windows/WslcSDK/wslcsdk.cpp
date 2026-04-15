@@ -493,13 +493,15 @@ try
 
     WSLCVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
-    // Only supported value currently
-    volumeOptions.Type = "vhd";
+    volumeOptions.Driver = "vhd";
 
-    auto dynamicOptions = std::format(R"({{ "SizeBytes": "{}" }})", options->sizeInBytes);
-    volumeOptions.Options = dynamicOptions.c_str();
+    auto sizeStr = std::to_string(options->sizeInBytes);
+    WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeStr.c_str()}};
+    volumeOptions.DriverOpts = driverOpts;
+    volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions));
+    WSLCVolumeInformation volumeInfo{};
+    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
 }
 CATCH_RETURN();
 
