@@ -757,6 +757,7 @@ try
     }
     catch (...)
     {
+        flushLine();
         LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
         try
         {
@@ -779,6 +780,8 @@ try
         }
         throw;
     }
+
+    flushLine();
 
     THROW_HR_IF_MSG(E_ABORT, cancelled, "Cancellation handle was signaled");
 

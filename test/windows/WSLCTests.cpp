@@ -1444,6 +1444,7 @@ class WSLCTests
         WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
         VERIFY_IS_TRUE(output.find("[greeting] WSL containers") != std::string::npos);
+        VERIFY_IS_TRUE(output.find("[description] support multi-stage builds") != std::string::npos);
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-multistage:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-multistage:latest", "wslc-build-multistage-container");
