@@ -69,7 +69,7 @@ class WSLCE2EPushPullTests
         auto session = OpenDefaultElevatedSession();
 
         {
-            auto [registryContainer, registryAddress] = StartLocalRegistry(*session, {}, {}, 50001);
+            auto [registryContainer, registryAddress] = StartLocalRegistry(*session);
 
             // Ensure the registry container is cleaned up after the test.
             auto registryAddressW = string::MultiByteToWide(registryAddress);
