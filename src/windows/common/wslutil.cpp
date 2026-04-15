@@ -1464,7 +1464,7 @@ std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::st
 
 std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValuePairs(const KeyValuePair* pairs, ULONG count, LPCSTR reservedKey)
 {
-    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr );
+    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);
 
     std::map<std::string, std::string> result;
 
