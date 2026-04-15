@@ -238,6 +238,9 @@ struct VolumeMount
     {
         return m_isReadOnlyMode;
     }
+
+    static bool IsValidNamedVolumeName(const std::wstring& name);
+
     static VolumeMount Parse(const std::wstring& value);
 
 private:
