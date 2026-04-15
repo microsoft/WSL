@@ -361,7 +361,7 @@ void wsl::windows::common::wslutil::CoInitializeSecurity()
 
 void wsl::windows::common::wslutil::ConfigureCrashHandler()
 {
-    AddVectoredExceptionHandler(1, OnException);
+    SetUnhandledExceptionFilter(OnException);
 }
 
 void wsl::windows::common::wslutil::ConfigureCrt()

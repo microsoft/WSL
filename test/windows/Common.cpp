@@ -2054,6 +2054,9 @@ Return Value:
 
         g_dumpKeyChange.emplace(
             HKEY_LOCAL_MACHINE, LXSS_REGISTRY_PATH, wsl::windows::common::wslutil::c_crashFolderKeyName, g_dumpFolder.c_str());
+
+        // Also install the vectored exception handler in the test host process itself.
+        wsl::windows::common::wslutil::ConfigureCrashHandler();
     }
 
     g_WatchdogTimer = CreateThreadpoolTimer(LxsstuWatchdogTimer, nullptr, nullptr);
