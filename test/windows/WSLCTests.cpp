@@ -2553,7 +2553,8 @@ class WSLCTests
         auto callback = Microsoft::WRL::Make<StuckBuildProgressCallback>(callbackReached, exitEvent);
 
         std::promise<HRESULT> buildResult;
-        std::thread buildThread([&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get())); });
+        std::thread buildThread(
+            [&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get())); });
 
         auto joinThread = wil::scope_exit([&]() {
             exitEvent.SetEvent();
