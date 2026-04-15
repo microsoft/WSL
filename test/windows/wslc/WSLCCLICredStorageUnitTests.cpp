@@ -28,7 +28,7 @@ namespace WSLCCredStorageUnitTests {
 class WSLCCLICredStorageUnitTests
 {
     WSL_TEST_CLASS(WSLCCLICredStorageUnitTests)
-    
+
     FileCredStorage m_fileStorage;
     WinCredStorage m_winCredStorage;
 
