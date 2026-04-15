@@ -40,6 +40,7 @@ class WSLCE2EContainerRunTests
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(PythonImage);
 
@@ -54,6 +55,7 @@ class WSLCE2EContainerRunTests
     TEST_METHOD_SETUP(TestMethodSetup)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(WslcContainerName2);
 
         EnvTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
         EnvTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
@@ -384,9 +386,6 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortAlreadyInUse)
     {
-        // Bug: https://github.com/microsoft/WSL/issues/14448
-        SKIP_TEST_NOT_IMPL();
-
         // Start a container with a simple server listening on a port
         auto result1 = RunWslc(std::format(
             L"container run -d --name {} -p {}:{} {} {}",
@@ -397,9 +396,28 @@ class WSLCE2EContainerRunTests
             GetPythonHttpServerScript(ContainerTestPort)));
         result1.Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Attempt to start another container mapping the same host port
-        auto result2 = RunWslc(std::format(L"container run -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
-        result2.Verify({.ExitCode = 1});
+        // Create a second container mapping the same host port to validate the full error message
+        auto createResult =
+            RunWslc(std::format(L"container create -p {}:{} {}", HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = createResult.GetStdoutOneLine();
+
+        // Attempt to start — should fail with port conflict
+        auto startResult = RunWslc(std::format(L"container start {}", containerId));
+        startResult.Verify(
+            {.Stderr = std::format(
+                 L"Port 127.0.0.1:{}/tcp is already in use, cannot start container {}\r\nError code: ERROR_ALREADY_EXISTS\r\n", HostTestPort1, containerId),
+             .ExitCode = 1});
+
+        // Clean up the created container
+        RunWslc(std::format(L"container rm {}", containerId)).Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Verify 'container run' auto-cleans up on port conflict (no ghost container)
+        auto runResult = RunWslc(std::format(
+            L"container run --name {} -p {}:{} {}", WslcContainerName2, HostTestPort1, ContainerTestPort, DebianImage.NameAndTag()));
+        runResult.Verify({.ExitCode = 1});
+
+        VerifyContainerIsNotListed(WslcContainerName2);
     }
 
     // https://github.com/microsoft/WSL/issues/14433
@@ -535,9 +553,22 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --workdir /tmp {} pwd", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir_ShortAlias)
+    {
+        auto result = RunWslc(std::format(L"container run --rm -w /tmp {} pwd", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
+    const std::wstring WslcContainerName2 = L"wslc-test-container-2";
 
     // Test environment variables
     const std::wstring HostEnvVariableName = L"WSLC_TEST_HOST_ENV";
@@ -608,6 +639,7 @@ private:
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
+                << L"  -w,--workdir      Working directory inside the container\r\n"
                 << L"  -h,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();

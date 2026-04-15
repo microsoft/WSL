@@ -12,7 +12,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "SessionModel.h"
+#include "WSLCSessionDefaults.h"
 #include "ImageModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
@@ -341,7 +341,14 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
     std::wstring targetSession = sessionName;
     if (targetSession.empty())
     {
-        targetSession = std::wstring{wsl::windows::wslc::models::SessionOptions::GetDefaultSessionName()};
+        auto isElevated = wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token(TOKEN_QUERY).get());
+        auto baseName = isElevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+
+        wchar_t username[256 + 1] = {};
+        DWORD usernameLen = ARRAYSIZE(username);
+        THROW_IF_WIN32_BOOL_FALSE(GetUserNameW(username, &usernameLen));
+
+        targetSession = std::format(L"{}-{}", baseName, username);
     }
 
     auto listResult = RunWslc(L"session list");

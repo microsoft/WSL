@@ -101,6 +101,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetUser(std::move(user));
     }
 
+    if (!options.WorkingDirectory.empty())
+    {
+        containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
+    }
+
     for (const auto& tmpfsSpec : options.Tmpfs)
     {
         auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
@@ -291,13 +296,15 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 {
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions);
-    runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
 
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
     THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
+
+    // Disable auto-delete only after successful start
+    runningContainer.SetDeleteOnClose(false);
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
