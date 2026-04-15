@@ -2569,6 +2569,7 @@ class WSLCTests
         // Terminate the session while the callback is stuck.
         // This should cancel the pending COM call and unblock BuildImage.
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        ResetTestSession();
 
         auto buildFuture = buildResult.get_future();
         auto buildStatus = buildFuture.wait_for(std::chrono::seconds(60));
