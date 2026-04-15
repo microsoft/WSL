@@ -26,6 +26,6 @@
     </Choose>
 
     <Target Name="WSLCSDK_ErrorPlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcSdkInvalidPlatform)' != ''">
-        <Error Text="wslcsdk.dll could not be copied because the $(_wslcSdkInvalidPlatformProperty) '$(_wslcSdkInvalidPlatform)' is not supported." />
+        <Error Text="wslcsdk.dll could not be copied because the $(_wslcSdkInvalidPlatformProperty) '$(_wslcSdkInvalidPlatform)' is not supported. Only x64 and arm64 platforms are supported." />
     </Target>
 </Project>

@@ -1,6 +1,6 @@
 set(TargetApp wslsettings)
 
-configure_csharp_target(${TargetApp})
+enable_language(CSharp)
 
 # needed for csharp_set_xaml_cs_properties
 include(CSharpUtilities)
@@ -182,6 +182,8 @@ csharp_set_xaml_cs_properties(
   Views/Settings/ShellPage.xaml
   Views/Settings/ShellPage.xaml.cs
 )
+
+configure_csharp_target(${TargetApp})
 
 set_property(
   SOURCE App.xaml
