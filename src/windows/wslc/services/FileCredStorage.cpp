@@ -134,12 +134,13 @@ void WriteCredentialFile(FILE* f, const CredentialFile& data)
 
     auto content = nlohmann::json(data).dump(2);
     auto written = fwrite(content.data(), 1, content.size(), f);
-    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::MessageWslcFailedToOpenFile(GetFilePath(), _wcserror(errno)), written != content.size());
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_FAIL, Localization::MessageWslcFailedToOpenFile(GetFilePath(), _wcserror(errno)), written != content.size());
 }
 
 void ModifyFileStore(FILE* f, const std::function<bool(CredentialFile&)>& modifier)
 {
-    auto data =  ReadCredentialFile(f);
+    auto data = ReadCredentialFile(f);
 
     if (modifier(data))
     {
@@ -199,7 +200,7 @@ std::optional<std::string> FileCredStorage::Get(const std::string& serverAddress
 
     auto data = ReadCredentialFile(file.get());
     const auto entry = data.Credentials.find(serverAddress);
-    
+
     if (entry == data.Credentials.end())
     {
         return std::nullopt;
