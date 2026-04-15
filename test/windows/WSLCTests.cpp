@@ -36,7 +36,6 @@ class WSLCTests
 {
     WSLC_TEST_CLASS(WSLCTests)
 
-    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WSLCSessionSettings m_defaultSessionSettings{};

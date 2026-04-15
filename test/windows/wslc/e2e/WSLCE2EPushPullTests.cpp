@@ -25,8 +25,6 @@ class WSLCE2EPushPullTests
 {
     WSLC_TEST_CLASS(WSLCE2EPushPullTests)
 
-    wil::unique_mta_usage_cookie m_mtaCookie;
-
     TEST_CLASS_SETUP(TestClassSetup)
     {
         THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
