@@ -29,8 +29,7 @@ struct bind_event {
     __u32 family;       /* AF_INET or AF_INET6 */
     __u32 protocol;     /* IPPROTO_TCP or IPPROTO_UDP */
     __u16 port;         /* host byte order */
-    __u8  is_bind;      /* 1 = bind, 0 = release */
-    __u8  pad;
+    __u16 pad;
     __u32 addr4;        /* IPv4 address (network byte order) */
     __u8  addr6[16];    /* IPv6 address */
 };

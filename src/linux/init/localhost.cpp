@@ -25,6 +25,8 @@
 #include "SecCompDispatcher.h"
 #include "seccomp_defs.h"
 #include "CommandLine.h"
+#include "NetlinkChannel.h"
+#include "NetlinkTransactionError.h"
 #include "listen_monitor.h"
 #include "listen_monitor.skel.h"
 
@@ -349,6 +351,8 @@ int RunPortTracker(int Argc, char** Argv)
                             " fd"
                             " [" INIT_BPF_FD_ARG
                             " fd]"
+                            " [" INIT_NETLINK_FD_ARG
+                            " fd]"
                             " [" INIT_PORT_TRACKER_LOCALHOST_RELAY " fd]\n";
 
     // This is only supported on VM mode.
@@ -362,11 +366,13 @@ int RunPortTracker(int Argc, char** Argv)
 
     int BpfFd = -1;
     int PortTrackerFd = -1;
+    int NetlinkSocketFd = -1;
     int GuestRelayFd = -1;
 
     ArgumentParser parser(Argc, Argv);
     parser.AddArgument(Integer{BpfFd}, INIT_BPF_FD_ARG);
     parser.AddArgument(Integer{PortTrackerFd}, INIT_PORT_TRACKER_FD_ARG);
+    parser.AddArgument(Integer{NetlinkSocketFd}, INIT_NETLINK_FD_ARG);
     parser.AddArgument(Integer{GuestRelayFd}, INIT_PORT_TRACKER_LOCALHOST_RELAY);
 
     try
@@ -379,7 +385,7 @@ int RunPortTracker(int Argc, char** Argv)
         return 1;
     }
 
-    const bool synchronousMode = BpfFd != -1;
+    const bool synchronousMode = BpfFd != -1 && NetlinkSocketFd != -1;
     const bool localhostRelay = GuestRelayFd != -1;
     auto hvSocketChannel = std::make_shared<wsl::shared::SocketChannel>(wil::unique_fd{PortTrackerFd}, "localhost");
 
@@ -400,13 +406,30 @@ int RunPortTracker(int Argc, char** Argv)
 
     if (!synchronousMode)
     {
-        std::cerr << "synchronous mode requires --bpf-fd\n";
+        std::cerr << "either both or none of --bpf-fd and --netlink-socket can be passed\n";
         return 1;
     }
+
+    auto channel = NetlinkChannel::FromFd(NetlinkSocketFd);
 
     auto channelMutex = std::make_shared<std::mutex>();
 
     auto seccompDispatcher = std::make_shared<SecCompDispatcher>(BpfFd);
+
+    GnsPortTracker portTracker(hvSocketChannel, std::move(channel), seccompDispatcher, channelMutex);
+
+    seccompDispatcher->RegisterHandler(
+        __NR_bind, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
+
+#ifdef __x86_64__
+    seccompDispatcher->RegisterHandler(I386_NR_socketcall, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+#else
+    seccompDispatcher->RegisterHandler(ARMV7_NR_bind, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+#endif
 
     seccompDispatcher->RegisterHandler(__NR_ioctl, [hvSocketChannel, seccompDispatcher, channelMutex](auto notification) -> int {
         LX_GNS_TUN_BRIDGE_REQUEST request{};
@@ -429,7 +452,6 @@ int RunPortTracker(int Argc, char** Argv)
         return reply.Result;
     });
 
-    GnsPortTracker portTracker(hvSocketChannel, channelMutex);
     try
     {
         portTracker.Run();
