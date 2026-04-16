@@ -68,7 +68,6 @@ static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f
-std::optional<RegistryKeyChange<std::wstring>> g_dumpKeyChange;
 static wil::unique_mta_usage_cookie g_mtaCookie;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
@@ -1976,9 +1975,6 @@ Return Value:
 {
     wsl::windows::common::wslutil::InitializeWil();
 
-    // Keep the MTA alive for the entire test module lifetime. Without this,
-    // the per-class MTA cookies leave a gap during class transitions where COM
-    // can unload WinRT DLLs, leaving stale pointers in the C++/WinRT factory cache.
     THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
 
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
@@ -2050,17 +2046,6 @@ Return Value:
 
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"WerReport", g_enableWerReport);
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"LogDmesg", g_LogDmesgAfterEachTest);
-
-    bool enableCrashDumpCollection = false;
-    WEX::TestExecution::RuntimeParameters::TryGetValue(L"CollectCrashDumps", enableCrashDumpCollection);
-
-    if (enableCrashDumpCollection)
-    {
-        LogInfo("Enabling crash dump collection. Target: %ls", g_dumpFolder.c_str());
-
-        g_dumpKeyChange.emplace(
-            HKEY_LOCAL_MACHINE, LXSS_REGISTRY_PATH, wsl::windows::common::wslutil::c_crashFolderKeyName, g_dumpFolder.c_str());
-    }
 
     g_WatchdogTimer = CreateThreadpoolTimer(LxsstuWatchdogTimer, nullptr, nullptr);
     VERIFY_IS_NOT_NULL(g_WatchdogTimer);

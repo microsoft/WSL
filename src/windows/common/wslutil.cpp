@@ -22,7 +22,6 @@ Abstract:
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
 #include "MsiQuery.h"
-#include <Dbghelp.h>
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
@@ -209,8 +208,6 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
 
 #undef X
 
-DEFINE_ENUM_FLAG_OPERATORS(MINIDUMP_TYPE);
-
 wil::unique_hlocal_string GetWinInetErrorString(HRESULT error)
 {
     const wil::unique_hmodule library{LoadLibrary(L"WinInet.dll")};
@@ -264,61 +261,6 @@ constexpr GUID EndianSwap(GUID value)
     return value;
 }
 
-static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
-{
-    try
-    {
-        static std::atomic<bool> handlingException = false;
-        if (handlingException.exchange(true))
-        {
-            return EXCEPTION_CONTINUE_SEARCH; // Don't keep trying if we crash during exception handling.
-        }
-
-        // Collect a crash dump if enabled.
-        auto image = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>()).filename();
-
-        auto lxssKey = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
-        auto crashFolder = wsl::windows::common::registry::ReadOptionalString(lxssKey.get(), nullptr, c_crashFolderKeyName);
-
-        std::optional<std::filesystem::path> dumpPath;
-        if (crashFolder.has_value())
-        {
-            dumpPath = std::filesystem::path(crashFolder.value()) / std::format(L"{}.{}.dmp", image.native(), GetCurrentProcessId());
-        }
-
-        WSL_LOG(
-            "ProcessCrash",
-            TraceLoggingValue(image.c_str(), "Process"),
-            TraceLoggingValue(dumpPath.has_value() ? dumpPath->native().c_str() : L"<none>", "DumpPath"));
-
-        if (!dumpPath.has_value())
-        {
-            return EXCEPTION_CONTINUE_SEARCH;
-        }
-
-        auto dumpFile = wil::create_new_file(dumpPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ);
-        THROW_LAST_ERROR_IF(!dumpFile);
-
-        MINIDUMP_EXCEPTION_INFORMATION exceptionInfo{};
-        exceptionInfo.ThreadId = GetCurrentThreadId();
-        exceptionInfo.ExceptionPointers = exception;
-
-        THROW_IF_WIN32_BOOL_FALSE(MiniDumpWriteDump(
-            GetCurrentProcess(),
-            GetCurrentProcessId(),
-            dumpFile.get(),
-            MiniDumpWithDataSegs | MiniDumpWithFullMemory | MiniDumpWithProcessThreadData | MiniDumpWithHandleData |
-                MiniDumpWithPrivateReadWriteMemory | MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo |
-                MiniDumpWithThreadInfo | MiniDumpWithTokenInformation | MiniDumpWithPrivateWriteCopyMemory | MiniDumpWithCodeSegs,
-            &exceptionInfo,
-            nullptr,
-            nullptr));
-    }
-    CATCH_LOG();
-
-    return EXCEPTION_CONTINUE_SEARCH;
-}
-
 std::regex BuildImageReferenceRegex()
 {
     // See: https://github.com/containers/image/blob/main/docker/reference/regexp.go
@@ -357,11 +299,6 @@ void wsl::windows::common::wslutil::CoInitializeSecurity()
 {
     THROW_IF_FAILED(CoInitializeSecurity(
         nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_STATIC_CLOAKING, 0));
-}
-
-void wsl::windows::common::wslutil::ConfigureCrashHandler()
-{
-    AddVectoredExceptionHandler(1, OnException);
 }
 
 void wsl::windows::common::wslutil::ConfigureCrt()

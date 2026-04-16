@@ -71,9 +71,6 @@ HRESULT WslInstallerService::OnServiceStarting()
     wsl::windows::common::wslutil::ConfigureCrt();
 
     WslTraceLoggingInitialize(WslServiceTelemetryProvider, !wsl::shared::OfficialBuild);
-
-    wsl::windows::common::wslutil::ConfigureCrashHandler();
-
     wsl::windows::common::security::ApplyProcessMitigationPolicies();
 
     return S_OK;
