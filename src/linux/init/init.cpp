@@ -336,6 +336,10 @@ int GenerateSystemdUnits(int Argc, char** Argv)
         // Mask NetworkManager-wait-online.service for the same reason, as it causes timeouts on distros using NetworkManager.
         THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/NetworkManager-wait-online.service", installPath).c_str()) < 0);
 
+        // Mask console-getty.service since /dev/tty devices are shared at the VM level across all distros.
+        // When multiple distros are running, the second distro's getty fails because the tty is already held.
+        THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/console-getty.service", installPath).c_str()) < 0);
+
         // Enable DNS response caching in systemd-resolved. On some distros (notably Ubuntu) the default
         // Cache=no-negative discards negative (NODATA/NXDOMAIN) responses, which causes repeated wire
         // queries for unsupported record types (e.g. AAAA on IPv4-only networks). This override aligns
@@ -2517,11 +2521,11 @@ Return Value:
 
             int Status{};
             auto Pid = waitpid(-1, &Status, WNOHANG);
-            if (Result == 0)
+            if (Pid == 0)
             {
                 continue;
             }
-            else if (Result > 0)
+            else if (Pid > 0)
             {
                 if (Pid == distroInitPid.value())
                 {

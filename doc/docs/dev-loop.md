@@ -96,7 +96,8 @@ bin\x64\debug\test.bat /name:*UnitTest* -f
 
 See [debugging](debugging.md) for general debugging instructions.
 
-To attach a debugger to the unit test process, use: `/waitfordebugger` when calling `test.bat`. 
+To automatically attach WinDbgX to the unit test process, use: `/attachdebugger` when calling `test.bat`.
+To wait for a debugger to be manually attached, use: `/waitfordebugger`.
 Use `/breakonfailure` to automatically break on the first test failure. 
 
 ## Tips and tricks
@@ -126,4 +127,11 @@ Also see:
 Every pull request needs to be clang-formatted before it can be merged.
 
 The code can be manually formatted by running: `powershell .\FormatSource.ps1 -ModifiedOnly $false`.
-To automatically check formatting when creating a commit, run: `tools\SetupClangFormat.bat`
+
+To automatically check formatting before each commit, run CMake configure (e.g. `cmake .`) and then: `tools\SetupClangFormat.bat`
+
+The pre-commit hook behavior can be configured by setting `WSL_PRE_COMMIT_MODE` in `UserConfig.cmake`:
+
+- `warn` (default) – report formatting issues without blocking the commit
+- `error` – block the commit when formatting issues are found
+- `fix` – automatically fix formatting and re-stage files
