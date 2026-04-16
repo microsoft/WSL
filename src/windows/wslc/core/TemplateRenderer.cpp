@@ -13,10 +13,7 @@ Abstract:
 --*/
 
 #include "TemplateRenderer.h"
-#include <wil/result_macros.h>
-#include <windows.h>
 #include <string>
-#include <stdexcept>
 
 // Use the cgo-generated header from the Go template renderer build
 #include "render.h"
@@ -25,29 +22,16 @@ namespace wsl::windows::wslc::core {
 
 using namespace wsl::shared::string;
 
-std::wstring TemplateRenderer::Render(const std::string& templateStr, const std::string& jsonData)
+bool TemplateRenderer::TryRender(const std::string& templateStr, const std::string& jsonData, std::wstring& output)
 {
-    // Call the Go template renderer
-    char* result = RenderGoTemplate(const_cast<char*>(templateStr.c_str()), const_cast<char*>(jsonData.c_str()));
+    char* rawOutput = nullptr;
+    auto success = TryRenderGoTemplate(const_cast<char*>(templateStr.c_str()), const_cast<char*>(jsonData.c_str()), &rawOutput);
 
-    if (result == nullptr)
-    {
-        throw std::runtime_error("error: Go template renderer returned null");
-    }
+    std::string result(rawOutput ? rawOutput : "");
+    FreeGoString(rawOutput);
 
-    // Check if result is an error message (starts with "error:")
-    std::string resultStr(result);
-
-    // Free the memory allocated by Go
-    FreeMemory(result);
-
-    // If it's an error, throw an exception
-    if (resultStr.starts_with("error:"))
-    {
-        throw std::runtime_error(resultStr);
-    }
-
-    return MultiByteToWide(resultStr);
+    output = MultiByteToWide(result);
+    return success != 0;
 }
 
 } // namespace wsl::windows::wslc::core

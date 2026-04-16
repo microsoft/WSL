@@ -174,20 +174,18 @@ void ListContainers(CLIExecutionContext& context)
         WI_ASSERT(context.Args.Contains(ArgType::Format));
         auto templateStr = WideToMultiByte(context.Args.Get<ArgType::Format>());
 
-        // Render the template using Go
-        try
+        for (const auto& container : containers)
         {
-            for (const auto& container : containers)
+            auto json = ToJson(container, c_jsonPrettyPrintIndent);
+            std::wstring result;
+            if (!wsl::windows::wslc::core::TemplateRenderer::TryRender(templateStr, json, result))
             {
-                auto json = ToJson(container, c_jsonPrettyPrintIndent);
-                auto result = wsl::windows::wslc::core::TemplateRenderer::Render(templateStr, json);
-                PrintMessage(result);
+                PrintMessage(L"Template rendering error: " + result);
+                context.ExitCode = 1;
+                break;
             }
-        }
-        catch (const std::exception& e)
-        {
-            PrintMessage(MultiByteToWide(std::string("Template rendering error: ") + e.what()));
-            context.ExitCode = 1;
+
+            PrintMessage(result);
         }
         break;
     }

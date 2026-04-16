@@ -15,16 +15,14 @@ Abstract:
 #pragma once
 
 #include <string>
-#include <memory>
 
 namespace wsl::windows::wslc::core {
 
 struct TemplateRenderer
 {
     // Renders a Go template with the provided JSON data.
-    // Returns the rendered output as a wide string.
-    // Throws an exception if template rendering fails.
-    static std::wstring Render(const std::string& templateStr, const std::string& jsonData);
+    // Returns true on success with the rendered output, false on failure with an error message.
+    static bool TryRender(const std::string& templateStr, const std::string& jsonData, std::wstring& output);
 };
 
 } // namespace wsl::windows::wslc::core
