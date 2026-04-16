@@ -29,6 +29,6 @@
     </ItemGroup>
 
     <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcIsInvalidPlatform)' == 'true'">
-        <Error Text="wslcsdk.dll could not be copied because platform '$(WslcPlatform)' is not supported. Only x64 and arm64 platforms are supported." />
+        <Error Text="wslcsdk.dll could not be copied because platform '$(WslcPlatform)' is not supported. Only x64 and arm64 platforms are supported. You can override the detected platform by setting the property WslcPlatform." />
     </Target>
 </Project>
