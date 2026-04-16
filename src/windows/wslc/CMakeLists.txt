@@ -25,7 +25,7 @@ add_custom_command(
     OUTPUT ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_OUTPUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E env GOOS=windows GOARCH=${GO_ARCH} CGO_ENABLED=1
-            go build -o ${GO_OUTPUT_DLL} -buildmode=c-shared render.go
+            go build -o ${GO_OUTPUT_DLL} -buildmode=c-shared -trimpath -ldflags=-s\ -w render.go
     COMMAND lib /def:${GO_TEMPLATE_DIR}/render.def /out:${GO_OUTPUT_LIB} /machine:${GO_LIB_MACHINE}
     WORKING_DIRECTORY ${GO_TEMPLATE_DIR}
     DEPENDS ${GO_TEMPLATE_DIR}/render.go ${GO_TEMPLATE_DIR}/render.def
