@@ -1949,8 +1949,13 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WSLCPruneVolumesResults* /*Results*/)
+HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WSLCPruneVolumesResults* Results)
 {
+    if (Results != nullptr)
+    {
+        ZeroMemory(Results, sizeof(*Results));
+    }
+
     // TODO: Implement volume pruning. Docker's volume prune API skips bind-mount volumes,
     // so WSLC VHD volumes require custom handling.
     return E_NOTIMPL;
