@@ -19,8 +19,8 @@ Abstract:
 // We declare these directly instead of including the cgo-generated render.h
 // to avoid Go boilerplate types that don't compile cleanly with MSVC.
 extern "C" {
-    int TryRenderGoTemplate(char* templateStr, char* jsonData, char** output);
-    void FreeGoString(char* ptr);
+int TryRenderGoTemplate(char* templateStr, char* jsonData, char** output);
+void FreeGoString(char* ptr);
 }
 
 namespace wsl::windows::wslc::core {
