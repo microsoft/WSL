@@ -1140,6 +1140,24 @@ class WSLCTests
         }
     }
 
+    class CapturingProgressCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+    {
+    public:
+        CapturingProgressCallback(std::string& output) : m_output(output)
+        {
+        }
+
+        HRESULT OnProgress(LPCSTR status, LPCSTR, ULONGLONG, ULONGLONG) override
+        {
+            m_output.append(status);
+            return S_OK;
+        }
+
+    private:
+        std::string& m_output;
+    };
+
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options, IProgressCallback* callback = nullptr)
     {
         auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
@@ -1408,10 +1426,10 @@ class WSLCTests
             // Two independent stages that can build in parallel, each producing
             // part of the final output.  The last stage combines them.
             dockerfile << "FROM debian:latest AS greeting\n";
-            dockerfile << "RUN echo -n 'WSL containers' > /part.txt\n";
+            dockerfile << "RUN echo -n 'WSL containers' | tee /part.txt\n";
             dockerfile << "\n";
             dockerfile << "FROM debian:latest AS description\n";
-            dockerfile << "RUN echo -n 'support multi-stage builds' > /part.txt\n";
+            dockerfile << "RUN echo -n 'support multi-stage builds' | tee /part.txt\n";
             dockerfile << "\n";
             dockerfile << "FROM debian:latest\n";
             dockerfile << "COPY --from=greeting /part.txt /greeting.txt\n";
@@ -1420,7 +1438,13 @@ class WSLCTests
                        << "\"echo \\\"$(cat /greeting.txt) $(cat /description.txt)\\\"\"]\n";
         }
 
-        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build-multistage:latest"));
+        std::string output;
+        auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
+        LPCSTR tag = "wslc-test-build-multistage:latest";
+        WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
+        VERIFY_IS_TRUE(output.find("[greeting] WSL containers") != std::string::npos);
+        VERIFY_IS_TRUE(output.find("[description] support multi-stage builds") != std::string::npos);
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-multistage:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-multistage:latest", "wslc-build-multistage-container");
@@ -1718,24 +1742,6 @@ class WSLCTests
 
     WSLC_TEST_METHOD(BuildImageNoCache)
     {
-        class CapturingProgressCallback
-            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
-        {
-        public:
-            CapturingProgressCallback(std::string& output) : m_output(output)
-            {
-            }
-
-            HRESULT OnProgress(LPCSTR status, LPCSTR, ULONGLONG, ULONGLONG) override
-            {
-                m_output.append(status);
-                return S_OK;
-            }
-
-        private:
-            std::string& m_output;
-        };
-
         auto contextDir = std::filesystem::current_path() / "build-context-nocache";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1759,7 +1765,7 @@ class WSLCTests
             std::string output;
             auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
-            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsVerbose};
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}};
             VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
             VERIFY_IS_TRUE(output.find("Imageisrebuilt") == std::string::npos);
         }
@@ -1769,7 +1775,7 @@ class WSLCTests
             std::string output;
             auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
-            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsVerbose};
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
             VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
             VERIFY_IS_TRUE(output.find("Imageisrebuilt") != std::string::npos);
         }

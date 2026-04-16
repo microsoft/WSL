@@ -542,7 +542,7 @@ typedef struct _WSLCDeleteImageOptions
 typedef enum _WSLCBuildImageFlags
 {
     WSLCBuildImageFlagsNone = 0,
-    WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps and all statuses.
+    WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps.
     WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
 } WSLCBuildImageFlags;
 

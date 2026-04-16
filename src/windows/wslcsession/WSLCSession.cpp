@@ -29,73 +29,6 @@ constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
 
-// Resolve \r overwrites: for each \n-delimited line, keep only the content after the last \r.
-// This collapses terminal progress updates (e.g. "50%\r75%\r100%") to their final state.
-std::string ResolveCarriageReturns(const std::string& input)
-{
-    if (input.empty())
-    {
-        return {};
-    }
-
-    std::string result;
-    size_t lineStart = 0;
-    while (lineStart < input.size())
-    {
-        size_t lineEnd = input.find('\n', lineStart);
-        if (lineEnd == std::string::npos)
-        {
-            lineEnd = input.size();
-        }
-
-        // Find the last \r in this line segment (skip empty segments to avoid rfind underflow).
-        size_t contentStart = lineStart;
-        if (lineEnd > lineStart)
-        {
-            size_t lastCr = input.rfind('\r', lineEnd - 1);
-            if (lastCr != std::string::npos && lastCr >= lineStart)
-            {
-                contentStart = lastCr + 1;
-            }
-        }
-
-        result.append(input, contentStart, lineEnd - contentStart);
-        if (lineEnd < input.size())
-        {
-            result.push_back('\n');
-        }
-
-        lineStart = lineEnd + 1;
-    }
-
-    return result;
-}
-
-std::string TailLines(const std::string& input, int lineCount)
-{
-    if (input.empty() || lineCount <= 0)
-    {
-        return {};
-    }
-
-    size_t pos = input.size();
-    if (input[pos - 1] == '\n')
-    {
-        pos--;
-    }
-
-    for (int i = 0; i < lineCount && pos > 0; i++)
-    {
-        pos = input.rfind('\n', pos - 1);
-        if (pos == std::string::npos)
-        {
-            return input;
-        }
-    }
-
-    return input.substr(pos + 1);
-}
-
 std::string IndentLines(const std::string& input, const std::string& prefix)
 {
     if (input.empty())
@@ -639,13 +572,59 @@ try
     std::string pendingJson;
     std::set<std::string> reportedSteps;
     std::set<std::string> reportedErrors;
-    std::string exportingVertexDigest;
-    std::map<std::string, std::string> vertexLogs; // digest -> accumulated log output
+    std::map<std::string, std::string> digestToStageName;
+    bool needsNewline = false; // true when the last log chunk didn't end with \n
+    std::string lastLogVertex; // digest of the vertex that produced the last log output
+
+    // Extract the named build stage from a BuildKit vertex name. Vertices within the same named stage
+    // (e.g. "[builder 1/3]" and "[builder 2/3]") share a key. Returns empty for unnamed stages.
+    auto getStageName = [](const std::string& name) -> std::string {
+        if (name.size() < 2 || name[0] != '[')
+        {
+            return {};
+        }
+
+        auto close = name.find(']');
+        if (close == std::string::npos)
+        {
+            return {};
+        }
+
+        // Pattern: "[name N/M]" or "[N/M]". The stage name is the part before "N/M".
+        std::string content = name.substr(1, close - 1);
+        auto slash = content.find('/');
+        if (slash != std::string::npos)
+        {
+            auto space = content.rfind(' ', slash);
+            if (space != std::string::npos)
+            {
+                return content.substr(0, space);
+            }
+        }
+
+        return {};
+    };
+
+    auto logPrefix = [](const std::string& name) -> std::string {
+        if (name.empty())
+        {
+            return "  | ";
+        }
+        return "  [" + name + "] ";
+    };
 
     auto reportProgress = [&](const std::string& message) {
         if (ProgressCallback != nullptr)
         {
             THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), "", 0, 0));
+        }
+    };
+
+    auto flushLine = [&]() {
+        if (needsNewline)
+        {
+            reportProgress("\n");
+            needsNewline = false;
         }
     };
 
@@ -673,73 +652,67 @@ try
         docker_schema::BuildKitSolveStatus status{};
         from_json(json, status);
 
-        // Accumulate logs before processing vertices so the error tail includes all data from this payload.
-        for (const auto& log : status.logs)
+        // Process vertices before logs so digestToStageName is populated for log correlation.
+        for (const auto& vertex : status.vertexes)
         {
-            if (log.data.empty())
+            if (!verbose && vertex.name.find("[internal]") != std::string::npos)
             {
                 continue;
             }
 
-            std::string decoded = wslutil::Base64Decode(log.data);
-            if (!decoded.empty())
-            {
-                auto& logBuffer = vertexLogs[log.vertex];
-                logBuffer.append(decoded);
-
-                // Cap raw buffer size; we resolve \r and trim to last N lines at display time.
-                constexpr size_t c_maxLogBytes = 64 * 1024;
-                if (logBuffer.size() > c_maxLogBytes)
-                {
-                    logBuffer.erase(0, logBuffer.size() - c_maxLogBytes);
-                }
-
-                if (verbose)
-                {
-                    reportProgress(IndentLines(decoded, "  "));
-                }
-            }
-        }
-
-        for (const auto& vertex : status.vertexes)
-        {
-            bool isInternal = vertex.name.find("[internal]") != std::string::npos;
+            digestToStageName.try_emplace(vertex.digest, getStageName(vertex.name));
 
             if (!vertex.started.empty() && reportedSteps.insert(vertex.digest).second)
             {
-                if (verbose || (!isInternal && !vertex.name.empty() && vertex.name[0] == '['))
-                {
-                    reportProgress(vertex.name + "\n");
-                }
-
-                // Track the "exporting to image" vertex so we can report its statuses (image hash, tags)
-                // in non-verbose mode. This is a well-known BuildKit vertex name.
-                if (vertex.name == "exporting to image")
-                {
-                    exportingVertexDigest = vertex.digest;
-                }
+                flushLine();
+                reportProgress(vertex.name + "\n");
             }
 
-            if (!vertex.error.empty() && !isInternal && reportedErrors.insert(vertex.digest).second)
+            if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
             {
-                if (auto it = vertexLogs.find(vertex.digest); it != vertexLogs.end() && !it->second.empty())
-                {
-                    if (!verbose)
-                    {
-                        std::string tail = TailLines(ResolveCarriageReturns(it->second), 16);
-                        reportProgress(IndentLines(tail, "  "));
-                    }
-                }
-
+                flushLine();
                 reportProgress(vertex.error + "\n");
+            }
+        }
+
+        for (const auto& log : status.logs)
+        {
+            if (auto it = digestToStageName.find(log.vertex); it != digestToStageName.end() && !log.data.empty())
+            {
+                std::string decoded = wslutil::Base64Decode(log.data);
+                if (!decoded.empty())
+                {
+                    if (log.vertex != lastLogVertex && decoded[0] != '\n')
+                    {
+                        flushLine();
+                    }
+
+                    // When continuing an unterminated line, emit the leading \n or \r directly
+                    // so it terminates/overwrites cleanly without a spurious prefix.
+                    if (needsNewline && (decoded[0] == '\n' || decoded[0] == '\r'))
+                    {
+                        reportProgress(decoded.substr(0, 1));
+                        decoded.erase(0, 1);
+                    }
+
+                    if (!decoded.empty())
+                    {
+                        reportProgress(IndentLines(decoded, logPrefix(it->second)));
+                    }
+
+                    needsNewline = !decoded.empty() && decoded.back() != '\n';
+                    lastLogVertex = log.vertex;
+                }
             }
         }
 
         for (const auto& entry : status.statuses)
         {
-            if (!entry.id.empty() && reportedSteps.insert(entry.id).second && (verbose || entry.vertex == exportingVertexDigest))
+            if (auto it = digestToStageName.find(entry.vertex);
+                it != digestToStageName.end() && !entry.id.empty() && reportedSteps.insert(entry.id).second)
             {
-                reportProgress(entry.id + "\n");
+                flushLine();
+                reportProgress(logPrefix(it->second) + entry.id + "\n");
             }
         }
     };
@@ -784,6 +757,7 @@ try
     }
     catch (...)
     {
+        flushLine();
         LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
         try
         {
@@ -806,6 +780,8 @@ try
         }
         throw;
     }
+
+    flushLine();
 
     THROW_HR_IF_MSG(E_ABORT, cancelled, "Cancellation handle was signaled");
 
