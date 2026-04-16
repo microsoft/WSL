@@ -772,7 +772,7 @@ ValueDone:
 
         // This key value will be overwritten, so we can ignore any malformed values.
         // However, we can still inform the user of the issue per warning above.
-        if (!firstMatchedKey || !matchedKey)
+        if (!firstMatchedKey && !matchedKey)
         {
             goto InvalidLine;
         }
