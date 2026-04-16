@@ -10,13 +10,33 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 set(GO_TEMPLATE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tools/gotemplate)
 set(GO_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/gotemplate")
 
+find_program(GO_EXECUTABLE go REQUIRED)
+
 # Reuse TARGET_PLATFORM already normalized by the root CMakeLists.txt
 if("${TARGET_PLATFORM}" STREQUAL "arm64")
     set(GO_ARCH arm64)
     set(GO_LIB_MACHINE ARM64)
+    find_program(GO_CLANG_EXECUTABLE
+        NAMES clang
+        HINTS
+            "$ENV{VCToolsInstallDir}/Llvm/x64/bin"
+            "$ENV{VCINSTALLDIR}/Tools/Llvm/x64/bin"
+            "$ENV{ProgramFiles}/LLVM/bin"
+            "$ENV{ProgramFiles(x86)}/LLVM/bin")
+
+    if(NOT GO_CLANG_EXECUTABLE)
+        message(FATAL_ERROR "clang is required for arm64 cgo builds. Install the Windows Clang toolchain or add clang to PATH.")
+    endif()
+
+    set(GO_CGO_ENV
+        "CC=${GO_CLANG_EXECUTABLE}"
+        "CGO_CFLAGS=--target=aarch64-pc-windows-msvc"
+        "CGO_CXXFLAGS=--target=aarch64-pc-windows-msvc"
+        "CGO_LDFLAGS=--target=aarch64-pc-windows-msvc")
 else()
     set(GO_ARCH amd64)
     set(GO_LIB_MACHINE X64)
+    set(GO_CGO_ENV)
 endif()
 
 set(GO_OUTPUT_DLL ${GO_OUTPUT_DIR}/render.dll)
@@ -24,8 +44,8 @@ set(GO_OUTPUT_LIB ${GO_OUTPUT_DIR}/render.lib)
 add_custom_command(
     OUTPUT ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_OUTPUT_DIR}
-    COMMAND ${CMAKE_COMMAND} -E env GOOS=windows GOARCH=${GO_ARCH} CGO_ENABLED=1
-            go build -o ${GO_OUTPUT_DLL} -buildmode=c-shared -trimpath -ldflags=-s\ -w render.go
+    COMMAND ${CMAKE_COMMAND} -E env GOOS=windows GOARCH=${GO_ARCH} CGO_ENABLED=1 ${GO_CGO_ENV}
+            ${GO_EXECUTABLE} build -o ${GO_OUTPUT_DLL} -buildmode=c-shared -trimpath -ldflags=-s\ -w render.go
     COMMAND lib /def:${GO_TEMPLATE_DIR}/render.def /out:${GO_OUTPUT_LIB} /machine:${GO_LIB_MACHINE}
     WORKING_DIRECTORY ${GO_TEMPLATE_DIR}
     DEPENDS ${GO_TEMPLATE_DIR}/render.go ${GO_TEMPLATE_DIR}/render.def
