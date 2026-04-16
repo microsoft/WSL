@@ -21,27 +21,16 @@ namespace wsl::windows::service::wslc {
 // Label key used to store WSLC volume metadata in Docker volume labels.
 constexpr auto WSLCVolumeMetadataLabel = "com.microsoft.wsl.volume.metadata";
 
-struct WSLCVhdVolumeMetadataV1
-{
-    std::wstring HostPath;
-    ULONGLONG SizeBytes{};
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVhdVolumeMetadataV1, HostPath, SizeBytes);
-};
-
-struct WSLCVhdVolumeMetadata
-{
-    std::optional<WSLCVhdVolumeMetadataV1> V1;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVhdVolumeMetadata, V1);
-};
+// Volume driver name for VHD-backed volumes.
+constexpr auto WSLCVhdVolumeDriver = "vhd";
 
 struct WSLCVolumeMetadata
 {
-    std::string Type;
-    std::optional<WSLCVhdVolumeMetadata> VhdVolumeMetadata;
+    std::string Driver;
+    std::map<std::string, std::string> DriverOpts;
+    std::map<std::string, std::string> Properties;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMetadata, Type, VhdVolumeMetadata);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMetadata, Driver, DriverOpts, Properties);
 };
 
 } // namespace wsl::windows::service::wslc

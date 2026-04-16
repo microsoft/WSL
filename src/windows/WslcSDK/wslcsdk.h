@@ -10,6 +10,11 @@ Abstract:
 
     This file contains the public WSL Container SDK api definitions.
 
+    PREVIEW NOTICE: This API is currently in preview and is subject to breaking
+    changes in future releases without prior notice. Do not rely on API stability
+    for production workloads. Features, function signatures, and behaviors may
+    change between releases during the preview period.
+
 --*/
 #pragma once
 #include <winsock2.h>
@@ -21,7 +26,7 @@ Abstract:
 EXTERN_C_START
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 72
+#define WSLC_SESSION_OPTIONS_SIZE 80
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -32,7 +37,7 @@ typedef struct WslcSessionSettings
 DECLARE_HANDLE(WslcSession);
 
 // Container values
-#define WSLC_CONTAINER_OPTIONS_SIZE 80
+#define WSLC_CONTAINER_OPTIONS_SIZE 96
 #define WSLC_CONTAINER_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcContainerSettings
@@ -66,6 +71,8 @@ typedef enum WslcVhdType
 
 typedef struct WslcVhdRequirements
 {
+    // Ignored by WslcSetSessionSettingsVHD
+    _In_z_ PCSTR name;
     _In_ uint64_t sizeInBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
 } WslcVhdRequirements;
@@ -96,7 +103,7 @@ STDAPI WslcSetSessionSettingsCpuCount(_In_ WslcSessionSettings* sessionSettings,
 STDAPI WslcSetSessionSettingsMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb);
 STDAPI WslcSetSessionSettingsTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS);
 
-STDAPI WslcSetSessionSettingsVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
+STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_opt_ const WslcVhdRequirements* vhdRequirements);
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
@@ -131,6 +138,13 @@ typedef struct WslcContainerVolume
     _In_z_ PCSTR containerPath;
     _In_ BOOL readOnly;
 } WslcContainerVolume;
+
+typedef struct WslcContainerNamedVolume
+{
+    _In_z_ PCSTR name;          // Name of the session volume (from WslcVhdRequirements.name)
+    _In_z_ PCSTR containerPath; // Absolute path inside the container
+    _In_ BOOL readOnly;
+} WslcContainerNamedVolume;
 
 typedef enum WslcContainerFlags
 {
@@ -180,6 +194,12 @@ STDAPI WslcSetContainerSettingsPortMappings(
 STDAPI WslcSetContainerSettingsVolumes(
     _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
 
+// Add named session volumes (created via WslcCreateSessionVhdVolume) to the container settings
+STDAPI WslcSetContainerSettingsNamedVolumes(
+    _In_ WslcContainerSettings* containerSettings,
+    _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes,
+    _In_ uint32_t namedVolumeCount);
+
 STDAPI WslcCreateContainerProcess(
     _In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
@@ -189,7 +209,7 @@ STDAPI WslcReleaseContainer(_In_ WslcContainer container);
 
 #define WSLC_CONTAINER_ID_BUFFER_SIZE 65 // 64 hex chars + null terminator
 
-STDAPI WslcGetContainerID(WslcContainer container, CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE]);
+STDAPI WslcGetContainerID(_In_ WslcContainer container, _Out_writes_(WSLC_CONTAINER_ID_BUFFER_SIZE) CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE]);
 
 STDAPI WslcGetContainerInitProcess(_In_ WslcContainer container, _Out_ WslcProcess* initProcess);
 
@@ -209,11 +229,7 @@ STDAPI WslcGetContainerInitProcess(_In_ WslcContainer container, _Out_ WslcProce
 //
 // Return Value:
 //   S_OK on success. Otherwise, an HRESULT error code indicating the failure.
-//
-// Notes:
-//   - The caller must pass a non-null pointer to a PCSTR variable.
-//   - The returned string is immutable and must not be modified by the caller.
-STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PCSTR* inspectData);
+STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR* inspectData);
 
 typedef enum WslcContainerState
 {
@@ -273,7 +289,7 @@ typedef enum WslcProcessIOHandle
 // Parameters:
 //   ioHandle
 //       The WslcProcessIOHandle that the IO callback is for.
-//       Only STDOUT and STDERR will recieve callbacks.
+//       Only STDOUT and STDERR will receive callbacks.
 //
 //   data
 //       Pointer to a buffer containing the bytes read. The buffer is owned
@@ -376,11 +392,6 @@ typedef struct WslcImageProgressMessage
     _Out_ WslcImageProgressDetail detail;
 } WslcImageProgressMessage;
 
-typedef struct WslcRegistryAuthenticationInformation
-{
-    // TBD
-} WslcRegistryAuthenticationInformation;
-
 // pointer-to-function typedef (unambiguous)
 typedef HRESULT(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
@@ -390,7 +401,7 @@ typedef struct WslcPullImageOptions
     _In_z_ PCSTR uri;
     WslcContainerImageProgressCallback progressCallback;
     PVOID progressCallbackContext;
-    _In_opt_ const WslcRegistryAuthenticationInformation* authInfo;
+    _In_opt_z_ PCSTR registryAuth;
 } WslcPullImageOptions;
 
 STDAPI WslcPullSessionImage(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
@@ -439,7 +450,59 @@ typedef struct WslcImageInfo
     uint64_t createdTimestamp;
 } WslcImageInfo;
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+typedef struct WslcTagImageOptions
+{
+    _In_z_ PCSTR image; // Source image name or ID.
+    _In_z_ PCSTR repo;  // Target repository name.
+    _In_z_ PCSTR tag;   // Target tag name.
+} WslcTagImageOptions;
+
+STDAPI WslcTagSessionImage(_In_ WslcSession session, _In_ const WslcTagImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+typedef struct WslcPushImageOptions
+{
+    _In_z_ PCSTR image;
+    _In_z_ PCSTR registryAuth; // Base64-encoded X-Registry-Auth header value.
+    _In_opt_ WslcContainerImageProgressCallback progressCallback;
+    _In_opt_ PVOID progressCallbackContext;
+} WslcPushImageOptions;
+
+STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Authenticates with a container registry and returns an identity token.
+//
+// Parameters:
+//   session
+//       A valid WslcSession handle.
+//
+//   serverAddress
+//       The registry server address (e.g. "127.0.0.1:5000").
+//
+//   username
+//       The username for authentication.
+//
+//   password
+//       The password for authentication.
+//
+//   identityToken
+//       On success, receives a pointer to a null-terminated ANSI string
+//       containing the identity token.
+//
+//       The string is allocated using CoTaskMemAlloc. The caller takes
+//       ownership of the returned memory and must free it by calling
+//       CoTaskMemFree when it is no longer needed.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the failure.
+STDAPI WslcSessionAuthenticate(
+    _In_ WslcSession session,
+    _In_z_ PCSTR serverAddress,
+    _In_z_ PCSTR username,
+    _In_z_ PCSTR password,
+    _Outptr_result_z_ PSTR* identityToken,
+    _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // Retrieves the list of container images
 // Parameters:
@@ -470,16 +533,19 @@ STDAPI WslcListSessionImages(_In_ WslcSession session, _Outptr_result_buffer_(*c
 
 // STORAGE
 
-STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcDeleteSessionVhdVolume(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // INSTALL
 
 typedef enum WslcComponentFlags
 {
     WSLC_COMPONENT_FLAG_NONE = 0,
-    WSLC_COMPONENT_FLAG_VMPOC = 1,
-    WSLC_COMPONENT_FLAG_WSL_OC = 2,
-    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 4,
+    // Services provided by the Virtual Machine Platform optional feature (other optional features may provide these services as
+    // well). Installing this component will require a reboot.
+    WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM = 1,
+    // The WSL runtime package, at an appropriate version to provide support for WSLC.
+    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 2,
 } WslcComponentFlags;
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcComponentFlags);

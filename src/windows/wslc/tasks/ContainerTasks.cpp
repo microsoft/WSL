@@ -19,12 +19,12 @@ Abstract:
 #include "ContainerTasks.h"
 #include "SessionModel.h"
 #include "SessionService.h"
-#include "TablePrinter.h"
+#include "TableOutput.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
-using namespace wsl::shared::string;
+using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
@@ -75,7 +75,7 @@ void InspectContainers(CLIExecutionContext& context)
         result.push_back(inspectData);
     }
 
-    auto json = ToJson(result);
+    auto json = ToJson(result, c_jsonPrettyPrintIndent);
     PrintMessage(MultiByteToWide(json));
 }
 
@@ -131,25 +131,40 @@ void ListContainers(CLIExecutionContext& context)
     {
     case FormatType::Json:
     {
-        auto json = ToJson(containers);
+        auto json = ToJson(containers, c_jsonPrettyPrintIndent);
         PrintMessage(MultiByteToWide(json));
         break;
     }
     case FormatType::Table:
     {
-        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS"});
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        // Create table with or without column limits based on --no-trunc flag
+        auto table =
+            trunc ? wsl::windows::wslc::TableOutput<6>(
+                        {{{L"CONTAINER ID", {Config::NoLimit, 12, false}},
+                          {L"NAME", {Config::NoLimit, 20, true}},
+                          {L"IMAGE", {Config::NoLimit, 20, false}},
+                          {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
+                          {L"STATUS", {Config::NoLimit, Config::NoLimit, false}},
+                          {L"PORTS", {Config::NoLimit, Config::NoLimit, false}}}})
+                  : wsl::windows::wslc::TableOutput<6>({L"CONTAINER ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS", L"PORTS"});
+
+        // Add each container as a row
         for (const auto& container : containers)
         {
-            tablePrinter.AddRow({
-                MultiByteToWide(container.Id),
+            table.OutputLine({
+                MultiByteToWide(trunc ? TruncateId(container.Id) : container.Id),
                 MultiByteToWide(container.Name),
                 MultiByteToWide(container.Image),
                 ContainerService::FormatRelativeTime(container.CreatedAt),
                 ContainerService::ContainerStateToString(container.State, container.StateChangedAt),
+                ContainerService::FormatPorts(container.State, container.Ports),
             });
         }
 
-        tablePrinter.Print();
+        table.Complete();
         break;
     }
     default:
@@ -263,6 +278,21 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Entrypoint.push_back(WideToMultiByte(context.Args.Get<ArgType::Entrypoint>()));
     }
 
+    if (context.Args.Contains(ArgType::User))
+    {
+        options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
+    }
+
+    if (context.Args.Contains(ArgType::TMPFS))
+    {
+        auto tmpfs = context.Args.GetAll<ArgType::TMPFS>();
+        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
+        for (const auto& value : tmpfs)
+        {
+            options.Tmpfs.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();
@@ -271,6 +301,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         {
             options.Arguments.emplace_back(WideToMultiByte(arg));
         }
+    }
+
+    if (context.Args.Contains(ArgType::WorkDir))
+    {
+        options.WorkingDirectory = WideToMultiByte(context.Args.Get<ArgType::WorkDir>());
     }
 
     context.Data.Add<Data::ContainerOptions>(std::move(options));

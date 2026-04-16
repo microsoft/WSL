@@ -22,6 +22,12 @@ namespace WSLCE2ETests {
 
 constexpr DWORD DefaultWaitTimeoutMs = 60000; // 60 seconds
 
+enum class ElevationType
+{
+    Elevated,
+    NonElevated
+};
+
 inline std::wstring GetWslcPath()
 {
     return (std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslc.exe").wstring();
@@ -37,13 +43,20 @@ struct WSLCExecutionResult
     void Verify(const WSLCExecutionResult& expected) const;
     std::vector<std::wstring> GetStdoutLines() const;
     std::wstring GetStdoutOneLine() const;
+    bool StdoutContainsLine(const std::wstring& expectedLine) const;
 };
 
 // Interactive session for testing wslc commands that require stdin/stdout interaction.
 // Uses PartialHandleRead for race-free output validation
 struct WSLCInteractiveSession
 {
-    WSLCInteractiveSession(std::wstring commandLine, wil::unique_hfile stdinWrite, wil::unique_hfile stdoutRead, wil::unique_hfile stderrRead, wil::unique_handle processHandle);
+    WSLCInteractiveSession(
+        std::wstring commandLine,
+        wil::unique_hfile stdinWrite,
+        wil::unique_hfile stdoutRead,
+        wil::unique_hfile stderrRead,
+        wil::unique_handle processHandle,
+        wil::unique_handle nonElevatedToken = wil::unique_handle{});
     ~WSLCInteractiveSession();
 
     // Non-copyable, non-movable
@@ -75,13 +88,15 @@ private:
     wil::unique_hfile m_stdoutRead;
     wil::unique_hfile m_stderrRead;
     wil::unique_handle m_processHandle;
+    wil::unique_handle m_nonElevatedToken; // Keep token alive for the lifetime of the session
     std::unique_ptr<PartialHandleRead> m_stdoutReader;
     std::unique_ptr<PartialHandleRead> m_stderrReader;
 };
 
-WSLCExecutionResult RunWslc(const std::wstring& commandLine);
-WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine);
-void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected);
+WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
+void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType = ElevationType::Elevated);
+
 std::wstring GetWslcHeader();
+WSLCInteractiveSession RunWslcInteractive(const std::wstring& commandLine, ElevationType elevationType = ElevationType::Elevated);
 
 } // namespace WSLCE2ETests

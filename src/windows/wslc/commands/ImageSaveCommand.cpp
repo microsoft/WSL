@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Image Save Command
@@ -34,12 +35,12 @@ std::vector<Argument> ImageSaveCommand::GetArguments() const
 
 std::wstring ImageSaveCommand::ShortDescription() const
 {
-    return {L"Save images."};
+    return Localization::WSLCCLI_ImageSaveDesc();
 }
 
 std::wstring ImageSaveCommand::LongDescription() const
 {
-    return {L"Saves images."};
+    return Localization::WSLCCLI_ImageSaveLongDesc();
 }
 
 void ImageSaveCommand::ExecuteInternal(CLIExecutionContext& context) const

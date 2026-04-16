@@ -27,57 +27,17 @@ namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLCProcess;
 using wsl::windows::common::wslc_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
+using namespace wsl::windows::common::wslutil;
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 using namespace std::chrono_literals;
-
-DEFINE_ENUM_FLAG_OPERATORS(WSLCLogsFlags);
-
-static void SetContainerTTYOptions(WSLCProcessOptions& options)
-{
-    if (!WI_IsFlagSet(options.Flags, WSLCProcessFlagsTty))
-    {
-        return;
-    }
-
-    auto tryGetConsoleInfo = [](HANDLE handle, CONSOLE_SCREEN_BUFFER_INFOEX& info) -> bool {
-        info.cbSize = sizeof(info);
-        return ::GetConsoleScreenBufferInfoEx(handle, &info) != FALSE;
-    };
-
-    CONSOLE_SCREEN_BUFFER_INFOEX info{};
-    HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (tryGetConsoleInfo(stdoutHandle, info))
-    {
-        options.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
-        options.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
-        return;
-    }
-
-    HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD stdinMode = 0;
-    if (::GetConsoleMode(stdinHandle, &stdinMode))
-    {
-        wil::unique_hfile consoleOutput(CreateFileW(
-            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
-        if (consoleOutput && tryGetConsoleInfo(consoleOutput.get(), info))
-        {
-            options.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
-            options.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
-            return;
-        }
-    }
-
-    PrintMessage(L"error: --tty requires stdin or stdout to be a console", stderr);
-    THROW_HR(E_FAIL);
-}
 
 static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const char*>& argsStorage)
 {
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static wsl::windows::common::RunningWSLCContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
+static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
 {
     auto processFlags = WSLCProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLCProcessFlagsStdin, options.Interactive);
@@ -135,13 +95,30 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
         containerLauncher.SetEntrypoint(std::move(entrypoints));
     }
 
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        containerLauncher.SetUser(std::move(user));
+    }
+
+    if (!options.WorkingDirectory.empty())
+    {
+        containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
+    }
+
+    for (const auto& tmpfsSpec : options.Tmpfs)
+    {
+        auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
+        containerLauncher.AddTmpfs(tmpfsMount.ContainerPath(), tmpfsMount.Options());
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLC_E_IMAGE_NOT_FOUND)
     {
         {
             // Attempt to pull the image if not found
             PullImageCallback callback;
-            PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
+            PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
             ImageService imageService;
             imageService.Pull(session, image, &callback);
         }
@@ -153,11 +130,29 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
+static PortInformation PortInformationFromWSLCPortMapping(const WSLCPortMapping& mapping)
+{
+    return PortInformation{
+        .HostPort = mapping.HostPort,
+        .ContainerPort = mapping.ContainerPort,
+        .Protocol = static_cast<int>(mapping.Protocol),
+        .BindingAddress = mapping.BindingAddress,
+    };
+}
+
 std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
 {
+    if (timestamp == 0)
+    {
+        return L"";
+    }
+
     constexpr LONGLONG SecondsPerMinute = std::chrono::duration_cast<std::chrono::seconds>(1min).count();
     constexpr LONGLONG SecondsPerHour = std::chrono::duration_cast<std::chrono::seconds>(1h).count();
     constexpr LONGLONG SecondsPerDay = std::chrono::duration_cast<std::chrono::seconds>(24h).count();
+    constexpr LONGLONG SecondsPerWeek = SecondsPerDay * 7;
+    constexpr LONGLONG SecondsPerMonth = SecondsPerDay * 30;
+    constexpr LONGLONG SecondsPerYear = SecondsPerDay * 365;
 
     auto elapsed = static_cast<LONGLONG>(std::time(nullptr)) - static_cast<LONGLONG>(timestamp);
     if (elapsed < 0)
@@ -165,24 +160,36 @@ std::wstring ContainerService::FormatRelativeTime(ULONGLONG timestamp)
         elapsed = 0;
     }
 
+    auto pluralize = [](LONGLONG count, const wchar_t* singular, const wchar_t* plural) {
+        return std::format(L"{} {} ago", count, (count == 1 ? singular : plural));
+    };
+
     if (elapsed < SecondsPerMinute)
     {
-        const auto seconds = elapsed;
-        return std::format(L"{} {} ago", seconds, (seconds == 1 ? L"second" : L"seconds"));
+        return pluralize(elapsed, L"second", L"seconds");
     }
     else if (elapsed < SecondsPerHour)
     {
-        const auto minutes = elapsed / SecondsPerMinute;
-        return std::format(L"{} {} ago", minutes, (minutes == 1 ? L"minute" : L"minutes"));
+        return pluralize(elapsed / SecondsPerMinute, L"minute", L"minutes");
     }
     else if (elapsed < SecondsPerDay)
     {
-        const auto hours = elapsed / SecondsPerHour;
-        return std::format(L"{} {} ago", hours, (hours == 1 ? L"hour" : L"hours"));
+        return pluralize(elapsed / SecondsPerHour, L"hour", L"hours");
+    }
+    else if (elapsed < SecondsPerWeek)
+    {
+        return pluralize(elapsed / SecondsPerDay, L"day", L"days");
+    }
+    else if (elapsed < SecondsPerMonth)
+    {
+        return pluralize(elapsed / SecondsPerWeek, L"week", L"weeks");
+    }
+    else if (elapsed < SecondsPerYear)
+    {
+        return pluralize(elapsed / SecondsPerMonth, L"month", L"months");
     }
 
-    const auto days = elapsed / SecondsPerDay;
-    return std::format(L"{} {} ago", days, (days == 1 ? L"day" : L"days"));
+    return pluralize(elapsed / SecondsPerYear, L"year", L"years");
 }
 
 int ContainerService::Attach(Session& session, const std::string& id)
@@ -198,26 +205,22 @@ int ContainerService::Attach(Session& session, const std::string& id)
 
     ClientRunningWSLCProcess runningProcess(std::move(process), processFlags);
 
-    ULONG stdinLogsHandle = 0;
-    ULONG stdoutLogsHandle = 0;
-    ULONG stderrLogsHandle = 0;
-    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogsHandle, &stdoutLogsHandle, &stderrLogsHandle));
+    COMOutputHandle stdinLogs{};
+    COMOutputHandle stdoutLogs{};
+    COMOutputHandle stderrLogs{};
+    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogs, &stdoutLogs, &stderrLogs));
 
-    wil::unique_handle stdinLogs(ULongToHandle(stdinLogsHandle));
-    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
-    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
-
-    if (stdoutLogs)
+    if (!stdoutLogs.Empty())
     {
         // Non-TTY process - relay separate stdout/stderr streams
-        WI_ASSERT(!!stderrLogs);
-        ConsoleService::RelayNonTtyProcess(std::move(stdinLogs), std::move(stdoutLogs), std::move(stderrLogs));
+        WI_ASSERT(!stderrLogs.Empty());
+        ConsoleService::RelayNonTtyProcess(stdinLogs.Release(), stdoutLogs.Release(), stderrLogs.Release());
     }
     else
     {
         // TTY process - relay using interactive TTY handling
-        WI_ASSERT(!stderrLogs);
-        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.get(), true))
+        WI_ASSERT(stderrLogs.Empty());
+        if (!ConsoleService::RelayInteractiveTty(runningProcess, stdinLogs.Release().get(), true))
         {
             wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
             return 0; // Exit early if user detached
@@ -259,17 +262,49 @@ std::wstring ContainerService::ContainerStateToString(WSLCContainerState state, 
     return std::format(L"{} {}", stateString, FormatRelativeTime(stateChangedAt));
 }
 
+std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::vector<PortInformation>& ports)
+{
+    if (state != WslcContainerStateRunning || ports.empty())
+    {
+        return L"";
+    }
+
+    std::wstring result;
+    for (size_t i = 0; i < ports.size(); ++i)
+    {
+        const auto& port = ports[i];
+
+        std::wstring hostIp = wsl::shared::string::MultiByteToWide(port.BindingAddress);
+
+        std::wstring protocol = (port.Protocol == IPPROTO_TCP)   ? L"tcp"
+                                : (port.Protocol == IPPROTO_UDP) ? L"udp"
+                                                                 : std::format(L"{}", port.Protocol);
+
+        if (i > 0)
+        {
+            result += L", ";
+        }
+
+        result += std::format(
+            L"{}:{}->{}/{}", (hostIp.find(L':') != std::wstring::npos) ? std::format(L"[{}]", hostIp) : hostIp, port.HostPort, port.ContainerPort, protocol);
+    }
+
+    return result;
+}
+
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
     // Create the container
-    auto runningContainer = CreateInternal(session, image, runOptions, nullptr);
-    runningContainer.SetDeleteOnClose(false);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     auto& container = runningContainer.Get();
 
     // Start the created container
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
     THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
+
+    // Disable auto-delete only after successful start
+    runningContainer.SetDeleteOnClose(false);
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
@@ -286,7 +321,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
-    auto runningContainer = CreateInternal(session, image, runOptions, nullptr);
+    auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
@@ -299,7 +334,7 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
-    THROW_IF_FAILED(container->Start(flags, nullptr));
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
@@ -321,7 +356,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Stop(options.Signal, options.Timeout));
+    THROW_IF_FAILED_EXCEPT(container->Stop(options.Signal, options.Timeout), WSLC_E_CONTAINER_NOT_RUNNING);
 }
 
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)
@@ -342,7 +377,9 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
+    wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
     for (const auto& current : containers)
     {
         ContainerInformation entry;
@@ -352,6 +389,15 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
         entry.Id = current.Id;
         entry.StateChangedAt = current.StateChangedAt;
         entry.CreatedAt = current.CreatedAt;
+
+        for (const auto& port : ports)
+        {
+            if (strcmp(port.Id, current.Id) == 0)
+            {
+                entry.Ports.push_back(PortInformationFromWSLCPortMapping(port.PortMapping));
+            }
+        }
+
         result.emplace_back(std::move(entry));
     }
 
@@ -367,9 +413,18 @@ int ContainerService::Exec(Session& session, const std::string& id, ContainerOpt
     WI_SetFlagIf(execFlags, WSLCProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(execFlags, WSLCProcessFlagsTty, options.TTY);
 
-    ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(
-        wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags).Launch(*container));
+    auto processLauncher = wsl::windows::common::WSLCProcessLauncher({}, options.Arguments, options.EnvironmentVariables, execFlags);
+    if (options.User.has_value())
+    {
+        auto user = options.User.value();
+        processLauncher.SetUser(std::move(user));
+    }
+    if (!options.WorkingDirectory.empty())
+    {
+        processLauncher.SetWorkingDirectory(std::move(options.WorkingDirectory));
+    }
+
+    return ConsoleService::AttachToCurrentConsole(processLauncher.Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
@@ -386,22 +441,21 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    ULONG stdoutLogsHandle = 0;
-    ULONG stderrLogsHandle = 0;
+    COMOutputHandle stdoutHandle;
+    COMOutputHandle stderrHandle;
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutLogsHandle, &stderrLogsHandle, 0, 0, 0));
-    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
-    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, 0));
 
     wsl::windows::common::relay::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-        std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
-    if (stderrLogs) // This handle is only used for non-tty processes.
+        stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
+
+    if (!stderrHandle.Empty()) // This handle is only used for non-tty processes.
     {
         io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
-            std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+            stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
     }
 
     // TODO: Handle ctrl-c.

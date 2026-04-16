@@ -31,7 +31,7 @@ public:
 
     IFACEMETHOD(Signal)(_In_ int Signal) override;
     IFACEMETHOD(GetExitEvent)(_Out_ HANDLE* Event) override;
-    IFACEMETHOD(GetStdHandle)(_In_ ULONG Index, _Out_ ULONG* Handle) override;
+    IFACEMETHOD(GetStdHandle)(_In_ WSLCFD Fd, _Out_ WSLCHandle* Handle) override;
     IFACEMETHOD(GetFlags)(_Out_ WSLCProcessFlags* Flags) override;
     IFACEMETHOD(GetPid)(_Out_ int* Pid) override;
     IFACEMETHOD(GetState)(_Out_ WSLCProcessState* State, _Out_ int* Code) override;

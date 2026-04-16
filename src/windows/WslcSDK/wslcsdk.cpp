@@ -20,6 +20,7 @@ Abstract:
 #include "wslutil.h"
 
 using namespace std::string_view_literals;
+using namespace wsl::windows::common::wslutil;
 
 namespace {
 constexpr uint32_t s_DefaultCPUCount = 2;
@@ -199,6 +200,14 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
         THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
 }
+static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
+{
+    if (inet_ntop(af, src, dst, dstCount) == nullptr)
+    {
+        return HRESULT_FROM_WIN32(WSAGetLastError());
+    }
+    return S_OK;
+}
 
 bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
 {
@@ -264,6 +273,85 @@ private:
     wsl::windows::common::relay::HandleWrapper m_fileHandle;
     ULONGLONG m_length;
 };
+
+// TODO: Implement Server SKU specific checks
+bool NeedsVirtualMachineServicesInstalled()
+{
+    return !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled();
+}
+
+#define WSLC_API_MIN_VERSION_SUPPORTED 2, 8, 0
+
+bool DoesWslRuntimeVersionSupportWslc(const std::optional<std::tuple<uint32_t, uint32_t, uint32_t>>& version)
+{
+    constexpr auto minimalPackageVersion = std::tuple<uint32_t, uint32_t, uint32_t>{WSLC_API_MIN_VERSION_SUPPORTED};
+    return version.has_value() && version >= minimalPackageVersion;
+}
+
+enum class WslRuntimeState
+{
+    NotInstalled,
+    InstalledWithoutWslcSupport,
+    InstalledWithWslcSupport,
+};
+
+WslRuntimeState CheckWslRuntimeState()
+{
+    auto version = wsl::windows::common::wslutil::GetInstalledPackageVersion();
+
+    if (!version.has_value())
+    {
+        return WslRuntimeState::NotInstalled;
+    }
+
+    return DoesWslRuntimeVersionSupportWslc(version) ? WslRuntimeState::InstalledWithWslcSupport : WslRuntimeState::InstalledWithoutWslcSupport;
+}
+
+std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
+{
+    wil::com_ptr<IWSLCSessionManager> result;
+    HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&result));
+    return {result, hr};
+}
+
+wil::com_ptr<IWSLCSessionManager> CreateSessionManager()
+{
+    auto [result, hr] = CreateSessionManagerRaw();
+
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        WslRuntimeState currentState = CheckWslRuntimeState();
+        THROW_WIN32_IF_MSG(
+            ERROR_NOT_SUPPORTED,
+            currentState == WslRuntimeState::InstalledWithoutWslcSupport,
+            "The currently installed WSL version does not support WSLC.");
+        THROW_HR_IF_MSG(
+            hr,
+            currentState == WslRuntimeState::InstalledWithWslcSupport,
+            "The WSL install appears to be corrupted; session manager class was not registered.");
+    }
+
+    THROW_IF_FAILED(hr);
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(result.get());
+
+    return result;
+}
+
+bool NeedsWslRuntimeInstalled()
+{
+    auto hr = CreateSessionManagerRaw().second;
+
+    if (SUCCEEDED(hr))
+    {
+        return false;
+    }
+    else if (hr == REGDB_E_CLASSNOTREG)
+    {
+        return true;
+    }
+    THROW_HR(hr);
+}
 } // namespace
 
 // SESSION DEFINITIONS
@@ -332,15 +420,12 @@ try
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
-    wil::com_ptr<IWSLCSessionManager> sessionManager;
-    RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+    wil::com_ptr<IWSLCSessionManager> sessionManager = CreateSessionManager();
 
     auto result = std::make_unique<WslcSessionImpl>();
     WSLCSessionSettings runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
-    // TODO: Is this the intended use for vhdRequirements.sizeInBytes?
     runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeInBytes / _1MB;
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
@@ -354,16 +439,6 @@ try
     }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
-
-    // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
-    // runtimeSettings.DmesgOutput;
-
-    // TODO: VHD overrides; I'm not sure if we intend these to be provided.
-    // runtimeSettings.RootVhdOverride = internalType->vhdRequirements.path;
-    // TODO: I don't think that this VHD type override can be reused from the VHD requirements type
-    //       Tracking the code suggests that this is the `filesystemtype` to the linux `mount` function.
-    //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
-    // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, &result->session))))
     {
@@ -403,23 +478,56 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcCreateSessionVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRequirements* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    UNREFERENCED_PARAMETER(errorMessage);
-    return E_NOTIMPL;
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
+    RETURN_HR_IF(E_INVALIDARG, options->sizeInBytes == 0);
+    RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
+
+    WSLCVolumeOptions volumeOptions{};
+    volumeOptions.Name = options->name;
+    volumeOptions.Driver = "vhd";
+
+    auto sizeStr = std::to_string(options->sizeInBytes);
+    WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeStr.c_str()}};
+    volumeOptions.DriverOpts = driverOpts;
+    volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+    WSLCVolumeInformation volumeInfo{};
+    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
 }
 CATCH_RETURN();
 
-STDAPI WslcSetSessionSettingsVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
+STDAPI WslcDeleteSessionVhdVolume(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, name);
+
+    return errorInfoWrapper.CaptureResult(internalType->session->DeleteVolume(name));
+}
+CATCH_RETURN();
+
+STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_opt_ const WslcVhdRequirements* vhdRequirements)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     if (vhdRequirements)
     {
+        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeInBytes == 0);
+        RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
+
         internalType->vhdRequirements = *vhdRequirements;
     }
     else
@@ -519,6 +627,8 @@ try
     auto result = std::make_unique<WslcContainerImpl>();
 
     WSLCContainerOptions containerOptions{};
+    std::unique_ptr<WSLCPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
+
     containerOptions.Image = internalContainerSettings->image;
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
@@ -544,7 +654,23 @@ try
         containerOptions.VolumesCount = static_cast<ULONG>(internalContainerSettings->volumesCount);
     }
 
-    std::unique_ptr<WSLCPortMapping[]> convertedPorts;
+    std::unique_ptr<WSLCNamedVolume[]> convertedNamedVolumes;
+    if (internalContainerSettings->namedVolumes && internalContainerSettings->namedVolumesCount)
+    {
+        convertedNamedVolumes = std::make_unique<WSLCNamedVolume[]>(internalContainerSettings->namedVolumesCount);
+        for (uint32_t i = 0; i < internalContainerSettings->namedVolumesCount; ++i)
+        {
+            const WslcContainerNamedVolume& internalVolume = internalContainerSettings->namedVolumes[i];
+            WSLCNamedVolume& convertedVolume = convertedNamedVolumes[i];
+
+            convertedVolume.Name = internalVolume.name;
+            convertedVolume.ContainerPath = internalVolume.containerPath;
+            convertedVolume.ReadOnly = internalVolume.readOnly;
+        }
+        containerOptions.NamedVolumes = convertedNamedVolumes.get();
+        containerOptions.NamedVolumesCount = static_cast<ULONG>(internalContainerSettings->namedVolumesCount);
+    }
+
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
         convertedPorts = std::make_unique<WSLCPortMapping[]>(internalContainerSettings->portsCount);
@@ -556,21 +682,64 @@ try
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
 
-            // TODO: Ipv6 & custom binding address support.
-            convertedPort.Family = AF_INET;
-
             // TODO: Consider using standard protocol numbers instead of our own enum.
-            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
-            convertedPort.BindingAddress = "127.0.0.1";
+            switch (internalPort.protocol)
+            {
+            case WSLC_PORT_PROTOCOL_TCP:
+                convertedPort.Protocol = IPPROTO_TCP;
+                break;
+            case WSLC_PORT_PROTOCOL_UDP:
+                convertedPort.Protocol = IPPROTO_UDP;
+                break;
+            default:
+                THROW_HR_MSG(E_INVALIDARG, "Unsupported port protocol: %u", internalPort.protocol);
+            }
+            // Validate IP address if provided and if valid, copy to runtime structure.
+            if (internalPort.windowsAddress != nullptr)
+            {
+                switch (internalPort.windowsAddress->ss_family)
+                {
+                case AF_INET:
+                {
+                    const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
+                    HRESULT hr = InetNtopToHresult(AF_INET, &addr4->sin_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
+                    if (FAILED(hr))
+                    {
+                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET address");
+                    }
+                    convertedPort.Family = AF_INET;
+                    break;
+                }
+
+                case AF_INET6:
+                {
+                    const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
+                    HRESULT hr = InetNtopToHresult(AF_INET6, &addr6->sin6_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
+                    if (FAILED(hr))
+                    {
+                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET6 address");
+                    }
+                    convertedPort.Family = AF_INET6;
+                    break;
+                }
+
+                default:
+                    THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", internalPort.windowsAddress->ss_family);
+                }
+            }
+            else
+            {
+                convertedPort.Family = AF_INET;
+                strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
+            }
         }
-        containerOptions.Ports = convertedPorts.get();
+        containerOptions.Ports = convertedPorts.get(); // Make sure convertedPorts stays in scope for life of containerOptions
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
     containerOptions.ContainerNetwork.ContainerNetworkType = internalContainerSettings->networking;
 
     // TODO: No user access
-    // containerOptions.Entrypoint;
     // containerOptions.Labels;
     // containerOptions.LabelsCount;
     // containerOptions.StopSignal;
@@ -694,10 +863,15 @@ try
 
     for (uint32_t i = 0; i < portMappingCount; ++i)
     {
-        RETURN_HR_IF(E_NOTIMPL, portMappings[i].windowsAddress != nullptr);
-        RETURN_HR_IF(E_NOTIMPL, portMappings[i].protocol != 0);
+        if (portMappings[i].windowsAddress != nullptr)
+        {
+            const auto family = portMappings[i].windowsAddress->ss_family;
+            RETURN_HR_IF_MSG(
+                E_INVALIDARG, family != AF_INET && family != AF_INET6, "Unsupported address family: %d at port mapping index %u", family, i);
+        }
+        RETURN_HR_IF_MSG(
+            E_NOTIMPL, portMappings[i].protocol != 0, "Unsupported protocol: %d at port mapping index %u", portMappings[i].protocol, i);
     }
-
     internalType->ports = portMappings;
     internalType->portsCount = portMappingCount;
 
@@ -722,6 +896,27 @@ try
 
     internalType->volumes = volumes;
     internalType->volumesCount = volumeCount;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetContainerSettingsNamedVolumes(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_opt_(namedVolumeCount) const WslcContainerNamedVolume* namedVolumes, _In_ uint32_t namedVolumeCount)
+try
+{
+    auto internalType = CheckAndGetInternalType(containerSettings);
+    RETURN_HR_IF(E_INVALIDARG, (namedVolumes == nullptr && namedVolumeCount != 0) || (namedVolumes != nullptr && namedVolumeCount == 0));
+
+    for (uint32_t i = 0; i < namedVolumeCount; ++i)
+    {
+        RETURN_HR_IF_NULL(E_INVALIDARG, namedVolumes[i].name);
+        RETURN_HR_IF_NULL(E_INVALIDARG, namedVolumes[i].containerPath);
+        EnsureAbsolutePath(namedVolumes[i].containerPath, true);
+    }
+
+    internalType->namedVolumes = namedVolumes;
+    internalType->namedVolumesCount = namedVolumeCount;
 
     return S_OK;
 }
@@ -774,12 +969,21 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PCSTR* inspectData)
+STDAPI WslcInspectContainer(_In_ WslcContainer container, _Outptr_result_z_ PSTR* inspectData)
 try
 {
-    UNREFERENCED_PARAMETER(container);
-    UNREFERENCED_PARAMETER(inspectData);
-    return E_NOTIMPL;
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    RETURN_HR_IF_NULL(E_POINTER, inspectData);
+
+    *inspectData = nullptr;
+
+    wil::unique_cotaskmem_ansistring result;
+    RETURN_IF_FAILED(internalType->container->Inspect(&result));
+
+    *inspectData = result.release();
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1041,8 +1245,7 @@ try
 
     auto progressCallback = ProgressCallback::CreateIf(options);
 
-    // TODO: Auth
-    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, nullptr, progressCallback.get()));
+    return errorInfoWrapper.CaptureResult(internalType->session->PullImage(options->uri, options->registryAuth, progressCallback.get()));
 }
 CATCH_RETURN();
 
@@ -1052,7 +1255,7 @@ static HRESULT WslcImportSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(internalSession->session->ImportImage(
-        HandleToULong(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
+        ToCOMInputHandle(imageFile.Handle()), imageName, progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcImportSessionImage(
@@ -1090,7 +1293,7 @@ static HRESULT WslcLoadSessionImageImpl(
     auto progressCallback = ProgressCallback::CreateIf(options);
 
     return errorInfoWrapper.CaptureResult(
-        internalSession->session->LoadImage(HandleToULong(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
+        internalSession->session->LoadImage(ToCOMInputHandle(imageFile.Handle()), progressCallback.get(), imageFile.Length()));
 }
 
 STDAPI WslcLoadSessionImage(
@@ -1118,22 +1321,88 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR NameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
-    RETURN_HR_IF_NULL(E_POINTER, NameOrId);
+    RETURN_HR_IF_NULL(E_POINTER, nameOrId);
 
     WSLCDeleteImageOptions options{};
-    options.Image = NameOrId;
+    options.Image = nameOrId;
     // TODO: Flags? (Force and NoPrune)
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImageInformation;
 
     return errorInfoWrapper.CaptureResult(
         internalType->session->DeleteImage(&options, &deletedImageInformation, deletedImageInformation.size_address<ULONG>()));
+}
+CATCH_RETURN();
+
+STDAPI WslcTagSessionImage(_In_ WslcSession session, _In_ const WslcTagImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->image);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->repo);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->tag);
+
+    WSLCTagImageOptions runtimeOptions{};
+    runtimeOptions.Image = options->image;
+    runtimeOptions.Repo = options->repo;
+    runtimeOptions.Tag = options->tag;
+
+    return errorInfoWrapper.CaptureResult(internalType->session->TagImage(&runtimeOptions));
+}
+CATCH_RETURN();
+
+STDAPI WslcPushSessionImage(_In_ WslcSession session, _In_ const WslcPushImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->image);
+    RETURN_HR_IF_NULL(E_INVALIDARG, options->registryAuth);
+
+    auto progressCallback = ProgressCallback::CreateIf(options);
+
+    return errorInfoWrapper.CaptureResult(internalType->session->PushImage(options->image, options->registryAuth, progressCallback.get()));
+}
+CATCH_RETURN();
+
+STDAPI WslcSessionAuthenticate(
+    _In_ WslcSession session,
+    _In_z_ PCSTR serverAddress,
+    _In_z_ PCSTR username,
+    _In_z_ PCSTR password,
+    _Outptr_result_z_ PSTR* identityToken,
+    _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
+    RETURN_HR_IF_NULL(E_POINTER, serverAddress);
+    RETURN_HR_IF_NULL(E_POINTER, username);
+    RETURN_HR_IF_NULL(E_POINTER, password);
+    RETURN_HR_IF_NULL(E_POINTER, identityToken);
+
+    *identityToken = nullptr;
+
+    wil::unique_cotaskmem_ansistring token;
+    auto hr = errorInfoWrapper.CaptureResult(internalType->session->Authenticate(serverAddress, username, password, &token));
+    if (SUCCEEDED(hr))
+    {
+        *identityToken = token.release();
+    }
+
+    return errorInfoWrapper;
 }
 CATCH_RETURN();
 
@@ -1192,9 +1461,21 @@ CATCH_RETURN();
 STDAPI WslcCanRun(_Out_ BOOL* canRun, _Out_ WslcComponentFlags* missingComponents)
 try
 {
-    UNREFERENCED_PARAMETER(canRun);
-    UNREFERENCED_PARAMETER(missingComponents);
-    return E_NOTIMPL;
+    RETURN_HR_IF_NULL(E_POINTER, canRun);
+    RETURN_HR_IF_NULL(E_POINTER, missingComponents);
+
+    *canRun = FALSE;
+    *missingComponents = WSLC_COMPONENT_FLAG_NONE;
+
+    WslcComponentFlags componentCheck = WSLC_COMPONENT_FLAG_NONE;
+
+    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, NeedsVirtualMachineServicesInstalled());
+    WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE, NeedsWslRuntimeInstalled());
+
+    *canRun = componentCheck == WSLC_COMPONENT_FLAG_NONE ? TRUE : FALSE;
+    *missingComponents = componentCheck;
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1206,9 +1487,7 @@ try
     static_assert(std::is_trivial_v<WslcVersion>, "WslcVersion must be trivial");
     *version = {};
 
-    wil::com_ptr<IWSLCSessionManager> sessionManager;
-    RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+    wil::com_ptr<IWSLCSessionManager> sessionManager = CreateSessionManager();
 
     WSLCVersion runtimeVersion{};
     RETURN_IF_FAILED(sessionManager->GetVersion(&runtimeVersion));
@@ -1229,3 +1508,22 @@ try
     return E_NOTIMPL;
 }
 CATCH_RETURN();
+
+EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
+{
+    wil::DLLMain(Instance, Reason, Reserved);
+
+    switch (Reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        wsl::windows::common::wslutil::InitializeWil();
+        WslTraceLoggingInitialize(WslcTelemetryProvider, false);
+        break;
+
+    case DLL_PROCESS_DETACH:
+        WslTraceLoggingUninitialize();
+        break;
+    }
+
+    return TRUE;
+}

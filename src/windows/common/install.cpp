@@ -104,7 +104,11 @@ int UpdatePackageImpl(bool preRelease, bool repair)
 
         const auto exitCode = UpgradeViaMsi(downloadPath.c_str(), L"", logFile.c_str(), &MsiMessageCallback);
 
-        if (exitCode != 0)
+        if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+        {
+            PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+        }
+        else if (exitCode != 0)
         {
             clearLogs.release();
             THROW_HR_WITH_USER_ERROR(
@@ -358,15 +362,20 @@ int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair)
 UINT wsl::windows::common::install::UpgradeViaMsi(
     _In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
 {
-    WriteInstallLog(std::format("Upgrading via MSI package: {}. Args: {}", PackageLocation, ExtraArgs != nullptr ? ExtraArgs : L""));
+    // Always suppress MSI-initiated reboots. With INSTALLUILEVEL_NONE, Windows Installer
+    // will silently reboot the machine if files are in use and REBOOT is not suppressed.
+    std::wstring args = L"REBOOT=ReallySuppress";
+    if (ExtraArgs != nullptr && *ExtraArgs != L'\0')
+    {
+        args = std::wstring(ExtraArgs) + L" " + args;
+    }
+
+    WriteInstallLog(std::format("Upgrading via MSI package: {}. Args: {}", PackageLocation, args));
 
     ConfigureMsiLogging(LogFile, Callback);
 
-    auto result = MsiInstallProduct(PackageLocation, ExtraArgs);
-    WSL_LOG(
-        "MsiInstallResult",
-        TraceLoggingValue(result, "result"),
-        TraceLoggingValue(ExtraArgs != nullptr ? ExtraArgs : L"", "ExtraArgs"));
+    auto result = MsiInstallProduct(PackageLocation, args.c_str());
+    WSL_LOG("MsiInstallResult", TraceLoggingValue(result, "result"), TraceLoggingValue(args.c_str(), "ExtraArgs"));
 
     WriteInstallLog(std::format("MSI upgrade result: {}", result));
 
@@ -382,7 +391,7 @@ UINT wsl::windows::common::install::UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _I
 
     ConfigureMsiLogging(LogFile, Callback);
 
-    auto result = MsiConfigureProduct(productCode.c_str(), 0, INSTALLSTATE_ABSENT);
+    auto result = MsiConfigureProductEx(productCode.c_str(), 0, INSTALLSTATE_ABSENT, L"REBOOT=ReallySuppress");
     WSL_LOG("MsiUninstallResult", TraceLoggingValue(result, "result"));
 
     WriteInstallLog(std::format("MSI package uninstall result: {}", result));

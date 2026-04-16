@@ -12,6 +12,8 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "WSLCSessionDefaults.h"
+#include "ImageModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -138,10 +140,10 @@ TestSession::~TestSession()
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status, const std::wstring& sessionName)
 {
-    std::wstring command = L"container list --all";
+    std::wstring command = L"container list --no-trunc --all";
     if (!sessionName.empty())
     {
-        command = std::format(L"container list --all --session {}", sessionName);
+        command = std::format(L"container list --no-trunc --all --session {}", sessionName);
     }
 
     auto result = RunWslc(command);
@@ -165,7 +167,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
 
 void VerifyImageIsUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"container list -a");
+    auto result = RunWslc(L"container list --no-trunc --all");
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -181,7 +183,7 @@ void VerifyImageIsUsed(const TestImage& image)
 
 void VerifyImageIsNotUsed(const TestImage& image)
 {
-    auto result = RunWslc(L"container list -a");
+    auto result = RunWslc(L"container list --no-trunc --all");
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -193,31 +195,33 @@ void VerifyImageIsNotUsed(const TestImage& image)
     }
 }
 
+void VerifyImageIsListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
+    {
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
-    const int shortIdLength = 12;
-    VERIFY_IS_GREATER_THAN_OR_EQUAL(id.length(), shortIdLength);
-    if (fullId)
-    {
-        return id;
-    }
-
-    // Remove the "sha256:" prefix if it exists and return the first 12 characters
-    const std::string prefix = "sha256:";
-    if (id.rfind(prefix, 0) == 0)
-    {
-        return id.substr(prefix.length(), shortIdLength);
-    }
-
-    return id.substr(0, shortIdLength);
+    return wsl::windows::common::string::TruncateId(id, !fullId);
 }
 
 wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName)
 {
     auto result = RunWslc(std::format(L"container inspect {}", containerName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -226,31 +230,14 @@ wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
 {
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(jsonOutput.c_str());
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
 
-namespace VT {
-    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste)
-    {
-        const auto containerId = InspectContainer(containerNameOrId).Id;
-        const auto shortId = GetHashId(containerId);
-        return BuildContainerPrompt(shortId, withBracketedPaste);
-    }
-
-    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId)
-    {
-        const auto containerId = InspectContainer(containerNameOrId).Id;
-        const auto shortId = GetHashId(containerId);
-        return BuildContainerAttachPrompt(shortId);
-    }
-} // namespace VT
-
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
-    auto listResult = RunWslc(L"container list --all");
+    auto listResult = RunWslc(L"container list --no-trunc --all");
     listResult.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto stdoutLines = listResult.GetStdoutLines();
@@ -261,11 +248,19 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
             if (line.find(L"running") != std::wstring::npos)
             {
                 auto result = RunWslc(std::format(L"container kill {}", containerName));
-                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                // Tolerate ERROR_NOT_FOUND - container already stopped/removed
+                if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"ERROR_NOT_FOUND") == std::wstring::npos))
+                {
+                    result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                }
             }
 
             auto result = RunWslc(std::format(L"container remove --force {}", containerName));
-            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            // Tolerate ERROR_NOT_FOUND - container already removed
+            if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"ERROR_NOT_FOUND") == std::wstring::npos))
+            {
+                result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            }
             break;
         }
     }
@@ -275,8 +270,7 @@ std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers(
 {
     auto result = RunWslc(L"container list --all --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto jsonOutput = result.GetStdoutOneLine();
-    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(jsonOutput.c_str());
+    return wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ContainerInformation>>(result.Stdout.value().c_str());
 }
 
 void EnsureImageContainersAreDeleted(const TestImage& image)
@@ -295,7 +289,7 @@ void EnsureImageContainersAreDeleted(const TestImage& image)
 
 void EnsureImageIsDeleted(const TestImage& image)
 {
-    auto result = RunWslc(L"image list");
+    auto result = RunWslc(L"image list -q");
     result.Verify({.Stderr = L"", .ExitCode = 0});
 
     auto outputLines = result.GetStdoutLines();
@@ -313,10 +307,10 @@ void EnsureImageIsDeleted(const TestImage& image)
 
 void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName)
 {
-    std::wstring listCommand = L"image list";
+    std::wstring listCommand = L"image list -q";
     if (!sessionName.empty())
     {
-        listCommand = std::format(L"image list --session \"{}\"", sessionName);
+        listCommand = std::format(L"image list -q --session \"{}\"", sessionName);
     }
 
     auto result = RunWslc(listCommand);
@@ -340,5 +334,53 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
 
     auto loadResult = RunWslc(loadCommand);
     loadResult.Verify({.Stderr = L"", .ExitCode = 0});
+}
+
+void EnsureSessionIsTerminated(const std::wstring& sessionName)
+{
+    std::wstring targetSession = sessionName;
+    if (targetSession.empty())
+    {
+        auto isElevated = wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token(TOKEN_QUERY).get());
+        auto baseName = isElevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+
+        wchar_t username[256 + 1] = {};
+        DWORD usernameLen = ARRAYSIZE(username);
+        THROW_IF_WIN32_BOOL_FALSE(GetUserNameW(username, &usernameLen));
+
+        targetSession = std::format(L"{}-{}", baseName, username);
+    }
+
+    auto listResult = RunWslc(L"session list");
+    listResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+    auto stdoutLines = listResult.GetStdoutLines();
+    for (const auto& line : stdoutLines)
+    {
+        // Check if the line ends with the target session name
+        if (line.size() >= targetSession.size() && line.compare(line.size() - targetSession.size(), targetSession.size(), targetSession) == 0)
+        {
+            auto result = RunWslc(std::format(L"session terminate \"{}\"", targetSession));
+            result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
+}
+
+void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& lines)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    VERIFY_IS_TRUE(file.is_open());
+    for (const auto& line : lines)
+    {
+        file << line << "\n";
+    }
+
+    VERIFY_IS_TRUE(file.good());
+}
+
+std::wstring GetPythonHttpServerScript(uint16_t port)
+{
+    return std::format(L"python3 -m http.server {}", port);
 }
 } // namespace WSLCE2ETests

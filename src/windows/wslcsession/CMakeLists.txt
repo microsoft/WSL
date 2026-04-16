@@ -45,14 +45,15 @@ set(HEADERS
     WSLCVolumeMetadata.h)
 
 add_executable(wslcsession WIN32 ${SOURCES} ${HEADERS})
-add_dependencies(wslcsession wslcidl)
+add_dependencies(wslcsession wslserviceidl)
 add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
 target_link_libraries(wslcsession
                       ${COMMON_LINK_LIBRARIES}
                       common
                       legacy_stdio_definitions
-                      VirtDisk.lib)
+                      VirtDisk.lib
+                      Crypt32.lib)
 
 target_precompile_headers(wslcsession REUSE_FROM common)
 set_target_properties(wslcsession PROPERTIES FOLDER windows)

@@ -18,6 +18,7 @@ Abstract:
 #include <wslc_schema.h>
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageInspectTests
 {
@@ -35,39 +36,31 @@ class WSLCE2EImageInspectTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image inspect --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_MissingImageName)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_MissingImageName)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"image inspect");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image inspect {}", InvalidImage.NameAndTag()));
         auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
         result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Image_Inspect_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_Success)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"image inspect {}", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto jsonOutput = result.GetStdoutOneLine();
-        auto inspectData = wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectImage>>(jsonOutput.c_str());
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectImage>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1u, inspectData.size());
         VERIFY_IS_TRUE(inspectData[0].RepoTags.has_value());
         VERIFY_ARE_EQUAL(1u, inspectData[0].RepoTags.value().size());
@@ -92,7 +85,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Inspect images.\r\n\r\n";
+        return Localization::WSLCCLI_ImageInspectLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const

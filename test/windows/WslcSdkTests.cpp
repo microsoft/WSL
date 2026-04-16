@@ -15,6 +15,9 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "wslcsdk.h"
+#include "WslcsdkPrivate.h"
+#include "WSLCContainerLauncher.h"
+#include "wslc_schema.h"
 #include <optional>
 
 extern std::wstring g_testDataPath;
@@ -195,12 +198,12 @@ class WslcSdkTests
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 4096ull * 1024 * 1024; // 4 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &m_defaultSession, nullptr));
 
         // Pull images required by the tests (no-op if already present).
-        for (const char* image : {"debian:latest", "python:3.12-alpine"})
+        for (const char* image : {"debian:latest", "python:3.12-alpine", "hello-world:latest", "wslc-registry:latest"})
         {
             LoadTestImage(image);
         }
@@ -235,10 +238,8 @@ class WslcSdkTests
     // Session tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(CreateSession)
+    WSLC_TEST_METHOD(CreateSession)
     {
-        WSL2_TEST_ONLY();
-
         std::filesystem::path extraStorage = m_storagePath / "wslc-extra-session-storage";
 
         WslcSessionSettings sessionSettings;
@@ -250,7 +251,7 @@ class WslcSdkTests
         WslcVhdRequirements vhdReqs{};
         vhdReqs.sizeInBytes = 1024ull * 1024 * 1024; // 1 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVHD(&sessionSettings, &vhdReqs));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
         UniqueSession session;
         VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
@@ -264,10 +265,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcCreateSession(nullptr, &session2, nullptr), E_POINTER);
     }
 
-    TEST_METHOD(TerminationCallbackViaTerminate)
+    WSLC_TEST_METHOD(TerminationCallbackViaTerminate)
     {
-        WSL2_TEST_ONLY();
-
         std::promise<WslcSessionTerminationReason> promise;
 
         auto callback = [](WslcSessionTerminationReason reason, PVOID context) {
@@ -293,10 +292,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(future.get(), WSLC_SESSION_TERMINATION_REASON_SHUTDOWN);
     }
 
-    TEST_METHOD(TerminationCallbackViaRelease)
+    WSLC_TEST_METHOD(TerminationCallbackViaRelease)
     {
-        WSL2_TEST_ONLY();
-
         std::promise<WslcSessionTerminationReason> promise;
 
         auto callback = [](WslcSessionTerminationReason reason, PVOID context) {
@@ -328,66 +325,8 @@ class WslcSdkTests
     // Image tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(PullImage)
+    WSLC_TEST_METHOD(ImageList)
     {
-        WSL2_TEST_ONLY();
-
-        // Positive: pull a well-known image.
-        {
-            WslcPullImageOptions opts{};
-            opts.uri = "hello-world:linux";
-            wil::unique_cotaskmem_string errorMsg;
-            HRESULT pullResult = WslcPullSessionImage(m_defaultSession, &opts, &errorMsg);
-
-            // Skip test if error is due to rate limit.
-            if (pullResult == E_FAIL)
-            {
-                if (errorMsg)
-                {
-                    if (wcsstr(errorMsg.get(), L"toomanyrequests") != nullptr)
-                    {
-                        LogWarning("Skipping PullImage test due to rate limiting.");
-                        return;
-                    }
-                }
-            }
-
-            VERIFY_SUCCEEDED(pullResult);
-
-            // Verify the image is usable by running a container from it.
-            auto output = RunContainerAndCapture(m_defaultSession, "hello-world:linux", {});
-            VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
-        }
-
-        // Negative: pull an image that does not exist.
-        {
-            WslcPullImageOptions opts{};
-            opts.uri = "does-not:exist";
-            wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), WSLC_E_IMAGE_NOT_FOUND);
-
-            // An error message should be present.
-            VERIFY_IS_NOT_NULL(errorMsg.get());
-        }
-
-        // Negative: null options pointer must fail.
-        {
-            wil::unique_cotaskmem_string errorMsg;
-            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, nullptr, &errorMsg), E_POINTER);
-        }
-
-        // Negative: null URI inside options must fail.
-        {
-            WslcPullImageOptions opts{};
-            opts.uri = nullptr;
-            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
-        }
-    }
-
-    TEST_METHOD(ImageList)
-    {
-        WSL2_TEST_ONLY();
-
         // Positive: session has images pre-loaded — list must return at least one entry.
         {
             WslcImageInfo* images = nullptr;
@@ -423,10 +362,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(LoadImage)
+    WSLC_TEST_METHOD(LoadImage)
     {
-        WSL2_TEST_ONLY();
-
         // Positive: load a saved image tar and verify the image can be run.
         {
             // Remove the image first (ignore failure if it wasn't present).
@@ -477,10 +414,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcLoadSessionImageFromFile(m_defaultSession, nullptr, &opts, nullptr), E_POINTER);
     }
 
-    TEST_METHOD(ImportImage)
+    WSLC_TEST_METHOD(ImportImage)
     {
-        WSL2_TEST_ONLY();
-
         const auto exportedImageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         constexpr auto c_handleImportedImageName = "my-hello-world-handle:test";
         constexpr auto c_pathImportedImageName = "my-hello-world-path:test";
@@ -488,6 +423,9 @@ class WslcSdkTests
         // Positive: import an exported image tar via handle+length and verify the image can be run.
         {
             WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr);
+
+            auto cleanup = wil::scope_exit(
+                [this]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, c_handleImportedImageName, nullptr)); });
 
             wil::unique_handle imageTarFileHandle{CreateFileW(
                 exportedImageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
@@ -505,7 +443,11 @@ class WslcSdkTests
 
         // Positive: import an exported image tar via path and verify the image can be run.
         {
+
             WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr);
+
+            auto cleanup = wil::scope_exit(
+                [this]() { LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, c_pathImportedImageName, nullptr)); });
 
             VERIFY_SUCCEEDED(WslcImportSessionImageFromFile(m_defaultSession, c_pathImportedImageName, exportedImageTar.c_str(), nullptr, nullptr));
 
@@ -525,9 +467,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcImportSessionImage(m_defaultSession, "zero-length:test", GetCurrentThreadEffectiveToken(), 0, &opts, nullptr), E_INVALIDARG);
     }
 
-    TEST_METHOD(LoadImageNonTar)
+    WSLC_TEST_METHOD(LoadImageNonTar)
     {
-        WSL2_TEST_ONLY();
         // The load should fail but it just silently ignores the load currently.
         SKIP_TEST_NOT_IMPL();
 
@@ -548,10 +489,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ImportImageNonTar)
+    WSLC_TEST_METHOD(ImportImageNonTar)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: attempt to load a non-tar file.
         {
             std::filesystem::path pathToSelf = wil::QueryFullProcessImageNameW<std::wstring>(GetCurrentProcess());
@@ -572,38 +511,19 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ImageDelete)
+    WSLC_TEST_METHOD(ImageDelete)
     {
-        WSL2_TEST_ONLY();
-
-        auto checkForImage = [this](std::string_view image) -> bool {
-            WslcImageInfo* images = nullptr;
-            uint32_t count = 0;
-            VERIFY_SUCCEEDED(WslcListSessionImages(m_defaultSession, &images, &count));
-            auto cleanupImages = wil::scope_exit([images]() { CoTaskMemFree(images); });
-            bool found = false;
-            for (uint32_t i = 0; i < count; ++i)
-            {
-                if (images[i].name == image)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            return found;
-        };
-
-        // Setup: load hello-world:latest so we have something to delete.
-        LoadTestImage("hello-world:latest");
-
-        VERIFY_IS_TRUE(checkForImage("hello-world:latest"));
+        VERIFY_IS_TRUE(HasImage("hello-world:latest"));
 
         // Positive: delete an existing image.
         wil::unique_cotaskmem_string errorMsg;
         VERIFY_SUCCEEDED(WslcDeleteSessionImage(m_defaultSession, "hello-world:latest", &errorMsg));
 
         // Verify the image is no longer present in the list.
-        VERIFY_IS_FALSE(checkForImage("hello-world:latest"));
+        VERIFY_IS_FALSE(HasImage("hello-world:latest"));
+
+        // Reload the image for subsequent tests.
+        LoadTestImage("hello-world:latest");
 
         // Negative: null name must fail.
         VERIFY_ARE_EQUAL(WslcDeleteSessionImage(m_defaultSession, nullptr, nullptr), E_POINTER);
@@ -613,10 +533,8 @@ class WslcSdkTests
     // Container lifecycle tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(CreateContainer)
+    WSLC_TEST_METHOD(CreateContainer)
     {
-        WSL2_TEST_ONLY();
-
         // Simple echo — verify stdout is captured correctly.
         {
             auto output = RunContainerAndCapture(m_defaultSession, "debian:latest", {"/bin/echo", "OK"});
@@ -662,10 +580,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerGetID)
+    WSLC_TEST_METHOD(ContainerGetID)
     {
-        WSL2_TEST_ONLY();
-
         UniqueContainer container;
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
@@ -682,10 +598,8 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
-    TEST_METHOD(ContainerGetState)
+    WSLC_TEST_METHOD(ContainerGetState)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -729,10 +643,8 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
-    TEST_METHOD(ContainerStopAndDelete)
+    WSLC_TEST_METHOD(ContainerStopAndDelete)
     {
-        WSL2_TEST_ONLY();
-
         // Build a long-running container.
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
@@ -761,10 +673,8 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
     }
 
-    TEST_METHOD(ProcessIOHandles)
+    WSLC_TEST_METHOD(ProcessIOHandles)
     {
-        WSL2_TEST_ONLY();
-
         // Verify that stdout and stderr can each be read, and are independent streams.
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
@@ -803,10 +713,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WaitForSingleObject(exitEvent, 60 * 1000), WAIT_OBJECT_0);
     }
 
-    TEST_METHOD(ContainerNetworkingMode)
+    WSLC_TEST_METHOD(ContainerNetworkingMode)
     {
-        WSL2_TEST_ONLY();
-
         // BRIDGED: container should have an eth0 interface in sysfs.
         {
             auto output = RunContainerAndCapture(
@@ -841,10 +749,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerPortMapping)
+    WSLC_TEST_METHOD(ContainerPortMapping)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: null mappings with nonzero count must fail.
         {
             WslcContainerSettings containerSettings;
@@ -869,18 +775,18 @@ class WslcSdkTests
 
         // Negative: port mappings with NONE networking must fail at container creation.
         {
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_NONE));
+            WslcContainerSettings containerSettings1;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings1, WSLC_CONTAINER_NETWORKING_MODE_NONE));
 
             WslcContainerPortMapping mapping{};
             mapping.windowsPort = 12342;
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings1, &mapping, 1));
 
             WslcContainer rawContainer = nullptr;
-            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &rawContainer, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings1, &rawContainer, nullptr), E_INVALIDARG);
             VERIFY_IS_NULL(rawContainer);
         }
 
@@ -894,19 +800,19 @@ class WslcSdkTests
             const char* env[] = {"PYTHONUNBUFFERED=1"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
 
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+            WslcContainerSettings containerSettings2;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings2));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings2, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings2, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
 
             WslcContainerPortMapping mapping{};
             mapping.windowsPort = 12341;
             mapping.containerPort = 8000;
             mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings, &mapping, 1));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings2, &mapping, 1));
 
             UniqueContainer container;
-            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings2, &container, nullptr));
             VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
             UniqueProcess process;
@@ -919,12 +825,109 @@ class WslcSdkTests
 
             ExpectHttpResponse(L"http://127.0.0.1:12341", 200);
         }
+
+        // Functional: port mapping with explicit IPv4 windowsAddress (127.0.0.1).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"python3", "-m", "http.server", "8000"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+            const char* env[] = {"PYTHONUNBUFFERED=1"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
+
+            WslcContainerSettings containerSettings3;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings3));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings3, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings3, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+
+            sockaddr_storage addr4{};
+            auto* sin4 = reinterpret_cast<sockaddr_in*>(&addr4);
+            sin4->sin_family = AF_INET;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET, "127.0.0.1", &sin4->sin_addr), 1);
+
+            WslcContainerPortMapping mapping{};
+            mapping.windowsPort = 12343;
+            mapping.containerPort = 8000;
+            mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
+            mapping.windowsAddress = &addr4;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings3, &mapping, 1));
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings3, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+            UniqueProcess process;
+            VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+            wil::unique_handle ownedStdout;
+            VERIFY_SUCCEEDED(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &ownedStdout));
+
+            WaitForOutput(std::move(ownedStdout), "Serving HTTP on", 30s);
+
+            ExpectHttpResponse(L"http://127.0.0.1:12343", 200);
+        }
+
+        // Functional: port mapping with explicit IPv6 windowsAddress (::1).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"python3", "-m", "http.server", "8000", "--bind", "::"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+            const char* env[] = {"PYTHONUNBUFFERED=1"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsEnvVariables(&procSettings, env, ARRAYSIZE(env)));
+
+            WslcContainerSettings containerSettings4;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("python:3.12-alpine", &containerSettings4));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings4, &procSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings4, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+
+            sockaddr_storage addr6{};
+            auto* sin6 = reinterpret_cast<sockaddr_in6*>(&addr6);
+            sin6->sin6_family = AF_INET6;
+            VERIFY_ARE_EQUAL(inet_pton(AF_INET6, "::1", &sin6->sin6_addr), 1);
+
+            WslcContainerPortMapping mapping{};
+            mapping.windowsPort = 12344;
+            mapping.containerPort = 8000;
+            mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
+            mapping.windowsAddress = &addr6;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsPortMappings(&containerSettings4, &mapping, 1));
+
+            UniqueContainer container;
+            VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings4, &container, nullptr));
+            VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+            UniqueProcess process;
+            VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+            wil::unique_handle ownedStdout;
+            VERIFY_SUCCEEDED(WslcGetProcessIOHandle(process.get(), WSLC_PROCESS_IO_HANDLE_STDOUT, &ownedStdout));
+
+            WaitForOutput(std::move(ownedStdout), "Serving HTTP on", 30s);
+
+            ExpectHttpResponse(L"http://[::1]:12344", 200);
+        }
+
+        // Negative: unsupported address family must fail when setting container portmapping values.
+        {
+            WslcContainerSettings containerSettings5;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings5));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNetworkingMode(&containerSettings5, WSLC_CONTAINER_NETWORKING_MODE_BRIDGED));
+
+            sockaddr_storage badAddr{};
+            badAddr.ss_family = AF_UNIX; // unsupported for port mapping
+
+            WslcContainerPortMapping mapping{};
+            mapping.windowsPort = 12345;
+            mapping.containerPort = 8000;
+            mapping.protocol = WSLC_PORT_PROTOCOL_TCP;
+            mapping.windowsAddress = &badAddr;
+            VERIFY_ARE_EQUAL(WslcSetContainerSettingsPortMappings(&containerSettings5, &mapping, 1), E_INVALIDARG);
+        }
     }
 
-    TEST_METHOD(ContainerVolumeUnit)
+    WSLC_TEST_METHOD(ContainerVolumeUnit)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: null volumes with nonzero count must fail.
         {
             WslcContainerSettings containerSettings;
@@ -989,10 +992,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerVolumeFunctional)
+    WSLC_TEST_METHOD(ContainerVolumeFunctional)
     {
-        WSL2_TEST_ONLY();
-
         // Functional: mount a read-write and a read-only directory into the container.
         {
             auto hostRwDir = std::filesystem::current_path() / "wslc-test-vol-rw";
@@ -1062,10 +1063,28 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerExec)
+    WSLC_TEST_METHOD(ContainerInspect)
     {
-        WSL2_TEST_ONLY();
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
 
+        wil::unique_cotaskmem_ansistring inspectData;
+        VERIFY_SUCCEEDED(WslcInspectContainer(container.get(), &inspectData));
+
+        VERIFY_IS_NOT_NULL(inspectData);
+
+        auto inspectObject = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(inspectData.get());
+
+        CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE];
+        VERIFY_SUCCEEDED(WslcGetContainerID(container.get(), containerId));
+
+        VERIFY_ARE_EQUAL(containerId, inspectObject.Id);
+    }
+
+    WSLC_TEST_METHOD(ContainerExec)
+    {
         // Start a long-running container so we can exec into it.
         WslcProcessSettings initProcSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&initProcSettings));
@@ -1113,10 +1132,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerHostName)
+    WSLC_TEST_METHOD(ContainerHostName)
     {
-        WSL2_TEST_ONLY();
-
         // Unit: setting a hostname succeeds.
         {
             WslcContainerSettings containerSettings;
@@ -1141,10 +1158,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ContainerDomainName)
+    WSLC_TEST_METHOD(ContainerDomainName)
     {
-        WSL2_TEST_ONLY();
-
         // Unit: setting a domain name succeeds.
         {
             WslcContainerSettings containerSettings;
@@ -1169,10 +1184,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessEnvVariables)
+    WSLC_TEST_METHOD(ProcessEnvVariables)
     {
-        WSL2_TEST_ONLY();
-
         // Negative: null pointer with nonzero count must fail.
         {
             WslcProcessSettings procSettings;
@@ -1213,10 +1226,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessSignal)
+    WSLC_TEST_METHOD(ProcessSignal)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -1246,10 +1257,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcSignalProcess(nullptr, WSLC_SIGNAL_SIGKILL), E_POINTER);
     }
 
-    TEST_METHOD(ProcessGetPid)
+    WSLC_TEST_METHOD(ProcessGetPid)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -1279,10 +1288,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcGetProcessPid(nullProcess, &pid), E_POINTER);
     }
 
-    TEST_METHOD(ProcessGetExitCode)
+    WSLC_TEST_METHOD(ProcessGetExitCode)
     {
-        WSL2_TEST_ONLY();
-
         auto RunAndGetProcess = [&](int exitCodeArg) -> UniqueProcess {
             std::string script = "exit " + std::to_string(exitCodeArg);
             const char* argv[] = {"/bin/sh", "-c", script.c_str()};
@@ -1335,10 +1342,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessGetState)
+    WSLC_TEST_METHOD(ProcessGetState)
     {
-        WSL2_TEST_ONLY();
-
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
         const char* argv[] = {"/bin/sleep", "99"};
@@ -1394,10 +1399,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessCurrentDirectory)
+    WSLC_TEST_METHOD(ProcessCurrentDirectory)
     {
-        WSL2_TEST_ONLY();
-
         // Unit: setting a current directory returns S_OK.
         {
             WslcProcessSettings procSettings;
@@ -1432,10 +1435,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(GetVersion)
+    WSLC_TEST_METHOD(GetVersion)
     {
-        WSL2_TEST_ONLY();
-
         // Positive: returns S_OK and fills in a non-zero version.
         {
             WslcVersion version{};
@@ -1447,14 +1448,24 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcGetVersion(nullptr), E_POINTER);
     }
 
+    WSLC_TEST_METHOD(CanRun)
+    {
+        BOOL canRun = FALSE;
+        WslcComponentFlags missing{};
+        VERIFY_SUCCEEDED(WslcCanRun(&canRun, &missing));
+
+        // Presumably anywhere that we run the tests we should get these results.
+        // The levels of OS state modification required to test beyond this are beyond the scope of these tests.
+        VERIFY_ARE_EQUAL(canRun, TRUE);
+        VERIFY_ARE_EQUAL(missing, WSLC_COMPONENT_FLAG_NONE);
+    }
+
     // -----------------------------------------------------------------------
     // WslcSetProcessSettingsCallbacks tests
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(ProcessIoCallbackUnit)
+    WSLC_TEST_METHOD(ProcessIoCallbackUnit)
     {
-        WSL2_TEST_ONLY();
-
         auto noopIoCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID) {};
         auto noopExitCb = [](INT32, PVOID) {};
 
@@ -1540,10 +1551,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessIoCallbackInitProcess)
+    WSLC_TEST_METHOD(ProcessIoCallbackInitProcess)
     {
-        WSL2_TEST_ONLY();
-
         struct IOContext
         {
             std::string stdoutData;
@@ -1592,10 +1601,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(ioContext.stderrData, "STDERR\n");
     }
 
-    TEST_METHOD(ProcessIoCallbackExecProcess)
+    WSLC_TEST_METHOD(ProcessIoCallbackExecProcess)
     {
-        WSL2_TEST_ONLY();
-
         // Start a long-running container so we can exec into it.
         WslcProcessSettings initProcSettings;
         VERIFY_SUCCEEDED(WslcInitProcessSettings(&initProcSettings));
@@ -1647,10 +1654,8 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(ioContext.stderrData, "EXEC_ERR\n");
     }
 
-    TEST_METHOD(ProcessIoCallbackHandleExclusion)
+    WSLC_TEST_METHOD(ProcessIoCallbackHandleExclusion)
     {
-        WSL2_TEST_ONLY();
-
         // Register a stdout callback only. IOCallback always acquires ALL pipe handles
         // (draining uncallbacked streams to prevent deadlock), so both stdout and stderr
         // handles are consumed and neither can be obtained via WslcGetProcessIOHandle.
@@ -1689,10 +1694,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessIoCallbackExitCallback)
+    WSLC_TEST_METHOD(ProcessIoCallbackExitCallback)
     {
-        WSL2_TEST_ONLY();
-
         // Verify the onExit callback fires with the correct exit code after IO has been flushed.
         // We test both exit 0 and a non-zero exit code.
         auto RunAndCaptureExit = [&](int exitCodeArg) -> std::pair<INT32, std::string> {
@@ -1757,10 +1760,8 @@ class WslcSdkTests
         }
     }
 
-    TEST_METHOD(ProcessIoCallbackCancelOnRelease)
+    WSLC_TEST_METHOD(ProcessIoCallbackCancelOnRelease)
     {
-        WSL2_TEST_ONLY();
-
         // Verify that releasing the process handle while an exec'd process is still running
         // and writing IO cancels the IOCallback pump:
         //   - No IO callbacks arrive after the handle is released.
@@ -1829,10 +1830,8 @@ class WslcSdkTests
         VERIFY_IS_FALSE(ctx.exitFired.load());
     }
 
-    TEST_METHOD(ProcessIoCallbackLargeOutput)
+    WSLC_TEST_METHOD(ProcessIoCallbackLargeOutput)
     {
-        WSL2_TEST_ONLY();
-
         // Generate ~1 MiB of stdout via: dd if=/dev/zero bs=1024 count=1024 | base64
         // 1,048,576 zero bytes → base64 output is 1,398,104 bytes (ceil(1048576/3)*4).
         static constexpr size_t c_expectedBytes = 1'398'104;
@@ -1876,50 +1875,539 @@ class WslcSdkTests
     }
 
     // -----------------------------------------------------------------------
+    // Storage tests
+    // -----------------------------------------------------------------------
+
+    WSLC_TEST_METHOD(SessionCreateVhd)
+    {
+        constexpr auto c_volumeName = "wslc-test-data-vol";
+        constexpr auto c_vhdSizeBytes = _1GB;
+
+        std::filesystem::path vhdSessionStorage = m_storagePath / "wslc-vhd-test-storage";
+        auto removeStorage = wil::scope_exit([&]() {
+            std::error_code error;
+            std::filesystem::remove_all(vhdSessionStorage, error);
+            if (error)
+            {
+                LogError("Failed to remove VHD test storage %ws: %hs", vhdSessionStorage.c_str(), error.message().c_str());
+            }
+        });
+
+        // Create a dedicated session so that volume creation does not affect the shared default session.
+        WslcSessionSettings sessionSettings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-vhd-test", vhdSessionStorage.c_str(), &sessionSettings));
+
+        WslcVhdRequirements sessionVhd{};
+        sessionVhd.sizeInBytes = 4 * _1GB;
+        sessionVhd.type = WSLC_VHD_TYPE_DYNAMIC;
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &sessionVhd));
+
+        UniqueSession session;
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &session, nullptr));
+
+        // Load debian so we have a container image to work with.
+        std::filesystem::path debianTar = GetTestImagePath("debian:latest");
+        VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), debianTar.c_str(), nullptr, nullptr));
+
+        // Positive: create a named VHD volume in the session.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeInBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            // The backing VHD file must exist on disk.
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
+            VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+        }
+
+        // Positive: write a marker via a container that mounts the named volume.
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/bin/sh", "-c", "echo wslc-vhd-test > /data/marker.txt"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            WslcContainerNamedVolume namedVol{};
+            namedVol.name = c_volumeName;
+            namedVol.containerPath = "/data";
+            namedVol.readOnly = FALSE;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
+
+            auto output = RunContainerAndCapture(session.get(), containerSettings);
+            VERIFY_IS_TRUE(output.stderrOutput.empty());
+        }
+
+        // Positive: read back the marker in a second container (read-only mount).
+        {
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/bin/sh", "-c", "cat /data/marker.txt"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            WslcContainerNamedVolume namedVol{};
+            namedVol.name = c_volumeName;
+            namedVol.containerPath = "/data";
+            namedVol.readOnly = TRUE;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
+
+            auto output = RunContainerAndCapture(session.get(), containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "wslc-vhd-test\n");
+        }
+
+        // Positive: delete the volume.
+        {
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_volumeName, &errorMsg));
+
+            // The backing VHD file must not exist on disk.
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_volumeName) + ".vhdx");
+            VERIFY_IS_FALSE(std::filesystem::exists(expectedVhdPath));
+        }
+
+        // Negative: null options pointer must fail.
+        VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), nullptr, nullptr), E_POINTER);
+
+        // Negative: null name must fail.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = nullptr;
+            vhd.sizeInBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: zero sizeInBytes must fail.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeInBytes = 0;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: fixed VHD type is not yet supported.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeInBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_FIXED;
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_NOTIMPL);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Authentication helpers
+    // -----------------------------------------------------------------------
+
+    // Starts a local registry container with host-mode networking and returns [container, registryAddress].
+    // Uses the COM API (via GetInternalType) with WSLCContainerLauncher to get host-mode networking,
+    // which the SDK doesn't expose. Host networking shares the VM's network namespace, so the registry
+    // is reachable at 127.0.0.1:<port> from both dockerd (inside the VM) and the host.
+    std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+        const std::string& username = {}, const std::string& password = {}, uint16_t port = 5000)
+    {
+        VERIFY_IS_TRUE(HasImage("wslc-registry:latest"));
+
+        std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
+        if (!username.empty())
+        {
+            env.push_back(std::format("USERNAME={}", username));
+            env.push_back(std::format("PASSWORD={}", password));
+        }
+
+        wsl::windows::common::WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+        launcher.SetEntrypoint({"/entrypoint.sh"});
+        launcher.AddPort(port, port, AF_INET);
+
+        // Get the IWSLCSession COM object from the SDK session handle.
+        auto& session = *reinterpret_cast<WslcSessionImpl*>(m_defaultSession)->session;
+        auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+
+        auto registryAddress = std::format("127.0.0.1:{}", port);
+
+        // Wait for the registry to be ready by probing from the host.
+        auto hostUrl = std::format(L"http://{}", registryAddress);
+        ExpectHttpResponse(hostUrl.c_str(), 200, true);
+
+        return {std::move(container), registryAddress};
+    }
+
+    // Tags and pushes an image to a local registry via the SDK APIs.
+    void PushImageToRegistry(const std::string& repo, const std::string& tag, const std::string& registryAddress, const std::string& registryAuth)
+    {
+        auto imageName = std::format("{}:{}", repo, tag);
+        auto registryImage = std::format("{}/{}:{}", registryAddress, repo, tag);
+        auto registryRepo = std::format("{}/{}", registryAddress, repo);
+
+        VERIFY_IS_TRUE(HasImage(imageName));
+
+        // Tag the image with the registry address so it can be pushed.
+        WslcTagImageOptions tagOptions{};
+        tagOptions.image = imageName.c_str();
+        tagOptions.repo = registryRepo.c_str();
+        tagOptions.tag = tag.c_str();
+        VERIFY_SUCCEEDED(WslcTagSessionImage(m_defaultSession, &tagOptions, nullptr));
+
+        // Ensures the registry-prefixed tag is removed after the push.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(WslcDeleteSessionImage(m_defaultSession, registryImage.c_str(), nullptr));
+        });
+
+        WslcPushImageOptions pushOptions{};
+        pushOptions.image = registryImage.c_str();
+        pushOptions.registryAuth = registryAuth.c_str();
+        VERIFY_SUCCEEDED(WslcPushSessionImage(m_defaultSession, &pushOptions, nullptr));
+    }
+
+    bool HasImage(const std::string& imageName)
+    {
+        wil::unique_cotaskmem_array_ptr<WslcImageInfo> images;
+        VERIFY_SUCCEEDED(WslcListSessionImages(m_defaultSession, images.addressof(), images.size_address<uint32_t>()));
+
+        for (const auto& image : images)
+        {
+            if (image.name == imageName)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // -----------------------------------------------------------------------
+    // Authentication tests
+    // -----------------------------------------------------------------------
+
+    WSLC_TEST_METHOD(AuthenticateTests)
+    {
+        constexpr auto c_username = "wslctest";
+        constexpr auto c_password = "password";
+
+        auto [registryContainer, registryAddress] = StartLocalRegistry(c_username, c_password);
+
+        // Negative: wrong password must fail.
+        {
+            wil::unique_cotaskmem_ansistring token;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(
+                WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, "wrong-password", &token, &errorMsg), E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
+        }
+
+        // Positive: correct credentials must succeed and return a non-null token.
+        {
+            wil::unique_cotaskmem_ansistring token;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, c_password, &token, &errorMsg));
+            VERIFY_IS_NOT_NULL(token.get());
+        }
+
+        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
+
+        auto image = std::format("{}/hello-world:latest", registryAddress);
+
+        // Pulling with credentials should succeed.
+        {
+            WslcPullImageOptions opts{};
+            opts.uri = image.c_str();
+            opts.registryAuth = xRegistryAuth.c_str();
+            VERIFY_SUCCEEDED(WslcPullSessionImage(m_defaultSession, &opts, nullptr));
+            VERIFY_IS_TRUE(HasImage(image));
+        }
+
+        // Negative: Pulling without credentials should fail.
+        {
+            WslcPullImageOptions opts{};
+            opts.uri = image.c_str();
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
+        }
+
+        // Negative: Pulling with bad credentials should fail.
+        {
+            auto badAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, "wrong", registryAddress);
+
+            WslcPullImageOptions opts{};
+            opts.uri = image.c_str();
+            opts.registryAuth = badAuth.c_str();
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
+        }
+
+        // Negative: null parameters must fail.
+        {
+            wil::unique_cotaskmem_ansistring token;
+            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, nullptr, c_username, c_password, &token, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), nullptr, c_password, &token, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, nullptr, &token, nullptr), E_POINTER);
+            VERIFY_ARE_EQUAL(WslcSessionAuthenticate(m_defaultSession, registryAddress.c_str(), c_username, c_password, nullptr, nullptr), E_POINTER);
+        }
+    }
+
+    WSLC_TEST_METHOD(PullImage)
+    {
+        // Start a local registry without auth to avoid Docker Hub rate limits.
+        auto [registryContainer, registryAddress] = StartLocalRegistry();
+        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "", registryAddress);
+
+        {
+            // Push hello-world:latest to the local registry.
+            PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
+
+            auto image = std::format("{}/hello-world:latest", registryAddress);
+
+            // Delete the image locally so the pull is a real pull.
+            WslcDeleteSessionImage(m_defaultSession, image.c_str(), nullptr);
+
+            // Pull from the local registry.
+            {
+                WslcPullImageOptions opts{};
+                opts.uri = image.c_str();
+                VERIFY_SUCCEEDED(WslcPullSessionImage(m_defaultSession, &opts, nullptr));
+            }
+
+            // Verify the pulled image is in the image list.
+            VERIFY_IS_TRUE(HasImage(image));
+
+            // Verify the image is usable by running a container from it.
+            auto output = RunContainerAndCapture(m_defaultSession, image.c_str(), {});
+            VERIFY_IS_TRUE(output.stdoutOutput.find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Negative: pull an image that does not exist.
+        {
+            auto image = std::format("{}/does-not-exist", registryAddress);
+
+            WslcPullImageOptions opts{};
+            opts.uri = image.c_str();
+            opts.registryAuth = xRegistryAuth.c_str();
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), WSLC_E_IMAGE_NOT_FOUND);
+        }
+
+        // Negative: null URI inside options must fail.
+        {
+            WslcPullImageOptions opts{};
+            opts.uri = nullptr;
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &opts, &errorMsg), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(PushImage)
+    {
+        auto emptyRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "", "");
+
+        // Negative: pushing a non-existent image must fail.
+        {
+            WslcPushImageOptions opts{};
+            opts.image = "does-not-exist";
+            opts.registryAuth = emptyRegistryAuth.c_str();
+
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_ARE_EQUAL(WslcPushSessionImage(m_defaultSession, &opts, &errorMsg), E_FAIL);
+            VERIFY_IS_NOT_NULL(errorMsg.get());
+        }
+
+        // Negative: null options must fail.
+        VERIFY_ARE_EQUAL(WslcPushSessionImage(m_defaultSession, nullptr, nullptr), E_POINTER);
+
+        // Negative: null image inside options must fail.
+        {
+            WslcPushImageOptions opts{};
+            opts.image = nullptr;
+            opts.registryAuth = emptyRegistryAuth.c_str();
+
+            VERIFY_ARE_EQUAL(WslcPushSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(TagImage)
+    {
+        // Positive: tag an existing image.
+        {
+            WslcTagImageOptions opts{};
+            opts.image = "debian:latest";
+            opts.repo = "debian";
+            opts.tag = "sdk-test-tag";
+            VERIFY_SUCCEEDED(WslcTagSessionImage(m_defaultSession, &opts, nullptr));
+
+            // Verify the tag is present.
+            VERIFY_IS_TRUE(HasImage("debian:sdk-test-tag"));
+
+            // Cleanup: delete the tag.
+            WslcDeleteSessionImage(m_defaultSession, "debian:sdk-test-tag", nullptr);
+        }
+
+        // Negative: null options must fail.
+        VERIFY_ARE_EQUAL(WslcTagSessionImage(m_defaultSession, nullptr, nullptr), E_POINTER);
+
+        // Negative: null fields must fail.
+        {
+            WslcTagImageOptions opts{};
+            opts.image = nullptr;
+            opts.repo = "debian";
+            opts.tag = "test";
+            VERIFY_ARE_EQUAL(WslcTagSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
+        }
+        {
+            WslcTagImageOptions opts{};
+            opts.image = "debian:latest";
+            opts.repo = nullptr;
+            opts.tag = "test";
+            VERIFY_ARE_EQUAL(WslcTagSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
+        }
+        {
+            WslcTagImageOptions opts{};
+            opts.image = "debian:latest";
+            opts.repo = "debian";
+            opts.tag = nullptr;
+            VERIFY_ARE_EQUAL(WslcTagSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Stub tests for unimplemented (E_NOTIMPL) functions.
     // Each of these confirms the current state of the SDK; once the underlying
     // function is implemented the assertion below will catch it and the test
     // should be updated to exercise the real behaviour.
     // -----------------------------------------------------------------------
 
-    TEST_METHOD(CanRunNotImplemented)
+    WSLC_TEST_METHOD(InstallWithDependenciesNotImplemented)
     {
-        WSL2_TEST_ONLY();
-
-        BOOL canRun = FALSE;
-        WslcComponentFlags missing{};
-        VERIFY_ARE_EQUAL(WslcCanRun(&canRun, &missing), E_NOTIMPL);
+        VERIFY_ARE_EQUAL(WslcInstallWithDependencies(nullptr, nullptr), E_NOTIMPL);
     }
 
-    TEST_METHOD(ContainerInspectNotImplemented)
-    {
-        WSL2_TEST_ONLY();
+    // Negative tests: handle lifecycle and invalid state transitions
 
+    WSLC_TEST_METHOD(ReleaseNullSessionHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseSession(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(TerminateNullSessionHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcTerminateSession(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(ReleaseNullContainerHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseContainer(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(ReleaseNullProcessHandle)
+    {
+        VERIFY_ARE_EQUAL(WslcReleaseProcess(nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(CreateContainerWithNullSession)
+    {
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcContainer container = nullptr;
+        VERIFY_ARE_EQUAL(WslcCreateContainer(nullptr, &containerSettings, &container, nullptr), E_POINTER);
+    }
+
+    WSLC_TEST_METHOD(StopContainerWithInvalidSignal)
+    {
         UniqueContainer container;
         WslcContainerSettings containerSettings;
         VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
         VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
 
-        PCSTR inspectData = nullptr;
-        VERIFY_ARE_EQUAL(WslcInspectContainer(container.get(), &inspectData), E_NOTIMPL);
+        // Wait for the short-lived init process to exit
+        UniqueProcess initProcess;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &initProcess));
+        HANDLE exitEvent = nullptr;
+        VERIFY_SUCCEEDED(WslcGetProcessExitEvent(initProcess.get(), &exitEvent));
+        VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(exitEvent, 30000));
 
-        VERIFY_SUCCEEDED(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr));
+        // Attempting to exec on a stopped container should fail
+        WslcProcessSettings execSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&execSettings));
+        PCSTR execArgv[] = {"/bin/echo", "should-fail"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&execSettings, execArgv, ARRAYSIZE(execArgv)));
+
+        UniqueProcess execProcess;
+        VERIFY_ARE_EQUAL(WslcCreateContainerProcess(container.get(), &execSettings, &execProcess, nullptr), WSLC_E_CONTAINER_NOT_RUNNING);
     }
 
-    TEST_METHOD(SessionCreateVhdNotImplemented)
+    WSLC_TEST_METHOD(DuplicateContainerName)
     {
-        WSL2_TEST_ONLY();
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
 
-        WslcVhdRequirements vhd{};
-        vhd.sizeInBytes = 1024ull * 1024 * 1024;
-        vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_ARE_EQUAL(WslcCreateSessionVhd(m_defaultSession, &vhd, nullptr), E_NOTIMPL);
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsName(&containerSettings, "duplicate-name-test"));
+
+        UniqueContainer container1;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container1, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container1.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        // Creating a second container with the same name should fail
+        UniqueContainer container2;
+        VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container2, nullptr), static_cast<HRESULT>(0x800700b7)); // ERROR_ALREADY_EXISTS
     }
 
-    TEST_METHOD(InstallWithDependenciesNotImplemented)
+    WSLC_TEST_METHOD(DeleteRunningContainerWithoutForce)
     {
-        WSL2_TEST_ONLY();
+        UniqueContainer container;
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
 
-        VERIFY_ARE_EQUAL(WslcInstallWithDependencies(nullptr, nullptr), E_NOTIMPL);
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        PCSTR argv[] = {"/bin/sleep", "10"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_NONE, nullptr));
+
+        // Deleting a running container without force flag should fail
+        VERIFY_ARE_EQUAL(WslcDeleteContainer(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
+    }
+
+    WSLC_TEST_METHOD(DeleteNonExistentImage)
+    {
+        VERIFY_ARE_EQUAL(WslcDeleteSessionImage(m_defaultSession, "nonexistent-image:this-tag-does-not-exist", nullptr), WSLC_E_IMAGE_NOT_FOUND);
+    }
+
+    WSLC_TEST_METHOD(PullInvalidImageUri)
+    {
+        WslcPullImageOptions pullOptions = {};
+        pullOptions.uri = "///invalid-registry-url///";
+        VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &pullOptions, nullptr), E_INVALIDARG);
     }
 };

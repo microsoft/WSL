@@ -2,6 +2,8 @@ LIBRARY wslcsdk
 
 EXPORTS
 
+DllMain
+
 WslcInitSessionSettings
 WslcInitContainerSettings
 WslcInitProcessSettings
@@ -18,9 +20,10 @@ WslcSetSessionSettingsTerminationCallback
 WslcSetSessionSettingsCpuCount
 WslcSetSessionSettingsMemory
 WslcSetSessionSettingsTimeout
-WslcSetSessionSettingsVHD
+WslcSetSessionSettingsVhd
  
 WslcTerminateSession
+WslcSessionAuthenticate
 WslcPullSessionImage
 WslcImportSessionImage
 WslcImportSessionImageFromFile
@@ -28,13 +31,17 @@ WslcLoadSessionImage
 WslcLoadSessionImageFromFile
 WslcDeleteSessionImage
 WslcListSessionImages
-WslcCreateSessionVhd
+WslcCreateSessionVhdVolume
+WslcDeleteSessionVhdVolume
+WslcTagSessionImage
+WslcPushSessionImage
 
 WslcSetContainerSettingsDomainName
 WslcSetContainerSettingsName
 WslcSetContainerSettingsNetworkingMode
 WslcSetContainerSettingsHostName
 WslcSetContainerSettingsVolumes
+WslcSetContainerSettingsNamedVolumes
 WslcSetContainerSettingsInitProcess
 WslcSetContainerSettingsFlags
 WslcSetContainerSettingsPortMappings
