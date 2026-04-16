@@ -50,7 +50,7 @@ namespace {
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption("SizeBytes"), it == DriverOpts.end());
 
         auto& value = it->second;
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), value[0] == '-');
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageInvalidSize(value), value.empty() || value[0] == '-');
 
         errno = 0;
         char* end = nullptr;
