@@ -54,7 +54,10 @@ void BuildImage(CLIExecutionContext& context)
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, flags, &callback, context.CreateCancelEvent());
+    callback.SetVerbose(context.Args.Contains(ArgType::Verbose));
+    auto cancelEvent = context.CreateCancelEvent();
+    callback.SetCancelEvent(cancelEvent);
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, flags, &callback, cancelEvent);
 }
 
 void GetImages(CLIExecutionContext& context)

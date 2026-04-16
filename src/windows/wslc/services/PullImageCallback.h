@@ -12,27 +12,10 @@ Abstract:
 
 --*/
 #pragma once
+#include "ChangeTerminalMode.h"
 #include "SessionService.h"
 
 namespace wsl::windows::wslc::services {
-
-class ChangeTerminalMode
-{
-public:
-    NON_COPYABLE(ChangeTerminalMode);
-    NON_MOVABLE(ChangeTerminalMode);
-    ChangeTerminalMode(HANDLE console, bool cursorVisible);
-    ~ChangeTerminalMode();
-
-    bool IsConsole() const
-    {
-        return m_console != nullptr;
-    }
-
-private:
-    HANDLE m_console{};
-    CONSOLE_CURSOR_INFO m_originalCursorInfo{};
-};
 
 // TODO: Handle terminal resizes.
 class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") PullImageCallback

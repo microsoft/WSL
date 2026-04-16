@@ -20,28 +20,6 @@ Abstract:
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 
-ChangeTerminalMode::ChangeTerminalMode(HANDLE console, bool cursorVisible) : m_console(console)
-{
-    if (!wsl::windows::common::wslutil::IsConsoleHandle(console))
-    {
-        m_console = nullptr;
-        return;
-    }
-
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(console, &m_originalCursorInfo));
-    CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
-    newCursorInfo.bVisible = cursorVisible;
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(console, &newCursorInfo));
-}
-
-ChangeTerminalMode::~ChangeTerminalMode()
-{
-    if (m_console)
-    {
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
-    }
-}
-
 auto PullImageCallback::MoveToLine(SHORT line)
 {
     if (line > 0)

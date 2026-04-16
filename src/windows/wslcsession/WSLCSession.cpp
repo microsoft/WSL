@@ -667,17 +667,19 @@ try
         return "  [" + name + "] ";
     };
 
-    auto reportProgress = [&](const std::string& message) {
+    auto reportProgress = [&](const std::string& message, const char* id = "") {
         if (ProgressCallback != nullptr)
         {
-            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), "", 0, 0));
+            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), id, 0, 0));
         }
     };
+
+    static constexpr char c_logId[] = "log";
 
     auto flushLine = [&]() {
         if (needsNewline)
         {
-            reportProgress("\n");
+            reportProgress("\n", c_logId);
             needsNewline = false;
         }
     };
@@ -745,13 +747,13 @@ try
                     // so it terminates/overwrites cleanly without a spurious prefix.
                     if (needsNewline && (decoded[0] == '\n' || decoded[0] == '\r'))
                     {
-                        reportProgress(decoded.substr(0, 1));
+                        reportProgress(decoded.substr(0, 1), c_logId);
                         decoded.erase(0, 1);
                     }
 
                     if (!decoded.empty())
                     {
-                        reportProgress(IndentLines(decoded, logPrefix(it->second)));
+                        reportProgress(IndentLines(decoded, logPrefix(it->second)), c_logId);
                     }
 
                     needsNewline = !decoded.empty() && decoded.back() != '\n';
@@ -766,7 +768,7 @@ try
                 it != digestToStageName.end() && !entry.id.empty() && reportedSteps.insert(entry.id).second)
             {
                 flushLine();
-                reportProgress(logPrefix(it->second) + entry.id + "\n");
+                reportProgress(logPrefix(it->second) + entry.id + "\n", c_logId);
             }
         }
     };
@@ -841,6 +843,10 @@ try
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
+    // Strip \r from the error output — the CRT's text mode translates \n to \r\n,
+    // so any \r already in the content produces \r\r\n which causes double-spacing
+    // when PowerShell captures stderr.
+    std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 
     return S_OK;
