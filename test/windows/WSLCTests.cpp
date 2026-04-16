@@ -1138,6 +1138,24 @@ class WSLCTests
         }
     }
 
+    class CapturingProgressCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+    {
+    public:
+        CapturingProgressCallback(std::string& output) : m_output(output)
+        {
+        }
+
+        HRESULT OnProgress(LPCSTR status, LPCSTR, ULONGLONG, ULONGLONG) override
+        {
+            m_output.append(status);
+            return S_OK;
+        }
+
+    private:
+        std::string& m_output;
+    };
+
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const WSLCBuildImageOptions* options, IProgressCallback* callback = nullptr)
     {
         auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
@@ -1406,10 +1424,10 @@ class WSLCTests
             // Two independent stages that can build in parallel, each producing
             // part of the final output.  The last stage combines them.
             dockerfile << "FROM debian:latest AS greeting\n";
-            dockerfile << "RUN echo -n 'WSL containers' > /part.txt\n";
+            dockerfile << "RUN echo -n 'WSL containers' | tee /part.txt\n";
             dockerfile << "\n";
             dockerfile << "FROM debian:latest AS description\n";
-            dockerfile << "RUN echo -n 'support multi-stage builds' > /part.txt\n";
+            dockerfile << "RUN echo -n 'support multi-stage builds' | tee /part.txt\n";
             dockerfile << "\n";
             dockerfile << "FROM debian:latest\n";
             dockerfile << "COPY --from=greeting /part.txt /greeting.txt\n";
@@ -1418,7 +1436,13 @@ class WSLCTests
                        << "\"echo \\\"$(cat /greeting.txt) $(cat /description.txt)\\\"\"]\n";
         }
 
-        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build-multistage:latest"));
+        std::string output;
+        auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
+        LPCSTR tag = "wslc-test-build-multistage:latest";
+        WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
+        VERIFY_IS_TRUE(output.find("[greeting] WSL containers") != std::string::npos);
+        VERIFY_IS_TRUE(output.find("[description] support multi-stage builds") != std::string::npos);
         ExpectImagePresent(*m_defaultSession, "wslc-test-build-multistage:latest");
 
         WSLCContainerLauncher launcher("wslc-test-build-multistage:latest", "wslc-build-multistage-container");
@@ -1716,24 +1740,6 @@ class WSLCTests
 
     WSLC_TEST_METHOD(BuildImageNoCache)
     {
-        class CapturingProgressCallback
-            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
-        {
-        public:
-            CapturingProgressCallback(std::string& output) : m_output(output)
-            {
-            }
-
-            HRESULT OnProgress(LPCSTR status, LPCSTR, ULONGLONG, ULONGLONG) override
-            {
-                m_output.append(status);
-                return S_OK;
-            }
-
-        private:
-            std::string& m_output;
-        };
-
         auto contextDir = std::filesystem::current_path() / "build-context-nocache";
         std::filesystem::create_directories(contextDir);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1757,7 +1763,7 @@ class WSLCTests
             std::string output;
             auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
-            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsVerbose};
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}};
             VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
             VERIFY_IS_TRUE(output.find("Imageisrebuilt") == std::string::npos);
         }
@@ -1767,7 +1773,7 @@ class WSLCTests
             std::string output;
             auto callback = Microsoft::WRL::Make<CapturingProgressCallback>(output);
             LPCSTR tag = "wslc-test-nocache:latest";
-            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsVerbose};
+            WSLCBuildImageOptions options{.Tags = {&tag, 1}, .Flags = WSLCBuildImageFlagsNoCache};
             VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, &options, callback.Get()));
             VERIFY_IS_TRUE(output.find("Imageisrebuilt") != std::string::npos);
         }
@@ -2495,6 +2501,88 @@ class WSLCTests
         VERIFY_ARE_NOT_EQUAL(details, L"");
     }
 
+    WSLC_TEST_METHOD(BuildImageStuckCallbackCancellation)
+    {
+        class StuckBuildProgressCallback
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+        {
+        public:
+            StuckBuildProgressCallback(std::promise<void>& reachedPromise, wil::unique_event& exitEvent) :
+                m_reachedPromise(reachedPromise), m_exitEvent(exitEvent)
+            {
+            }
+
+            HRESULT OnProgress(LPCSTR, LPCSTR, ULONGLONG, ULONGLONG) override
+            {
+                if (!m_signaled)
+                {
+                    m_signaled = true;
+                    m_reachedPromise.set_value();
+                    m_exitEvent.wait(); // Block until this test case is complete.
+                }
+
+                return S_OK;
+            }
+
+        private:
+            std::promise<void>& m_reachedPromise;
+            wil::unique_event& m_exitEvent;
+            bool m_signaled{};
+        };
+
+        auto contextDir = std::filesystem::current_path() / "build-context-stuck-callback";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN echo hello\n";
+        }
+
+        auto contextPathStr = contextDir.wstring();
+        auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
+
+        WSLCBuildImageOptions options{
+            .ContextPath = contextPathStr.c_str(),
+            .DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get()),
+            .Flags = WSLCBuildImageFlagsVerbose,
+        };
+
+        std::promise<void> callbackReached;
+        wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+        auto callback = Microsoft::WRL::Make<StuckBuildProgressCallback>(callbackReached, exitEvent);
+
+        std::promise<HRESULT> buildResult;
+        std::thread buildThread(
+            [&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get())); });
+
+        auto joinThread = wil::scope_exit([&]() {
+            exitEvent.SetEvent();
+            buildThread.join();
+        });
+
+        // Wait for the progress callback to be called, proving the COM call is in flight.
+        auto reachedFuture = callbackReached.get_future();
+        auto reachedStatus = reachedFuture.wait_for(std::chrono::seconds(60));
+        VERIFY_ARE_EQUAL(reachedStatus, std::future_status::ready);
+
+        // Terminate the session while the callback is stuck.
+        // This should cancel the pending COM call and unblock BuildImage.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        ResetTestSession();
+
+        auto buildFuture = buildResult.get_future();
+        auto buildStatus = buildFuture.wait_for(std::chrono::seconds(60));
+        VERIFY_ARE_EQUAL(buildStatus, std::future_status::ready);
+
+        // BuildImage should have failed due to COM call cancellation.
+        VERIFY_FAILED(buildFuture.get());
+    }
+
     WSLC_TEST_METHOD(InteractiveShell)
     {
         WSLCProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
@@ -3187,12 +3275,17 @@ class WSLCTests
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
-        volumeOptions.Type = "vhd";
-        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
+
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
 
         // Create volume and validate duplicate volume name handling.
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
-        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        VERIFY_ARE_EQUAL(std::string(volInfo.Name), volumeName);
+        VERIFY_ARE_EQUAL(std::string(volInfo.Driver), std::string("vhd"));
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Verify volume VHD exists and mount point is present in the VM.
         VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
@@ -3275,10 +3368,13 @@ class WSLCTests
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
-        volumeOptions.Type = "vhd";
-        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
 
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
         VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
 
         // Create a container that uses the named volume and writes a marker.
@@ -3332,45 +3428,62 @@ class WSLCTests
     {
         const std::string volumeName = "wslc-volume-name";
 
-        auto validateInvalidOptionsFailure =
-            [&](const std::string& options, HRESULT expectedResult, const std::optional<std::wstring>& expectedMessage = std::nullopt) {
-                LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        auto validateInvalidOptionsFailure = [&](const WSLCDriverOption* opts,
+                                                 ULONG optsCount,
+                                                 HRESULT expectedResult,
+                                                 const std::optional<std::wstring>& expectedMessage = std::nullopt) {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
-                auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
-                WSLCVolumeOptions volumeOptions{};
-                volumeOptions.Name = volumeName.c_str();
-                volumeOptions.Type = "vhd";
-                volumeOptions.Options = options.c_str();
+            WSLCVolumeOptions volumeOptions{};
+            volumeOptions.Name = volumeName.c_str();
+            volumeOptions.DriverOpts = opts;
+            volumeOptions.DriverOptsCount = optsCount;
 
-                const auto result = m_defaultSession->CreateVolume(&volumeOptions);
+            WSLCVolumeInformation volInfo{};
+            const auto result = m_defaultSession->CreateVolume(&volumeOptions, &volInfo);
 
-                if (result != expectedResult)
-                {
-                    LogInfo(
-                        "CreateVolume mismatch options='%hs' result=0x%08x expected=0x%08x",
-                        options.c_str(),
-                        static_cast<unsigned int>(result),
-                        static_cast<unsigned int>(expectedResult));
-                }
+            if (result != expectedResult)
+            {
+                LogInfo("CreateVolume mismatch result=0x%08x expected=0x%08x", static_cast<unsigned int>(result), static_cast<unsigned int>(expectedResult));
+            }
 
-                VERIFY_ARE_EQUAL(result, expectedResult);
-                if (expectedMessage.has_value())
-                {
-                    ValidateCOMErrorMessage(expectedMessage);
-                }
-            };
+            VERIFY_ARE_EQUAL(result, expectedResult);
+            if (expectedMessage.has_value())
+            {
+                ValidateCOMErrorMessage(expectedMessage);
+            }
+        };
 
-        validateInvalidOptionsFailure("not-json", WSL_E_INVALID_JSON);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"abc"})", WSL_E_INVALID_JSON);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"+-1"})", WSL_E_INVALID_JSON);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"123abc"})", WSL_E_INVALID_JSON);
+        // Missing SizeBytes.
+        validateInvalidOptionsFailure(nullptr, 0, E_INVALIDARG, L"Missing required option: 'SizeBytes'");
 
-        validateInvalidOptionsFailure(R"({"SizeBytes":"18446744073709551616"})", E_INVALIDARG);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"-1"})", E_INVALIDARG);
-        validateInvalidOptionsFailure(R"({"SizeBytes":"0"})", E_INVALIDARG, L"Invalid size: 0");
-        validateInvalidOptionsFailure("{}", E_INVALIDARG, L"Invalid volume options: '{}'");
-        validateInvalidOptionsFailure("", WSL_E_INVALID_JSON);
+        WSLCDriverOption wrongOption[] = {{"WrongOption", "value"}};
+        validateInvalidOptionsFailure(wrongOption, ARRAYSIZE(wrongOption), E_INVALIDARG, L"Missing required option: 'SizeBytes'");
+
+        // Invalid SizeBytes values.
+        WSLCDriverOption emptySize[] = {{"SizeBytes", ""}};
+        validateInvalidOptionsFailure(emptySize, ARRAYSIZE(emptySize), E_INVALIDARG, L"Invalid size: ");
+
+        WSLCDriverOption zeroSize[] = {{"SizeBytes", "0"}};
+        validateInvalidOptionsFailure(zeroSize, ARRAYSIZE(zeroSize), E_INVALIDARG, L"Invalid size: 0");
+
+        WSLCDriverOption invalidSizeAbc[] = {{"SizeBytes", "abc"}};
+        validateInvalidOptionsFailure(invalidSizeAbc, ARRAYSIZE(invalidSizeAbc), E_INVALIDARG, L"Invalid size: abc");
+
+        WSLCDriverOption invalidSizeMixed[] = {{"SizeBytes", "123abc"}};
+        validateInvalidOptionsFailure(invalidSizeMixed, ARRAYSIZE(invalidSizeMixed), E_INVALIDARG, L"Invalid size: 123abc");
+
+        WSLCDriverOption invalidSizeSign[] = {{"SizeBytes", "+-1"}};
+        validateInvalidOptionsFailure(invalidSizeSign, ARRAYSIZE(invalidSizeSign), E_INVALIDARG, L"Invalid size: +-1");
+
+        WSLCDriverOption invalidSizeOverflow[] = {{"SizeBytes", "18446744073709551616"}};
+        validateInvalidOptionsFailure(
+            invalidSizeOverflow, ARRAYSIZE(invalidSizeOverflow), E_INVALIDARG, L"Invalid size: 18446744073709551616");
+
+        WSLCDriverOption invalidSizeNeg[] = {{"SizeBytes", "-1"}};
+        validateInvalidOptionsFailure(invalidSizeNeg, ARRAYSIZE(invalidSizeNeg), E_INVALIDARG, L"Invalid size: -1");
     }
 
     WSLC_TEST_METHOD(ListAndInspectNamedVolumesTest)
@@ -3391,18 +3504,21 @@ class WSLCTests
         // Create first volume and verify list returns one entry.
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName1.c_str();
-        volumeOptions.Type = "vhd";
-        volumeOptions.Options = R"({"SizeBytes":"1073741824"})";
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
 
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
         VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName1);
-        VERIFY_ARE_EQUAL(std::string(volumes[0].Type), std::string("vhd"));
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Driver), std::string("vhd"));
 
         // Create second volume and verify list returns two entries.
         volumeOptions.Name = volumeName2.c_str();
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions));
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
 
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, volumes.size());
@@ -3411,7 +3527,7 @@ class WSLCTests
         for (const auto& v : volumes)
         {
             names.insert(v.Name);
-            VERIFY_ARE_EQUAL(std::string(v.Type), std::string("vhd"));
+            VERIFY_ARE_EQUAL(std::string(v.Driver), std::string("vhd"));
         }
 
         VERIFY_IS_TRUE(names.contains(volumeName1));
@@ -3424,10 +3540,8 @@ class WSLCTests
 
         auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, volumeName1);
-        VERIFY_ARE_EQUAL(inspect.Type, std::string("vhd"));
-        VERIFY_IS_TRUE(inspect.VhdVolume.has_value());
-        VERIFY_ARE_EQUAL(inspect.VhdVolume->SizeBytes, 1073741824ull);
-        VERIFY_IS_FALSE(inspect.VhdVolume->HostPath.empty());
+        VERIFY_ARE_EQUAL(inspect.Driver, std::string("vhd"));
+        VERIFY_IS_TRUE(inspect.DriverOpts.contains("SizeBytes"));
 
         // Verify InspectVolume fails for a non-existent volume.
         output.reset();
