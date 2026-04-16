@@ -101,21 +101,16 @@ struct InspectImage
         InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config);
 };
 
-struct InspectVhdVolume
-{
-    std::string HostPath;
-    uint64_t SizeBytes{};
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVhdVolume, HostPath, SizeBytes);
-};
-
 struct InspectVolume
 {
     std::string Name;
-    std::string Type;
-    std::optional<InspectVhdVolume> VhdVolume;
+    std::string Driver;
+    std::string CreatedAt;
+    std::map<std::string, std::string> DriverOpts;
+    std::map<std::string, std::string> Labels;
+    std::optional<std::map<std::string, std::string>> Status;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVolume, Name, Type, VhdVolume);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVolume, Name, Driver, CreatedAt, DriverOpts, Labels, Status);
 };
 
 } // namespace wsl::windows::common::wslc_schema
