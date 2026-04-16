@@ -31,10 +31,6 @@ void Argument::Validate(const ArgMap& execArgs) const
 {
     switch (m_argType)
     {
-    case ArgType::Format:
-        validation::ValidateFormatTypeFromString(execArgs.GetAll<ArgType::Format>(), m_name);
-        break;
-
     case ArgType::Signal:
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
@@ -144,15 +140,7 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
     return static_cast<WSLCSignal>(signalValue);
 }
 
-void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName)
-{
-    for (const auto& value : values)
-    {
-        std::ignore = GetFormatTypeFromString(value, argName);
-    }
-}
-
-FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName)
+FormatType GetFormatTypeFromString(const std::wstring& input)
 {
     if (IsEqual(input, L"json"))
     {

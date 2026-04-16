@@ -31,6 +31,7 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
+using namespace wsl::windows::wslc::core;
 
 namespace wsl::windows::wslc::task {
 void AttachContainer::operator()(CLIExecutionContext& context) const
@@ -171,20 +172,12 @@ void ListContainers(CLIExecutionContext& context)
     }
     case FormatType::Template:
     {
-        WI_ASSERT(context.Args.Contains(ArgType::Format));
         auto templateStr = WideToMultiByte(context.Args.Get<ArgType::Format>());
-
         for (const auto& container : containers)
         {
             auto json = ToJson(container, c_jsonPrettyPrintIndent);
             std::wstring result;
-            if (!wsl::windows::wslc::core::TemplateRenderer::TryRender(templateStr, json, result))
-            {
-                PrintMessage(L"Template rendering error: " + result);
-                context.ExitCode = 1;
-                break;
-            }
-
+            TemplateRenderer::Render(templateStr, json, result);
             PrintMessage(result);
         }
         break;

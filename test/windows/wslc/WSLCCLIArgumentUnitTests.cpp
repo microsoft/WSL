@@ -137,8 +137,6 @@ class WSLCCLIArgumentUnitTests
         format = validation::GetFormatTypeFromString(L"table");
         VERIFY_ARE_EQUAL(format, FormatType::Table);
         VERIFY_THROWS(validation::GetFormatTypeFromString(L"xml"), ArgumentException);
-        VERIFY_NO_THROW(validation::ValidateFormatTypeFromString({L"json", L"table"}, L"formatArg"));
-        VERIFY_THROWS(validation::ValidateFormatTypeFromString({L"JSON", L"TABLE", L"csv"}, L"formatArg"), ArgumentException);
     }
 
     // Test: Verify EnumVariantMap behavior with ArgTypes.

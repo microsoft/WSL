@@ -27,16 +27,41 @@ namespace wsl::windows::wslc::core {
 
 using namespace wsl::shared::string;
 
-bool TemplateRenderer::TryRender(const std::string& templateStr, const std::string& jsonData, std::wstring& output)
+TemplateRenderer::RenderResult TemplateRenderer::TryRender(const std::string& templateStr, const std::string& jsonData, std::wstring& output)
 {
-    char* rawOutput = nullptr;
-    auto success = TryRenderGoTemplate(const_cast<char*>(templateStr.c_str()), const_cast<char*>(jsonData.c_str()), &rawOutput);
+    try
+    {
+        char* rawOutput = nullptr;
+        auto success = TryRenderGoTemplate(const_cast<char*>(templateStr.c_str()), const_cast<char*>(jsonData.c_str()), &rawOutput);
 
-    std::string result(rawOutput ? rawOutput : "");
-    FreeGoString(rawOutput);
+        std::string result(rawOutput ? rawOutput : "");
+        FreeGoString(rawOutput);
 
-    output = MultiByteToWide(result);
-    return success != 0;
+        output = MultiByteToWide(result);
+        return static_cast<RenderResult>(success);
+    }
+    catch (const std::exception& ex)
+    {
+        output = MultiByteToWide(ex.what());
+        return RenderResult::Fail_Unknown;
+    }
+}
+
+void TemplateRenderer::Render(const std::string& templateStr, const std::string& jsonData, std::wstring& output)
+{
+    switch (TryRender(templateStr, jsonData, output))
+    {
+    case RenderResult::Success:
+        return;
+    case RenderResult::Fail_NullPointer:
+    case RenderResult::Fail_ParseJSON:
+    case RenderResult::Fail_ParseTemplate:
+    case RenderResult::Fail_ExecuteTemplate:
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, output);
+    case RenderResult::Fail_Unknown:
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
 }
 
 } // namespace wsl::windows::wslc::core

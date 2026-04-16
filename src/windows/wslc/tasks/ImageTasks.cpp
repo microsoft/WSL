@@ -22,6 +22,7 @@ Abstract:
 #include "PullImageCallback.h"
 #include "TableOutput.h"
 #include "Task.h"
+#include "TemplateRenderer.h"
 #include <format>
 
 using namespace wsl::shared;
@@ -29,6 +30,7 @@ using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::services;
+using namespace wsl::windows::wslc::core;
 
 namespace wsl::windows::wslc::task {
 void BuildImage(CLIExecutionContext& context)
@@ -122,6 +124,18 @@ void ListImages(CLIExecutionContext& context)
         }
 
         table.Complete();
+        break;
+    }
+    case FormatType::Template:
+    {
+        auto templateStr = WideToMultiByte(context.Args.Get<ArgType::Format>());
+        for (const auto& image : images)
+        {
+            auto json = ToJson(image, c_jsonPrettyPrintIndent);
+            std::wstring result;
+            TemplateRenderer::Render(templateStr, json, result);
+            PrintMessage(result);
+        }
         break;
     }
     default:
