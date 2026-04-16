@@ -46,6 +46,7 @@ using wsl::windows::service::wslc::WSLCVolumeMount;
 
 using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
+using namespace wsl::windows::common::wslutil;
 using namespace std::chrono_literals;
 using wsl::shared::Localization;
 
@@ -1234,19 +1235,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             common::docker_schema::PortMapping{.HostIp = e.VmMapping.BindingAddressString(), .HostPort = std::to_string(hostPort)});
     }
 
-    std::map<std::string, std::string> labels;
-    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
-    {
-        const auto& label = containerOptions.Labels[i];
-
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Key, "Label at index %lu has null key", i);
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Value, "Label at index %lu has null value", i);
-
-        THROW_HR_IF_MSG(E_INVALIDARG, strcmp(label.Key, WSLCContainerMetadataLabel) == 0, "Label key '%hs' is reserved", WSLCContainerMetadataLabel);
-        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), labels.contains(label.Key), "Duplicate label key: '%hs'", label.Key);
-
-        labels[label.Key] = label.Value;
-    }
+    auto labels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
 
     // Build WSLC metadata to store in a label for recovery on Open().
     WSLCContainerMetadataV1 metadata;
