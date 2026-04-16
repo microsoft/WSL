@@ -1218,9 +1218,8 @@ int Unmount(_In_ const std::wstring& arg)
     wsl::windows::common::SvcComm service;
     const HRESULT result = wil::ResultFromException([&] { value = service.DetachDisk(disk); });
 
-    // support relative paths in unmount
-    // check is the result is the error code for "file not found" and the path is relative
-    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) && PathIsRelative(disk))
+    // Retry with the normalized path to handle relative paths and \\?\ prefix mismatches.
+    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
     {
         // retry dismounting with the absolute path
         const auto absoluteDisk = wsl::windows::common::filesystem::GetFullPath(filesystem::UnquotePath(disk).c_str());
@@ -1277,7 +1276,11 @@ int Uninstall()
 
     const auto exitCode = wsl::windows::common::install::UninstallViaMsi(logFile.c_str(), &wsl::windows::common::install::MsiMessageCallback);
 
-    if (exitCode != 0)
+    if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+    {
+        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS_REBOOT_REQUIRED);
+    }
+    else if (exitCode != 0)
     {
         clearLogs.release();
         THROW_HR_WITH_USER_ERROR(

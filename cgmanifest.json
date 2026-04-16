@@ -6,8 +6,8 @@
             "component": {
                 "type": "git",
                 "git": {
-                    "repositoryUrl": "https://github.com/microsoft/GSL",
-                    "commitHash": "0f6dbc9e2915ef5c16830f3fa3565738de2a9230"
+                    "repositoryUrl": "https://github.com/llvm/llvm-project",
+                    "commitHash": "d32170dbd5b0d54436537b6b75beaf44324e0c28"
                 }
             }
         },
@@ -15,8 +15,8 @@
             "component": {
                 "type": "git",
                 "git": {
-                    "repositoryUrl": "https://github.com/llvm/llvm-project",
-                    "commitHash": "d32170dbd5b0d54436537b6b75beaf44324e0c28"
+                    "repositoryUrl": "https://github.com/libarchive/libarchive",
+                    "commitHash": "b439d586f53911c84be5e380445a8a259e19114c"
                 }
             }
         },
@@ -28,6 +28,48 @@
                     "version": "3.7.7",
                     "downloadUrl": "https://github.com/libarchive/libarchive/releases/download/v3.7.7/libarchive-3.7.7.tar.gz",
                     "hash": "sha1:918692098b11db61aff23684ab04f375e4a68f69"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/boostorg/boost",
+                    "commitHash": "1bed2b0712b2119f20d66c5053def9173c8462a5"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "boost",
+                    "version": "1.90.0",
+                    "downloadUrl": "https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz",
+                    "hash": "sha256:5e93d582aff26868d581a52ae78c7d8edf3f3064742c6e77901a1f18a437eea9"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "GSL",
+                    "version": "4.0.0",
+                    "downloadUrl": "https://github.com/microsoft/GSL/archive/refs/tags/v4.0.0.tar.gz",
+                    "hash": "sha256:f0e32cb10654fea91ad56bde89170d78cfbf4363ee0b01d8f097de2ba49f6ce9"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "nlohmann::json",
+                    "version": "3.12.0",
+                    "downloadUrl": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+                    "hash": "sha256:42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
                 }
             }
         }
