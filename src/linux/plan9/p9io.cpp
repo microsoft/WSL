@@ -282,7 +282,7 @@ Task<IoResult> WriteAsync(CoroutineIoIssuer& file, std::uint64_t offset, gsl::sp
         cb.aio_offset = offset;
         if (aio_write(&cb) < 0)
         {
-            return {errno, 0};
+            return {-errno, 0};
         }
 
         return {};
