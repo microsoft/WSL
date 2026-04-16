@@ -215,7 +215,7 @@ void wsl::windows::common::helpers::ConnectPipe(_In_ HANDLE Pipe, _In_ DWORD Tim
             }
 
             const auto Result = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(WaitHandles.size()), WaitHandles.data(), FALSE, Timeout);
-            if (!ExitEvents.empty() && Result > WAIT_OBJECT_0 && Result <= WAIT_OBJECT_0 + WaitHandles.size())
+            if (!ExitEvents.empty() && Result > WAIT_OBJECT_0 && Result < WAIT_OBJECT_0 + WaitHandles.size())
             {
                 THROW_HR(E_ABORT);
             }
