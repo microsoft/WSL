@@ -8,7 +8,7 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 
 # Build Go template renderer library
 set(GO_TEMPLATE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tools/gotemplate)
-set(GO_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/gotemplate)
+set(GO_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/gotemplate")
 
 # Reuse TARGET_PLATFORM already normalized by the root CMakeLists.txt
 if("${TARGET_PLATFORM}" STREQUAL "arm64")
