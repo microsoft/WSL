@@ -24,14 +24,10 @@ CoroutineIoIssuer::CoroutineIoIssuer(int fd) : m_FileDescriptor(fd)
 void CoroutineIoIssuer::Callback(sigval value)
 {
     const auto operation = static_cast<CoroutineIoOperation*>(value.sival_ptr);
+    auto error = aio_error(&operation->ControlBlock);
     auto bytesTransferred = aio_return(&operation->ControlBlock);
-    int error = 0;
-    if (bytesTransferred < 0)
-    {
-        error = aio_error(&operation->ControlBlock);
-    }
 
-    operation->Result = {error, static_cast<size_t>(bytesTransferred)};
+    operation->Result = {error, error == 0 ? static_cast<size_t>(bytesTransferred) : 0};
     if (!operation->DoneOrCoroutine.exchange(true))
     {
         return;
