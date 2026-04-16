@@ -356,7 +356,7 @@ void Interface::SetActiveChild(const Interface& child_interface)
 void Interface::CreateTunTapAdapter(const std::string& name, bool TunAdapter)
 {
     wil::unique_fd fd;
-    if (name.size() > IFNAMSIZ)
+    if (name.size() >= IFNAMSIZ)
     {
         throw RuntimeErrorWithSourceLocation("Tun adapter name exceeds IFNAMSIZ");
     }
