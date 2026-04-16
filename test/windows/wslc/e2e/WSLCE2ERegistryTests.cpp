@@ -51,9 +51,6 @@ class WSLCE2ERegistryTests
         const auto& debianImage = DebianTestImage();
         EnsureImageIsLoaded(debianImage);
 
-        // Ensure the default elevated session exists before opening it via COM.
-        RunWslcAndVerify(L"container list", {.Stderr = L"", .ExitCode = 0});
-
         auto session = OpenDefaultElevatedSession();
 
         {

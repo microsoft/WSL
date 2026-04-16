@@ -42,11 +42,11 @@ class WSLCCLICredStorageUnitTests
         VERIFY_ARE_EQUAL(std::string("credential-data-1"), secret);
     }
 
-    TEST_METHOD(FileCred_Store_And_Get_RoundTrips)
+    WSLC_TEST_METHOD(FileCred_Store_And_Get_RoundTrips)
     {
         TestStoreAndGetRoundTrips(m_fileStorage);
     }
-    TEST_METHOD(WinCred_Store_And_Get_RoundTrips)
+    WSLC_TEST_METHOD(WinCred_Store_And_Get_RoundTrips)
     {
         TestStoreAndGetRoundTrips(m_winCredStorage);
     }
@@ -58,11 +58,11 @@ class WSLCCLICredStorageUnitTests
         VERIFY_IS_TRUE(secret.empty());
     }
 
-    TEST_METHOD(FileCred_Get_NonExistent_ReturnsEmpty)
+    WSLC_TEST_METHOD(FileCred_Get_NonExistent_ReturnsEmpty)
     {
         TestGetNonExistentReturnsEmpty(m_fileStorage);
     }
-    TEST_METHOD(WinCred_Get_NonExistent_ReturnsEmpty)
+    WSLC_TEST_METHOD(WinCred_Get_NonExistent_ReturnsEmpty)
     {
         TestGetNonExistentReturnsEmpty(m_winCredStorage);
     }
@@ -78,11 +78,11 @@ class WSLCCLICredStorageUnitTests
         VERIFY_ARE_EQUAL(std::string("new-credential"), secret);
     }
 
-    TEST_METHOD(FileCred_Store_Overwrites_ExistingCredential)
+    WSLC_TEST_METHOD(FileCred_Store_Overwrites_ExistingCredential)
     {
         TestStoreOverwritesExistingCredential(m_fileStorage);
     }
-    TEST_METHOD(WinCred_Store_Overwrites_ExistingCredential)
+    WSLC_TEST_METHOD(WinCred_Store_Overwrites_ExistingCredential)
     {
         TestStoreOverwritesExistingCredential(m_winCredStorage);
     }
@@ -114,11 +114,11 @@ class WSLCCLICredStorageUnitTests
         VERIFY_IS_TRUE(found2);
     }
 
-    TEST_METHOD(FileCred_List_ContainsStoredServers)
+    WSLC_TEST_METHOD(FileCred_List_ContainsStoredServers)
     {
         TestListContainsStoredServers(m_fileStorage);
     }
-    TEST_METHOD(WinCred_List_ContainsStoredServers)
+    WSLC_TEST_METHOD(WinCred_List_ContainsStoredServers)
     {
         TestListContainsStoredServers(m_winCredStorage);
     }
@@ -134,11 +134,11 @@ class WSLCCLICredStorageUnitTests
         VERIFY_IS_TRUE(username2.empty());
     }
 
-    TEST_METHOD(FileCred_Erase_RemovesCredential)
+    WSLC_TEST_METHOD(FileCred_Erase_RemovesCredential)
     {
         TestEraseRemovesCredential(m_fileStorage);
     }
-    TEST_METHOD(WinCred_Erase_RemovesCredential)
+    WSLC_TEST_METHOD(WinCred_Erase_RemovesCredential)
     {
         TestEraseRemovesCredential(m_winCredStorage);
     }
@@ -150,11 +150,11 @@ class WSLCCLICredStorageUnitTests
         });
     }
 
-    TEST_METHOD(FileCred_Erase_NonExistent_Throws)
+    WSLC_TEST_METHOD(FileCred_Erase_NonExistent_Throws)
     {
         TestEraseNonExistentThrows(m_fileStorage);
     }
-    TEST_METHOD(WinCred_Erase_NonExistent_Throws)
+    WSLC_TEST_METHOD(WinCred_Erase_NonExistent_Throws)
     {
         TestEraseNonExistentThrows(m_winCredStorage);
     }

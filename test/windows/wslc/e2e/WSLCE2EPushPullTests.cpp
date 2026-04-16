@@ -54,9 +54,6 @@ class WSLCE2EPushPullTests
         const auto& debianImage = DebianTestImage();
         EnsureImageIsLoaded(debianImage);
 
-        // Ensure the default elevated session exists.
-        RunWslcAndVerify(L"container list", {.Stderr = L"", .ExitCode = 0});
-
         // Start a local registry without auth.
         auto session = OpenDefaultElevatedSession();
 

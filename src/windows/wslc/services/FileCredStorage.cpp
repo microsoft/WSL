@@ -86,6 +86,7 @@ wil::unique_file CreateFileExclusive()
         THROW_HR(E_FAIL);
     }
 
+    fd.release();
     return f;
 }
 

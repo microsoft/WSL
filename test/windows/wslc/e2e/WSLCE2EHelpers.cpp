@@ -370,6 +370,9 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
 
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 {
+    // Ensure the default elevated session exists before opening it via COM.
+    RunWslcAndVerify(L"container list", {.Stderr = L"", .ExitCode = 0});
+
     wil::com_ptr<IWSLCSessionManager> sessionManager;
     VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
