@@ -18,15 +18,12 @@ Abstract:
 #include <string>
 #include <stdexcept>
 
+// Use the cgo-generated header from the Go template renderer build
+#include "render.h"
+
 namespace wsl::windows::wslc::core {
 
 using namespace wsl::shared::string;
-
-// Forward declaration of C functions from Go library
-extern "C" {
-char* RenderGoTemplate(char* templateStr, char* jsonData);
-void FreeMemory(char* ptr);
-}
 
 std::wstring TemplateRenderer::Render(const std::string& templateStr, const std::string& jsonData)
 {

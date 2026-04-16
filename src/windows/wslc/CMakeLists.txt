@@ -8,37 +8,42 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 
 # Build Go template renderer library
 set(GO_TEMPLATE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tools/gotemplate)
-set(GO_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/CMakeFiles/gotemplate)
+set(GO_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/gotemplate)
 
-if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "arm64" OR "${TARGET_PLATFORM}" STREQUAL "arm64")
+# Reuse TARGET_PLATFORM already normalized by the root CMakeLists.txt
+if("${TARGET_PLATFORM}" STREQUAL "arm64")
     set(GO_ARCH arm64)
     set(GO_LIB_MACHINE ARM64)
-elseif("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64|amd64" OR "${TARGET_PLATFORM}" MATCHES "x64|amd64")
+else()
     set(GO_ARCH amd64)
     set(GO_LIB_MACHINE X64)
-else()
-    message(FATAL_ERROR "Unsupported platform: ${CMAKE_GENERATOR_PLATFORM}")
 endif()
 
 set(GO_OUTPUT_DLL ${GO_OUTPUT_DIR}/render.dll)
 set(GO_OUTPUT_LIB ${GO_OUTPUT_DIR}/render.lib)
+set(GO_OUTPUT_HEADER ${GO_OUTPUT_DIR}/render.h)
+
+# Add GO_OUTPUT_HEADER to HEADERS
+list(APPEND HEADERS ${GO_OUTPUT_HEADER})
 
 add_custom_command(
-    OUTPUT ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB}
+    OUTPUT ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB} ${GO_OUTPUT_HEADER}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_OUTPUT_DIR}
-    COMMAND powershell -NoProfile -Command "cd '${GO_TEMPLATE_DIR}' ; \$env:GOOS='windows' ; \$env:GOARCH='${GO_ARCH}' ; \$env:CGO_ENABLED='1' ; go build -o '${GO_OUTPUT_DLL}' -buildmode=c-shared render.go"
+    COMMAND ${CMAKE_COMMAND} -E env GOOS=windows GOARCH=${GO_ARCH} CGO_ENABLED=1
+            go build -o ${GO_OUTPUT_DLL} -buildmode=c-shared render.go
     COMMAND lib /def:${GO_TEMPLATE_DIR}/render.def /out:${GO_OUTPUT_LIB} /machine:${GO_LIB_MACHINE}
-    DEPENDS ${GO_TEMPLATE_DIR}/render.go ${GO_TEMPLATE_DIR}/go.mod ${GO_TEMPLATE_DIR}/render.def
+    WORKING_DIRECTORY ${GO_TEMPLATE_DIR}
+    DEPENDS ${GO_TEMPLATE_DIR}/render.go ${GO_TEMPLATE_DIR}/render.def
     COMMENT "Building Go template renderer library"
     VERBATIM
 )
 
-add_custom_target(gotemplate_lib ALL DEPENDS ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB})
+add_custom_target(gotemplate_lib ALL DEPENDS ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB} ${GO_OUTPUT_HEADER})
 
 # Object library for WSLC components.
 # Used to build the executable and also unit testing components.
 add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
-target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS})
+target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS} ${GO_OUTPUT_DIR})
 
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}

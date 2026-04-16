@@ -5,10 +5,6 @@ package main
 /*
 #include <stdlib.h>
 #include <string.h>
-
-// Exported C functions
-char* RenderGoTemplate(char* templateStr, char* jsonData);
-void FreeMemory(char* ptr);
 */
 import "C"
 
