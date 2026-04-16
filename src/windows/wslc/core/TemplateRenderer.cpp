@@ -19,7 +19,7 @@ Abstract:
 // We declare these directly instead of including the cgo-generated render.h
 // to avoid Go boilerplate types that don't compile cleanly with MSVC.
 extern "C" {
-int TryRenderGoTemplate(char* templateStr, char* jsonData, char** output);
+int TryRenderGoTemplate(const char* templateStr, const char* jsonData, char** output);
 void FreeGoString(char* ptr);
 }
 
@@ -32,7 +32,7 @@ TemplateRenderer::RenderResult TemplateRenderer::TryRender(const std::string& te
     try
     {
         char* rawOutput = nullptr;
-        auto success = TryRenderGoTemplate(const_cast<char*>(templateStr.c_str()), const_cast<char*>(jsonData.c_str()), &rawOutput);
+        auto success = TryRenderGoTemplate(templateStr.c_str(), jsonData.c_str(), &rawOutput);
 
         std::string result(rawOutput ? rawOutput : "");
         FreeGoString(rawOutput);
@@ -54,6 +54,7 @@ void TemplateRenderer::Render(const std::string& templateStr, const std::string&
     case RenderResult::Success:
         return;
     case RenderResult::Fail_NullPointer:
+        THROW_HR(E_POINTER);
     case RenderResult::Fail_ParseJSON:
     case RenderResult::Fail_ParseTemplate:
     case RenderResult::Fail_ExecuteTemplate:

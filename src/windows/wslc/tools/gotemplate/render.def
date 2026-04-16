@@ -1,3 +1,5 @@
+LIBRARY render
+
 EXPORTS
     TryRenderGoTemplate
     FreeGoString

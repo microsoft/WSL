@@ -28,14 +28,11 @@ struct TemplateRenderer
         Fail_ParseTemplate = 3,
         Fail_ExecuteTemplate = 4,
 
-        // Catch-all for any unknown errors
+        // All other failures
         Fail_Unknown = -1,
     };
 
-    // Renders a Go template with the provided JSON data.
-    // Returns true on success with the rendered output, false on failure with an error message.
     static RenderResult TryRender(const std::string& templateStr, const std::string& jsonData, std::wstring& output);
-
     static void Render(const std::string& templateStr, const std::string& jsonData, std::wstring& output);
 };
 

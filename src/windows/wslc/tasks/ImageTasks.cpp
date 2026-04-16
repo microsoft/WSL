@@ -131,7 +131,7 @@ void ListImages(CLIExecutionContext& context)
         auto templateStr = WideToMultiByte(context.Args.Get<ArgType::Format>());
         for (const auto& image : images)
         {
-            auto json = ToJson(image, c_jsonPrettyPrintIndent);
+            auto json = ToJson(image);
             std::wstring result;
             TemplateRenderer::Render(templateStr, json, result);
             PrintMessage(result);

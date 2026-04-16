@@ -175,7 +175,7 @@ void ListContainers(CLIExecutionContext& context)
         auto templateStr = WideToMultiByte(context.Args.Get<ArgType::Format>());
         for (const auto& container : containers)
         {
-            auto json = ToJson(container, c_jsonPrettyPrintIndent);
+            auto json = ToJson(container);
             std::wstring result;
             TemplateRenderer::Render(templateStr, json, result);
             PrintMessage(result);
