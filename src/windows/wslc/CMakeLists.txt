@@ -21,13 +21,8 @@ endif()
 
 set(GO_OUTPUT_DLL ${GO_OUTPUT_DIR}/render.dll)
 set(GO_OUTPUT_LIB ${GO_OUTPUT_DIR}/render.lib)
-set(GO_OUTPUT_HEADER ${GO_OUTPUT_DIR}/render.h)
-
-# Add GO_OUTPUT_HEADER to HEADERS
-list(APPEND HEADERS ${GO_OUTPUT_HEADER})
-
 add_custom_command(
-    OUTPUT ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB} ${GO_OUTPUT_HEADER}
+    OUTPUT ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_OUTPUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E env GOOS=windows GOARCH=${GO_ARCH} CGO_ENABLED=1
             go build -o ${GO_OUTPUT_DLL} -buildmode=c-shared render.go
@@ -38,7 +33,7 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(gotemplate_lib ALL DEPENDS ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB} ${GO_OUTPUT_HEADER})
+add_custom_target(gotemplate_lib ALL DEPENDS ${GO_OUTPUT_DLL} ${GO_OUTPUT_LIB})
 
 # Include Go source files for browsing in Solution Explorer
 set(GO_SOURCES ${GO_TEMPLATE_DIR}/render.go)
@@ -47,7 +42,7 @@ set_source_files_properties(${GO_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
 # Object library for WSLC components.
 # Used to build the executable and also unit testing components.
 add_library(wslclib OBJECT ${SOURCES} ${HEADERS} ${GO_SOURCES})
-target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS} ${GO_OUTPUT_DIR})
+target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS})
 
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}
