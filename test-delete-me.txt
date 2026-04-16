@@ -1,2 +1,0 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
-// This file is too large to push via create_or_update_file, using push_files instead.
