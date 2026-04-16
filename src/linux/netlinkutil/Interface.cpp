@@ -644,7 +644,7 @@ void Interface::EnableNetworkSetting(const char* settingName, int addressFamily)
 
     wil::unique_fd fd(Syscall(open, settingFilePath.c_str(), (O_WRONLY | O_CLOEXEC)));
 
-    Syscall(write, fd.get(), c_value1, sizeof(c_value1));
+    Syscall(write, fd.get(), c_value1, sizeof(c_value1) - 1);
 }
 
 void Interface::DisableNetworkSetting(const char* settingName, int addressFamily)
@@ -654,7 +654,7 @@ void Interface::DisableNetworkSetting(const char* settingName, int addressFamily
 
     wil::unique_fd fd(Syscall(open, settingFilePath.c_str(), (O_WRONLY | O_CLOEXEC)));
 
-    Syscall(write, fd.get(), c_value0, sizeof(c_value0));
+    Syscall(write, fd.get(), c_value0, sizeof(c_value0) - 1);
 }
 
 void Interface::ResetIpv6State()
