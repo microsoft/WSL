@@ -181,6 +181,5 @@ private:
     }
 
     std::vector<std::byte> m_buffer;
-    size_t m_offset = 0;
 };
 } // namespace wsl::shared
