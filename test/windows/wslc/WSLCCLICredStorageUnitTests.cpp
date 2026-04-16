@@ -34,7 +34,7 @@ class WSLCCLICredStorageUnitTests
 
     static void TestStoreAndGetRoundTrips(ICredentialStorage& storage)
     {
-        auto cleanup = wil::scope_exit([&]() { storage.Erase("wslc-test-server1"); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { storage.Erase("wslc-test-server1"); });
         storage.Store("wslc-test-server1", "test-user", "credential-data-1");
 
         auto [username, secret] = storage.Get("wslc-test-server1");
@@ -69,7 +69,7 @@ class WSLCCLICredStorageUnitTests
 
     static void TestStoreOverwritesExistingCredential(ICredentialStorage& storage)
     {
-        auto cleanup = wil::scope_exit([&]() { storage.Erase("wslc-test-server2"); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { storage.Erase("wslc-test-server2"); });
         storage.Store("wslc-test-server2", "old-user", "old-credential");
         storage.Store("wslc-test-server2", "new-user", "new-credential");
 
@@ -89,7 +89,7 @@ class WSLCCLICredStorageUnitTests
 
     static void TestListContainsStoredServers(ICredentialStorage& storage)
     {
-        auto cleanup = wil::scope_exit([&]() {
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             storage.Erase("wslc-test-list1");
             storage.Erase("wslc-test-list2");
         });

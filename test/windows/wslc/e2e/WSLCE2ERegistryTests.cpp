@@ -59,7 +59,7 @@ class WSLCE2ERegistryTests
 
             auto registryImageName = TagImageForRegistry(debianImage.NameAndTag(), registryAddressW);
 
-            auto cleanup = wil::scope_exit([&]() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 RunWslc(std::format(L"image delete --force {}", registryImageName));
                 RunWslc(std::format(L"logout {}", registryAddressW));
             });
