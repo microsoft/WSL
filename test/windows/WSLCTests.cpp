@@ -58,7 +58,6 @@ class WSLCTests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
-        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         // The WSLC SDK tests use this same storage to reduce pull overhead.

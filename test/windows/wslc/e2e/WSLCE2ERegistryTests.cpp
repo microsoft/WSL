@@ -46,12 +46,6 @@ class WSLCE2ERegistryTests
 {
     WSLC_TEST_CLASS(WSLCE2ERegistryTests)
 
-    TEST_CLASS_SETUP(TestClassSetup)
-    {
-        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
-        return true;
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Registry_LoginLogout_PushPull_AuthFlow)
     {
         const auto& debianImage = DebianTestImage();

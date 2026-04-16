@@ -25,12 +25,6 @@ class WSLCE2EPushPullTests
 {
     WSLC_TEST_CLASS(WSLCE2EPushPullTests)
 
-    TEST_CLASS_SETUP(TestClassSetup)
-    {
-        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
-        return true;
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Image_Push_HelpCommand)
     {
         auto result = RunWslc(L"image push --help");
