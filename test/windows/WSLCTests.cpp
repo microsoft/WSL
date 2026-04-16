@@ -2503,6 +2503,88 @@ class WSLCTests
         VERIFY_ARE_NOT_EQUAL(details, L"");
     }
 
+    WSLC_TEST_METHOD(BuildImageStuckCallbackCancellation)
+    {
+        class StuckBuildProgressCallback
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
+        {
+        public:
+            StuckBuildProgressCallback(std::promise<void>& reachedPromise, wil::unique_event& exitEvent) :
+                m_reachedPromise(reachedPromise), m_exitEvent(exitEvent)
+            {
+            }
+
+            HRESULT OnProgress(LPCSTR, LPCSTR, ULONGLONG, ULONGLONG) override
+            {
+                if (!m_signaled)
+                {
+                    m_signaled = true;
+                    m_reachedPromise.set_value();
+                    m_exitEvent.wait(); // Block until this test case is complete.
+                }
+
+                return S_OK;
+            }
+
+        private:
+            std::promise<void>& m_reachedPromise;
+            wil::unique_event& m_exitEvent;
+            bool m_signaled{};
+        };
+
+        auto contextDir = std::filesystem::current_path() / "build-context-stuck-callback";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM debian:latest\n";
+            dockerfile << "RUN echo hello\n";
+        }
+
+        auto contextPathStr = contextDir.wstring();
+        auto dockerfileHandle = wil::open_file((contextDir / "Dockerfile").c_str());
+
+        WSLCBuildImageOptions options{
+            .ContextPath = contextPathStr.c_str(),
+            .DockerfileHandle = ToCOMInputHandle(dockerfileHandle.get()),
+            .Flags = WSLCBuildImageFlagsVerbose,
+        };
+
+        std::promise<void> callbackReached;
+        wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+        auto callback = Microsoft::WRL::Make<StuckBuildProgressCallback>(callbackReached, exitEvent);
+
+        std::promise<HRESULT> buildResult;
+        std::thread buildThread(
+            [&]() { buildResult.set_value(m_defaultSession->BuildImage(&options, callback.Get(), exitEvent.get())); });
+
+        auto joinThread = wil::scope_exit([&]() {
+            exitEvent.SetEvent();
+            buildThread.join();
+        });
+
+        // Wait for the progress callback to be called, proving the COM call is in flight.
+        auto reachedFuture = callbackReached.get_future();
+        auto reachedStatus = reachedFuture.wait_for(std::chrono::seconds(60));
+        VERIFY_ARE_EQUAL(reachedStatus, std::future_status::ready);
+
+        // Terminate the session while the callback is stuck.
+        // This should cancel the pending COM call and unblock BuildImage.
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        ResetTestSession();
+
+        auto buildFuture = buildResult.get_future();
+        auto buildStatus = buildFuture.wait_for(std::chrono::seconds(60));
+        VERIFY_ARE_EQUAL(buildStatus, std::future_status::ready);
+
+        // BuildImage should have failed due to COM call cancellation.
+        VERIFY_FAILED(buildFuture.get());
+    }
+
     WSLC_TEST_METHOD(InteractiveShell)
     {
         WSLCProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, WSLCProcessFlagsTty | WSLCProcessFlagsStdin);
