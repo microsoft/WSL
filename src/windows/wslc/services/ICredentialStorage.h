@@ -14,7 +14,6 @@ Abstract:
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,8 +24,8 @@ struct ICredentialStorage
 {
     virtual ~ICredentialStorage() = default;
 
-    virtual void Store(const std::string& serverAddress, const std::string& credential) = 0;
-    virtual std::optional<std::string> Get(const std::string& serverAddress) = 0;
+    virtual void Store(const std::string& serverAddress, const std::string& username, const std::string& secret) = 0;
+    virtual std::pair<std::string, std::string> Get(const std::string& serverAddress) = 0;
     virtual void Erase(const std::string& serverAddress) = 0;
     virtual std::vector<std::wstring> List() = 0;
 };

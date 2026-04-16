@@ -23,14 +23,11 @@ namespace wsl::windows::wslc::services {
 class RegistryService
 {
 public:
-    static void Store(const std::string& serverAddress, const std::string& credential);
-    static std::optional<std::string> Get(const std::string& serverAddress);
+    static void Store(const std::string& serverAddress, const std::string& username, const std::string& secret);
+    static std::string Get(const std::string& serverAddress);
     static void Erase(const std::string& serverAddress);
     static std::vector<std::wstring> List();
-
-    // Authenticates with a registry via the session's Docker engine.
-    // Returns a base64-encoded auth header ready to store and pass to push/pull.
-    static std::string Authenticate(
+    static std::pair<std::string, std::string> Authenticate(
         wsl::windows::wslc::models::Session& session, const std::string& serverAddress, const std::string& username, const std::string& password);
 
     // Default registry server address used when no explicit server is provided.

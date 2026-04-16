@@ -205,10 +205,8 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
     auto server = GetServerFromImage(image);
-    auto storedAuth = RegistryService::Get(server);
-    auto auth = storedAuth.has_value() ? storedAuth->c_str() : nullptr;
-
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth, callback));
+    auto auth = RegistryService::Get(server);
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
@@ -238,9 +236,7 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
 void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
     auto server = GetServerFromImage(image);
-    auto storedAuth = RegistryService::Get(server);
-    auto auth = storedAuth.value_or(BuildRegistryAuthHeader("", "", server));
-
+    auto auth = RegistryService::Get(server);
     THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));
 }
 

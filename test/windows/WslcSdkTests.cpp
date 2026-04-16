@@ -2111,7 +2111,7 @@ class WslcSdkTests
             VERIFY_IS_NOT_NULL(token.get());
         }
 
-        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password);
         PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
 
         auto image = std::format("{}/hello-world:latest", registryAddress);
@@ -2137,7 +2137,7 @@ class WslcSdkTests
 
         // Negative: Pulling with bad credentials should fail.
         {
-            auto badAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, "wrong", registryAddress);
+            auto badAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, "wrong");
 
             WslcPullImageOptions opts{};
             opts.uri = image.c_str();
@@ -2162,7 +2162,7 @@ class WslcSdkTests
     {
         // Start a local registry without auth to avoid Docker Hub rate limits.
         auto [registryContainer, registryAddress] = StartLocalRegistry();
-        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "", registryAddress);
+        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
 
         {
             // Push hello-world:latest to the local registry.
@@ -2212,7 +2212,7 @@ class WslcSdkTests
 
     WSLC_TEST_METHOD(PushImage)
     {
-        auto emptyRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "", "");
+        auto emptyRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
 
         // Negative: pushing a non-existent image must fail.
         {

@@ -180,22 +180,22 @@ std::string Unprotect(const std::string& cipherBase64)
 
 namespace wsl::windows::wslc::services {
 
-void FileCredStorage::Store(const std::string& serverAddress, const std::string& credential)
+void FileCredStorage::Store(const std::string& serverAddress, const std::string& username, const std::string& secret)
 {
     auto file = RetryOpenFileOnSharingViolation(CreateFileExclusive);
 
     ModifyFileStore(file.get(), [&](CredentialFile& data) {
-        data.Credentials[serverAddress] = CredentialEntry{Protect(credential)};
+        data.Credentials[serverAddress] = CredentialEntry{username, Protect(secret)};
         return true;
     });
 }
 
-std::optional<std::string> FileCredStorage::Get(const std::string& serverAddress)
+std::pair<std::string, std::string> FileCredStorage::Get(const std::string& serverAddress)
 {
     auto file = RetryOpenFileOnSharingViolation(OpenFileShared);
     if (!file)
     {
-        return std::nullopt;
+        return {};
     }
 
     auto data = ReadCredentialFile(file.get());
@@ -203,10 +203,10 @@ std::optional<std::string> FileCredStorage::Get(const std::string& serverAddress
 
     if (entry == data.Credentials.end())
     {
-        return std::nullopt;
+        return {};
     }
 
-    return Unprotect(entry->second.RegistryAuthenticationInformation);
+    return {entry->second.UserName, Unprotect(entry->second.Secret)};
 }
 
 void FileCredStorage::Erase(const std::string& serverAddress)

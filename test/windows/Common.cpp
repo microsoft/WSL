@@ -2209,6 +2209,7 @@ Return Value:
     }
 
     WslTraceLoggingUninitialize();
+    g_mtaCookie.reset();
 
     return true;
 }

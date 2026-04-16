@@ -47,24 +47,30 @@ std::string ResolveCredentialKey(const std::string& serverAddress)
 
 namespace wsl::windows::wslc::services {
 
-void RegistryService::Store(const std::string& serverAddress, const std::string& credential)
+// Sentinel username matching Docker's convention for identity-token credentials.
+static constexpr auto TokenUsername = "<token>";
+
+void RegistryService::Store(const std::string& serverAddress, const std::string& username, const std::string& secret)
 {
     THROW_HR_IF(E_INVALIDARG, serverAddress.empty());
-    THROW_HR_IF(E_INVALIDARG, credential.empty());
+    THROW_HR_IF(E_INVALIDARG, secret.empty());
 
     auto storage = OpenCredentialStorage();
-    storage->Store(ResolveCredentialKey(serverAddress), credential);
+    storage->Store(ResolveCredentialKey(serverAddress), username, secret);
 }
 
-std::optional<std::string> RegistryService::Get(const std::string& serverAddress)
+std::string RegistryService::Get(const std::string& serverAddress)
 {
-    if (serverAddress.empty())
+    auto storage = OpenCredentialStorage();
+    auto key = ResolveCredentialKey(serverAddress);
+    auto [username, secret] = storage->Get(key);
+
+    if (username == TokenUsername)
     {
-        return std::nullopt;
+        return BuildRegistryAuthHeader(secret);
     }
 
-    auto storage = OpenCredentialStorage();
-    return storage->Get(ResolveCredentialKey(serverAddress));
+    return BuildRegistryAuthHeader(username, secret);
 }
 
 void RegistryService::Erase(const std::string& serverAddress)
@@ -81,7 +87,7 @@ std::vector<std::wstring> RegistryService::List()
     return storage->List();
 }
 
-std::string RegistryService::Authenticate(
+std::pair<std::string, std::string> RegistryService::Authenticate(
     wsl::windows::wslc::models::Session& session, const std::string& serverAddress, const std::string& username, const std::string& password)
 {
     wil::unique_cotaskmem_ansistring identityToken;
@@ -90,10 +96,10 @@ std::string RegistryService::Authenticate(
     // If the registry returned an identity token, use it. Otherwise fall back to username/password.
     if (identityToken && strlen(identityToken.get()) > 0)
     {
-        return BuildRegistryAuthHeader(identityToken.get(), serverAddress);
+        return {TokenUsername, identityToken.get()};
     }
 
-    return BuildRegistryAuthHeader(username, password, serverAddress);
+    return {username, password};
 }
 
 } // namespace wsl::windows::wslc::services

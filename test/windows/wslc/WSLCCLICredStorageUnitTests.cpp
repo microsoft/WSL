@@ -35,11 +35,11 @@ class WSLCCLICredStorageUnitTests
     static void TestStoreAndGetRoundTrips(ICredentialStorage& storage)
     {
         auto cleanup = wil::scope_exit([&]() { storage.Erase("wslc-test-server1"); });
-        storage.Store("wslc-test-server1", "credential-data-1");
+        storage.Store("wslc-test-server1", "test-user", "credential-data-1");
 
-        auto result = storage.Get("wslc-test-server1");
-        VERIFY_IS_TRUE(result.has_value());
-        VERIFY_ARE_EQUAL(std::string("credential-data-1"), result.value());
+        auto [username, secret] = storage.Get("wslc-test-server1");
+        VERIFY_ARE_EQUAL(std::string("test-user"), username);
+        VERIFY_ARE_EQUAL(std::string("credential-data-1"), secret);
     }
 
     TEST_METHOD(FileCred_Store_And_Get_RoundTrips)
@@ -51,30 +51,31 @@ class WSLCCLICredStorageUnitTests
         TestStoreAndGetRoundTrips(m_winCredStorage);
     }
 
-    static void TestGetNonExistentReturnsNullopt(ICredentialStorage& storage)
+    static void TestGetNonExistentReturnsEmpty(ICredentialStorage& storage)
     {
-        auto result = storage.Get("wslc-test-nonexistent-server");
-        VERIFY_IS_FALSE(result.has_value());
+        auto [username, secret] = storage.Get("wslc-test-nonexistent-server");
+        VERIFY_IS_TRUE(username.empty());
+        VERIFY_IS_TRUE(secret.empty());
     }
 
-    TEST_METHOD(FileCred_Get_NonExistent_ReturnsNullopt)
+    TEST_METHOD(FileCred_Get_NonExistent_ReturnsEmpty)
     {
-        TestGetNonExistentReturnsNullopt(m_fileStorage);
+        TestGetNonExistentReturnsEmpty(m_fileStorage);
     }
-    TEST_METHOD(WinCred_Get_NonExistent_ReturnsNullopt)
+    TEST_METHOD(WinCred_Get_NonExistent_ReturnsEmpty)
     {
-        TestGetNonExistentReturnsNullopt(m_winCredStorage);
+        TestGetNonExistentReturnsEmpty(m_winCredStorage);
     }
 
     static void TestStoreOverwritesExistingCredential(ICredentialStorage& storage)
     {
         auto cleanup = wil::scope_exit([&]() { storage.Erase("wslc-test-server2"); });
-        storage.Store("wslc-test-server2", "old-credential");
-        storage.Store("wslc-test-server2", "new-credential");
+        storage.Store("wslc-test-server2", "old-user", "old-credential");
+        storage.Store("wslc-test-server2", "new-user", "new-credential");
 
-        auto result = storage.Get("wslc-test-server2");
-        VERIFY_IS_TRUE(result.has_value());
-        VERIFY_ARE_EQUAL(std::string("new-credential"), result.value());
+        auto [username, secret] = storage.Get("wslc-test-server2");
+        VERIFY_ARE_EQUAL(std::string("new-user"), username);
+        VERIFY_ARE_EQUAL(std::string("new-credential"), secret);
     }
 
     TEST_METHOD(FileCred_Store_Overwrites_ExistingCredential)
@@ -92,8 +93,8 @@ class WSLCCLICredStorageUnitTests
             storage.Erase("wslc-test-list1");
             storage.Erase("wslc-test-list2");
         });
-        storage.Store("wslc-test-list1", "cred1");
-        storage.Store("wslc-test-list2", "cred2");
+        storage.Store("wslc-test-list1", "user1", "cred1");
+        storage.Store("wslc-test-list2", "user2", "cred2");
 
         auto servers = storage.List();
         bool found1 = false, found2 = false;
@@ -124,11 +125,13 @@ class WSLCCLICredStorageUnitTests
 
     static void TestEraseRemovesCredential(ICredentialStorage& storage)
     {
-        storage.Store("wslc-test-erase", "cred");
-        VERIFY_IS_TRUE(storage.Get("wslc-test-erase").has_value());
+        storage.Store("wslc-test-erase", "user", "cred");
+        auto [username, secret] = storage.Get("wslc-test-erase");
+        VERIFY_IS_FALSE(username.empty());
 
         storage.Erase("wslc-test-erase");
-        VERIFY_IS_FALSE(storage.Get("wslc-test-erase").has_value());
+        auto [username2, secret2] = storage.Get("wslc-test-erase");
+        VERIFY_IS_TRUE(username2.empty());
     }
 
     TEST_METHOD(FileCred_Erase_RemovesCredential)

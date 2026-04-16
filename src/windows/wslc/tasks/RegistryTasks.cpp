@@ -43,8 +43,8 @@ void Login(CLIExecutionContext& context)
         serverAddress = WideToMultiByte(context.Args.Get<ArgType::Server>());
     }
 
-    auto auth = RegistryService::Authenticate(session, serverAddress, username, password);
-    RegistryService::Store(serverAddress, auth);
+    auto [credUsername, credSecret] = RegistryService::Authenticate(session, serverAddress, username, password);
+    RegistryService::Store(serverAddress, credUsername, credSecret);
 
     PrintMessage(Localization::WSLCCLI_LoginSucceeded());
 }
