@@ -39,8 +39,7 @@ std::wstring InspectCommand::LongDescription() const
 
 void InspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context
-        << CreateSession //
-        << Inspect;
+    context << CreateSession //
+            << Inspect;
 }
 } // namespace wsl::windows::wslc

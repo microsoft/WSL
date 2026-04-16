@@ -11,7 +11,6 @@ Abstract:
     Implementation of inspection command related execution logic.
 --*/
 
-
 #include "Argument.h"
 #include "ArgumentValidation.h"
 #include "InspectTasks.h"

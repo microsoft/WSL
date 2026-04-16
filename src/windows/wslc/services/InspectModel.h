@@ -21,4 +21,4 @@ typedef enum _InspectType
     Image = 2,
     All = Container | Image,
 } InspectType;
-} // namespace wsl::windows::wslc::services
+} // namespace wsl::windows::wslc::models
