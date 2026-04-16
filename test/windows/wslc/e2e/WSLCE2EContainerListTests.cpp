@@ -154,12 +154,6 @@ class WSLCE2EContainerListTests
         VERIFY_ARE_EQUAL(containerId, outputLine);
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
-    {
-        const auto result = RunWslc(L"container list --format invalid");
-        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_List_JsonFormat)
     {
         VerifyContainerIsNotListed(WslcContainerName);
@@ -201,6 +195,21 @@ class WSLCE2EContainerListTests
         // Verify both container IDs are in the list
         VERIFY_IS_TRUE(std::find(containerIds.begin(), containerIds.end(), containerId) != containerIds.end());
         VERIFY_IS_TRUE(std::find(containerIds.begin(), containerIds.end(), containerId2) != containerIds.end());
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_List_TemplateFormat)
+    {
+        // Create a container
+        RunWslcAndVerify(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()), {.Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()), {.Stderr = L"", .ExitCode = 0});
+
+        // List containers with json format
+        auto result = RunWslc(L"container list --all --format \"Name = {{.Name}}\"");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto output = result.GetStdoutLines();
+        VERIFY_ARE_EQUAL(2U, output.size());
+        VERIFY_ARE_EQUAL(std::format(L"Name = {}", WslcContainerName), output[0]);
+        VERIFY_ARE_EQUAL(std::format(L"Name = {}", WslcContainerName2), output[1]);
     }
 
 private:

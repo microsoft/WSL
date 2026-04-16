@@ -79,12 +79,6 @@ class WSLCE2EImageListTests
         VERIFY_IS_TRUE(imageFound);
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_List_InvalidFormatOption)
-    {
-        const auto result = RunWslc(L"image list --format invalid");
-        result.Verify({.Stderr = L"Invalid format value: invalid is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Image_List_JsonFormat)
     {
         const auto result = RunWslc(L"image list --format json");
@@ -126,6 +120,16 @@ class WSLCE2EImageListTests
         }
 
         VERIFY_IS_TRUE(foundHeader, L"Expected table header with REPOSITORY, TAG, IMAGE ID, CREATED, SIZE columns");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_List_TemplateFormat)
+    {
+        auto result = RunWslc(L"image list --format \"{{.Repository}}:{{.Tag}}\"");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto output = result.GetStdoutLines();
+        VERIFY_ARE_EQUAL(2U, output.size());
+        VERIFY_ARE_EQUAL(DebianImage.NameAndTag(), output[0]);
+        VERIFY_ARE_EQUAL(AlpineImage.NameAndTag(), output[1]);
     }
 
 private:

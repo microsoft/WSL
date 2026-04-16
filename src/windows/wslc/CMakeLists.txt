@@ -22,7 +22,7 @@ if("${TARGET_PLATFORM}" STREQUAL "arm64")
             "$ENV{VCToolsInstallDir}/Llvm/x64/bin"
             "$ENV{VCINSTALLDIR}/Tools/Llvm/x64/bin"
             "$ENV{ProgramFiles}/LLVM/bin"
-            "$ENV{ProgramFiles(x86)}/LLVM/bin")
+            "$ENV{ProgramFiles\(x86\)}/LLVM/bin")
 
     if(NOT GO_CLANG_EXECUTABLE)
         message(FATAL_ERROR "clang is required for arm64 cgo builds. Install the Windows Clang toolchain or add clang to PATH.")
