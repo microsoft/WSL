@@ -597,7 +597,8 @@ typedef struct _WSLCNetworkOptions
 {
     LPCSTR Name;
     LPCSTR Driver;
-    [unique] LPCSTR Options;
+    [unique, size_is(DriverOptsCount)] const WSLCDriverOption* DriverOpts;
+    ULONG DriverOptsCount;
     [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
     ULONG LabelsCount;
 } WSLCNetworkOptions;

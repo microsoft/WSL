@@ -3570,7 +3570,8 @@ class WSLCTests
         WSLCNetworkOptions options{};
         options.Name = networkName.c_str();
         options.Driver = "bridge";
-        options.Options = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
@@ -3602,10 +3603,13 @@ class WSLCTests
 
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
+        WSLCDriverOption subnetOpt[] = {{"Subnet", "172.28.0.0/16"}};
+
         WSLCNetworkOptions options{};
         options.Name = networkName.c_str();
         options.Driver = "bridge";
-        options.Options = R"({"Subnet":"172.28.0.0/16","Gateway":"172.28.0.1"})";
+        options.DriverOpts = subnetOpt;
+        options.DriverOptsCount = ARRAYSIZE(subnetOpt);
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
@@ -3623,10 +3627,13 @@ class WSLCTests
 
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
+        WSLCDriverOption internalOpt[] = {{"Internal", "true"}};
+
         WSLCNetworkOptions options{};
         options.Name = networkName.c_str();
         options.Driver = "bridge";
-        options.Options = R"({"Internal":true})";
+        options.DriverOpts = internalOpt;
+        options.DriverOptsCount = ARRAYSIZE(internalOpt);
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
@@ -3645,14 +3652,15 @@ class WSLCTests
         LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
         WSLCLabel labels[] = {
-            {const_cast<LPSTR>("com.example.env"), const_cast<LPSTR>("test")},
-            {const_cast<LPSTR>("com.example.team"), const_cast<LPSTR>("infra")},
+            {.Key = "com.example.env", .Value = "test"},
+            {.Key = "com.example.team", .Value = "infra"},
         };
 
         WSLCNetworkOptions options{};
         options.Name = networkName.c_str();
         options.Driver = "bridge";
-        options.Options = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
         options.Labels = labels;
         options.LabelsCount = ARRAYSIZE(labels);
 
@@ -3671,25 +3679,31 @@ class WSLCTests
         WSLCNetworkOptions options{};
         options.Name = "bad-driver-net";
         options.Driver = "overlay";
-        options.Options = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"Unsupported network driver:");
     }
 
     WSLC_TEST_METHOD(NetworkCreateReservedNameTest)
     {
         WSLCNetworkOptions options{};
         options.Driver = "bridge";
-        options.Options = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
 
         options.Name = "bridge";
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"bridge");
 
         options.Name = "host";
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"host");
 
         options.Name = "none";
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"none");
     }
 
     WSLC_TEST_METHOD(NetworkCreateInvalidNameTest)
@@ -3697,22 +3711,11 @@ class WSLCTests
         WSLCNetworkOptions options{};
         options.Name = "invalid name!";
         options.Driver = "bridge";
-        options.Options = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
-    }
-
-    WSLC_TEST_METHOD(NetworkCreateInvalidOptionsJsonTest)
-    {
-        WSLCNetworkOptions options{};
-        options.Name = "json-fail-net";
-        options.Driver = "bridge";
-        options.Options = "not valid json";
-
-        VERIFY_FAILED(m_defaultSession->CreateNetwork(&options));
-
-        options.Options = R"({"Gateway":"10.0.0.1"})";
-        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"invalid name!");
     }
 
     WSLC_TEST_METHOD(NetworkSessionRecoveryTest)
@@ -3724,7 +3727,8 @@ class WSLCTests
         WSLCNetworkOptions options{};
         options.Name = networkName.c_str();
         options.Driver = "bridge";
-        options.Options = nullptr;
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
@@ -3759,19 +3763,24 @@ class WSLCTests
         WSLCNetworkOptions optionsA{};
         optionsA.Name = networkNameA.c_str();
         optionsA.Driver = "bridge";
-        optionsA.Options = nullptr;
+        optionsA.DriverOpts = nullptr;
+        optionsA.DriverOptsCount = 0;
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsA));
 
+        WSLCDriverOption subnetOpt[] = {{"Subnet", "172.29.0.0/16"}};
         WSLCNetworkOptions optionsB{};
         optionsB.Name = networkNameB.c_str();
         optionsB.Driver = "bridge";
-        optionsB.Options = R"({"Subnet":"172.29.0.0/16"})";
+        optionsB.DriverOpts = subnetOpt;
+        optionsB.DriverOptsCount = ARRAYSIZE(subnetOpt);
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsB));
 
+        WSLCDriverOption internalOpt[] = {{"Internal", "true"}};
         WSLCNetworkOptions optionsC{};
         optionsC.Name = networkNameC.c_str();
         optionsC.Driver = "bridge";
-        optionsC.Options = R"({"Internal":"true"})";
+        optionsC.DriverOpts = internalOpt;
+        optionsC.DriverOptsCount = ARRAYSIZE(internalOpt);
         VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsC));
 
         wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;

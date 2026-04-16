@@ -1977,12 +1977,8 @@ try
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(name), IsReservedNetworkName(name));
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriver(driver), driver != WSLCBridgeNetworkDriver);
 
-    RETURN_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
-    for (ULONG i = 0; i < Options->LabelsCount; i++)
-    {
-        RETURN_HR_IF_NULL(E_POINTER, Options->Labels[i].Key);
-        RETURN_HR_IF_NULL(E_POINTER, Options->Labels[i].Value);
-    }
+    auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
+    auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -1994,64 +1990,22 @@ try
     docker_schema::CreateNetwork request;
     request.Name = name;
     request.Driver = driver;
-
-    if (Options->Labels != nullptr && Options->LabelsCount > 0)
-    {
-        for (ULONG i = 0; i < Options->LabelsCount; i++)
-        {
-            request.Labels[Options->Labels[i].Key] = Options->Labels[i].Value;
-        }
-    }
-
+    request.Labels = labels;
     request.Labels[WSLCNetworkManagedLabel] = "true";
 
-    if (Options->Options)
+    if (auto it = driverOpts.find("Internal"); it != driverOpts.end())
     {
-        try
-        {
-            auto options = nlohmann::json::parse(Options->Options);
-            THROW_HR_IF(E_INVALIDARG, !options.is_object());
+        request.Internal = (it->second == "true");
+    }
 
-            if (auto it = options.find("Internal"); it != options.end())
-            {
-                if (it->is_boolean())
-                {
-                    request.Internal = it->get<bool>();
-                }
-                else if (it->is_string())
-                {
-                    request.Internal = (it->get<std::string>() == "true");
-                }
-                else
-                {
-                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidNetworkOptions(Options->Options));
-                }
-            }
+    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    {
+        docker_schema::IPAMConfig ipamConfig;
+        ipamConfig.Subnet = it->second;
 
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG,
-                Localization::MessageWslcInvalidNetworkOptions(Options->Options),
-                options.contains("Gateway") && !options.contains("Subnet"));
-
-            if (auto it = options.find("Subnet"); it != options.end())
-            {
-                docker_schema::IPAMConfig ipamConfig;
-                ipamConfig.Subnet = it->get<std::string>();
-
-                if (auto gw = options.find("Gateway"); gw != options.end())
-                {
-                    ipamConfig.Gateway = gw->get<std::string>();
-                }
-
-                auto& ipam = request.IPAM.emplace();
-                ipam.Driver = "default";
-                ipam.Config.emplace().push_back(std::move(ipamConfig));
-            }
-        }
-        catch (const nlohmann::json::exception&)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidNetworkOptions(Options->Options));
-        }
+        auto& ipam = request.IPAM.emplace();
+        ipam.Driver = "default";
+        ipam.Config.emplace().push_back(std::move(ipamConfig));
     }
 
     docker_schema::CreateNetworkResponse response;
