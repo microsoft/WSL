@@ -117,7 +117,8 @@ void ListImages(CLIExecutionContext& context)
                 MultiByteToWide(image.Tag.value_or("<untagged>")),
                 MultiByteToWide(TruncateId(image.Id, trunc)),
                 ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
+                // Dividing by 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1000 * 1000)),
             });
         }
 
