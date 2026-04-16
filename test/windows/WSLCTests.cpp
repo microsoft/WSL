@@ -5352,7 +5352,7 @@ class WSLCTests
 
                 VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEACCES));
 
-                // Validate that port 1234 is still available.
+                // Validate that port 1236 is still available (was cleaned up after failure).
                 VERIFY_IS_TRUE(!!bindSocket(1236));
             }
         }
