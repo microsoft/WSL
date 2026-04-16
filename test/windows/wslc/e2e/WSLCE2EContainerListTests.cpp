@@ -200,8 +200,10 @@ class WSLCE2EContainerListTests
     WSLC_TEST_METHOD(WSLCE2E_Container_List_TemplateFormat)
     {
         // Create a container
-        RunWslcAndVerify(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()), {.Stderr = L"", .ExitCode = 0});
-        RunWslcAndVerify(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()), {.Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(
+            std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()), {.Stderr = L"", .ExitCode = 0});
+        RunWslcAndVerify(
+            std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()), {.Stderr = L"", .ExitCode = 0});
 
         // List containers with json format
         auto result = RunWslc(L"container list --all --format \"Name = {{.Name}}\"");
