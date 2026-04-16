@@ -1870,6 +1870,7 @@ void WslCoreVm::InitializeGuest()
             const auto errorString = wsl::windows::common::wslutil::GetSystemErrorString(result);
             EMIT_USER_WARNING(wsl::shared::Localization::MessageLocalhostRelayFailed(errorString));
         }
+        break;
     }
 
     default:
