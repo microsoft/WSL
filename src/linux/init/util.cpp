@@ -784,10 +784,6 @@ Return Value:
         if (Output)
         {
             (*Output) += Buffer.data();
-            if (Result < 0)
-            {
-                goto ErrorExit;
-            }
         }
         else
         {
