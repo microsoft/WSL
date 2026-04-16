@@ -101,6 +101,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetUser(std::move(user));
     }
 
+    if (!options.WorkingDirectory.empty())
+    {
+        containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
+    }
+
     for (const auto& tmpfsSpec : options.Tmpfs)
     {
         auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);

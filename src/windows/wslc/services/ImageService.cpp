@@ -76,7 +76,7 @@ void ImageService::Build(
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
     const std::wstring& dockerfilePath,
-    bool verbose,
+    WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
 {
@@ -128,7 +128,7 @@ void ImageService::Build(
         .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
-        .Verbose = verbose,
+        .Flags = flags,
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));

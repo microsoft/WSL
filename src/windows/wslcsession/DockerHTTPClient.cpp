@@ -417,9 +417,9 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
-void DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
+docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
 {
-    Transaction(verb::post, URL::Create("/volumes/create"), Request);
+    return Transaction<docker_schema::CreateVolume>(verb::post, URL::Create("/volumes/create"), Request);
 }
 
 void DockerHTTPClient::RemoveVolume(const std::string& Name)

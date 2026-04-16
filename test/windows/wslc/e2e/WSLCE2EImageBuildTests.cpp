@@ -169,8 +169,7 @@ class WSLCE2EImageBuildTests
         // Deny read access so wslc cannot open the file.
         SetPathAccess(containerfilePath, GENERIC_READ, DENY_ACCESS);
 
-        auto restore = wil::scope_exit_log(
-            WI_DIAGNOSTICS_INFO, [containerfilePath]() { SetPathAccess(containerfilePath, GENERIC_READ, GRANT_ACCESS); });
+        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [containerfilePath]() { DeleteFileW(containerfilePath.c_str()); });
 
         auto absoluteContainerfilePath = std::filesystem::absolute(containerfilePath);
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));

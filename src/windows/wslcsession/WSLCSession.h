@@ -49,6 +49,24 @@ private:
     HANDLE m_handle{};
 };
 
+class UserCOMCallback
+{
+    NON_COPYABLE(UserCOMCallback);
+
+public:
+    UserCOMCallback(WSLCSession& Session) noexcept;
+    UserCOMCallback(UserCOMCallback&& Other) noexcept;
+
+    ~UserCOMCallback() noexcept;
+
+    UserCOMCallback& operator=(UserCOMCallback&& Other) noexcept;
+    void Reset() noexcept;
+
+private:
+    WSLCSession* m_session{};
+    DWORD m_threadId{};
+};
+
 //
 // WSLCSession - Implements IWSLCSession for container management.
 // Runs in a per-user COM server process for security isolation.
@@ -105,10 +123,11 @@ public:
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
     // Volume management.
-    IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options) override;
+    IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListVolumes)(_Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(PruneVolumes)(_In_opt_ const WSLCPruneVolumesOptions* Options, _Out_ WSLCPruneVolumesResults* Results) override;
 
     // Network management.
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
@@ -131,10 +150,14 @@ public:
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);
 
+    UserCOMCallback RegisterUserCOMCallback();
+    void UnregisterUserCOMCallback(DWORD ThreadId);
+
 private:
     ULONG m_id = 0;
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
+    __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
@@ -177,6 +200,10 @@ private:
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
     __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
+
+    // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
+    std::recursive_mutex m_userCOMCallbacksLock;
+    __guarded_by(m_userCOMCallbacksLock) std::set<DWORD> m_userCOMCallbackThreads;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;
