@@ -891,7 +891,7 @@ HRESULT LxssUserSessionImpl::MountDisk(
     _Out_ int* Step,
     _Out_ LPWSTR* MountName)
 {
-    ExecutionContext context(Context::DetachDisk);
+    ExecutionContext context(Context::MountDisk);
 
     std::lock_guard lock(m_instanceLock);
     return wil::ResultFromException([&]() {
