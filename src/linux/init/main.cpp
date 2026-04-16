@@ -471,7 +471,7 @@ Return Value:
         return {};
     }
 
-    struct sockaddr_nl Address;
+    struct sockaddr_nl Address{};
     Address.nl_family = AF_NETLINK;
     if (bind(Fd.get(), (struct sockaddr*)&Address, sizeof(Address)) < 0)
     {
