@@ -254,6 +254,8 @@ jobs:
           SymbolsVersion: $(version.WSL_PACKAGE_VERSION)
           SearchPattern: |
             $(ob_outputDirectory)/pdb/**/*.pdb
+            bin/**/*.exe
+            bin/**/*.dll
 
       - ${{ if ne(parameters.pool, '') }}:
         - task: PublishPipelineArtifact@1

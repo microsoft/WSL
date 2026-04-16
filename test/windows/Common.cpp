@@ -2068,6 +2068,8 @@ Return Value:
         THROW_HR_MSG(E_FAIL, "Test setup returned non-zero exit code %lu", ExitCode);
     }
 
+    __debugbreak();
+
     return true;
 }
 
