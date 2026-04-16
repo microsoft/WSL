@@ -437,7 +437,7 @@ public:
     static unique_pipe create(int flags)
     {
         int pipe[2] = {-1, -1};
-        if (pipe2(pipe, flags) < -1)
+        if (pipe2(pipe, flags) < 0)
         {
             THROW_ERRNO(errno);
         }
