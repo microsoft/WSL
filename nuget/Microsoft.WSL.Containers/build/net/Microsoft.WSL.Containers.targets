@@ -5,27 +5,27 @@
     <Choose>
         <When Condition="'$(RuntimeIdentifier)' != ''">
             <PropertyGroup>
-                <_wslcSdkPlatform Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x64</_wslcSdkPlatform>
-                <_wslcSdkPlatform Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</_wslcSdkPlatform>
-                <_wslcSdkInvalidPlatformProperty Condition="'$(_wslcSdkPlatform)' == ''">RuntimeIdentifier</_wslcSdkInvalidPlatformProperty>
-                <_wslcSdkInvalidPlatform Condition="'$(_wslcSdkPlatform)' == ''">$(RuntimeIdentifier)</_wslcSdkInvalidPlatform>
+                <_wslcPlatform Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x64</_wslcPlatform>
+                <_wslcPlatform Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</_wslcPlatform>
+                <_wslcInvalidPlatformProperty Condition="'$(_wslcPlatform)' == ''">RuntimeIdentifier</_wslcInvalidPlatformProperty>
+                <_wslcInvalidPlatform Condition="'$(_wslcPlatform)' == ''">$(RuntimeIdentifier)</_wslcInvalidPlatform>
             </PropertyGroup>
         </When>
         <Otherwise>
             <PropertyGroup>
-                <_wslcSdkPlatform Condition="'$(PlatformTarget)' == 'x64'">x64</_wslcSdkPlatform>
-                <_wslcSdkPlatform Condition="'$(PlatformTarget)' == 'arm64'">arm64</_wslcSdkPlatform>
-                <_wslcSdkInvalidPlatformProperty Condition="'$(_wslcSdkPlatform)' == ''">PlatformTarget</_wslcSdkInvalidPlatformProperty>
-                <_wslcSdkInvalidPlatform Condition="'$(_wslcSdkPlatform)' == ''">$(PlatformTarget)</_wslcSdkInvalidPlatform>
+                <_wslcPlatform Condition="'$(PlatformTarget)' == 'x64'">x64</_wslcPlatform>
+                <_wslcPlatform Condition="'$(PlatformTarget)' == 'arm64'">arm64</_wslcPlatform>
+                <_wslcInvalidPlatformProperty Condition="'$(_wslcPlatform)' == ''">PlatformTarget</_wslcInvalidPlatformProperty>
+                <_wslcInvalidPlatform Condition="'$(_wslcPlatform)' == ''">$(PlatformTarget)</_wslcInvalidPlatform>
             </PropertyGroup>
 
-            <ItemGroup Condition="'$(_wslcSdkPlatform)' != ''">
-                <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(_wslcSdkPlatform)\native\wslcsdk.dll" />
+            <ItemGroup Condition="'$(_wslcPlatform)' != ''">
+                <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(_wslcPlatform)\native\wslcsdk.dll" />
             </ItemGroup>
         </Otherwise>
     </Choose>
 
-    <Target Name="WSLCSDK_ErrorPlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcSdkInvalidPlatform)' != ''">
-        <Error Text="wslcsdk.dll could not be copied because the $(_wslcSdkInvalidPlatformProperty) '$(_wslcSdkInvalidPlatform)' is not supported. Only x64 and arm64 platforms are supported." />
+    <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcInvalidPlatform)' != ''">
+        <Error Text="wslcsdk.dll could not be copied because the $(_wslcInvalidPlatformProperty) '$(_wslcInvalidPlatform)' is not supported. Only x64 and arm64 platforms are supported." />
     </Target>
 </Project>
