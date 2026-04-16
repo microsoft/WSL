@@ -324,7 +324,7 @@ try
 
             sched_param Parameter{};
             Parameter.sched_priority = 0;
-            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) < 0);
+            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) != 0);
 
             //
             // Periodically check if the machine is idle by querying procfs for CPU usage.
