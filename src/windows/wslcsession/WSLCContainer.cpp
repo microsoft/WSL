@@ -1191,7 +1191,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         volumes.push_back(WSLCVolumeMount{hostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly), sourceFilename});
 
         auto options = volume.ReadOnly ? "ro" : "rw";
-        auto bindSource = sourceFilename.empty() ? parentVMPath : std::format("{}/{}", parentVMPath, sourceFilename);
+        auto bindSource = sourceFilename.empty()
+                              ? parentVMPath
+                              : std::format("{}/{}", parentVMPath, wsl::shared::string::WideToMultiByte(sourceFilename));
         auto bind = std::format("{}:{}:{}", bindSource, volume.ContainerPath, options);
 
         binds.push_back(std::move(bind));
