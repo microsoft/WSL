@@ -51,6 +51,8 @@ class Transaction
 public:
     ~Transaction() = default;
 
+    NON_COPYABLE(Transaction);
+
     template <typename TMessage>
     void Send(gsl::span<gsl::byte> span);
 
