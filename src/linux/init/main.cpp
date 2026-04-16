@@ -429,7 +429,7 @@ try
                 if (PageReportingOrder != 0 && (Start - Stop) > IdleThreshold)
                 {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
-                    const long long int Stop = GetUserCpuTime();
+                    Stop = GetUserCpuTime();
                     THROW_LAST_ERROR_IF(Stop == -1);
                     if ((Stop - Start) < IdleThreshold)
                     {
