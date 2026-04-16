@@ -68,9 +68,7 @@ std::pair<std::string, std::string> WinCredStorage::Get(const std::string& serve
         username = wsl::shared::string::WideToMultiByte(cred.get()->UserName);
     }
 
-    return {
-        std::move(username),
-        {reinterpret_cast<const char*>(cred.get()->CredentialBlob), cred.get()->CredentialBlobSize}};
+    return {std::move(username), {reinterpret_cast<const char*>(cred.get()->CredentialBlob), cred.get()->CredentialBlobSize}};
 }
 
 void WinCredStorage::Erase(const std::string& serverAddress)

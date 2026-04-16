@@ -47,18 +47,19 @@ wil::unique_file RetryOpenFileOnSharingViolation(const std::function<wil::unique
 wil::unique_file OpenFileExclusive()
 {
     wil::unique_file f(_wfsopen(GetFilePath().c_str(), L"r+b", _SH_DENYRW));
-    if (f)
+    if (!f)
     {
-        return f;
+        auto dosError = _doserrno;
+        if (dosError == ERROR_FILE_NOT_FOUND || dosError == ERROR_PATH_NOT_FOUND)
+        {
+            return nullptr;
+        }
+
+        THROW_WIN32_IF(dosError, dosError != 0);
+        THROW_HR(E_FAIL);
     }
 
-    auto dosError = _doserrno;
-    if (dosError == ERROR_FILE_NOT_FOUND || dosError == ERROR_PATH_NOT_FOUND)
-    {
-        return nullptr;
-    }
-
-    THROW_WIN32(dosError);
+    return f;
 }
 
 wil::unique_file CreateFileExclusive()
@@ -66,16 +67,23 @@ wil::unique_file CreateFileExclusive()
     auto filePath = GetFilePath();
     std::filesystem::create_directories(filePath.parent_path());
 
-    // Use _wsopen_s with _O_CREAT to atomically create-or-open without truncation.
-    int fd = -1;
-    auto err = _wsopen_s(&fd, filePath.c_str(), _O_RDWR | _O_CREAT | _O_BINARY, _SH_DENYRW, _S_IREAD | _S_IWRITE);
-    THROW_WIN32_IF(_doserrno, err != 0);
+    using UniqueFd = wil::unique_any<int, decltype(_close), _close, wil::details::pointer_access_all, int, int, -1>;
 
-    wil::unique_file f(_fdopen(fd, "r+b"));
+    UniqueFd fd;
+    auto err = _wsopen_s(fd.addressof(), filePath.c_str(), _O_RDWR | _O_CREAT | _O_BINARY, _SH_DENYRW, _S_IREAD | _S_IWRITE);
+    if (err != 0)
+    {
+        auto dosError = _doserrno;
+        THROW_WIN32_IF(dosError, dosError != 0);
+        THROW_HR(E_FAIL);
+    }
+
+    wil::unique_file f(_fdopen(fd.get(), "r+b"));
     if (!f)
     {
-        _close(fd);
-        THROW_WIN32(_doserrno);
+        auto dosError = _doserrno;
+        THROW_WIN32_IF(dosError, dosError != 0);
+        THROW_HR(E_FAIL);
     }
 
     return f;
@@ -84,18 +92,19 @@ wil::unique_file CreateFileExclusive()
 wil::unique_file OpenFileShared()
 {
     wil::unique_file f(_wfsopen(GetFilePath().c_str(), L"rb", _SH_DENYWR));
-    if (f)
+    if (!f)
     {
-        return f;
+        auto dosError = _doserrno;
+        if (dosError == ERROR_FILE_NOT_FOUND || dosError == ERROR_PATH_NOT_FOUND)
+        {
+            return nullptr;
+        }
+
+        THROW_WIN32_IF(dosError, dosError != 0);
+        THROW_HR(E_FAIL);
     }
 
-    auto dosError = _doserrno;
-    if (dosError == ERROR_FILE_NOT_FOUND || dosError == ERROR_PATH_NOT_FOUND)
-    {
-        return nullptr;
-    }
-
-    THROW_WIN32(dosError);
+    return f;
 }
 
 CredentialFile ReadCredentialFile(FILE* f)
@@ -124,18 +133,15 @@ CredentialFile ReadCredentialFile(FILE* f)
 void WriteCredentialFile(FILE* f, const CredentialFile& data)
 {
     auto error = fseek(f, 0, SEEK_SET);
-    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::MessageWslcFailedToOpenFile(GetFilePath(), _wcserror(errno)), error != 0);
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::MessageWslcFailedToWriteFile(GetFilePath(), _wcserror(errno)), error != 0);
 
     error = _chsize_s(_fileno(f), 0);
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(_doserrno),
-        Localization::MessageWslcFailedToOpenFile(GetFilePath(), GetSystemErrorString(HRESULT_FROM_WIN32(_doserrno))),
-        error != 0);
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, Localization::MessageWslcFailedToWriteFile(GetFilePath(), _wcserror(error)), error != 0);
 
     auto content = nlohmann::json(data).dump(2);
     auto written = fwrite(content.data(), 1, content.size(), f);
     THROW_HR_WITH_USER_ERROR_IF(
-        E_FAIL, Localization::MessageWslcFailedToOpenFile(GetFilePath(), _wcserror(errno)), written != content.size());
+        E_FAIL, Localization::MessageWslcFailedToWriteFile(GetFilePath(), _wcserror(errno)), written != content.size());
 }
 
 void ModifyFileStore(FILE* f, const std::function<bool(CredentialFile&)>& modifier)
