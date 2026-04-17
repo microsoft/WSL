@@ -31,15 +31,18 @@ int SessionService::Attach(const std::wstring& sessionName, bool raw)
 
     wil::com_ptr<IWSLCSession> session;
     HRESULT hr = manager->OpenSessionByName(sessionName.empty() ? nullptr : sessionName.c_str(), &session);
-    if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
+
+    if (FAILED(hr))
     {
-        // Session not found — create it.
-        WSLCSessionSettings settings{};
-        settings.FeatureFlags = raw ? WslcFeatureFlagsRaw : WslcFeatureFlagsNone;
-        THROW_IF_FAILED(manager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
-    }
-    else if (FAILED(hr))
-    {
+        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
+        {
+            wslutil::PrintMessage(
+                sessionName.empty() ? Localization::MessageWslcDefaultSessionNotFound()
+                                    : Localization::MessageWslcSessionNotFound(sessionName.c_str()),
+                stderr);
+            return 1;
+        }
+
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
         wslutil::PrintMessage(
             Localization::MessageErrorCode(

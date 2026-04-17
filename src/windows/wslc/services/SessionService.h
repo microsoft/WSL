@@ -26,7 +26,7 @@ struct SessionInformation
 
 struct SessionService
 {
-    static int Attach(const std::wstring& name, bool raw = false);
+    static int Attach(const std::wstring& name, bool raw);
     // Creates a default session with server-determined name and settings.
     static wsl::windows::wslc::models::Session CreateDefaultSession();
     static int Enter(const std::wstring& storagePath, const std::wstring& displayName);

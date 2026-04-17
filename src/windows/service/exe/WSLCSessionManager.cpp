@@ -125,7 +125,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     // Resolve display name upfront (for both default and custom sessions).
     std::wstring resolvedDisplayName;
-    if (Settings == nullptr || Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0)
+    if (Settings == nullptr)
     {
         // Default session: name determined from token, qualified with username.
         resolvedDisplayName = ResolveDefaultSessionName(tokenInfo);
@@ -175,11 +175,10 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     // Initialize settings for the default session.
     std::unique_ptr<SessionSettings> defaultSettings;
-    const WSLCFeatureFlags callerFeatureFlags = Settings != nullptr ? Settings->FeatureFlags : WslcFeatureFlagsNone;
-    if (Settings == nullptr || Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0)
+
+    if (Settings == nullptr)
     {
         defaultSettings = SessionSettings::Default(callerToken.get(), tokenInfo.Elevated, resolvedDisplayName);
-        defaultSettings->Settings.FeatureFlags = defaultSettings->Settings.FeatureFlags | callerFeatureFlags;
         Settings = &defaultSettings->Settings;
     }
 
