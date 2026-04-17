@@ -2801,7 +2801,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
-    TEST_METHOD(MoveVhdOwnership)
+    WSL2_TEST_METHOD(MoveVhdOwnership)
     {
         constexpr auto name = L"move-owner-test-distro";
         constexpr auto moveElevatedFolder = L"move-owner-elevated";
