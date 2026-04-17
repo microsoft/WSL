@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "ImageService.h"
+#include "RegistryService.h"
 #include "SessionService.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
@@ -61,6 +62,13 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
     }
 
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBuildFileNotFound(contextPath));
+}
+
+std::string GetServerFromImage(const std::string& image)
+{
+    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
+    return server;
 }
 
 } // namespace
@@ -196,7 +204,9 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
+    auto server = GetServerFromImage(image);
+    auto auth = RegistryService::Get(server);
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
@@ -223,8 +233,11 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push()
+void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
+    auto server = GetServerFromImage(image);
+    auto auth = RegistryService::Get(server);
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)

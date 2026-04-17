@@ -19,7 +19,7 @@ Abstract:
 #include "ImageModel.h"
 #include "ImageService.h"
 #include "ImageTasks.h"
-#include "PullImageCallback.h"
+#include "ImageProgressCallback.h"
 #include "TableOutput.h"
 #include "Task.h"
 #include <format>
@@ -137,8 +137,19 @@ void PullImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
-    PullImageCallback callback;
+    ImageProgressCallback callback;
     services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
+}
+
+void PushImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+
+    ImageProgressCallback callback;
+    services::ImageService::Push(session, WideToMultiByte(imageId), &callback);
 }
 
 void DeleteImage(CLIExecutionContext& context)

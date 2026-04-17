@@ -36,7 +36,6 @@ class WSLCTests
 {
     WSLC_TEST_CLASS(WSLCTests)
 
-    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WSLCSessionSettings m_defaultSessionSettings{};
@@ -59,7 +58,6 @@ class WSLCTests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
-        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         // The WSLC SDK tests use this same storage to reduce pull overhead.
@@ -482,7 +480,7 @@ class WSLCTests
             // Start a local registry without auth and push hello-world:latest to it.
             auto [registryContainer, registryAddress] = StartLocalRegistry();
 
-            auto image = PushImageToRegistry("hello-world:latest", registryAddress, BuildRegistryAuthHeader("", "", registryAddress));
+            auto image = PushImageToRegistry("hello-world:latest", registryAddress, BuildRegistryAuthHeader("", ""));
             ExpectImagePresent(*m_defaultSession, image.c_str(), false);
 
             VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr));
@@ -524,7 +522,7 @@ class WSLCTests
     {
         // Start a local registry without auth to avoid Docker Hub rate limits.
         auto [registryContainer, registryAddress] = StartLocalRegistry();
-        auto auth = BuildRegistryAuthHeader("", "", registryAddress);
+        auto auth = BuildRegistryAuthHeader("", "");
 
         auto validatePull = [&](const std::string& sourceImage) {
             // Push the source image to the local registry.
@@ -606,7 +604,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(PushImage)
     {
-        auto emptyAuth = BuildRegistryAuthHeader("", "", "");
+        auto emptyAuth = BuildRegistryAuthHeader("", "");
 
         // Validate that pushing a non-existent image fails.
         {
@@ -642,7 +640,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, c_password, &token));
         VERIFY_IS_NOT_NULL(token.get());
 
-        auto xRegistryAuth = BuildRegistryAuthHeader(c_username, c_password, registryAddress);
+        auto xRegistryAuth = BuildRegistryAuthHeader(c_username, c_password);
         auto image = PushImageToRegistry("hello-world:latest", registryAddress, xRegistryAuth);
 
         // Pulling without credentials should fail.
