@@ -47,14 +47,21 @@ void BuildImage(CLIExecutionContext& context)
         dockerfilePath = context.Args.Get<ArgType::File>();
     }
 
+    std::wstring target;
+    if (context.Args.Contains(ArgType::BuildTarget))
+    {
+        target = context.Args.Get<ArgType::BuildTarget>();
+    }
+
     PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
 
     WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
     WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.Contains(ArgType::Verbose));
     WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.Contains(ArgType::BuildPull));
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, flags, &callback, context.CreateCancelEvent());
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, target, flags, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
