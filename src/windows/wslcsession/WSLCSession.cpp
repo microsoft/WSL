@@ -21,6 +21,7 @@ Abstract:
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
 using wsl::shared::Localization;
+using wsl::windows::service::wslc::UserCOMCallback;
 using wsl::windows::service::wslc::UserHandle;
 using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
@@ -28,73 +29,6 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
-
-// Resolve \r overwrites: for each \n-delimited line, keep only the content after the last \r.
-// This collapses terminal progress updates (e.g. "50%\r75%\r100%") to their final state.
-std::string ResolveCarriageReturns(const std::string& input)
-{
-    if (input.empty())
-    {
-        return {};
-    }
-
-    std::string result;
-    size_t lineStart = 0;
-    while (lineStart < input.size())
-    {
-        size_t lineEnd = input.find('\n', lineStart);
-        if (lineEnd == std::string::npos)
-        {
-            lineEnd = input.size();
-        }
-
-        // Find the last \r in this line segment (skip empty segments to avoid rfind underflow).
-        size_t contentStart = lineStart;
-        if (lineEnd > lineStart)
-        {
-            size_t lastCr = input.rfind('\r', lineEnd - 1);
-            if (lastCr != std::string::npos && lastCr >= lineStart)
-            {
-                contentStart = lastCr + 1;
-            }
-        }
-
-        result.append(input, contentStart, lineEnd - contentStart);
-        if (lineEnd < input.size())
-        {
-            result.push_back('\n');
-        }
-
-        lineStart = lineEnd + 1;
-    }
-
-    return result;
-}
-
-std::string TailLines(const std::string& input, int lineCount)
-{
-    if (input.empty() || lineCount <= 0)
-    {
-        return {};
-    }
-
-    size_t pos = input.size();
-    if (input[pos - 1] == '\n')
-    {
-        pos--;
-    }
-
-    for (int i = 0; i < lineCount && pos > 0; i++)
-    {
-        pos = input.rfind('\n', pos - 1);
-        if (pos == std::string::npos)
-        {
-            return input;
-        }
-    }
-
-    return input.substr(pos + 1);
-}
 
 std::string IndentLines(const std::string& input, const std::string& prefix)
 {
@@ -218,6 +152,47 @@ UserHandle::~UserHandle()
 HANDLE UserHandle::Get() const noexcept
 {
     return m_handle;
+}
+
+UserCOMCallback::UserCOMCallback(WSLCSession& Session) noexcept : m_session(&Session), m_threadId(GetCurrentThreadId())
+{
+}
+
+UserCOMCallback::UserCOMCallback(UserCOMCallback&& Other) noexcept
+{
+    *this = std::move(Other);
+}
+
+UserCOMCallback& UserCOMCallback::operator=(UserCOMCallback&& Other) noexcept
+{
+    if (this != &Other)
+    {
+        Reset();
+        m_session = Other.m_session;
+        m_threadId = Other.m_threadId;
+
+        Other.m_threadId = 0;
+        Other.m_session = nullptr;
+    }
+    return *this;
+}
+
+void UserCOMCallback::Reset() noexcept
+{
+    if (m_threadId != 0)
+    {
+        WI_ASSERT(m_session != nullptr);
+
+        m_session->UnregisterUserCOMCallback(m_threadId);
+        m_threadId = 0;
+
+        LOG_IF_FAILED(CoDisableCallCancellation(nullptr));
+    }
+}
+
+UserCOMCallback::~UserCOMCallback() noexcept
+{
+    Reset();
 }
 
 HRESULT WSLCSession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
@@ -443,6 +418,12 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
         bool isJson = false;
     };
 
+    std::optional<UserCOMCallback> comCall;
+    if (ProgressCallback != nullptr)
+    {
+        comCall = RegisterUserCOMCallback();
+    }
+
     std::optional<Response> httpResponse;
 
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
@@ -589,6 +570,12 @@ try
 
     auto buildFileHandle = OpenUserHandle(Options->DockerfileHandle);
 
+    std::optional<UserCOMCallback> comCall;
+    if (ProgressCallback != nullptr)
+    {
+        comCall = RegisterUserCOMCallback();
+    }
+
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
@@ -639,13 +626,59 @@ try
     std::string pendingJson;
     std::set<std::string> reportedSteps;
     std::set<std::string> reportedErrors;
-    std::string exportingVertexDigest;
-    std::map<std::string, std::string> vertexLogs; // digest -> accumulated log output
+    std::map<std::string, std::string> digestToStageName;
+    bool needsNewline = false; // true when the last log chunk didn't end with \n
+    std::string lastLogVertex; // digest of the vertex that produced the last log output
+
+    // Extract the named build stage from a BuildKit vertex name. Vertices within the same named stage
+    // (e.g. "[builder 1/3]" and "[builder 2/3]") share a key. Returns empty for unnamed stages.
+    auto getStageName = [](const std::string& name) -> std::string {
+        if (name.size() < 2 || name[0] != '[')
+        {
+            return {};
+        }
+
+        auto close = name.find(']');
+        if (close == std::string::npos)
+        {
+            return {};
+        }
+
+        // Pattern: "[name N/M]" or "[N/M]". The stage name is the part before "N/M".
+        std::string content = name.substr(1, close - 1);
+        auto slash = content.find('/');
+        if (slash != std::string::npos)
+        {
+            auto space = content.rfind(' ', slash);
+            if (space != std::string::npos)
+            {
+                return content.substr(0, space);
+            }
+        }
+
+        return {};
+    };
+
+    auto logPrefix = [](const std::string& name) -> std::string {
+        if (name.empty())
+        {
+            return "  | ";
+        }
+        return "  [" + name + "] ";
+    };
 
     auto reportProgress = [&](const std::string& message) {
         if (ProgressCallback != nullptr)
         {
             THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), "", 0, 0));
+        }
+    };
+
+    auto flushLine = [&]() {
+        if (needsNewline)
+        {
+            reportProgress("\n");
+            needsNewline = false;
         }
     };
 
@@ -673,73 +706,67 @@ try
         docker_schema::BuildKitSolveStatus status{};
         from_json(json, status);
 
-        // Accumulate logs before processing vertices so the error tail includes all data from this payload.
-        for (const auto& log : status.logs)
+        // Process vertices before logs so digestToStageName is populated for log correlation.
+        for (const auto& vertex : status.vertexes)
         {
-            if (log.data.empty())
+            if (!verbose && vertex.name.find("[internal]") != std::string::npos)
             {
                 continue;
             }
 
-            std::string decoded = wslutil::Base64Decode(log.data);
-            if (!decoded.empty())
-            {
-                auto& logBuffer = vertexLogs[log.vertex];
-                logBuffer.append(decoded);
-
-                // Cap raw buffer size; we resolve \r and trim to last N lines at display time.
-                constexpr size_t c_maxLogBytes = 64 * 1024;
-                if (logBuffer.size() > c_maxLogBytes)
-                {
-                    logBuffer.erase(0, logBuffer.size() - c_maxLogBytes);
-                }
-
-                if (verbose)
-                {
-                    reportProgress(IndentLines(decoded, "  "));
-                }
-            }
-        }
-
-        for (const auto& vertex : status.vertexes)
-        {
-            bool isInternal = vertex.name.find("[internal]") != std::string::npos;
+            digestToStageName.try_emplace(vertex.digest, getStageName(vertex.name));
 
             if (!vertex.started.empty() && reportedSteps.insert(vertex.digest).second)
             {
-                if (verbose || (!isInternal && !vertex.name.empty() && vertex.name[0] == '['))
-                {
-                    reportProgress(vertex.name + "\n");
-                }
-
-                // Track the "exporting to image" vertex so we can report its statuses (image hash, tags)
-                // in non-verbose mode. This is a well-known BuildKit vertex name.
-                if (vertex.name == "exporting to image")
-                {
-                    exportingVertexDigest = vertex.digest;
-                }
+                flushLine();
+                reportProgress(vertex.name + "\n");
             }
 
-            if (!vertex.error.empty() && !isInternal && reportedErrors.insert(vertex.digest).second)
+            if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
             {
-                if (auto it = vertexLogs.find(vertex.digest); it != vertexLogs.end() && !it->second.empty())
-                {
-                    if (!verbose)
-                    {
-                        std::string tail = TailLines(ResolveCarriageReturns(it->second), 16);
-                        reportProgress(IndentLines(tail, "  "));
-                    }
-                }
-
+                flushLine();
                 reportProgress(vertex.error + "\n");
+            }
+        }
+
+        for (const auto& log : status.logs)
+        {
+            if (auto it = digestToStageName.find(log.vertex); it != digestToStageName.end() && !log.data.empty())
+            {
+                std::string decoded = wslutil::Base64Decode(log.data);
+                if (!decoded.empty())
+                {
+                    if (log.vertex != lastLogVertex && decoded[0] != '\n')
+                    {
+                        flushLine();
+                    }
+
+                    // When continuing an unterminated line, emit the leading \n or \r directly
+                    // so it terminates/overwrites cleanly without a spurious prefix.
+                    if (needsNewline && (decoded[0] == '\n' || decoded[0] == '\r'))
+                    {
+                        reportProgress(decoded.substr(0, 1));
+                        decoded.erase(0, 1);
+                    }
+
+                    if (!decoded.empty())
+                    {
+                        reportProgress(IndentLines(decoded, logPrefix(it->second)));
+                    }
+
+                    needsNewline = !decoded.empty() && decoded.back() != '\n';
+                    lastLogVertex = log.vertex;
+                }
             }
         }
 
         for (const auto& entry : status.statuses)
         {
-            if (!entry.id.empty() && reportedSteps.insert(entry.id).second && (verbose || entry.vertex == exportingVertexDigest))
+            if (auto it = digestToStageName.find(entry.vertex);
+                it != digestToStageName.end() && !entry.id.empty() && reportedSteps.insert(entry.id).second)
             {
-                reportProgress(entry.id + "\n");
+                flushLine();
+                reportProgress(logPrefix(it->second) + entry.id + "\n");
             }
         }
     };
@@ -784,6 +811,7 @@ try
     }
     catch (...)
     {
+        flushLine();
         LOG_IF_FAILED(buildProcess.Get().Signal(WSLCSignalSIGTERM));
         try
         {
@@ -806,6 +834,8 @@ try
         }
         throw;
     }
+
+    flushLine();
 
     THROW_HR_IF_MSG(E_ABORT, cancelled, "Cancellation handle was signaled");
 
@@ -1640,6 +1670,9 @@ try
 {
     COMServiceExecutionContext context;
 
+    RETURN_HR_IF_NULL(E_POINTER, Result);
+    ZeroMemory(Result, sizeof(*Result));
+
     DockerHTTPClient::PruneContainersFilters filters;
 
     if (FiltersCount > 0)
@@ -1779,34 +1812,53 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::CreateVolume(const WSLCVolumeOptions* Options)
+HRESULT WSLCSession::CreateVolume(const WSLCVolumeOptions* Options, WSLCVolumeInformation* VolumeInfo)
 try
 {
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
-    RETURN_HR_IF_NULL(E_POINTER, Options->Name);
-    RETURN_HR_IF_NULL(E_POINTER, Options->Type);
+    RETURN_HR_IF_NULL(E_POINTER, VolumeInfo);
+    ZeroMemory(VolumeInfo, sizeof(*VolumeInfo));
 
-    std::string name = Options->Name;
-    std::string type = Options->Type;
+    // Default driver to "vhd" if not specified. Currently only "vhd" is supported.
+    // TODO: Add support for docker's builtin volume drivers and change the default to "local"
+    // to match docker's behaviour.
+    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCVhdVolumeDriver;
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver);
 
-    ValidateName(name.c_str());
+    auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
+    auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCVolumeMetadataLabel);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     std::lock_guard volumesLock(m_volumesLock);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(name));
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(type), type != WSLCVhdVolumeType);
 
-    auto volume = WSLCVhdVolumeImpl::Create(*Options, m_storageVhdPath.parent_path(), m_virtualMachine.value(), m_dockerClient.value());
+    if (Options->Name != nullptr && Options->Name[0] != '\0')
+    {
+        ValidateName(Options->Name);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(Options->Name));
+    }
+
+    auto volume = WSLCVhdVolumeImpl::Create(
+        Options->Name,
+        std::move(driverOpts),
+        std::move(labels),
+        m_storageVhdPath.parent_path(),
+        m_virtualMachine.value(),
+        m_dockerClient.value());
+
+    const auto& name = volume->Name();
+    auto info = volume->GetVolumeInformation();
+
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
     WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"));
 
+    *VolumeInfo = info;
     return S_OK;
 }
 CATCH_RETURN();
@@ -1859,10 +1911,9 @@ try
     auto output = wil::make_unique_cotaskmem<WSLCVolumeInformation[]>(m_volumes.size());
 
     ULONG index = 0;
-    for (const auto& [name, volume] : m_volumes)
+    for (const auto& [name, vol] : m_volumes)
     {
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Type, WSLCVhdVolumeType) != 0);
+        output[index] = vol->GetVolumeInformation();
         index++;
     }
 
@@ -1901,6 +1952,13 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WSLCPruneVolumesResults* /*Results*/)
+{
+    // TODO: Implement volume pruning. Docker's volume prune API skips bind-mount volumes,
+    // so WSLC VHD volumes require custom handling.
+    return E_NOTIMPL;
+}
+
 HRESULT WSLCSession::Terminate()
 try
 {
@@ -1916,6 +1974,14 @@ try
         // Cancel any pending IO on user-provided handles to unblock operations
         // in case the handles don't support overlapped IO.
         CancelUserHandleIO();
+    }
+
+    {
+        std::lock_guard comLock(m_userCOMCallbacksLock);
+
+        // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
+        // to unblock operations waiting for cross-process COM responses.
+        CancelUserCOMCallbacks();
     }
 
     // Acquire an exclusive lock to ensure that no operation is running.
@@ -2154,6 +2220,41 @@ void WSLCSession::CancelUserHandleIO()
     }
 }
 
+UserCOMCallback WSLCSession::RegisterUserCOMCallback()
+{
+    std::lock_guard lock(m_userCOMCallbacksLock);
+
+    // Don't allow new COM calls if the session is terminating.
+    // N.B. This check must happen under m_userCOMCallbacksLock to synchronize with Terminate().
+    THROW_HR_IF_MSG(
+        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
+
+    THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
+
+    auto [_, inserted] = m_userCOMCallbackThreads.insert(GetCurrentThreadId());
+    WI_VERIFY(inserted);
+
+    return UserCOMCallback{*this};
+}
+
+void WSLCSession::UnregisterUserCOMCallback(DWORD ThreadId)
+{
+    std::lock_guard lock(m_userCOMCallbacksLock);
+
+    auto it = m_userCOMCallbackThreads.find(ThreadId);
+    WI_VERIFY(it != m_userCOMCallbackThreads.end());
+
+    m_userCOMCallbackThreads.erase(it);
+}
+
+void WSLCSession::CancelUserCOMCallbacks()
+{
+    for (auto threadId : m_userCOMCallbackThreads)
+    {
+        LOG_IF_FAILED(CoCancelCall(threadId, 0));
+    }
+}
+
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
 {
     auto lock = m_lock.lock_shared();
@@ -2217,7 +2318,7 @@ void WSLCSession::RecoverExistingVolumes()
 
     for (const auto& volume : volumes)
     {
-        if (!volume.Labels.contains(WSLCVolumeMetadataLabel))
+        if (!volume.Labels.has_value() || !volume.Labels->contains(WSLCVolumeMetadataLabel))
         {
             m_anonymousVolumes.insert(volume.Name);
             continue;

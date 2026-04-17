@@ -73,6 +73,7 @@ private:
             {L"list", Localization::WSLCCLI_ImageListDesc()},
             {L"load", Localization::WSLCCLI_ImageLoadDesc()},
             {L"pull", Localization::WSLCCLI_ImagePullDesc()},
+            {L"push", Localization::WSLCCLI_ImagePushDesc()},
             {L"save", Localization::WSLCCLI_ImageSaveDesc()},
             {L"tag", Localization::WSLCCLI_ImageTagDesc()},
         };

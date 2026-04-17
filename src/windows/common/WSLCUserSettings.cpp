@@ -49,7 +49,10 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # Default path for session storage. By default, storage is per-session under:\n"
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli        (standard sessions)\n"
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin (elevated sessions)\n"
-    "  # defaultStoragePath: \"\"\n";
+    "  # defaultStoragePath: \"\"\n"
+    "\n"
+    "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
+    "# credentialStore: wincred\n";
 
 // Validate individual setting specializations
 namespace details {
@@ -121,6 +124,20 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionDnsTunneling)
     {
         return value;
+    }
+
+    WSLC_VALIDATE_SETTING(CredentialStore)
+    {
+        if (value == "wincred")
+        {
+            return CredentialStoreType::WinCred;
+        }
+        if (value == "file")
+        {
+            return CredentialStoreType::File;
+        }
+
+        return std::nullopt;
     }
 
 #undef WSLC_VALIDATE_SETTING
