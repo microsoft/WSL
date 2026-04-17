@@ -162,6 +162,18 @@ void WindowsUpdateContext::DownloadUpdates(std::function<void(uint32_t)> progres
         }
     }
 
+    // All updates are already downloaded — nothing to do.
+    LONG toDownloadCount{};
+    THROW_IF_FAILED(toDownload->get_Count(&toDownloadCount));
+    if (toDownloadCount == 0)
+    {
+        if (progress)
+        {
+            progress(100);
+        }
+        return;
+    }
+
     wil::com_ptr<IUpdateDownloader> updateDownloader;
     THROW_IF_FAILED(m_session->CreateUpdateDownloader(&updateDownloader));
 
