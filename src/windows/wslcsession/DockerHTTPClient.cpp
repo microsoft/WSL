@@ -367,14 +367,14 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool D
 {
     auto url = URL::Create("/containers/{}", Id);
 
-    if (DeleteVolumes)
-    {
-        url.SetParameter("v", true);
-    }
-
     if (Force)
     {
         url.SetParameter("force", true);
+    }
+
+    if (DeleteVolumes)
+    {
+        url.SetParameter("v", true);
     }
 
     Transaction(verb::delete_, url);
