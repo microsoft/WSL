@@ -44,8 +44,27 @@ WslCoreInstance::WslCoreInstance(
     m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
 
     // Read a message from the init daemon. This will let us know if anything failed during startup.
+    //
+    // N.B. Telemetry Begin/End events are emitted around this receive so the backend can tell
+    //      whether a user is stuck waiting on the init daemon's mount/journal-recovery step,
+    //      rather than silently timing out with no events.
+    WSL_LOG_TELEMETRY(
+        "WaitForCreateInstanceResultBegin",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(InstanceId, "instanceId"),
+        TraceLoggingValue(m_socketTimeout, "timeoutMs"));
+
     gsl::span<gsl::byte> span;
     const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
+
+    WSL_LOG_TELEMETRY(
+        "WaitForCreateInstanceResultEnd",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(InstanceId, "instanceId"),
+        TraceLoggingValue(result.Result, "initResult"),
+        TraceLoggingValue(static_cast<int>(result.FailureStep), "failureStep"));
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -370,9 +389,26 @@ void WslCoreInstance::Initialize()
     LX_INIT_DRVFS_MOUNT drvfsMount = LxInitDrvfsMountNone;
 
     // If drive mounting is supported, ensure that DrvFs has been initialized.
+    //
+    // N.B. This can block on m_drvfsInitialResult.get(), which waits on a std::future with no
+    //      timeout. If the DrvFs init thread hangs (e.g. Plan9 server startup issue), this can
+    //      stall the entire create-instance flow. Telemetry Begin/End events make this visible.
     if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING))
     {
+        WSL_LOG_TELEMETRY(
+            "WaitForDrvFsInitBegin",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(m_instanceId, "instanceId"));
+
         drvfsMount = m_initializeDrvFs(m_userToken.get());
+
+        WSL_LOG_TELEMETRY(
+            "WaitForDrvFsInitEnd",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(m_instanceId, "instanceId"),
+            TraceLoggingValue(static_cast<int>(drvfsMount), "drvfsMount"));
     }
 
     // Create a console manager that will be used to manage session leaders.
@@ -392,8 +428,25 @@ void WslCoreInstance::Initialize()
     m_initChannel->GetChannel().SendMessage<LX_INIT_CONFIGURATION_INFORMATION>(gsl::span(config));
 
     // Init replies with information about the distribution.
+    //
+    // N.B. The receive below has no explicit timeout and WslCorePort's channel has no exit event,
+    //      so if the init daemon hangs during config processing (e.g. systemd startup, mount),
+    //      this can block indefinitely. Telemetry Begin/End events let the backend distinguish
+    //      a true hang in this step from lack of progress elsewhere.
+    WSL_LOG_TELEMETRY(
+        "WaitForInitConfigResponseBegin",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(m_instanceId, "instanceId"));
+
     gsl::span<gsl::byte> span;
     const auto& response = m_initChannel->GetChannel().ReceiveMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
+
+    WSL_LOG_TELEMETRY(
+        "WaitForInitConfigResponseEnd",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(m_instanceId, "instanceId"));
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;

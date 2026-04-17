@@ -178,10 +178,24 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
     {
         if (e.hooks.OnVMStarted != nullptr)
         {
-            WSL_LOG(
-                "PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
+            // N.B. Begin/End telemetry is emitted per plugin so the backend can attribute hangs to
+            //      a specific third-party plugin (e.g. Docker Desktop) when no End event arrives.
+            WSL_LOG_TELEMETRY(
+                "PluginOnVmStartedBegin",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->UserSid, "Sid"));
 
-            ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), Session->SessionId, e.name.c_str());
+            const auto hr = e.hooks.OnVMStarted(Session, Settings);
+
+            WSL_LOG_TELEMETRY(
+                "PluginOnVmStartedEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->UserSid, "Sid"),
+                TraceLoggingValue(hr, "result"));
+
+            ThrowIfPluginError(hr, Session->SessionId, e.name.c_str());
         }
     }
 }
@@ -211,13 +225,26 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
     {
         if (e.hooks.OnDistributionStarted != nullptr)
         {
-            WSL_LOG(
-                "PluginOnDistroStartedCall",
+            // N.B. Begin/End telemetry is emitted per plugin so the backend can attribute hangs to
+            //      a specific third-party plugin (e.g. Docker Desktop) when no End event arrives.
+            WSL_LOG_TELEMETRY(
+                "PluginOnDistroStartedBegin",
+                PDT_ProductAndServicePerformance,
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
-            ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), Session->SessionId, e.name.c_str());
+            const auto hr = e.hooks.OnDistributionStarted(Session, Distribution);
+
+            WSL_LOG_TELEMETRY(
+                "PluginOnDistroStartedEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->UserSid, "Sid"),
+                TraceLoggingValue(Distribution->Id, "DistributionId"),
+                TraceLoggingValue(hr, "result"));
+
+            ThrowIfPluginError(hr, Session->SessionId, e.name.c_str());
         }
     }
 }
