@@ -24,29 +24,28 @@ namespace WRL = Microsoft::WRL;
 namespace {
 
 // Stubs the 4 IDispatch pure virtual methods. All WUA interfaces derive from IDispatch.
-#define STUB_IDISPATCH()                                                                             \
-    STDMETHOD(GetTypeInfoCount)(UINT*) override                                                      \
-    {                                                                                                \
-        return E_NOTIMPL;                                                                            \
-    }                                                                                                \
-    STDMETHOD(GetTypeInfo)(UINT, LCID, ITypeInfo**) override                                         \
-    {                                                                                                \
-        return E_NOTIMPL;                                                                            \
-    }                                                                                                \
-    STDMETHOD(GetIDsOfNames)(REFIID, LPOLESTR*, UINT, LCID, DISPID*) override                        \
-    {                                                                                                \
-        return E_NOTIMPL;                                                                            \
-    }                                                                                                \
+#define STUB_IDISPATCH() \
+    STDMETHOD(GetTypeInfoCount)(UINT*) override \
+    { \
+        return E_NOTIMPL; \
+    } \
+    STDMETHOD(GetTypeInfo)(UINT, LCID, ITypeInfo**) override \
+    { \
+        return E_NOTIMPL; \
+    } \
+    STDMETHOD(GetIDsOfNames)(REFIID, LPOLESTR*, UINT, LCID, DISPID*) override \
+    { \
+        return E_NOTIMPL; \
+    } \
     STDMETHOD(Invoke)(DISPID, REFIID, LCID, WORD, DISPPARAMS*, VARIANT*, EXCEPINFO*, UINT*) override \
-    {                                                                                                \
-        return E_NOTIMPL;                                                                            \
+    { \
+        return E_NOTIMPL; \
     }
 
 // ---------------------------------------------------------------------------
 // MockUpdateCollection — implements IUpdateCollection
 // ---------------------------------------------------------------------------
-struct MockUpdateCollection
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateCollection>
+struct MockUpdateCollection : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateCollection>
 {
     STUB_IDISPATCH()
 
@@ -84,12 +83,30 @@ struct MockUpdateCollection
         return S_OK;
     }
 
-    STDMETHOD(put_Item)(LONG, IUpdate*) override { return E_NOTIMPL; }
-    STDMETHOD(get__NewEnum)(IUnknown**) override { return E_NOTIMPL; }
-    STDMETHOD(get_ReadOnly)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(Copy)(IUpdateCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(Insert)(LONG, IUpdate*) override { return E_NOTIMPL; }
-    STDMETHOD(RemoveAt)(LONG) override { return E_NOTIMPL; }
+    STDMETHOD(put_Item)(LONG, IUpdate*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get__NewEnum)(IUnknown**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ReadOnly)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(Copy)(IUpdateCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(Insert)(LONG, IUpdate*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(RemoveAt)(LONG) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -107,57 +124,188 @@ struct MockUpdate : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::Classic
         return S_OK;
     }
 
-    STDMETHOD(get_Title)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_AutoSelectOnWebSites)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_BundledUpdates)(IUpdateCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_CanRequireSource)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_Categories)(ICategoryCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_Deadline)(VARIANT*) override { return E_NOTIMPL; }
-    STDMETHOD(get_DeltaCompressedContentAvailable)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_DeltaCompressedContentPreferred)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_Description)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_EulaAccepted)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_EulaText)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_HandlerID)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_Identity)(IUpdateIdentity**) override { return E_NOTIMPL; }
-    STDMETHOD(get_Image)(IImageInformation**) override { return E_NOTIMPL; }
-    STDMETHOD(get_InstallationBehavior)(IInstallationBehavior**) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsBeta)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsHidden)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(put_IsHidden)(VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsInstalled)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsMandatory)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsUninstallable)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_Languages)(IStringCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_LastDeploymentChangeTime)(DATE*) override { return E_NOTIMPL; }
-    STDMETHOD(get_MaxDownloadSize)(DECIMAL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_MinDownloadSize)(DECIMAL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_MoreInfoUrls)(IStringCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_MsrcSeverity)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_RecommendedCpuSpeed)(LONG*) override { return E_NOTIMPL; }
-    STDMETHOD(get_RecommendedHardDiskSpace)(LONG*) override { return E_NOTIMPL; }
-    STDMETHOD(get_RecommendedMemory)(LONG*) override { return E_NOTIMPL; }
-    STDMETHOD(get_ReleaseNotes)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_SecurityBulletinIDs)(IStringCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_SupersededUpdateIDs)(IStringCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_SupportUrl)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_Type)(UpdateType*) override { return E_NOTIMPL; }
-    STDMETHOD(get_UninstallationNotes)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_UninstallationBehavior)(IInstallationBehavior**) override { return E_NOTIMPL; }
-    STDMETHOD(get_UninstallationSteps)(IStringCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_KBArticleIDs)(IStringCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(AcceptEula)() override { return E_NOTIMPL; }
-    STDMETHOD(get_DeploymentAction)(DeploymentAction*) override { return E_NOTIMPL; }
-    STDMETHOD(CopyFromCache)(BSTR, VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(get_DownloadPriority)(DownloadPriority*) override { return E_NOTIMPL; }
-    STDMETHOD(get_DownloadContents)(IUpdateDownloadContentCollection**) override { return E_NOTIMPL; }
+    STDMETHOD(get_Title)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_AutoSelectOnWebSites)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_BundledUpdates)(IUpdateCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_CanRequireSource)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Categories)(ICategoryCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Deadline)(VARIANT*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_DeltaCompressedContentAvailable)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_DeltaCompressedContentPreferred)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Description)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_EulaAccepted)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_EulaText)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_HandlerID)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Identity)(IUpdateIdentity**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Image)(IImageInformation**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_InstallationBehavior)(IInstallationBehavior**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsBeta)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsHidden)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_IsHidden)(VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsInstalled)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsMandatory)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsUninstallable)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Languages)(IStringCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_LastDeploymentChangeTime)(DATE*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_MaxDownloadSize)(DECIMAL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_MinDownloadSize)(DECIMAL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_MoreInfoUrls)(IStringCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_MsrcSeverity)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_RecommendedCpuSpeed)(LONG*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_RecommendedHardDiskSpace)(LONG*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_RecommendedMemory)(LONG*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ReleaseNotes)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_SecurityBulletinIDs)(IStringCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_SupersededUpdateIDs)(IStringCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_SupportUrl)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Type)(UpdateType*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_UninstallationNotes)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_UninstallationBehavior)(IInstallationBehavior**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_UninstallationSteps)(IStringCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_KBArticleIDs)(IStringCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(AcceptEula)() override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_DeploymentAction)(DeploymentAction*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(CopyFromCache)(BSTR, VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_DownloadPriority)(DownloadPriority*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_DownloadContents)(IUpdateDownloadContentCollection**) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockSearchResult — implements ISearchResult
 // ---------------------------------------------------------------------------
-struct MockSearchResult
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, ISearchResult>
+struct MockSearchResult : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, ISearchResult>
 {
     STUB_IDISPATCH()
 
@@ -175,15 +323,20 @@ struct MockSearchResult
         return updates.query_to(retval);
     }
 
-    STDMETHOD(get_RootCategories)(ICategoryCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_Warnings)(IUpdateExceptionCollection**) override { return E_NOTIMPL; }
+    STDMETHOD(get_RootCategories)(ICategoryCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Warnings)(IUpdateExceptionCollection**) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockUpdateSearcher — implements IUpdateSearcher
 // ---------------------------------------------------------------------------
-struct MockUpdateSearcher
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateSearcher>
+struct MockUpdateSearcher : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateSearcher>
 {
     STUB_IDISPATCH()
 
@@ -194,46 +347,113 @@ struct MockUpdateSearcher
         return searchResult.query_to(retval);
     }
 
-    STDMETHOD(get_CanAutomaticallyUpgradeService)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(put_CanAutomaticallyUpgradeService)(VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(get_ClientApplicationID)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(put_ClientApplicationID)(BSTR) override { return E_NOTIMPL; }
-    STDMETHOD(get_IncludePotentiallySupersededUpdates)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(put_IncludePotentiallySupersededUpdates)(VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(get_ServerSelection)(ServerSelection*) override { return E_NOTIMPL; }
-    STDMETHOD(put_ServerSelection)(ServerSelection) override { return E_NOTIMPL; }
-    STDMETHOD(BeginSearch)(BSTR, IUnknown*, VARIANT, ISearchJob**) override { return E_NOTIMPL; }
-    STDMETHOD(EndSearch)(ISearchJob*, ISearchResult**) override { return E_NOTIMPL; }
-    STDMETHOD(EscapeString)(BSTR, BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(QueryHistory)(LONG, LONG, IUpdateHistoryEntryCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(get_Online)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(put_Online)(VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(GetTotalHistoryCount)(LONG*) override { return E_NOTIMPL; }
-    STDMETHOD(get_ServiceID)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(put_ServiceID)(BSTR) override { return E_NOTIMPL; }
+    STDMETHOD(get_CanAutomaticallyUpgradeService)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_CanAutomaticallyUpgradeService)(VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ClientApplicationID)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_ClientApplicationID)(BSTR) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IncludePotentiallySupersededUpdates)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_IncludePotentiallySupersededUpdates)(VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ServerSelection)(ServerSelection*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_ServerSelection)(ServerSelection) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(BeginSearch)(BSTR, IUnknown*, VARIANT, ISearchJob**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(EndSearch)(ISearchJob*, ISearchResult**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(EscapeString)(BSTR, BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(QueryHistory)(LONG, LONG, IUpdateHistoryEntryCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Online)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_Online)(VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(GetTotalHistoryCount)(LONG*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ServiceID)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_ServiceID)(BSTR) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockDownloadJob — implements IDownloadJob
 // ---------------------------------------------------------------------------
-struct MockDownloadJob
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IDownloadJob>
+struct MockDownloadJob : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IDownloadJob>
 {
     STUB_IDISPATCH()
 
-    STDMETHOD(CleanUp)() override { return S_OK; }
-    STDMETHOD(get_AsyncState)(VARIANT*) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsCompleted)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_Updates)(IUpdateCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(GetProgress)(IDownloadProgress**) override { return E_NOTIMPL; }
-    STDMETHOD(RequestAbort)() override { return E_NOTIMPL; }
+    STDMETHOD(CleanUp)() override
+    {
+        return S_OK;
+    }
+    STDMETHOD(get_AsyncState)(VARIANT*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsCompleted)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Updates)(IUpdateCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(GetProgress)(IDownloadProgress**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(RequestAbort)() override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockDownloadResult — implements IDownloadResult
 // ---------------------------------------------------------------------------
-struct MockDownloadResult
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IDownloadResult>
+struct MockDownloadResult : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IDownloadResult>
 {
     STUB_IDISPATCH()
 
@@ -245,15 +465,20 @@ struct MockDownloadResult
         return S_OK;
     }
 
-    STDMETHOD(get_ResultCode)(OperationResultCode*) override { return E_NOTIMPL; }
-    STDMETHOD(GetUpdateResult)(LONG, IUpdateDownloadResult**) override { return E_NOTIMPL; }
+    STDMETHOD(get_ResultCode)(OperationResultCode*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(GetUpdateResult)(LONG, IUpdateDownloadResult**) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockUpdateDownloader — implements IUpdateDownloader
 // ---------------------------------------------------------------------------
-struct MockUpdateDownloader
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateDownloader>
+struct MockUpdateDownloader : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateDownloader>
 {
     STUB_IDISPATCH()
 
@@ -279,37 +504,77 @@ struct MockUpdateDownloader
         return downloadResult.query_to(retval);
     }
 
-    STDMETHOD(get_ClientApplicationID)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(put_ClientApplicationID)(BSTR) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsForced)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(put_IsForced)(VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(get_Priority)(DownloadPriority*) override { return E_NOTIMPL; }
-    STDMETHOD(put_Priority)(DownloadPriority) override { return E_NOTIMPL; }
-    STDMETHOD(get_Updates)(IUpdateCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(Download)(IDownloadResult**) override { return E_NOTIMPL; }
+    STDMETHOD(get_ClientApplicationID)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_ClientApplicationID)(BSTR) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsForced)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_IsForced)(VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Priority)(DownloadPriority*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_Priority)(DownloadPriority) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Updates)(IUpdateCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(Download)(IDownloadResult**) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockInstallationJob — implements IInstallationJob
 // ---------------------------------------------------------------------------
-struct MockInstallationJob
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IInstallationJob>
+struct MockInstallationJob : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IInstallationJob>
 {
     STUB_IDISPATCH()
 
-    STDMETHOD(CleanUp)() override { return S_OK; }
-    STDMETHOD(get_AsyncState)(VARIANT*) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsCompleted)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_Updates)(IUpdateCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(GetProgress)(IInstallationProgress**) override { return E_NOTIMPL; }
-    STDMETHOD(RequestAbort)() override { return E_NOTIMPL; }
+    STDMETHOD(CleanUp)() override
+    {
+        return S_OK;
+    }
+    STDMETHOD(get_AsyncState)(VARIANT*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsCompleted)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Updates)(IUpdateCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(GetProgress)(IInstallationProgress**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(RequestAbort)() override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockInstallationResult — implements IInstallationResult
 // ---------------------------------------------------------------------------
-struct MockInstallationResult
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IInstallationResult>
+struct MockInstallationResult : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IInstallationResult>
 {
     STUB_IDISPATCH()
 
@@ -321,16 +586,24 @@ struct MockInstallationResult
         return S_OK;
     }
 
-    STDMETHOD(get_RebootRequired)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_ResultCode)(OperationResultCode*) override { return E_NOTIMPL; }
-    STDMETHOD(GetUpdateResult)(LONG, IUpdateInstallationResult**) override { return E_NOTIMPL; }
+    STDMETHOD(get_RebootRequired)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ResultCode)(OperationResultCode*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(GetUpdateResult)(LONG, IUpdateInstallationResult**) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockUpdateInstaller — implements IUpdateInstaller
 // ---------------------------------------------------------------------------
-struct MockUpdateInstaller
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateInstaller>
+struct MockUpdateInstaller : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateInstaller>
 {
     STUB_IDISPATCH()
 
@@ -356,31 +629,84 @@ struct MockUpdateInstaller
         return installResult.query_to(retval);
     }
 
-    STDMETHOD(get_ClientApplicationID)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(put_ClientApplicationID)(BSTR) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsForced)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(put_IsForced)(VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(get_ParentHwnd)(HWND*) override { return E_NOTIMPL; }
-    STDMETHOD(put_ParentHwnd)(HWND) override { return E_NOTIMPL; }
-    STDMETHOD(put_ParentWindow)(IUnknown*) override { return E_NOTIMPL; }
-    STDMETHOD(get_ParentWindow)(IUnknown**) override { return E_NOTIMPL; }
-    STDMETHOD(get_Updates)(IUpdateCollection**) override { return E_NOTIMPL; }
-    STDMETHOD(BeginUninstall)(IUnknown*, IUnknown*, VARIANT, IInstallationJob**) override { return E_NOTIMPL; }
-    STDMETHOD(EndUninstall)(IInstallationJob*, IInstallationResult**) override { return E_NOTIMPL; }
-    STDMETHOD(Install)(IInstallationResult**) override { return E_NOTIMPL; }
-    STDMETHOD(RunWizard)(BSTR, IInstallationResult**) override { return E_NOTIMPL; }
-    STDMETHOD(get_IsBusy)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(Uninstall)(IInstallationResult**) override { return E_NOTIMPL; }
-    STDMETHOD(get_AllowSourcePrompts)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(put_AllowSourcePrompts)(VARIANT_BOOL) override { return E_NOTIMPL; }
-    STDMETHOD(get_RebootRequiredBeforeInstallation)(VARIANT_BOOL*) override { return E_NOTIMPL; }
+    STDMETHOD(get_ClientApplicationID)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_ClientApplicationID)(BSTR) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsForced)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_IsForced)(VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ParentHwnd)(HWND*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_ParentHwnd)(HWND) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_ParentWindow)(IUnknown*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ParentWindow)(IUnknown**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_Updates)(IUpdateCollection**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(BeginUninstall)(IUnknown*, IUnknown*, VARIANT, IInstallationJob**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(EndUninstall)(IInstallationJob*, IInstallationResult**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(Install)(IInstallationResult**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(RunWizard)(BSTR, IInstallationResult**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_IsBusy)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(Uninstall)(IInstallationResult**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_AllowSourcePrompts)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_AllowSourcePrompts)(VARIANT_BOOL) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_RebootRequiredBeforeInstallation)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // MockUpdateSession — implements IUpdateSession
 // ---------------------------------------------------------------------------
-struct MockUpdateSession
-    : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateSession>
+struct MockUpdateSession : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL::ClassicCom>, IUpdateSession>
 {
     STUB_IDISPATCH()
 
@@ -388,7 +714,10 @@ struct MockUpdateSession
     wil::com_ptr_nothrow<MockUpdateDownloader> downloader = wil::MakeOrThrow<MockUpdateDownloader>();
     wil::com_ptr_nothrow<MockUpdateInstaller> installer = wil::MakeOrThrow<MockUpdateInstaller>();
 
-    STDMETHOD(put_ClientApplicationID)(BSTR) override { return S_OK; }
+    STDMETHOD(put_ClientApplicationID)(BSTR) override
+    {
+        return S_OK;
+    }
 
     STDMETHOD(CreateUpdateSearcher)(IUpdateSearcher** retval) override
     {
@@ -405,10 +734,22 @@ struct MockUpdateSession
         return installer.query_to(retval);
     }
 
-    STDMETHOD(get_ClientApplicationID)(BSTR*) override { return E_NOTIMPL; }
-    STDMETHOD(get_ReadOnly)(VARIANT_BOOL*) override { return E_NOTIMPL; }
-    STDMETHOD(get_WebProxy)(IWebProxy**) override { return E_NOTIMPL; }
-    STDMETHOD(put_WebProxy)(IWebProxy*) override { return E_NOTIMPL; }
+    STDMETHOD(get_ClientApplicationID)(BSTR*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_ReadOnly)(VARIANT_BOOL*) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(get_WebProxy)(IWebProxy**) override
+    {
+        return E_NOTIMPL;
+    }
+    STDMETHOD(put_WebProxy)(IWebProxy*) override
+    {
+        return E_NOTIMPL;
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -514,9 +855,7 @@ class WindowsUpdateTests
 
         WindowsUpdateContext ctx(std::move(factory), L"TestProduct");
 
-        VERIFY_ARE_EQUAL(
-            WSLC_E_WU_SEARCH_FAILED,
-            CaptureHResult([&] { ctx.SearchForUpdates(); }));
+        VERIFY_ARE_EQUAL(WSLC_E_WU_SEARCH_FAILED, CaptureHResult([&] { ctx.SearchForUpdates(); }));
     }
 
     // -----------------------------------------------------------------------
@@ -662,10 +1001,7 @@ class WindowsUpdateTests
         // Verify that install progress values are offset and scaled into the remaining range.
         // The install lambda is:  progress(DownloadProgressPercent + (percent * InstallProgressPercent) / 100)
         // For percent=100: expected outer value = 70 + (100 * 30) / 100 = 100
-        VERIFY_ARE_EQUAL(
-            100u,
-            WindowsUpdateContext::DownloadProgressPercent +
-                (100u * WindowsUpdateContext::InstallProgressPercent) / 100u);
+        VERIFY_ARE_EQUAL(100u, WindowsUpdateContext::DownloadProgressPercent + (100u * WindowsUpdateContext::InstallProgressPercent) / 100u);
     }
 
     TEST_METHOD(RunUpdateFlow_DownloadFails_Propagates)
