@@ -40,7 +40,8 @@ public:
         std::filesystem::path&& HostPath,
         ULONGLONG SizeBytes,
         ULONG Lun,
-        std::string&& VirtualMachinePath,
+        std::string&& Uuid,
+        std::string&& CreatedAt,
         std::map<std::string, std::string>&& DriverOpts,
         std::map<std::string, std::string>&& Labels,
         WSLCVirtualMachine& VirtualMachine,
@@ -67,10 +68,6 @@ public:
     {
         return m_name;
     }
-    const std::string& VirtualMachinePath() const noexcept
-    {
-        return m_virtualMachinePath;
-    }
 
     void OnDeleted();
 
@@ -78,7 +75,7 @@ private:
     void Detach();
     std::string m_name;
     std::filesystem::path m_hostPath;
-    std::string m_virtualMachinePath;
+    std::string m_uuid;
     std::string m_createdAt;
     std::map<std::string, std::string> m_driverOpts;
     std::map<std::string, std::string> m_labels;

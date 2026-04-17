@@ -3554,6 +3554,54 @@ class WSLCTests
         VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName2);
     }
 
+    WSLC_TEST_METHOD(CreateVhdVolumeWithoutNameGetsAnonymousLabel)
+    {
+        // When Docker's local driver creates a volume without an explicit name, it tags the
+        // volume with the "com.docker.volume.anonymous" label (empty value). Verify that
+        // VHD-backed volumes mirror that behavior.
+        constexpr auto c_anonymousLabel = "com.docker.volume.anonymous";
+
+        WSLCVolumeOptions volumeOptions{};
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        // Create an anonymous (no Name) volume.
+        WSLCVolumeInformation anonymousInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &anonymousInfo));
+
+        const std::string anonymousName = anonymousInfo.Name;
+        VERIFY_IS_FALSE(anonymousName.empty());
+
+        auto cleanupAnonymous = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(anonymousName.c_str())); });
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(anonymousName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto anonymousInspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
+        VERIFY_ARE_EQUAL(anonymousInspect.Name, anonymousName);
+        VERIFY_IS_TRUE(anonymousInspect.Labels.contains(c_anonymousLabel));
+        VERIFY_ARE_EQUAL(anonymousInspect.Labels[c_anonymousLabel], std::string{});
+
+        // Verify that a named volume does NOT get the anonymous label.
+        const std::string namedVolume = "wslc-test-named-not-anonymous";
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(namedVolume.c_str()));
+        auto cleanupNamed = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(namedVolume.c_str())); });
+
+        volumeOptions.Name = namedVolume.c_str();
+        WSLCVolumeInformation namedInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &namedInfo));
+
+        output.reset();
+        VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(namedVolume.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto namedInspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
+        VERIFY_ARE_EQUAL(namedInspect.Name, namedVolume);
+        VERIFY_IS_FALSE(namedInspect.Labels.contains(c_anonymousLabel));
+    }
+
     WSLC_TEST_METHOD(CreateContainer)
     {
         // Test a simple container start.

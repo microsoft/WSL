@@ -488,10 +488,19 @@ std::pair<ULONG, std::string> WSLCVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     return {Lun, Device};
 }
 
-void WSLCVirtualMachine::Ext4Format(const std::string& Device)
+void WSLCVirtualMachine::Ext4Format(const std::string& Device, const std::string& Uuid)
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
-    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
+    std::vector<std::string> args{mkfsPath};
+    
+    if (!Uuid.empty())
+    {
+        args.emplace_back("-U");
+        args.emplace_back(Uuid);
+    }
+    args.emplace_back(Device);
+
+    ServiceProcessLauncher launcher(mkfsPath, std::move(args));
     auto result = launcher.Launch(*this).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
