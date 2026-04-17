@@ -2830,6 +2830,23 @@ void WslCoreVm::ValidateNetworkingMode()
         }
     }
 
+    // If mirrored networking was requested, ensure IPv6 is not disabled on the host.
+    // Mirrored mode requires IPv6 to mirror host interfaces. When the DisabledComponents registry value
+    // is set to 0xFF, all IPv6 components are disabled and mirrored networking cannot function.
+    if (m_vmConfig.NetworkingMode == NetworkingMode::Mirrored)
+    {
+        constexpr DWORD c_ipv6DisabledAll = 0xFF;
+        const auto disabledComponents = wsl::windows::common::registry::ReadDword(
+            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", 0);
+
+        if (disabledComponents == c_ipv6DisabledAll)
+        {
+            m_vmConfig.NetworkingMode = NetworkingMode::Nat;
+            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingNotSupportedReason(
+                Localization::MessageMirroredNetworkingNotSupportedIpv6Disabled()));
+        }
+    }
+
     // If mirrored networking was requested, ensure it is supported by the OS and guest kernel.
     if (m_vmConfig.NetworkingMode == NetworkingMode::Mirrored)
     {
