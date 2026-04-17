@@ -21,8 +21,9 @@
                 <RemoveFile Id="CleanUpWSLShortCut" Directory="ProgramMenuFolder" Name="WSL" On="uninstall"/>
                 <File Id="wsl.exe" Name="wsl.exe" Source="${PACKAGE_INPUT_DIR}/wsl.exe" KeyPath="yes">
                     <Shortcut Id="WSLShortcut" Name="WSL" Description="Windows Subsystem for Linux" Arguments="--cd ~" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico">
-                        <ShortcutProperty Key="System.AppUserModel.ID" Value="Microsoft.WSL"/>
-                        <ShortcutProperty Key="System.AppUserModel.ToastActivatorCLSID" Value="{2B9C59C3-98F1-45C8-B87B-12AE3C7927E8}"/>
+                        <!-- ShortcutProperty entries removed to prevent Warning 1946 dialog popups.
+                             Properties are set by the RepairShortcutProperties custom action with retry logic.
+                             See: microsoft/WSL#11276, microsoft/WSL#13469 -->
                     </Shortcut>
                 </File>
 
@@ -285,7 +286,8 @@
                     <RemoveFile Id="CleanUpWSLSettingsShortCutNonServer" Directory="ProgramMenuFolder" Name="WSLSettings" On="uninstall"/>
                     <File Id="wslsettings.exe_nonserver" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6a.exe">
                         <Shortcut Id="WSLSettingsShortcutNonServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico">
-                            <ShortcutProperty Key="System.AppUserModel.IsSystemComponent" Value="true"/>
+                            <!-- ShortcutProperty removed to prevent Warning 1946 dialog popup.
+                                 Set by RepairShortcutProperties custom action instead. -->
                         </Shortcut>
                     </File>
                     <!-- Protocol registration -->
@@ -454,6 +456,17 @@
             Execute="deferred"
          />
 
+        <!-- Repair shortcut properties that may fail due to sharing violations (Warning 1946).
+             Runs after CreateShortcuts to re-apply properties with retry logic via COM IPropertyStore.
+             See: microsoft/WSL#11276, microsoft/WSL#13469 -->
+        <CustomAction Id="RepairShortcutProperties"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="RepairShortcutProperties"
+            Return="ignore"
+            Execute="deferred"
+         />
+
         <CustomAction Id="RegisterLspCategories"
             Impersonate="no"
             BinaryRef="wslinstall.dll"
@@ -536,6 +549,9 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+
+            <!-- Repair shortcut properties after CreateShortcuts has run. Only during install/upgrade, not uninstall. -->
+            <Custom Action="RepairShortcutProperties" After="FinalizeInstall" Condition='(not REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
 
         </InstallExecuteSequence>
 
