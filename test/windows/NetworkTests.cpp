@@ -4549,6 +4549,21 @@ class MirroredTests
 
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
+
+    WSL2_TEST_METHOD(MirroredFallbackToNatWhenIpv6Disabled)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        // Set the registry key to disable IPv6 globally on the host.
+        RegistryKeyChange<DWORD> disableIpv6(
+            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", 0xFF);
+
+        // Request mirrored mode - this should fall back to NAT since IPv6 is disabled.
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+
+        // Verify WSL is actually running in NAT mode.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
+    }
 };
 
 class BridgedTests
