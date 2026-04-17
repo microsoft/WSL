@@ -45,7 +45,7 @@ class WSLCE2EInspectTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Inspect_MissingImageName)
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_MissingObjectId)
     {
         auto result = RunWslc(L"inspect");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'object-id'\r\n", .ExitCode = 1});
@@ -170,7 +170,7 @@ class WSLCE2EInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Inspect_InvalidTypeValue)
     {
         auto result = RunWslc(std::format(L"inspect --type invalid {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid  value: invalid is not a recognized inspect type. Supported inspect types are: image, container.\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container.\r\n", .ExitCode = 1});
     }
 
 private:
