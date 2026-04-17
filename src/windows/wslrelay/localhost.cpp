@@ -397,7 +397,7 @@ struct PortRelay
         message.BufferSize = LOCALHOST_RELAY_BUFFER_SIZE;
         channel.SendMessage(message);
 
-        wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket(), LOCALHOST_RELAY_BUFFER_SIZE);
+        wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket(), message.BufferSize);
     }
 
     void CompleteAccept()
