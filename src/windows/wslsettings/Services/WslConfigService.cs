@@ -5,12 +5,13 @@ using static WslSettings.Contracts.Services.IWslConfigService;
 
 namespace WslSettings.Services;
 
-public class WslConfigService : IWslConfigService
+public class WslConfigService : IWslConfigService, IDisposable
 {
     private WslConfig? _wslConfig { get; set; }
     private WslConfig? _wslConfigDefaults { get; init; }
     private readonly object? _wslCoreConfigInterfaceLockObj = null;
     private FileSystemWatcher? _wslConfigFileSystemWatcher = null;
+    private bool _disposed = false;
 
     public WslConfigService()
     {
@@ -31,8 +32,28 @@ public class WslConfigService : IWslConfigService
 
     ~WslConfigService()
     {
-        WslCoreConfigInterface.FreeWslConfig(_wslConfig);
-        WslCoreConfigInterface.FreeWslConfig(_wslConfigDefaults);
+        Dispose(false);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _wslConfigFileSystemWatcher?.Dispose();
+            }
+
+            WslCoreConfigInterface.FreeWslConfig(_wslConfig);
+            WslCoreConfigInterface.FreeWslConfig(_wslConfigDefaults);
+            _disposed = true;
+        }
     }
 
     public IWslConfigSetting GetWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting)
