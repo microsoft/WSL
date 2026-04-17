@@ -53,7 +53,7 @@ void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) con
         auto format = execArgs.Get<ArgType::Format>();
         if (!IsEqual(format, L"json") && !IsEqual(format, L"table"))
         {
-            throw CommandException(Localization::WSLCCLI_InvalidFormatError());
+            throw CommandException(Localization::WSLCCLI_InvalidFormatError(L"format", format, L"json, table"));
         }
     }
 }

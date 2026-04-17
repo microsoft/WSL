@@ -85,7 +85,7 @@ void Inspect(CLIExecutionContext& context)
         }
         else
         {
-            PrintMessage(std::format(L"Object not found: {}", objectId), stderr);
+            PrintMessage(Localization::WSLCCLI_ObjectNotFoundError(objectId), stderr);
             context.ExitCode = 1;
         }
     }

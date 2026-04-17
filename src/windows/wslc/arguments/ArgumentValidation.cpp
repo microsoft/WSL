@@ -16,6 +16,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "Exceptions.h"
+#include "Localization.h"
 #include <charconv>
 #include <format>
 #include <unordered_map>
@@ -164,8 +165,8 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     }
     else
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+        constexpr std::wstring_view supportedValues = L"json, table";
+        throw ArgumentException(Localization::WSLCCLI_InvalidFormatError(argName, input, supportedValues));
     }
 }
 
@@ -181,8 +182,8 @@ InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstri
     }
     else
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized inspect type. Supported inspect types are: image, container.", argName, input));
+        constexpr std::wstring_view supportedValues = L"image, container";
+        throw ArgumentException(Localization::WSLCCLI_InvalidInspectError(argName, input, supportedValues));
     }
 }
 
