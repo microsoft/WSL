@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file wslinfo function definitions.
+    This file contains wslinfo function definitions.
 
 --*/
 

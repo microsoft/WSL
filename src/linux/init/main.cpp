@@ -587,7 +587,7 @@ Return Value:
     std::string content = wsl::shared::string::ReadFile<char, char>(std::format("/sys/block/{}/dev", BlockDeviceName).c_str());
     auto separator = content.find(':');
 
-    if (separator == 0 || separator == std::string::npos)
+    if (separator == std::string::npos || separator == 0 ||  separator + 1 == content.size())
     {
         LOG_ERROR("Failed to parse device number '{}' for device '{}'", content.c_str(), BlockDeviceName.c_str());
         THROW_ERRNO(EINVAL);

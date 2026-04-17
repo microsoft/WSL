@@ -25,9 +25,13 @@ void CoroutineIoIssuer::Callback(sigval value)
 {
     const auto operation = static_cast<CoroutineIoOperation*>(value.sival_ptr);
     auto error = aio_error(&operation->ControlBlock);
+    if (error == EINPROGRESS)
+    {
+        return;
+    }
     auto bytesTransferred = aio_return(&operation->ControlBlock);
 
-    operation->Result = {error, error == 0 ? static_cast<size_t>(bytesTransferred) : 0};
+    operation->Result = {-error, error == 0 ? static_cast<size_t>(bytesTransferred) : 0};
     if (!operation->DoneOrCoroutine.exchange(true))
     {
         return;
