@@ -1670,6 +1670,9 @@ try
 {
     COMServiceExecutionContext context;
 
+    RETURN_HR_IF_NULL(E_POINTER, Result);
+    ZeroMemory(Result, sizeof(*Result));
+
     DockerHTTPClient::PruneContainersFilters filters;
 
     if (FiltersCount > 0)
