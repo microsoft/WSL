@@ -15,8 +15,10 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
+#include "Argument.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EContainerTests
 {
@@ -32,15 +34,13 @@ class WSLCE2EContainerTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
+    WSLC_TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
     {
-        WSL2_TEST_ONLY();
         RunWslc(L"container INVALID_CMD").Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
@@ -58,7 +58,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Container command for demonstration purposes.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerCommandLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -68,21 +68,33 @@ private:
 
     std::wstring GetAvailableCommands() const
     {
+        std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
+            {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
+            {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
+            {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
+            {L"inspect", Localization::WSLCCLI_ContainerInspectDesc()},
+            {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
+            {L"logs", Localization::WSLCCLI_ContainerLogsDesc()},
+            {L"list", Localization::WSLCCLI_ContainerListDesc()},
+            {L"remove", Localization::WSLCCLI_ContainerRemoveDesc()},
+            {L"run", Localization::WSLCCLI_ContainerRunDesc()},
+            {L"start", Localization::WSLCCLI_ContainerStartDesc()},
+            {L"stop", Localization::WSLCCLI_ContainerStopDesc()},
+        };
+
+        size_t maxLen = 0;
+        for (const auto& [name, _] : entries)
+        {
+            maxLen = (std::max)(maxLen, name.size());
+        }
+
         std::wstringstream commands;
-        commands << L"The following sub-commands are available:\r\n"
-                 << L"  attach   Attach to a container.\r\n"
-                 << L"  create   Create a container.\r\n"
-                 << L"  exec     Execute a command in a running container.\r\n"
-                 << L"  inspect  Inspect a container.\r\n"
-                 << L"  kill     Kill containers.\r\n"
-                 << L"  logs     View container logs.\r\n"
-                 << L"  list     List containers.\r\n"
-                 << L"  remove   Remove containers.\r\n"
-                 << L"  run      Run a container.\r\n"
-                 << L"  start    Start a container.\r\n"
-                 << L"  stop     Stop containers.\r\n"
-                 << L"\r\n"
-                 << L"For more details on a specific command, pass it the help argument. [-h]\r\n\r\n";
+        commands << Localization::WSLCCLI_AvailableSubcommands() << L"\r\n";
+        for (const auto& [name, desc] : entries)
+        {
+            commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";
+        }
+        commands << L"\r\n" << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L"]\r\n\r\n";
         return commands.str();
     }
 

@@ -144,6 +144,7 @@ void VMPortMapping::Unmap()
 {
     if (Vm)
     {
+        auto clearVm = wil::scope_exit([&] { Vm = nullptr; });
         Vm->UnmapPort(*this);
     }
 }
@@ -164,6 +165,11 @@ bool VMPortMapping::IsLocalhost() const
     {
         return IN4ADDR_ISLOOPBACK(&BindAddress.Ipv4);
     }
+}
+
+bool VMPortMapping::IsIPv6() const
+{
+    return BindAddress.si_family == AF_INET6;
 }
 
 uint16_t VMPortMapping::HostPort() const

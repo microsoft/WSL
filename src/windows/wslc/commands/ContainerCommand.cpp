@@ -15,6 +15,7 @@ Abstract:
 #include "ContainerCommand.h"
 
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Root Command
@@ -42,12 +43,12 @@ std::vector<Argument> ContainerCommand::GetArguments() const
 
 std::wstring ContainerCommand::ShortDescription() const
 {
-    return {L"Container command."};
+    return Localization::WSLCCLI_ContainerCommandDesc();
 }
 
 std::wstring ContainerCommand::LongDescription() const
 {
-    return {L"Container command for demonstration purposes."};
+    return Localization::WSLCCLI_ContainerCommandLongDesc();
 }
 
 void ContainerCommand::ExecuteInternal(CLIExecutionContext& context) const

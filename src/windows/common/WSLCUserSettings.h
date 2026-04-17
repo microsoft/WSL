@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    UserSettings.h
+    WSLCUserSettings.h
 
 Abstract:
 
@@ -41,6 +41,8 @@ enum class Setting : size_t
     SessionStoragePath,
     SessionNetworkingMode,
     SessionHostFileShareMode,
+    SessionDnsTunneling,
+    CredentialStore,
 
     Max
 };
@@ -49,6 +51,12 @@ enum class HostFileShareMode
 {
     Plan9,
     VirtioFs
+};
+
+enum class CredentialStoreType
+{
+    WinCred,
+    File
 };
 
 namespace details {
@@ -81,6 +89,8 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::wstring,       {},                            "session.defaultStoragePath")
     DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode, WSLCNetworkingModeVirtioProxy, "session.networkingMode")
     DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,  HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
+    DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,               true,                          "session.dnsTunneling")
+    DEFINE_SETTING_MAPPING(CredentialStore,            std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on
@@ -154,9 +164,7 @@ public:
     // Overwrites the settings file with the commented-out defaults template.
     void Reset() const;
 
-protected:
-    // Loads settings from an explicit directory. Used by the singleton (via
-    // the private zero-arg constructor) and by test subclasses.
+    // Loads settings from an explicit directory.
     explicit UserSettings(const std::filesystem::path& settingsDir);
     ~UserSettings() = default;
 

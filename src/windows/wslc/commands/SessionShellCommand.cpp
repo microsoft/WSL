@@ -18,6 +18,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Session Shell Command
@@ -30,12 +31,12 @@ std::vector<Argument> SessionShellCommand::GetArguments() const
 
 std::wstring SessionShellCommand::ShortDescription() const
 {
-    return {L"Attach to a session."};
+    return Localization::WSLCCLI_SessionShellDesc();
 }
 
 std::wstring SessionShellCommand::LongDescription() const
 {
-    return {L"Attaches to an active session. If no session ID is provided, the wslc default session will be used."};
+    return Localization::WSLCCLI_SessionShellLongDesc();
 }
 
 void SessionShellCommand::ExecuteInternal(CLIExecutionContext& context) const

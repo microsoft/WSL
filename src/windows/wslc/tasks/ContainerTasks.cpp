@@ -278,6 +278,21 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Entrypoint.push_back(WideToMultiByte(context.Args.Get<ArgType::Entrypoint>()));
     }
 
+    if (context.Args.Contains(ArgType::User))
+    {
+        options.User = WideToMultiByte(context.Args.Get<ArgType::User>());
+    }
+
+    if (context.Args.Contains(ArgType::TMPFS))
+    {
+        auto tmpfs = context.Args.GetAll<ArgType::TMPFS>();
+        options.Tmpfs.reserve(options.Tmpfs.size() + tmpfs.size());
+        for (const auto& value : tmpfs)
+        {
+            options.Tmpfs.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::ForwardArgs))
     {
         auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();
@@ -286,6 +301,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         {
             options.Arguments.emplace_back(WideToMultiByte(arg));
         }
+    }
+
+    if (context.Args.Contains(ArgType::WorkDir))
+    {
+        options.WorkingDirectory = WideToMultiByte(context.Args.Get<ArgType::WorkDir>());
     }
 
     context.Data.Add<Data::ContainerOptions>(std::move(options));

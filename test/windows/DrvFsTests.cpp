@@ -258,7 +258,6 @@ public:
 
     void DrvfsMountElevated(DrvFsMode Mode)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
         SKIP_TEST_ARM64();
 
@@ -270,7 +269,6 @@ public:
 
     void DrvfsMountElevatedDifferentConsole(DrvFsMode Mode)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
         SKIP_TEST_ARM64();
 
@@ -282,7 +280,6 @@ public:
 
     void DrvfsMountNonElevated(DrvFsMode Mode)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
         SKIP_TEST_ARM64();
 
@@ -296,7 +293,6 @@ public:
 
     void DrvfsMountNonElevatedDifferentConsole(DrvFsMode Mode)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
         SKIP_TEST_ARM64();
 
@@ -310,7 +306,6 @@ public:
 
     void DrvfsMountElevatedSystemDistroEnabled(DrvFsMode Mode)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
         SKIP_TEST_ARM64();
 
@@ -322,7 +317,6 @@ public:
 
     void DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode Mode)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
         SKIP_TEST_ARM64();
 
@@ -383,8 +377,6 @@ public:
 
     void DrvFsMountUnicodePath(DrvFsMode Mode)
     {
-        WSL2_TEST_ONLY();
-
         // Create a Windows directory with unicode characters
         constexpr auto unicodeDir = L"C:\\drvfs-测试-テスト";
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(unicodeDir); });
@@ -1149,63 +1141,53 @@ class WSL1 : public DrvFsTests
         return true;
     }
 
-    TEST_METHOD(DrvFsDisableQueryByName)
+    WSL1_TEST_METHOD(DrvFsDisableQueryByName)
     {
-        WSL1_TEST_ONLY();
         VERIFY_NO_THROW(DrvFsCommon(LX_DRVFS_DISABLE_QUERY_BY_NAME));
     }
 
-    TEST_METHOD(DrvFsDisableQueryByNameAndStatInfo)
+    WSL1_TEST_METHOD(DrvFsDisableQueryByNameAndStatInfo)
     {
-        WSL1_TEST_ONLY();
         VERIFY_NO_THROW(DrvFsCommon(LX_DRVFS_DISABLE_QUERY_BY_NAME_AND_STAT_INFO));
     }
 
-    TEST_METHOD(VfsAccessDrvFs)
+    WSL1_TEST_METHOD(VfsAccessDrvFs)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::VfsAccessDrvFs();
     }
 
-    TEST_METHOD(FsCommonDrvFs)
+    WSL1_TEST_METHOD(FsCommonDrvFs)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::FsCommonDrvFs();
     }
 
-    TEST_METHOD(DrvFs)
+    WSL1_TEST_METHOD(DrvFs)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::DrvFs(DrvFsMode::WSL1);
     }
 
-    TEST_METHOD(DrvFsFat)
+    WSL1_TEST_METHOD(DrvFsFat)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::DrvFsFat(DrvFsMode::WSL1);
     }
 
-    TEST_METHOD(DrvFsSmb)
+    WSL1_TEST_METHOD(DrvFsSmb)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::DrvFsSmb(DrvFsMode::WSL1);
     }
 
-    TEST_METHOD(DrvFsMetadata)
+    WSL1_TEST_METHOD(DrvFsMetadata)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::DrvFsMetadata(DrvFsMode::WSL1);
     }
 
-    TEST_METHOD(XattrDrvFs)
+    WSL1_TEST_METHOD(XattrDrvFs)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::XattrDrvFs(DrvFsMode::WSL1);
     }
 
-    TEST_METHOD(WslPath)
+    WSL1_TEST_METHOD(WslPath)
     {
-        WSL1_TEST_ONLY();
         DrvFsTests::WslPath(DrvFsMode::WSL1);
     }
 };
@@ -1242,99 +1224,83 @@ class WSL1 : public DrvFsTests
             return true; \
         } \
 \
-        TEST_METHOD(VfsAccessDrvFs) \
+        WSL2_TEST_METHOD(VfsAccessDrvFs) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::VfsAccessDrvFs(); \
         } \
 \
-        TEST_METHOD(FsCommonDrvFs) \
+        WSL2_TEST_METHOD(FsCommonDrvFs) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::FsCommonDrvFs(); \
         } \
 \
-        TEST_METHOD(DrvFs) \
+        WSL2_TEST_METHOD(DrvFs) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFs(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvFsFat) \
+        WSL2_TEST_METHOD(DrvFsFat) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFsFat(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvFsSmb) \
+        WSL2_TEST_METHOD(DrvFsSmb) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFsSmb(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvFsMetadata) \
+        WSL2_TEST_METHOD(DrvFsMetadata) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFsMetadata(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvfsMountElevated) \
+        WSL2_TEST_METHOD(DrvfsMountElevated) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvfsMountElevated(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvfsMountElevatedDifferentConsole) \
+        WSL2_TEST_METHOD(DrvfsMountElevatedDifferentConsole) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvfsMountElevatedDifferentConsole(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvfsMountNonElevated) \
+        WSL2_TEST_METHOD(DrvfsMountNonElevated) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvfsMountNonElevated(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvfsMountNonElevatedDifferentConsole) \
+        WSL2_TEST_METHOD(DrvfsMountNonElevatedDifferentConsole) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvfsMountNonElevatedDifferentConsole(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
+        WSL2_TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvfsMountElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
+        WSL2_TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(XattrDrvFs) \
+        WSL2_TEST_METHOD(XattrDrvFs) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::XattrDrvFs(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvFsReFs) \
+        WSL2_TEST_METHOD(DrvFsReFs) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFsReFs(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(WslPath) \
+        WSL2_TEST_METHOD(WslPath) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::WslPath(DrvFsMode::##_mode##); \
         } \
 \
-        TEST_METHOD(DrvFsMountUnicodePath) \
+        WSL2_TEST_METHOD(DrvFsMountUnicodePath) \
         { \
-            WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFsMountUnicodePath(DrvFsMode::##_mode##); \
         } \
     }

@@ -18,6 +18,7 @@ Abstract:
 #include <chrono>
 #include <wslc_schema.h>
 #include <ContainerModel.h>
+#include <WSLCContainerLauncher.h>
 
 namespace WSLCE2ETests {
 
@@ -119,6 +120,7 @@ private:
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
+void VerifyImageIsListed(const TestImage& image);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
@@ -130,6 +132,9 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
+
+void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
+std::wstring GetPythonHttpServerScript(uint16_t port);
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
@@ -176,4 +181,15 @@ inline void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
     VerifyContainerIsNotListed(containerNameOrId, std::chrono::milliseconds(0), std::chrono::milliseconds(0));
 }
+
+wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
+
+// Starts a local registry container with host networking using the COM API.
+// Returns the running container (holds it alive) and the registry address (e.g. "127.0.0.1:PORT").
+std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username = "", const std::string& password = "", USHORT port = 5000);
+
+// Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
+std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
+
 } // namespace WSLCE2ETests

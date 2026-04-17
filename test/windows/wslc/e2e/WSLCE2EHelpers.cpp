@@ -12,11 +12,13 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "SessionModel.h"
+#include "WSLCSessionDefaults.h"
+#include "ImageModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include <JsonUtils.h>
+#include <wslutil.h>
 
 extern std::wstring g_testDataPath;
 
@@ -194,6 +196,23 @@ void VerifyImageIsNotUsed(const TestImage& image)
     }
 }
 
+void VerifyImageIsListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
+    {
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -323,7 +342,14 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
     std::wstring targetSession = sessionName;
     if (targetSession.empty())
     {
-        targetSession = std::wstring{wsl::windows::wslc::models::SessionOptions::GetDefaultSessionName()};
+        auto isElevated = wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token(TOKEN_QUERY).get());
+        auto baseName = isElevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+
+        wchar_t username[256 + 1] = {};
+        DWORD usernameLen = ARRAYSIZE(username);
+        THROW_IF_WIN32_BOOL_FALSE(GetUserNameW(username, &usernameLen));
+
+        targetSession = std::format(L"{}-{}", baseName, username);
     }
 
     auto listResult = RunWslc(L"session list");
@@ -340,5 +366,72 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
             break;
         }
     }
+}
+
+wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
+{
+    // Ensure the default elevated session exists before opening it via COM.
+    RunWslcAndVerify(L"container list", {.Stderr = L"", .ExitCode = 0});
+
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    wil::com_ptr<IWSLCSession> session;
+    VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(nullptr, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    return std::move(session);
+}
+
+std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
+{
+    EnsureImageIsLoaded({L"wslc-registry", L"latest", GetTestImagePath("wslc-registry:latest")});
+
+    std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
+
+    if (!username.empty())
+    {
+        env.push_back(std::format("USERNAME={}", username));
+        env.push_back(std::format("PASSWORD={}", password));
+    }
+
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+    launcher.SetEntrypoint({"/entrypoint.sh"});
+    launcher.AddPort(port, port, AF_INET);
+
+    auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+
+    auto address = std::format("127.0.0.1:{}", port);
+    auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+
+    int expectedCode = username.empty() ? 200 : 401;
+    ExpectHttpResponse(url.c_str(), expectedCode, true);
+
+    return {std::move(container), std::move(address)};
+}
+
+std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress)
+{
+    auto registryImage = std::format(L"{}/{}", registryAddress, imageName);
+    RunWslcAndVerify(std::format(L"image tag {} {}", imageName, registryImage), {.ExitCode = 0});
+    return registryImage;
+}
+
+void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& lines)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    VERIFY_IS_TRUE(file.is_open());
+    for (const auto& line : lines)
+    {
+        file << line << "\n";
+    }
+
+    VERIFY_IS_TRUE(file.good());
+}
+
+std::wstring GetPythonHttpServerScript(uint16_t port)
+{
+    return std::format(L"python3 -m http.server {}", port);
 }
 } // namespace WSLCE2ETests

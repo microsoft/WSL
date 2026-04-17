@@ -19,7 +19,7 @@ Abstract:
 #include "ImageModel.h"
 #include "ImageService.h"
 #include "ImageTasks.h"
-#include "PullImageCallback.h"
+#include "ImageProgressCallback.h"
 #include "TableOutput.h"
 #include "Task.h"
 #include <format>
@@ -47,12 +47,21 @@ void BuildImage(CLIExecutionContext& context)
         dockerfilePath = context.Args.Get<ArgType::File>();
     }
 
+    std::wstring target;
+    if (context.Args.Contains(ArgType::BuildTarget))
+    {
+        target = context.Args.Get<ArgType::BuildTarget>();
+    }
+
     PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
 
-    bool verbose = context.Args.Contains(ArgType::Verbose);
+    WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.Contains(ArgType::Verbose));
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsPull, context.Args.Contains(ArgType::BuildPull));
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CreateCancelEvent());
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, target, flags, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -115,7 +124,8 @@ void ListImages(CLIExecutionContext& context)
                 MultiByteToWide(image.Tag.value_or("<untagged>")),
                 MultiByteToWide(TruncateId(image.Id, trunc)),
                 ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024)),
+                // Dividing by 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1000 * 1000)),
             });
         }
 
@@ -134,8 +144,19 @@ void PullImage(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
 
-    PullImageCallback callback;
+    ImageProgressCallback callback;
     services::ImageService::Pull(session, WideToMultiByte(imageId), &callback);
+}
+
+void PushImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImageId));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& imageId = context.Args.Get<ArgType::ImageId>();
+
+    ImageProgressCallback callback;
+    services::ImageService::Push(session, WideToMultiByte(imageId), &callback);
 }
 
 void DeleteImage(CLIExecutionContext& context)
@@ -163,7 +184,7 @@ void LoadImage(CLIExecutionContext& context)
     }
 
     // TODO Read from stdin if no input argument is provided.
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, L"Requested load but no input provided.");
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageLoadNoInputError());
 }
 
 void InspectImages(CLIExecutionContext& context)
@@ -193,5 +214,14 @@ void SaveImage(CLIExecutionContext& context)
     auto& imageId = context.Args.Get<ArgType::ImageId>();
     auto& output = context.Args.Get<ArgType::Output>();
     services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+}
+
+void TagImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& source = context.Args.Get<ArgType::Source>();
+    auto& target = context.Args.Get<ArgType::Target>();
+    services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
 }
 } // namespace wsl::windows::wslc::task

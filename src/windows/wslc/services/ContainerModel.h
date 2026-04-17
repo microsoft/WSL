@@ -38,7 +38,10 @@ struct ContainerOptions
     bool TTY = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
+    std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
+    std::optional<std::string> User{};
+    std::vector<std::string> Tmpfs;
 };
 
 struct CreateContainerResult
@@ -235,6 +238,9 @@ struct VolumeMount
     {
         return m_isReadOnlyMode;
     }
+
+    static bool IsValidNamedVolumeName(const std::wstring& name);
+
     static VolumeMount Parse(const std::wstring& value);
 
 private:
@@ -251,5 +257,22 @@ private:
     {
         return IsReadOnlyMode(mode) || mode == L"rw";
     }
+};
+
+struct TmpfsMount
+{
+    std::string ContainerPath() const
+    {
+        return m_containerPath;
+    }
+    std::string Options() const
+    {
+        return m_options;
+    }
+    static TmpfsMount Parse(const std::string& value);
+
+private:
+    std::string m_containerPath;
+    std::string m_options;
 };
 } // namespace wsl::windows::wslc::models
