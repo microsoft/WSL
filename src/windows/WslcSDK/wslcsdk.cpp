@@ -20,6 +20,7 @@ Abstract:
 #include "Localization.h"
 #include "WslInstall.h"
 #include "wslutil.h"
+#include "WindowsUpdateIntegration.h"
 
 using namespace std::string_view_literals;
 using namespace wsl::windows::common::wslutil;
@@ -1480,15 +1481,16 @@ try
 
     if (needsRuntime)
     {
-        std::function<void(uint32_t, uint32_t)> callback;
+        std::function<void(uint32_t)> callback;
         if (progressCallback)
         {
-            callback = [progressCallback, context](uint32_t progress, uint32_t total) {
-                progressCallback(WSLC_COMPONENT_FLAG_WSL_PACKAGE, progress, total, context);
+            callback = [progressCallback, context](uint32_t progress) {
+                progressCallback(WSLC_COMPONENT_FLAG_WSL_PACKAGE, progress, 100, context);
             };
         }
 
-
+        wsl::windows::common::WindowsUpdateContext context;
+        context.RunUpdateFlow(true, callback);
     }
 
     return S_OK;
