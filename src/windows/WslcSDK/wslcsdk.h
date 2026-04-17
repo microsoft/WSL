@@ -258,7 +258,8 @@ STDAPI WslcStopContainer(_In_ WslcContainer container, _In_ WslcSignal signal, _
 typedef enum WslcDeleteContainerFlags
 {
     WSLC_DELETE_CONTAINER_FLAG_NONE = 0,
-    WSLC_DELETE_CONTAINER_FLAG_FORCE = 0x01
+    WSLC_DELETE_CONTAINER_FLAG_FORCE = 0x01,
+    WSLC_DELETE_CONTAINER_FLAG_DELETE_VOLUMES = 0x02
 } WslcDeleteContainerFlags;
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcDeleteContainerFlags);

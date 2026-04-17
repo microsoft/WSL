@@ -1814,34 +1814,106 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
 
-        WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess();
+        // Lists anonymous docker volume names via the VM's docker CLI.
+        // TODO: Add proper support so we can list via session's API instead.
+        auto listAnonymousVolumes = [&]() {
+            auto result = ExpectCommandResult(
+                m_defaultSession.get(),
+                {"/usr/bin/docker", "volume", "ls", "-q", "-f", "label=com.docker.volume.anonymous"},
+                0);
+            std::vector<std::string> names;
+            std::stringstream ss(result.Output[1]);
+            std::string line;
+            while (std::getline(ss, line))
+            {
+                if (!line.empty())
+                {
+                    names.push_back(line);
+                }
+            }
+            return names;
+        };
 
-        auto containerId = container.Id();
+        // Session-restart scenario: an anonymous volume-backed container survives a session reset.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess();
 
-        ValidateProcessOutput(result, {});
+            auto containerId = container.Id();
 
-        ResetTestSession();
+            ValidateProcessOutput(result, {});
 
-        container.SetDeleteOnClose(false);
+            ResetTestSession();
 
-        // Manually cleanup the container since the session has been reset.
-        auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            wil::com_ptr<IWSLCContainer> container;
-            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &container));
+            container.SetDeleteOnClose(false);
 
-            VERIFY_SUCCEEDED(container->Delete(WSLCDeleteFlagsForce));
-        });
+            // Manually cleanup the container and delete anonymous volumes since the session has been reset. 
+            auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                wil::com_ptr<IWSLCContainer> container;
+                VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &container));
 
-        // Validate that the session is correctly restarted.
-        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-        wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(container->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
+            });
 
-        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            // Validate that the session is correctly restarted.
+            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
 
-        VERIFY_ARE_EQUAL(containers.size(), 1);
-        VERIFY_ARE_EQUAL(containers[0].Id, containerId);
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            VERIFY_ARE_EQUAL(containers[0].Id, containerId);
+        }
+
+        // Ensure any anonymous volume from the session-restart scope is gone before the delete scenarios run.
+        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "volume", "prune", "-f"});
+        VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+
+        // Delete container without WSLCDeleteFlagsDeleteVolumes -> anonymous volume is leaked.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-leak", {"test", "-d", "/volume"});
+            auto container = launcher.Launch(*m_defaultSession);
+            container.GetInitProcess().Wait();
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+
+            // Anonymous volume was NOT deleted by Docker.
+            auto leaked = listAnonymousVolumes();
+            VERIFY_ARE_EQUAL(leaked.size(), 1u);
+
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "volume", "prune", "-f"});
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+        }
+
+        // Delete container with WSLCDeleteFlagsDeleteVolumes -> anonymous volume is cleaned up.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-rm", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            container.SetDeleteOnClose(false);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsDeleteVolumes));
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+        }
+
+        // Container with WSLCContainerFlagsRm -> anonymous volume cleaned up when the container auto-removes on exit.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-rm", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+        }
     }
 
     WSLC_TEST_METHOD(TagImage)

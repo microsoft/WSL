@@ -637,7 +637,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
             if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
             {
-                DeleteExclusiveLockHeld(WSLCDeleteFlagsNone);
+                DeleteExclusiveLockHeld(WSLCDeleteFlagsDeleteVolumes);
             }
         }
     }
@@ -753,7 +753,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
-        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce);
+        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
     }
 }
 
@@ -780,7 +780,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
 
     try
     {
-        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce));
+        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
@@ -1257,8 +1257,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
-    auto deleteOnFailure = wil::scope_exit_log(
-        WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() { DockerClient.DeleteContainer(containerId, true); });
+    auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() {
+        DockerClient.DeleteContainer(containerId, true, true);
+    });
 
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);

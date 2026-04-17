@@ -69,8 +69,10 @@ template <>
 struct FlagsTraits<WslcDeleteContainerFlags>
 {
     using WslcType = WSLCDeleteFlags;
-    constexpr static WslcDeleteContainerFlags Mask = WSLC_DELETE_CONTAINER_FLAG_FORCE;
+    constexpr static WslcDeleteContainerFlags Mask =
+        static_cast<WslcDeleteContainerFlags>(WSLC_DELETE_CONTAINER_FLAG_FORCE | WSLC_DELETE_CONTAINER_FLAG_DELETE_VOLUMES);
     WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_FORCE, WSLCDeleteFlagsForce);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_DELETE_CONTAINER_FLAG_DELETE_VOLUMES, WSLCDeleteFlagsDeleteVolumes);
 };
 
 template <typename Flags>

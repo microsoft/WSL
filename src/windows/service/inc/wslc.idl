@@ -478,10 +478,11 @@ typedef enum _WSLCDeleteFlags
 {
     WSLCDeleteFlagsNone = 0,
     WSLCDeleteFlagsForce = 1,
-    // TODO: Flags to remove anonymous volumes, bridge links, etc.
+    WSLCDeleteFlagsDeleteVolumes = 2,
+    // TODO: Flags to remove bridge links, etc.
 } WSLCDeleteFlags;
 
-cpp_quote("#define WSLCDeleteFlagsValid (WSLCDeleteFlagsForce)")
+cpp_quote("#define WSLCDeleteFlagsValid (WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteFlags);")
 

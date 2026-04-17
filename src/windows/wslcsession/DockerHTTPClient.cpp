@@ -363,9 +363,14 @@ void DockerHTTPClient::SignalContainer(const std::string& Id, std::optional<WSLC
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force)
+void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes)
 {
     auto url = URL::Create("/containers/{}", Id);
+
+    if (DeleteVolumes)
+    {
+        url.SetParameter("v", true);
+    }
 
     if (Force)
     {
