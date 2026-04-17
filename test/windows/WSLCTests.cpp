@@ -981,13 +981,17 @@ class WSLCTests
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-        WSLCContainerLauncher launcher("hello-world:latest", "wslc-load-image-container");
 
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+        // Validate container launch from the loaded image
+        {
+            WSLCContainerLauncher launcher("hello-world:latest", "wslc-load-image-container");
 
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
 
         // Validate that invalid tars fail with proper error message and code.
         {
@@ -997,6 +1001,58 @@ class WSLCTests
             VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(ToCOMInputHandle(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+        }
+
+        // Validate that LoadImage fails when the input pipe is closed during reading.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> loadResult;
+            std::thread operationThread([&]() {
+                loadResult.set_value(m_defaultSession->LoadImage(ToCOMInputHandle(pipeRead.get()), nullptr, 1024 * 1024));
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to ensure the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            // Close the write end.
+            pipeWrite.reset();
+
+            VERIFY_ARE_EQUAL(E_FAIL, loadResult.get_future().get());
+        }
+
+        // Validate that LoadImage is aborted when the session terminates.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> terminateResult;
+            wil::unique_event testCompleted{wil::EventOptions::ManualReset};
+            std::thread operationThread([&]() {
+                terminateResult.set_value(m_defaultSession->LoadImage(ToCOMInputHandle(pipeRead.get()), nullptr, 1024 * 1024));
+                WI_ASSERT(testCompleted.is_signaled());
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to validate that the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            testCompleted.SetEvent();
+
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+            auto restore = ResetTestSession();
+
+            auto hr = terminateResult.get_future().get();
+            VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
         }
     }
 
@@ -1019,13 +1075,15 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
         // Validate that containers can be started from the imported image.
-        WSLCContainerLauncher launcher("my-hello-world:test", "wslc-import-image-container", {"/hello"});
+        {
+            WSLCContainerLauncher launcher("my-hello-world:test", "wslc-import-image-container", {"/hello"});
 
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
 
         // Validate that ImportImage fails if no tag is passed
         {
@@ -1046,6 +1104,59 @@ class WSLCTests
                 E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+        }
+
+        // Validate that ImportImage fails when the input pipe is closed during reading.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> importResult;
+            std::thread operationThread([&]() {
+                importResult.set_value(m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "broken-read:eof", nullptr, 1024 * 1024));
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to ensure the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            // Close the write end.
+            pipeWrite.reset();
+
+            VERIFY_ARE_EQUAL(E_FAIL, importResult.get_future().get());
+        }
+
+        // Validate that ImportImage is aborted when the session terminates.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> terminateResult;
+            wil::unique_event testCompleted{wil::EventOptions::ManualReset};
+            std::thread operationThread([&]() {
+                terminateResult.set_value(
+                    m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "session-terminate:test", nullptr, 1024 * 1024));
+                WI_ASSERT(testCompleted.is_signaled());
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to validate that the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            testCompleted.SetEvent();
+
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+            auto restore = ResetTestSession();
+
+            auto hr = terminateResult.get_future().get();
+            VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
         }
     }
 
