@@ -2529,8 +2529,8 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Show detailed information about the listed sessions.</value>
   </data>
   <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized format type. Supported format types are: {}.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Invalid format type specified. Supported format types are: json, table</value>
+    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
     <value>Invalid {} value: {} is not a recognized inspect type. Supported inspect types are: {}.</value>

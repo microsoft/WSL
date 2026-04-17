@@ -107,7 +107,6 @@ class WSLCE2EInspectTests
         EnsureContainerDoesNotExist(DebianImage.Name);
         auto createResult = RunWslc(std::format(L"container create --name {} {}", DebianImage.Name, DebianImage.NameAndTag()));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
-        auto containerId = createResult.GetStdoutOneLine();
 
         // No type specified
         {

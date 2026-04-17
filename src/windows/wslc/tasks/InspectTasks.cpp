@@ -66,7 +66,7 @@ void Inspect(CLIExecutionContext& context)
     auto type = InspectType::All;
     if (context.Args.Contains(ArgType::Type))
     {
-        type = validation::GetInspectTypeFromString(context.Args.Get<ArgType::Type>());
+        type = validation::GetInspectTypeFromString(context.Args.Get<ArgType::Type>(), L"type");
     }
 
     for (const auto& objectId : objectIds)
@@ -90,7 +90,7 @@ void Inspect(CLIExecutionContext& context)
         }
     }
 
-    // Always print the array, event if it's empty or an error was encountered
+    // Always print the array, even if it's empty or an error was encountered
     PrintMessage(MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)));
 }
 } // namespace wsl::windows::wslc::task
