@@ -136,7 +136,11 @@ if (Test-Path $wslconfig)
     Copy-Item $wslconfig $folder | Out-Null
 }
 
+# Collect high-level WSL install log (written by WriteInstallLog() in install.cpp)
 Copy-Item "C:\Windows\temp\wsl-install-log.txt" $folder -ErrorAction ignore
+
+# Collect MSI verbose install log (preserved on failed wsl --update)
+Copy-Item "$env:TEMP/wsl-install-logs.txt" $folder -ErrorAction ignore
 
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt

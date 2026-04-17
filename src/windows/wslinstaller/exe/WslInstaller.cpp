@@ -38,7 +38,9 @@ try
     const auto path = wsl::windows::common::registry::ReadString(key.get(), L"MSI", L"UpgradeLogFile", L"");
     if (path.empty())
     {
-        return {};
+        // Default to the same path used by wsl --update so all MSI logs
+        // are collected from one location by the diagnostic script.
+        return (std::filesystem::temp_directory_path() / L"wsl-install-logs.txt").wstring();
     }
 
     // A canonical path is required because msiexec doesn't like symlinks.
@@ -53,6 +55,14 @@ catch (...)
 std::pair<UINT, std::wstring> InstallMsipackageImpl()
 {
     const auto logFile = GetUpgradeLogFileLocation();
+
+    // Delete MSI log on success, preserve on failure for diagnostics (same as wsl --update)
+    auto clearLogs = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() {
+        if (logFile.has_value())
+        {
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(logFile->c_str()));
+        }
+    });
 
     std::wstring errors;
     auto messageCallback = [&errors](INSTALLMESSAGE type, LPCWSTR message) {
@@ -80,6 +90,11 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
         GetMsiPackagePath().c_str(), L"SKIPMSIX=1", logFile.has_value() ? logFile->c_str() : nullptr, messageCallback);
 
     WSL_LOG("MSIUpgradeResult", TraceLoggingValue(result, "result"), TraceLoggingValue(errors.c_str(), "errorMessage"));
+
+    if (result != 0)
+    {
+        clearLogs.release();
+    }
 
     return {result, errors};
 }
