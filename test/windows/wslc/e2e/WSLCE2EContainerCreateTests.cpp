@@ -665,7 +665,7 @@ private:
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -h,--help         Shows help about the selected command\r\n"
+                << L"  -?,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }
