@@ -333,13 +333,17 @@ public:
                 WSL_LOG(
                     "DiscardStaleNonTransactionMessage",
                     TraceLoggingValue(m_name, "Name"),
+                    TraceLoggingValue(ToString(header->MessageType), "MessageType"),
+                    TraceLoggingValue(ToString(TMessage::Type), "ExpectedMessageType"),
                     TraceLoggingValue(header->TransactionId, "StaleNonTransactionId"),
                     TraceLoggingValue(m_received_non_transaction_messages, "ExpectedNonTransactionId"));
 #else
                 LOG_WARNING(
-                    "Discard stale non-transaction message on channel: {}. StaleNonTransactionId: {}, ExpectedNonTransactionId: "
-                    "{}",
+                    "Discard stale non-transaction message on channel: {}. MessageType: {}, ExpectedMessageType: {}, "
+                    "StaleNonTransactionId: {}, ExpectedNonTransactionId: {}",
                     m_name,
+                    header->MessageType,
+                    TMessage::Type,
                     header->TransactionId,
                     m_received_non_transaction_messages);
 #endif
@@ -355,13 +359,17 @@ public:
                     WSL_LOG(
                         "DiscardOutOfOrderTransactionMessage",
                         TraceLoggingValue(m_name, "Name"),
+                        TraceLoggingValue(ToString(header->MessageType), "MessageType"),
+                        TraceLoggingValue(ToString(TMessage::Type), "ExpectedMessageType"),
                         TraceLoggingValue(header->TransactionStep, "StaleTransactionStep"),
                         TraceLoggingValue(expectedTransactionStep, "ExpectedTransactionStep"));
 #else
                     LOG_WARNING(
-                        "Discard out of order transaction message on channel: {}. StaleTransactionStep: {}, "
-                        "ExpectedTransactionStep: {}",
+                        "Discard out of order transaction message on channel: {}. MessageType: {}, ExpectedMessageType: {}, "
+                        "StaleTransactionStep: {}, ExpectedTransactionStep: {}",
                         m_name,
+                        header->MessageType,
+                        TMessage::Type,
                         header->TransactionStep,
                         expectedTransactionStep);
 #endif
@@ -378,12 +386,17 @@ public:
                 WSL_LOG(
                     "DiscardStaleTransactionMessage",
                     TraceLoggingValue(m_name, "Name"),
+                    TraceLoggingValue(ToString(header->MessageType), "MessageType"),
+                    TraceLoggingValue(ToString(TMessage::Type), "ExpectedMessageType"),
                     TraceLoggingValue(header->TransactionId, "StaleTransactionId"),
                     TraceLoggingValue(expectedTransactionId, "ExpectedTransactionId"));
 #else
                 LOG_WARNING(
-                    "Discard stale transaction message on channel: {}. StaleTransactionId: {}, ExpectedTransactionId: {}",
+                    "Discard stale transaction message on channel: {}. MessageType: {}, ExpectedMessageType: {}, "
+                    "StaleTransactionId: {}, ExpectedTransactionId: {}",
                     m_name,
+                    header->MessageType,
+                    TMessage::Type,
                     header->TransactionId,
                     expectedTransactionId);
 #endif
