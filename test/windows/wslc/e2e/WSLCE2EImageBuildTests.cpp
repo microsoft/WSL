@@ -123,6 +123,8 @@ class WSLCE2EImageBuildTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_Pull_Success)
     {
+        SKIP_TEST_UNSTABLE(); // TODO: Enable when a private image source is available.
+
         auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-pull";
         auto cleanup = SetupTestDirectory(testRoot);
 
