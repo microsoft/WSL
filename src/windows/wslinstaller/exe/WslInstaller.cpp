@@ -91,7 +91,7 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
 
     WSL_LOG("MSIUpgradeResult", TraceLoggingValue(result, "result"), TraceLoggingValue(errors.c_str(), "errorMessage"));
 
-    if (result != 0)
+    if (result != ERROR_SUCCESS && result != ERROR_SUCCESS_REBOOT_REQUIRED)
     {
         clearLogs.release();
     }
