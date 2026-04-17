@@ -4,13 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCTableOutputUnitTests.cpp
+    WSLCCLITableOutputUnitTests.cpp
 
 Abstract:
 
     Unit tests for the TableOutput class.
-    Output is redirected to an in-memory std::wstringstream so that tests
-    are fully self-contained and do not depend on a real console or FILE*.
 
 --*/
 
@@ -27,24 +25,6 @@ using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
 namespace WSLCTableOutputUnitTests {
-
-// Helper: capture all lines emitted by a TableOutput into a vector<wstring>.
-// ---------------------------------------------------------------------------
-template <size_t N>
-struct TableOutputCapture
-{
-    std::vector<std::wstring> lines;
-    TableOutput<N> table;
-
-    // Forwards constructor arguments straight to TableOutput.
-    template <typename... Args>
-    explicit TableOutputCapture(Args&&... args) : table(std::forward<Args>(args)...)
-    {
-        table.SetOutputFunction([this](const std::wstring& line) { lines.push_back(line); });
-        // Pin the console width so shrinking tests are deterministic.
-        table.SetConsoleWidthOverride(120);
-    }
-};
 
 class WSLCTableOutputUnitTests
 {
@@ -135,9 +115,10 @@ class WSLCTableOutputUnitTests
         VERIFY_IS_TRUE(dataLine.find(L"ok") != std::wstring::npos);
 
         // There must be at least 3 spaces between the two values
+        auto columnPadding = 3;
         auto namePos = dataLine.find(L"abc");
         auto statusPos = dataLine.find(L"ok");
-        VERIFY_IS_TRUE(statusPos > namePos + 3);
+        VERIFY_IS_TRUE(statusPos >= namePos + wcslen(L"abc") + columnPadding);
     }
 
     // Test: custom column padding is respected.
@@ -154,7 +135,9 @@ class WSLCTableOutputUnitTests
         const std::wstring& dataLine = cap.lines[1];
         auto posX = dataLine.find(L'x');
         auto posY = dataLine.find(L'y');
-        VERIFY_IS_TRUE(posY >= posX + customPadding);
+        VERIFY_IS_TRUE(posX != std::wstring::npos);
+        VERIFY_IS_TRUE(posY != std::wstring::npos);
+        VERIFY_IS_TRUE(posY >= posX + 1 + customPadding);
     }
 
     // Test: column width expands to fit the widest data value.
@@ -193,6 +176,7 @@ class WSLCTableOutputUnitTests
         // position 14 + padding.
         const std::wstring& dataLine = cap.lines[1];
         auto posOk = dataLine.find(L"ok");
+        VERIFY_IS_TRUE(posOk != std::wstring::npos);
         // "CONTAINER_NAME" = 14 chars, padding = 3 -> "ok" must be at >= 17
         VERIFY_IS_TRUE(posOk >= static_cast<size_t>(14 + TableOutput<2>::DefaultColumnPadding));
     }
@@ -288,6 +272,125 @@ class WSLCTableOutputUnitTests
 
         // "id-value" is 8 chars but MaxWidth=6 -> must be truncated
         VERIFY_IS_TRUE(cap.lines[1].find(L"\x2026") != std::wstring::npos);
+    }
+
+    // Test: SetShowHeader(false) suppresses header when there are data rows.
+    TEST_METHOD(TableOutput_ShowHeader_False_SuppressesHeaderWithDataRows)
+    {
+        TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+        cap.table.SetShowHeader(false);
+
+        cap.table.OutputLine({L"my-container", L"running"});
+        cap.table.Complete();
+
+        // Only the data row should be emitted — no header.
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), cap.lines.size());
+        VERIFY_IS_TRUE(cap.lines[0].find(L"my-container") != std::wstring::npos);
+        VERIFY_IS_TRUE(cap.lines[0].find(L"NAME") == std::wstring::npos);
+    }
+
+    // Test: SetShowHeader(false) with AlwaysShowHeader(true) still suppresses header when empty.
+    TEST_METHOD(TableOutput_ShowHeader_False_SuppressesHeaderEvenWhenAlwaysShowHeaderTrue)
+    {
+        TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+        cap.table.SetAlwaysShowHeader(true);
+        cap.table.SetShowHeader(false);
+
+        cap.table.Complete();
+
+        // SetShowHeader(false) takes precedence — nothing should be emitted.
+        VERIFY_ARE_EQUAL(static_cast<size_t>(0), cap.lines.size());
+    }
+
+    // Test: SetShowHeader(true) is the default — header appears before data rows.
+    TEST_METHOD(TableOutput_ShowHeader_True_IsDefaultAndEmitsHeader)
+    {
+        TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+        // No explicit call to SetShowHeader — default must be true.
+
+        cap.table.OutputLine({L"my-container", L"running"});
+        cap.table.Complete();
+
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), cap.lines.size());
+        VERIFY_IS_TRUE(cap.lines[0].find(L"NAME") != std::wstring::npos);
+        VERIFY_IS_TRUE(cap.lines[0].find(L"STATUS") != std::wstring::npos);
+    }
+
+    // Test: SetShowHeader(false) with multiple data rows emits only data rows.
+    TEST_METHOD(TableOutput_ShowHeader_False_MultipleDataRowsNoHeader)
+    {
+        TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+        cap.table.SetShowHeader(false);
+
+        cap.table.OutputLine({L"container-a", L"running"});
+        cap.table.OutputLine({L"container-b", L"stopped"});
+        cap.table.Complete();
+
+        // Two data rows, zero header rows.
+        VERIFY_ARE_EQUAL(static_cast<size_t>(2), cap.lines.size());
+        VERIFY_IS_TRUE(cap.lines[0].find(L"container-a") != std::wstring::npos);
+        VERIFY_IS_TRUE(cap.lines[1].find(L"container-b") != std::wstring::npos);
+        // Neither line should contain the column header text.
+        VERIFY_IS_TRUE(cap.lines[0].find(L"NAME") == std::wstring::npos);
+        VERIFY_IS_TRUE(cap.lines[1].find(L"NAME") == std::wstring::npos);
+    }
+
+    // Test: SetShowHeader controls whether the header row is emitted.
+    // Covers: default (true), suppression with data rows, suppression when empty
+    // (even with AlwaysShowHeader), and multiple data rows with no header.
+    TEST_METHOD(TableOutput_ShowHeader)
+    {
+        // Default is true — header appears before data rows without an explicit call.
+        {
+            TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+
+            cap.table.OutputLine({L"my-container", L"running"});
+            cap.table.Complete();
+
+            VERIFY_ARE_EQUAL(static_cast<size_t>(2), cap.lines.size());
+            VERIFY_IS_TRUE(cap.lines[0].find(L"NAME") != std::wstring::npos);
+            VERIFY_IS_TRUE(cap.lines[0].find(L"STATUS") != std::wstring::npos);
+        }
+
+        // SetShowHeader(false) suppresses the header when data rows are present.
+        {
+            TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+            cap.table.SetShowHeader(false);
+
+            cap.table.OutputLine({L"my-container", L"running"});
+            cap.table.Complete();
+
+            VERIFY_ARE_EQUAL(static_cast<size_t>(1), cap.lines.size());
+            VERIFY_IS_TRUE(cap.lines[0].find(L"my-container") != std::wstring::npos);
+            VERIFY_IS_TRUE(cap.lines[0].find(L"NAME") == std::wstring::npos);
+        }
+
+        // SetShowHeader(false) suppresses the header even when AlwaysShowHeader is true and the table is empty.
+        {
+            TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+            cap.table.SetAlwaysShowHeader(true);
+            cap.table.SetShowHeader(false);
+
+            cap.table.Complete();
+
+            VERIFY_ARE_EQUAL(static_cast<size_t>(0), cap.lines.size());
+        }
+
+        // SetShowHeader(false) with multiple data rows emits only data rows.
+        {
+            TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
+            cap.table.SetShowHeader(false);
+
+            cap.table.OutputLine({L"container-a", L"running"});
+            cap.table.OutputLine({L"container-b", L"stopped"});
+            cap.table.Complete();
+
+            VERIFY_ARE_EQUAL(static_cast<size_t>(2), cap.lines.size());
+            VERIFY_IS_TRUE(cap.lines[0].find(L"container-a") != std::wstring::npos);
+            VERIFY_IS_TRUE(cap.lines[1].find(L"container-b") != std::wstring::npos);
+            VERIFY_IS_TRUE(cap.lines[0].find(L"NAME") == std::wstring::npos);
+            VERIFY_IS_TRUE(cap.lines[1].find(L"NAME") == std::wstring::npos);
+        }
     }
 };
 

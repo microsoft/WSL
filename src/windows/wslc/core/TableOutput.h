@@ -148,9 +148,19 @@ struct TableOutput
         m_alwaysShowHeader = alwaysShow;
     }
 
+    // Set whether to show the header row
+    void SetShowHeader(bool showHeader)
+    {
+        m_showHeader = showHeader;
+    }
+
     // Override the output function (e.g. redirect to a stringstream in tests).
     void SetOutputFunction(OutputFn fn)
     {
+        static_assert(
+            std::is_same<OutputFn, std::function<void(const std::wstring&)>>::value,
+            "OutputFn must be a callable with signature void(const std::wstring&)");
+        FAIL_FAST_IF_MSG(!fn, "OutputFn must not be empty");
         m_outputFn = std::move(fn);
     }
 
@@ -184,7 +194,7 @@ struct TableOutput
         {
             EvaluateAndFlushBuffer();
         }
-        else if (m_alwaysShowHeader)
+        else if (m_alwaysShowHeader && m_showHeader)
         {
             OutputHeaderOnly();
         }
@@ -215,6 +225,7 @@ private:
     bool m_empty = true;
     bool m_limitColumnWidths = false;
     bool m_alwaysShowHeader = true;
+    bool m_showHeader = true;
     std::wstringstream m_stream;
     OutputFn m_outputFn;
     size_t m_consoleWidthOverride = 0;
@@ -401,13 +412,16 @@ private:
             }
         }
 
-        line_t headerLine;
-        for (size_t i = 0; i < FieldCount; ++i)
+        if (m_showHeader)
         {
-            headerLine[i] = m_columns[i].Name.c_str();
-        }
+            line_t headerLine;
+            for (size_t i = 0; i < FieldCount; ++i)
+            {
+                headerLine[i] = m_columns[i].Name.c_str();
+            }
 
-        OutputLineToStream(headerLine);
+            OutputLineToStream(headerLine);
+        }
 
         for (const auto& line : m_buffer)
         {
