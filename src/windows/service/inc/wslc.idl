@@ -544,9 +544,10 @@ typedef enum _WSLCBuildImageFlags
     WSLCBuildImageFlagsNone = 0,
     WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps.
     WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
+    WSLCBuildImageFlagsPull = 4,    // Always attempt to pull a newer version of the image.
 } WSLCBuildImageFlags;
 
-cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache)")
+cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
 
@@ -556,6 +557,7 @@ typedef struct _WSLCBuildImageOptions
     WSLCHandle DockerfileHandle;
     WSLCStringArray Tags;
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
+    LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
 } WSLCBuildImageOptions;
 

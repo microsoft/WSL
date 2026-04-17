@@ -592,6 +592,15 @@ try
     {
         buildArgs.push_back("--no-cache");
     }
+    if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsPull))
+    {
+        buildArgs.push_back("--pull");
+    }
+    if (Options->Target != nullptr && Options->Target[0] != '\0')
+    {
+        buildArgs.push_back("--target");
+        buildArgs.push_back(Options->Target);
+    }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
         RETURN_HR_IF_NULL(E_INVALIDARG, Options->Tags.Values[i]);

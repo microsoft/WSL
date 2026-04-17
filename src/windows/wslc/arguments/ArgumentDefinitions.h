@@ -36,6 +36,8 @@ Abstract:
 _(All,            "all",                 L"a",              Kind::Flag,        Localization::WSLCCLI_AllArgDescription()) \
 _(Attach,         "attach",              L"a",              Kind::Flag,        Localization::WSLCCLI_AttachArgDescription()) \
 _(BuildArg,       "build-arg",           NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_BuildArgDescription()) \
+_(BuildPull,      "pull",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_BuildPullArgDescription()) \
+_(BuildTarget,    "target",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_BuildTargetArgDescription()) \
 /*_(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_CIDFileArgDescription())*/ \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_CommandArgDescription()) \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \

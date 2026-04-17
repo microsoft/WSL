@@ -1900,7 +1900,7 @@ class WSLCTests
         WSLCBuildImageOptions options{
             .ContextPath = contextDir.c_str(),
             .DockerfileHandle = ToCOMInputHandle(dummyDockerfile.get()),
-            .Flags = static_cast<WSLCBuildImageFlags>(0x4)};
+            .Flags = static_cast<WSLCBuildImageFlags>(0x8)};
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr));
     }
