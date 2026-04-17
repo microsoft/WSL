@@ -36,7 +36,8 @@ static bool TryInspect(TInspectFn&& fn, HRESULT notFoundError)
     }
     catch (const wil::ResultException& ex)
     {
-        if (ex.GetErrorCode() == notFoundError || ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS))
+        auto errorCode = ex.GetErrorCode();
+        if (errorCode == notFoundError || errorCode == HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS) || errorCode == E_INVALIDARG)
         {
             return false;
         }
@@ -58,7 +59,6 @@ static bool TryInspectContainer(wsl::windows::wslc::models::Session& session, co
 void Inspect(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::ObjectId));
     auto& session = context.Data.Get<Data::Session>();
     auto objectIds = context.Args.GetAll<ArgType::ObjectId>();
 
@@ -86,9 +86,11 @@ void Inspect(CLIExecutionContext& context)
         else
         {
             PrintMessage(std::format(L"Object not found: {}", objectId), stderr);
+            context.ExitCode = 1;
         }
     }
 
+    // Always print the array, event if it's empty or an error was encountered
     PrintMessage(MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)));
 }
 } // namespace wsl::windows::wslc::task

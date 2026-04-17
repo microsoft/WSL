@@ -14,6 +14,7 @@ Abstract:
 #include "SessionTasks.h"
 #include "InspectTasks.h"
 
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc {
@@ -29,12 +30,12 @@ std::vector<Argument> InspectCommand::GetArguments() const
 
 std::wstring InspectCommand::ShortDescription() const
 {
-    return {L"Inspect objects."};
+    return {Localization::WSLCCLI_InspectDesc()};
 }
 
 std::wstring InspectCommand::LongDescription() const
 {
-    return {L"Inspects objects."};
+    return {Localization::WSLCCLI_InspectLongDesc()};
 }
 
 void InspectCommand::ExecuteInternal(CLIExecutionContext& context) const

@@ -2584,4 +2584,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
     <value>Type of the object to inspect</value>
   </data>
+  <data name="WSLCCLI_InspectDesc" xml:space="preserve">
+    <value>Inspect objects.</value>
+  </data>
+  <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
+    <value>Inspect objects.</value>
+  </data>
 </root>
