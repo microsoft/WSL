@@ -306,9 +306,10 @@ struct CreateDeviceRequest
     std::wstring deviceName;
     std::optional<GUID> lowerEdgeAdapterId;
     std::optional<std::wstring> lowerEdgeDeviceName;
+    bool disableLoopbackMirroring{};
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(CreateDeviceRequest, type, deviceName, lowerEdgeAdapterId, lowerEdgeDeviceName);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(CreateDeviceRequest, type, deviceName, lowerEdgeAdapterId, lowerEdgeDeviceName, disableLoopbackMirroring);
 
 inline void to_json(nlohmann::json& j, const CreateDeviceRequest& request)
 {
@@ -322,6 +323,11 @@ inline void to_json(nlohmann::json& j, const CreateDeviceRequest& request)
     if (request.lowerEdgeDeviceName.has_value())
     {
         j["lowerEdgeDeviceName"] = request.lowerEdgeDeviceName.value();
+    }
+
+    if (request.disableLoopbackMirroring)
+    {
+        j["disableLoopbackMirroring"] = true;
     }
 }
 

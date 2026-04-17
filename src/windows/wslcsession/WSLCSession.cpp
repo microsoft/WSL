@@ -243,6 +243,8 @@ try
     // Get an event from the service that is signaled when the VM exits.
     THROW_IF_FAILED(Vm->GetTerminationEvent(&m_vmExitedEvent));
 
+    const bool raw = WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsRaw);
+
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
@@ -256,12 +258,12 @@ try
     THROW_WIN32_IF_MSG(
         ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
-    auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
+        auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+        m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
-    //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
+        //  Start the event tracker.
+        m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
     // Monitor for unexpected VM exit.
     m_ioRelay.AddHandle(
@@ -2352,6 +2354,14 @@ try
         retrying = true;
     }
 
+    {
+        std::lock_guard comLock(m_userCOMCallbacksLock);
+
+        // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
+        // to unblock operations waiting for cross-process COM responses.
+        CancelUserCOMCallbacks();
+    }
+
     // Acquire an exclusive lock to ensure that no operation is running.
     WI_VERIFY(sessionLock);
 
@@ -2412,6 +2422,7 @@ try
             }
             CATCH_LOG();
         }
+
     }
 
     m_dockerdProcess.reset();

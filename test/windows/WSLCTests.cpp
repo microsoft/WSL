@@ -532,7 +532,7 @@ class WSLCTests
             // Start a local registry without auth and push hello-world:latest to it.
             auto [registryContainer, registryAddress] = StartLocalRegistry();
 
-            auto image = PushImageToRegistry("hello-world:latest", registryAddress, BuildRegistryAuthHeader("", ""));
+            auto image = PushImageToRegistry("hello-world:latest", registryAddress, BuildRegistryAuthHeader("", "", registryAddress));
             ExpectImagePresent(*m_defaultSession, image.c_str(), false);
 
             VERIFY_SUCCEEDED(m_defaultSession->PullImage(image.c_str(), nullptr, nullptr));
@@ -574,7 +574,7 @@ class WSLCTests
     {
         // Start a local registry without auth to avoid Docker Hub rate limits.
         auto [registryContainer, registryAddress] = StartLocalRegistry();
-        auto auth = BuildRegistryAuthHeader("", "");
+        auto auth = BuildRegistryAuthHeader("", "", registryAddress);
 
         auto validatePull = [&](const std::string& sourceImage) {
             // Push the source image to the local registry.
@@ -656,7 +656,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(PushImage)
     {
-        auto emptyAuth = BuildRegistryAuthHeader("", "");
+        auto emptyAuth = BuildRegistryAuthHeader("", "", "");
 
         // Validate that pushing a non-existent image fails.
         {
@@ -692,7 +692,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->Authenticate(registryAddress.c_str(), c_username, c_password, &token));
         VERIFY_IS_NOT_NULL(token.get());
 
-        auto xRegistryAuth = BuildRegistryAuthHeader(c_username, c_password);
+        auto xRegistryAuth = BuildRegistryAuthHeader(c_username, c_password, registryAddress);
         auto image = PushImageToRegistry("hello-world:latest", registryAddress, xRegistryAuth);
 
         // Pulling without credentials should fail.

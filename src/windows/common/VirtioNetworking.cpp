@@ -83,7 +83,9 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
 
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
-        [&](const SOCKADDR_INET& addr, int protocol, bool allocate) { return HandlePortNotification(addr, protocol, allocate); },
+        [&](const SOCKADDR_INET& addr, int protocol, bool allocate) {
+            return HandlePortNotification(addr, protocol, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)), allocate);
+        },
         [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
 
@@ -94,7 +96,7 @@ try
 }
 CATCH_LOG()
 
-HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
+HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const noexcept
 {
     if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6))
     {
@@ -114,7 +116,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         }
     }
 
-    const auto guestPort = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr));
+    auto hostPort = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr));
 
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
     {
@@ -134,8 +136,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
 
         try
         {
-            const auto addrStr = wsl::windows::common::string::SockAddrInetToString(localAddr);
-            ModifyOpenPorts(c_loopbackDeviceName, addrStr.c_str(), guestPort, guestPort, protocol, allocate);
+            hostPort = ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, allocate);
         }
         catch (...)
         {
@@ -147,8 +148,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
     {
         try
         {
-            const auto addrStr = wsl::windows::common::string::SockAddrInetToString(addr);
-            ModifyOpenPorts(c_eth0DeviceName, addrStr.c_str(), guestPort, guestPort, protocol, allocate);
+            hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
         }
         catch (...)
         {
@@ -160,7 +160,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
 }
 
 uint16_t VirtioNetworking::ModifyOpenPorts(
-    _In_ PCWSTR tag, _In_opt_ PCSTR hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const
+    _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const
 {
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
@@ -172,8 +172,10 @@ uint16_t VirtioNetworking::ModifyOpenPorts(
     const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
     THROW_HR_IF(E_NOT_SET, !server);
 
+    const auto hostAddressStr = wsl::windows::common::string::SockAddrInetToString(hostAddress);
+
     // format: tag={tag}[;host_port={port}];guest_port={port}[;listen_addr={addr}|;allocate=false][;udp]
-    std::wstring portString = std::format(L"tag={};guest_port={};listen_addr={}", tag, GuestPort, hostAddress);
+    std::wstring portString = std::format(L"tag={};guest_port={};listen_addr={}", tag, GuestPort, hostAddressStr.c_str());
 
     if (HostPort != WSLC_EPHEMERAL_PORT)
     {
@@ -191,6 +193,7 @@ uint16_t VirtioNetworking::ModifyOpenPorts(
     }
 
     const HRESULT addShareResult = server->AddShare(portString.c_str(), nullptr, 0);
+    WSL_LOG("MapVirtioPort", TraceLoggingValue(portString.c_str(), "PortString"), TraceLoggingValue(addShareResult, "Result"));
 
     if (HostPort == WSLC_EPHEMERAL_PORT && isOpen && SUCCEEDED(addShareResult))
     {
@@ -202,29 +205,25 @@ uint16_t VirtioNetworking::ModifyOpenPorts(
     return HostPort;
 }
 
-HRESULT VirtioNetworking::MapPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ PCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort) const
+HRESULT VirtioNetworking::MapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol, _Out_ USHORT* AllocatedHostPort) const
 try
 {
-    RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr || ListenAddress == nullptr);
+    RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr);
     RETURN_HR_IF_MSG(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP, "Invalid protocol: %i", Protocol);
 
     *AllocatedHostPort = 0;
 
-    *AllocatedHostPort = ModifyOpenPorts(c_eth0DeviceName, ListenAddress, HostPort, GuestPort, Protocol, true);
-    return S_OK;
+    return HandlePortNotification(ListenAddress, Protocol, GuestPort, true);
 }
 CATCH_RETURN()
 
-HRESULT VirtioNetworking::UnmapPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ PCSTR ListenAddress) const
+HRESULT VirtioNetworking::UnmapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol) const
 try
 {
-    RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
     RETURN_HR_IF(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP);
 
-    const auto listenAddrW = wsl::shared::string::MultiByteToWide(ListenAddress);
-
-    ModifyOpenPorts(c_eth0DeviceName, nullptr, HostPort, GuestPort, Protocol, false);
-    return S_OK;
+    const auto hostPort = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&ListenAddress));
+    return HandlePortNotification(ListenAddress, Protocol, GuestPort, false);
 }
 CATCH_RETURN()
 
@@ -335,6 +334,7 @@ void VirtioNetworking::SetupLoopbackDevice()
     createLoopbackDevice.deviceName = c_loopbackDeviceName;
     createLoopbackDevice.type = hns::DeviceType::Loopback;
     createLoopbackDevice.lowerEdgeAdapterId = m_localhostAdapterId.value();
+    createLoopbackDevice.disableLoopbackMirroring = WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DisableLoopbackMirroring);
     constexpr auto loopbackType = GnsMessageType(createLoopbackDevice);
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }

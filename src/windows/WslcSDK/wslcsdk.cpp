@@ -17,10 +17,7 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
-#include "Localization.h"
-#include "WslInstall.h"
 #include "wslutil.h"
-#include "WindowsUpdateIntegration.h"
 
 using namespace std::string_view_literals;
 using namespace wsl::windows::common::wslutil;
@@ -216,7 +213,7 @@ bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const Wslc
 {
     if (initProcessOptions)
     {
-        runtimeOptions.CurrentDirectory = initProcessOptions->workingDirectory;
+        runtimeOptions.CurrentDirectory = initProcessOptions->currentDirectory;
         runtimeOptions.CommandLine.Values = initProcessOptions->commandLine;
         runtimeOptions.CommandLine.Count = initProcessOptions->commandLineCount;
         runtimeOptions.Environment.Values = initProcessOptions->environment;
@@ -373,7 +370,7 @@ try
     internalType->cpuCount = s_DefaultCPUCount;
     internalType->memoryMb = s_DefaultMemoryMB;
     internalType->timeoutMS = s_DefaultBootTimeout;
-    internalType->vhdRequirements.sizeBytes = s_DefaultStorageSize;
+    internalType->vhdRequirements.sizeInBytes = s_DefaultStorageSize;
 
     return S_OK;
 }
@@ -397,14 +394,14 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetSessionSettingsMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMB)
+STDAPI WslcSetSessionSettingsMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
-    if (memoryMB)
+    if (memoryMb)
     {
-        internalType->memoryMb = memoryMB;
+        internalType->memoryMb = memoryMb;
     }
     else
     {
@@ -429,7 +426,7 @@ try
     WSLCSessionSettings runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
-    runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeBytes / _1MB;
+    runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeInBytes / _1MB;
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
@@ -491,14 +488,14 @@ try
     RETURN_HR_IF_NULL(E_POINTER, options);
 
     RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
-    RETURN_HR_IF(E_INVALIDARG, options->sizeBytes == 0);
+    RETURN_HR_IF(E_INVALIDARG, options->sizeInBytes == 0);
     RETURN_HR_IF(E_NOTIMPL, options->type != WSLC_VHD_TYPE_DYNAMIC);
 
     WSLCVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
     volumeOptions.Driver = "vhd";
 
-    auto sizeStr = std::to_string(options->sizeBytes);
+    auto sizeStr = std::to_string(options->sizeInBytes);
     WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeStr.c_str()}};
     volumeOptions.DriverOpts = driverOpts;
     volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
@@ -528,7 +525,7 @@ try
 
     if (vhdRequirements)
     {
-        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
+        RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeInBytes == 0);
         RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
 
         internalType->vhdRequirements = *vhdRequirements;
@@ -536,7 +533,6 @@ try
     else
     {
         internalType->vhdRequirements = {};
-        internalType->vhdRequirements.sizeBytes = s_DefaultStorageSize;
     }
 
     return S_OK;
@@ -960,16 +956,16 @@ CATCH_RETURN();
 
 // GENERAL CONTAINER MANAGEMENT
 
-STDAPI WslcGetContainerID(WslcContainer container, CHAR containerID[WSLC_CONTAINER_ID_BUFFER_SIZE])
+STDAPI WslcGetContainerID(WslcContainer container, CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE])
 try
 {
     static_assert(WSLC_CONTAINER_ID_BUFFER_SIZE == sizeof(WSLCContainerId), "Container ID lengths differ.");
 
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
-    RETURN_HR_IF_NULL(E_POINTER, containerID);
+    RETURN_HR_IF_NULL(E_POINTER, containerId);
 
-    return internalType->container->GetId(containerID);
+    return internalType->container->GetId(containerId);
 }
 CATCH_RETURN();
 
@@ -1071,12 +1067,12 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSetProcessSettingsWorkingDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR workingDirectory)
+STDAPI WslcSetProcessSettingsCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory)
 try
 {
     auto internalType = CheckAndGetInternalType(processSettings);
 
-    internalType->workingDirectory = workingDirectory;
+    internalType->currentDirectory = currentDirectory;
 
     return S_OK;
 }
@@ -1325,16 +1321,16 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrID, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
-    RETURN_HR_IF_NULL(E_POINTER, nameOrID);
+    RETURN_HR_IF_NULL(E_POINTER, nameOrId);
 
     WSLCDeleteImageOptions options{};
-    options.Image = nameOrID;
+    options.Image = nameOrId;
     // TODO: Flags? (Force and NoPrune)
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImageInformation;
@@ -1447,7 +1443,7 @@ try
                     0);
             ConvertSHA256Hash(currentImage.Hash, currentResult.sha256);
             currentResult.sizeBytes = currentImage.Size;
-            currentResult.createdUnixTime = currentImage.Created;
+            currentResult.createdTimestamp = currentImage.Created;
         }
 
         *images = result.release();
@@ -1462,11 +1458,13 @@ CATCH_RETURN();
 
 // INSTALL
 
-STDAPI WslcGetMissingComponents(_Out_ WslcComponentFlags* missingComponents)
+STDAPI WslcCanRun(_Out_ BOOL* canRun, _Out_ WslcComponentFlags* missingComponents)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, canRun);
     RETURN_HR_IF_NULL(E_POINTER, missingComponents);
 
+    *canRun = FALSE;
     *missingComponents = WSLC_COMPONENT_FLAG_NONE;
 
     WslcComponentFlags componentCheck = WSLC_COMPONENT_FLAG_NONE;
@@ -1474,6 +1472,7 @@ try
     WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, NeedsVirtualMachineServicesInstalled());
     WI_SetFlagIf(componentCheck, WSLC_COMPONENT_FLAG_WSL_PACKAGE, NeedsWslRuntimeInstalled());
 
+    *canRun = componentCheck == WSLC_COMPONENT_FLAG_NONE ? TRUE : FALSE;
     *missingComponents = componentCheck;
 
     return S_OK;
@@ -1504,61 +1503,9 @@ CATCH_RETURN();
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 try
 {
-    HRESULT result = S_OK;
-    bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
-    bool needsRuntime = NeedsWslRuntimeInstalled();
-
-    if (!needsVirtualMachine && !needsRuntime)
-    {
-        return result;
-    }
-
-    // Installing these components requires elevation.
-    auto token = wil::open_current_access_token();
-    RETURN_HR_IF(
-        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
-        !wsl::windows::common::security::IsTokenElevated(token.get()) && !wsl::windows::common::security::IsTokenLocalSystem(token.get()));
-
-    if (needsVirtualMachine)
-    {
-        if (progressCallback)
-        {
-            progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 0, 1, context);
-        }
-
-        auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameVmp, false);
-        if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
-        {
-            result = HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
-        }
-        else if (exitCode != 0)
-        {
-            THROW_HR_WITH_USER_ERROR(
-                WSL_E_INSTALL_COMPONENT_FAILED,
-                wsl::shared::Localization::MessageOptionalComponentInstallFailed(WslInstall::c_optionalFeatureNameVmp, exitCode));
-        }
-
-        if (progressCallback)
-        {
-            progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 1, 1, context);
-        }
-    }
-
-    if (needsRuntime)
-    {
-        std::function<void(uint32_t)> callback;
-        if (progressCallback)
-        {
-            callback = [progressCallback, context](uint32_t progress) {
-                progressCallback(WSLC_COMPONENT_FLAG_WSL_PACKAGE, progress, 100, context);
-            };
-        }
-
-        wsl::windows::common::WindowsUpdateContext wuContext;
-        wuContext.RunUpdateFlow(true, callback);
-    }
-
-    return result;
+    UNREFERENCED_PARAMETER(progressCallback);
+    UNREFERENCED_PARAMETER(context);
+    return E_NOTIMPL;
 }
 CATCH_RETURN();
 

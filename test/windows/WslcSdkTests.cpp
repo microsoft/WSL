@@ -168,6 +168,7 @@ class WslcSdkTests
 {
     WSLC_TEST_CLASS(WslcSdkTests)
 
+    wil::unique_mta_usage_cookie m_mtaCookie;
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WslcSession m_defaultSession = nullptr;
@@ -181,6 +182,7 @@ class WslcSdkTests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
+        THROW_IF_FAILED(CoIncrementMTAUsage(&m_mtaCookie));
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         // Use the same storage path as WSLC runtime tests to reduce pull overhead.
@@ -194,7 +196,7 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
 
         WslcVhdRequirements vhdReqs{};
-        vhdReqs.sizeBytes = 4096ull * 1024 * 1024; // 4 GB
+        vhdReqs.sizeInBytes = 4096ull * 1024 * 1024; // 4 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
         VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
@@ -247,7 +249,7 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcSetSessionSettingsTimeout(&sessionSettings, 30 * 1000));
 
         WslcVhdRequirements vhdReqs{};
-        vhdReqs.sizeBytes = 1024ull * 1024 * 1024; // 1 GB
+        vhdReqs.sizeInBytes = 1024ull * 1024 * 1024; // 1 GB
         vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
         VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
 
@@ -338,7 +340,7 @@ class WslcSdkTests
             for (uint32_t i = 0; i < count; ++i)
             {
                 if (images[i].name[0] != '\0' && (images[i].sha256[0] != 0 || images[i].sha256[31] != 0) &&
-                    images[i].sizeBytes != 0 && images[i].createdUnixTime != 0)
+                    images[i].sizeBytes != 0 && images[i].createdTimestamp != 0)
                 {
                     foundNonEmpty = true;
                     break;
@@ -1397,17 +1399,17 @@ class WslcSdkTests
         }
     }
 
-    WSLC_TEST_METHOD(ProcessWorkingDirectory)
+    WSLC_TEST_METHOD(ProcessCurrentDirectory)
     {
-        // Unit: setting a working directory returns S_OK.
+        // Unit: setting a current directory returns S_OK.
         {
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsWorkingDirectory(&procSettings, "/tmp"));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCurrentDirectory(&procSettings, "/tmp"));
         }
 
         // Negative: null processSettings must fail.
-        VERIFY_ARE_EQUAL(WslcSetProcessSettingsWorkingDirectory(nullptr, "/tmp"), E_POINTER);
+        VERIFY_ARE_EQUAL(WslcSetProcessSettingsCurrentDirectory(nullptr, "/tmp"), E_POINTER);
 
         // Functional: verify pwd reports the configured working directory.
         {
@@ -1416,13 +1418,13 @@ class WslcSdkTests
             VERIFY_IS_FALSE(output.stdoutOutput.empty());
         }
 
-        // Functional: set working directory to /tmp and verify pwd output.
+        // Functional: set current directory to /tmp and verify pwd output.
         {
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
             const char* argv[] = {"/bin/pwd"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsWorkingDirectory(&procSettings, "/tmp"));
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCurrentDirectory(&procSettings, "/tmp"));
 
             WslcContainerSettings containerSettings;
             VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
@@ -1446,13 +1448,15 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcGetVersion(nullptr), E_POINTER);
     }
 
-    WSLC_TEST_METHOD(GetMissingComponents)
+    WSLC_TEST_METHOD(CanRun)
     {
+        BOOL canRun = FALSE;
         WslcComponentFlags missing{};
-        VERIFY_SUCCEEDED(WslcGetMissingComponents(&missing));
+        VERIFY_SUCCEEDED(WslcCanRun(&canRun, &missing));
 
         // Presumably anywhere that we run the tests we should get these results.
         // The levels of OS state modification required to test beyond this are beyond the scope of these tests.
+        VERIFY_ARE_EQUAL(canRun, TRUE);
         VERIFY_ARE_EQUAL(missing, WSLC_COMPONENT_FLAG_NONE);
     }
 
@@ -1894,7 +1898,7 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-vhd-test", vhdSessionStorage.c_str(), &sessionSettings));
 
         WslcVhdRequirements sessionVhd{};
-        sessionVhd.sizeBytes = 4 * _1GB;
+        sessionVhd.sizeInBytes = 4 * _1GB;
         sessionVhd.type = WSLC_VHD_TYPE_DYNAMIC;
         VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &sessionVhd));
 
@@ -1909,7 +1913,7 @@ class WslcSdkTests
         {
             WslcVhdRequirements vhd{};
             vhd.name = c_volumeName;
-            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.sizeInBytes = c_vhdSizeBytes;
             vhd.type = WSLC_VHD_TYPE_DYNAMIC;
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
@@ -1978,7 +1982,7 @@ class WslcSdkTests
         {
             WslcVhdRequirements vhd{};
             vhd.name = nullptr;
-            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.sizeInBytes = c_vhdSizeBytes;
             vhd.type = WSLC_VHD_TYPE_DYNAMIC;
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
@@ -1987,7 +1991,7 @@ class WslcSdkTests
         {
             WslcVhdRequirements vhd{};
             vhd.name = c_volumeName;
-            vhd.sizeBytes = 0;
+            vhd.sizeInBytes = 0;
             vhd.type = WSLC_VHD_TYPE_DYNAMIC;
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
@@ -1996,7 +2000,7 @@ class WslcSdkTests
         {
             WslcVhdRequirements vhd{};
             vhd.name = c_volumeName;
-            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.sizeInBytes = c_vhdSizeBytes;
             vhd.type = WSLC_VHD_TYPE_FIXED;
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_NOTIMPL);
         }
@@ -2109,7 +2113,7 @@ class WslcSdkTests
             VERIFY_IS_NOT_NULL(token.get());
         }
 
-        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password);
+        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, c_password, registryAddress);
         PushImageToRegistry("hello-world", "latest", registryAddress, xRegistryAuth);
 
         auto image = std::format("{}/hello-world:latest", registryAddress);
@@ -2135,7 +2139,7 @@ class WslcSdkTests
 
         // Negative: Pulling with bad credentials should fail.
         {
-            auto badAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, "wrong");
+            auto badAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader(c_username, "wrong", registryAddress);
 
             WslcPullImageOptions opts{};
             opts.uri = image.c_str();
@@ -2160,7 +2164,7 @@ class WslcSdkTests
     {
         // Start a local registry without auth to avoid Docker Hub rate limits.
         auto [registryContainer, registryAddress] = StartLocalRegistry();
-        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
+        auto xRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "", registryAddress);
 
         {
             // Push hello-world:latest to the local registry.
@@ -2210,7 +2214,7 @@ class WslcSdkTests
 
     WSLC_TEST_METHOD(PushImage)
     {
-        auto emptyRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "");
+        auto emptyRegistryAuth = wsl::windows::common::wslutil::BuildRegistryAuthHeader("", "", "");
 
         // Negative: pushing a non-existent image must fail.
         {
@@ -2278,6 +2282,18 @@ class WslcSdkTests
             opts.tag = nullptr;
             VERIFY_ARE_EQUAL(WslcTagSessionImage(m_defaultSession, &opts, nullptr), E_INVALIDARG);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Stub tests for unimplemented (E_NOTIMPL) functions.
+    // Each of these confirms the current state of the SDK; once the underlying
+    // function is implemented the assertion below will catch it and the test
+    // should be updated to exercise the real behaviour.
+    // -----------------------------------------------------------------------
+
+    WSLC_TEST_METHOD(InstallWithDependenciesNotImplemented)
+    {
+        VERIFY_ARE_EQUAL(WslcInstallWithDependencies(nullptr, nullptr), E_NOTIMPL);
     }
 
     // Negative tests: handle lifecycle and invalid state transitions
@@ -2393,48 +2409,5 @@ class WslcSdkTests
         WslcPullImageOptions pullOptions = {};
         pullOptions.uri = "///invalid-registry-url///";
         VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &pullOptions, nullptr), E_INVALIDARG);
-    }
-
-    WSLC_TEST_METHOD(ContainerGpu)
-    {
-        // Validate that creating a GPU container on a session without GPU support fails.
-        {
-            WslcContainerSettings containerSettings;
-            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsFlags(&containerSettings, WSLC_CONTAINER_FLAG_ENABLE_GPU));
-
-            UniqueContainer container;
-            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
-        }
-
-        // Create a GPU-enabled session.
-        std::filesystem::path gpuStorage = m_storagePath / "wslc-gpu-session-storage";
-        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            std::error_code error;
-            std::filesystem::remove_all(gpuStorage, error);
-        });
-
-        WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-gpu-test", gpuStorage.c_str(), &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsFeatureFlags(&sessionSettings, WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU));
-
-        WslcVhdRequirements vhdReqs{};
-        vhdReqs.sizeBytes = 4096ull * 1024 * 1024;
-        vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
-        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
-
-        UniqueSession gpuSession;
-        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &gpuSession, nullptr));
-        THROW_IF_FAILED(WslcLoadSessionImageFromFile(gpuSession.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
-
-        // Validate /dev/dxg is available and LD_LIBRARY_PATH is set via the container init command.
-        {
-            const char* initArgv[] = {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"};
-
-            auto output = RunContainerAndCapture(
-                gpuSession.get(), "debian:latest", {initArgv[0], initArgv[1], initArgv[2]}, WSLC_CONTAINER_FLAG_ENABLE_GPU);
-
-            VERIFY_ARE_EQUAL(output.stdoutOutput, "/usr/lib/wsl/lib\n");
-        }
     }
 };
