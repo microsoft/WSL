@@ -99,6 +99,14 @@ WindowsUpdateContext::WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFac
 
     auto applicationID = wil::make_bstr(L"Windows Subsystem for Linux");
     THROW_IF_FAILED(m_session->put_ClientApplicationID(applicationID.get()));
+
+    m_activity = std::make_unique<ActivityType>();
+    TraceLoggingWriteStart(
+        *m_activity,
+        "WindowsUpdateContext",
+        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"),
+        TraceLoggingWideString(m_product.c_str(), "product"));
 }
 
 std::wstring WindowsUpdateContext::WslProductIdentifier()
@@ -113,6 +121,8 @@ void WindowsUpdateContext::EnsureProductRegistryEntry() const
 
 size_t WindowsUpdateContext::SearchForUpdates()
 {
+    TraceLoggingWriteTagged(
+        *m_activity, "SearchForUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
     THROW_IF_FAILED(m_session->CreateUpdateSearcher(&m_searcher));
 
     std::wstring queryString = std::format(L"Product='{}'", m_product);
@@ -147,6 +157,8 @@ size_t WindowsUpdateContext::GetUpdateCount() const
 
 void WindowsUpdateContext::DownloadUpdates(std::function<void(uint32_t)> progress) const
 {
+    TraceLoggingWriteTagged(
+        *m_activity, "DownloadUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
     // Collect all of the updates that are not currently downloaded
     wil::com_ptr<IUpdateCollection> toDownload = m_factory->CreateUpdateCollection();
 
@@ -200,6 +212,8 @@ void WindowsUpdateContext::DownloadUpdates(std::function<void(uint32_t)> progres
 
 void WindowsUpdateContext::InstallUpdates(std::function<void(uint32_t)> progress) const
 {
+    TraceLoggingWriteTagged(
+        *m_activity, "InstallUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
     wil::com_ptr<IUpdateInstaller> updateInstaller;
     THROW_IF_FAILED(m_session->CreateUpdateInstaller(&updateInstaller));
 
@@ -226,6 +240,9 @@ void WindowsUpdateContext::InstallUpdates(std::function<void(uint32_t)> progress
 
 void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, std::function<void(uint32_t)> progress)
 {
+    TraceLoggingWriteTagged(
+        *m_activity, "RunUpdateFlow", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+
     static_assert(
         DownloadProgressPercent + InstallProgressPercent == 100, "Download and Install progress values must add up to 100.");
 

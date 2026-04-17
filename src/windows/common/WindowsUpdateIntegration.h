@@ -72,10 +72,13 @@ struct WindowsUpdateContext
     void RunUpdateFlow(bool forceInstall = false, std::function<void(uint32_t)> progress = {});
 
 private:
+    using ActivityType = TraceLoggingActivity<g_hTraceLoggingProvider, MICROSOFT_KEYWORD_MEASURES>;
+
     std::unique_ptr<WindowsUpdateClassFactory> m_factory;
     std::wstring m_product;
     wil::com_ptr<IUpdateSession> m_session;
     wil::com_ptr<IUpdateSearcher> m_searcher;
     wil::com_ptr<IUpdateCollection> m_updates;
+    std::unique_ptr<ActivityType> m_activity;
 };
 } // namespace wsl::windows::common
