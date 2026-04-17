@@ -26,37 +26,33 @@ using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::models;
 
-static std::optional<wslc_schema::InspectImage> TryInspectImage(wsl::windows::wslc::models::Session& session, const std::string& image)
+template <typename TInspectFn>
+static bool TryInspect(TInspectFn&& fn, HRESULT notFoundError)
 {
     try
     {
-        return services::ImageService::Inspect(session, image);
+        fn();
+        return true;
     }
     catch (const wil::ResultException& ex)
     {
-        if (ex.GetErrorCode() == WSLC_E_IMAGE_NOT_FOUND)
+        if (ex.GetErrorCode() == notFoundError || ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS))
         {
-            return std::nullopt;
+            return false;
         }
 
         throw;
     }
 }
 
-static std::optional<wslc_schema::InspectContainer> TryInspectContainer(wsl::windows::wslc::models::Session& session, const std::string& containerId)
+static bool TryInspectImage(wsl::windows::wslc::models::Session& session, const std::string& image, std::optional<wslc_schema::InspectImage>& result)
 {
-    try
-    {
-        return services::ContainerService::Inspect(session, containerId);
-    }
-    catch (const wil::ResultException& ex)
-    {
-        if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
-        {
-            return std::nullopt;
-        }
-        throw;
-    }
+    return TryInspect([&]() { result = services::ImageService::Inspect(session, image); }, WSLC_E_IMAGE_NOT_FOUND);
+}
+
+static bool TryInspectContainer(wsl::windows::wslc::models::Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& result)
+{
+    return TryInspect([&]() { result = services::ContainerService::Inspect(session, containerId); }, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 }
 
 void Inspect(CLIExecutionContext& context)
@@ -76,36 +72,23 @@ void Inspect(CLIExecutionContext& context)
     for (const auto& objectId : objectIds)
     {
         auto id = WideToMultiByte(objectId);
+        std::optional<wslc_schema::InspectContainer> container;
+        std::optional<wslc_schema::InspectImage> image;
 
-        // 1. Try to inspect object as container
-        if (WI_IsFlagSet(type, InspectType::Container))
+        if (WI_IsFlagSet(type, InspectType::Container) && TryInspectContainer(session, id, container))
         {
-            auto container = TryInspectContainer(session, id);
-            if (container)
-            {
-                array.push_back(*container);
-                continue;
-            }
+            array.push_back(std::move(*container));
         }
-
-        // 2. Try to inspect object as image
-        if (WI_IsFlagSet(type, InspectType::Image))
+        else if (WI_IsFlagSet(type, InspectType::Image) && TryInspectImage(session, id, image))
         {
-            auto image = TryInspectImage(session, id);
-            if (image)
-            {
-                array.push_back(*image);
-                continue;
-            }
+            array.push_back(std::move(*image));
+        }
+        else
+        {
+            PrintMessage(std::format(L"Object not found: {}", objectId), stderr);
         }
     }
 
-    // Check if array is empty then throw error not found
-    if (array.empty())
-    {
-        THROW_HR(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-    }
-
-    PrintMessage(MultiByteToWide(array.dump()));
+    PrintMessage(MultiByteToWide(array.dump(c_jsonPrettyPrintIndent)));
 }
 } // namespace wsl::windows::wslc::task

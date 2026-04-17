@@ -16,7 +16,6 @@ Abstract:
 namespace wsl::windows::wslc::models {
 typedef enum _InspectType
 {
-    None = 0,
     Container = 1,
     Image = 2,
     All = Container | Image,
