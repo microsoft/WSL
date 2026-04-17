@@ -202,8 +202,8 @@ private:
     std::wstring GetAvailableCommands() const
     {
         std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n" //
-                 << L"  object-id    Name or Id of any object type\r\n"                //
+        commands << L"The following arguments are available:\r\n"       //
+                 << L"  object-id    Name or Id of any object type\r\n" //
                  << L"\r\n";
         return commands.str();
     }
@@ -211,8 +211,8 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"               //
-                << L"  -t,--type    Type of the object to inspect\r\n"       //
+        options << L"The following options are available:\r\n"                 //
+                << L"  -t,--type    Type of the object to inspect\r\n"         //
                 << L"  --session    Specify the session to use\r\n"            //
                 << L"  -h,--help    Shows help about the selected command\r\n" //
                 << L"\r\n";
