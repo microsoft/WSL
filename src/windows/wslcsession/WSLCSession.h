@@ -155,9 +155,13 @@ private:
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
+    void OnContainerdLog(const gsl::span<char>& Data);
+    void OnContainerdExited();
     void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();
+    void StartContainerd();
     void StartDockerd();
+    int StopProcess(std::optional<ServiceRunningProcess>& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingVolumes();
@@ -183,6 +187,7 @@ private:
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;
+    std::optional<ServiceRunningProcess> m_containerdProcess;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
