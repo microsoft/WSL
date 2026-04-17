@@ -768,7 +768,7 @@ ValueDone:
             fprintf(stderr, "expected \"\n");
         }
 
-        EMIT_USER_WARNING(Localization::MessageConfigExpected("'", filePath, line));
+        EMIT_USER_WARNING(Localization::MessageConfigExpected("\"", filePath, line));
 
         // This key value will be overwritten, so we can ignore any malformed values.
         // However, we can still inform the user of the issue per warning above.
