@@ -2426,6 +2426,16 @@ Return Value:
             FATAL_ERROR("signalfd failed {}", errno);
         }
 
+        // Handle the case where the child already exited before signalfd was set up.
+        int Status{};
+        auto WaitResult = waitpid(distroInitPid.value(), &Status, WNOHANG);
+        if (WaitResult > 0 || (WaitResult < 0 && errno == ECHILD))
+        {
+            LOG_ERROR("Init has exited. Terminating distribution");
+            InitTerminateInstanceInternal(Config);
+            return;
+        }
+
         PollDescriptors.resize(2);
         PollDescriptors[1].fd = SignalFd.get();
         PollDescriptors[1].events = POLLIN;
