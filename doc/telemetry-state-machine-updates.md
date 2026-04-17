@@ -105,24 +105,3 @@ The client uses `WslTelemetryScope` RAII so an End event is always emitted, even
 | `Begin` + `End` with `hr == S_OK` | Step succeeded |
 | `Begin` + `End` with `hr != S_OK` | Step failed, error surfaced — **not** a hang |
 | `Begin` with no `End` observed | Real silent hang → feeds timeout categorization |
-
-## Mapping to known issues
-
-Each timeout sub-label points at a specific class of GitHub issues:
-
-| Sub-label | Related issues |
-|---|---|
-| `Timeout_InitMount` | [#14056](https://github.com/microsoft/WSL/issues/14056), [#9942](https://github.com/microsoft/WSL/issues/9942), [#6986](https://github.com/microsoft/WSL/issues/6986), [#9443](https://github.com/microsoft/WSL/issues/9443), [#5895](https://github.com/microsoft/WSL/issues/5895) |
-| `Timeout_InitConfigResp` | [#14166](https://github.com/microsoft/WSL/issues/14166), [#9442](https://github.com/microsoft/WSL/issues/9442) |
-| `Timeout_PluginOnDistro` | [#11923](https://github.com/microsoft/WSL/issues/11923), [#10710](https://github.com/microsoft/WSL/issues/10710) |
-| `Timeout_KernelBoot` | [#8696](https://github.com/microsoft/WSL/issues/8696), [#14005](https://github.com/microsoft/WSL/issues/14005), [#8529](https://github.com/microsoft/WSL/issues/8529), [#8763](https://github.com/microsoft/WSL/issues/8763) |
-| `Timeout_Hns` | [#14072](https://github.com/microsoft/WSL/issues/14072), [#12764](https://github.com/microsoft/WSL/issues/12764) — **slow but successful** once progress events are respected |
-| `Timeout_SendLaunchInit` | [#13301](https://github.com/microsoft/WSL/issues/13301) |
-| `Timeout_AttachVhd` | [#12599](https://github.com/microsoft/WSL/issues/12599) |
-
-## Rollout
-
-1. Merge the client PR.
-2. Land change 1 (progress events reset the timer). This immediately removes most false-positive timeouts.
-3. Land change 2 (timeout sub-labels) and add a dashboard dimension on the new field.
-4. Older WSL clients without the new events remain backward-compatible — they fall into `Timeout_EarlyHang`.
