@@ -14,7 +14,7 @@ param (
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrEmpty($Password)) {
-    $SecurePassword = New-Object System.Security.SecureString
+    $SecurePassword = Read-Host -AsSecureString -Prompt "Enter password for $Username"
 }
 else {
     $SecurePassword = ConvertTo-SecureString "$Password" -AsPlainText -Force

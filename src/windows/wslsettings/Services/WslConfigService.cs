@@ -31,6 +31,7 @@ public class WslConfigService : IWslConfigService
 
     ~WslConfigService()
     {
+        _wslConfigFileSystemWatcher?.Dispose();
         WslCoreConfigInterface.FreeWslConfig(_wslConfig);
         WslCoreConfigInterface.FreeWslConfig(_wslConfigDefaults);
     }

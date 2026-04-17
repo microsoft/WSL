@@ -64,16 +64,16 @@ public:
     void DrvFsCommon(int TestMode, std::optional<DrvFsMode> DrvFsMode = {}) const
     {
         auto cleanup = wil::scope_exit([TestMode] {
-            RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\junction");
-            RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\absolutelink");
-            DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\filelink");
-            RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\relativelink");
-            RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\test\\linktarget");
-            DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\test\\filetarget");
-            RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\test");
-            DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\v1link");
-            DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\appexeclink");
-            RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR);
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\junction"));
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\absolutelink"));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\filelink"));
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\relativelink"));
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\test\\linktarget"));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\test\\filetarget"));
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR L"\\test"));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\v1link"));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(LXSST_DRVFS_REPARSE_TEST_DIR L"\\appexeclink"));
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(LXSST_DRVFS_REPARSE_TEST_DIR));
             SetFileAttributes(LXSST_DRVFS_RWX_TEST_FILE, FILE_ATTRIBUTE_NORMAL);
             DeleteFileW(LXSST_DRVFS_RWX_TEST_FILE);
             DeleteFileW(LXSST_DRVFS_READONLY_TEST_FILE);

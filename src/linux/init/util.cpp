@@ -2571,6 +2571,24 @@ int UtilSaveBlockedSignals(const sigset_t& SignalMask)
     return sigprocmask(SIG_BLOCK, &SignalMask, &g_originalSignals);
 }
 
+// Signals that cannot or should not be overridden by save/set handlers.
+static bool SkipSignal(unsigned int Signal)
+{
+    switch (Signal)
+    {
+    case SIGKILL:
+    case SIGSTOP:
+    case SIGCONT:
+    case SIGHUP:
+    case 32:
+    case 33:
+    case 34:
+        return true;
+    default:
+        return false;
+    }
+}
+
 int UtilSaveSignalHandlers(struct sigaction* SavedSignalActions)
 
 /*++
@@ -2592,15 +2610,8 @@ Return Value:
 {
     for (unsigned int Index = 1; Index < _NSIG; Index += 1)
     {
-        switch (Index)
+        if (SkipSignal(Index))
         {
-        case SIGKILL:
-        case SIGSTOP:
-        case SIGCONT:
-        case SIGHUP:
-        case 32:
-        case 33:
-        case 34:
             continue;
         }
 
@@ -2639,15 +2650,8 @@ Return Value:
 
     for (unsigned int Index = 1; Index < _NSIG; Index += 1)
     {
-        switch (Index)
+        if (SkipSignal(Index))
         {
-        case SIGKILL:
-        case SIGSTOP:
-        case SIGCONT:
-        case SIGHUP:
-        case 32:
-        case 33:
-        case 34:
             continue;
         }
 

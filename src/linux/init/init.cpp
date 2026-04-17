@@ -2389,9 +2389,8 @@ Return Value:
 
     if (distroInitPid.has_value())
     {
-        // Reset sigchld so we get notified when children exit.
-        signal(SIGCHLD, SIG_DFL);
-
+        // Block SIGCHLD before setting handler to prevent a race where a child
+        // exits between signal(SIG_DFL) and the sigprocmask(SIG_BLOCK) call.
         sigset_t SignalMask;
         sigemptyset(&SignalMask);
         sigaddset(&SignalMask, SIGCHLD);
@@ -2399,6 +2398,9 @@ Return Value:
         {
             FATAL_ERROR("sigprocmask failed {}", errno);
         }
+
+        // Reset sigchld so we get notified when children exit.
+        signal(SIGCHLD, SIG_DFL);
 
         SignalFd = {signalfd(-1, &SignalMask, SFD_CLOEXEC)};
         if (!SignalFd)

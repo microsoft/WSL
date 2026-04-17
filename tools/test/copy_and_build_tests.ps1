@@ -52,7 +52,7 @@ Write-Output "Cleaning unit tests at $DistroPath\rootfs\data\test"
 Run { wsl.exe --distribution $DistroName --user root --exec bash -c "$cleanTestCommand" }
 
 # call the logic in copy_tests.ps1
-Invoke-Expression $copyScriptCommand
+& (Join-Path $PSScriptRoot "copy_tests.ps1") -WslTestDirPath $WslTestDirPath -DistroName $DistroName
 
 # build the tests on the linux side
 Write-Output "Building unit tests at $DistroPath\rootfs\data\test\"
