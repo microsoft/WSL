@@ -49,10 +49,12 @@ void BuildImage(CLIExecutionContext& context)
 
     PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
 
-    bool verbose = context.Args.Contains(ArgType::Verbose);
+    WSLCBuildImageFlags flags = WSLCBuildImageFlagsNone;
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsVerbose, context.Args.Contains(ArgType::Verbose));
+    WI_SetFlagIf(flags, WSLCBuildImageFlagsNoCache, context.Args.Contains(ArgType::NoCache));
 
     BuildImageCallback callback;
-    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, verbose, &callback, context.CreateCancelEvent());
+    services::ImageService::Build(session, contextPath, tags, buildArgs, dockerfilePath, flags, &callback, context.CreateCancelEvent());
 }
 
 void GetImages(CLIExecutionContext& context)
@@ -193,5 +195,14 @@ void SaveImage(CLIExecutionContext& context)
     auto& imageId = context.Args.Get<ArgType::ImageId>();
     auto& output = context.Args.Get<ArgType::Output>();
     services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+}
+
+void TagImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& source = context.Args.Get<ArgType::Source>();
+    auto& target = context.Args.Get<ArgType::Target>();
+    services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
 }
 } // namespace wsl::windows::wslc::task

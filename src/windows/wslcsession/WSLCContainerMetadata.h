@@ -42,10 +42,13 @@ struct WSLCVolumeMount
     std::string ContainerPath;
     bool ReadOnly{};
 
+    // Non-empty when the mount target is a single file rather than a directory.
+    std::wstring SourceFilename;
+
     // Runtime-only field. Not serialized to JSON.
     bool Mounted{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly, SourceFilename);
 };
 
 struct WSLCContainerMetadataV1

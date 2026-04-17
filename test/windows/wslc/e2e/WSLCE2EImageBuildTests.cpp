@@ -167,10 +167,9 @@ class WSLCE2EImageBuildTests
         WriteTestFile(containerfilePath, "FROM debian:latest\n");
 
         // Deny read access so wslc cannot open the file.
-        SetReadAccess(containerfilePath, DENY_ACCESS);
+        SetPathAccess(containerfilePath, GENERIC_READ, DENY_ACCESS);
 
-        auto restore =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [containerfilePath]() { SetReadAccess(containerfilePath, GRANT_ACCESS); });
+        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [containerfilePath]() { DeleteFileW(containerfilePath.c_str()); });
 
         auto absoluteContainerfilePath = std::filesystem::absolute(containerfilePath);
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));
@@ -234,29 +233,6 @@ private:
         file << content;
         THROW_HR_IF(E_FAIL, !file.good());
         file.close();
-    }
-
-    static void SetReadAccess(const std::filesystem::path& path, ACCESS_MODE Mode)
-    {
-        auto [everyoneSid, everyoneSidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
-
-        EXPLICIT_ACCESSW ea{};
-        ea.grfAccessPermissions = FILE_GENERIC_READ;
-        ea.grfAccessMode = Mode;
-        ea.grfInheritance = NO_INHERITANCE;
-        ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-        ea.Trustee.ptstrName = static_cast<LPWSTR>(everyoneSid);
-
-        PACL acl = nullptr;
-        wil::unique_hlocal descriptor;
-        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
-            path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
-
-        wsl::windows::common::security::unique_acl newAcl;
-        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &ea, acl, &newAcl));
-
-        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
-            const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
     }
 };
 } // namespace WSLCE2ETests

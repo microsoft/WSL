@@ -48,6 +48,24 @@ private:
     HANDLE m_handle{};
 };
 
+class UserCOMCallback
+{
+    NON_COPYABLE(UserCOMCallback);
+
+public:
+    UserCOMCallback(WSLCSession& Session) noexcept;
+    UserCOMCallback(UserCOMCallback&& Other) noexcept;
+
+    ~UserCOMCallback() noexcept;
+
+    UserCOMCallback& operator=(UserCOMCallback&& Other) noexcept;
+    void Reset() noexcept;
+
+private:
+    WSLCSession* m_session{};
+    DWORD m_threadId{};
+};
+
 //
 // WSLCSession - Implements IWSLCSession for container management.
 // Runs in a per-user COM server process for security isolation.
@@ -81,13 +99,20 @@ public:
     IFACEMETHOD(ListImages)(_In_opt_ const WSLCListImageOptions* Options, _Out_ WSLCImageInformation** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLCDeleteImageOptions* Options, _Out_ WSLCDeletedImageInformation** DeletedImages, _Out_ ULONG* Count) override;
     IFACEMETHOD(TagImage)(_In_ const WSLCTagImageOptions* Options) override;
+    IFACEMETHOD(PushImage)(_In_ LPCSTR Image, _In_ LPCSTR RegistryAuthenticationInformation, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(InspectImage)(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(Authenticate)(_In_ LPCSTR ServerAddress, _In_ LPCSTR Username, _In_ LPCSTR Password, _Out_ LPSTR* IdentityToken) override;
+    IFACEMETHOD(PruneImages)(
+        _In_opt_ const WSLCPruneImagesOptions* Options,
+        _Out_ WSLCDeletedImageInformation** DeletedImages,
+        _Out_ ULONG* DeletedImagesCount,
+        _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLCContainerOptions* Options, _Out_ IWSLCContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLCContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLCContainerEntry** Containers, _Out_ ULONG* Count, _Out_ WSLCContainerPortMapping** Ports, _Out_ ULONG* PortsCount) override;
-    IFACEMETHOD(PruneContainers)(_In_opt_ WSLCContainerPruneFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result) override;
+    IFACEMETHOD(PruneContainers)(_In_opt_ WSLCPruneLabelFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
@@ -97,10 +122,11 @@ public:
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
     // Volume management.
-    IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options) override;
+    IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListVolumes)(_Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
+    IFACEMETHOD(PruneVolumes)(_In_opt_ const WSLCPruneVolumesOptions* Options, _Out_ WSLCPruneVolumesResults* Results) override;
 
     IFACEMETHOD(Terminate()) override;
 
@@ -118,10 +144,14 @@ public:
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);
 
+    UserCOMCallback RegisterUserCOMCallback();
+    void UnregisterUserCOMCallback(DWORD ThreadId);
+
 private:
     ULONG m_id = 0;
 
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
+    __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
@@ -133,6 +163,7 @@ private:
     void RecoverExistingVolumes();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
+    void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;
@@ -160,6 +191,10 @@ private:
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;
     __guarded_by(m_userHandlesLock) std::vector<HANDLE> m_userHandles;
+
+    // Threads currently inside an outgoing COM callback (e.g. IProgressCallback::OnProgress).
+    std::recursive_mutex m_userCOMCallbacksLock;
+    __guarded_by(m_userCOMCallbacksLock) std::set<DWORD> m_userCOMCallbackThreads;
 
     // Used for testing only.
     std::mutex m_allocatedPortsLock;

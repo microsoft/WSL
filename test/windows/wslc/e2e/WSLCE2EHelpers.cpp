@@ -12,7 +12,8 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "SessionModel.h"
+#include "WSLCSessionDefaults.h"
+#include "ImageModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -194,6 +195,23 @@ void VerifyImageIsNotUsed(const TestImage& image)
     }
 }
 
+void VerifyImageIsListed(const TestImage& image)
+{
+    auto result = RunWslc(L"image list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto images = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::ImageInformation>>(result.Stdout.value().c_str());
+    for (const auto& img : images)
+    {
+        if (img.Repository == wsl::shared::string::WideToMultiByte(image.Name) &&
+            img.Tag == wsl::shared::string::WideToMultiByte(image.Tag))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -323,7 +341,14 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
     std::wstring targetSession = sessionName;
     if (targetSession.empty())
     {
-        targetSession = std::wstring{wsl::windows::wslc::models::SessionOptions::GetDefaultSessionName()};
+        auto isElevated = wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token(TOKEN_QUERY).get());
+        auto baseName = isElevated ? wsl::windows::wslc::DefaultAdminSessionName : wsl::windows::wslc::DefaultSessionName;
+
+        wchar_t username[256 + 1] = {};
+        DWORD usernameLen = ARRAYSIZE(username);
+        THROW_IF_WIN32_BOOL_FALSE(GetUserNameW(username, &usernameLen));
+
+        targetSession = std::format(L"{}-{}", baseName, username);
     }
 
     auto listResult = RunWslc(L"session list");
@@ -340,5 +365,22 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
             break;
         }
     }
+}
+
+void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& lines)
+{
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    VERIFY_IS_TRUE(file.is_open());
+    for (const auto& line : lines)
+    {
+        file << line << "\n";
+    }
+
+    VERIFY_IS_TRUE(file.good());
+}
+
+std::wstring GetPythonHttpServerScript(uint16_t port)
+{
+    return std::format(L"python3 -m http.server {}", port);
 }
 } // namespace WSLCE2ETests

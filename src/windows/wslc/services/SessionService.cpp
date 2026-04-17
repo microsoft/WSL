@@ -23,27 +23,30 @@ using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
 
-int SessionService::Attach(const std::wstring& sessionName)
+int SessionService::Attach(const std::wstring& sessionName, bool raw)
 {
-    THROW_HR_IF(E_INVALIDARG, sessionName.empty());
-
     wil::com_ptr<IWSLCSessionManager> manager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    HRESULT hr = manager->OpenSessionByName(sessionName.c_str(), &session);
-    if (FAILED(hr))
+    HRESULT hr = manager->OpenSessionByName(sessionName.empty() ? nullptr : sessionName.c_str(), &session);
+    if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
     {
-        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
-        {
-            wslutil::PrintMessage(Localization::MessageWslcSessionNotFound(sessionName.c_str()), stderr);
-            return 1;
-        }
-
+        // Session not found — create it.
+        WSLCSessionSettings settings{};
+        settings.FeatureFlags = raw ? WslcFeatureFlagsRaw : WslcFeatureFlagsNone;
+        THROW_IF_FAILED(manager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
+    }
+    else if (FAILED(hr))
+    {
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
         wslutil::PrintMessage(
-            Localization::MessageErrorCode(Localization::MessageWslcOpenSessionFailed(sessionName.c_str()), errorString), stderr);
+            Localization::MessageErrorCode(
+                sessionName.empty() ? Localization::MessageWslcOpenDefaultSessionFailed()
+                                    : Localization::MessageWslcOpenSessionFailed(sessionName.c_str()),
+                errorString),
+            stderr);
         return 1;
     }
 
@@ -100,15 +103,15 @@ int SessionService::Attach(const std::wstring& sessionName)
     return static_cast<int>(exitCode);
 }
 
-Session SessionService::CreateSession(const SessionOptions& options, WSLCSessionFlags Flags)
+Session SessionService::CreateDefaultSession()
 {
-    const WSLCSessionSettings* settings = options.Get();
     wil::com_ptr<IWSLCSessionManager> sessionManager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
+    // Null Settings = default session with server-determined name and settings.
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->CreateSession(settings, Flags, &session));
+    THROW_IF_FAILED(sessionManager->CreateSession(nullptr, WSLCSessionFlagsNone, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
@@ -118,14 +121,13 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     THROW_HR_IF(E_INVALIDARG, storagePath.empty());
     THROW_HR_IF(E_INVALIDARG, displayName.empty());
 
-    // Build session settings from the user configuration, overriding storage path and display name.
-    SessionOptions options;
-    options.Get()->DisplayName = displayName.c_str();
-    options.Get()->StoragePath = storagePath.c_str();
-    options.Get()->StorageFlags = WSLCSessionStorageFlagsNoCreate; // Don't create storage if it doesn't exist.
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
-    // Create a non-persistent session: lifetime is tied to our COM reference.
-    auto session = SessionService::CreateSession(options, WSLCSessionFlagsNone);
+    wil::com_ptr<IWSLCSession> session;
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     wsl::windows::common::wslutil::PrintMessage(Localization::MessageWslcCreatedSession(displayName), stderr);
 
     const std::string shell = "/bin/sh";
@@ -135,7 +137,7 @@ int SessionService::Enter(const std::wstring& storagePath, const std::wstring& d
     const auto windowSize = console.GetWindowSize();
     launcher.SetTtySize(windowSize.Y, windowSize.X);
 
-    return ConsoleService::AttachToCurrentConsole(launcher.Launch(*session.Get()));
+    return ConsoleService::AttachToCurrentConsole(launcher.Launch(*session.get()));
 }
 
 std::vector<SessionInformation> SessionService::List()
@@ -174,19 +176,20 @@ Session SessionService::OpenSession(const std::wstring& displayName)
 
 int SessionService::TerminateSession(const std::wstring& displayName)
 {
-    THROW_HR_IF(E_INVALIDARG, displayName.empty());
-
     wil::com_ptr<IWSLCSessionManager> sessionManager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLCSession> session;
-    HRESULT hr = sessionManager->OpenSessionByName(displayName.c_str(), &session);
+    HRESULT hr = sessionManager->OpenSessionByName(displayName.empty() ? nullptr : displayName.c_str(), &session);
     if (FAILED(hr))
     {
         if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
         {
-            wslutil::PrintMessage(Localization::MessageWslcSessionNotFound(displayName.c_str()), stderr);
+            wslutil::PrintMessage(
+                displayName.empty() ? Localization::MessageWslcDefaultSessionNotFound()
+                                    : Localization::MessageWslcSessionNotFound(displayName.c_str()),
+                stderr);
             return 1;
         }
 
@@ -200,7 +203,11 @@ int SessionService::TerminateSession(const std::wstring& displayName)
     {
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
         wslutil::PrintMessage(
-            Localization::MessageErrorCode(Localization::MessageWslcTerminateSessionFailed(displayName.c_str()), errorString), stderr);
+            Localization::MessageErrorCode(
+                displayName.empty() ? Localization::MessageWslcTerminateDefaultSessionFailed()
+                                    : Localization::MessageWslcTerminateSessionFailed(displayName.c_str()),
+                errorString),
+            stderr);
         return 1;
     }
 

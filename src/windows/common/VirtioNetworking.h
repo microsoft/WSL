@@ -18,6 +18,7 @@ enum class VirtioNetworkingFlags
     DnsTunneling = 0x2,
     Ipv6 = 0x4,
     DnsTunnelingSocket = 0x8,
+    DisableLoopbackMirroring = 0x10,
 };
 DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
 
@@ -46,15 +47,15 @@ public:
     void FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message) override;
     void StartPortTracker(wil::unique_socket&& socket) override;
 
-    HRESULT MapPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ PCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort) const;
+    HRESULT MapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol, _Out_ USHORT* AllocatedHostPort) const;
 
-    HRESULT UnmapPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ PCSTR ListenAddress) const;
+    HRESULT UnmapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol) const;
 
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
 
-    HRESULT HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept;
-    uint16_t ModifyOpenPorts(_In_ PCWSTR tag, _In_opt_ PCSTR hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
+    HRESULT HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const noexcept;
+    uint16_t ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();
     void SetupLoopbackDevice();
     void SendDefaultRoute(const std::wstring& gateway, wsl::shared::hns::ModifyRequestType requestType);

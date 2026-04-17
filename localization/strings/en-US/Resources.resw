@@ -217,9 +217,6 @@ Install using 'wsl.exe {} &lt;Distro&gt;'.
 To get a list of valid distributions, use 'wsl.exe --list --online'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageInstanceTerminated" xml:space="preserve">
-    <value>The Windows Subsystem for Linux instance has terminated.</value>
-  </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
     <value>Invalid command line argument: {}
 Please use '{} --help' to get a list of supported arguments.</value>
@@ -851,6 +848,10 @@ For information please visit https://aka.ms/wslinstall</value>
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Failed to create the swap disk in '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateDisk" xml:space="preserve">
+    <value>Failed to create disk '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
@@ -1935,6 +1936,15 @@ Usage:
     <value>Session termination failed: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
+    <value>Default session not found</value>
+  </data>
+  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
+    <value>Failed to open default session</value>
+  </data>
+  <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
+    <value>Default session termination failed</value>
+  </data>
   <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} exited with: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1954,6 +1964,18 @@ Usage:
   </data>
   <data name="MessageWslcUnknownCommand" xml:space="preserve">
     <value>Unknown command: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
+    <value>Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotRunning" xml:space="preserve">
+    <value>Container '{}' is not running.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerIsRunning" xml:space="preserve">
+    <value>Container '{}' is running.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
@@ -2098,8 +2120,8 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Volume not found: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name = "MessageWslcInvalidVolumeOptions" xml:space = "preserve" >
-    <value>Invalid volume options: '{}'</value>
+  <data name = "MessageWslcMissingVolumeOption" xml:space = "preserve" >
+    <value>Missing required option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcInvalidVolumeType" xml:space = "preserve" >
@@ -2108,6 +2130,14 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcVolumeInUse" xml:space = "preserve" >
     <value>Volume '{}' is in use.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcFailedToMountVolume" xml:space = "preserve" >
+    <value>Failed to create volume '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslcPortInUse" xml:space = "preserve" >
+    <value>Port {} is already in use, cannot start container {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcBothDockerAndContainerFileFound" xml:space = "preserve" >
@@ -2124,6 +2154,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcSessionStorageNotFound" xml:space = "preserve" >
     <value>No WSLC session found in '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
+    <value>Invalid image tag format: '{}'. Expected format is 'name:tag'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
@@ -2194,7 +2228,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Run a container.</value>
   </data>
   <data name="WSLCCLI_ContainerRunLongDesc" xml:space="preserve">
-    <value>Runs a container. By default, the container is started in the background; use --detach to run in the foreground.</value>
+    <value>Runs a container. By default, the container is started in the foreground; use --detach to run in the background.</value>
     <comment>{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerStartDesc" xml:space="preserve">
@@ -2258,6 +2292,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ImageSaveLongDesc" xml:space="preserve">
     <value>Saves images.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
+    <value>Tag an image.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagLongDesc" xml:space="preserve">
+    <value>Tags an image.</value>
   </data>
   <data name="WSLCCLI_SessionCommandDesc" xml:space="preserve">
     <value>Manage sessions.</value>
@@ -2372,6 +2412,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Name of the container</value>
   </data>
+  <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
+    <value>Do not use cache when building the image</value>
+  </data>
   <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
     <value>Do not delete untagged parents</value>
   </data>
@@ -2403,8 +2446,14 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Signal to send (default: {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
+    <value>Current or existing image reference in the image-name[:tag] format</value>
+  </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
+  </data>
+  <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
+    <value>New image reference in the image-name[:tag] format</value>
   </data>
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
     <value>Time in seconds to wait before executing (default 5)</value>

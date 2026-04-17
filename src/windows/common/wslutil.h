@@ -48,6 +48,13 @@ inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
 inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLC: Does this apply to WSLC ?
 
+enum class EnumReferenceFormat
+{
+    None,
+    Tag,
+    Digest
+};
+
 struct GitHubReleaseAsset
 {
     std::wstring url;
@@ -276,7 +283,7 @@ void ParseIpv6Address(const char* Address, in_addr6& Result);
 
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
 
-std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input);
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input, EnumReferenceFormat* Format = nullptr);
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
@@ -322,5 +329,18 @@ WSLCHandle ToCOMInputHandle(HANDLE Handle);
 [[nodiscard]] WSLCHandle ToCOMOutputHandle(HANDLE Handle, DWORD Access, WSLCHandleType Type);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
+
+std::string Base64Encode(const std::string& input);
+std::string Base64Decode(const std::string& encoded);
+
+// Builds the base64-encoded X-Registry-Auth header value used by Docker APIs
+// (PullImage, PushImage, etc.) from the given credentials.
+std::string BuildRegistryAuthHeader(const std::string& username, const std::string& password, const std::string& serverAddress);
+
+// Builds the base64-encoded X-Registry-Auth header value from an identity token
+// returned by Authenticate().
+std::string BuildRegistryAuthHeader(const std::string& identityToken, const std::string& serverAddress);
+
+std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
 
 } // namespace wsl::windows::common::wslutil

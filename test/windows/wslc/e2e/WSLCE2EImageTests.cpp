@@ -74,6 +74,7 @@ private:
             {L"load", Localization::WSLCCLI_ImageLoadDesc()},
             {L"pull", Localization::WSLCCLI_ImagePullDesc()},
             {L"save", Localization::WSLCCLI_ImageSaveDesc()},
+            {L"tag", Localization::WSLCCLI_ImageTagDesc()},
         };
 
         size_t maxLen = 0;

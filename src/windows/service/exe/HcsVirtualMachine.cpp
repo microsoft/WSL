@@ -21,6 +21,7 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
+#include "string.hpp"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -416,7 +417,8 @@ try
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
+        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6 | wsl::core::VirtioNetworkingFlags::LocalhostRelay |
+                                                 wsl::core::VirtioNetworkingFlags::DisableLoopbackMirroring;
         if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
             WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunnelingSocket);
@@ -588,12 +590,17 @@ try
 
     *AllocatedHostPort = 0;
 
+    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(
+        wsl::shared::string::MultiByteToWide(ListenAddress));
+
+    listenAddr.Ipv4.sin_port = HostPort;
+
     std::lock_guard lock(m_lock);
 
     auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
 
-    return virtioNet->MapPort(HostPort, GuestPort, Protocol, ListenAddress, AllocatedHostPort);
+    return virtioNet->MapPort(listenAddr, GuestPort, Protocol, AllocatedHostPort);
 }
 CATCH_RETURN()
 
@@ -602,12 +609,18 @@ try
 {
     RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
 
+    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(
+        wsl::shared::string::MultiByteToWide(ListenAddress));
+
+    listenAddr.Ipv4.sin_port = HostPort;
+
+
     std::lock_guard lock(m_lock);
 
     auto* virtioNet = dynamic_cast<wsl::core::VirtioNetworking*>(m_networkEngine.get());
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), virtioNet == nullptr);
 
-    return virtioNet->UnmapPort(HostPort, GuestPort, Protocol, ListenAddress);
+    return virtioNet->UnmapPort(listenAddr, GuestPort, Protocol);
 }
 CATCH_RETURN()
 

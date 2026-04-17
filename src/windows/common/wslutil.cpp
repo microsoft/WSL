@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "wslutil.h"
 #include "WslPluginApi.h"
+#include <wincrypt.h>
 #include "wslinstallerservice.h"
 #include "wslc.h"
 
@@ -150,6 +151,11 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_WIN32(ERROR_INVALID_STATE),
     X(WSLC_E_IMAGE_NOT_FOUND),
     X(WSLC_E_CONTAINER_NOT_FOUND),
+    X(WSLC_E_VOLUME_NOT_FOUND),
+    X(WSLC_E_CONTAINER_NOT_RUNNING),
+    X(WSLC_E_CONTAINER_IS_RUNNING),
+    X(WSLC_E_SESSION_RESERVED),
+    X(WSLC_E_INVALID_SESSION_NAME),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED)};
 
@@ -633,21 +639,11 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_DEFAULT_DISTRO_NOT_FOUND:
         return Localization::MessageNoDefaultDistro();
 
-    case HRESULT_FROM_WIN32(WSAECONNABORTED):
-    case HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS):
-        return Localization::MessageInstanceTerminated();
-
     case WSL_E_DISTRO_NOT_FOUND:
         return Localization::MessageDistroNotFound();
 
-    case HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS):
-        return Localization::MessageDistroNameAlreadyExists();
-
     case WSL_E_DISTRIBUTION_NAME_NEEDED:
         return Localization::MessageDistributionNameNeeded();
-
-    case HRESULT_FROM_WIN32(ERROR_FILE_EXISTS):
-        return Localization::MessageDistroInstallPathAlreadyExists();
 
     case WSL_E_TOO_MANY_DISKS_ATTACHED:
         return Localization::MessageTooManyDisks();
@@ -1243,7 +1239,7 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
-std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input)
+std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil::ParseImage(const std::string& Input, EnumReferenceFormat* Format)
 {
     static const auto regex = BuildImageReferenceRegex();
     std::smatch match;
@@ -1258,18 +1254,25 @@ std::pair<std::string, std::optional<std::string>> wsl::windows::common::wslutil
 
     THROW_HR_IF_MSG(E_UNEXPECTED, !repo.matched, "Unexpected regex match. Input: %hs", Input.c_str());
 
+    EnumReferenceFormat referenceFormat = EnumReferenceFormat::None;
+    std::optional<std::string> tagOrDigest;
     if (digest.matched) // <repo>:[tag]@<digest> (If both digest and tag are specified, digest takes precedence).
     {
-        return {repo.str(), digest.str()};
+        tagOrDigest = digest.str();
+        referenceFormat = EnumReferenceFormat::Digest;
     }
     else if (tag.matched) // <repo>:<tag>
     {
-        return {repo.str(), tag.str()}; // <repo>
+        tagOrDigest = tag.str();
+        referenceFormat = EnumReferenceFormat::Tag;
     }
-    else
+
+    if (Format)
     {
-        return {repo.str(), std::nullopt};
+        *Format = referenceFormat;
     }
+
+    return {repo.str(), std::move(tagOrDigest)};
 }
 
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
@@ -1412,4 +1415,73 @@ catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
+}
+
+std::string wsl::windows::common::wslutil::Base64Encode(const std::string& input)
+{
+    DWORD base64Size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()), static_cast<DWORD>(input.size()), CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, nullptr, &base64Size));
+
+    auto buffer = std::make_unique<char[]>(base64Size);
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()),
+        static_cast<DWORD>(input.size()),
+        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+        buffer.get(),
+        &base64Size));
+
+    return std::string(buffer.get());
+}
+
+std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encoded)
+{
+    DWORD size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, nullptr, &size, nullptr, nullptr));
+
+    std::string result(size, '\0');
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr));
+
+    result.resize(size);
+    return result;
+}
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& username, const std::string& password, const std::string& serverAddress)
+{
+    nlohmann::json authJson = {{"username", username}, {"password", password}, {"serveraddress", serverAddress}};
+
+    return Base64Encode(authJson.dump());
+}
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& identityToken, const std::string& serverAddress)
+{
+    nlohmann::json authJson = {{"identitytoken", identityToken}, {"serveraddress", serverAddress}};
+
+    return Base64Encode(authJson.dump());
+}
+
+std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValuePairs(const KeyValuePair* pairs, ULONG count, LPCSTR reservedKey)
+{
+    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);
+
+    std::map<std::string, std::string> result;
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Key, "Key at index %lu is null", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Value, "Value at index %lu is null", i);
+
+        if (reservedKey != nullptr)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, strcmp(pairs[i].Key, reservedKey) == 0, "Key '%hs' is reserved", reservedKey);
+        }
+
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), result.contains(pairs[i].Key), "Duplicate key: '%hs'", pairs[i].Key);
+
+        result[pairs[i].Key] = pairs[i].Value;
+    }
+
+    return result;
 }

@@ -5,7 +5,7 @@
     <version>${WSL_NUGET_PACKAGE_VERSION}</version>
     <authors>Microsoft</authors>
     <projectUrl>https://github.com/microsoft/WSL</projectUrl>
-    <description>WSL Containers SDK</description>
+    <description>WSL Containers SDK (Preview - API subject to breaking changes)</description>
     <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <tags>WSL</tags>
     <language>en-us</language>
