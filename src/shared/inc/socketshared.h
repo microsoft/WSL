@@ -49,7 +49,7 @@ try
 #if defined(_MSC_VER)
         THROW_HR(E_UNEXPECTED);
 #elif defined(__GNUC__)
-        THROW_UNEXCEPTED();
+        THROW_UNEXPECTED();
 #endif
     }
 
@@ -60,7 +60,7 @@ try
 #if defined(_MSC_VER)
         THROW_HR_MSG(E_UNEXPECTED, "Unexpected message size: %llu", MessageSize);
 #elif defined(__GNUC__)
-        THROW_UNEXCEPTED();
+        THROW_UNEXPECTED();
 #endif
     }
 
@@ -69,7 +69,7 @@ try
 #if defined(_MSC_VER)
         THROW_HR_MSG(E_UNEXPECTED, "Message size too large: %llu", MessageSize);
 #elif defined(__GNUC__)
-        THROW_UNEXCEPTED();
+        THROW_UNEXPECTED();
 #endif
     }
 
