@@ -488,6 +488,36 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage()
                 wsl::shared::string::GuidToString<char>(createDeviceRequest.lowerEdgeAdapterId.value_or(emptyGuid)).c_str(),
                 gelnic.Name().c_str());
             manager.InitializeLoopbackConfiguration(gelnic);
+
+            if (createDeviceRequest.disableLoopbackMirroring)
+            {
+                // Masquerade loopback-sourced traffic that gets forwarded to non-loopback interfaces.
+                // Without this, packets forwarded to containers arrive with source 127.0.0.1, and the
+                // container sends the reply to its own loopback instead of back through the bridge.
+                // iptables -t nat -A POSTROUTING -s 127.0.0.0/8 ! -o lo -j MASQUERADE
+
+                const char* argv[] = {
+                    "/sbin/iptables", "-t", "nat", "-A", "POSTROUTING",
+                    "-s", "127.0.0.0/8",
+                    "!", "-o", "lo",
+                    "-j", "MASQUERADE",
+                    nullptr};
+
+                int status = -1;
+                if (UtilCreateProcessAndWait("/sbin/iptables", argv, &status) < 0 || status != 0)
+                {
+                    throw RuntimeErrorWithSourceLocation(
+                        std::format("iptables POSTROUTING MASQUERADE failed, status: {}", status));
+                }
+
+                // Enable route_localnet on all interfaces (including future ones like docker0).
+                // This allows packets with 127.x.x.x source/destination to be routed on non-loopback
+                // interfaces, which is required for conntrack to reverse the masquerade on reply packets.
+                WriteToFile("/proc/sys/net/ipv4/conf/all/route_localnet", "1");
+                WriteToFile("/proc/sys/net/ipv4/conf/default/route_localnet", "1");
+                WriteToFile("/proc/sys/net/ipv4/conf/eth0/route_localnet", "1");
+            }
+
             break;
         }
         default:

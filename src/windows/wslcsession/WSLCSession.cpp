@@ -236,26 +236,31 @@ try
 
     m_virtualMachine->Initialize();
 
+    const bool raw = WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsRaw);
+
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
-    // Launch dockerd
-    StartDockerd();
+    if (!raw)
+    {
+        // Launch dockerd
+        StartDockerd();
 
-    // Wait for dockerd to be ready before starting the event tracker.
-    THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+        // Wait for dockerd to be ready before starting the event tracker.
+        THROW_WIN32_IF_MSG(
+            ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
-    auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
+        auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+        m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
-    //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
+        //  Start the event tracker.
+        m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
-    // Recover any existing containers from storage.
-    RecoverExistingVolumes();
-    RecoverExistingContainers();
+        // Recover any existing containers from storage.
+        RecoverExistingVolumes();
+        RecoverExistingContainers();
+    }
 
     errorCleanup.release();
     return S_OK;

@@ -133,7 +133,6 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     }
     else
     {
-        THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
         THROW_HR_IF(E_INVALIDARG, Settings->StoragePath != nullptr && wcslen(Settings->StoragePath) == 0);
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, wcslen(Settings->DisplayName) >= std::size(WSLCSessionInformation{}.DisplayName));
         THROW_HR_IF_MSG(
@@ -176,6 +175,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
     // Initialize settings for the default session.
     std::unique_ptr<SessionSettings> defaultSettings;
+
     if (Settings == nullptr)
     {
         defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName);
