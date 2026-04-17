@@ -242,7 +242,6 @@ try
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
     // Launch containerd first
-    auto daemonStartTime = std::chrono::steady_clock::now();
     StartContainerd();
 
     // Launch dockerd with external containerd socket
@@ -251,9 +250,6 @@ try
     // Wait for dockerd to be ready before starting the event tracker.
     THROW_WIN32_IF_MSG(
         ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
-
-    auto daemonReadyMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - daemonStartTime).count();
-    WSL_LOG("DaemonStartupTime", TraceLoggingValue(daemonReadyMs, "ElapsedMs"));
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
