@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "WindowsUpdateIntegration.h"
 
-
 namespace wsl::windows::common {
 
 namespace anon {
@@ -39,21 +38,21 @@ namespace anon {
     struct DownloadProgressChangedCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDownloadProgressChangedCallback>
     {
-    DownloadProgressChangedCallback(std::function<void(uint32_t)> progress) :
-        m_progress(progress)
-    {}
+        DownloadProgressChangedCallback(std::function<void(uint32_t)> progress) : m_progress(progress)
+        {
+        }
 
-    IFACEMETHOD(Invoke)(IDownloadJob*, IDownloadProgressChangedCallbackArgs* callbackArgs) override
-    {
-        wil::com_ptr<IDownloadProgress> progress;
-        RETURN_IF_FAILED(callbackArgs->get_Progress(&progress));
+        IFACEMETHOD(Invoke)(IDownloadJob*, IDownloadProgressChangedCallbackArgs* callbackArgs) override
+        {
+            wil::com_ptr<IDownloadProgress> progress;
+            RETURN_IF_FAILED(callbackArgs->get_Progress(&progress));
 
-        LONG percent{};
-        RETURN_IF_FAILED(progress->get_PercentComplete(&percent));
+            LONG percent{};
+            RETURN_IF_FAILED(progress->get_PercentComplete(&percent));
 
-        m_progress(static_cast<uint32_t>(percent));
-        return S_OK;
-    }
+            m_progress(static_cast<uint32_t>(percent));
+            return S_OK;
+        }
 
     private:
         std::function<void(uint32_t)> m_progress;
@@ -94,8 +93,7 @@ WindowsUpdateContext::WindowsUpdateContext(std::wstring product) :
 }
 
 WindowsUpdateContext::WindowsUpdateContext(std::unique_ptr<WindowsUpdateClassFactory> factory, std::wstring product) :
-    m_factory(std::move(factory)),
-    m_product(std::move(product))
+    m_factory(std::move(factory)), m_product(std::move(product))
 {
     m_session = m_factory->CreateUpdateSession();
 
@@ -216,7 +214,8 @@ void WindowsUpdateContext::InstallUpdates(std::function<void(uint32_t)> progress
 
 void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, std::function<void(uint32_t)> progress)
 {
-    static_assert(DownloadProgressPercent + InstallProgressPercent == 100, "Download and Install progress values must add up to 100.");
+    static_assert(
+        DownloadProgressPercent + InstallProgressPercent == 100, "Download and Install progress values must add up to 100.");
 
     if (progress)
     {
