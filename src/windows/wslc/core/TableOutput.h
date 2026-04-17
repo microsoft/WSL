@@ -157,9 +157,6 @@ struct TableOutput
     // Override the output function (e.g. redirect to a stringstream in tests).
     void SetOutputFunction(OutputFn fn)
     {
-        static_assert(
-            std::is_same<OutputFn, std::function<void(const std::wstring&)>>::value,
-            "OutputFn must be a callable with signature void(const std::wstring&)");
         FAIL_FAST_IF_MSG(!fn, "OutputFn must not be empty");
         m_outputFn = std::move(fn);
     }

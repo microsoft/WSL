@@ -283,7 +283,7 @@ class WSLCTableOutputUnitTests
         cap.table.OutputLine({L"my-container", L"running"});
         cap.table.Complete();
 
-        // Only the data row should be emitted — no header.
+        // Only the data row should be emitted.
         VERIFY_ARE_EQUAL(static_cast<size_t>(1), cap.lines.size());
         VERIFY_IS_TRUE(cap.lines[0].find(L"my-container") != std::wstring::npos);
         VERIFY_IS_TRUE(cap.lines[0].find(L"NAME") == std::wstring::npos);
@@ -298,15 +298,15 @@ class WSLCTableOutputUnitTests
 
         cap.table.Complete();
 
-        // SetShowHeader(false) takes precedence — nothing should be emitted.
+        // SetShowHeader(false) takes precedence. Nothing should be emitted.
         VERIFY_ARE_EQUAL(static_cast<size_t>(0), cap.lines.size());
     }
 
-    // Test: SetShowHeader(true) is the default — header appears before data rows.
+    // Test: SetShowHeader(true) is the default. Header appears before data rows.
     TEST_METHOD(TableOutput_ShowHeader_True_IsDefaultAndEmitsHeader)
     {
         TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
-        // No explicit call to SetShowHeader — default must be true.
+        // No explicit call to SetShowHeader. Default must be true.
 
         cap.table.OutputLine({L"my-container", L"running"});
         cap.table.Complete();
@@ -340,7 +340,7 @@ class WSLCTableOutputUnitTests
     // (even with AlwaysShowHeader), and multiple data rows with no header.
     TEST_METHOD(TableOutput_ShowHeader)
     {
-        // Default is true — header appears before data rows without an explicit call.
+        // Default is true. Header appears before data rows without an explicit call.
         {
             TableOutputCapture<2> cap(TableOutput<2>::header_t{L"NAME", L"STATUS"});
 
