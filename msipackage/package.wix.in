@@ -551,7 +551,7 @@
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
 
             <!-- Repair shortcut properties after CreateShortcuts has run. Only during install/upgrade, not uninstall. -->
-            <Custom Action="RepairShortcutProperties" After="FinalizeInstall" Condition='(not REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
+            <Custom Action="RepairShortcutProperties" After="FinalizeInstall" Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED) and (not UPGRADINGPRODUCTCODE)' />
 
         </InstallExecuteSequence>
 

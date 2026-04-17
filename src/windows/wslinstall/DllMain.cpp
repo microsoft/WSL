@@ -810,10 +810,11 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
     return NOERROR;
 }
 
-// Ensures shortcut properties are set on the WSL.lnk shortcut, retrying on sharing violations.
-// This is a repair action that runs after CreateShortcuts to handle the case where the built-in
-// MsiShortcutProperty table fails due to another process (e.g., search indexer, antivirus, or
-// PowerToys Run) holding the .lnk file open. See: microsoft/WSL#11276, microsoft/WSL#13469
+// Ensures shortcut properties are set on the WSL.lnk and WSL Settings.lnk shortcuts, retrying on
+// sharing violations. This is a repair action that runs after CreateShortcuts to handle the case
+// where the built-in MsiShortcutProperty table fails due to another process (e.g., search indexer,
+// antivirus, or PowerToys Run) holding a .lnk file open. See: microsoft/WSL#11276,
+// microsoft/WSL#13469
 //
 // Uses exponential backoff: 50ms, 100ms, 200ms, 400ms, 800ms... capped at 1s per retry.
 // Total timeout is approximately 5 seconds (enough for any transient lock to release).
@@ -934,20 +935,30 @@ extern "C" UINT __stdcall RepairShortcutProperties(MSIHANDLE install)
                 TraceLoggingValue(hr, "result"));
         }
 
-        // Repair WSL Settings.lnk
-        auto wslSettingsShortcut = programsFolderStr + L"\\WSL Settings.lnk";
-        if (GetFileAttributesW(wslSettingsShortcut.c_str()) != INVALID_FILE_ATTRIBUTES)
+        // Repair WSL Settings.lnk — only on workstation (MsiNTProductType = 1).
+        // The server shortcut does not use IsSystemComponent (matches original WiX authoring).
         {
-            PROPVARIANT pvSystemComponent{};
-            pvSystemComponent.vt = VT_BOOL;
-            pvSystemComponent.boolVal = VARIANT_TRUE;
+            // Use GetVersionEx to check for workstation vs server
+            OSVERSIONINFOEXW osvi{};
+            osvi.dwOSVersionInfoSize = sizeof(osvi);
+            #pragma warning(suppress: 4996) // GetVersionExW is deprecated but sufficient for product type check
+            if (GetVersionExW(reinterpret_cast<OSVERSIONINFOW*>(&osvi)) && osvi.wProductType == VER_NT_WORKSTATION)
+            {
+                auto wslSettingsShortcut = programsFolderStr + L"\\WSL Settings.lnk";
+                if (GetFileAttributesW(wslSettingsShortcut.c_str()) != INVALID_FILE_ATTRIBUTES)
+                {
+                    PROPVARIANT pvSystemComponent{};
+                    pvSystemComponent.vt = VT_BOOL;
+                    pvSystemComponent.boolVal = VARIANT_TRUE;
 
-            auto hr = SetShortcutPropertiesWithRetry(wslSettingsShortcut.c_str(), {
-                {c_pkeyAppUserModelIsSystemComponent, pvSystemComponent}});
+                    auto hr = SetShortcutPropertiesWithRetry(wslSettingsShortcut.c_str(), {
+                        {c_pkeyAppUserModelIsSystemComponent, pvSystemComponent}});
 
-            WSL_LOG("RepairShortcutProperty",
-                TraceLoggingValue(wslSettingsShortcut.c_str(), "shortcut"),
-                TraceLoggingValue(hr, "result"));
+                    WSL_LOG("RepairShortcutProperty",
+                        TraceLoggingValue(wslSettingsShortcut.c_str(), "shortcut"),
+                        TraceLoggingValue(hr, "result"));
+                }
+            }
         }
     }
     CATCH_LOG();
