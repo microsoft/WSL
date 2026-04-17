@@ -843,6 +843,7 @@ std::string wsl::windows::common::filesystem::GetLinuxHostName()
 
     WI_ASSERT((size <= LX_HOST_NAME_MAX) && (hostName.size() == size + 1));
 
+    hostName.resize(size);
     return wsl::shared::string::CleanHostname(hostName);
 }
 
