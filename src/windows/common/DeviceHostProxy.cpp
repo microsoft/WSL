@@ -259,3 +259,16 @@ try
     return S_OK;
 }
 CATCH_RETURN()
+
+HRESULT
+DeviceHostProxy::QuerySectionMmioRangeDirtyBitmap(const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages, UINT64 PageCount, BYTE* Bitmap, UINT32 BitmapSizeInBytes)
+try
+{
+    auto lock = m_devicesLock.lock_shared();
+    RETURN_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
+    const auto device = m_devices.find(InstanceId);
+    RETURN_HR_IF(E_ACCESSDENIED, device == m_devices.end() || !device->second.MemoryMapping);
+    RETURN_IF_FAILED(device->second.MemoryMapping->QuerySectionMmioRangeDirtyBitmap(static_cast<FIOV_BAR_SELECTOR>(BarIndex), BarOffsetInPages, PageCount, Bitmap, BitmapSizeInBytes));
+    return S_OK;
+}
+CATCH_RETURN()

@@ -39,6 +39,8 @@ public:
 
     IFACEMETHOD(DestroySectionBackedMmioRange)(const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages) override;
 
+    IFACEMETHOD(QuerySectionMmioRangeDirtyBitmap)(const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages, UINT64 PageCount, BYTE* Bitmap, UINT32 BitmapSizeInBytes) override;
+
 private:
     struct RemoteFileSystemInfo
     {

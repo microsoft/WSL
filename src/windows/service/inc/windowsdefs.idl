@@ -48,7 +48,8 @@ typedef[v1_enum] enum {
 typedef[v1_enum] enum {
     FiovMmioMappingFlagNone = 0x00000000,
     FiovMmioMappingFlagWriteable = 0x00000001,
-    FiovMmioMappingFlagExecutable = 0x00000002
+    FiovMmioMappingFlagExecutable = 0x00000002,
+    FiovMmioMappingFlagTrackDirtyPages = 0x00000004
 
 } FiovMmioMappingFlags;
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(FiovMmioMappingFlags);")
@@ -111,6 +112,15 @@ interface IVmFiovGuestMmioMappings : IUnknown
     DestroySectionBackedMmioRange(
         [in]                             FIOV_BAR_SELECTOR     BarIndex,
         [in]                             ULONG64               BarOffsetInPages
+        );
+
+    HRESULT
+    QuerySectionMmioRangeDirtyBitmap(
+        [in]                             FIOV_BAR_SELECTOR     BarIndex,
+        [in]                             ULONG64               BarOffsetInPages,
+        [in]                             UINT64                PageCount,
+        [out, size_is(BitmapSizeInBytes)] BYTE                 *Bitmap,
+        [in]                             UINT32                BitmapSizeInBytes
         );
 };
 
@@ -197,6 +207,12 @@ interface IPlan9FileSystemHost : IUnknown
     HRESULT DestroySectionBackedMmioRange([in] REFGUID InstanceId,
                                           [in] UINT8 BarIndex,
                                           [in] UINT64 BarOffsetInPages);
+    HRESULT QuerySectionMmioRangeDirtyBitmap([in] REFGUID InstanceId,
+                                              [in] UINT8 BarIndex,
+                                              [in] UINT64 BarOffsetInPages,
+                                              [in] UINT64 PageCount,
+                                              [out, size_is(BitmapSizeInBytes)] BYTE *Bitmap,
+                                              [in] UINT32 BitmapSizeInBytes);
 };
 
 cpp_quote("#ifdef __cplusplus")
