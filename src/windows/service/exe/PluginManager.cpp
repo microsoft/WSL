@@ -180,22 +180,24 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
         {
             // N.B. Begin/End telemetry is emitted per plugin so the backend can attribute hangs to
             //      a specific third-party plugin (e.g. Docker Desktop) when no End event arrives.
+            //      The End is fired by WslTelemetryScope even if the plugin or ThrowIfPluginError
+            //      throws, so only a real hang produces "Begin without End".
             WSL_LOG_TELEMETRY(
                 "PluginOnVmStartedBegin",
                 PDT_ProductAndServicePerformance,
                 TraceLoggingValue(e.name.c_str(), "Plugin"),
                 TraceLoggingValue(Session->UserSid, "Sid"));
 
-            const auto hr = e.hooks.OnVMStarted(Session, Settings);
+            auto pluginOnVmStartedEnd = WslTelemetryScope([&](HRESULT hr) {
+                WSL_LOG_TELEMETRY(
+                    "PluginOnVmStartedEnd",
+                    PDT_ProductAndServicePerformance,
+                    TraceLoggingValue(e.name.c_str(), "Plugin"),
+                    TraceLoggingValue(Session->UserSid, "Sid"),
+                    TraceLoggingHResult(hr, "hr"));
+            });
 
-            WSL_LOG_TELEMETRY(
-                "PluginOnVmStartedEnd",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"),
-                TraceLoggingValue(hr, "result"));
-
-            ThrowIfPluginError(hr, Session->SessionId, e.name.c_str());
+            ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), Session->SessionId, e.name.c_str());
         }
     }
 }
@@ -227,6 +229,8 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
         {
             // N.B. Begin/End telemetry is emitted per plugin so the backend can attribute hangs to
             //      a specific third-party plugin (e.g. Docker Desktop) when no End event arrives.
+            //      The End is fired by WslTelemetryScope even if the plugin or ThrowIfPluginError
+            //      throws, so only a real hang produces "Begin without End".
             WSL_LOG_TELEMETRY(
                 "PluginOnDistroStartedBegin",
                 PDT_ProductAndServicePerformance,
@@ -234,17 +238,17 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
-            const auto hr = e.hooks.OnDistributionStarted(Session, Distribution);
+            auto pluginOnDistroStartedEnd = WslTelemetryScope([&](HRESULT hr) {
+                WSL_LOG_TELEMETRY(
+                    "PluginOnDistroStartedEnd",
+                    PDT_ProductAndServicePerformance,
+                    TraceLoggingValue(e.name.c_str(), "Plugin"),
+                    TraceLoggingValue(Session->UserSid, "Sid"),
+                    TraceLoggingValue(Distribution->Id, "DistributionId"),
+                    TraceLoggingHResult(hr, "hr"));
+            });
 
-            WSL_LOG_TELEMETRY(
-                "PluginOnDistroStartedEnd",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"),
-                TraceLoggingValue(Distribution->Id, "DistributionId"),
-                TraceLoggingValue(hr, "result"));
-
-            ThrowIfPluginError(hr, Session->SessionId, e.name.c_str());
+            ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), Session->SessionId, e.name.c_str());
         }
     }
 }

@@ -45,9 +45,9 @@ WslCoreInstance::WslCoreInstance(
 
     // Read a message from the init daemon. This will let us know if anything failed during startup.
     //
-    // N.B. Telemetry Begin/End events are emitted around this receive so the backend can tell
-    //      whether a user is stuck waiting on the init daemon's mount/journal-recovery step,
-    //      rather than silently timing out with no events.
+    // N.B. The End event is fired by WslTelemetryScope even if ReceiveMessage throws, so the
+    //      backend can distinguish "init daemon mount failed with a surfaced error" from a real
+    //      silent hang (where no End is ever observed).
     WSL_LOG_TELEMETRY(
         "WaitForCreateInstanceResultBegin",
         PDT_ProductAndServicePerformance,
@@ -55,16 +55,23 @@ WslCoreInstance::WslCoreInstance(
         TraceLoggingValue(InstanceId, "instanceId"),
         TraceLoggingValue(m_socketTimeout, "timeoutMs"));
 
+    int initResult = 0;
+    int failureStep = 0;
+    auto waitForCreateInstanceResultEnd = WslTelemetryScope([&](HRESULT hr) {
+        WSL_LOG_TELEMETRY(
+            "WaitForCreateInstanceResultEnd",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(InstanceId, "instanceId"),
+            TraceLoggingHResult(hr, "hr"),
+            TraceLoggingValue(initResult, "initResult"),
+            TraceLoggingValue(failureStep, "failureStep"));
+    });
+
     gsl::span<gsl::byte> span;
     const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
-
-    WSL_LOG_TELEMETRY(
-        "WaitForCreateInstanceResultEnd",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
-        TraceLoggingValue(InstanceId, "instanceId"),
-        TraceLoggingValue(result.Result, "initResult"),
-        TraceLoggingValue(static_cast<int>(result.FailureStep), "failureStep"));
+    initResult = result.Result;
+    failureStep = static_cast<int>(result.FailureStep);
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -392,7 +399,8 @@ void WslCoreInstance::Initialize()
     //
     // N.B. This can block on m_drvfsInitialResult.get(), which waits on a std::future with no
     //      timeout. If the DrvFs init thread hangs (e.g. Plan9 server startup issue), this can
-    //      stall the entire create-instance flow. Telemetry Begin/End events make this visible.
+    //      stall the entire create-instance flow. The End event is fired via WslTelemetryScope
+    //      even if the wait throws, so a surfaced failure is distinguishable from a real hang.
     if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING))
     {
         WSL_LOG_TELEMETRY(
@@ -401,14 +409,17 @@ void WslCoreInstance::Initialize()
             TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
             TraceLoggingValue(m_instanceId, "instanceId"));
 
-        drvfsMount = m_initializeDrvFs(m_userToken.get());
+        auto waitForDrvFsInitEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "WaitForDrvFsInitEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+                TraceLoggingValue(m_instanceId, "instanceId"),
+                TraceLoggingHResult(hr, "hr"),
+                TraceLoggingValue(static_cast<int>(drvfsMount), "drvfsMount"));
+        });
 
-        WSL_LOG_TELEMETRY(
-            "WaitForDrvFsInitEnd",
-            PDT_ProductAndServicePerformance,
-            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-            TraceLoggingValue(m_instanceId, "instanceId"),
-            TraceLoggingValue(static_cast<int>(drvfsMount), "drvfsMount"));
+        drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
 
     // Create a console manager that will be used to manage session leaders.
@@ -431,22 +442,25 @@ void WslCoreInstance::Initialize()
     //
     // N.B. The receive below has no explicit timeout and WslCorePort's channel has no exit event,
     //      so if the init daemon hangs during config processing (e.g. systemd startup, mount),
-    //      this can block indefinitely. Telemetry Begin/End events let the backend distinguish
-    //      a true hang in this step from lack of progress elsewhere.
+    //      this can block indefinitely. WslTelemetryScope ensures an End is always emitted on
+    //      success or exception paths; only a true hang produces "Begin without End".
     WSL_LOG_TELEMETRY(
         "WaitForInitConfigResponseBegin",
         PDT_ProductAndServicePerformance,
         TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
         TraceLoggingValue(m_instanceId, "instanceId"));
 
+    auto waitForInitConfigResponseEnd = WslTelemetryScope([&](HRESULT hr) {
+        WSL_LOG_TELEMETRY(
+            "WaitForInitConfigResponseEnd",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(m_instanceId, "instanceId"),
+            TraceLoggingHResult(hr, "hr"));
+    });
+
     gsl::span<gsl::byte> span;
     const auto& response = m_initChannel->GetChannel().ReceiveMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
-
-    WSL_LOG_TELEMETRY(
-        "WaitForInitConfigResponseEnd",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-        TraceLoggingValue(m_instanceId, "instanceId"));
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;

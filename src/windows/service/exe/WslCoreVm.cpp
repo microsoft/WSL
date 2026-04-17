@@ -322,16 +322,23 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Create the utility VM and store the runtime ID.
     //
     // N.B. HcsCreateComputeSystem can take a long time under load or when HCS is in a bad state.
-    //      Begin/End telemetry ensures the backend can see that the service is waiting on HCS.
+    //      WslTelemetryScope emits the End event even if the call throws, so a surfaced HCS
+    //      failure is distinguishable from a real hang.
     std::wstring json = GenerateConfigJson();
 
-    WSL_LOG_TELEMETRY(
-        "HcsCreateSystemBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(VmId, "vmId"));
+    WSL_LOG_TELEMETRY("HcsCreateSystemBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(VmId, "vmId"));
 
-    m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
+    {
+        auto hcsCreateSystemEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "HcsCreateSystemEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(VmId, "vmId"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
-    WSL_LOG_TELEMETRY(
-        "HcsCreateSystemEnd", PDT_ProductAndServicePerformance, TraceLoggingValue(VmId, "vmId"));
+        m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
+    }
 
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
@@ -355,22 +362,28 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     signalEarlyTermination.release();
 
     // Start the utility VM.
-    WSL_LOG_TELEMETRY(
-        "HcsStartSystemBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
+    WSL_LOG_TELEMETRY("HcsStartSystemBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
 
-    try
     {
-        wsl::windows::common::hcs::StartComputeSystem(m_system.get(), json.c_str());
-    }
-    catch (...)
-    {
-        // Reset m_system so we don't try to wait for termination in the destructor, since the VM isn't even running.
-        m_system.reset();
-        throw;
-    }
+        auto hcsStartSystemEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "HcsStartSystemEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(m_runtimeId, "vmId"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
-    WSL_LOG_TELEMETRY(
-        "HcsStartSystemEnd", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
+        try
+        {
+            wsl::windows::common::hcs::StartComputeSystem(m_system.get(), json.c_str());
+        }
+        catch (...)
+        {
+            // Reset m_system so we don't try to wait for termination in the destructor, since the VM isn't even running.
+            m_system.reset();
+            throw;
+        }
+    }
 
     // Add GPUs to the utility VM.
     if (m_vmConfig.EnableGpuSupport)
@@ -455,35 +468,44 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
     //
     // N.B. This is a common silent-hang point when the kernel boots slowly or the HCS socket path
-    //      is wedged. Begin/End telemetry shows the backend exactly how long the service waited
-    //      on the guest to connect.
+    //      is wedged. WslTelemetryScope emits the End event even on timeout/abort so a surfaced
+    //      failure is distinguishable from a real hang.
     WSL_LOG_TELEMETRY(
         "WaitForMiniInitConnectBegin",
         PDT_ProductAndServicePerformance,
         TraceLoggingValue(m_runtimeId, "vmId"),
         TraceLoggingValue(m_vmConfig.KernelBootTimeout, "timeoutMs"));
 
-    m_miniInitChannel = wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
+    {
+        auto waitForMiniInitConnectEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "WaitForMiniInitConnectEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(m_runtimeId, "vmId"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
-    WSL_LOG_TELEMETRY(
-        "WaitForMiniInitConnectEnd", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
+        m_miniInitChannel = wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
+    }
 
     // Accept the connection from the Linux guest for notifications.
     m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
 
     // Receive and parse the guest kernel version
-    WSL_LOG_TELEMETRY(
-        "ReadGuestCapabilitiesBegin",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(m_runtimeId, "vmId"));
+    WSL_LOG_TELEMETRY("ReadGuestCapabilitiesBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
 
-    ReadGuestCapabilities();
+    {
+        auto readGuestCapabilitiesEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "ReadGuestCapabilitiesEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(m_runtimeId, "vmId"),
+                TraceLoggingValue(m_kernelVersionString.c_str(), "kernelVersion"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
-    WSL_LOG_TELEMETRY(
-        "ReadGuestCapabilitiesEnd",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(m_runtimeId, "vmId"),
-        TraceLoggingValue(m_kernelVersionString.c_str(), "kernelVersion"));
+        ReadGuestCapabilities();
+    }
 
     // Mount the system distro.
     // N.B. If using SCSI, the system distro is added during VM creation.
@@ -574,13 +596,22 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         ExecutionContext context(Context::ConfigureNetworking);
 
         // N.B. Network configuration is one of the main sources of slow startups that trip the
-        //      telemetry 3-minute timeout window (e.g. HNS taking minutes to come up). Begin/End
-        //      events let the backend see when the service is waiting on HNS/HCN.
+        //      telemetry 3-minute timeout window (e.g. HNS taking minutes to come up).
+        //      WslTelemetryScope fires the End event even on exception paths.
         WSL_LOG_TELEMETRY(
             "ConfigureNetworkingBegin",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(m_runtimeId, "vmId"),
             TraceLoggingValue(ToString(m_vmConfig.NetworkingMode), "networkingMode"));
+
+        auto configureNetworkingEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "ConfigureNetworkingEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(m_runtimeId, "vmId"),
+                TraceLoggingValue(ToString(m_vmConfig.NetworkingMode), "finalNetworkingMode"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
         // Accept the connection from the guest network service and create the channel.
         wsl::core::GnsChannel gnsChannel(AcceptConnection(m_vmConfig.KernelBootTimeout));
@@ -598,21 +629,25 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         // For NAT networking, ensure the network can be created. If creating the network fails, fall back to
         // virtio proxy networking mode.
         //
-        // N.B. CreateNatNetwork interacts with HNS and can block for minutes. Begin/End events
-        //      distinguish HNS wait from other networking work.
+        // N.B. CreateNatNetwork interacts with HNS and can block for minutes. WslTelemetryScope
+        //      fires the End event even on exception paths.
         wsl::windows::common::hcs::unique_hcn_network natNetwork;
         if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
         {
-            WSL_LOG_TELEMETRY(
-                "CreateNatNetworkBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
+            WSL_LOG_TELEMETRY("CreateNatNetworkBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
 
-            natNetwork = wsl::core::NatNetworking::CreateNetwork(m_vmConfig);
+            {
+                auto createNatNetworkEnd = WslTelemetryScope([&](HRESULT hr) {
+                    WSL_LOG_TELEMETRY(
+                        "CreateNatNetworkEnd",
+                        PDT_ProductAndServicePerformance,
+                        TraceLoggingValue(m_runtimeId, "vmId"),
+                        TraceLoggingValue(static_cast<bool>(natNetwork), "success"),
+                        TraceLoggingHResult(hr, "hr"));
+                });
 
-            WSL_LOG_TELEMETRY(
-                "CreateNatNetworkEnd",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(m_runtimeId, "vmId"),
-                TraceLoggingValue(natNetwork != nullptr, "success"));
+                natNetwork = wsl::core::NatNetworking::CreateNetwork(m_vmConfig);
+            }
 
             if (!natNetwork)
             {
@@ -720,22 +755,23 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             m_networkingEngine.reset();
         }
 
-        WSL_LOG_TELEMETRY(
-            "ConfigureNetworkingEnd",
-            PDT_ProductAndServicePerformance,
-            TraceLoggingValue(m_runtimeId, "vmId"),
-            TraceLoggingValue(ToString(m_vmConfig.NetworkingMode), "finalNetworkingMode"),
-            TraceLoggingValue(result, "result"));
+        // configureNetworkingEnd (WslTelemetryScope) fires here on scope exit.
     }
 
     // Perform additional initialization.
-    WSL_LOG_TELEMETRY(
-        "InitializeGuestBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
+    WSL_LOG_TELEMETRY("InitializeGuestBegin", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
 
-    InitializeGuest();
+    {
+        auto initializeGuestEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "InitializeGuestEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(m_runtimeId, "vmId"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
-    WSL_LOG_TELEMETRY(
-        "InitializeGuestEnd", PDT_ProductAndServicePerformance, TraceLoggingValue(m_runtimeId, "vmId"));
+        InitializeGuest();
+    }
 }
 
 WslCoreVm::~WslCoreVm() noexcept
@@ -1243,8 +1279,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     // Add the VHD to the machine.
     //
     // N.B. AttachDisk performs an HCS operation that can hang or fail when the VHD file is
-    //      corrupted, stored on a BitLocker volume, or on slow/intermittent storage. Begin/End
-    //      events help the backend see when instance creation is blocked on VHD attachment.
+    //      corrupted, stored on a BitLocker volume, or on slow/intermittent storage.
+    //      WslTelemetryScope fires the End event even if AttachDiskLockHeld throws.
     WSL_LOG_TELEMETRY(
         "AttachDistroVhdBegin",
         PDT_ProductAndServicePerformance,
@@ -1252,14 +1288,21 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
         TraceLoggingValue(Configuration.Name.c_str(), "distroName"));
 
     auto lock = m_lock.lock_exclusive();
-    const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
 
-    WSL_LOG_TELEMETRY(
-        "AttachDistroVhdEnd",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(InstanceId, "instanceId"),
-        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
-        TraceLoggingValue(lun, "lun"));
+    ULONG lun = 0;
+    {
+        auto attachDistroVhdEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "AttachDistroVhdEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(InstanceId, "instanceId"),
+                TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+                TraceLoggingValue(lun, "lun"),
+                TraceLoggingHResult(hr, "hr"));
+        });
+
+        lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    }
 
     // Launch the init daemon and create the instance.
     int flags = LxMiniInitMessageFlagNone;
@@ -1301,21 +1344,26 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->UserProfileOffset, userProfile);
 
     // N.B. SendMessage can appear to succeed locally even when the hvsocket is silently broken
-    //      (e.g. after sleep/wake). Emitting Begin/End helps distinguish a lost LaunchInit message
-    //      from the guest hanging after receiving it.
+    //      (e.g. after sleep/wake). WslTelemetryScope fires the End event even if SendMessage
+    //      throws, distinguishing a surfaced failure from a silent hang.
     WSL_LOG_TELEMETRY(
         "SendLaunchInitBegin",
         PDT_ProductAndServicePerformance,
         TraceLoggingValue(InstanceId, "instanceId"),
         TraceLoggingValue(Configuration.Name.c_str(), "distroName"));
 
-    m_miniInitChannel.SendMessage<LX_MINI_INIT_MESSAGE>(message.Span());
+    {
+        auto sendLaunchInitEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "SendLaunchInitEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(InstanceId, "instanceId"),
+                TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
-    WSL_LOG_TELEMETRY(
-        "SendLaunchInitEnd",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(InstanceId, "instanceId"),
-        TraceLoggingValue(Configuration.Name.c_str(), "distroName"));
+        m_miniInitChannel.SendMessage<LX_MINI_INIT_MESSAGE>(message.Span());
+    }
 
     return CreateInstanceInternal(
         InstanceId, Configuration, ReceiveTimeout, DefaultUid, ClientLifetimeId, WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), ConnectPort);
@@ -1340,7 +1388,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     // Establish a communication channel with the init daemon.
     //
     // N.B. If the guest init daemon fails to start or the hvsocket is wedged, this AcceptConnection
-    //      is the first place a silent hang will surface. Begin/End events make the wait visible.
+    //      is the first place a silent hang will surface. WslTelemetryScope fires the End event
+    //      even on timeout/abort so a surfaced failure is distinguishable from a real hang.
     WSL_LOG_TELEMETRY(
         "WaitForInitDaemonConnectBegin",
         PDT_ProductAndServicePerformance,
@@ -1348,13 +1397,19 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
         TraceLoggingValue(ReceiveTimeout, "timeoutMs"));
 
-    auto initSocket = AcceptConnection(ReceiveTimeout);
+    wil::unique_socket initSocket;
+    {
+        auto waitForInitDaemonConnectEnd = WslTelemetryScope([&](HRESULT hr) {
+            WSL_LOG_TELEMETRY(
+                "WaitForInitDaemonConnectEnd",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(InstanceId, "instanceId"),
+                TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+                TraceLoggingHResult(hr, "hr"));
+        });
 
-    WSL_LOG_TELEMETRY(
-        "WaitForInitDaemonConnectEnd",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(InstanceId, "instanceId"),
-        TraceLoggingValue(Configuration.Name.c_str(), "distroName"));
+        initSocket = AcceptConnection(ReceiveTimeout);
+    }
 
     // If the system distro is enabled, establish a communication channel with its init daemon.
     wil::unique_socket systemDistroSocket;

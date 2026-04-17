@@ -74,3 +74,64 @@ private:
         TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), \
         TelemetryPrivacyDataTag(Tag), \
         __VA_ARGS__);
+
+#ifdef __cplusplus
+
+// RAII helper that ensures a paired End telemetry event is always emitted,
+// including when the enclosing scope exits via exception. On destruction:
+//   - If the stack is unwinding due to an uncaught exception, the HRESULT
+//     passed to the end lambda is populated from wil::ResultFromCaughtException().
+//   - Otherwise, the HRESULT passed is S_OK.
+//
+// This lets the backend state machine distinguish between three outcomes:
+//   1. Normal success     -> End event emitted with hr == S_OK
+//   2. Exception / error  -> End event emitted with hr != S_OK
+//   3. Real hang          -> No End event ever emitted
+//
+// Usage (caller emits Begin first, scope emits End on destruction):
+//   WSL_LOG_TELEMETRY("XxxBegin", PDT_ProductAndServicePerformance, ...);
+//   auto scope = WslTelemetryScope([&](HRESULT hr) {
+//       WSL_LOG_TELEMETRY("XxxEnd", PDT_ProductAndServicePerformance,
+//                          ..., TraceLoggingHResult(hr, "hr"));
+//   });
+//   // ...work, may throw...
+//   // On scope exit (success or exception) End event fires with populated hr.
+template <typename TEndEmit>
+class WslTelemetryScope
+{
+public:
+    explicit WslTelemetryScope(TEndEmit endEmit) :
+        m_endEmit(std::move(endEmit)), m_uncaughtOnEntry(std::uncaught_exceptions())
+    {
+    }
+
+    ~WslTelemetryScope() noexcept
+    {
+        HRESULT hr = S_OK;
+        if (std::uncaught_exceptions() > m_uncaughtOnEntry)
+        {
+            hr = wil::ResultFromCaughtException();
+        }
+
+        try
+        {
+            m_endEmit(hr);
+        }
+        CATCH_LOG();
+    }
+
+    WslTelemetryScope(const WslTelemetryScope&) = delete;
+    WslTelemetryScope& operator=(const WslTelemetryScope&) = delete;
+    WslTelemetryScope(WslTelemetryScope&&) = delete;
+    WslTelemetryScope& operator=(WslTelemetryScope&&) = delete;
+
+private:
+    TEndEmit m_endEmit;
+    int m_uncaughtOnEntry;
+};
+
+// Deduction guide so callers do not need to spell out the lambda type.
+template <typename TEndEmit>
+WslTelemetryScope(TEndEmit) -> WslTelemetryScope<TEndEmit>;
+
+#endif // __cplusplus
