@@ -55,7 +55,7 @@ bool CoroutineIoIssuer::PreIssue(CoroutineIoOperation& operation, CancelToken& t
     }
 
     // The operation has already been cancelled. Don't even issue the IO.
-    operation.Result = {ECANCELED, 0};
+    operation.Result = {-ECANCELED, 0};
     operation.DoneOrCoroutine = true;
     return false;
 }
