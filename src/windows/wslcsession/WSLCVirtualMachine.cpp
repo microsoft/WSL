@@ -492,7 +492,7 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, const std::string
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
     std::vector<std::string> args{mkfsPath};
-    
+
     if (!Uuid.empty())
     {
         args.emplace_back("-U");
