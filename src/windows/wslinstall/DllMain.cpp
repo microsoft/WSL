@@ -903,6 +903,10 @@ static HRESULT SetShortcutPropertiesWithRetry(
     return HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION);
 }
 
+// Ensures shortcut properties are set on WSL.lnk and WSL Settings.lnk, retrying on
+// sharing violations. Runs after CreateShortcuts to handle the case where the built-in
+// MsiShortcutProperty table fails due to another process (e.g., search indexer, antivirus,
+// or PowerToys Run) holding a .lnk file open. See: microsoft/WSL#11276, microsoft/WSL#13469
 extern "C" UINT __stdcall RepairShortcutProperties(MSIHANDLE install)
 {
     try
