@@ -2836,8 +2836,9 @@ void WslCoreVm::ValidateNetworkingMode()
     if (m_vmConfig.NetworkingMode == NetworkingMode::Mirrored)
     {
         constexpr DWORD c_ipv6Disabled = 0xFF;
-        const auto disabledComponents = wsl::windows::common::registry::ReadDword(
-            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", 0);
+        DWORD disabledComponents = 0;
+        wil::reg::get_value_dword_nothrow(
+            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", &disabledComponents);
 
         if (disabledComponents == c_ipv6Disabled)
         {

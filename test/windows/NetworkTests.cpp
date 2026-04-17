@@ -4558,8 +4558,9 @@ class MirroredTests
         RegistryKeyChange<DWORD> disableIpv6(
             HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", 0xFF);
 
-        // Request mirrored mode - this should fall back to NAT since IPv6 is disabled.
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        // Force a restart so we re-evaluate the networking mode with the regkey set.
+        WslShutdown();
 
         // Verify WSL is actually running in NAT mode.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
