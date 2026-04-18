@@ -43,10 +43,12 @@ std::wstring ImagePruneCommand::LongDescription() const
     return Localization::WSLCCLI_ImagePruneLongDesc();
 }
 
+// clang-format off
 void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context              //
-        << CreateSession //
+    context
+        << CreateSession
         << PruneImages;
 }
+// clang-format on
 } // namespace wsl::windows::wslc
