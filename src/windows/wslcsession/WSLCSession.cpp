@@ -27,6 +27,7 @@ using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
+constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -411,9 +412,11 @@ CATCH_LOG();
 
 void WSLCSession::StartContainerd()
 {
-    constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
+    constexpr auto c_containerdRoot = "/var/lib/docker/containerd/daemon";
+    constexpr auto c_containerdState = "/run/docker/containerd/daemon";
 
-    std::vector<std::string> args{"/usr/bin/containerd", "--address", c_containerdSocket};
+    std::vector<std::string> args{
+        "/usr/bin/containerd", "--address", c_containerdSocket, "--root", c_containerdRoot, "--state", c_containerdState};
 
     if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
     {
@@ -445,7 +448,7 @@ void WSLCSession::StartDockerd()
 
     // Use external containerd socket (requires StartContainerd() to be called first).
     args.emplace_back("--containerd");
-    args.emplace_back("/run/containerd/containerd.sock");
+    args.emplace_back(c_containerdSocket);
 
     if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
     {
