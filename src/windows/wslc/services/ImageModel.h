@@ -24,6 +24,7 @@ struct ImageInformation
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageInformation, Repository, Tag, Id, Created, Size);
 };
+
 struct PruneImagesResult
 {
     std::vector<std::string> DeletedImages;

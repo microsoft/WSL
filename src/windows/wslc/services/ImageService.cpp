@@ -260,7 +260,7 @@ models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Sessio
     WSLCPruneImagesOptions options{};
     if (all)
     {
-        options.Flags |= WSLCPruneImagesFlagsDanglingFalse;
+        WI_SetFlag(options.Flags, WSLCPruneImagesFlagsDanglingFalse);
     }
 
     wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
