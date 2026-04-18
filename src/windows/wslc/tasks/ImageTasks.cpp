@@ -224,6 +224,7 @@ void TagImage(CLIExecutionContext& context)
     auto& target = context.Args.Get<ArgType::Target>();
     services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
 }
+
 void PruneImages(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -234,14 +235,16 @@ void PruneImages(CLIExecutionContext& context)
 
     for (const auto& image : result.UntaggedImages)
     {
-        PrintMessage(std::format(L"Untagged: {}\n", MultiByteToWide(image)), stdout);
+        PrintMessage(Localization::WSLCCLI_ImagePruneUntagged(MultiByteToWide(image)));
     }
 
     for (const auto& image : result.DeletedImages)
     {
-        PrintMessage(std::format(L"Deleted: {}\n", MultiByteToWide(image)), stdout);
+        PrintMessage(Localization::WSLCCLI_ImagePruneDeleted(MultiByteToWide(image)));
     }
 
-    PrintMessage(std::format(L"\nTotal reclaimed space: {:.2f} MB\n", static_cast<double>(result.SpaceReclaimed) / (1024 * 1024)), stdout);
+    PrintMessage(L"");
+    // Dividing by 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
+    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / (1000 * 1000)));
 }
 } // namespace wsl::windows::wslc::task
