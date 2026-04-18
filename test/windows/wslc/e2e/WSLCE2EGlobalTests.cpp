@@ -66,11 +66,6 @@ class WSLCE2EGlobalTests
         RunWslcAndVerify(L"INVALID_CMD", {.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_VersionCommand)
-    {
-        RunWslcAndVerify(L"version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_VersionFlag)
     {
         RunWslcAndVerify(L"--version", {.Stdout = GetVersionMessage(), .Stderr = L"", .ExitCode = 0});

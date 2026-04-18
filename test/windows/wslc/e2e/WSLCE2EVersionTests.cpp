@@ -64,9 +64,7 @@ class WSLCE2EVersionTests
     WSLC_TEST_METHOD(WSLCE2E_Version_InvalidFormatOption)
     {
         const auto result = RunWslc(L"version --format yaml");
-        result.Verify(
-            {.Stderr = L"Invalid format value: yaml is not a recognized format type. Supported format types are: json, table.\r\n",
-             .ExitCode = 1});
+        result.Verify({.Stderr = L"Invalid format value: yaml is not a recognized format type. Supported format types are: json, table.\r\n", .ExitCode = 1});
     }
 
 private:
