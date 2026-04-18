@@ -144,7 +144,7 @@ public:
     common::docker_schema::PruneContainerResult PruneContainers(const PruneContainersFilters& filters = {});
 
     // Volume management.
-    void CreateVolume(const common::docker_schema::CreateVolume& Request);
+    common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
     void RemoveVolume(const std::string& Name);
     std::vector<common::docker_schema::Volume> ListVolumes();
 

@@ -59,12 +59,12 @@ COMMAND_LINE_TEST_CASE(L"run --rm -it --entrypoint bash archlinux:latest -c \"ec
 COMMAND_LINE_TEST_CASE(L"run --rm --entrypoint /bin/bash debian:latest -c ls", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run jrottenberg/ffmpeg:4.4-alpine -i http://url/to/media.mp4 -stats", L"run", true)
 COMMAND_LINE_TEST_CASE(
-    L"run -v ${PWD}:/data jrottenberg/ffmpeg:4.4-scratch -stats -i http://www.hevc-10bit.mkv -c:v libx265 -pix_fmt yuv420p10 -t "
+    L"run -v ./:/data jrottenberg/ffmpeg:4.4-scratch -stats -i http://www.hevc-10bit.mkv -c:v libx265 -pix_fmt yuv420p10 -t "
     L"5 -f mp4 test.mp4",
     L"run",
     true)
 COMMAND_LINE_TEST_CASE(
-    L"run -v ${PWD}:/data -it jrottenberg/ffmpeg:4.4-scratch -stats -i https://file-examples/file_example_MP4_480_1_5MG.mp4 -c:v "
+    L"run -v ./:/data -it jrottenberg/ffmpeg:4.4-scratch -stats -i https://file-examples/file_example_MP4_480_1_5MG.mp4 -c:v "
     L"libx265 -pix_fmt yuv420p10 -t 5 -f mp4 /dataout.mp4",
     L"run",
     true)
@@ -83,6 +83,16 @@ COMMAND_LINE_TEST_CASE(L"container start --attach cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"container start -a cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"create ubuntu:latest", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --workdir /app ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create -w /app ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --workdir /app ubuntu sh", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --workdir", L"create", false)             // Missing value for --workdir
+COMMAND_LINE_TEST_CASE(L"create --workdir \"\" ubuntu", L"create", false) // Empty working directory
+COMMAND_LINE_TEST_CASE(L"run --workdir /app ubuntu echo hello", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run -w /app ubuntu echo hello", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --workdir /app ubuntu sh", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --workdir", L"run", false)                        // Missing value for --workdir
+COMMAND_LINE_TEST_CASE(L"run --workdir \"\" ubuntu echo hello", L"run", false) // Empty working directory
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
@@ -123,6 +133,9 @@ COMMAND_LINE_TEST_CASE(L"image build C:\\context --build-arg A=1 --build-arg B=2
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test:latest --build-arg KEY=VALUE -f Dockerfile.custom", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context --verbose", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test --build-arg KEY=VALUE --verbose", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context --no-cache", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context --no-cache --verbose", L"build", true)
+COMMAND_LINE_TEST_CASE(L"image build C:\\context -t test --no-cache", L"build", true)
 COMMAND_LINE_TEST_CASE(L"image build", L"build", false)
 COMMAND_LINE_TEST_CASE(L"build C:\\context", L"build", true)
 COMMAND_LINE_TEST_CASE(L"build C:\\context -t test", L"build", true)

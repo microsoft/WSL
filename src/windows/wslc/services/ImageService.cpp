@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "ImageService.h"
+#include "RegistryService.h"
 #include "SessionService.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
@@ -63,6 +64,13 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBuildFileNotFound(contextPath));
 }
 
+std::string GetServerFromImage(const std::string& image)
+{
+    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
+    return server;
+}
+
 } // namespace
 
 namespace wsl::windows::wslc::services {
@@ -76,7 +84,8 @@ void ImageService::Build(
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
     const std::wstring& dockerfilePath,
-    bool verbose,
+    const std::wstring& target,
+    WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
 {
@@ -122,13 +131,16 @@ void ImageService::Build(
     std::vector<LPCSTR> buildArgPointers;
     toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
 
+    auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
+
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
         .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
-        .Verbose = verbose,
+        .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
+        .Flags = flags,
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
@@ -196,7 +208,9 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
+    auto server = GetServerFromImage(image);
+    auto auth = RegistryService::Get(server);
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback));
 }
 
 void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
@@ -223,8 +237,11 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push()
+void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
+    auto server = GetServerFromImage(image);
+    auto auth = RegistryService::Get(server);
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)

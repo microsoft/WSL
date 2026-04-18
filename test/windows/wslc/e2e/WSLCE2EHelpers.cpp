@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include <JsonUtils.h>
+#include <wslutil.h>
 
 extern std::wstring g_testDataPath;
 
@@ -365,6 +366,56 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
             break;
         }
     }
+}
+
+wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
+{
+    // Ensure the default elevated session exists before opening it via COM.
+    RunWslcAndVerify(L"container list", {.Stderr = L"", .ExitCode = 0});
+
+    wil::com_ptr<IWSLCSessionManager> sessionManager;
+    VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    wil::com_ptr<IWSLCSession> session;
+    VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(nullptr, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    return std::move(session);
+}
+
+std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(IWSLCSession& session, const std::string& username, const std::string& password, USHORT port)
+{
+    EnsureImageIsLoaded({L"wslc-registry", L"latest", GetTestImagePath("wslc-registry:latest")});
+
+    std::vector<std::string> env = {std::format("REGISTRY_HTTP_ADDR=0.0.0.0:{}", port)};
+
+    if (!username.empty())
+    {
+        env.push_back(std::format("USERNAME={}", username));
+        env.push_back(std::format("PASSWORD={}", password));
+    }
+
+    WSLCContainerLauncher launcher("wslc-registry:latest", {}, {}, env);
+    launcher.SetEntrypoint({"/entrypoint.sh"});
+    launcher.AddPort(port, port, AF_INET);
+
+    auto container = launcher.Launch(session, WSLCContainerStartFlagsNone);
+
+    auto address = std::format("127.0.0.1:{}", port);
+    auto url = std::format(L"http://{}/v2/", wsl::shared::string::MultiByteToWide(address));
+
+    int expectedCode = username.empty() ? 200 : 401;
+    ExpectHttpResponse(url.c_str(), expectedCode, true);
+
+    return {std::move(container), std::move(address)};
+}
+
+std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress)
+{
+    auto registryImage = std::format(L"{}/{}", registryAddress, imageName);
+    RunWslcAndVerify(std::format(L"image tag {} {}", imageName, registryImage), {.ExitCode = 0});
+    return registryImage;
 }
 
 void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& lines)

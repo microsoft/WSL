@@ -200,6 +200,14 @@ void EnsureAbsolutePath(const std::filesystem::path& path, bool containerPath)
         THROW_HR_IF(E_INVALIDARG, path.is_relative());
     }
 }
+static HRESULT InetNtopToHresult(int af, const void* src, char* dst, size_t dstCount)
+{
+    if (inet_ntop(af, src, dst, dstCount) == nullptr)
+    {
+        return HRESULT_FROM_WIN32(WSAGetLastError());
+    }
+    return S_OK;
+}
 
 bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const WslcContainerProcessOptionsInternal* initProcessOptions)
 {
@@ -485,13 +493,15 @@ try
 
     WSLCVolumeOptions volumeOptions{};
     volumeOptions.Name = options->name;
-    // Only supported value currently
-    volumeOptions.Type = "vhd";
+    volumeOptions.Driver = "vhd";
 
-    auto dynamicOptions = std::format(R"({{ "SizeBytes": "{}" }})", options->sizeInBytes);
-    volumeOptions.Options = dynamicOptions.c_str();
+    auto sizeStr = std::to_string(options->sizeInBytes);
+    WSLCDriverOption driverOpts[] = {{"SizeBytes", sizeStr.c_str()}};
+    volumeOptions.DriverOpts = driverOpts;
+    volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
 
-    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions));
+    WSLCVolumeInformation volumeInfo{};
+    return errorInfoWrapper.CaptureResult(internalType->session->CreateVolume(&volumeOptions, &volumeInfo));
 }
 CATCH_RETURN();
 
@@ -617,6 +627,8 @@ try
     auto result = std::make_unique<WslcContainerImpl>();
 
     WSLCContainerOptions containerOptions{};
+    std::unique_ptr<WSLCPortMapping[]> convertedPorts; // this must stay in same scope as containerOptions since containerOptions.Ports is getting a raw pointer to the array owned by convertedPorts.
+
     containerOptions.Image = internalContainerSettings->image;
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
@@ -659,7 +671,6 @@ try
         containerOptions.NamedVolumesCount = static_cast<ULONG>(internalContainerSettings->namedVolumesCount);
     }
 
-    std::unique_ptr<WSLCPortMapping[]> convertedPorts;
     if (internalContainerSettings->ports && internalContainerSettings->portsCount)
     {
         convertedPorts = std::make_unique<WSLCPortMapping[]>(internalContainerSettings->portsCount);
@@ -671,14 +682,58 @@ try
             convertedPort.HostPort = internalPort.windowsPort;
             convertedPort.ContainerPort = internalPort.containerPort;
 
-            // TODO: Ipv6 & custom binding address support.
-            convertedPort.Family = AF_INET;
-
             // TODO: Consider using standard protocol numbers instead of our own enum.
-            convertedPort.Protocol = internalPort.protocol == WSLC_PORT_PROTOCOL_TCP ? IPPROTO_TCP : IPPROTO_UDP;
-            strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
+            switch (internalPort.protocol)
+            {
+            case WSLC_PORT_PROTOCOL_TCP:
+                convertedPort.Protocol = IPPROTO_TCP;
+                break;
+            case WSLC_PORT_PROTOCOL_UDP:
+                convertedPort.Protocol = IPPROTO_UDP;
+                break;
+            default:
+                THROW_HR_MSG(E_INVALIDARG, "Unsupported port protocol: %u", internalPort.protocol);
+            }
+            // Validate IP address if provided and if valid, copy to runtime structure.
+            if (internalPort.windowsAddress != nullptr)
+            {
+                switch (internalPort.windowsAddress->ss_family)
+                {
+                case AF_INET:
+                {
+                    const auto* addr4 = reinterpret_cast<const sockaddr_in*>(internalPort.windowsAddress);
+                    HRESULT hr = InetNtopToHresult(AF_INET, &addr4->sin_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
+                    if (FAILED(hr))
+                    {
+                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET address");
+                    }
+                    convertedPort.Family = AF_INET;
+                    break;
+                }
+
+                case AF_INET6:
+                {
+                    const auto* addr6 = reinterpret_cast<const sockaddr_in6*>(internalPort.windowsAddress);
+                    HRESULT hr = InetNtopToHresult(AF_INET6, &addr6->sin6_addr, convertedPort.BindingAddress, sizeof(convertedPort.BindingAddress));
+                    if (FAILED(hr))
+                    {
+                        THROW_HR_MSG(hr, "inet_ntop() failed for AF_INET6 address");
+                    }
+                    convertedPort.Family = AF_INET6;
+                    break;
+                }
+
+                default:
+                    THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", internalPort.windowsAddress->ss_family);
+                }
+            }
+            else
+            {
+                convertedPort.Family = AF_INET;
+                strcpy_s(convertedPort.BindingAddress, "127.0.0.1");
+            }
         }
-        containerOptions.Ports = convertedPorts.get();
+        containerOptions.Ports = convertedPorts.get(); // Make sure convertedPorts stays in scope for life of containerOptions
         containerOptions.PortsCount = static_cast<ULONG>(internalContainerSettings->portsCount);
     }
 
@@ -808,10 +863,15 @@ try
 
     for (uint32_t i = 0; i < portMappingCount; ++i)
     {
-        RETURN_HR_IF(E_NOTIMPL, portMappings[i].windowsAddress != nullptr);
-        RETURN_HR_IF(E_NOTIMPL, portMappings[i].protocol != 0);
+        if (portMappings[i].windowsAddress != nullptr)
+        {
+            const auto family = portMappings[i].windowsAddress->ss_family;
+            RETURN_HR_IF_MSG(
+                E_INVALIDARG, family != AF_INET && family != AF_INET6, "Unsupported address family: %d at port mapping index %u", family, i);
+        }
+        RETURN_HR_IF_MSG(
+            E_NOTIMPL, portMappings[i].protocol != 0, "Unsupported protocol: %d at port mapping index %u", portMappings[i].protocol, i);
     }
-
     internalType->ports = portMappings;
     internalType->portsCount = portMappingCount;
 

@@ -61,7 +61,7 @@ struct SessionSettings
     }
 
     // Default session: name and storage path determined from caller's token.
-    static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, bool Elevated, const std::wstring& ResolvedName)
+    static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, const std::wstring& ResolvedName)
     {
         auto userSettings = LoadUserSettings(UserToken);
         auto localAppData = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
@@ -178,7 +178,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     std::unique_ptr<SessionSettings> defaultSettings;
     if (Settings == nullptr)
     {
-        defaultSettings = SessionSettings::Default(callerToken.get(), tokenInfo.Elevated, resolvedDisplayName);
+        defaultSettings = SessionSettings::Default(callerToken.get(), resolvedDisplayName);
         Settings = &defaultSettings->Settings;
     }
 
