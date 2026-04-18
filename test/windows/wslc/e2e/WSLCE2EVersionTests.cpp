@@ -34,9 +34,9 @@ private:
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()        //
-               << GetDescription()       //
-               << GetUsage()             //
+        output << GetWslcHeader()  //
+               << GetDescription() //
+               << GetUsage()       //
                << GetAvailableOptions();
         return output.str();
     }
