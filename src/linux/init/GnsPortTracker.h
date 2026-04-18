@@ -48,7 +48,7 @@ public:
         PortAllocation(std::uint16_t Port, int Family, int Protocol, in6_addr& Address) :
             Port(Port), Family(Family), Protocol(Protocol)
         {
-            memcpy(this->Address.s6_addr32, Address.s6_addr32, sizeof(this->Address.s6_addr32));
+            memcpy(this->Address.s6_addr32, Address.s6_addr32, sizeof(Address.s6_addr32));
         }
 
         bool operator<(const PortAllocation& other) const

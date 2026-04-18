@@ -202,9 +202,8 @@ std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
 
             if (payload->idiag_family == AF_INET6)
             {
-                static_assert(sizeof(address.s6_addr32) == 16);
                 static_assert(sizeof(address.s6_addr32) == sizeof(payload->id.idiag_src));
-                memcpy(address.s6_addr32, payload->id.idiag_src, sizeof(address.s6_addr32));
+                memcpy(address.s6_addr32, payload->id.idiag_src, sizeof(payload->id.idiag_src));
             }
             else
             {
