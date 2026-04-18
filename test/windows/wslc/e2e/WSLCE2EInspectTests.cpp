@@ -173,6 +173,20 @@ class WSLCE2EInspectTests
         result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container.\r\n", .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidFormatError)
+    {
+        // Image name cannot be upper case, but root inspect command should skip this error and continue with the inspect instead of failing
+        auto result = RunWslc(std::format(L"inspect UPPER_CASE_INVALID_IMAGE", DebianImage.NameAndTag(), InvalidImage.NameAndTag()));
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = L"Object not found: UPPER_CASE_INVALID_IMAGE\r\n", .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidTypeSpecifiedArgumentError)
+    {
+        // Container name cannot contain a colon, but root inspect command should skip this error and continue with the inspect instead of failing
+        auto result = RunWslc(std::format(L"inspect {}", InvalidImage.NameAndTag()));
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Object not found: {}\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-inspect-test-container";
     const TestImage& DebianImage = DebianTestImage();
