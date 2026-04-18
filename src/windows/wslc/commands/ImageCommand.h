@@ -175,6 +175,7 @@ struct ImageTagCommand final : public Command
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
+
 // Prune Command
 struct ImagePruneCommand final : public Command
 {

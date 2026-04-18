@@ -28,8 +28,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImagePruneCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::All),
-        Argument::Create(ArgType::ImageForce),
+        Argument::Create(ArgType::All, std::nullopt, std::nullopt, Localization::WSLCCLI_ImagePruneAllArgDescription()),
         Argument::Create(ArgType::Session),
     };
 }

@@ -44,7 +44,7 @@ class WSLCE2EImagePruneTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_NoDanglingImages)
     {
         // Prune when no dangling images exist should succeed with zero reclaimed space
-        const auto result = RunWslc(L"image prune --force");
+        const auto result = RunWslc(L"image prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"Total reclaimed space:"));
@@ -60,7 +60,7 @@ class WSLCE2EImagePruneTests
         deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Now prune should remove the dangling image
-        const auto result = RunWslc(L"image prune --force");
+        const auto result = RunWslc(L"image prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         bool foundDeleted = false;
@@ -76,18 +76,36 @@ class WSLCE2EImagePruneTests
         VERIFY_IS_TRUE(foundDeleted, L"Expected pruned image output");
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"Total reclaimed space:"));
 
+        // Verify the dangling image is no longer listed
+        auto listResult = RunWslc(L"image list");
+        listResult.Verify({.Stderr = L"", .ExitCode = 0});
+        for (const auto& line : listResult.GetStdoutLines())
+        {
+            VERIFY_IS_FALSE(line.find(L"<none>") != std::wstring::npos, L"Dangling image should have been pruned");
+        }
+
         // Cleanup: delete the test tag and reload original
-        RunWslc(L"image delete --force debian:prune-test");
+        RunWslc(L"image delete debian:prune-test");
         EnsureImageIsLoaded(DebianImage);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_AllFlag)
     {
         // --all should prune unused images (not just dangling)
-        const auto result = RunWslc(L"image prune --all --force");
+        const auto result = RunWslc(L"image prune --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.StdoutContainsLine(L"Total reclaimed space:"));
+
+        // Verify the image was actually pruned
+        auto listResult = RunWslc(L"image list");
+        listResult.Verify({.Stderr = L"", .ExitCode = 0});
+        for (const auto& line : listResult.GetStdoutLines())
+        {
+            VERIFY_IS_FALSE(
+                line.find(DebianImage.NameAndTag()) != std::wstring::npos,
+                std::format(L"Image '{}' should have been pruned by --all", DebianImage.NameAndTag()).c_str());
+        }
 
         // Reload images for subsequent tests
         EnsureImageIsLoaded(DebianImage);
@@ -96,7 +114,7 @@ class WSLCE2EImagePruneTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_SpaceReclaimedOutput)
     {
         // Verify the output contains the expected format
-        const auto result = RunWslc(L"image prune --force");
+        const auto result = RunWslc(L"image prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         bool foundSpaceReclaimed = false;
@@ -139,8 +157,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  -a,--all    " << Localization::WSLCCLI_AllArgDescription() << L"\r\n"
-                << L"  -f,--force  " << Localization::WSLCCLI_ImageForceArgDescription() << L"\r\n"
+                << L"  -a,--all    " << Localization::WSLCCLI_ImagePruneAllArgDescription() << L"\r\n"
                 << L"  --session   " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
                 << L"  -h,--help   Shows help about the selected command\r\n"
                 << L"\r\n";
