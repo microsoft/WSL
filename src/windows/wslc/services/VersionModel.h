@@ -15,73 +15,73 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-#define WSLC_VERSION_ROW(key, value) std::format("{:<20}{}", key ":", value)
+#define WSLC_VERSION_ROW(key, value) std::format("{:<20}{}\n", key ":", value)
 
 struct ClientVersion
 {
-    const std::string Version = WSL_PACKAGE_VERSION;
-    const std::string GitCommit = COMMIT_HASH;
-    const std::string Built = __DATE__ " " __TIME__;
-    const std::string Os = "windows";
+    std::string Version = WSL_PACKAGE_VERSION;
+    std::string GitCommit = COMMIT_HASH;
+    std::string Built = __DATE__ " " __TIME__;
+    std::string Os = "windows";
 
 #if defined(_AMD64_)
-    const std::string Arch = "amd64";
+    std::string Arch = "amd64";
 #elif defined(_ARM64_)
-    const std::string Arch = "arm64";
+    std::string Arch = "arm64";
 #else
-    const std::string Arch = "unknown";
+    std::string Arch = "unknown";
 #endif
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ClientVersion, Version, GitCommit, Built, Os, Arch);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ClientVersion, Version, GitCommit, Built, Os, Arch);
 
     std::string ToString() const
     {
         std::stringstream ss;
-        ss << "Client:" << std::endl;
-        ss << WSLC_VERSION_ROW("  Version", Version) << std::endl;
-        ss << WSLC_VERSION_ROW("  Git commit", GitCommit) << std::endl;
-        ss << WSLC_VERSION_ROW("  Built", Built) << std::endl;
-        ss << WSLC_VERSION_ROW("  OS/Arch", Os + "/" + Arch) << std::endl;
+        ss << "Client:\n";
+        ss << WSLC_VERSION_ROW("  Version", Version);
+        ss << WSLC_VERSION_ROW("  Git commit", GitCommit);
+        ss << WSLC_VERSION_ROW("  Built", Built);
+        ss << WSLC_VERSION_ROW("  OS/Arch", Os + "/" + Arch);
         return ss.str();
     }
 };
 
 struct ServerVersion
 {
-    const std::string Kernel = KERNEL_VERSION;
-    const std::string WSLg = WSLG_VERSION;
-    const std::string MSRDC = MSRDC_VERSION;
-    const std::string Direct3D = DIRECT3D_VERSION;
-    const std::string DXCore = DXCORE_VERSION;
-    const std::string Windows = wsl::windows::common::helpers::GetWindowsVersionString();
+    std::string Kernel = KERNEL_VERSION;
+    std::string WSLg = WSLG_VERSION;
+    std::string MSRDC = MSRDC_VERSION;
+    std::string Direct3D = DIRECT3D_VERSION;
+    std::string DXCore = DXCORE_VERSION;
+    std::string Windows = wsl::windows::common::helpers::GetWindowsVersionString();
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ServerVersion, Kernel, WSLg, MSRDC, Direct3D, DXCore, Windows);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ServerVersion, Kernel, WSLg, MSRDC, Direct3D, DXCore, Windows);
 
     std::string ToString() const
     {
         std::stringstream ss;
-        ss << "Server:" << std::endl;
-        ss << WSLC_VERSION_ROW("  Linux kernel", Kernel) << std::endl;
-        ss << WSLC_VERSION_ROW("  WSLg", WSLg) << std::endl;
-        ss << WSLC_VERSION_ROW("  MSRDC", MSRDC) << std::endl;
-        ss << WSLC_VERSION_ROW("  Direct3D", Direct3D) << std::endl;
-        ss << WSLC_VERSION_ROW("  DXCore", DXCore) << std::endl;
-        ss << WSLC_VERSION_ROW("  Windows", Windows) << std::endl;
+        ss << "Server:\n";
+        ss << WSLC_VERSION_ROW("  Linux kernel", Kernel);
+        ss << WSLC_VERSION_ROW("  WSLg", WSLg);
+        ss << WSLC_VERSION_ROW("  MSRDC", MSRDC);
+        ss << WSLC_VERSION_ROW("  Direct3D", Direct3D);
+        ss << WSLC_VERSION_ROW("  DXCore", DXCore);
+        ss << WSLC_VERSION_ROW("  Windows", Windows);
         return ss.str();
     }
 };
 
 struct VersionInfo
 {
-    ClientVersion Client;
-    ServerVersion Server;
+    ClientVersion Client{};
+    ServerVersion Server{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(VersionInfo, Client, Server);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VersionInfo, Client, Server);
 
     std::string ToString() const
     {
         std::stringstream ss;
-        ss << Client.ToString() << std::endl;
+        ss << Client.ToString() << "\n";
         ss << Server.ToString();
         return ss.str();
     }
