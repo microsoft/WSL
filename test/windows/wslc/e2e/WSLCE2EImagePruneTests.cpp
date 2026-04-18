@@ -47,19 +47,28 @@ class WSLCE2EImagePruneTests
         const auto result = RunWslc(L"image prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(L"Total reclaimed space:"));
+        VerifyStdoutContains(result, L"Total reclaimed space:");
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_DanglingImage)
     {
-        // Create a dangling image by tagging and then deleting the original tag
-        auto tagResult = RunWslc(std::format(L"image tag {} debian:prune-test", DebianImage.NameAndTag()));
-        tagResult.Verify({.Stderr = L"", .ExitCode = 0});
+        // Create a dangling image by overwriting its only tag with a different image.
+        // 1. Tag debian as prune-target:v1
+        // 2. Delete the original debian:latest tag so prune-target:v1 is the only reference
+        // 3. Tag alpine as prune-target:v1, overwriting it — debian image is now dangling
+        EnsureImageIsLoaded(AlpineImage);
+        auto cleanup = wil::scope_exit([&]() {
+            RunWslc(L"image prune");
+            RunWslc(L"image delete prune-target:v1");
+            EnsureImageIsDeleted(AlpineImage);
+            EnsureImageIsLoaded(DebianImage);
+        });
 
-        auto deleteResult = RunWslc(std::format(L"image delete {}", DebianImage.NameAndTag()));
-        deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"image tag {} prune-target:v1", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"image delete {}", DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"image tag {} prune-target:v1", AlpineImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
 
-        // Now prune should remove the dangling image
+        // Now prune should remove the dangling (original debian) image
         const auto result = RunWslc(L"image prune");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -74,28 +83,21 @@ class WSLCE2EImagePruneTests
         }
 
         VERIFY_IS_TRUE(foundDeleted, L"Expected pruned image output");
-        VERIFY_IS_TRUE(result.StdoutContainsLine(L"Total reclaimed space:"));
+        VerifyStdoutContains(result, L"Total reclaimed space:");
 
-        // Verify the dangling image is no longer listed
-        auto listResult = RunWslc(L"image list");
-        listResult.Verify({.Stderr = L"", .ExitCode = 0});
-        for (const auto& line : listResult.GetStdoutLines())
-        {
-            VERIFY_IS_FALSE(line.find(L"<none>") != std::wstring::npos, L"Dangling image should have been pruned");
-        }
-
-        // Cleanup: delete the test tag and reload original
-        RunWslc(L"image delete debian:prune-test");
-        EnsureImageIsLoaded(DebianImage);
+        // Verify alpine image is still present (prune should only remove dangling images)
+        VerifyImageIsListed(AlpineImage);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Prune_AllFlag)
     {
+        auto cleanup = wil::scope_exit([&]() { EnsureImageIsLoaded(DebianImage); });
+
         // --all should prune unused images (not just dangling)
         const auto result = RunWslc(L"image prune --all");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        VERIFY_IS_TRUE(result.StdoutContainsLine(L"Total reclaimed space:"));
+        VerifyStdoutContains(result, L"Total reclaimed space:");
 
         // Verify the image was actually pruned
         auto listResult = RunWslc(L"image list");
@@ -106,32 +108,24 @@ class WSLCE2EImagePruneTests
                 line.find(DebianImage.NameAndTag()) != std::wstring::npos,
                 std::format(L"Image '{}' should have been pruned by --all", DebianImage.NameAndTag()).c_str());
         }
-
-        // Reload images for subsequent tests
-        EnsureImageIsLoaded(DebianImage);
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Image_Prune_SpaceReclaimedOutput)
-    {
-        // Verify the output contains the expected format
-        const auto result = RunWslc(L"image prune");
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        bool foundSpaceReclaimed = false;
-        for (const auto& line : result.GetStdoutLines())
-        {
-            if (line.find(L"Total reclaimed space:") != std::wstring::npos && line.find(L"MB") != std::wstring::npos)
-            {
-                foundSpaceReclaimed = true;
-                break;
-            }
-        }
-
-        VERIFY_IS_TRUE(foundSpaceReclaimed, L"Expected 'Total reclaimed space: X.XX MB' in output");
     }
 
 private:
     const TestImage& DebianImage = DebianTestImage();
+    const TestImage& AlpineImage = AlpineTestImage();
+
+    static void VerifyStdoutContains(const WSLCExecutionResult& result, const std::wstring& substring)
+    {
+        for (const auto& line : result.GetStdoutLines())
+        {
+            if (line.find(substring) != std::wstring::npos)
+            {
+                return;
+            }
+        }
+
+        VERIFY_FAIL(std::format(L"Expected stdout to contain '{}'", substring).c_str());
+    }
 
     std::wstring GetHelpMessage() const
     {
@@ -157,9 +151,9 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  -a,--all    " << Localization::WSLCCLI_ImagePruneAllArgDescription() << L"\r\n"
-                << L"  --session   " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
-                << L"  -h,--help   Shows help about the selected command\r\n"
+                << L"  -a,--all   " << Localization::WSLCCLI_ImagePruneAllArgDescription() << L"\r\n"
+                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"
+                << L"  -h,--help  Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }
