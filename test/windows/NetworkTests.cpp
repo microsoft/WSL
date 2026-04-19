@@ -345,6 +345,41 @@ class NetworkTests
         VERIFY_ARE_EQUAL(v6State.DefaultRoute->Device, L"eth0");
     }
 
+    WSL2_TEST_METHOD(AddRemoveDefaultOnlinkRoutes)
+    {
+        wsl::shared::hns::Route defaultRouteV4;
+        defaultRouteV4.NextHop = L"0.0.0.0";
+        defaultRouteV4.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+        defaultRouteV4.Family = AF_INET;
+        defaultRouteV4.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        wsl::shared::hns::Route defaultRouteV6;
+        defaultRouteV6.NextHop = L"::";
+        defaultRouteV6.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
+        defaultRouteV6.Family = AF_INET6;
+        defaultRouteV6.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteExists =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+        const bool defaultV6RouteExists =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteRemoved =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
+        const bool defaultV6RouteRemoved =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
+
+        VERIFY_IS_TRUE(defaultV4RouteExists);
+        VERIFY_IS_TRUE(defaultV6RouteExists);
+        VERIFY_IS_TRUE(defaultV4RouteRemoved);
+        VERIFY_IS_TRUE(defaultV6RouteRemoved);
+    }
+
     WSL2_TEST_METHOD(SetInterfaceDownAndUp)
     {
         // Disconnect interface
@@ -3813,11 +3848,8 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(LoopbackExplicit)
+    WSL2_TEST_METHOD(LoopbackExplicit)
     {
-        // TODO: re-enable once OS build 29555 loopback regression is resolved.
-        SKIP_TEST_UNSTABLE();
-
         MIRRORED_NETWORKING_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));

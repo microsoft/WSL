@@ -3,9 +3,14 @@
 #include "Route.h"
 #include "Utils.h"
 
-Route::Route(int family, const std::optional<Address>& via, int dev, bool defaultRoute, const std::optional<Address>& to, int metric) :
-    family(family), via(via), dev(dev), defaultRoute(defaultRoute), to(to), metric(metric)
+Route::Route(int routeFamily, const std::optional<Address>& routeNextHop, int routeInterface, bool isRouteDefault, const std::optional<Address>& routeDestination, int routeMetric) :
+    family(routeFamily), via(routeNextHop), dev(routeInterface), defaultRoute(isRouteDefault), to(routeDestination), metric(routeMetric)
 {
+    // For onlink routes, ensure the via field is empty
+    if (via.has_value() && ((family == AF_INET && via->Addr() == "0.0.0.0") || (family == AF_INET6 && via->Addr() == "::")))
+    {
+        via.reset();
+    }
 }
 
 std::ostream& operator<<(std::ostream& out, const Route& route)
@@ -30,7 +35,7 @@ std::ostream& operator<<(std::ostream& out, const Route& route)
 
 bool Route::IsOnlink() const
 {
-    return !via.has_value() || (family == AF_INET && via->Addr() == "0.0.0.0") || (family == AF_INET6 && via->Addr() == "::");
+    return !via.has_value();
 }
 
 bool Route::IsMulticast() const
