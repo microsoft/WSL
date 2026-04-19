@@ -2293,7 +2293,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
     <value>Removes all dangling images. If --all is specified, removes all images not used by any container.</value>
-    <comment>{Locked="--all"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
     <value>Total reclaimed space: {:.2f} MB</value>
