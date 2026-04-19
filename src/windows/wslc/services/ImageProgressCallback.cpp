@@ -4,16 +4,16 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    PullImageCallback.cpp
+    ImageProgressCallback.cpp
 
 Abstract:
 
-    This file contains the PullImageCallback Implementation.
+    This file contains the ImageProgressCallback Implementation.
 
 --*/
 
 #include "precomp.h"
-#include "PullImageCallback.h"
+#include "ImageProgressCallback.h"
 #include "ImageService.h"
 #include <format>
 
@@ -42,7 +42,7 @@ ChangeTerminalMode::~ChangeTerminalMode()
     }
 }
 
-auto PullImageCallback::MoveToLine(SHORT line)
+auto ImageProgressCallback::MoveToLine(SHORT line)
 {
     if (line > 0)
     {
@@ -57,7 +57,7 @@ auto PullImageCallback::MoveToLine(SHORT line)
     });
 }
 
-HRESULT PullImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total)
+HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total)
 {
     try
     {
@@ -94,14 +94,14 @@ HRESULT PullImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG curren
     CATCH_RETURN();
 }
 
-CONSOLE_SCREEN_BUFFER_INFO PullImageCallback::Info()
+CONSOLE_SCREEN_BUFFER_INFO ImageProgressCallback::Info()
 {
     CONSOLE_SCREEN_BUFFER_INFO info{};
     THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
     return info;
 }
 
-std::wstring PullImageCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
+std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
 {
     std::wstring line;
     if (total != 0)

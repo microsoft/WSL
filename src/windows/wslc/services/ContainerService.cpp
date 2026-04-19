@@ -16,7 +16,7 @@ Abstract:
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "ImageService.h"
-#include "PullImageCallback.h"
+#include "ImageProgressCallback.h"
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
@@ -101,6 +101,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetUser(std::move(user));
     }
 
+    if (!options.WorkingDirectory.empty())
+    {
+        containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
+    }
+
     for (const auto& tmpfsSpec : options.Tmpfs)
     {
         auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
@@ -112,7 +117,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     {
         {
             // Attempt to pull the image if not found
-            PullImageCallback callback;
+            ImageProgressCallback callback;
             PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
             ImageService imageService;
             imageService.Pull(session, image, &callback);
