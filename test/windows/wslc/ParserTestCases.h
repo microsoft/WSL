@@ -75,7 +75,7 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
 // clang-format off
 #define WSLC_PARSER_TEST_CASES \
 /* Simple case with required arg and simple other args */ \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -h)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -?)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose image1)") \
 \
@@ -89,14 +89,14 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 -p=443:443 image1)") \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --verbose --verbose image1)") \
 \
 /* Flag parse tests */ \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -h image1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -hi image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -ihp- image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pih image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pih=80:80 image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pih 80:80 image1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -ihp 80:80 image1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -ihp=80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -? image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -?i image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -i?p- image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi?=80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? 80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p 80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p=80:80 image1)") \
 \
 /* Validation tests */ \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO image1)") \

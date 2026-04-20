@@ -84,6 +84,7 @@ void ImageService::Build(
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
     const std::wstring& dockerfilePath,
+    const std::wstring& target,
     WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
@@ -130,12 +131,15 @@ void ImageService::Build(
     std::vector<LPCSTR> buildArgPointers;
     toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
 
+    auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
+
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
         .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
+        .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
         .Flags = flags,
     };
 
@@ -246,9 +250,14 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
         CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!outputFile);
 
+    Save(session, image, outputFile.get(), cancelEvent);
+}
+
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent)
+{
     wsl::windows::common::HandleConsoleProgressBar progressBar(
-        outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
-    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
+        outputHandle, L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), image.c_str(), nullptr, cancelEvent));
 }
 
 void ImageService::Prune()
