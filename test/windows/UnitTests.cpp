@@ -29,6 +29,7 @@ Abstract:
 #include "Distribution.h"
 #include "WslCoreConfigInterface.h"
 #include "CommandLine.h"
+#include "retryshared.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -6558,6 +6559,53 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"--uninstall Distro",
             wsl::shared::Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG) + L"\r\n",
             -1);
+    }
+
+    // Verifies wsl::shared::retry::CallWithDeadline enforces a true per-call
+    // deadline when the inner routine hangs (throws DeadlineExceededError
+    // within the deadline, does not wait for the hang to finish).
+    TEST_METHOD(CallWithDeadlineEnforcesDeadlineOnHang)
+    {
+        const auto start = std::chrono::steady_clock::now();
+        bool threw = false;
+        try
+        {
+            wsl::shared::retry::CallWithDeadline(std::chrono::milliseconds(500), []() -> int {
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+                return 0;
+            });
+        }
+        catch (const wsl::shared::retry::DeadlineExceededError&)
+        {
+            threw = true;
+        }
+        const auto elapsed = std::chrono::steady_clock::now() - start;
+        VERIFY_IS_TRUE(threw);
+        VERIFY_IS_TRUE(elapsed < std::chrono::seconds(2));
+    }
+
+    // Verifies CallWithDeadline returns the routine's value when it completes
+    // before the deadline.
+    TEST_METHOD(CallWithDeadlineReturnsResultIfFastEnough)
+    {
+        const int result = wsl::shared::retry::CallWithDeadline(std::chrono::seconds(1), []() -> int { return 42; });
+        VERIFY_ARE_EQUAL(result, 42);
+    }
+
+    // Verifies that an exception thrown by the routine is propagated to the
+    // caller (i.e., CallWithDeadline is transparent to inner exceptions).
+    TEST_METHOD(CallWithDeadlinePropagatesInnerException)
+    {
+        bool caught = false;
+        try
+        {
+            wsl::shared::retry::CallWithDeadline(std::chrono::seconds(1), []() -> int { throw std::runtime_error("inner oops"); });
+        }
+        catch (const std::runtime_error&)
+        {
+            caught = true;
+        }
+        VERIFY_IS_TRUE(caught);
     }
 
 }; // namespace UnitTests

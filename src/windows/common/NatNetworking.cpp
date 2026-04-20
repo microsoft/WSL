@@ -25,6 +25,13 @@ using wsl::windows::common::hcs::unique_hcn_endpoint;
 static wil::srwlock g_endpointsInUseLock;
 static std::vector<GUID> g_endpointsInUse;
 
+// After an HcnCreateNetwork call exceeds its per-call deadline, skip the RPC
+// for this cooldown window and go straight to fallback. This prevents
+// detached workers from piling up when HNS is persistently slow or wedged
+// (one detached worker per attempt otherwise).
+static std::atomic<std::chrono::steady_clock::time_point> g_hcnCreateNetworkCooldownUntil{};
+static constexpr auto c_hcnCreateNetworkCooldown = std::chrono::minutes(2);
+
 NatNetworking::NatNetworking(
     HCS_SYSTEM system,
     wsl::windows::common::hcs::unique_hcn_network&& network,
@@ -753,6 +760,21 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
     CATCH_LOG()
 
     wsl::windows::common::hcs::unique_hcn_network network{};
+
+    // If a recent HcnCreateNetwork attempt exceeded its deadline, skip the RPC
+    // for a cooldown window and let the caller fall back immediately. This
+    // bounds thread accumulation when HNS is stuck or repeatedly slow.
+    if (std::chrono::steady_clock::now() < g_hcnCreateNetworkCooldownUntil.load())
+    {
+        WSL_LOG_TELEMETRY(
+            "HcnCreateNetworkSkippedDueToRecentDeadline",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingGuid(config.NatNetworkId(), "networkGuid"),
+            TraceLoggingValue(settings.Name.c_str(), "settingsName"));
+        hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+        return {};
+    }
+
     try
     {
         auto retryCount = 0ul;
@@ -827,14 +849,17 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
     }
     catch (const wsl::shared::retry::DeadlineExceededError&)
     {
-        // HNS RPC never came back in time. Emit a dedicated telemetry event
-        // so the cloud pipeline can distinguish these from 'timeout' and
+        // HNS RPC never came back in time. Start a cooldown window so
+        // subsequent VM starts skip the HcnCreateNetwork RPC entirely (instead
+        // of spawning another detached worker). Emit a dedicated telemetry
+        // event so the cloud pipeline can distinguish these from 'timeout' and
         // return an empty network — WslCoreVm::Initialize will fall back to
         // VirtioProxy mode (see WslCoreVm.cpp:553-560).
+        g_hcnCreateNetworkCooldownUntil.store(std::chrono::steady_clock::now() + c_hcnCreateNetworkCooldown);
         WSL_LOG_TELEMETRY(
             "HcnCreateNetworkDeadlineExceeded",
             PDT_ProductAndServicePerformance,
-            TraceLoggingValue(config.NatNetworkId(), "networkGuid"),
+            TraceLoggingGuid(config.NatNetworkId(), "networkGuid"),
             TraceLoggingValue(settings.Name.c_str(), "settingsName"));
         hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
         return {};
