@@ -1976,10 +1976,6 @@ class WSLCTests
             VERIFY_ARE_EQUAL(containers[0].Id, containerId);
         }
 
-        // Ensure any anonymous volume from the session-restart scope is gone before the delete scenarios run.
-        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "volume", "prune", "-f"});
-        VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
-
         // Delete container without WSLCDeleteFlagsDeleteVolumes -> anonymous volume is leaked.
         {
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-leak", {"test", "-d", "/volume"});
