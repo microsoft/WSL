@@ -102,7 +102,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  -h,--help  Shows help about the selected command\r\n\r\n";
+                << L"  -?,--help  Shows help about the selected command\r\n\r\n";
         return options.str();
     }
 };

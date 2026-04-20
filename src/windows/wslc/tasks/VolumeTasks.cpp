@@ -29,25 +29,15 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
-static std::string OptionsToJson(const std::vector<std::wstring>& options)
+static std::pair<std::string, std::string> OptionsToKeyValue(const std::wstring& option)
 {
-    std::map<std::string, std::string> result{};
-    for (const auto& option : options)
+    auto pos = option.find('=');
+    if (pos == std::wstring::npos)
     {
-        auto pos = option.find('=');
-        if (pos == std::wstring::npos)
-        {
-            result[WideToMultiByte(option)] = {};
-        }
-        else
-        {
-            auto key = WideToMultiByte(option.substr(0, pos));
-            auto value = WideToMultiByte(option.substr(pos + 1));
-            result[key] = value;
-        }
+        return {WideToMultiByte(option), std::string()};
     }
 
-    return ToJson(result);
+    return {WideToMultiByte(option.substr(0, pos)), WideToMultiByte(option.substr(pos + 1))};
 }
 
 void CreateVolume(CLIExecutionContext& context)
@@ -55,18 +45,25 @@ void CreateVolume(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::VolumeName));
 
-    auto name = WideToMultiByte(context.Args.Get<ArgType::VolumeName>());
-
-    // Driver option (default "vhd")
-    std::string type = "vhd";
-    if (context.Args.Contains(ArgType::Driver))
+    models::CreateVolumeOptions options{};
+    options.Name = WideToMultiByte(context.Args.Get<ArgType::VolumeName>());
+    for (const auto& option : context.Args.GetAll<ArgType::Options>())
     {
-        type = WideToMultiByte(context.Args.Get<ArgType::Driver>());
+        options.DriverOpts.push_back(OptionsToKeyValue(option));
     }
 
-    auto optionsJson = OptionsToJson(context.Args.GetAll<ArgType::Options>());
-    VolumeService::Create(context.Data.Get<Data::Session>(), name, type, optionsJson);
-    PrintMessage(MultiByteToWide(name));
+    for (const auto& label : context.Args.GetAll<ArgType::Label>())
+    {
+        options.Labels.push_back(OptionsToKeyValue(label));
+    }
+
+    if (context.Args.Contains(ArgType::Driver))
+    {
+        options.Driver = WideToMultiByte(context.Args.Get<ArgType::Driver>());
+    }
+
+    auto result = VolumeService::Create(context.Data.Get<Data::Session>(), options);
+    PrintMessage(MultiByteToWide(result.Name));
 }
 
 void DeleteVolumes(CLIExecutionContext& context)
@@ -138,7 +135,7 @@ void ListVolumes(CLIExecutionContext& context)
         for (const auto& volume : volumes)
         {
             table.OutputLine({
-                MultiByteToWide(volume.Type),
+                MultiByteToWide(volume.Driver),
                 MultiByteToWide(volume.Name),
             });
         }

@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "wslutil.h"
 #include "WslPluginApi.h"
+#include <wincrypt.h>
 #include "wslinstallerservice.h"
 #include "wslc.h"
 
@@ -153,6 +154,9 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_VOLUME_NOT_FOUND),
     X(WSLC_E_CONTAINER_NOT_RUNNING),
     X(WSLC_E_CONTAINER_IS_RUNNING),
+    X(WSLC_E_SESSION_RESERVED),
+    X(WSLC_E_INVALID_SESSION_NAME),
+    X(WSLC_E_NETWORK_NOT_FOUND),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED)};
 
@@ -636,21 +640,11 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_DEFAULT_DISTRO_NOT_FOUND:
         return Localization::MessageNoDefaultDistro();
 
-    case HRESULT_FROM_WIN32(WSAECONNABORTED):
-    case HRESULT_FROM_WIN32(ERROR_SHUTDOWN_IN_PROGRESS):
-        return Localization::MessageInstanceTerminated();
-
     case WSL_E_DISTRO_NOT_FOUND:
         return Localization::MessageDistroNotFound();
 
-    case HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS):
-        return Localization::MessageDistroNameAlreadyExists();
-
     case WSL_E_DISTRIBUTION_NAME_NEEDED:
         return Localization::MessageDistributionNameNeeded();
-
-    case HRESULT_FROM_WIN32(ERROR_FILE_EXISTS):
-        return Localization::MessageDistroInstallPathAlreadyExists();
 
     case WSL_E_TOO_MANY_DISKS_ATTACHED:
         return Localization::MessageTooManyDisks();
@@ -1422,4 +1416,71 @@ catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
+}
+
+std::string wsl::windows::common::wslutil::Base64Encode(const std::string& input)
+{
+    DWORD base64Size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()), static_cast<DWORD>(input.size()), CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, nullptr, &base64Size));
+
+    auto buffer = std::make_unique<char[]>(base64Size);
+    THROW_IF_WIN32_BOOL_FALSE(CryptBinaryToStringA(
+        reinterpret_cast<const BYTE*>(input.c_str()),
+        static_cast<DWORD>(input.size()),
+        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+        buffer.get(),
+        &base64Size));
+
+    return std::string(buffer.get());
+}
+
+std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encoded)
+{
+    DWORD size = 0;
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, nullptr, &size, nullptr, nullptr));
+
+    std::string result(size, '\0');
+    THROW_IF_WIN32_BOOL_FALSE(CryptStringToBinaryA(
+        encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64, reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr));
+
+    result.resize(size);
+    return result;
+}
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& username, const std::string& password)
+{
+    nlohmann::json authJson = {{"username", username}, {"password", password}};
+    return Base64Encode(authJson.dump());
+}
+
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& identityToken)
+{
+    nlohmann::json authJson = {{"identitytoken", identityToken}};
+    return Base64Encode(authJson.dump());
+}
+
+std::map<std::string, std::string> wsl::windows::common::wslutil::ParseKeyValuePairs(const KeyValuePair* pairs, ULONG count, LPCSTR reservedKey)
+{
+    THROW_HR_IF(E_POINTER, count > 0 && pairs == nullptr);
+
+    std::map<std::string, std::string> result;
+
+    for (ULONG i = 0; i < count; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Key, "Key at index %lu is null", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, pairs[i].Value, "Value at index %lu is null", i);
+
+        if (reservedKey != nullptr)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, strcmp(pairs[i].Key, reservedKey) == 0, "Key '%hs' is reserved", reservedKey);
+        }
+
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), result.contains(pairs[i].Key), "Duplicate key: '%hs'", pairs[i].Key);
+
+        result[pairs[i].Key] = pairs[i].Value;
+    }
+
+    return result;
 }

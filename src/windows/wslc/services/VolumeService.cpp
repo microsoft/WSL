@@ -13,19 +13,42 @@ Abstract:
 --*/
 #include "VolumeService.h"
 #include <wslutil.h>
+#include <wslc.h>
 
 using namespace wsl::shared;
+using namespace wsl::shared::string;
 using namespace wsl::windows::common::wslutil;
 
 namespace wsl::windows::wslc::services {
 
-void VolumeService::Create(models::Session& session, const std::string& name, const std::string& type, const std::string& opt)
+WSLCVolumeInformation VolumeService::Create(models::Session& session, const models::CreateVolumeOptions& createOptions)
 {
     WSLCVolumeOptions options{};
-    options.Name = name.c_str();
-    options.Type = type.c_str();
-    options.Options = opt.c_str();
-    THROW_IF_FAILED(session.Get()->CreateVolume(&options));
+    options.Name = createOptions.Name.c_str();
+    options.Driver = createOptions.Driver.c_str();
+
+    // Set driver options
+    std::vector<KeyValuePair> driverOpts;
+    for (const auto& option : createOptions.DriverOpts)
+    {
+        driverOpts.push_back({.Key = option.first.c_str(), .Value = option.second.c_str()});
+    }
+
+    // Set labels
+    std::vector<KeyValuePair> labels;
+    for (const auto& label : createOptions.Labels)
+    {
+        labels.push_back({.Key = label.first.c_str(), .Value = label.second.c_str()});
+    }
+
+    options.DriverOpts = driverOpts.data();
+    options.DriverOptsCount = static_cast<ULONG>(driverOpts.size());
+    options.Labels = labels.data();
+    options.LabelsCount = static_cast<ULONG>(labels.size());
+
+    WSLCVolumeInformation info{};
+    THROW_IF_FAILED(session.Get()->CreateVolume(&options, &info));
+    return info;
 }
 
 void VolumeService::Delete(models::Session& session, const std::string& name)
@@ -45,7 +68,7 @@ std::vector<models::VolumeInformation> VolumeService::List(models::Session& sess
     {
         models::VolumeInformation info;
         info.Name = ptr->Name;
-        info.Type = ptr->Type;
+        info.Driver = ptr->Driver;
         volumes.push_back(std::move(info));
     }
 

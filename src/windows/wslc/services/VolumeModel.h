@@ -22,9 +22,17 @@ namespace wsl::windows::wslc::models {
 struct VolumeInformation
 {
     std::string Name;
-    std::string Type;
+    std::string Driver;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(VolumeInformation, Name, Type);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(VolumeInformation, Name, Driver);
+};
+
+struct CreateVolumeOptions
+{
+    std::string Name;
+    std::string Driver;
+    std::vector<std::pair<std::string, std::string>> DriverOpts{};
+    std::vector<std::pair<std::string, std::string>> Labels{};
 };
 
 } // namespace wsl::windows::wslc::models

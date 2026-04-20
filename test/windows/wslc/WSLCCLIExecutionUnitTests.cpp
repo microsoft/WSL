@@ -194,6 +194,96 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
     }
 
+    // Test: Full parse of 'run --workdir "" image cmd' rejects empty working directory
+    TEST_METHOD(RunCommand_ParseWorkDirEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir \"\" ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    // Test: Full parse of 'run --workdir /path image cmd' sets WorkingDirectory
+    TEST_METHOD(RunCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir /tmp/mydir ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/tmp/mydir"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'run -w /path image cmd' (short alias) sets WorkingDirectory
+    TEST_METHOD(RunCommand_ParseWorkDirShortOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc -w /app ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'create --workdir "" image cmd' rejects empty working directory
+    TEST_METHOD(CreateCommand_ParseWorkDirEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir \"\" ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    // Test: Full parse of 'create --workdir /path image cmd' sets WorkingDirectory
+    TEST_METHOD(CreateCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir /tmp/mydir ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/tmp/mydir"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'create -w /path image cmd' (short alias) sets WorkingDirectory
+    TEST_METHOD(CreateCommand_ParseWorkDirShortOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc -w /app ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
+    }
+
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
     // This test verifies the command line parsing logic used by the CLI and executes the same
     // code as the CLI up to the point of command execution, including parsing and argument validtion.

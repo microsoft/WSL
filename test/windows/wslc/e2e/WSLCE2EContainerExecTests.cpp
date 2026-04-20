@@ -452,7 +452,7 @@ private:
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -h,--help         Shows help about the selected command\r\n"
+                << L"  -?,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

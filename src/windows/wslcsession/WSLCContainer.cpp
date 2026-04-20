@@ -46,6 +46,7 @@ using wsl::windows::service::wslc::WSLCVolumeMount;
 
 using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
+using namespace wsl::windows::common::wslutil;
 using namespace std::chrono_literals;
 using wsl::shared::Localization;
 
@@ -229,6 +230,16 @@ std::string ExtractContainerName(const std::vector<std::string>& names, const st
     }
 
     return CleanContainerName(names[0]);
+}
+
+std::string FormatPortEndpoint(const ContainerPortMapping& portMapping)
+{
+    auto addr = portMapping.VmMapping.BindingAddressString();
+    return std::format(
+        "{}:{}/{}",
+        portMapping.VmMapping.IsIPv6() ? std::format("[{}]", addr) : addr,
+        portMapping.VmMapping.HostPort(),
+        portMapping.ProtocolString());
 }
 
 WSLCContainerMetadataV1 ParseContainerMetadata(const std::string& json)
@@ -1224,19 +1235,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             common::docker_schema::PortMapping{.HostIp = e.VmMapping.BindingAddressString(), .HostPort = std::to_string(hostPort)});
     }
 
-    std::map<std::string, std::string> labels;
-    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
-    {
-        const auto& label = containerOptions.Labels[i];
-
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Key, "Label at index %lu has null key", i);
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Value, "Label at index %lu has null value", i);
-
-        THROW_HR_IF_MSG(E_INVALIDARG, strcmp(label.Key, WSLCContainerMetadataLabel) == 0, "Label key '%hs' is reserved", WSLCContainerMetadataLabel);
-        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), labels.contains(label.Key), "Duplicate label key: '%hs'", label.Key);
-
-        labels[label.Key] = label.Value;
-    }
+    auto labels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
 
     // Build WSLC metadata to store in a label for recovery on Open().
     WSLCContainerMetadataV1 metadata;
@@ -1497,12 +1496,10 @@ void WSLCContainerImpl::MapPorts()
                 auto allocatedPort =
                     m_virtualMachine.TryAllocatePort(e.ContainerPort, e.VmMapping.BindAddress.si_family, e.VmMapping.Protocol);
 
-                THROW_HR_IF_MSG(
+                THROW_HR_WITH_USER_ERROR_IF(
                     HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                    !allocatedPort,
-                    "Port %hu is in use, cannot start container %hs",
-                    e.ContainerPort,
-                    m_id.c_str());
+                    wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id),
+                    !allocatedPort);
 
                 e.VmMapping.AssignVmPort(allocatedPort);
 
@@ -1510,7 +1507,20 @@ void WSLCContainerImpl::MapPorts()
             }
         }
 
-        m_virtualMachine.MapPort(e.VmMapping);
+        try
+        {
+            m_virtualMachine.MapPort(e.VmMapping);
+        }
+        catch (...)
+        {
+            auto result = wil::ResultFromCaughtException();
+            if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) || result == HRESULT_FROM_WIN32(WSAEADDRINUSE))
+            {
+                THROW_HR_WITH_USER_ERROR(
+                    HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), wsl::shared::Localization::MessageWslcPortInUse(FormatPortEndpoint(e), m_id));
+            }
+            throw;
+        }
     }
 }
 

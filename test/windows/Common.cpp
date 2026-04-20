@@ -68,6 +68,7 @@ static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f
+static wil::unique_mta_usage_cookie g_mtaCookie;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -1974,6 +1975,8 @@ Return Value:
 {
     wsl::windows::common::wslutil::InitializeWil();
 
+    THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
+
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG
     wil::g_fResultFailFastUnknownExceptions = false;
@@ -2188,6 +2191,7 @@ Return Value:
     }
 
     WslTraceLoggingUninitialize();
+    g_mtaCookie.reset();
 
     return true;
 }
@@ -2842,6 +2846,10 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     else if (imageName == "hello-world:latest")
     {
         result /= L"HelloWorldSaved.tar";
+    }
+    else if (imageName == "wslc-registry:latest")
+    {
+        result /= L"wslc-registry.tar";
     }
     else
     {

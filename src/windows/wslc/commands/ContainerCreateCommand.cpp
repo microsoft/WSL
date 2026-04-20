@@ -53,6 +53,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, false, NO_LIMIT),
         // Argument::Create(ArgType::Virtual),
+        Argument::Create(ArgType::WorkDir),
     };
     // clang-format on
 }

@@ -391,13 +391,13 @@ struct PortRelay
         wsl::shared::SocketChannel channel(wsl::windows::common::hvsocket::Connect(VmId, RelayPort), "SocketRelay");
 
         WI_VERIFY(Family == AF_INET || Family == AF_INET6);
-        LX_INIT_START_SOCKET_RELAY message;
+        LX_INIT_START_SOCKET_RELAY message{};
         message.Port = LinuxPort;
         message.Family = Family == AF_INET ? LX_AF_INET : LX_AF_INET6;
-        message.BufferSize = 4096;
+        message.BufferSize = LOCALHOST_RELAY_BUFFER_SIZE;
         channel.SendMessage(message);
 
-        wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket());
+        wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket(), message.BufferSize);
     }
 
     void CompleteAccept()

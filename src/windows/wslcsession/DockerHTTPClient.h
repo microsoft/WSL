@@ -144,9 +144,14 @@ public:
     common::docker_schema::PruneContainerResult PruneContainers(const PruneContainersFilters& filters = {});
 
     // Volume management.
-    void CreateVolume(const common::docker_schema::CreateVolume& Request);
+    common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
     void RemoveVolume(const std::string& Name);
     std::vector<common::docker_schema::Volume> ListVolumes();
+
+    // Network management.
+    common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
+    void RemoveNetwork(const std::string& Name);
+    std::vector<common::docker_schema::Network> ListNetworks();
 
     // Image management.
     struct ListImagesFilters
@@ -166,10 +171,13 @@ public:
         std::vector<std::string> absentLabels;
     };
 
-    std::unique_ptr<HTTPRequestContext> PullImage(const std::string& Repo, const std::optional<std::string>& tagOrDigest);
+    std::unique_ptr<HTTPRequestContext> PullImage(
+        const std::string& Repo, const std::optional<std::string>& tagOrDigest, const std::optional<std::string>& registryAuth = std::nullopt);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
+    std::unique_ptr<HTTPRequestContext> PushImage(const std::string& ImageName, const std::optional<std::string>& tag, const std::string& registryAuth);
+    std::string Authenticate(const std::string& serverAddress, const std::string& username, const std::string& password);
     std::vector<common::docker_schema::Image> ListImages(bool all = false, bool digests = false, const ListImagesFilters& filters = {});
     common::docker_schema::InspectImage InspectImage(const std::string& NameOrId);
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
@@ -240,13 +248,13 @@ private:
     wil::unique_socket ConnectSocket();
 
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
-        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers);
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers = {});
 
     std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");
 
     std::pair<HTTPResponse, wil::unique_socket> SendRequest(
-        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers = {});
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers = {});
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
     auto Transaction(boost::beast::http::verb Method, const URL& Url, const TRequest& RequestObject = {})

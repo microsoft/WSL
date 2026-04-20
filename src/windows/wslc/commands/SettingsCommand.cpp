@@ -13,12 +13,11 @@ Abstract:
 --*/
 #include "Argument.h"
 #include "SettingsCommand.h"
-#include "UserSettings.h"
+#include "WSLCUserSettings.h"
 #include "wslutil.h"
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
-using namespace wsl::windows::wslc::settings;
 using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
@@ -48,9 +47,9 @@ std::wstring SettingsCommand::LongDescription() const
 
 void SettingsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    settings::User().PrepareToShellExecuteFile();
-
-    const auto& path = settings::User().SettingsFilePath();
+    const auto& userSettings = settings::User();
+    userSettings.PrepareToShellExecuteFile();
+    const auto path = userSettings.SettingsFilePath();
 
     // Some versions of windows will fail if no file extension association exists, other will pop up the dialog
     // to make the user pick their default.
@@ -83,7 +82,6 @@ std::wstring SettingsResetCommand::LongDescription() const
 
 void SettingsResetCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    // TODO: do we need prompt support?
     settings::User().Reset();
     PrintMessage(Localization::WSLCCLI_SettingsResetConfirm());
 }

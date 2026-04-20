@@ -73,6 +73,7 @@ private:
             {L"list", Localization::WSLCCLI_ImageListDesc()},
             {L"load", Localization::WSLCCLI_ImageLoadDesc()},
             {L"pull", Localization::WSLCCLI_ImagePullDesc()},
+            {L"push", Localization::WSLCCLI_ImagePushDesc()},
             {L"save", Localization::WSLCCLI_ImageSaveDesc()},
             {L"tag", Localization::WSLCCLI_ImageTagDesc()},
         };
@@ -97,7 +98,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  -h,--help  Shows help about the selected command\r\n"
+                << L"  -?,--help  Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }
