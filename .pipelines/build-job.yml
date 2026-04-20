@@ -230,6 +230,7 @@ jobs:
 
             Copy-Item -Path "bin\x64\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wsltests.dll"
             Copy-Item -Path "bin\x64\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\testplugin.dll"
+            Copy-Item -Path "bin\x64\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wslcsdk.dll"
             Copy-Item -Path "bin\x64\release\installer.msix" -Destination "$(ob_outputDirectory)\testbin\x64\release\installer.msix"
             Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\x64" -Destination "$(ob_outputDirectory)\testbin\x64\release\taef"
 
@@ -242,6 +243,9 @@ jobs:
 
             $TestDistroVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
             Copy-Item "packages\Microsoft.WSL.TestDistro.$TestDistroVersion\x64\test_distro.tar.xz" "$(ob_outputDirectory)\testbin\x64"
+
+            $TestDataVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestData'']/@version').Node.Value
+            Copy-Item "packages\Microsoft.WSL.TestData.$TestDataVersion\x64" "$(ob_outputDirectory)\testbin\x64\test_data" -Recurse -Force
 
           displayName: Stage test artifacts
 
