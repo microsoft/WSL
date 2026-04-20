@@ -1839,11 +1839,11 @@ try
     RETURN_HR_IF_NULL(E_POINTER, VolumeInfo);
     ZeroMemory(VolumeInfo, sizeof(*VolumeInfo));
 
-    // Default driver to "vhd" if not specified. Currently only "vhd" is supported.
-    // TODO: Add support for docker's builtin volume drivers and change the default to "local"
-    // to match docker's behaviour.
-    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCVhdVolumeDriver;
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver);
+    // Default driver to "guest" if not specified. "guest" delegates storage to docker's built-in
+    // "local" driver inside the VM. "vhd" is still supported as an explicit opt-in.
+    std::string driver = (Options->Driver != nullptr && *Options->Driver != '\0') ? Options->Driver : WSLCGuestVolumeDriver;
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver && driver != WSLCGuestVolumeDriver);
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCVolumeMetadataLabel);
@@ -1860,13 +1860,22 @@ try
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(Options->Name));
     }
 
-    auto volume = WSLCVhdVolumeImpl::Create(
-        Options->Name,
-        std::move(driverOpts),
-        std::move(labels),
-        m_storageVhdPath.parent_path(),
-        m_virtualMachine.value(),
-        m_dockerClient.value());
+    std::unique_ptr<IWSLCVolume> volume;
+    if (driver == WSLCVhdVolumeDriver)
+    {
+        WSL_LOG("VolumeCreatedVhdDriver", TraceLoggingValue(Options->Name ? Options->Name : "", "VolumeName"));
+        volume = WSLCVhdVolumeImpl::Create(
+            Options->Name,
+            std::move(driverOpts),
+            std::move(labels),
+            m_storageVhdPath.parent_path(),
+            m_virtualMachine.value(),
+            m_dockerClient.value());
+    }
+    else
+    {
+        volume = WSLCGuestVolumeImpl::Create(Options->Name, std::move(driverOpts), std::move(labels), m_dockerClient.value());
+    }
 
     const auto& name = volume->Name();
     auto info = volume->GetVolumeInformation();
@@ -2525,8 +2534,29 @@ void WSLCSession::RecoverExistingVolumes()
         {
             WI_ASSERT(!m_volumes.contains(volume.Name));
 
-            auto vhdVolume = WSLCVhdVolumeImpl::Open(volume, m_virtualMachine.value(), m_dockerClient.value());
-            auto [_, inserted] = m_volumes.insert({volume.Name, std::move(vhdVolume)});
+            // Peek at the driver field to decide which implementation to use.
+            const auto& metadataJson = volume.Labels->at(WSLCVolumeMetadataLabel);
+            auto metadata = wsl::shared::FromJson<WSLCVolumeMetadata>(metadataJson.c_str());
+
+            std::unique_ptr<IWSLCVolume> recovered;
+            if (metadata.Driver == WSLCVhdVolumeDriver)
+            {
+                recovered = WSLCVhdVolumeImpl::Open(volume, m_virtualMachine.value(), m_dockerClient.value());
+            }
+            else if (metadata.Driver == WSLCGuestVolumeDriver)
+            {
+                recovered = WSLCGuestVolumeImpl::Open(volume, m_dockerClient.value());
+            }
+            else
+            {
+                WSL_LOG(
+                    "VolumeRecoverySkippedUnknownDriver",
+                    TraceLoggingValue(volume.Name.c_str(), "VolumeName"),
+                    TraceLoggingValue(metadata.Driver.c_str(), "Driver"));
+                continue;
+            }
+
+            auto [_, inserted] = m_volumes.insert({volume.Name, std::move(recovered)});
             WI_VERIFY(inserted);
         }
         CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());

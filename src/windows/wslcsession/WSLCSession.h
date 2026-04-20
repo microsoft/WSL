@@ -17,7 +17,9 @@ Abstract:
 #include "wslc.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
+#include "IWSLCVolume.h"
 #include "WSLCVhdVolume.h"
+#include "WSLCGuestVolume.h"
 #include "WSLCVolumeMetadata.h"
 #include "WSLCNetworkMetadata.h"
 #include "ContainerEventTracker.h"
@@ -185,7 +187,7 @@ private:
     std::mutex m_containersLock;
     std::mutex m_volumesLock;
     std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
-    std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>> m_volumes;
+    std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;
     std::unordered_set<std::string> m_anonymousVolumes; // TODO: Implement proper anonymous volume support.
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
