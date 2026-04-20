@@ -3604,24 +3604,83 @@ class WSLCTests
         VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLC_E_VOLUME_NOT_FOUND);
     }
 
-    WSLC_TEST_METHOD(NamedVolumeGuestRejectsDriverOpts)
+    WSLC_TEST_METHOD(NamedVolumeGuestDriverOptsTest)
     {
         const std::string volumeName = "wslc-test-named-volume-guest-opts";
         LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
-        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        auto expectReject = [&](const WSLCDriverOption* opts, ULONG optsCount, const std::wstring& expectedSubstring) {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
-        WSLCVolumeOptions volumeOptions{};
-        volumeOptions.Name = volumeName.c_str();
-        volumeOptions.Driver = "guest";
-        volumeOptions.DriverOpts = driverOpts;
-        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+            WSLCVolumeOptions volumeOptions{};
+            volumeOptions.Name = volumeName.c_str();
+            volumeOptions.Driver = "guest";
+            volumeOptions.DriverOpts = opts;
+            volumeOptions.DriverOptsCount = optsCount;
 
-        WSLCVolumeInformation volInfo{};
-        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions, &volInfo), E_INVALIDARG);
-        ValidateCOMErrorMessageContains(L"Unsupported volume driver options:");
-        ValidateCOMErrorMessageContains(L"SizeBytes");
+            WSLCVolumeInformation volInfo{};
+            VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions, &volInfo), E_INVALIDARG);
+            ValidateCOMErrorMessage(std::format(L"Unsupported volume driver options: {}", expectedSubstring));
+        };
+
+        auto expectAccept = [&](const WSLCDriverOption* opts, ULONG optsCount) {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+            WSLCVolumeOptions volumeOptions{};
+            volumeOptions.Name = volumeName.c_str();
+            volumeOptions.Driver = "guest";
+            volumeOptions.DriverOpts = opts;
+            volumeOptions.DriverOptsCount = optsCount;
+
+            WSLCVolumeInformation volInfo{};
+            VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        };
+
+        // Allowed: no options (nullptr).
+        expectAccept(nullptr, 0);
+
+        // Allowed: type=tmpfs.
+        {
+            WSLCDriverOption opts[] = {{"type", "tmpfs"}};
+            expectAccept(opts, ARRAYSIZE(opts));
+        }
+
+        // Allowed: type=tmpfs with o= suboptions.
+        {
+            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"o", "size=100m,uid=1000"}};
+            expectAccept(opts, ARRAYSIZE(opts));
+        }
+
+        // Blocked: device is always rejected.
+        {
+            WSLCDriverOption opts[] = {{"device", "/some/path"}};
+            expectReject(opts, ARRAYSIZE(opts), L"device");
+        }
+
+        // Blocked: device with type=tmpfs is still rejected.
+        {
+            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"device", "/some/path"}};
+            expectReject(opts, ARRAYSIZE(opts), L"device");
+        }
+
+        // Blocked: type=none (bind mount).
+        {
+            WSLCDriverOption opts[] = {{"type", "none"}};
+            expectReject(opts, ARRAYSIZE(opts), L"type=none");
+        }
+
+        // Blocked: type=nfs.
+        {
+            WSLCDriverOption opts[] = {{"type", "nfs"}};
+            expectReject(opts, ARRAYSIZE(opts), L"type=nfs");
+        }
+
+        // Blocked: unknown option key.
+        {
+            WSLCDriverOption opts[] = {{"SizeBytes", "1073741824"}};
+            expectReject(opts, ARRAYSIZE(opts), L"SizeBytes");
+        }
     }
 
     WSLC_TEST_METHOD(NamedVolumeVhdOptionsParseTest)

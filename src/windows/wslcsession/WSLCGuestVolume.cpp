@@ -27,11 +27,18 @@ namespace wsl::windows::service::wslc {
 namespace {
 
 // Allowlist for driver options that the guest driver forwards to docker's
-// "local" driver. Start conservatively: reject everything. Expand as concrete
-// scenarios appear (e.g. tmpfs-backed volumes via type=tmpfs + filtered o=...).
-// Rejecting unknown opts avoids accidentally exposing host paths via
-// device=/host/path or other local-driver options that could break the
-// WSL-for-apps isolation model.
+// "local" driver. The local driver passes type/device/o directly to mount(8),
+// so we must block options that could expose host paths or network resources.
+//
+// Allowed:
+//   - (empty)    : default — Docker creates a directory under /var/lib/docker/volumes/.
+//   - type=tmpfs : memory-backed volume. "o" suboptions (size, mode, uid, etc.)
+//                  are kernel-validated and safe.
+//   - o=...      : only when type=tmpfs.
+//
+// Blocked:
+//   - device     : always — prevents bind-mounting arbitrary VM paths.
+//   - type=none/nfs/cifs/... : require device or network access.
 void ValidateDriverOpts(const std::map<std::string, std::string>& DriverOpts)
 {
     if (DriverOpts.empty())
@@ -39,12 +46,23 @@ void ValidateDriverOpts(const std::map<std::string, std::string>& DriverOpts)
         return;
     }
 
-    std::vector<std::string> keys(DriverOpts.size());
-    std::ranges::transform(DriverOpts, keys.begin(), [](const auto& e) { return e.first; });
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("device"), DriverOpts.contains("device"));
 
-    auto optNames = wsl::shared::string::Join(keys, ',');
+    auto typeIt = DriverOpts.find("type");
+    std::string type = (typeIt != DriverOpts.end()) ? typeIt->second : "";
 
-    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts(optNames));
+    // Only tmpfs is allowed as a type. Everything else (none, nfs, cifs, ext4, ...)
+    // requires a device or network access.
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("type=" + type), !type.empty() && type != "tmpfs");
+
+    // Reject any unknown keys beyond the allowed set {type, o}.
+    for (const auto& [key, _] : DriverOpts)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts(key), key != "type" && key != "o");
+    }
 }
 
 } // namespace
