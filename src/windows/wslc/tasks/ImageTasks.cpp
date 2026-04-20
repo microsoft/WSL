@@ -248,12 +248,12 @@ void PruneImages(CLIExecutionContext& context)
 
     for (const auto& image : result.UntaggedImages)
     {
-        PrintMessage(Localization::WSLCCLI_ImagePruneUntagged(MultiByteToWide(image)));
+        PrintMessage(Localization::WSLCCLI_ImagePruneUntagged(image));
     }
 
     for (const auto& image : result.DeletedImages)
     {
-        PrintMessage(Localization::WSLCCLI_ImagePruneDeleted(MultiByteToWide(image)));
+        PrintMessage(Localization::WSLCCLI_ImagePruneDeleted(image));
     }
 
     PrintMessage(L"");
