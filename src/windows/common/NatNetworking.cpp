@@ -859,8 +859,8 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
         WSL_LOG_TELEMETRY(
             "HcnCreateNetworkDeadlineExceeded",
             PDT_ProductAndServicePerformance,
-            TraceLoggingGuid(config.NatNetworkId(), "networkGuid"),
-            TraceLoggingValue(settings.Name.c_str(), "settingsName"));
+            TraceLoggingGuid(config.NatNetworkId(), "NetworkGuid"),
+            TraceLoggingValue(settings.Name.c_str(), "NetworkName"));
         hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
         return {};
     }
