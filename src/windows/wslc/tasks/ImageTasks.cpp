@@ -125,8 +125,7 @@ void ListImages(CLIExecutionContext& context)
                 MultiByteToWide(image.Tag.value_or("<untagged>")),
                 MultiByteToWide(TruncateId(image.Id, trunc)),
                 ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
-                // Dividing by 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1000 * 1000)),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / WSLC_IMAGE_1MB),
             });
         }
 
@@ -258,7 +257,6 @@ void PruneImages(CLIExecutionContext& context)
     }
 
     PrintMessage(L"");
-    // Dividing by 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
-    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / (1000 * 1000)));
+    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
 }
 } // namespace wsl::windows::wslc::task

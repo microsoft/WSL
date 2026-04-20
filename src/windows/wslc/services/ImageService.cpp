@@ -260,7 +260,7 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), image.c_str(), nullptr, cancelEvent));
 }
 
-models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
+wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
 {
     WSLCPruneImagesOptions options{};
     if (all)
@@ -272,7 +272,7 @@ models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Sessio
     ULONGLONG spaceReclaimed = 0;
     THROW_IF_FAILED(session.Get()->PruneImages(&options, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
 
-    models::PruneImagesResult result;
+    wsl::windows::wslc::models::PruneImagesResult result;
     result.SpaceReclaimed = spaceReclaimed;
     for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
     {

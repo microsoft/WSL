@@ -13,6 +13,9 @@ Abstract:
 --*/
 #pragma once
 
+// 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
+#define WSLC_IMAGE_1MB (1000 * 1000)
+
 namespace wsl::windows::wslc::models {
 struct ImageInformation
 {

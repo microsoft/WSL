@@ -45,13 +45,11 @@ std::wstring ImageListCommand::LongDescription() const
     return Localization::WSLCCLI_ImageListLongDesc();
 }
 
-// clang-format off
 void ImageListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context
-        << CreateSession
-        << GetImages
+    context              //
+        << CreateSession //
+        << GetImages     //
         << ListImages;
 }
-// clang-format on
 } // namespace wsl::windows::wslc
