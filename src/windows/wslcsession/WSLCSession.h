@@ -155,10 +155,11 @@ private:
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
-    void OnContainerdLog(const gsl::span<char>& Data);
+    void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
-    void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();
+    ServiceRunningProcess StartProcess(
+        const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()> ExitCallback);
     void StartContainerd();
     void StartDockerd();
     int StopProcess(std::optional<ServiceRunningProcess>& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);

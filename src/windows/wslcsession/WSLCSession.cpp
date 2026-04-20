@@ -374,22 +374,22 @@ void WSLCSession::OnContainerdExited()
     }
 }
 
-void WSLCSession::OnDockerdLog(const gsl::span<char>& buffer)
+void WSLCSession::OnProcessLog(const gsl::span<char>& Buffer, PCSTR Source)
 try
 {
-    if (buffer.empty())
+    if (Buffer.empty())
     {
         return;
     }
 
-    constexpr auto c_containerdReadyLogLine = "API listen on /var/run/docker.sock";
+    constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 
-    std::string entry = {buffer.begin(), buffer.end()};
-    WSL_LOG("ContainerdLog", TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
+    std::string entry = {Buffer.begin(), Buffer.end()};
+    WSL_LOG("ContainerdLog", TraceLoggingValue(Source, "Source"), TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
 
     if (!m_containerdReadyEvent.is_signaled())
     {
-        if (entry.find(c_containerdReadyLogLine) != std::string::npos)
+        if (entry.find(c_dockerdReadyLogLine) != std::string::npos)
         {
             m_containerdReadyEvent.SetEvent();
         }
@@ -397,18 +397,23 @@ try
 }
 CATCH_LOG();
 
-void WSLCSession::OnContainerdLog(const gsl::span<char>& buffer)
-try
+ServiceRunningProcess WSLCSession::StartProcess(
+    const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()> ExitCallback)
 {
-    if (buffer.empty())
-    {
-        return;
-    }
+    ServiceProcessLauncher launcher{Executable, Args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
 
-    std::string entry = {buffer.begin(), buffer.end()};
-    WSL_LOG("ContainerdProcessLog", TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
+    auto process = launcher.Launch(*m_virtualMachine);
+
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
+
+    return process;
 }
-CATCH_LOG();
 
 void WSLCSession::StartContainerd()
 {
@@ -424,52 +429,20 @@ void WSLCSession::StartContainerd()
         args.emplace_back("debug");
     }
 
-    ServiceProcessLauncher launcher{"/usr/bin/containerd", args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
-
-    m_containerdProcess = launcher.Launch(*m_virtualMachine);
-
-    // Log containerd output for diagnostics.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        m_containerdProcess->GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }, false));
-
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        m_containerdProcess->GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }, false));
-
-    // Monitor containerd's exit so we can detect abnormal exits.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(
-        m_containerdProcess->GetExitEvent(), std::bind(&WSLCSession::OnContainerdExited, this)));
-
+    m_containerdProcess = StartProcess("/usr/bin/containerd", args, "containerd", std::bind(&WSLCSession::OnContainerdExited, this));
     WSL_LOG("ContainerdStarted");
 }
 
 void WSLCSession::StartDockerd()
 {
-    std::vector<std::string> args{"/usr/bin/dockerd"};
-
-    // Use external containerd socket (requires StartContainerd() to be called first).
-    args.emplace_back("--containerd");
-    args.emplace_back(c_containerdSocket);
+    std::vector<std::string> args{"/usr/bin/dockerd", "--containerd", c_containerdSocket};
 
     if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
     {
         args.emplace_back("--debug");
     }
 
-    ServiceProcessLauncher launcher{"/usr/bin/dockerd", args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
-
-    m_dockerdProcess = launcher.Launch(*m_virtualMachine);
-
-    // Read stdout & stderr.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        m_dockerdProcess->GetStdHandle(1), [&](const auto& data) { OnDockerdLog(data); }, false));
-
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        m_dockerdProcess->GetStdHandle(2), [&](const auto& data) { OnDockerdLog(data); }, false));
-
-    // Monitor dockerd's exit so we can detect abnormal exits.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(
-        m_dockerdProcess->GetExitEvent(), std::bind(&WSLCSession::OnDockerdExited, this)));
-
+    m_dockerdProcess = StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this));
     WSL_LOG("DockerdStarted");
 }
 
@@ -2042,7 +2015,7 @@ int WSLCSession::StopProcess(std::optional<ServiceRunningProcess>& Process, DWOR
         LOG_CAUGHT_EXCEPTION();
         try
         {
-            Process->Get().Signal(WSLCSignalSIGKILL);
+            LOG_IF_FAILED(Process->Get().Signal(WSLCSignalSIGKILL));
             return Process->Wait(KillTimeoutMs);
         }
         CATCH_LOG();
@@ -2102,13 +2075,19 @@ try
 
     // Stop dockerd first, then containerd (dockerd is a client of containerd).
     // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
-    auto dockerdExitCode = StopProcess(m_dockerdProcess, c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-    WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
-    m_dockerdProcess.reset();
+    if (m_dockerdProcess.has_value())
+    {
+        auto dockerdExitCode = StopProcess(m_dockerdProcess, c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+        WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
+        m_dockerdProcess.reset();
+    }
 
-    auto containerdExitCode = StopProcess(m_containerdProcess, c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-    WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
-    m_containerdProcess.reset();
+    if (m_containerdProcess.has_value())
+    {
+        auto containerdExitCode = StopProcess(m_containerdProcess, c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+        WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
+        m_containerdProcess.reset();
+    }
 
     if (m_virtualMachine)
     {
