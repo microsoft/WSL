@@ -538,7 +538,7 @@ std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::ResolvePortZeroBin
     // The bind() syscall has been completed (CompleteRequest() already unblocked the
     // caller). Poll getsockname() briefly until the kernel assigns a port.
     constexpr int maxRetries = 25;
-    constexpr auto retryDelay = std::chrono::milliseconds(100);
+    constexpr auto retryDelay = std::chrono::milliseconds(10);
 
     in_port_t port = 0;
     in6_addr address = {};
