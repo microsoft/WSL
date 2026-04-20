@@ -250,7 +250,8 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
             {
                 auto result = RunWslc(std::format(L"container kill {}", containerName));
                 // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
-                if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
+                if (result.ExitCode != 0 &&
+                    (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
                 {
                     result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
                 }
@@ -258,7 +259,8 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
 
             auto result = RunWslc(std::format(L"container remove --force {}", containerName));
             // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already removed
-            if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
+            if (result.ExitCode != 0 &&
+                (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
             {
                 result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             }

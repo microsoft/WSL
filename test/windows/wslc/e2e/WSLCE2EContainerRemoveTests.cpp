@@ -55,7 +55,10 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container remove {}", WslcContainerName));
-        result.Verify({.Stdout = L"", .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName), .ExitCode = 1});
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Valid)

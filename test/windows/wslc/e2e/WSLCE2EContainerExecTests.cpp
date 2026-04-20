@@ -82,7 +82,9 @@ class WSLCE2EContainerExecTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_ContainerNotFound)
     {
         auto result = RunWslc(std::format(L"container exec {} echo hello", WslcContainerName));
-        result.Verify({.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName), .ExitCode = 1});
+        result.Verify(
+            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Exec_SimpleCommand)
