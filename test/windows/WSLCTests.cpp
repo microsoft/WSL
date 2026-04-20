@@ -1818,9 +1818,7 @@ class WSLCTests
         // TODO: Add proper support so we can list via session's API instead.
         auto listAnonymousVolumes = [&]() {
             auto result = ExpectCommandResult(
-                m_defaultSession.get(),
-                {"/usr/bin/docker", "volume", "ls", "-q", "-f", "label=com.docker.volume.anonymous"},
-                0);
+                m_defaultSession.get(), {"/usr/bin/docker", "volume", "ls", "-q", "-f", "label=com.docker.volume.anonymous"}, 0);
             std::vector<std::string> names;
             std::stringstream ss(result.Output[1]);
             std::string line;
@@ -1848,7 +1846,7 @@ class WSLCTests
 
             container.SetDeleteOnClose(false);
 
-            // Manually cleanup the container and delete anonymous volumes since the session has been reset. 
+            // Manually cleanup the container and delete anonymous volumes since the session has been reset.
             auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 wil::com_ptr<IWSLCContainer> container;
                 VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &container));
@@ -1860,7 +1858,8 @@ class WSLCTests
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
 
-            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
             VERIFY_ARE_EQUAL(containers.size(), 1);
             VERIFY_ARE_EQUAL(containers[0].Id, containerId);
