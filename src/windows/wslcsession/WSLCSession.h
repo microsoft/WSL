@@ -164,11 +164,10 @@ private:
     void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
     void OnDockerdExited();
-    ServiceRunningProcess StartProcess(
-        const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()> ExitCallback);
+    ServiceRunningProcess StartProcess(const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
     void StartContainerd();
     void StartDockerd();
-    int StopProcess(std::optional<ServiceRunningProcess>& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
+    int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingVolumes();

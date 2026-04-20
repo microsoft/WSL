@@ -400,7 +400,7 @@ try
 CATCH_LOG();
 
 ServiceRunningProcess WSLCSession::StartProcess(
-    const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()> ExitCallback)
+    const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback)
 {
     ServiceProcessLauncher launcher{Executable, Args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
 
@@ -2015,26 +2015,21 @@ HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WS
     return E_NOTIMPL;
 }
 
-int WSLCSession::StopProcess(std::optional<ServiceRunningProcess>& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs)
+int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs)
 {
-    if (!Process.has_value())
-    {
-        return -1;
-    }
-
-    LOG_IF_FAILED(Process->Get().Signal(WSLCSignalSIGTERM));
+    LOG_IF_FAILED(Process.Get().Signal(WSLCSignalSIGTERM));
 
     try
     {
-        return Process->Wait(TerminateTimeoutMs);
+        return Process.Wait(TerminateTimeoutMs);
     }
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
         try
         {
-            LOG_IF_FAILED(Process->Get().Signal(WSLCSignalSIGKILL));
-            return Process->Wait(KillTimeoutMs);
+            LOG_IF_FAILED(Process.Get().Signal(WSLCSignalSIGKILL));
+            return Process.Wait(KillTimeoutMs);
         }
         CATCH_LOG();
     }
@@ -2241,14 +2236,14 @@ try
     // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
     if (m_dockerdProcess.has_value())
     {
-        auto dockerdExitCode = StopProcess(m_dockerdProcess, c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+        auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
         WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
         m_dockerdProcess.reset();
     }
 
     if (m_containerdProcess.has_value())
     {
-        auto containerdExitCode = StopProcess(m_containerdProcess, c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+        auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
         WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
         m_containerdProcess.reset();
     }
