@@ -26,9 +26,6 @@ using wsl::shared::Localization;
 namespace wsl::windows::service::wslc {
 
 namespace {
-
-    constexpr auto c_anonymousVolumeLabel = "com.docker.volume.anonymous";
-
     std::string GenerateName()
     {
         std::random_device rd;
