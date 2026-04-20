@@ -26,6 +26,8 @@ using wsl::shared::Localization;
 namespace wsl::windows::service::wslc {
 
 namespace {
+    constexpr auto uuidPrefix = "UUID=";
+
     std::string GenerateName()
     {
         std::random_device rd;
@@ -99,14 +101,14 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     WSLCVirtualMachine& VirtualMachine,
     DockerHTTPClient& DockerClient)
 {
-    auto name = (Name == nullptr || Name[0] == '\0') ? GenerateName() : std::string{Name};
+    std::string name = (Name != nullptr && Name[0] != '\0') ? std::string(Name) : GenerateName();
     auto sizeBytes = ParseSizeBytes(DriverOpts);
 
     GUID uuidGuid{};
     THROW_IF_FAILED(CoCreateGuid(&uuidGuid));
     auto uuid = wsl::shared::string::GuidToString<char>(uuidGuid, wsl::shared::string::GuidToStringFlags::None);
 
-    auto hostPath = StoragePath / "volumes" / (uuid + ".vhdx");
+    auto hostPath = StoragePath / "volumes" / (name + ".vhdx");
 
     auto createVhdCleanup =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(hostPath.c_str())); });
@@ -126,7 +128,6 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     metadata.DriverOpts = DriverOpts;
     metadata.Properties = {
         {"HostPath", hostPath.string()},
-        {"Uuid", uuid},
     };
 
     docker_schema::CreateVolume request{};
@@ -134,7 +135,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     request.Driver = "local";
     request.DriverOpts = {
         {"type", "ext4"},
-        {"device", "UUID=" + uuid},
+        {"device", uuidPrefix + uuid},
     };
     request.Labels = {{WSLCVolumeMetadataLabel, wsl::shared::ToJson(metadata)}};
 
@@ -149,14 +150,14 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
         auto createdVolume = DockerClient.CreateVolume(request);
 
         auto volume = std::make_unique<WSLCVhdVolumeImpl>(
-            std::move(createdVolume.Name),
+            std::move(name),
             std::move(hostPath),
             sizeBytes,
             lun,
             std::move(uuid),
             std::move(createdVolume.CreatedAt),
             std::move(DriverOpts),
-            std::move(labels),
+            std::move(request.Labels),
             VirtualMachine,
             DockerClient);
 
@@ -187,10 +188,15 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
     auto driverOpts = metadata.DriverOpts;
     auto sizeBytes = ParseSizeBytes(driverOpts);
 
-    auto uuidIt = metadata.Properties.find("Uuid");
-    THROW_HR_IF(E_INVALIDARG, uuidIt == metadata.Properties.end());
-    THROW_HR_IF(E_INVALIDARG, uuidIt->second.empty());
-    std::string uuid = uuidIt->second;
+    // The UUID is encoded in the Docker volume's "device" driver option as "UUID=<uuid>".
+    THROW_HR_IF(E_INVALIDARG, !Volume.Options.has_value());
+    auto deviceIt = Volume.Options->find("device");
+
+    THROW_HR_IF(E_INVALIDARG, deviceIt == Volume.Options->end());
+    THROW_HR_IF(E_INVALIDARG, !deviceIt->second.starts_with(uuidPrefix));
+
+    std::string uuid = deviceIt->second.substr(wcslen(uuidPrefix));
+    THROW_HR_IF(E_INVALIDARG, uuid.empty());
 
     // Extract user labels (all labels except our internal metadata label).
     std::map<std::string, std::string> userLabels;
@@ -202,9 +208,6 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Open(
         }
     }
 
-    // Attach the VHD so the kernel sees the ext4 superblock and libblkid can
-    // resolve UUID=<uuid> when Docker mounts the device on container start.
-    // No in-guest mount is needed.
     auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
     auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });
 
