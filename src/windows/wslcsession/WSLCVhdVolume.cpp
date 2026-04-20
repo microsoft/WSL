@@ -26,6 +26,27 @@ using wsl::shared::Localization;
 namespace wsl::windows::service::wslc {
 
 namespace {
+
+    constexpr auto c_anonymousVolumeLabel = "com.docker.volume.anonymous";
+
+    std::string GenerateName()
+    {
+        std::random_device rd;
+        std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned short> random(rd());
+
+        std::array<unsigned short, 32> randomBytes;
+        std::generate(randomBytes.begin(), randomBytes.end(), random);
+
+        std::string name;
+        name.reserve(randomBytes.size() * 2);
+        for (auto b : randomBytes)
+        {
+            std::format_to(std::back_inserter(name), "{:02x}", static_cast<BYTE>(b));
+        }
+
+        return name;
+    }
+
     ULONGLONG ParseSizeBytes(std::map<std::string, std::string>& DriverOpts)
     {
         const auto it = DriverOpts.find("SizeBytes");
@@ -81,6 +102,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     WSLCVirtualMachine& VirtualMachine,
     DockerHTTPClient& DockerClient)
 {
+    auto name = (Name == nullptr || Name[0] == '\0') ? GenerateName() : std::string{Name};
     auto sizeBytes = ParseSizeBytes(DriverOpts);
 
     GUID uuidGuid{};
@@ -111,10 +133,7 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     };
 
     docker_schema::CreateVolume request{};
-    if (Name != nullptr && Name[0] != '\0')
-    {
-        request.Name = Name;
-    }
+    request.Name = name;
     request.Driver = "local";
     request.DriverOpts = {
         {"type", "ext4"},
@@ -131,8 +150,6 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     try
     {
         auto createdVolume = DockerClient.CreateVolume(request);
-        auto labels = createdVolume.Labels.value();
-        WI_VERIFY(labels.erase(WSLCVolumeMetadataLabel) == 1);
 
         auto volume = std::make_unique<WSLCVhdVolumeImpl>(
             std::move(createdVolume.Name),
