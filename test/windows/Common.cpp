@@ -250,9 +250,9 @@ Return Value:
     {
         THROW_HR_MSG(
             E_UNEXPECTED,
-            "Command \"%ls\""
+            "Command \"%ls\" "
             "returned unexpected exit code (%lu != %i). "
-            "Stdout: '%ls'"
+            "Stdout: '%ls' "
             "Stderr: '%ls'",
             Cmd,
             ExitCode,

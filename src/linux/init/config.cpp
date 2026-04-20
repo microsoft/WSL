@@ -2137,7 +2137,7 @@ Return Value:
     //
 
     const char* const Argv[] = {MOUNT_COMMAND, MOUNT_FSTAB_ARG, nullptr};
-    if (UtilCreateProcessAndWait(Argv[0], Argv, nullptr, {{WSL_DRVFS_ELEVATED_ENV, Elevated ? "1" : "0"}}) < 0)
+    if (UtilCreateProcessAndWait(Argv[0], Argv, nullptr, {{WSL_DRVFS_ELEVATED_ENV, Elevated ? "1" : "0"}}, true) < 0)
     {
         auto message = wsl::shared::Localization::MessageFstabMountFailed();
         LOG_ERROR("{}", message.c_str());

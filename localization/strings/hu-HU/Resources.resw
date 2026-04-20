@@ -960,6 +960,10 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>A frissítés nem sikerült (kilépési kód: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>A(z) {} nem fogad argumentumokat. Egy disztribúció regisztrációjának törléséhez használja inkább a következőt: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
     <value>Az eltávolítás nem sikerült (kilépési kód: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

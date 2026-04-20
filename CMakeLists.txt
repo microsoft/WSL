@@ -16,10 +16,8 @@ endif()
 
 if("${CMAKE_GENERATOR_PLATFORM}" STREQUAL "arm64" OR "${TARGET_PLATFORM}" STREQUAL "arm64")
     set(TARGET_PLATFORM "arm64")
-    set(TEST_DISTRO_PLATFORM "arm64")
 elseif("${CMAKE_GENERATOR_PLATFORM}" MATCHES "x64|amd64" OR "${TARGET_PLATFORM}" MATCHES "x64|amd64")
     set(TARGET_PLATFORM "x64")
-    set(TEST_DISTRO_PLATFORM "amd64")
 else()
     message(FATAL_ERROR "Unsupported platform: ${CMAKE_GENERATOR_PLATFORM}")
 endif()
@@ -29,11 +27,43 @@ if (NOT ${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION} STREQUAL ${CMAKE_SYSTEM_VERS
     message(FATAL_ERROR "Incorrect Windows SDK version: ${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}, requires ${CMAKE_SYSTEM_VERSION}")
 endif()
 
+# Default to debug build if unspecified (pipeline always passes -DCMAKE_BUILD_TYPE=Release)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
+# Only generate the build configuration that CMake is configured for
+set(CMAKE_CONFIGURATION_TYPES "${CMAKE_BUILD_TYPE}" CACHE STRING "" FORCE)
+
+# Configure output directories
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
+
+# BUNDLE_ONLY mode: skip all source builds; only configure the msixbundle target and nuspec files.
+# Used by the package pipeline stage to create the bundle from pre-built per-platform msix files.
+option(BUNDLE_ONLY "Only configure the msixbundle target, skip all source builds" OFF)
+if (BUNDLE_ONLY)
+    if (NOT PACKAGE_VERSION)
+        message(FATAL_ERROR "PACKAGE_VERSION is required for BUNDLE_ONLY mode")
+    endif()
+
+    if (NOT PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+        message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'")
+    endif()
+
+    set(PACKAGE_SIGN_COMMAND echo Skipped package signing for:)
+
+    add_subdirectory(nuget)
+    add_subdirectory(msixinstaller)
+    return()
+endif()
+
 include(FetchContent)
 
 # Import GSL and nlohmannjson
 
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/_deps/${TARGET_PLATFORM})
+
+# N.B. Changes to any of the FetchContent dependencies below (GSL, nlohmannjson) must be reflected in cgmanifest.json
 
 FetchContent_Declare(GSL
                      URL https://github.com/microsoft/GSL/archive/refs/tags/v4.0.0.tar.gz
@@ -103,11 +133,6 @@ find_nuget_package(WinUIEx WINUIEX /)
 
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
-# Default to debug build if unspecified
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Debug")
-endif()
-
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
@@ -120,17 +145,14 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
-# Only generate the build configuration that CMake is configured for
-set(CMAKE_CONFIGURATION_TYPES "${CMAKE_BUILD_TYPE}" CACHE STRING "" FORCE)
-
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
     find_version(PACKAGE_VERSION WSL_NUGET_PACKAGE_VERSION) # Fetch the package version from git if not specified
 endif ()
 
-if (NOT PACKAGE_VERSION MATCHES "^([0-9]+).([0-9]+).([0-9]+).([0-9]+)$")
-    message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'. Needs to match '([0-9]+).([0-9]+).([0-9]+).([0-9]+)'")
+if (NOT PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+    message(FATAL_ERROR "PACKAGE_VERSION must be four dot-separated numeric components (e.g., '1.2.3.4'): got '${PACKAGE_VERSION}'")
 endif()
 
 set(PACKAGE_VERSION_MAJOR ${CMAKE_MATCH_1})
@@ -138,12 +160,11 @@ set(PACKAGE_VERSION_MINOR ${CMAKE_MATCH_2})
 set(PACKAGE_VERSION_REVISION ${CMAKE_MATCH_3})
 
 # The store requires the revision number to be 0, so enforce this on official builds
-if (OFFICIAL_BUILD AND NOT PACKAGE_VERSION MATCHES "^([0-9]+).([0-9]+).([0-9]+).0$")
+if (OFFICIAL_BUILD AND NOT PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.0$")
     message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'. Needs to match '([0-9]+).([0-9]+).([0-9]+).0' for official builds")
 endif()
 
-# Configure output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
+# Configure per-config output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release)
 
@@ -156,8 +177,13 @@ file(MAKE_DIRECTORY ${BIN})
 set (GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
+# Generate Source Link JSON so debuggers can fetch source from GitHub (pipeline builds only)
+if (DEFINED PIPELINE_BUILD_ID)
+    set(SOURCELINK_JSON "${GENERATED_DIR}/sourcelink.json")
+    file(WRITE "${SOURCELINK_JSON}" "{\"documents\":{\"${CMAKE_SOURCE_DIR}/*\":\"https://raw.githubusercontent.com/microsoft/WSL/${COMMIT_HASH}/*\"}}")
+endif()
+
 set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
-file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll ${BIN}/wsldevicehost.dll)
 file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
 
@@ -166,7 +192,7 @@ if (${SKIP_PACKAGE_SIGNING})
 else()
     if (NOT EXISTS ${PACKAGE_CERTIFICATE})
         execute_process(
-            COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive ${CMAKE_CURRENT_LIST_DIR}/tools/create-dev-cert.ps1 -OutputPath ${PACKAGE_CERTIFICATE}
+            COMMAND powershell.exe -ExecutionPolicy Bypass -NoProfile -NonInteractive -File "${CMAKE_CURRENT_LIST_DIR}/tools/create-dev-cert.ps1" -OutputPath "${PACKAGE_CERTIFICATE}"
             COMMAND_ERROR_IS_FATAL ANY)
     endif()
 
@@ -188,10 +214,12 @@ endif()
 
 if (${TARGET_PLATFORM} STREQUAL "x64")
     add_compile_definitions(_AMD64_)
+    set(DISTRO_HOSTTYPE x86_64)
 endif()
 
 if (${TARGET_PLATFORM} STREQUAL "arm64")
     add_compile_definitions(_ARM64_)
+    set(DISTRO_HOSTTYPE aarch64)
 endif()
 
 add_definitions(/sdl) # Default-initialize class members
@@ -214,6 +242,7 @@ add_compile_definitions(UNICODE
                         WSL_PACKAGE_VERSION_MAJOR=${PACKAGE_VERSION_MAJOR}
                         WSL_PACKAGE_VERSION_MINOR=${PACKAGE_VERSION_MINOR}
                         WSL_PACKAGE_VERSION_REVISION=${PACKAGE_VERSION_REVISION}
+                        DISTRO_HOSTTYPE="${DISTRO_HOSTTYPE}"
                         WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS})
 
 if (${OFFICIAL_BUILD})
@@ -232,6 +261,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /guard:cf /Qspectre"
 # Linker flags
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
+if (DEFINED SOURCELINK_JSON)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SOURCELINK:\"${SOURCELINK_JSON}\"")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SOURCELINK:\"${SOURCELINK_JSON}\"")
+endif()
 if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /CETCOMPAT")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
@@ -250,13 +283,19 @@ set(COMMON_LINK_LIBRARIES
     Shlwapi.lib
     synchronization.lib
     Bcrypt.lib
-    Iphlpapi.lib
-    icu.lib
+    icu.lib)
+
+set(MSI_LINK_LIBRARIES
+    Wintrust.lib
+    msi.lib)
+
+set(HCS_LINK_LIBRARIES
     computecore.lib
     computenetwork.lib
+    Iphlpapi.lib)
+
+set(SERVICE_LINK_LIBRARIES
     MI.lib
-    Wintrust.lib
-    msi.lib
     wsldeps.lib)
 
 # Linux
@@ -308,9 +347,17 @@ endif()
 # Generate the clang-format script which contains a path to clang-format.exe
 configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/FormatSource.ps1.in ${CMAKE_BINARY_DIR}/FormatSource.ps1)
 
+# Pre-commit hook mode: warn (default), error, or fix
+set(WSL_PRE_COMMIT_MODE "warn" CACHE STRING "Pre-commit hook behavior: warn, error, or fix")
+
+# Generate the pre-commit hook into the build tree
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tools/hooks)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit.in ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit @ONLY)
+
 cmake_path(COMPARE "${wsl_SOURCE_DIR}" EQUAL "${wsl_BINARY_DIR}" BUILD_IN_SOURCE)
 if (NOT ${BUILD_IN_SOURCE}) # Testing on 3.26 project_type_DIR paths appear canonicalized
     file(CREATE_LINK ${LLVM_INSTALL_DIR}/clang-format.exe ${wsl_SOURCE_DIR}/tools/clang-format.exe COPY_ON_ERROR)
+    file(COPY_FILE ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit ${wsl_SOURCE_DIR}/tools/hooks/pre-commit ONLY_IF_DIFFERENT)
 endif()
 
 set(LINUXSDK_PATH ${LINUXSDK_SOURCE_DIR}/${LLVM_ARCH})

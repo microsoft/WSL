@@ -59,7 +59,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define HYPERV_FIREWALL_TEST_ONLY() \
     { \
-        WSL2_TEST_ONLY(); \
         WINDOWS_11_TEST_ONLY(); \
         if (!AreExperimentalNetworkingFeaturesSupported() || !IsHyperVFirewallSupported()) \
         { \
@@ -70,7 +69,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define MIRRORED_NETWORKING_TEST_ONLY() \
     { \
-        WSL2_TEST_ONLY(); \
         WINDOWS_11_TEST_ONLY(); \
         if (!AreExperimentalNetworkingFeaturesSupported() || !IsHyperVFirewallSupported()) \
         { \
@@ -81,7 +79,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define DNS_TUNNELING_TEST_ONLY() \
     { \
-        WSL2_TEST_ONLY(); \
         WINDOWS_11_TEST_ONLY(); \
         if (!AreExperimentalNetworkingFeaturesSupported()) \
         { \
@@ -97,7 +94,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define WINHTTP_PROXY_TEST_ONLY() \
     { \
-        WSL2_TEST_ONLY(); \
         if (!TryLoadWinhttpProxyMethods()) \
         { \
             LogSkipped("Winhttp proxy APIs not present on this OS. Skipping test..."); \
@@ -107,7 +103,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
 
 #define VIRTIOPROXY_TEST_ONLY() \
     { \
-        WSL2_TEST_ONLY(); \
     }
 
 static constexpr auto c_wslVmCreatorId = L"\'{40e0ac32-46a5-438a-A0B2-2B479E8F2E90}\'";
@@ -301,10 +296,8 @@ class NetworkTests
         return true;
     }
 
-    TEST_METHOD(RemoveAndAddDefaultRoute)
+    WSL2_TEST_METHOD(RemoveAndAddDefaultRoute)
     {
-        WSL2_TEST_ONLY();
-
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Verify that the default routes are set
@@ -352,10 +345,43 @@ class NetworkTests
         VERIFY_ARE_EQUAL(v6State.DefaultRoute->Device, L"eth0");
     }
 
-    TEST_METHOD(SetInterfaceDownAndUp)
+    WSL2_TEST_METHOD(AddRemoveDefaultOnlinkRoutes)
     {
-        WSL2_TEST_ONLY();
+        wsl::shared::hns::Route defaultRouteV4;
+        defaultRouteV4.NextHop = L"0.0.0.0";
+        defaultRouteV4.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+        defaultRouteV4.Family = AF_INET;
+        defaultRouteV4.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Add, GuestEndpointResourceType::Route);
 
+        wsl::shared::hns::Route defaultRouteV6;
+        defaultRouteV6.NextHop = L"::";
+        defaultRouteV6.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
+        defaultRouteV6.Family = AF_INET6;
+        defaultRouteV6.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteExists =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+        const bool defaultV6RouteExists =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteRemoved =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
+        const bool defaultV6RouteRemoved =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
+
+        VERIFY_IS_TRUE(defaultV4RouteExists);
+        VERIFY_IS_TRUE(defaultV6RouteExists);
+        VERIFY_IS_TRUE(defaultV4RouteRemoved);
+        VERIFY_IS_TRUE(defaultV6RouteRemoved);
+    }
+
+    WSL2_TEST_METHOD(SetInterfaceDownAndUp)
+    {
         // Disconnect interface
         wsl::shared::hns::NetworkInterface link;
         link.Connected = false;
@@ -368,10 +394,8 @@ class NetworkTests
         VERIFY_IS_TRUE(GetInterfaceState(L"eth0").Up);
     }
 
-    TEST_METHOD(SetMtu)
+    WSL2_TEST_METHOD(SetMtu)
     {
-        WSL2_TEST_ONLY();
-
         // Set MTU - must be 1280 bytes or above to meet IPv6 minimum MTU requirement
         wsl::shared::hns::NetworkInterface link;
         link.Connected = true;
@@ -380,10 +404,8 @@ class NetworkTests
         VERIFY_ARE_EQUAL(GetInterfaceState(L"eth0").Mtu, 1280);
     }
 
-    TEST_METHOD(AddAndRemoveCustomRoute)
+    WSL2_TEST_METHOD(AddAndRemoveCustomRoute)
     {
-        WSL2_TEST_ONLY();
-
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Add custom routes, one per address family
@@ -418,10 +440,8 @@ class NetworkTests
         VERIFY_IS_TRUE(v6CustomRouteGone);
     }
 
-    TEST_METHOD(AddRouteWithMetrics)
+    WSL2_TEST_METHOD(AddRouteWithMetrics)
     {
-        WSL2_TEST_ONLY();
-
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Add a custom route per address family
@@ -458,10 +478,8 @@ class NetworkTests
         VERIFY_IS_TRUE(v6CustomRouteGone);
     }
 
-    TEST_METHOD(ResetRoutes)
+    WSL2_TEST_METHOD(ResetRoutes)
     {
-        WSL2_TEST_ONLY();
-
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Add a custom route per address family
@@ -532,10 +550,8 @@ class NetworkTests
         VERIFY_IS_TRUE(v6GwRestoredCorrectly);
     }
 
-    TEST_METHOD(ResetRoutesTwice)
+    WSL2_TEST_METHOD(ResetRoutesTwice)
     {
-        WSL2_TEST_ONLY();
-
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         auto state = GetIpv4RoutingTableState();
@@ -564,10 +580,8 @@ class NetworkTests
         VERIFY_IS_TRUE(state.Routes.empty());
     }
 
-    TEST_METHOD(UpdateIpAddress)
+    WSL2_TEST_METHOD(UpdateIpAddress)
     {
-        WSL2_TEST_ONLY();
-
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Verify that the IPs are in the preferred state
@@ -625,10 +639,8 @@ class NetworkTests
         IpSuffixOriginRandom,
     };
 
-    TEST_METHOD(TemporaryAddress)
+    WSL2_TEST_METHOD(TemporaryAddress)
     {
-        WSL2_TEST_ONLY();
-
         TestCase({{L"eth0", {}, {}, {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Make the address public
@@ -687,33 +699,33 @@ class NetworkTests
         VERIFY_ARE_EQUAL(L"fc00::abcd:1234:5678:9999", match.str(1));
     }
 
-    TEST_METHOD(SimpleCase)
+    WSL2_TEST_METHOD(SimpleCase)
     {
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
     }
 
-    TEST_METHOD(AddressChange)
+    WSL2_TEST_METHOD(AddressChange)
     {
         TestCase(
             {{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"},
              {L"eth0", {{L"192.168.0.3", 24}}, L"192.168.0.1", {{L"fc00::3", 64}}, L"fc00::1"}});
     }
 
-    TEST_METHOD(GatewayChange)
+    WSL2_TEST_METHOD(GatewayChange)
     {
         TestCase(
             {{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"},
              {L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.3", {{L"fc00::2", 64}}, L"fc00::3"}});
     }
 
-    TEST_METHOD(NetworkChange)
+    WSL2_TEST_METHOD(NetworkChange)
     {
         TestCase(
             {{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"},
              {L"eth0", {{L"10.0.0.2", 16}}, L"10.0.0.1", {{L"fc00:abcd::5", 80}}, L"fc00:abcd::1"}});
     }
 
-    TEST_METHOD(NetworkChangeAndBack)
+    WSL2_TEST_METHOD(NetworkChangeAndBack)
     {
         TestCase(
             {{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"},
@@ -721,14 +733,14 @@ class NetworkTests
              {L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
     }
 
-    TEST_METHOD(NoChange)
+    WSL2_TEST_METHOD(NoChange)
     {
         TestCase(
             {{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"},
              {L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
     }
 
-    TEST_METHOD(MultipleIps)
+    WSL2_TEST_METHOD(MultipleIps)
     {
         TestCase(
             {{L"eth0",
@@ -738,10 +750,8 @@ class NetworkTests
               L"fc00::1"}});
     }
 
-    TEST_METHOD(MacAddressChangeAndBack)
+    WSL2_TEST_METHOD(MacAddressChangeAndBack)
     {
-        WSL2_TEST_ONLY();
-
         const auto originalMac = GetMacAddress();
 
         wsl::shared::hns::MacAddress macAddress;
@@ -807,19 +817,6 @@ class NetworkTests
         VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
         VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
         VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
-    }
-
-    static void VerifyDnsResolutionDigV6()
-    {
-        if (!HostHasInternetConnectivity(AF_INET6))
-        {
-            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
-            return;
-        }
-
-        // Test AAAA record resolution (IPv6) with both UDP and TCP
-        VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
     }
 
     static void VerifyDnsQueries()
@@ -965,7 +962,7 @@ class NetworkTests
         VerifyDnsQueries();
     }
 
-    TEST_METHOD(NatDnsTunneling)
+    WSL2_TEST_METHOD(NatDnsTunneling)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -974,7 +971,7 @@ class NetworkTests
         VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
     }
 
-    TEST_METHOD(NatDnsTunnelingWithSpecificIp)
+    WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -983,7 +980,7 @@ class NetworkTests
         VerifyDnsTunneling(L"10.255.255.1");
     }
 
-    TEST_METHOD(NatDnsTunnelingVerifySuffixes)
+    WSL2_TEST_METHOD(NatDnsTunnelingVerifySuffixes)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -992,10 +989,8 @@ class NetworkTests
         VerifyDnsSuffixes();
     }
 
-    TEST_METHOD(NatWithoutIcsDnsProxy)
+    WSL2_TEST_METHOD(NatWithoutIcsDnsProxy)
     {
-        WSL2_TEST_ONLY();
-
         // Verify WSL has connectivity in NAT mode when the ICS DNS proxy is turned off (in which case the DNS servers
         // from Windows are mirrored in Linux)
         WslConfigChange config(LxssGenerateTestConfig({.dnsProxy = false}));
@@ -1003,10 +998,8 @@ class NetworkTests
         GuestClient(L"tcp-connect:bing.com:80");
     }
 
-    TEST_METHOD(DnsChange)
+    WSL2_TEST_METHOD(DnsChange)
     {
-        WSL2_TEST_ONLY();
-
         wsl::shared::hns::DNS dns;
         dns.ServerList = {L"1.1.1.1"};
         dns.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
@@ -1017,10 +1010,8 @@ class NetworkTests
         VERIFY_ARE_EQUAL(expected, out.c_str());
     }
 
-    TEST_METHOD(DnsChangeMultipleServerAndSearch)
+    WSL2_TEST_METHOD(DnsChangeMultipleServerAndSearch)
     {
-        WSL2_TEST_ONLY();
-
         wsl::shared::hns::DNS dns;
         dns.ServerList = L"1.1.1.1,1.1.1.2";
         dns.Search = L"foo.microsoft.com,bar.microsoft.com";
@@ -1036,24 +1027,18 @@ class NetworkTests
         VERIFY_ARE_EQUAL(expected, out.c_str());
     }
 
-    TEST_METHOD(DnsResolutionBasic)
+    WSL2_TEST_METHOD(DnsResolutionBasic)
     {
-        WSL2_TEST_ONLY();
-
         NetworkTests::VerifyDnsResolutionBasic();
     }
 
-    TEST_METHOD(DnsResolutionDig)
+    WSL2_TEST_METHOD(DnsResolutionDig)
     {
-        WSL2_TEST_ONLY();
-
         NetworkTests::VerifyDnsResolutionDig();
     }
 
-    TEST_METHOD(DnsResolutionRecordTypes)
+    WSL2_TEST_METHOD(DnsResolutionRecordTypes)
     {
-        WSL2_TEST_ONLY();
-
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
@@ -1285,7 +1270,7 @@ class NetworkTests
         VerifyHttpProxyFilterByNetworkConfiguration(false);
     }
 
-    TEST_METHOD(NatHttpProxyVerifyConfigDisabled)
+    WSL2_TEST_METHOD(NatHttpProxyVerifyConfigDisabled)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = false}));
@@ -1295,7 +1280,7 @@ class NetworkTests
         VerifyHttpProxyEnvVariables(L"", L"", L"");
     }
 
-    TEST_METHOD(NatHttpProxySimple)
+    WSL2_TEST_METHOD(NatHttpProxySimple)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
@@ -1303,7 +1288,7 @@ class NetworkTests
         VerifyHttpProxySimple();
     }
 
-    TEST_METHOD(NatHttpProxySimpleMachineScope)
+    WSL2_TEST_METHOD(NatHttpProxySimpleMachineScope)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
@@ -1312,7 +1297,7 @@ class NetworkTests
         VerifyHttpProxySimple(false);
     }
 
-    TEST_METHOD(NatNoHttpProxyConfigured)
+    WSL2_TEST_METHOD(NatNoHttpProxyConfigured)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
@@ -1320,38 +1305,36 @@ class NetworkTests
         VerifyNoHttpProxyConfigured();
     }
 
-    TEST_METHOD(NatHttpProxyWithBypassesConfigured)
+    WSL2_TEST_METHOD(NatHttpProxyWithBypassesConfigured)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyWithBypassesConfigured();
     }
 
-    TEST_METHOD(NatHttpProxyChange)
+    WSL2_TEST_METHOD(NatHttpProxyChange)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyChange();
     }
 
-    TEST_METHOD(NatHttpProxyAndWslEnv)
+    WSL2_TEST_METHOD(NatHttpProxyAndWslEnv)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyAndWslEnv();
     }
 
-    TEST_METHOD(NatHttpProxyFilterByNetworkConfiguration)
+    WSL2_TEST_METHOD(NatHttpProxyFilterByNetworkConfiguration)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyFilterByNetworkConfigurationNAT();
     }
 
-    TEST_METHOD(RenameInterface)
+    WSL2_TEST_METHOD(RenameInterface)
     {
-        WSL2_TEST_ONLY();
-
         // Disconnect "eth0" interface so it can be renamed
         wsl::shared::hns::NetworkInterface link;
         link.Connected = false;
@@ -1375,10 +1358,8 @@ class NetworkTests
         VERIFY_IS_TRUE(eth0Connected);
     }
 
-    TEST_METHOD(RenameWifiInterface)
+    WSL2_TEST_METHOD(RenameWifiInterface)
     {
-        WSL2_TEST_ONLY();
-
         std::wstring commandLine(L"wsl.exe bash -c \"zcat /proc/config.gz | grep CONFIG_PROXY_WIFI=y\"");
         const auto out = std::get<0>(LxsstuLaunchCommandAndCaptureOutputWithResult(commandLine.data()));
         if (out.empty())
@@ -1406,10 +1387,8 @@ class NetworkTests
         VERIFY_IS_TRUE(eth0Connected);
     }
 
-    TEST_METHOD(EnableLoopbackRouting)
+    WSL2_TEST_METHOD(EnableLoopbackRouting)
     {
-        WSL2_TEST_ONLY();
-
         // Enable accept_local and route_localnet settings for eth0
         wsl::shared::hns::VmNicCreatedNotification creationNotification{AdapterId};
         RunGns(creationNotification, LxGnsMessageVmNicCreatedNotification);
@@ -1422,10 +1401,8 @@ class NetworkTests
         VERIFY_IS_TRUE(routeLocalnetEnabled);
     }
 
-    TEST_METHOD(InitializeLoopbackConfiguration)
+    WSL2_TEST_METHOD(InitializeLoopbackConfiguration)
     {
-        WSL2_TEST_ONLY();
-
         // Assume eth0 is the GELNIC
         wsl::shared::hns::CreateDeviceRequest createDeviceRequest{wsl::shared::hns::DeviceType::Loopback, L"loopback", AdapterId};
         RunGns(createDeviceRequest, LxGnsMessageCreateDeviceRequest);
@@ -1473,10 +1450,8 @@ class NetworkTests
         VERIFY_IS_TRUE(shutdownSuccessful);
     }
 
-    TEST_METHOD(AddRemoveLoopbackRoutesv4)
+    WSL2_TEST_METHOD(AddRemoveLoopbackRoutesv4)
     {
-        WSL2_TEST_ONLY();
-
         const std::wstring interfaceName = L"eth0";
         const std::vector<std::wstring> ipAddresses = {L"127.0.0.1", L"127.0.0.2"};
 
@@ -1527,10 +1502,8 @@ class NetworkTests
         The test uses the "ip route get" command, which is equivalent to asking the OS what route it will take for a packet. It
         functions as a small integration test.
     */
-    TEST_METHOD(LoopbackGetRoute)
+    WSL2_TEST_METHOD(LoopbackGetRoute)
     {
-        WSL2_TEST_ONLY();
-
         // Verify that before configurations are applied, the route chosen for 127.0.0.1 tcp/udp uses the local routing table
         const bool loopbackTcpUsesLocalTable =
             LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto tcp | grep local") == (DWORD)0;
@@ -1559,10 +1532,8 @@ class NetworkTests
     }
 
     // Validate that adapter has an ip address, default route and DNS configuration in NAT mode
-    TEST_METHOD(NatConfiguration)
+    WSL2_TEST_METHOD(NatConfiguration)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig());
 
         const auto state = GetInterfaceState(L"eth0");
@@ -1647,9 +1618,8 @@ class NetworkTests
         VERIFY_SUCCEEDED(hr, error.get());
     }
 
-    TEST_METHOD(NatInvalidRange)
+    WSL2_TEST_METHOD(NatInvalidRange)
     {
-        WSL2_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration(L"InvalidRange", {}, {L"delete"});
         ResetWslNetwork();
@@ -1669,9 +1639,8 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    TEST_METHOD(NatInvalidGateway)
+    WSL2_TEST_METHOD(NatInvalidGateway)
     {
-        WSL2_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration({}, L"InvalidGateway", {});
         ResetWslNetwork();
@@ -1691,9 +1660,8 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    TEST_METHOD(NatInvalidAddress)
+    WSL2_TEST_METHOD(NatInvalidAddress)
     {
-        WSL2_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig());
 
         const auto previousConfiguration = GetNatConfiguration();
@@ -1835,7 +1803,11 @@ class NetworkTests
             __fallthrough;
         case wsl::core::NetworkingMode::Mirrored:
         case wsl::core::NetworkingMode::VirtioProxy:
-            WSL2_TEST_ONLY();
+            if (!LxsstuVmMode())
+            {
+                LogSkipped("This test is only applicable to WSL2");
+                return;
+            }
             break;
         }
 
@@ -2326,19 +2298,16 @@ class NetworkTests
         }
     }
 
-    TEST_METHOD(NatLocalhostRelay)
+    WSL2_TEST_METHOD(NatLocalhostRelay)
     {
-        WSL2_TEST_ONLY();
         WslKeepAlive keepAlive;
 
         ValidateLocalhostRelayTraffic(AF_INET);
         ValidateLocalhostRelayTraffic(AF_INET6);
     }
 
-    TEST_METHOD(NatLocalhostRelayNoIpv6)
+    WSL2_TEST_METHOD(NatLocalhostRelayNoIpv6)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig({.kernelCommandLine = L"ipv6.disable=1"}));
         WslKeepAlive keepAlive;
 
@@ -2402,10 +2371,8 @@ class NetworkTests
         VERIFY_ARE_NOT_EQUAL(warnings.find(L"starting data transfer loop"), std::string::npos);
     }
 
-    TEST_METHOD(NatNonRootNamespaceEphemeralBind)
+    WSL2_TEST_METHOD(NatNonRootNamespaceEphemeralBind)
     {
-        WSL2_TEST_ONLY();
-
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
         // needs to be accessible from the new namespace, so it can't use a 127* IP.
@@ -2612,7 +2579,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(hyperVBlockRule, expectedConnectivity);
     }
 
-    TEST_METHOD(NatFirewallRulesExpectedBlock)
+    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlock)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -2621,7 +2588,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Blocked);
     }
 
-    TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
+    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -2632,7 +2599,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Allowed);
     }
 
-    TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
+    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
     {
         HYPERV_FIREWALL_TEST_ONLY();
 
@@ -2672,7 +2639,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(allowHyperVRule, expectedConnectivity);
     }
 
-    TEST_METHOD(NatFirewallRulesExpectedAllow)
+    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllow)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -2681,7 +2648,7 @@ class NetworkTests
         FirewallRuleAllowedTests(FirewallTestConnectivity::Allowed);
     }
 
-    TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
+    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -2759,7 +2726,7 @@ class NetworkTests
             blockRule, isHyperVFirewallEnabled ? FirewallTestConnectivity::Blocked : FirewallTestConnectivity::Allowed);
     }
 
-    TEST_METHOD(NatFirewallRulesEnabledSetting)
+    WSL2_TEST_METHOD(NatFirewallRulesEnabledSetting)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -2768,7 +2735,7 @@ class NetworkTests
         FirewallSettingEnabledTests(true);
     }
 
-    TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
+    WSL2_TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -3063,8 +3030,6 @@ class NetworkTests
 
     void TestCase(const std::vector<InterfaceState>& interfaceStates)
     {
-        WSL2_TEST_ONLY();
-
         for (const auto& state : interfaceStates)
         {
             if (state.Rename)
@@ -3546,10 +3511,8 @@ class NetworkTests
         VERIFY_IS_FALSE(Watchdog.IsExpired());
     }
 
-    TEST_METHOD(ConnectivityCheckTestNATDefaultSuccess)
+    WSL2_TEST_METHOD(ConnectivityCheckTestNATDefaultSuccess)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig());
         WaitForNATStateInLinux();
 
@@ -3599,10 +3562,8 @@ class NetworkTests
         RunGns("www.msftconnecttest.com", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
-    TEST_METHOD(ConnectivityCheckTestNATNameResolutionFailure)
+    WSL2_TEST_METHOD(ConnectivityCheckTestNATNameResolutionFailure)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig());
         WaitForNATStateInLinux();
 
@@ -3626,10 +3587,8 @@ class NetworkTests
         RunGns("asdlkfadsf.bbcxzncvb", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
-    TEST_METHOD(ConnectivityCheckTestNATNameResolvesButConnectivityFails)
+    WSL2_TEST_METHOD(ConnectivityCheckTestNATNameResolvesButConnectivityFails)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange config(LxssGenerateTestConfig());
         WaitForNATStateInLinux();
 
@@ -3692,7 +3651,7 @@ class MirroredTests
         return true;
     }
 
-    TEST_METHOD(DnsTunneling)
+    WSL2_TEST_METHOD(DnsTunneling)
     {
         DNS_TUNNELING_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -3703,7 +3662,7 @@ class MirroredTests
         NetworkTests::VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
     }
 
-    TEST_METHOD(DnsTunnelingWithSpecificIp)
+    WSL2_TEST_METHOD(DnsTunnelingWithSpecificIp)
     {
         DNS_TUNNELING_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -3715,7 +3674,7 @@ class MirroredTests
         NetworkTests::VerifyDnsTunneling(L"10.255.255.1");
     }
 
-    TEST_METHOD(DnsTunnelingVerifySuffixes)
+    WSL2_TEST_METHOD(DnsTunnelingVerifySuffixes)
     {
         DNS_TUNNELING_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -3726,7 +3685,7 @@ class MirroredTests
         NetworkTests::VerifyDnsSuffixes();
     }
 
-    TEST_METHOD(WithoutTunnelingVerifySuffixes)
+    WSL2_TEST_METHOD(WithoutTunnelingVerifySuffixes)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3736,7 +3695,7 @@ class MirroredTests
         NetworkTests::VerifyDnsSuffixes();
     }
 
-    TEST_METHOD(HttpProxyVerifyConfigDisabled)
+    WSL2_TEST_METHOD(HttpProxyVerifyConfigDisabled)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3748,7 +3707,7 @@ class MirroredTests
         NetworkTests::VerifyHttpProxyEnvVariables(L"", L"", L"");
     }
 
-    TEST_METHOD(HttpProxySimple)
+    WSL2_TEST_METHOD(HttpProxySimple)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3758,7 +3717,7 @@ class MirroredTests
         NetworkTests::VerifyHttpProxySimple();
     }
 
-    TEST_METHOD(HttpProxySimpleMachineScope)
+    WSL2_TEST_METHOD(HttpProxySimpleMachineScope)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3770,7 +3729,7 @@ class MirroredTests
         NetworkTests::VerifyHttpProxySimple(false);
     }
 
-    TEST_METHOD(NoHttpProxyConfigured)
+    WSL2_TEST_METHOD(NoHttpProxyConfigured)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3780,7 +3739,7 @@ class MirroredTests
         NetworkTests::VerifyNoHttpProxyConfigured();
     }
 
-    TEST_METHOD(HttpProxyWithBypassesConfigured)
+    WSL2_TEST_METHOD(HttpProxyWithBypassesConfigured)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3790,7 +3749,7 @@ class MirroredTests
         NetworkTests::VerifyHttpProxyWithBypassesConfigured();
     }
 
-    TEST_METHOD(HttpProxyChange)
+    WSL2_TEST_METHOD(HttpProxyChange)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3800,7 +3759,7 @@ class MirroredTests
         NetworkTests::VerifyHttpProxyChange();
     }
 
-    TEST_METHOD(HttpProxyAndWslEnv)
+    WSL2_TEST_METHOD(HttpProxyAndWslEnv)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3809,7 +3768,7 @@ class MirroredTests
         NetworkTests::VerifyHttpProxyAndWslEnv();
     }
 
-    TEST_METHOD(HttpProxyFilterByNetworkConfiguration)
+    WSL2_TEST_METHOD(HttpProxyFilterByNetworkConfiguration)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -3818,7 +3777,7 @@ class MirroredTests
         NetworkTests::VerifyHttpProxyFilterByNetworkConfigurationMirrored();
     }
 
-    TEST_METHOD(SmokeTest)
+    WSL2_TEST_METHOD(SmokeTest)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3829,7 +3788,7 @@ class MirroredTests
         NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
     }
 
-    TEST_METHOD(InternetConnectivityV4)
+    WSL2_TEST_METHOD(InternetConnectivityV4)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3845,7 +3804,7 @@ class MirroredTests
         NetworkTests::GuestClient(L"tcp4-connect:bing.com:80");
     }
 
-    TEST_METHOD(InternetConnectivityV6)
+    WSL2_TEST_METHOD(InternetConnectivityV6)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3861,7 +3820,7 @@ class MirroredTests
         NetworkTests::GuestClient(L"tcp6-connect:bing.com:80");
     }
 
-    TEST_METHOD(LoopbackLocal)
+    WSL2_TEST_METHOD(LoopbackLocal)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3889,11 +3848,8 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(LoopbackExplicit)
+    WSL2_TEST_METHOD(LoopbackExplicit)
     {
-        // TODO: re-enable once OS build 29555 loopback regression is resolved.
-        SKIP_TEST_UNSTABLE();
-
         MIRRORED_NETWORKING_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
@@ -3905,7 +3861,7 @@ class MirroredTests
         // VerifyLoopbackConnectivity(L"::1");
     }
 
-    TEST_METHOD(LoopbackSystemd)
+    WSL2_TEST_METHOD(LoopbackSystemd)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3931,7 +3887,7 @@ class MirroredTests
         NetworkTests::VerifyLoopbackGuestToHost(L"127.0.0.1", IPPROTO_TCP);
     }
 
-    TEST_METHOD(GuestPortCantBeBoundByHost)
+    WSL2_TEST_METHOD(GuestPortCantBeBoundByHost)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3949,7 +3905,7 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(GuestPortIsReleased)
+    WSL2_TEST_METHOD(GuestPortIsReleased)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -3983,7 +3939,7 @@ class MirroredTests
         VERIFY_IS_TRUE(bound);
     }
 
-    TEST_METHOD(HostPortCantBeBoundByGuest)
+    WSL2_TEST_METHOD(HostPortCantBeBoundByGuest)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4001,7 +3957,7 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(UdpBindDoesNotPreventTcpBind)
+    WSL2_TEST_METHOD(UdpBindDoesNotPreventTcpBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4012,7 +3968,7 @@ class MirroredTests
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", true);
     }
 
-    TEST_METHOD(HostUdpBindDoesNotPreventGuestTcpBind)
+    WSL2_TEST_METHOD(HostUdpBindDoesNotPreventGuestTcpBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4023,7 +3979,7 @@ class MirroredTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
-    TEST_METHOD(MultipleGuestBindOnSameTuple)
+    WSL2_TEST_METHOD(MultipleGuestBindOnSameTuple)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4053,7 +4009,7 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(EphemeralBind)
+    WSL2_TEST_METHOD(EphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4064,7 +4020,7 @@ class MirroredTests
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:0", true);
     }
 
-    TEST_METHOD(PortZeroBindIsTracked)
+    WSL2_TEST_METHOD(PortZeroBindIsTracked)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4079,7 +4035,7 @@ class MirroredTests
         NetworkTests::VerifyPortZeroBindIsTracked(false);
     }
 
-    TEST_METHOD(ExplicitEphemeralBind)
+    WSL2_TEST_METHOD(ExplicitEphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4124,7 +4080,7 @@ class MirroredTests
         VERIFY_IS_TRUE(canBindUdp);
     }
 
-    TEST_METHOD(NonRootNamespaceEphemeralBind)
+    WSL2_TEST_METHOD(NonRootNamespaceEphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4140,7 +4096,7 @@ class MirroredTests
 
     // Verifies that in mirrored mode, Windows can connect to a listener running in a Linux network namespace different from
     // the Linux root network namespace.
-    TEST_METHOD(PortForwardingToNonRootNamespace)
+    WSL2_TEST_METHOD(PortForwardingToNonRootNamespace)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4220,7 +4176,7 @@ class MirroredTests
         VERIFY_ARE_EQUAL(connect(clientSocket.get(), reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)), 0);
     }
 
-    TEST_METHOD(LinuxNonRootNamespaceConnectToWindowsHost)
+    WSL2_TEST_METHOD(LinuxNonRootNamespaceConnectToWindowsHost)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4293,7 +4249,7 @@ class MirroredTests
         VERIFY_ARE_NOT_EQUAL(warnings.find(L"starting data transfer loop"), std::string::npos);
     }
 
-    TEST_METHOD(ResolvConf)
+    WSL2_TEST_METHOD(ResolvConf)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4306,7 +4262,7 @@ class MirroredTests
         VERIFY_IS_TRUE(std::regex_match(out, pattern));
     }
 
-    TEST_METHOD(NetworkSettings)
+    WSL2_TEST_METHOD(NetworkSettings)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4344,7 +4300,7 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(FirewallRulesExpectedBlock)
+    WSL2_TEST_METHOD(FirewallRulesExpectedBlock)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4358,7 +4314,7 @@ class MirroredTests
         NetworkTests::FirewallRuleBlockedTests(NetworkTests::FirewallTestConnectivity::Blocked);
     }
 
-    TEST_METHOD(FirewallRulesExpectedAllow)
+    WSL2_TEST_METHOD(FirewallRulesExpectedAllow)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4372,7 +4328,7 @@ class MirroredTests
         NetworkTests::FirewallRuleAllowedTests(NetworkTests::FirewallTestConnectivity::Allowed);
     }
 
-    TEST_METHOD(FirewallRulesEnabledSetting)
+    WSL2_TEST_METHOD(FirewallRulesEnabledSetting)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4386,9 +4342,8 @@ class MirroredTests
         NetworkTests::FirewallSettingEnabledTests(true);
     }
 
-    TEST_METHOD(ConnectivityCheckTestDefaultSuccess)
+    WSL2_TEST_METHOD(ConnectivityCheckTestDefaultSuccess)
     {
-        WSL2_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
 
         SKIP_TEST_UNSTABLE();
@@ -4441,9 +4396,8 @@ class MirroredTests
         NetworkTests::RunGns("www.msftconnecttest.com", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
-    TEST_METHOD(ConnectivityCheckTestNameResolutionFailure)
+    WSL2_TEST_METHOD(ConnectivityCheckTestNameResolutionFailure)
     {
-        WSL2_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
@@ -4469,9 +4423,8 @@ class MirroredTests
         NetworkTests::RunGns("asdlkfadsf.bbcxzncvb", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
-    TEST_METHOD(ConnectivityCheckTestNameResolvesButConnectivityFails)
+    WSL2_TEST_METHOD(ConnectivityCheckTestNameResolvesButConnectivityFails)
     {
-        WSL2_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
 
         SKIP_TEST_UNSTABLE();
@@ -4567,7 +4520,7 @@ class MirroredTests
         VERIFY_IS_FALSE(Watchdog.IsExpired());
     }
 
-    TEST_METHOD(DnsResolutionBasic)
+    WSL2_TEST_METHOD(DnsResolutionBasic)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4577,7 +4530,7 @@ class MirroredTests
         NetworkTests::VerifyDnsResolutionBasic();
     }
 
-    TEST_METHOD(DnsResolutionDig)
+    WSL2_TEST_METHOD(DnsResolutionDig)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4587,7 +4540,7 @@ class MirroredTests
         NetworkTests::VerifyDnsResolutionDig();
     }
 
-    TEST_METHOD(DnsResolutionRecordTypes)
+    WSL2_TEST_METHOD(DnsResolutionRecordTypes)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
@@ -4625,9 +4578,8 @@ class BridgedTests
         return true;
     }
 
-    TEST_METHOD(Basic)
+    WSL2_TEST_METHOD(Basic)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         // There's no way to guarantee that an external switch will work in the test environment
@@ -4639,9 +4591,8 @@ class BridgedTests
         VERIFY_ARE_EQUAL(L"1\n", out);
     }
 
-    TEST_METHOD(CustomMac)
+    WSL2_TEST_METHOD(CustomMac)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         constexpr auto mac = L"aa:bb:cc:dd:ee:ff";
@@ -4651,9 +4602,8 @@ class BridgedTests
         VERIFY_ARE_EQUAL(mac, GetMacAddress());
     }
 
-    TEST_METHOD(CustomMacDashes)
+    WSL2_TEST_METHOD(CustomMacDashes)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         // Note: The SynthNic fails to start if the first byte of the mac address is 0xff.
@@ -4666,9 +4616,8 @@ class BridgedTests
         VERIFY_ARE_EQUAL(mac, GetMacAddress());
     }
 
-    TEST_METHOD(Ipv6)
+    WSL2_TEST_METHOD(Ipv6)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig(
@@ -4678,9 +4627,8 @@ class BridgedTests
         VERIFY_ARE_EQUAL(L"0\n", out);
     }
 
-    TEST_METHOD(SmokeTest)
+    WSL2_TEST_METHOD(SmokeTest)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET) && !NetworkTests::HostHasInternetConnectivity(AF_INET6))
@@ -4695,9 +4643,8 @@ class BridgedTests
         NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
     }
 
-    TEST_METHOD(InternetConnectivityV4)
+    WSL2_TEST_METHOD(InternetConnectivityV4)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
@@ -4711,9 +4658,8 @@ class BridgedTests
         NetworkTests::GuestClient(L"tcp4-connect:bing.com:80");
     }
 
-    TEST_METHOD(InternetConnectivityV6)
+    WSL2_TEST_METHOD(InternetConnectivityV6)
     {
-        WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
@@ -4755,7 +4701,7 @@ class VirtioProxyTests
         return true;
     }
 
-    TEST_METHOD(SmokeTest)
+    WSL2_TEST_METHOD(SmokeTest)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4765,7 +4711,7 @@ class VirtioProxyTests
         NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
     }
 
-    TEST_METHOD(InternetConnectivityV4)
+    WSL2_TEST_METHOD(InternetConnectivityV4)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4780,7 +4726,7 @@ class VirtioProxyTests
         NetworkTests::GuestClient(L"tcp4-connect:bing.com:80");
     }
 
-    TEST_METHOD(InternetConnectivityV6)
+    WSL2_TEST_METHOD(InternetConnectivityV6)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4797,7 +4743,7 @@ class VirtioProxyTests
         NetworkTests::GuestClient(L"tcp6-connect:bing.com:80");
     }
 
-    TEST_METHOD(Configuration)
+    WSL2_TEST_METHOD(Configuration)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4822,7 +4768,7 @@ class VirtioProxyTests
         }
     }
 
-    TEST_METHOD(GuestPortIsReleased)
+    WSL2_TEST_METHOD(GuestPortIsReleased)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4850,7 +4796,7 @@ class VirtioProxyTests
             std::chrono::minutes(2));
     }
 
-    TEST_METHOD(LoopbackGuestToHost)
+    WSL2_TEST_METHOD(LoopbackGuestToHost)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4864,7 +4810,7 @@ class VirtioProxyTests
         // NetworkTests::VerifyLoopbackGuestToHost(L"::", IPPROTO_TCP);
     }
 
-    TEST_METHOD(UdpBindDoesNotPreventTcpBind)
+    WSL2_TEST_METHOD(UdpBindDoesNotPreventTcpBind)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4874,7 +4820,7 @@ class VirtioProxyTests
         auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", true);
     }
 
-    TEST_METHOD(HostUdpBindDoesNotPreventGuestTcpBind)
+    WSL2_TEST_METHOD(HostUdpBindDoesNotPreventGuestTcpBind)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4884,7 +4830,7 @@ class VirtioProxyTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
-    TEST_METHOD(PortZeroBindIsTracked)
+    WSL2_TEST_METHOD(PortZeroBindIsTracked)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4893,7 +4839,7 @@ class VirtioProxyTests
         NetworkTests::VerifyPortZeroBindIsTracked();
     }
 
-    TEST_METHOD(HttpProxySimple)
+    WSL2_TEST_METHOD(HttpProxySimple)
     {
         VIRTIOPROXY_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
@@ -4902,7 +4848,7 @@ class VirtioProxyTests
         NetworkTests::VerifyHttpProxySimple();
     }
 
-    TEST_METHOD(ConfigurationV6)
+    WSL2_TEST_METHOD(ConfigurationV6)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -4977,7 +4923,7 @@ class VirtioProxyTests
         }
     }
 
-    TEST_METHOD(GuestPortIsReleasedV6)
+    WSL2_TEST_METHOD(GuestPortIsReleasedV6)
     {
         VIRTIOPROXY_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
@@ -5006,7 +4952,7 @@ class VirtioProxyTests
             std::chrono::minutes(2));
     }
 
-    TEST_METHOD(ConfigurationV6DnsServers)
+    WSL2_TEST_METHOD(ConfigurationV6DnsServers)
     {
         VIRTIOPROXY_TEST_ONLY();
 
@@ -5031,7 +4977,31 @@ class VirtioProxyTests
         VERIFY_IS_TRUE(std::regex_match(out, v6Pattern));
     }
 
-    TEST_METHOD(DnsResolutionBasicDnsTunneling)
+    WSL2_TEST_METHOD(DnsResolutionBasic)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    WSL2_TEST_METHOD(DnsResolutionDig)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    WSL2_TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
+        NetworkTests::VerifyDnsResolutionRecordTypes();
+    }
+
+    WSL2_TEST_METHOD(DnsResolutionBasicDnsTunneling)
     {
         VIRTIOPROXY_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
@@ -5040,7 +5010,7 @@ class VirtioProxyTests
         NetworkTests::VerifyDnsResolutionBasic();
     }
 
-    TEST_METHOD(DnsResolutionDigDnsTunneling)
+    WSL2_TEST_METHOD(DnsResolutionDigDnsTunneling)
     {
         VIRTIOPROXY_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
@@ -5049,54 +5019,13 @@ class VirtioProxyTests
         NetworkTests::VerifyDnsResolutionDig();
     }
 
-    TEST_METHOD(DnsResolutionRecordTypesDnsTunneling)
+    WSL2_TEST_METHOD(DnsResolutionRecordTypesDnsTunneling)
     {
         VIRTIOPROXY_TEST_ONLY();
         DNS_TUNNELING_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
-    }
-
-    TEST_METHOD(DnsResolutionDigV6DnsTunneling)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-        DNS_TUNNELING_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
-        NetworkTests::VerifyDnsResolutionDigV6();
-    }
-
-    TEST_METHOD(DnsResolutionBasic)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
-        NetworkTests::VerifyDnsResolutionBasic();
-    }
-
-    TEST_METHOD(DnsResolutionDig)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
-        NetworkTests::VerifyDnsResolutionDig();
-    }
-
-    TEST_METHOD(DnsResolutionRecordTypes)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
-        NetworkTests::VerifyDnsResolutionRecordTypes();
-    }
-
-    TEST_METHOD(DnsResolutionDigV6)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = false}));
-        NetworkTests::VerifyDnsResolutionDigV6();
     }
 };
 } // namespace NetworkTests
