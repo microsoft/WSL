@@ -41,6 +41,6 @@ public:
     static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent = nullptr);
     static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent = nullptr);
     static void Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage);
-    void Prune();
+    static wsl::windows::wslc::models::PruneImagesResult Prune(wsl::windows::wslc::models::Session& session, bool all);
 };
 } // namespace wsl::windows::wslc::services

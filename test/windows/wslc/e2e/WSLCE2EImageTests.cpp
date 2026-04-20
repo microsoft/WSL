@@ -72,6 +72,7 @@ private:
             {L"inspect", Localization::WSLCCLI_ImageInspectDesc()},
             {L"list", Localization::WSLCCLI_ImageListDesc()},
             {L"load", Localization::WSLCCLI_ImageLoadDesc()},
+            {L"prune", Localization::WSLCCLI_ImagePruneDesc()},
             {L"pull", Localization::WSLCCLI_ImagePullDesc()},
             {L"push", Localization::WSLCCLI_ImagePushDesc()},
             {L"save", Localization::WSLCCLI_ImageSaveDesc()},
