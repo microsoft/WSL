@@ -342,7 +342,7 @@ private:
 
             LOG_ERROR(
                 "Protocol error: Received message size: {}, type: {}, sequence: {}. Expected type: {}, expected sequence: {}, "
-                "channel: %s",
+                "channel: {}",
                 header.MessageSize,
                 header.MessageType,
                 header.SequenceNumber,
