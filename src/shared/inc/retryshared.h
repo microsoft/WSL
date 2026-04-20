@@ -70,8 +70,8 @@ public:
 //   capturing inputs by value and returning outputs via the result type.
 // - `routine` must eventually return. This helper gives up waiting; it does
 //   not and cannot cancel a native call that is truly deadlocked.
-template <typename F>
-auto CallWithDeadline(std::chrono::milliseconds deadline, F routine) -> std::invoke_result_t<F>
+template <typename TRep, typename TPeriod, typename F>
+auto CallWithDeadline(std::chrono::duration<TRep, TPeriod> deadline, F routine) -> std::invoke_result_t<F>
 {
     using R = std::invoke_result_t<F>;
     std::packaged_task<R()> task(std::move(routine));

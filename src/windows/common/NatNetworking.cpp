@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
+#include <atomic>
 #include "NatNetworking.h"
 #include "WslCoreNetworkEndpointSettings.h"
 #include "WslCoreHostDnsInfo.h"
