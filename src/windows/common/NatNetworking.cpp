@@ -766,12 +766,12 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
     // bounds thread accumulation when HNS is stuck or repeatedly slow.
     if (std::chrono::steady_clock::now() < g_hcnCreateNetworkCooldownUntil.load())
     {
+        executionStep = "HcnCreateNetworkCooldownSkip";
         WSL_LOG_TELEMETRY(
             "HcnCreateNetworkSkippedDueToRecentDeadline",
             PDT_ProductAndServicePerformance,
-            TraceLoggingGuid(config.NatNetworkId(), "networkGuid"),
-            TraceLoggingValue(settings.Name.c_str(), "settingsName"));
-        executionStep = "HcnCreateNetworkCooldownSkip";
+            TraceLoggingGuid(config.NatNetworkId(), "NetworkGuid"),
+            TraceLoggingValue(settings.Name.c_str(), "NetworkName"));
         hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
         return {};
     }

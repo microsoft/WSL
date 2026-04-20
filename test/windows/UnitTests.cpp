@@ -6581,6 +6581,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
         const auto elapsed = std::chrono::steady_clock::now() - start;
         VERIFY_IS_TRUE(threw);
+        // 4s upper bound leaves headroom for loaded CI machines while still
+        // proving the 500ms deadline fired (the inner routine sleeps 5s).
         VERIFY_IS_TRUE(elapsed < std::chrono::seconds(4));
     }
 
