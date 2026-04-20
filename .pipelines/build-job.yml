@@ -228,8 +228,8 @@ jobs:
             New-Item -ItemType Directory -Path "$(ob_outputDirectory)\bundle" -Force
             mkdir $(ob_outputDirectory)\testbin\x64\release
 
-            Move-Item -Path "bin\x64\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wsltests.dll"
-            Move-Item -Path "bin\x64\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\testplugin.dll"
+            Copy-Item -Path "bin\x64\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wsltests.dll"
+            Copy-Item -Path "bin\x64\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\testplugin.dll"
             Copy-Item -Path "bin\x64\release\installer.msix" -Destination "$(ob_outputDirectory)\testbin\x64\release\installer.msix"
             Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\x64" -Destination "$(ob_outputDirectory)\testbin\x64\release\taef"
 
@@ -254,6 +254,8 @@ jobs:
           SymbolsVersion: $(version.WSL_PACKAGE_VERSION)
           SearchPattern: |
             $(ob_outputDirectory)/pdb/**/*.pdb
+            bin/**/*.exe
+            bin/**/*.dll
 
       - ${{ if ne(parameters.pool, '') }}:
         - task: PublishPipelineArtifact@1
