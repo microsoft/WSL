@@ -760,8 +760,34 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
             [&] {
                 executionStep = "HcnCreateNetwork";
                 ExecutionContext context(Context::HNS);
-                wil::unique_cotaskmem_string error;
-                HRESULT hns_hr = HcnCreateNetwork(config.NatNetworkId(), ToJsonW(settings).c_str(), &network, &error);
+
+                // Bound the single HcnCreateNetwork RPC with a real deadline.
+                // If HNS is slow starting or wedged, the RPC can block for
+                // minutes with no per-call timeout otherwise (see
+                // retryshared.h CallWithDeadline for rationale).
+                struct HcnCreateResult
+                {
+                    HRESULT hr;
+                    wsl::windows::common::hcs::unique_hcn_network network;
+                    std::wstring error;
+                };
+
+                HcnCreateResult result = wsl::shared::retry::CallWithDeadline(
+                    std::chrono::seconds(30),
+                    [natId = config.NatNetworkId(), settingsJson = ToJsonW(settings)]() -> HcnCreateResult {
+                        HcnCreateResult r{};
+                        wil::unique_cotaskmem_string err;
+                        r.hr = HcnCreateNetwork(natId, settingsJson.c_str(), &r.network, &err);
+                        if (err)
+                        {
+                            r.error = err.get();
+                        }
+                        return r;
+                    });
+
+                HRESULT hns_hr = result.hr;
+                network = std::move(result.network);
+
                 WSL_LOG(
                     "NatNetworking::CreateNetwork [HcnCreateNetwork]",
                     TraceLoggingValue(config.NatNetworkId(), "networkGuid"),
@@ -785,7 +811,7 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
                 else
                 {
                     // Throw other errors to allow for retries
-                    THROW_IF_FAILED_MSG(hns_hr, "HcnCreateNetwork %ls", error.get());
+                    THROW_IF_FAILED_MSG(hns_hr, "HcnCreateNetwork %ls", result.error.c_str());
                 }
 
                 executionStep = "HcnQueryNetworkProperties";
@@ -799,6 +825,20 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
             },
             std::chrono::milliseconds(100),
             std::chrono::seconds(3));
+    }
+    catch (const wsl::shared::retry::DeadlineExceededError&)
+    {
+        // HNS RPC never came back in time. Emit a dedicated telemetry event
+        // so the cloud pipeline can distinguish these from 'timeout' and
+        // return an empty network — WslCoreVm::Initialize will fall back to
+        // VirtioProxy mode (see WslCoreVm.cpp:553-560).
+        WSL_LOG_TELEMETRY(
+            "HcnCreateNetworkDeadlineExceeded",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(config.NatNetworkId(), "networkGuid"),
+            TraceLoggingValue(settings.Name.c_str(), "settingsName"));
+        hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+        return {};
     }
     catch (...)
     {
