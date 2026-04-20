@@ -3901,6 +3901,69 @@ class WSLCTests
         VERIFY_ARE_EQUAL(2u, networks.size());
     }
 
+    WSLC_TEST_METHOD(NetworkInspectTest)
+    {
+        const std::string networkName = "test-inspect-network";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        VERIFY_ARE_EQUAL(inspect.Name, networkName);
+        VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
+        VERIFY_IS_FALSE(inspect.Id.empty());
+        VERIFY_IS_FALSE(inspect.Internal);
+    }
+
+    WSLC_TEST_METHOD(NetworkInspectWithSubnetTest)
+    {
+        const std::string networkName = "test-inspect-subnet-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCDriverOption subnetOpt[] = {{"Subnet", "172.30.0.0/16"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = subnetOpt;
+        options.DriverOptsCount = ARRAYSIZE(subnetOpt);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        VERIFY_ARE_EQUAL(inspect.Name, networkName);
+        VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(std::string("172.30.0.0/16"), inspect.IPAM.Config->at(0).Subnet);
+    }
+
+    WSLC_TEST_METHOD(NetworkInspectNotFoundTest)
+    {
+        wil::unique_cotaskmem_ansistring output;
+        auto hr = m_defaultSession->InspectNetwork("nonexistent-network", &output);
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, hr);
+        ValidateCOMErrorMessageContains(L"nonexistent-network");
+    }
+
     WSLC_TEST_METHOD(CreateContainer)
     {
         // Test a simple container start.

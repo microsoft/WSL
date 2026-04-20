@@ -54,7 +54,7 @@ std::string IndentLines(const std::string& input, const std::string& prefix)
     return result;
 }
 
-void ValidateName(LPCSTR Name)
+void ValidateName(LPCSTR Name, size_t maxLength = WSLC_MAX_CONTAINER_NAME_LENGTH)
 {
     const auto& locale = std::locale::classic();
     size_t i = 0;
@@ -67,7 +67,7 @@ void ValidateName(LPCSTR Name)
         }
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > WSLC_MAX_CONTAINER_NAME_LENGTH);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
@@ -1991,7 +1991,7 @@ try
     std::string name = Options->Name;
     std::string driver = Options->Driver;
 
-    ValidateName(name.c_str());
+    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(name), IsReservedNetworkName(name));
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriver(driver), driver != WSLCBridgeNetworkDriver);
@@ -2055,7 +2055,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
-    ValidateName(name.c_str());
+    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -2117,6 +2117,68 @@ try
 
     *Networks = output.release();
     *Count = index;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::InspectNetwork(LPCSTR Name, LPSTR* Output)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Name);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
+
+    *Output = nullptr;
+
+    std::string name = Name;
+    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+
+    {
+        std::lock_guard networksLock(m_networksLock);
+
+        auto it = m_networks.find(name);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
+    }
+
+    docker_schema::Network network;
+    try
+    {
+        network = m_dockerClient->InspectNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", name.c_str());
+    }
+
+    wslc_schema::InspectNetwork result;
+    result.Id = network.Id;
+    result.Name = network.Name;
+    result.Driver = network.Driver;
+    result.Scope = network.Scope;
+    result.Internal = network.Internal;
+    result.Labels = network.Labels;
+
+    result.IPAM.Driver = network.IPAM.Driver;
+    if (network.IPAM.Config)
+    {
+        auto& configs = result.IPAM.Config.emplace();
+        for (const auto& cfg : *network.IPAM.Config)
+        {
+            wslc_schema::InspectIPAMConfig inspectCfg;
+            inspectCfg.Subnet = cfg.Subnet;
+            inspectCfg.Gateway = cfg.Gateway;
+            configs.push_back(std::move(inspectCfg));
+        }
+    }
+
+    std::string json = wsl::shared::ToJson(result);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
 
     return S_OK;
 }

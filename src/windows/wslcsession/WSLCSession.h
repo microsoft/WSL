@@ -133,6 +133,7 @@ public:
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
+    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
     IFACEMETHOD(Terminate()) override;
 
