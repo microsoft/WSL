@@ -26,44 +26,43 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-// Allowlist for driver options that the guest driver forwards to docker's
-// "local" driver. The local driver passes type/device/o directly to mount(8),
-// so we must block options that could expose host paths or network resources.
-//
-// Allowed:
-//   - (empty)    : default — Docker creates a directory under /var/lib/docker/volumes/.
-//   - type=tmpfs : memory-backed volume. "o" suboptions (size, mode, uid, etc.)
-//                  are kernel-validated and safe.
-//   - o=...      : only when type=tmpfs.
-//
-// Blocked:
-//   - device     : always — prevents bind-mounting arbitrary VM paths.
-//   - type=none/nfs/cifs/... : require device or network access.
-void ValidateDriverOpts(const std::map<std::string, std::string>& DriverOpts)
-{
-    if (DriverOpts.empty())
+    // Allowlist for driver options that the guest driver forwards to docker's
+    // "local" driver. The local driver passes type/device/o directly to mount(8),
+    // so we must block options that could expose host paths or network resources.
+    //
+    // Allowed:
+    //   - (empty)    : default — Docker creates a directory under /var/lib/docker/volumes/.
+    //   - type=tmpfs : memory-backed volume. "o" suboptions (size, mode, uid, etc.)
+    //                  are kernel-validated and safe.
+    //   - o=...      : only when type=tmpfs.
+    //
+    // Blocked:
+    //   - device     : always — prevents bind-mounting arbitrary VM paths.
+    //   - type=none/nfs/cifs/... : require device or network access.
+    void ValidateDriverOpts(const std::map<std::string, std::string>& DriverOpts)
     {
-        return;
-    }
+        if (DriverOpts.empty())
+        {
+            return;
+        }
 
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("device"), DriverOpts.contains("device"));
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("device"), DriverOpts.contains("device"));
 
-    auto typeIt = DriverOpts.find("type");
-    std::string type = (typeIt != DriverOpts.end()) ? typeIt->second : "";
+        auto typeIt = DriverOpts.find("type");
+        std::string type = (typeIt != DriverOpts.end()) ? typeIt->second : "";
 
-    // Only tmpfs is allowed as a type. Everything else (none, nfs, cifs, ext4, ...)
-    // requires a device or network access.
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("type=" + type), !type.empty() && type != "tmpfs");
-
-    // Reject any unknown keys beyond the allowed set {type, o}.
-    for (const auto& [key, _] : DriverOpts)
-    {
+        // Only tmpfs is allowed as a type. Everything else (none, nfs, cifs, ext4, ...)
+        // requires a device or network access.
         THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts(key), key != "type" && key != "o");
+            E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("type=" + type), !type.empty() && type != "tmpfs");
+
+        // Reject any unknown keys beyond the allowed set {type, o}.
+        for (const auto& [key, _] : DriverOpts)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts(key), key != "type" && key != "o");
+        }
     }
-}
 
 } // namespace
 
@@ -73,19 +72,12 @@ WSLCGuestVolumeImpl::WSLCGuestVolumeImpl(
     std::map<std::string, std::string>&& DriverOpts,
     std::map<std::string, std::string>&& Labels,
     DockerHTTPClient& DockerClient) :
-    m_name(std::move(Name)),
-    m_createdAt(std::move(CreatedAt)),
-    m_driverOpts(std::move(DriverOpts)),
-    m_labels(std::move(Labels)),
-    m_dockerClient(DockerClient)
+    m_name(std::move(Name)), m_createdAt(std::move(CreatedAt)), m_driverOpts(std::move(DriverOpts)), m_labels(std::move(Labels)), m_dockerClient(DockerClient)
 {
 }
 
 std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
-    LPCSTR Name,
-    std::map<std::string, std::string>&& DriverOpts,
-    std::map<std::string, std::string>&& Labels,
-    DockerHTTPClient& DockerClient)
+    LPCSTR Name, std::map<std::string, std::string>&& DriverOpts, std::map<std::string, std::string>&& Labels, DockerHTTPClient& DockerClient)
 {
     ValidateDriverOpts(DriverOpts);
 
@@ -113,11 +105,7 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Create(
         auto createdVolume = DockerClient.CreateVolume(request);
 
         return std::make_unique<WSLCGuestVolumeImpl>(
-            std::move(createdVolume.Name),
-            std::move(createdVolume.CreatedAt),
-            std::move(DriverOpts),
-            std::move(Labels),
-            DockerClient);
+            std::move(createdVolume.Name), std::move(createdVolume.CreatedAt), std::move(DriverOpts), std::move(Labels), DockerClient);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to create volume '%hs'", Name != nullptr ? Name : "");
 }
@@ -143,11 +131,7 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Open(const wsl::window
     }
 
     auto volume = std::make_unique<WSLCGuestVolumeImpl>(
-        std::string{Volume.Name},
-        std::string{Volume.CreatedAt},
-        std::move(metadata.DriverOpts),
-        std::move(userLabels),
-        DockerClient);
+        std::string{Volume.Name}, std::string{Volume.CreatedAt}, std::move(metadata.DriverOpts), std::move(userLabels), DockerClient);
 
     return volume;
 }

@@ -3370,7 +3370,7 @@ class WSLCTests
         VERIFY_ARE_EQUAL(m_defaultSession->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     }
 
-    // Exercises behavior that all volume drivers must implement identically: 
+    // Exercises behavior that all volume drivers must implement identically:
     // create, duplicate-name rejection, multi-mount, cross-container read/write,
     // in-use deletion rejection, and clean deletion after the referencing container is removed.
     void ValidateNamedVolumeContract(std::string_view driver, const WSLCDriverOption* driverOpts, ULONG driverOptsCount)
@@ -3551,7 +3551,6 @@ class WSLCTests
         ValidateNamedVolumeRecoveryContract("guest", nullptr, 0);
     }
 
-
     WSLC_TEST_METHOD(NamedVolumesVhdSessionRecovery)
     {
         WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
@@ -3574,8 +3573,7 @@ class WSLCTests
         // Create a container that depends on the volume so we can verify it
         // gets dropped when the backing .vhdx is removed.
         {
-            WSLCContainerLauncher writer(
-                "debian:latest", containerName, {"/bin/sh", "-c", "echo vhd-recovery >/data/marker.txt"});
+            WSLCContainerLauncher writer("debian:latest", containerName, {"/bin/sh", "-c", "echo vhd-recovery >/data/marker.txt"});
             writer.AddNamedVolume(volumeName, "/data", false);
 
             auto writerContainer = writer.Launch(*m_defaultSession);
@@ -3782,8 +3780,7 @@ class WSLCTests
         WSLCVolumeOptions duplicateGuestOptions{};
         duplicateGuestOptions.Name = vhdVolumeName.c_str();
         duplicateGuestOptions.Driver = "guest";
-        VERIFY_ARE_EQUAL(
-            m_defaultSession->CreateVolume(&duplicateGuestOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&duplicateGuestOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Create a guest volume and verify both drivers show up in the list.
         WSLCVolumeOptions guestOptions{};
@@ -3797,8 +3794,7 @@ class WSLCTests
         duplicateVhdOptions.Driver = "vhd";
         duplicateVhdOptions.DriverOpts = driverOpts;
         duplicateVhdOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
-        VERIFY_ARE_EQUAL(
-            m_defaultSession->CreateVolume(&duplicateVhdOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&duplicateVhdOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, volumes.size());

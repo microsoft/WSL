@@ -53,8 +53,7 @@ public:
         _In_ std::map<std::string, std::string>&& Labels,
         _In_ DockerHTTPClient& DockerClient);
 
-    static std::unique_ptr<WSLCGuestVolumeImpl> Open(
-        _In_ const wsl::windows::common::docker_schema::Volume& Volume, _In_ DockerHTTPClient& DockerClient);
+    static std::unique_ptr<WSLCGuestVolumeImpl> Open(_In_ const wsl::windows::common::docker_schema::Volume& Volume, _In_ DockerHTTPClient& DockerClient);
 
     // IWSLCVolume
     const std::string& Name() const noexcept override
