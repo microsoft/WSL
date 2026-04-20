@@ -981,13 +981,17 @@ class WSLCTests
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-        WSLCContainerLauncher launcher("hello-world:latest", "wslc-load-image-container");
 
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+        // Validate container launch from the loaded image
+        {
+            WSLCContainerLauncher launcher("hello-world:latest", "wslc-load-image-container");
 
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
 
         // Validate that invalid tars fail with proper error message and code.
         {
@@ -997,6 +1001,58 @@ class WSLCTests
             VERIFY_ARE_EQUAL(m_defaultSession->LoadImage(ToCOMInputHandle(currentExecutableHandle.get()), nullptr, fileSize.QuadPart), E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+        }
+
+        // Validate that LoadImage fails when the input pipe is closed during reading.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> loadResult;
+            std::thread operationThread([&]() {
+                loadResult.set_value(m_defaultSession->LoadImage(ToCOMInputHandle(pipeRead.get()), nullptr, 1024 * 1024));
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to ensure the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            // Close the write end.
+            pipeWrite.reset();
+
+            VERIFY_ARE_EQUAL(E_FAIL, loadResult.get_future().get());
+        }
+
+        // Validate that LoadImage is aborted when the session terminates.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> terminateResult;
+            wil::unique_event testCompleted{wil::EventOptions::ManualReset};
+            std::thread operationThread([&]() {
+                terminateResult.set_value(m_defaultSession->LoadImage(ToCOMInputHandle(pipeRead.get()), nullptr, 1024 * 1024));
+                WI_ASSERT(testCompleted.is_signaled());
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to validate that the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            testCompleted.SetEvent();
+
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+            auto restore = ResetTestSession();
+
+            auto hr = terminateResult.get_future().get();
+            VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
         }
     }
 
@@ -1019,13 +1075,15 @@ class WSLCTests
         ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
         // Validate that containers can be started from the imported image.
-        WSLCContainerLauncher launcher("my-hello-world:test", "wslc-import-image-container", {"/hello"});
+        {
+            WSLCContainerLauncher launcher("my-hello-world:test", "wslc-import-image-container", {"/hello"});
 
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
-        VERIFY_ARE_EQUAL(0, result.Code);
-        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
 
         // Validate that ImportImage fails if no tag is passed
         {
@@ -1046,6 +1104,59 @@ class WSLCTests
                 E_FAIL);
 
             ValidateCOMErrorMessage(L"archive/tar: invalid tar header");
+        }
+
+        // Validate that ImportImage fails when the input pipe is closed during reading.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> importResult;
+            std::thread operationThread([&]() {
+                importResult.set_value(m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "broken-read:eof", nullptr, 1024 * 1024));
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to ensure the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            // Close the write end.
+            pipeWrite.reset();
+
+            VERIFY_ARE_EQUAL(E_FAIL, importResult.get_future().get());
+        }
+
+        // Validate that ImportImage is aborted when the session terminates.
+        {
+            wil::unique_handle pipeRead;
+            wil::unique_handle pipeWrite;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+
+            std::promise<HRESULT> terminateResult;
+            wil::unique_event testCompleted{wil::EventOptions::ManualReset};
+            std::thread operationThread([&]() {
+                terminateResult.set_value(
+                    m_defaultSession->ImportImage(ToCOMInputHandle(pipeRead.get()), "session-terminate:test", nullptr, 1024 * 1024));
+                WI_ASSERT(testCompleted.is_signaled());
+            });
+
+            auto threadCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { operationThread.join(); });
+
+            // Write some data to validate that the service has started reading from the pipe (pipe buffer is 2 bytes).
+            DWORD bytesWritten{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(pipeWrite.get(), "data", 4, &bytesWritten, nullptr));
+
+            testCompleted.SetEvent();
+
+            VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+            auto restore = ResetTestSession();
+
+            auto hr = terminateResult.get_future().get();
+            VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
         }
     }
 
@@ -1789,7 +1900,7 @@ class WSLCTests
         WSLCBuildImageOptions options{
             .ContextPath = contextDir.c_str(),
             .DockerfileHandle = ToCOMInputHandle(dummyDockerfile.get()),
-            .Flags = static_cast<WSLCBuildImageFlags>(0x4)};
+            .Flags = static_cast<WSLCBuildImageFlags>(0x8)};
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->BuildImage(&options, nullptr, nullptr));
     }
@@ -3623,6 +3734,242 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
         VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName2);
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateDeleteListTest)
+    {
+        const std::string networkName = "test-network";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        // List should start empty.
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(0u, networks.size());
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        // Verify it appears in the list with correct fields.
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
+        VERIFY_IS_TRUE(strlen(networks[0].Id) > 0);
+
+        // Duplicate name should fail.
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_defaultSession->CreateNetwork(&options));
+
+        cleanup.release();
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        // List should be empty again.
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(0u, networks.size());
+
+        // Delete non-existent should fail.
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->DeleteNetwork(networkName.c_str()));
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateWithSubnetTest)
+    {
+        const std::string networkName = "subnet-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption subnetOpt[] = {{"Subnet", "172.28.0.0/16"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = subnetOpt;
+        options.DriverOptsCount = ARRAYSIZE(subnetOpt);
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInternalTest)
+    {
+        const std::string networkName = "internal-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption internalOpt[] = {{"Internal", "true"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = internalOpt;
+        options.DriverOptsCount = ARRAYSIZE(internalOpt);
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateWithLabelsTest)
+    {
+        const std::string networkName = "labels-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCLabel labels[] = {
+            {.Key = "com.example.env", .Value = "test"},
+            {.Key = "com.example.team", .Value = "infra"},
+        };
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+        options.Labels = labels;
+        options.LabelsCount = ARRAYSIZE(labels);
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInvalidDriverTest)
+    {
+        WSLCNetworkOptions options{};
+        options.Name = "bad-driver-net";
+        options.Driver = "overlay";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"Unsupported network driver:");
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateReservedNameTest)
+    {
+        WSLCNetworkOptions options{};
+        options.Driver = "bridge";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+
+        options.Name = "bridge";
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"bridge");
+
+        options.Name = "host";
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"host");
+
+        options.Name = "none";
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"none");
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInvalidNameTest)
+    {
+        WSLCNetworkOptions options{};
+        options.Name = "invalid name!";
+        options.Driver = "bridge";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+        ValidateCOMErrorMessageContains(L"invalid name!");
+    }
+
+    WSLC_TEST_METHOD(NetworkSessionRecoveryTest)
+    {
+        const std::string networkName = "recovery-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        // Reset the session (simulates session restart).
+        ResetTestSession();
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(1u, networks.size());
+        VERIFY_ARE_EQUAL(networkName, std::string(networks[0].Name));
+        VERIFY_ARE_EQUAL(std::string("bridge"), std::string(networks[0].Driver));
+        VERIFY_IS_TRUE(strlen(networks[0].Id) > 0);
+    }
+
+    WSLC_TEST_METHOD(NetworkMultipleCreateListDeleteTest)
+    {
+        const std::string networkNameA = "net-a";
+        const std::string networkNameB = "net-b";
+        const std::string networkNameC = "net-c";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameA.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameC.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameA.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkNameC.c_str()));
+        });
+
+        WSLCNetworkOptions optionsA{};
+        optionsA.Name = networkNameA.c_str();
+        optionsA.Driver = "bridge";
+        optionsA.DriverOpts = nullptr;
+        optionsA.DriverOptsCount = 0;
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsA));
+
+        WSLCDriverOption subnetOpt[] = {{"Subnet", "172.29.0.0/16"}};
+        WSLCNetworkOptions optionsB{};
+        optionsB.Name = networkNameB.c_str();
+        optionsB.Driver = "bridge";
+        optionsB.DriverOpts = subnetOpt;
+        optionsB.DriverOptsCount = ARRAYSIZE(subnetOpt);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsB));
+
+        WSLCDriverOption internalOpt[] = {{"Internal", "true"}};
+        WSLCNetworkOptions optionsC{};
+        optionsC.Name = networkNameC.c_str();
+        optionsC.Driver = "bridge";
+        optionsC.DriverOpts = internalOpt;
+        optionsC.DriverOptsCount = ARRAYSIZE(internalOpt);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&optionsC));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(3u, networks.size());
+
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(networkNameB.c_str()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(2u, networks.size());
     }
 
     WSLC_TEST_METHOD(CreateContainer)

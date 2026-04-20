@@ -573,7 +573,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -v,--version  Show version information for this tool\r\n"
-                << L"  -h,--help     Shows help about the selected command\r\n"
+                << L"  -?,--help     Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

@@ -27,6 +27,7 @@ public:
         const std::vector<std::wstring>& tags,
         const std::vector<std::wstring>& buildArgs,
         const std::wstring& dockerfilePath,
+        const std::wstring& target,
         WSLCBuildImageFlags flags,
         IProgressCallback* callback,
         HANDLE cancelEvent = nullptr);
@@ -38,6 +39,7 @@ public:
     static void Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
     static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent = nullptr);
+    static void Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent = nullptr);
     static void Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage);
     void Prune();
 };

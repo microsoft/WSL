@@ -438,6 +438,21 @@ std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
     return response.Volumes;
 }
 
+docker_schema::CreateNetworkResponse DockerHTTPClient::CreateNetwork(const docker_schema::CreateNetwork& Request)
+{
+    return Transaction(verb::post, URL::Create("/networks/create"), Request);
+}
+
+void DockerHTTPClient::RemoveNetwork(const std::string& Name)
+{
+    Transaction(verb::delete_, URL::Create("/networks/{}", Name));
+}
+
+std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
+{
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
+}
+
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);

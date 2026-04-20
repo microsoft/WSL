@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
+#include "WSLCNetworkMetadata.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -254,6 +255,7 @@ try
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
     // Recover any existing containers from storage.
+    RecoverExistingNetworks();
     RecoverExistingVolumes();
     RecoverExistingContainers();
 
@@ -591,6 +593,15 @@ try
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
+    }
+    if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsPull))
+    {
+        buildArgs.push_back("--pull");
+    }
+    if (Options->Target != nullptr && Options->Target[0] != '\0')
+    {
+        buildArgs.push_back("--target");
+        buildArgs.push_back(Options->Target);
     }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
@@ -951,8 +962,15 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
     };
 
+    // Shutdown the Docker stream's write side when the user pipe is closed.
+    // This is required for Docker to know when the request body is complete.
+    auto onInputComplete = [socket = Request.stream.native_handle()]() {
+        LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
+    };
+
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        userHandle.Get(), common::relay::HandleWrapper{Request.stream.native_handle()}));
+        common::relay::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
+        common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -1959,6 +1977,151 @@ HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WS
     return E_NOTIMPL;
 }
 
+// Network management.
+
+HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Name);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Driver);
+
+    std::string name = Options->Name;
+    std::string driver = Options->Driver;
+
+    ValidateName(name.c_str());
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(name), IsReservedNetworkName(name));
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriver(driver), driver != WSLCBridgeNetworkDriver);
+
+    auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
+    auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard networksLock(m_networksLock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_networks.contains(name));
+
+    docker_schema::CreateNetwork request;
+    request.Name = name;
+    request.Driver = driver;
+    request.Labels = labels;
+    request.Labels[WSLCNetworkManagedLabel] = "true";
+
+    if (auto it = driverOpts.find("Internal"); it != driverOpts.end())
+    {
+        request.Internal = (it->second == "true");
+    }
+
+    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    {
+        docker_schema::IPAMConfig ipamConfig;
+        ipamConfig.Subnet = it->second;
+
+        auto& ipam = request.IPAM.emplace();
+        ipam.Driver = "default";
+        ipam.Config.emplace().push_back(std::move(ipamConfig));
+    }
+
+    docker_schema::CreateNetworkResponse response;
+    try
+    {
+        response = m_dockerClient->CreateNetwork(request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), Localization::MessageWslcNetworkAlreadyExists(name), e.StatusCode() == 409);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
+    }
+
+    auto [it, inserted] = m_networks.insert({name, NetworkEntry{response.Id, driver}});
+    WI_VERIFY(inserted);
+
+    WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(response.Id.c_str(), "NetworkId"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::DeleteNetwork(LPCSTR Name)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Name);
+    std::string name = Name;
+    ValidateName(name.c_str());
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard networksLock(m_networksLock);
+
+    auto it = m_networks.find(name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
+
+    try
+    {
+        m_dockerClient->RemoveNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete network '%hs'", name.c_str());
+    }
+
+    m_networks.erase(it);
+    WSL_LOG("NetworkDeleted", TraceLoggingValue(name.c_str(), "NetworkName"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Networks);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *Networks = nullptr;
+    *Count = 0;
+
+    auto lock = m_lock.lock_shared();
+    std::lock_guard networksLock(m_networksLock);
+
+    if (m_networks.empty())
+    {
+        return S_OK;
+    }
+
+    auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
+
+    ULONG index = 0;
+    for (const auto& [name, entry] : m_networks)
+    {
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
+        index++;
+    }
+
+    *Networks = output.release();
+    *Count = index;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLCSession::Terminate()
 try
 {
@@ -1988,9 +2151,11 @@ try
     auto lock = m_lock.lock_exclusive();
     std::lock_guard containersLock(m_containersLock);
     std::lock_guard volumesLock(m_volumesLock);
+    std::lock_guard networksLock(m_networksLock);
 
     m_containers.clear();
     m_volumes.clear();
+    m_networks.clear();
 
     // Stop the IO relay.
     // This stops:
@@ -2305,6 +2470,38 @@ void WSLCSession::RecoverExistingContainers()
         "ContainersRecovered",
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_containers.size(), "ContainerCount"));
+}
+
+void WSLCSession::RecoverExistingNetworks()
+{
+    WI_ASSERT(m_dockerClient.has_value());
+    WI_ASSERT(m_virtualMachine.has_value());
+
+    auto networks = m_dockerClient->ListNetworks();
+
+    std::lock_guard networksLock(m_networksLock);
+
+    for (const auto& network : networks)
+    {
+        if (!network.Labels.contains(WSLCNetworkManagedLabel))
+        {
+            continue;
+        }
+
+        try
+        {
+            WI_ASSERT(!m_networks.contains(network.Name));
+
+            auto [_, inserted] = m_networks.insert({network.Name, NetworkEntry{network.Id, network.Driver}});
+            WI_VERIFY(inserted);
+        }
+        CATCH_LOG_MSG("Failed to recover network: %hs", network.Name.c_str());
+    }
+
+    WSL_LOG(
+        "NetworksRecovered",
+        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+        TraceLoggingValue(m_networks.size(), "NetworkCount"));
 }
 
 void WSLCSession::RecoverExistingVolumes()
