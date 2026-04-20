@@ -12,6 +12,16 @@ Executing tests with TAEF is done by invoking the `TE.exe` binary:
 2. Navigate to the subdirectory containing the built test binaries (`bin/<X64|Arm64>/<Debug|Release>/`)
 3. Execute the binaries via invoking TE and passing the test dll/s as arguments: `TE.exe test1.dll test2.dll test3.dll`
 
+## test.bat Options
+
+The following options are handled by `test.bat` / `run-tests.ps1` before invoking TE.exe:
+
+### **/attachdebugger**
+
+Automatically launches WinDbgX and attaches it to the test host process. Requires [WinDbg](https://aka.ms/windbg) to be installed (`winget install Microsoft.WinDbg`). Under the hood it passes `/waitfordebugger /inproc` to TE.exe so tests run in-process, then attaches WinDbgX directly to `TE.exe`.
+
+`test.bat /attachdebugger /name:*MyTest*`
+
 ## Useful **TE.exe** Command Line Parameters for Debugging/Executing Tests
 
 Command Line parameters are passed to `TE.exe` after supplying the target `.dll`:
