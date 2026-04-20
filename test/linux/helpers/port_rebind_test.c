@@ -58,7 +58,8 @@ int main(void)
 
     if (bind(sock2, (struct sockaddr*)&addr, sizeof(addr)) < 0)
     {
-        printf("Failed to bind second socket to port %d: %m\n", port);
+        printf("Failed to bind second socket to port %d\n", port);
+        perror("bind 2");
         return 1;
     }
 
