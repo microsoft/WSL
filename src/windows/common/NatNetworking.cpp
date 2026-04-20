@@ -771,6 +771,7 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
             PDT_ProductAndServicePerformance,
             TraceLoggingGuid(config.NatNetworkId(), "networkGuid"),
             TraceLoggingValue(settings.Name.c_str(), "settingsName"));
+        executionStep = "HcnCreateNetworkCooldownSkip";
         hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
         return {};
     }
