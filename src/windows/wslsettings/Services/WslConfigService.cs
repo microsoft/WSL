@@ -11,7 +11,6 @@ public class WslConfigService : IWslConfigService, IDisposable
     private WslConfig? _wslConfigDefaults { get; init; }
     private readonly object? _wslCoreConfigInterfaceLockObj = null;
     private FileSystemWatcher? _wslConfigFileSystemWatcher = null;
-    private bool _disposed = false;
 
     public WslConfigService()
     {
@@ -43,16 +42,20 @@ public class WslConfigService : IWslConfigService, IDisposable
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!_disposed)
+        lock (_wslCoreConfigInterfaceLockObj!)
         {
-            if (disposing)
+            if (disposing && _wslConfigFileSystemWatcher != null)
             {
-                _wslConfigFileSystemWatcher?.Dispose();
+                _wslConfigFileSystemWatcher.EnableRaisingEvents = false;
+                _wslConfigFileSystemWatcher.Changed -= OnWslConfigFileChanged;
+                _wslConfigFileSystemWatcher.Deleted -= OnWslConfigFileChanged;
+                _wslConfigFileSystemWatcher.Renamed -= OnWslConfigFileChanged;
+                _wslConfigFileSystemWatcher.Dispose();
+                _wslConfigFileSystemWatcher = null;
             }
 
             WslCoreConfigInterface.FreeWslConfig(_wslConfig);
             WslCoreConfigInterface.FreeWslConfig(_wslConfigDefaults);
-            _disposed = true;
         }
     }
 
