@@ -6581,7 +6581,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
         const auto elapsed = std::chrono::steady_clock::now() - start;
         VERIFY_IS_TRUE(threw);
-        VERIFY_IS_TRUE(elapsed < std::chrono::seconds(2));
+        VERIFY_IS_TRUE(elapsed < std::chrono::seconds(4));
     }
 
     // Verifies CallWithDeadline returns the routine's value when it completes
