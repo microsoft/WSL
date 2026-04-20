@@ -1891,7 +1891,9 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
 
 bool WslCoreVm::IsDnsTunnelingSupported() const
 {
-    WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored);
+    WI_ASSERT(
+        m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored ||
+        m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy);
 
     return SUCCEEDED_LOG(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
 }
