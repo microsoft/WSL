@@ -4411,7 +4411,8 @@ class WSLCTests
             expectOpen("", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: ''");
 
-            expectOpen("non-existing-container", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            expectOpen("non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
+            ValidateCOMErrorMessage(L"Container 'non-existing-container' not found.");
 
             expectOpen("/", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: '/'");
@@ -4607,7 +4608,7 @@ class WSLCTests
         // Verify that trying to open a non existing container fails.
         {
             wil::com_ptr<IWSLCContainer> sameContainer;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("does-not-exist", &sameContainer), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("does-not-exist", &sameContainer), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Validate that container names are unique.
@@ -6097,7 +6098,7 @@ class WSLCTests
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Phase 3: Create new session from same storage, verify the container is not listed.
@@ -6106,7 +6107,7 @@ class WSLCTests
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
     }
 
@@ -6174,7 +6175,7 @@ class WSLCTests
         wil::com_ptr<IWSLCContainer> container;
         auto hr = session->OpenContainer(containerName.c_str(), &container);
 
-        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(hr, WSLC_E_CONTAINER_NOT_FOUND);
     }
 
     TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
@@ -6786,7 +6787,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that a container with the Rm flag is automatically deleted when the init process is killed.
@@ -6805,7 +6806,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that a container with the Rm flag is automatically deleted when the container is killed.
@@ -6824,7 +6825,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-kill", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-kill", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that the container autoremove flag is applied when the container exits on its own.
@@ -6839,7 +6840,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that the Rm flag is persisted across wslc sessions.
@@ -6864,8 +6865,8 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
 
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
@@ -6900,7 +6901,7 @@ class WSLCTests
 
         // Validate that the container is not found if we try to open it by name or id, or found in the container list.
         wil::com_ptr<IWSLCContainer> notFound;
-        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
 
         wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
         wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
@@ -7273,7 +7274,7 @@ class WSLCTests
 
             // Validate that the container can't be opened anymore.
             wil::com_ptr<IWSLCContainer> dummy;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerId.c_str(), &dummy), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerId.c_str(), &dummy), WSLC_E_CONTAINER_NOT_FOUND);
 
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
         }
