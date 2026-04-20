@@ -1601,7 +1601,7 @@ try
         }
         catch (DockerHTTPException& e)
         {
-            RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), e.StatusCode() == 404, "Container not found: '%hs'", Id);
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), e.StatusCode() == 404);
             RETURN_HR_IF_MSG(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS, e.StatusCode() == 400, "Ambiguous prefix: '%hs'", Id);
 
             THROW_HR_MSG(E_FAIL, "Unexpected error inspecting container '%hs': %hs", Id, e.what());
@@ -1614,8 +1614,8 @@ try
 
     auto result = wil::ResultFromException([&]() { (*it)->CopyTo(Container); });
 
-    // Return ERROR_NOT_FOUND if the container was found, but is being deleted for consistency.
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == RPC_E_DISCONNECTED);
+    // Return WSLC_E_CONTAINER_NOT_FOUND if the container was found, but is being deleted for consistency.
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), result == RPC_E_DISCONNECTED);
 
     return result;
 }

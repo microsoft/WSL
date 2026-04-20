@@ -115,7 +115,7 @@ class WSLCE2EContainerAttachTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Attach_ContainerNotFound)
     {
         auto result = RunWslc(std::format(L"container attach {}", WslcContainerName));
-        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName), .ExitCode = 1});
     }
 
 private:
