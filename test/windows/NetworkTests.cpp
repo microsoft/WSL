@@ -2139,10 +2139,13 @@ class NetworkTests
     static void VerifyPortZeroRebindSucceeds()
     {
         HMODULE hModule = nullptr;
-        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(&VerifyPortZeroRebindSucceeds), &hModule);
+        THROW_LAST_ERROR_IF(!GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(&VerifyPortZeroRebindSucceeds),
+            &hModule));
         auto dllPath = wil::GetModuleFileNameW(hModule);
         std::filesystem::path binaryPath = std::filesystem::path(dllPath.get()).parent_path() / L"port_rebind_test";
-        auto cmd = std::format(L"bash -c \"$(wslpath '{}')\"", binaryPath.wstring());
+        auto cmd = std::format(L"bash -c \"\\\"$(wslpath '{}')\\\"\"", binaryPath.wstring());
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(cmd.c_str()), 0L);
     }
 
