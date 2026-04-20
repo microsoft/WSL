@@ -39,15 +39,10 @@ void ValidateDriverOpts(const std::map<std::string, std::string>& DriverOpts)
         return;
     }
 
-    std::string optNames;
-    for (const auto& [key, _] : DriverOpts)
-    {
-        if (!optNames.empty())
-        {
-            optNames += ", ";
-        }
-        optNames += key;
-    }
+    std::vector<std::string> keys(DriverOpts.size());
+    std::ranges::transform(DriverOpts, keys.begin(), [](const auto& e) { return e.first; });
+
+    auto optNames = wsl::shared::string::Join(keys, ',');
 
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts(optNames));
 }

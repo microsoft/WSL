@@ -1874,6 +1874,7 @@ try
     }
     else
     {
+        WI_ASSERT(driver == WSLCGuestVolumeDriver);
         volume = WSLCGuestVolumeImpl::Create(Options->Name, std::move(driverOpts), std::move(labels), m_dockerClient.value());
     }
 
