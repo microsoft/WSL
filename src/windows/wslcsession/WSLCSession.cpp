@@ -387,7 +387,11 @@ try
     constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 
     std::string entry = {Buffer.begin(), Buffer.end()};
-    WSL_LOG("ContainerdLog", TraceLoggingValue(Source, "Source"), TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
+    WSL_LOG(
+        "ContainerdLog",
+        TraceLoggingValue(Source, "Source"),
+        TraceLoggingValue(entry.c_str(), "Content"),
+        TraceLoggingValue(m_displayName.c_str(), "Name"));
 
     if (!m_containerdReadyEvent.is_signaled())
     {
@@ -407,10 +411,10 @@ ServiceRunningProcess WSLCSession::StartProcess(
     auto process = launcher.Launch(*m_virtualMachine);
 
     m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+            process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
     m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+            process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
 
     m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
 
@@ -422,8 +426,7 @@ void WSLCSession::StartContainerd()
     constexpr auto c_containerdRoot = "/var/lib/docker/containerd/daemon";
     constexpr auto c_containerdState = "/run/docker/containerd/daemon";
 
-    std::vector<std::string> args{
-        "/usr/bin/containerd", "--address", c_containerdSocket, "--root", c_containerdRoot, "--state", c_containerdState};
+    std::vector<std::string> args{"/usr/bin/containerd", "--address", c_containerdSocket, "--root", c_containerdRoot, "--state", c_containerdState};
 
     if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
     {
@@ -521,7 +524,7 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
     auto onCompleted = [&]() { io.Cancel(); };
 
     io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+            requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
 
     io.Run({});
 
@@ -668,7 +671,7 @@ try
     auto io = CreateIOContext();
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        buildFileHandle.Get(), common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
+            buildFileHandle.Get(), common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLCFDStdin)}));
 
     bool verbose = WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsVerbose);
     std::string allOutput;
@@ -1007,8 +1010,8 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     };
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
-        common::relay::HandleWrapper{Request.stream.native_handle()}));
+            common::relay::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
+            common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -1586,14 +1589,14 @@ try
         std::scoped_lock lock(m_containersLock, m_volumesLock);
 
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
-            *containerOptions,
-            *this,
-            m_virtualMachine.value(),
-            m_volumes,
-            std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
-            m_eventTracker.value(),
-            m_dockerClient.value(),
-            m_ioRelay));
+                *containerOptions,
+                *this,
+                m_virtualMachine.value(),
+                m_volumes,
+                std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
+                m_eventTracker.value(),
+                m_dockerClient.value(),
+                m_ioRelay));
 
         it->CopyTo(Container);
 
