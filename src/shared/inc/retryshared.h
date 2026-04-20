@@ -54,7 +54,9 @@ T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTime
 class DeadlineExceededError : public std::runtime_error
 {
 public:
-    DeadlineExceededError() : std::runtime_error("call deadline exceeded") {}
+    DeadlineExceededError() : std::runtime_error("call deadline exceeded")
+    {
+    }
 };
 
 // Enforces a true per-call deadline. If `routine` does not complete within

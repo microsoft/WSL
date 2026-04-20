@@ -773,8 +773,7 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetworkIntern
                 };
 
                 HcnCreateResult result = wsl::shared::retry::CallWithDeadline(
-                    std::chrono::seconds(30),
-                    [natId = config.NatNetworkId(), settingsJson = ToJsonW(settings)]() -> HcnCreateResult {
+                    std::chrono::seconds(30), [natId = config.NatNetworkId(), settingsJson = ToJsonW(settings)]() -> HcnCreateResult {
                         HcnCreateResult r{};
                         wil::unique_cotaskmem_string err;
                         r.hr = HcnCreateNetwork(natId, settingsJson.c_str(), &r.network, &err);
