@@ -499,6 +499,7 @@ add_subdirectory(src/linux/plan9)
 add_subdirectory(src/linux/init)
 add_subdirectory(localization)
 
+add_subdirectory(test/linux/helpers)
 add_subdirectory(test/windows)
 
 if (DEFINED PIPELINE_BUILD_ID)

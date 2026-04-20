@@ -2136,6 +2136,16 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
+    static void VerifyPortZeroRebindSucceeds()
+    {
+        HMODULE hModule = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(&VerifyPortZeroRebindSucceeds), &hModule);
+        auto dllPath = wil::GetModuleFileNameW(hModule);
+        std::filesystem::path binaryPath = std::filesystem::path(dllPath.get()).parent_path() / L"port_rebind_test";
+        auto cmd = std::format(L"bash -c \"$(wslpath '{}')\"", binaryPath.wstring());
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(cmd.c_str()), 0L);
+    }
+
     template <typename T>
     static void VerifyNotBound(T& Address, int AddressFamily, int Protocol)
     {
@@ -4035,6 +4045,16 @@ class MirroredTests
         NetworkTests::VerifyPortZeroBindIsTracked(false);
     }
 
+    WSL2_TEST_METHOD(PortZeroRebindSucceeds)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyPortZeroRebindSucceeds();
+    }
+
     WSL2_TEST_METHOD(ExplicitEphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4837,6 +4857,15 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         NetworkTests::VerifyPortZeroBindIsTracked();
+    }
+
+    WSL2_TEST_METHOD(PortZeroRebindSucceeds)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyPortZeroRebindSucceeds();
     }
 
     WSL2_TEST_METHOD(HttpProxySimple)

@@ -99,6 +99,8 @@ function(add_linux_executable target sources headers libraries)
      )
 
     add_custom_target(${target} DEPENDS ${output} ${stripped_output} SOURCES ${sources} ${headers})
-    add_dependencies(${target} ${lib_targets})
+    if(lib_targets)
+        add_dependencies(${target} ${lib_targets})
+    endif()
 
 endfunction()
