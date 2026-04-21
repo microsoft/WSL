@@ -114,7 +114,8 @@ class WSLCE2EVolumeRemoveTests
 
         // Create a container that uses the volume to ensure it's in use
         result = RunWslc(std::format(
-            L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep infinity\"",
+            L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep "
+            L"infinity\"",
             WslcContainerName,
             TestVolumeName,
             DebianImage.NameAndTag()));
@@ -122,7 +123,10 @@ class WSLCE2EVolumeRemoveTests
 
         // Attempt to remove the volume while it's in use
         result = RunWslc(std::format(L"volume remove {}", TestVolumeName));
-        result.Verify({.Stdout = L"", .Stderr = std::format(L"Volume '{}' is in use.\r\nError code: ERROR_SHARING_VIOLATION\r\n", TestVolumeName), .ExitCode = 1});
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = std::format(L"Volume '{}' is in use.\r\nError code: ERROR_SHARING_VIOLATION\r\n", TestVolumeName),
+             .ExitCode = 1});
 
         VerifyVolumeIsListed(TestVolumeName);
     }

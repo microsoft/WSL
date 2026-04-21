@@ -84,7 +84,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         auto volume = VolumeMount::Parse(volumeSpec);
         auto host = volume.Host();
         auto container = volume.ContainerPath();
-        if(volume.IsNamedVolume())
+        if (volume.IsNamedVolume())
         {
             containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
         }

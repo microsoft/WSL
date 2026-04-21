@@ -575,10 +575,7 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Create another container that mounts the same named volume and verify the file content
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} cat /data/test.txt",
-            WslcVolumeName,
-            DebianImage.NameAndTag()));
+        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/test.txt", WslcVolumeName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"WSLC Named Volume Test", .Stderr = L"", .ExitCode = 0});
     }
 
