@@ -2145,7 +2145,24 @@ class NetworkTests
             &hModule));
         auto dllPath = wil::GetModuleFileNameW(hModule);
         std::filesystem::path binaryPath = std::filesystem::path(dllPath.get()).parent_path() / L"port_rebind_test";
+
+        // Diagnostic: check if the binary exists on the Windows side
+        LogInfo("DLL path: %ls", dllPath.get());
+        LogInfo("Expected binary path: %ls", binaryPath.wstring().c_str());
+        LogInfo("Binary exists on Windows: %d", std::filesystem::exists(binaryPath));
+
+        // Diagnostic: check what wslpath produces
+        auto [wslpathOut, wslpathErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath '{}'", binaryPath.wstring()));
+        LogInfo("wslpath output: '%ls'", wslpathOut.c_str());
+        LogInfo("wslpath stderr: '%ls'", wslpathErr.c_str());
+
+        // Diagnostic: check if the file exists from Linux's perspective
+        auto [lsOut, lsErr] = LxsstuLaunchWslAndCaptureOutput(std::format(L"ls -la \"$(wslpath '{}')\"", binaryPath.wstring()));
+        LogInfo("ls output: '%ls'", lsOut.c_str());
+        LogInfo("ls stderr: '%ls'", lsErr.c_str());
+
         auto cmd = std::format(L"bash -c \"\\\"$(wslpath '{}')\\\"\"", binaryPath.wstring());
+        LogInfo("Full command: %ls", cmd.c_str());
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(cmd.c_str()), 0L);
     }
 
