@@ -184,6 +184,7 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
 
 void VirtioNetworking::RefreshGuestConnection()
 {
+
     // Query current networking information before acquiring the lock.
     auto networkSettings = GetHostEndpointSettings();
 
@@ -232,6 +233,9 @@ void VirtioNetworking::RefreshGuestConnection()
     // Add virtio net adapter to guest. If the adapter already exists update adapter state.
     if (device_options != m_trackedDeviceOptions)
     {
+        // Initialize COM for this thread since we're calling into the virtio interface.
+        const auto com = InitializeCOMState();
+
         if (!m_adapterId.has_value())
         {
             m_adapterId = m_guestDeviceManager->AddGuestDevice(
