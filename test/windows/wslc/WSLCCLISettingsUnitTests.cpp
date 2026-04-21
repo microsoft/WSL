@@ -91,9 +91,9 @@ class WSLCCLISettingsUnitTests
     TEST_METHOD(SettingsMap_GetOrDefault_ReturnsBuiltInWhenAbsent)
     {
         SettingsMap map;
-        VERIFY_ARE_EQUAL(4u, map.GetOrDefault<Setting::SessionCpuCount>());
-        VERIFY_ARE_EQUAL(2048u, map.GetOrDefault<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(102400u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(std::wstring{}, map.GetOrDefault<Setting::SessionStoragePath>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(map.GetOrDefault<Setting::CredentialStore>()));
     }
@@ -104,7 +104,7 @@ class WSLCCLISettingsUnitTests
         SettingsMap map;
         map.Add<Setting::SessionCpuCount>(16u);
         VERIFY_ARE_EQUAL(16u, map.GetOrDefault<Setting::SessionCpuCount>());
-        VERIFY_ARE_EQUAL(2048u, map.GetOrDefault<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionMemoryMb>());
     }
 
     // -----------------------------------------------------------------------
@@ -119,9 +119,9 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
-        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
@@ -165,9 +165,9 @@ class WSLCCLISettingsUnitTests
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
-        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
     }
 
     // When the settings file fails to parse, the type is Default and a warning is emitted.
@@ -180,14 +180,14 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
-        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
     }
 
     // -----------------------------------------------------------------------
     // Per-setting validation
     // -----------------------------------------------------------------------
 
-    // cpuCount: 0 must be rejected; the default (4) is used and a warning emitted.
+    // cpuCount: 0 is rejected by validation; the default (0) is used and a warning emitted.
     TEST_METHOD(Validation_CpuCount_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
@@ -195,12 +195,12 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
         VERIFY_IS_FALSE(s.GetWarnings().front().SettingPath.empty());
     }
 
-    // memorySize: 0 must be rejected; the default (2048) is used.
+    // memorySize: 0 is rejected by validation; the default (0) is used.
     TEST_METHOD(Validation_MemoryMb_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
@@ -208,11 +208,11 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
-    // maxStorageSize: 0 must be rejected; the default (100GB) is used.
+    // maxStorageSize: 0 must be rejected; the default is used.
     TEST_METHOD(Validation_StorageSizeMb_Zero_UsesDefaultAndWarns)
     {
         auto dir = UniqueTempDir();
@@ -220,7 +220,7 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
@@ -233,7 +233,7 @@ class WSLCCLISettingsUnitTests
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
@@ -270,10 +270,108 @@ class WSLCCLISettingsUnitTests
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
-        VERIFY_ARE_EQUAL(2048u, s.Get<Setting::SessionMemoryMb>());
-        VERIFY_ARE_EQUAL(102400u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
+    }
+
+    // The string "default" for any setting must silently use the built-in
+    // default, same as if the key were absent.
+    TEST_METHOD(Validation_DefaultString_UsesBuiltInDefaultsNoWarnings)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: default\n"
+            "  memorySize: default\n"
+            "  maxStorageSize: default\n"
+            "  defaultStoragePath: default\n"
+            "  networkingMode: default\n"
+            "  hostFileShareMode: default\n"
+            "  dnsTunneling: default\n"
+            "credentialStore: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
+        VERIFY_ARE_EQUAL(
+            static_cast<int>(WSLCNetworkingModeVirtioProxy),
+            static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(
+            static_cast<int>(HostFileShareMode::VirtioFs),
+            static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
+        VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
+        VERIFY_ARE_EQUAL(
+            static_cast<int>(CredentialStoreType::WinCred),
+            static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    // "default" on a single setting uses the built-in default for that setting
+    // while explicit values on other settings are preserved.
+    TEST_METHOD(Validation_DefaultString_MixedWithExplicitValues)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 8\n"
+            "  memorySize: default\n"
+            "  maxStorageSize: 50000MB\n"
+            "credentialStore: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(8u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(50000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    // Quoted "default" string must behave the same as unquoted default.
+    TEST_METHOD(Validation_DefaultString_QuotedIsAlsoValid)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: \"default\"\n"
+            "  memorySize: \"default\"\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+    }
+
+    // "Default" (capitalized) is NOT the magic string — it must be treated as
+    // an invalid value and fall back to the built-in default with a warning.
+    TEST_METHOD(Validation_DefaultString_IsCaseSensitive)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  networkingMode: Default\n"
+            "credentialStore: DEFAULT\n");
+
+        UserSettingsTest s{dir};
+
+        // Both should be rejected by their validators and produce warnings.
+        VERIFY_IS_TRUE(s.GetWarnings().size() >= 2u);
+        // Values still fall back to built-in defaults.
+        VERIFY_ARE_EQUAL(
+            static_cast<int>(WSLCNetworkingModeVirtioProxy),
+            static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
     // credentialStore: invalid value must fall back to default and warn.
