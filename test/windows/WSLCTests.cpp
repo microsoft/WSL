@@ -3447,6 +3447,8 @@ class WSLCTests
         // Verify that after deleting the container, the volume can be deleted.
         VERIFY_SUCCEEDED(holderContainer.Get().Delete(WSLCDeleteFlagsNone));
         VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+        cleanup.release();
     }
 
     WSLC_TEST_METHOD(NamedVolumesVhd)
@@ -3460,14 +3462,6 @@ class WSLCTests
         const std::string volumeName = "wslc-test-named-volume-vhd-host";
         const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
 
-        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
-
-        auto cleanup = wil::scope_exit([&]() {
-            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
-            std::error_code ec;
-            std::filesystem::remove(volumeVhdPath, ec);
-        });
-
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
         volumeOptions.Driver = "vhd";
@@ -3476,11 +3470,14 @@ class WSLCTests
 
         WSLCVolumeInformation volInfo{};
         VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
         VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
         ExpectMount(m_defaultSession.get(), std::format("/mnt/wslc-volumes/{}", volumeName), std::optional<std::string>{"*ext4*"});
 
         VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        cleanup.release();
+
         ExpectMount(m_defaultSession.get(), std::format("/mnt/wslc-volumes/{}", volumeName), std::nullopt);
         VERIFY_IS_FALSE(std::filesystem::exists(volumeVhdPath));
     }
@@ -3604,11 +3601,11 @@ class WSLCTests
 
     WSLC_TEST_METHOD(NamedVolumeGuestDriverOptsTest)
     {
-        const std::string volumeName = "wslc-test-named-volume-guest-opts";
+        const std::string volumeName = "wslc-test-vol";
         LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
-        auto expectReject = [&](const WSLCDriverOption* opts, ULONG optsCount, const std::wstring& expectedSubstring) {
+        auto expectReject = [&](const WSLCDriverOption* opts, ULONG optsCount, const std::wstring& expectedMessage) {
             LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
             WSLCVolumeOptions volumeOptions{};
@@ -3619,7 +3616,7 @@ class WSLCTests
 
             WSLCVolumeInformation volInfo{};
             VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions, &volInfo), E_INVALIDARG);
-            ValidateCOMErrorMessage(std::format(L"Unsupported volume driver options: {}", expectedSubstring));
+            ValidateCOMErrorMessageContains(expectedMessage);
         };
 
         auto expectAccept = [&](const WSLCDriverOption* opts, ULONG optsCount) {
@@ -3638,46 +3635,52 @@ class WSLCTests
         // Allowed: no options (nullptr).
         expectAccept(nullptr, 0);
 
-        // Allowed: type=tmpfs.
+        // Allowed: type=tmpfs with device=tmpfs.
         {
-            WSLCDriverOption opts[] = {{"type", "tmpfs"}};
+            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"device", "tmpfs"}};
             expectAccept(opts, ARRAYSIZE(opts));
         }
 
-        // Allowed: type=tmpfs with o= suboptions.
+        // Allowed: type=tmpfs with device=tmpfs and o= suboptions.
         {
-            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"o", "size=100m,uid=1000"}};
+            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"device", "tmpfs"}, {"o", "size=100m,uid=1000"}};
             expectAccept(opts, ARRAYSIZE(opts));
-        }
-
-        // Blocked: device is always rejected.
-        {
-            WSLCDriverOption opts[] = {{"device", "/some/path"}};
-            expectReject(opts, ARRAYSIZE(opts), L"device");
-        }
-
-        // Blocked: device with type=tmpfs is still rejected.
-        {
-            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"device", "/some/path"}};
-            expectReject(opts, ARRAYSIZE(opts), L"device");
         }
 
         // Blocked: type=none (bind mount).
         {
             WSLCDriverOption opts[] = {{"type", "none"}};
-            expectReject(opts, ARRAYSIZE(opts), L"type=none");
+            expectReject(opts, ARRAYSIZE(opts), L"unsupported volume driver options: type=none");
         }
 
         // Blocked: type=nfs.
         {
             WSLCDriverOption opts[] = {{"type", "nfs"}};
-            expectReject(opts, ARRAYSIZE(opts), L"type=nfs");
+            expectReject(opts, ARRAYSIZE(opts), L"unsupported volume driver options: type=nfs");
         }
 
-        // Blocked: unknown option key.
+        // Blocked by Docker: device without type.
         {
-            WSLCDriverOption opts[] = {{"SizeBytes", "1073741824"}};
-            expectReject(opts, ARRAYSIZE(opts), L"SizeBytes");
+            WSLCDriverOption opts[] = {{"device", "/some/path"}};
+            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+        }
+
+        // Blocked by Docker: device without type.
+        {
+            WSLCDriverOption opts[] = {{"device", "/some/path"}};
+            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+        }
+
+        // Blocked by Docker: device=tmpfs without type.
+        {
+            WSLCDriverOption opts[] = {{"device", "tmpfs"}};
+            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+        }
+
+        // Blocked by Docker: device and o without type.
+        {
+            WSLCDriverOption opts[] = {{"device", "tmpfs"}, {"o", "size=100m"}};
+            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
         }
     }
 

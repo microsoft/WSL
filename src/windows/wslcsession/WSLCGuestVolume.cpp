@@ -26,19 +26,8 @@ namespace wsl::windows::service::wslc {
 
 namespace {
 
-    // Allowlist for driver options that the guest driver forwards to docker's
-    // "local" driver. The local driver passes type/device/o directly to mount(8),
-    // so we must block options that could expose host paths or network resources.
-    //
-    // Allowed:
-    //   - (empty)    : default — Docker creates a directory under /var/lib/docker/volumes/.
-    //   - type=tmpfs : memory-backed volume. "o" suboptions (size, mode, uid, etc.)
-    //                  are kernel-validated and safe.
-    //   - o=...      : only when type=tmpfs.
-    //
-    // Blocked:
-    //   - device     : always — prevents bind-mounting arbitrary VM paths.
-    //   - type=none/nfs/cifs/... : require device or network access.
+    // The Docker local driver passes type/device/o directly to mount(8).
+    // Validate that the driver opts are either empty or only contain "type=tmpfs".
     void ValidateDriverOpts(const std::map<std::string, std::string>& DriverOpts)
     {
         if (DriverOpts.empty())
@@ -46,22 +35,13 @@ namespace {
             return;
         }
 
-        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("device"), DriverOpts.contains("device"));
-
+        // Determine the mount type. Only tmpfs is supported; everything else
+        // (none, nfs, cifs, ext4, ...) requires a device path or network access.
         auto typeIt = DriverOpts.find("type");
         std::string type = (typeIt != DriverOpts.end()) ? typeIt->second : "";
 
-        // Only tmpfs is allowed as a type. Everything else (none, nfs, cifs, ext4, ...)
-        // requires a device or network access.
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts("type=" + type), !type.empty() && type != "tmpfs");
-
-        // Reject any unknown keys beyond the allowed set {type, o}.
-        for (const auto& [key, _] : DriverOpts)
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::MessageWslcUnsupportedVolumeDriverOpts(key), key != "type" && key != "o");
-        }
     }
 
 } // namespace
@@ -119,6 +99,13 @@ std::unique_ptr<WSLCGuestVolumeImpl> WSLCGuestVolumeImpl::Open(const wsl::window
 
     auto metadata = wsl::shared::FromJson<WSLCVolumeMetadata>(metadataIt->second.c_str());
     THROW_HR_IF(E_INVALIDARG, metadata.Driver != WSLCGuestVolumeDriver);
+
+    THROW_HR_IF(E_INVALIDARG, Volume.Driver != "local");
+
+    if (Volume.Options.has_value())
+    {
+        ValidateDriverOpts(Volume.Options.value());
+    }
 
     // Extract user labels (all labels except our internal metadata label).
     std::map<std::string, std::string> userLabels;
