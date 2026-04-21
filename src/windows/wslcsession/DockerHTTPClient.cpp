@@ -363,13 +363,18 @@ void DockerHTTPClient::SignalContainer(const std::string& Id, std::optional<WSLC
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force)
+void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes)
 {
     auto url = URL::Create("/containers/{}", Id);
 
     if (Force)
     {
         url.SetParameter("force", true);
+    }
+
+    if (DeleteVolumes)
+    {
+        url.SetParameter("v", true);
     }
 
     Transaction(verb::delete_, url);
@@ -417,9 +422,9 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const 
     return {response.result_int(), std::move(socket)};
 }
 
-void DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
+docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
 {
-    Transaction(verb::post, URL::Create("/volumes/create"), Request);
+    return Transaction<docker_schema::CreateVolume>(verb::post, URL::Create("/volumes/create"), Request);
 }
 
 void DockerHTTPClient::RemoveVolume(const std::string& Name)
@@ -431,6 +436,21 @@ std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
 {
     auto response = Transaction<docker_schema::EmptyRequest, docker_schema::ListVolumesResponse>(verb::get, URL::Create("/volumes"));
     return response.Volumes;
+}
+
+docker_schema::CreateNetworkResponse DockerHTTPClient::CreateNetwork(const docker_schema::CreateNetwork& Request)
+{
+    return Transaction(verb::post, URL::Create("/networks/create"), Request);
+}
+
+void DockerHTTPClient::RemoveNetwork(const std::string& Name)
+{
+    Transaction(verb::delete_, URL::Create("/networks/{}", Name));
+}
+
+std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
+{
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)

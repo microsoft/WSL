@@ -67,9 +67,31 @@ struct AuthResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AuthResponse, Status, IdentityToken);
 };
 
+struct VolumeUsageData
+{
+    int64_t Size{-1};
+    int64_t RefCount{-1};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeUsageData, Size, RefCount);
+};
+
+struct Volume
+{
+    std::string Name;
+    std::string Driver;
+    std::string Mountpoint;
+    std::string CreatedAt;
+    std::optional<std::map<std::string, std::string>> Options;
+    std::optional<std::map<std::string, std::string>> Labels;
+    std::optional<std::map<std::string, std::string>> Status;
+    std::optional<VolumeUsageData> UsageData;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, CreatedAt, Options, Labels, Status, UsageData);
+};
+
 struct CreateVolume
 {
-    using TResponse = void;
+    using TResponse = Volume;
 
     std::string Name;
     std::string Driver;
@@ -79,22 +101,61 @@ struct CreateVolume
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateVolume, Name, Driver, DriverOpts, Labels);
 };
 
-struct Volume
-{
-    std::string Name;
-    std::string Driver;
-    std::string Mountpoint;
-    std::optional<std::map<std::string, std::string>> Options;
-    std::map<std::string, std::string> Labels;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
-};
-
 struct ListVolumesResponse
 {
     std::vector<Volume> Volumes;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ListVolumesResponse, Volumes);
+};
+
+struct IPAMConfig
+{
+    std::string Subnet;
+    std::string Gateway;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway);
+};
+
+struct IPAM
+{
+    std::string Driver;
+    std::optional<std::vector<IPAMConfig>> Config;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAM, Driver, Config);
+};
+
+struct CreateNetworkResponse
+{
+    std::string Id;
+    std::string Warning;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetworkResponse, Id, Warning);
+};
+
+struct CreateNetwork
+{
+    using TResponse = CreateNetworkResponse;
+
+    std::string Name;
+    std::string Driver;
+    bool Internal{};
+    std::optional<IPAM> IPAM;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Labels);
+};
+
+struct Network
+{
+    std::string Id;
+    std::string Name;
+    std::string Driver;
+    std::string Scope;
+    bool Internal{};
+    IPAM IPAM;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
 };
 
 struct EmptyObject

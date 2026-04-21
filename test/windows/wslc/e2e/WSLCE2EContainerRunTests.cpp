@@ -553,6 +553,12 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = L"invalid mount path: '' mount path must be absolute\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --workdir /tmp {} pwd", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -627,7 +633,8 @@ private:
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
-                << L"  -h,--help         Shows help about the selected command\r\n"
+                << L"  -w,--workdir      Working directory inside the container\r\n"
+                << L"  -?,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

@@ -82,12 +82,17 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
     // ERROR_SUCCESS_REBOOT_REQUIRED (3010) means the install succeeded but some files
     // will be replaced on the next reboot. Treat as success since the service runs
     // silently with no user-facing console.
-    if (result == ERROR_SUCCESS_REBOOT_REQUIRED)
+    const bool rebootRequired = (result == ERROR_SUCCESS_REBOOT_REQUIRED);
+    if (rebootRequired)
     {
         result = ERROR_SUCCESS;
     }
 
-    WSL_LOG("MSIUpgradeResult", TraceLoggingValue(result, "result"), TraceLoggingValue(errors.c_str(), "errorMessage"));
+    WSL_LOG(
+        "MSIUpgradeResult",
+        TraceLoggingValue(result, "result"),
+        TraceLoggingValue(rebootRequired, "rebootRequired"),
+        TraceLoggingValue(errors.c_str(), "errorMessage"));
 
     return {result, errors};
 }

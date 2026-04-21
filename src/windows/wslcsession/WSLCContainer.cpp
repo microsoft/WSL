@@ -46,6 +46,7 @@ using wsl::windows::service::wslc::WSLCVolumeMount;
 
 using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
+using namespace wsl::windows::common::wslutil;
 using namespace std::chrono_literals;
 using wsl::shared::Localization;
 
@@ -636,7 +637,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
             if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
             {
-                DeleteExclusiveLockHeld(WSLCDeleteFlagsNone);
+                DeleteExclusiveLockHeld(WSLCDeleteFlagsDeleteVolumes);
             }
         }
     }
@@ -752,7 +753,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
-        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce);
+        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
     }
 }
 
@@ -779,7 +780,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
 
     try
     {
-        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce));
+        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
@@ -1234,19 +1235,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             common::docker_schema::PortMapping{.HostIp = e.VmMapping.BindingAddressString(), .HostPort = std::to_string(hostPort)});
     }
 
-    std::map<std::string, std::string> labels;
-    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
-    {
-        const auto& label = containerOptions.Labels[i];
-
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Key, "Label at index %lu has null key", i);
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Value, "Label at index %lu has null value", i);
-
-        THROW_HR_IF_MSG(E_INVALIDARG, strcmp(label.Key, WSLCContainerMetadataLabel) == 0, "Label key '%hs' is reserved", WSLCContainerMetadataLabel);
-        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), labels.contains(label.Key), "Duplicate label key: '%hs'", label.Key);
-
-        labels[label.Key] = label.Value;
-    }
+    auto labels = ParseKeyValuePairs(containerOptions.Labels, containerOptions.LabelsCount, WSLCContainerMetadataLabel);
 
     // Build WSLC metadata to store in a label for recovery on Open().
     WSLCContainerMetadataV1 metadata;
@@ -1268,8 +1257,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
-    auto deleteOnFailure = wil::scope_exit_log(
-        WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() { DockerClient.DeleteContainer(containerId, true); });
+    auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() {
+        DockerClient.DeleteContainer(containerId, true, true);
+    });
 
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);

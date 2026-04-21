@@ -52,6 +52,9 @@ private:
     void ModifyDefaultRouteImpl(const Route& route, int operation, int flags);
 
     template <typename TAddr>
+    void ModifyDefaultLinkLocalRouteImpl(const Route& route, int operation, int flags);
+
+    template <typename TAddr>
     void ModifyLinkLocalRouteImpl(const Route& route, int operation, int flags);
 
     /*

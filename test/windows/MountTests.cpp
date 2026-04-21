@@ -438,6 +438,28 @@ class MountTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + absolutePath.wstring()), (DWORD)0);
     }
 
+    WSL2_TEST_METHOD(AbsolutePathVhdUnmountAfterVMTimeout)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+
+        WslKeepAlive keepAlive;
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " TEST_MOUNT_VHD L" --vhd --bare"), (DWORD)0);
+
+        const auto disk = GetBlockDeviceInWsl();
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+
+        WaitForVmTimeout(keepAlive);
+
+        const auto absolutePath = std::filesystem::absolute(TEST_MOUNT_VHD);
+
+        // Validate that the vhd path doesn't start with '\\?'
+        VERIFY_IS_FALSE(absolutePath.wstring().starts_with(L"\\"));
+
+        // Validate the unmounting by absolute path is successful
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + absolutePath.wstring()), (DWORD)0);
+    }
+
     // Attach a disk, but don't mount it
     WSL2_TEST_METHOD(TestBareMount)
     {

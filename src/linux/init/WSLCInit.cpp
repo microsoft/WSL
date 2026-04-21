@@ -409,33 +409,46 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_FORK& Mes
 
     {
         auto childLogic = [ListenSocketFd = ListenSocket.get(), SocketAddress, &Channel, &Message, &childPid]() mutable {
-            wil::unique_fd ListenSocket;
-
-            // Close parent channel
-            if (Message.ForkType == WSLC_FORK::Process || Message.ForkType == WSLC_FORK::Pty)
+            bool futureSet = false;
+            try
             {
-                Channel.Close();
-            }
+                wil::unique_fd ListenSocket;
 
-            if (Message.ForkType == WSLC_FORK::Thread)
+                // Close parent channel
+                if (Message.ForkType == WSLC_FORK::Process || Message.ForkType == WSLC_FORK::Pty)
+                {
+                    Channel.Close();
+                }
+
+                if (Message.ForkType == WSLC_FORK::Thread)
+                {
+                    // If this is a thread, detach from the process' fd table.
+                    // This prevents other threads from creating child processes that could inherit fds that this thread could create.
+                    // N.B. This needs to happen before childPid is signalled to ensure that ListenSocket() is not closed by the parent before getting duplicated in the child's fd table.
+                    THROW_LAST_ERROR_IF(unshare(CLONE_FILES) < 0);
+                }
+
+                // ListenSocket should only be assigned after this thread is guaranteed to have its own fd table (either via unshare() or a child process).
+                ListenSocket.reset(ListenSocketFd);
+                childPid.set_value(getpid());
+                futureSet = true;
+
+                wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
+                THROW_LAST_ERROR_IF(!ProcessSocket);
+
+                ListenSocket.reset();
+
+                auto subChannel = wsl::shared::SocketChannel{std::move(ProcessSocket), "ForkedChannel"};
+                ProcessMessages(subChannel);
+            }
+            catch (...)
             {
-                // If this is a thread, detach from the process' fd table.
-                // This prevents other threads from creating child processes that could inherit fds that this thread could create.
-                // N.B. This needs to happen before childPid is signalled to ensure that ListenSocket() is not closed by the parent before getting duplicated in the child's fd table.
-                THROW_LAST_ERROR_IF(unshare(CLONE_FILES) < 0);
+                LOG_CAUGHT_EXCEPTION();
+                if (!futureSet)
+                {
+                    childPid.set_exception(std::current_exception());
+                }
             }
-
-            // ListenSocket should only be assigned after this thread is guaranteed to have its own fd table (either via unshare() or a child process).
-            ListenSocket.reset(ListenSocketFd);
-            childPid.set_value(getpid());
-
-            wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
-            THROW_LAST_ERROR_IF(!ProcessSocket);
-
-            ListenSocket.reset();
-
-            auto subChannel = wsl::shared::SocketChannel{std::move(ProcessSocket), "ForkedChannel"};
-            ProcessMessages(subChannel);
         };
 
         if (Message.ForkType == WSLC_FORK::Thread)
@@ -777,7 +790,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_WATCH_PRO
                 }
                 else
                 {
-                    LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status)
+                    LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status);
                 }
 
                 Channel.SendMessage(message);

@@ -51,7 +51,7 @@ set(SOURCES
     wslutil.cpp
     install.cpp
     WSLCUserSettings.cpp
-    )
+    notifications.cpp)
 
 set(HEADERS
     ../../../generated/Localization.h
