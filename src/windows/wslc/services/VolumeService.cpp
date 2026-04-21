@@ -25,7 +25,10 @@ WSLCVolumeInformation VolumeService::Create(models::Session& session, const mode
 {
     WSLCVolumeOptions options{};
     options.Name = createOptions.Name.c_str();
-    options.Driver = createOptions.Driver.c_str();
+    if (createOptions.Driver.has_value())
+    {
+        options.Driver = createOptions.Driver->c_str();
+    }
 
     // Set driver options
     std::vector<KeyValuePair> driverOpts;

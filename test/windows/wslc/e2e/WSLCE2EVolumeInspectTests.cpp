@@ -64,7 +64,7 @@ class WSLCE2EVolumeInspectTests
         auto inspect = inspectData[0];
 
         VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), inspect.Name);
-        VERIFY_ARE_EQUAL("vhd", inspect.Type);
+        VERIFY_ARE_EQUAL("vhd", inspect.Driver);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_InspectMultiple_Success)
@@ -84,11 +84,11 @@ class WSLCE2EVolumeInspectTests
 
         auto inspect1 = inspectData[0];
         VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), inspect1.Name);
-        VERIFY_ARE_EQUAL("vhd", inspect1.Type);
+        VERIFY_ARE_EQUAL("vhd", inspect1.Driver);
 
         auto inspect2 = inspectData[1];
         VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName2), inspect2.Name);
-        VERIFY_ARE_EQUAL("vhd", inspect2.Type);
+        VERIFY_ARE_EQUAL("vhd", inspect2.Driver);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_NotFound)

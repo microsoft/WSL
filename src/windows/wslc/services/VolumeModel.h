@@ -30,7 +30,7 @@ struct VolumeInformation
 struct CreateVolumeOptions
 {
     std::string Name;
-    std::string Driver;
+    std::optional<std::string> Driver;
     std::vector<std::pair<std::string, std::string>> DriverOpts{};
     std::vector<std::pair<std::string, std::string>> Labels{};
 };

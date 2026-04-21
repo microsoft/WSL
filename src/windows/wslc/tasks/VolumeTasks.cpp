@@ -43,10 +43,13 @@ static std::pair<std::string, std::string> OptionsToKeyValue(const std::wstring&
 void CreateVolume(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
-    WI_ASSERT(context.Args.Contains(ArgType::VolumeName));
 
     models::CreateVolumeOptions options{};
-    options.Name = WideToMultiByte(context.Args.Get<ArgType::VolumeName>());
+    if (context.Args.Contains(ArgType::VolumeName))
+    {
+        options.Name = WideToMultiByte(context.Args.Get<ArgType::VolumeName>());
+    }
+
     for (const auto& option : context.Args.GetAll<ArgType::Options>())
     {
         options.DriverOpts.push_back(OptionsToKeyValue(option));

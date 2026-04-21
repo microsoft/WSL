@@ -43,10 +43,19 @@ class WSLCE2EVolumeCreateTests
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_MissingVolumeName)
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_EmptyName)
     {
-        auto result = RunWslc(L"volume create");
-        result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Required argument not provided: 'volume-name'\r\n", .ExitCode = 1});
+        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} ", DefaultVolumeSizeBytes));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto volumeName = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(volumeName.empty());
+
+        auto deleteVolume = wil::scope_exit([&]()
+        {
+            auto deleteResult = RunWslc(std::format(L"volume rm {}", volumeName));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+        });
+        VerifyVolumeIsListed(volumeName);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Create_DefaultDriver_Success)
@@ -57,7 +66,7 @@ class WSLCE2EVolumeCreateTests
 
         VerifyVolumeIsListed(TestVolumeName);
         auto inspect = InspectVolume(TestVolumeName);
-        VERIFY_ARE_EQUAL("vhd", inspect.Type);
+        VERIFY_ARE_EQUAL("vhd", inspect.Driver);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Create_ExplicitDriver_Success)
@@ -68,7 +77,7 @@ class WSLCE2EVolumeCreateTests
 
         VerifyVolumeIsListed(TestVolumeName);
         auto inspect = InspectVolume(TestVolumeName);
-        VERIFY_ARE_EQUAL("vhd", inspect.Type);
+        VERIFY_ARE_EQUAL("vhd", inspect.Driver);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Create_InvalidDriver)
@@ -101,7 +110,7 @@ private:
 
     std::wstring GetUsage() const
     {
-        return L"Usage: wslc volume create [<options>] <volume-name>\r\n\r\n";
+        return L"Usage: wslc volume create [<options>] [<volume-name>]\r\n\r\n";
     }
 
     std::wstring GetAvailableCommands() const
@@ -119,8 +128,9 @@ private:
         options << L"The following options are available:\r\n"                      //
                 << L"  -d,--driver    Specify volume driver name (default vhd)\r\n" //
                 << L"  -o,--opt       Set driver specific options\r\n"              //
+                << L"  --label        Volume metadata setting\r\n"                //
                 << L"  --session      Specify the session to use\r\n"               //
-                << L"  -h,--help      Shows help about the selected command\r\n"    //
+                << L"  -?,--help      Shows help about the selected command\r\n"    //
                 << L"\r\n";
         return options.str();
     }
