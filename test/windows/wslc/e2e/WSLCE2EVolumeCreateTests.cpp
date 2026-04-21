@@ -96,6 +96,19 @@ class WSLCE2EVolumeCreateTests
         VerifyVolumeIsNotListed(TestVolumeName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_WithLabel_Success)
+    {
+        auto result =
+            RunWslc(std::format(L"volume create --label A=1 --label B=2 --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestVolumeName, result.GetStdoutOneLine());
+
+        VerifyVolumeIsListed(TestVolumeName);
+        auto inspect = InspectVolume(TestVolumeName);
+        VERIFY_ARE_EQUAL("1", inspect.Labels["A"]);
+        VERIFY_ARE_EQUAL("2", inspect.Labels["B"]);
+    }
+
 private:
     const std::wstring TestVolumeName = L"wslc-e2e-volume-create";
     const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
