@@ -62,6 +62,27 @@ static bool TryInspectVolume(Session& session, const std::string& volumeName, st
     }
 }
 
+static bool TryDeleteVolume(Session& session, const std::string& volumeName)
+{
+    try
+    {
+        VolumeService::Delete(session, volumeName);
+        return true;
+    }
+    catch (const wil::ResultException& ex)
+    {
+        if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
+        {
+            PrintMessage(std::format(L"Volume not found: '{}'", MultiByteToWide(volumeName)), stderr);
+            return false;
+        }
+        else
+        {
+            throw;
+        }
+    }
+}
+
 void CreateVolume(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -98,7 +119,15 @@ void DeleteVolumes(CLIExecutionContext& context)
     auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
     for (const auto& name : volumeNames)
     {
-        VolumeService::Delete(session, WideToMultiByte(name));
+        std::optional<wslc_schema::InspectVolume> deleteData;
+        if (TryDeleteVolume(session, WideToMultiByte(name)))
+        {
+            PrintMessage(name);
+        }
+         else
+        {   
+            context.ExitCode = 1;
+        }
     }
 }
 

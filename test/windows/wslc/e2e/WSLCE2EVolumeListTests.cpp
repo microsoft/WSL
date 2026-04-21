@@ -109,7 +109,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return Localization::WSLCCLI_VolumeListLongDesc() + L"\r\n\r\n";
+        return std::format(L"{}\r\n\r\n", Localization::WSLCCLI_VolumeListLongDesc());
     }
 
     std::wstring GetUsage() const
@@ -126,10 +126,10 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  --format    " << Localization::WSLCCLI_FormatArgDescription() << L"\r\n"
+                << L"  --format    Output formatting (json or table) (Default: table)\r\n"
                 << L"  -q,--quiet  Outputs the volume names only\r\n"         //
                 << L"  --session   Specify the session to use\r\n"            //
-                << L"  -h,--help   Shows help about the selected command\r\n" //
+                << L"  -?,--help   Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
     }

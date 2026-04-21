@@ -57,7 +57,7 @@ class WSLCE2EVolumeRemoveTests
         VerifyVolumeIsListed(TestVolumeName);
 
         result = RunWslc(std::format(L"volume remove {}", TestVolumeName));
-        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+        result.Verify({.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = L"", .ExitCode = 0});
 
         VerifyVolumeIsNotListed(TestVolumeName);
     }
@@ -84,8 +84,23 @@ class WSLCE2EVolumeRemoveTests
         auto result = RunWslc(std::format(L"volume remove {}", TestVolumeName));
         result.Verify(
             {.Stdout = L"",
-             .Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", TestVolumeName),
+             .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName),
              .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_MixedFoundNotFound)
+    {
+        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsListed(TestVolumeName);
+
+        result = RunWslc(std::format(L"volume remove {} {}", TestVolumeName, TestVolumeName2));
+        result.Dump(true);
+        result.Verify(
+            {.Stdout = std::format(L"{}\r\n", TestVolumeName),
+             .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName2),
+             .ExitCode = 1});
+        VerifyVolumeIsNotListed(TestVolumeName);
     }
 
 private:
@@ -134,7 +149,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"                   //
                 << L"  --session      Specify the session to use\r\n"            //
-                << L"  -h,--help      Shows help about the selected command\r\n" //
+                << L"  -?,--help      Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
     }

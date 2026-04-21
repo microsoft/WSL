@@ -141,7 +141,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return Localization::WSLCCLI_VolumeInspectLongDesc() + L"\r\n\r\n";
+        return std::format(L"{}\r\n\r\n", Localization::WSLCCLI_VolumeInspectLongDesc());
     }
 
     std::wstring GetUsage() const
