@@ -69,6 +69,7 @@ class WSLCE2EVolumeInspectTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_InspectMultiple_Success)
     {
+        // Create two volumes to inspect at the same time
         auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName1));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestVolumeName1, result.GetStdoutOneLine());
@@ -76,6 +77,7 @@ class WSLCE2EVolumeInspectTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestVolumeName2, result.GetStdoutOneLine());
 
+        // Inspect both volumes in the same command
         result = RunWslc(std::format(L"volume inspect {} {}", TestVolumeName1, TestVolumeName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto inspectData =
@@ -95,9 +97,30 @@ class WSLCE2EVolumeInspectTests
     {
         auto result = RunWslc(std::format(L"volume inspect {}", TestVolumeName1));
         result.Verify(
-            {.Stdout = L"",
-             .Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", TestVolumeName1),
+            {.Stdout = L"[]\r\n",
+             .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName1),
              .ExitCode = 1});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_MixedFoundNotFound)
+    {
+        // Create one volume but not the other
+        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(TestVolumeName1, result.GetStdoutOneLine());
+
+        // Inspect both volumes in the same command, expecting one to be found and the other to not be found
+        result = RunWslc(std::format(L"volume inspect {} {}", TestVolumeName1, TestVolumeName2));
+        result.Verify(
+            {.Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName2),
+             .ExitCode = 1});
+
+        // Verify found volume
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+        auto inspect = inspectData[0];
+        VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), inspect.Name);
     }
 
 private:
@@ -140,7 +163,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"                   //
                 << L"  --session      Specify the session to use\r\n"            //
-                << L"  -h,--help      Shows help about the selected command\r\n" //
+                << L"  -?,--help      Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
     }

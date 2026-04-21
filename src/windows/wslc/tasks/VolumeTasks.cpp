@@ -21,6 +21,7 @@ Abstract:
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
+using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
@@ -38,6 +39,27 @@ static std::pair<std::string, std::string> OptionsToKeyValue(const std::wstring&
     }
 
     return {WideToMultiByte(option.substr(0, pos)), WideToMultiByte(option.substr(pos + 1))};
+}
+
+static bool TryInspectVolume(Session& session, const std::string& volumeName, std::optional<wslc_schema::InspectVolume>& inspectData)
+{
+    try
+    {
+        inspectData = VolumeService::Inspect(session, volumeName);
+        return true;
+    }
+    catch (const wil::ResultException& ex)
+    {
+        if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
+        {
+            PrintMessage(std::format(L"Volume not found: '{}'", MultiByteToWide(volumeName)), stderr);
+            return false;
+        }
+        else
+        {
+            throw;
+        }
+    }
 }
 
 void CreateVolume(CLIExecutionContext& context)
@@ -95,8 +117,15 @@ void InspectVolumes(CLIExecutionContext& context)
     std::vector<wsl::windows::common::wslc_schema::InspectVolume> result;
     for (const auto& name : volumeNames)
     {
-        auto inspectData = VolumeService::Inspect(session, WideToMultiByte(name));
-        result.push_back(inspectData);
+        std::optional<wslc_schema::InspectVolume> inspectData;
+        if (TryInspectVolume(session, WideToMultiByte(name), inspectData))
+        {
+            result.push_back(*inspectData);
+        }
+        else
+        {   
+            context.ExitCode = 1;
+        }
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);

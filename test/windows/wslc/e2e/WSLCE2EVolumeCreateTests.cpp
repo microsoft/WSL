@@ -58,7 +58,7 @@ class WSLCE2EVolumeCreateTests
         VerifyVolumeIsListed(volumeName);
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_DefaultDriver_Success)
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_DefaultDriverIsVhd)
     {
         auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -80,11 +80,20 @@ class WSLCE2EVolumeCreateTests
         VERIFY_ARE_EQUAL("vhd", inspect.Driver);
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_InvalidDriver)
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_Vhd_MissingOpts_Fail)
+    {
+        auto result = RunWslc(std::format(L"volume create --driver vhd {}", TestVolumeName));
+        result.Verify({.Stderr = L"Missing required option: 'SizeBytes'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+
+        VerifyVolumeIsNotListed(TestVolumeName);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Create_InvalidDriver_Fail)
     {
         auto result =
             RunWslc(std::format(L"volume create --driver invalid_driver --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
         result.Verify({.Stdout = L"", .Stderr = L"Unsupported volume type: 'invalid_driver'\r\nError code: E_INVALIDARG\r\n", .ExitCode = 1});
+
         VerifyVolumeIsNotListed(TestVolumeName);
     }
 
