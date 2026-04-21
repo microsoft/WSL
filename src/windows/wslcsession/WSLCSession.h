@@ -180,7 +180,7 @@ private:
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
-    wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
 

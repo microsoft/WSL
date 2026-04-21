@@ -251,7 +251,7 @@ try
 
     // Wait for dockerd to be ready before starting the event tracker.
     THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
@@ -393,11 +393,11 @@ try
         TraceLoggingValue(entry.c_str(), "Content"),
         TraceLoggingValue(m_displayName.c_str(), "Name"));
 
-    if (!m_containerdReadyEvent.is_signaled())
+    if (!m_dockerdReadyEvent.is_signaled())
     {
         if (entry.find(c_dockerdReadyLogLine) != std::string::npos)
         {
-            m_containerdReadyEvent.SetEvent();
+            m_dockerdReadyEvent.SetEvent();
         }
     }
 }
