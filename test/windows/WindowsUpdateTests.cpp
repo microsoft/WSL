@@ -492,10 +492,18 @@ struct MockUpdateDownloader : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WR
         return S_OK;
     }
 
-    STDMETHOD(BeginDownload)(IUnknown*, IUnknown*, VARIANT, IDownloadJob** retval) override
+    STDMETHOD(BeginDownload)(IUnknown*, IUnknown* completedCallback, VARIANT, IDownloadJob** retval) override
     {
         beginDownloadCalled = true;
         *retval = wil::MakeOrThrow<MockDownloadJob>().Detach();
+        if (completedCallback)
+        {
+            wil::com_ptr<IDownloadCompletedCallback> cb;
+            if (SUCCEEDED(completedCallback->QueryInterface(IID_PPV_ARGS(&cb))))
+            {
+                cb->Invoke(*retval, nullptr);
+            }
+        }
         return S_OK;
     }
 
@@ -617,10 +625,18 @@ struct MockUpdateInstaller : public WRL::RuntimeClass<WRL::RuntimeClassFlags<WRL
         return S_OK;
     }
 
-    STDMETHOD(BeginInstall)(IUnknown*, IUnknown*, VARIANT, IInstallationJob** retval) override
+    STDMETHOD(BeginInstall)(IUnknown*, IUnknown* completedCallback, VARIANT, IInstallationJob** retval) override
     {
         beginInstallCalled = true;
         *retval = wil::MakeOrThrow<MockInstallationJob>().Detach();
+        if (completedCallback)
+        {
+            wil::com_ptr<IInstallationCompletedCallback> cb;
+            if (SUCCEEDED(completedCallback->QueryInterface(IID_PPV_ARGS(&cb))))
+            {
+                cb->Invoke(*retval, nullptr);
+            }
+        }
         return S_OK;
     }
 

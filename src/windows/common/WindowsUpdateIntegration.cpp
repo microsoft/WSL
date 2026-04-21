@@ -58,6 +58,28 @@ namespace anon {
         std::function<void(uint32_t)> m_progress;
     };
 
+    struct DownloadCompletedCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDownloadCompletedCallback>
+    {
+        DownloadCompletedCallback()
+        {
+        }
+
+        IFACEMETHOD(Invoke)(IDownloadJob*, IDownloadCompletedCallbackArgs*) override
+        {
+            m_completed.SetEvent();
+            return S_OK;
+        }
+
+        void Wait()
+        {
+            m_completed.wait();
+        }
+
+    private:
+        wil::slim_event_manual_reset m_completed;
+    };
+
     struct InstallationProgressChangedCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IInstallationProgressChangedCallback>
     {
@@ -79,6 +101,28 @@ namespace anon {
 
     private:
         std::function<void(uint32_t)> m_progress;
+    };
+
+    struct InstallationCompletedCallback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IInstallationCompletedCallback>
+    {
+        InstallationCompletedCallback()
+        {
+        }
+
+        IFACEMETHOD(Invoke)(IInstallationJob*, IInstallationCompletedCallbackArgs*) override
+        {
+            m_completed.SetEvent();
+            return S_OK;
+        }
+
+        void Wait()
+        {
+            m_completed.wait();
+        }
+
+    private:
+        wil::slim_event_manual_reset m_completed;
     };
 } // namespace anon
 
@@ -196,10 +240,11 @@ void WindowsUpdateContext::DownloadUpdates(std::function<void(uint32_t)> progres
     {
         downloadProgress = wil::MakeOrThrow<anon::DownloadProgressChangedCallback>(progress);
     }
+    auto downloadCompleted = wil::MakeOrThrow<anon::DownloadCompletedCallback>();
     wil::com_ptr<IDownloadJob> downloadJob;
 
-    THROW_IF_FAILED(updateDownloader->BeginDownload(downloadProgress.Get(), nullptr, VARIANT{}, &downloadJob));
-    // Waits for download to complete
+    THROW_IF_FAILED(updateDownloader->BeginDownload(downloadProgress.Get(), downloadCompleted.Get(), VARIANT{}, &downloadJob));
+    downloadCompleted->Wait();
     THROW_IF_FAILED(downloadJob->CleanUp());
 
     wil::com_ptr<IDownloadResult> result;
@@ -224,10 +269,11 @@ void WindowsUpdateContext::InstallUpdates(std::function<void(uint32_t)> progress
     {
         installationProgress = wil::MakeOrThrow<anon::InstallationProgressChangedCallback>(progress);
     }
+    auto installationCompleted = wil::MakeOrThrow<anon::InstallationCompletedCallback>();
     wil::com_ptr<IInstallationJob> installationJob;
 
-    THROW_IF_FAILED(updateInstaller->BeginInstall(installationProgress.Get(), nullptr, VARIANT{}, &installationJob));
-    // Waits for install to complete
+    THROW_IF_FAILED(updateInstaller->BeginInstall(installationProgress.Get(), installationCompleted.Get(), VARIANT{}, &installationJob));
+    installationCompleted->Wait();
     THROW_IF_FAILED(installationJob->CleanUp());
 
     wil::com_ptr<IInstallationResult> result;
