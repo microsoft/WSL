@@ -1,4 +1,4 @@
-﻿// Copyright (C) Microsoft Corporation. All rights reserved.
+// Copyright (C) Microsoft Corporation. All rights reserved.
 
 using WslSettings.Contracts.Services;
 using static WslSettings.Contracts.Services.IWslConfigService;
@@ -11,6 +11,10 @@ public class WslConfigService : IWslConfigService, IDisposable
     private WslConfig? _wslConfigDefaults { get; init; }
     private readonly object? _wslCoreConfigInterfaceLockObj = null;
     private FileSystemWatcher? _wslConfigFileSystemWatcher = null;
+
+    // Pending changes: stores only entries the user has changed in-app but not yet committed.
+    // Values are plain managed objects (bool, int, ulong, string, or enum) — no native clones needed.
+    private readonly Dictionary<WslConfigEntry, object> _pendingValues = new();
 
     public WslConfigService()
     {
@@ -61,31 +65,164 @@ public class WslConfigService : IWslConfigService, IDisposable
 
     public IWslConfigSetting GetWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting)
     {
-        WslConfigSettingManaged? wslConfigSetting = null;
-        lock (_wslCoreConfigInterfaceLockObj!)
+        if (defaultSetting)
         {
-            wslConfigSetting = new WslConfigSettingManaged(WslCoreConfigInterface.GetWslConfigSetting(defaultSetting ? _wslConfigDefaults : _wslConfig, wslConfigEntry));
+            return GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: true);
         }
 
-        return wslConfigSetting;
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            if (_pendingValues.TryGetValue(wslConfigEntry, out var pendingValue))
+            {
+                // Build a native setting from the pending managed value for the caller
+                var setting = GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: false);
+                setting.SetValueDirect(pendingValue);
+                return setting;
+            }
+
+            return GetPersistedWslConfigSetting(wslConfigEntry, defaultSetting: false);
+        }
     }
 
     public uint SetWslConfigSetting(IWslConfigSetting wslConfigSetting)
     {
-        var wslConfigSettingsManaged = wslConfigSetting as WslConfigSettingManaged;
-        if (wslConfigSettingsManaged == null)
+        var settingManaged = wslConfigSetting as WslConfigSettingManaged;
+        if (settingManaged == null)
         {
-            throw new ArgumentNullException("wslConfigSetting");
+            throw new ArgumentNullException(nameof(wslConfigSetting));
         }
 
-        uint result = 0;
+        bool pendingStateChanged;
         lock (_wslCoreConfigInterfaceLockObj!)
         {
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
-            result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, wslConfigSettingsManaged.ConfigSetting);
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            var hadPendingBefore = _pendingValues.Count > 0;
+
+            var persisted = GetPersistedWslConfigSetting(settingManaged.ConfigEntry, defaultSetting: false);
+            try
+            {
+                bool isChanged = !persisted.Equals(settingManaged.GetValueAsObject());
+
+                if (isChanged)
+                {
+                    _pendingValues[settingManaged.ConfigEntry] = settingManaged.GetValueAsObject();
+                }
+                else
+                {
+                    _pendingValues.Remove(settingManaged.ConfigEntry);
+                }
+            }
+            finally
+            {
+                persisted.ConfigSetting.Dispose();
+            }
+
+            var hasPendingAfter = _pendingValues.Count > 0;
+            pendingStateChanged = hadPendingBefore != hasPendingAfter;
         }
 
+        if (pendingStateChanged)
+        {
+            _onPendingChangesChangedHandler?.Invoke();
+        }
+
+        return 0;
+    }
+
+    public bool HasPendingChanges
+    {
+        get
+        {
+            lock (_wslCoreConfigInterfaceLockObj!)
+            {
+                return _pendingValues.Count > 0;
+            }
+        }
+    }
+
+    public IReadOnlyList<WslConfigPendingChange> GetPendingChanges()
+    {
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            var changes = new List<WslConfigPendingChange>(_pendingValues.Count);
+            foreach (var (entry, value) in _pendingValues)
+            {
+                changes.Add(new WslConfigPendingChange
+                {
+                    ConfigEntry = entry,
+                    PendingValue = value,
+                });
+            }
+            return changes;
+        }
+    }
+
+    public uint CommitPendingChanges()
+    {
+        uint result = 0;
+        bool pendingStateChanged;
+
+        lock (_wslCoreConfigInterfaceLockObj!)
+        {
+            if (_pendingValues.Count == 0)
+            {
+                return 0;
+            }
+
+            _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
+            try
+            {
+                var committed = new List<WslConfigEntry>();
+                foreach (var (entry, value) in _pendingValues)
+                {
+                    var setting = GetPersistedWslConfigSetting(entry, defaultSetting: false);
+                    try
+                    {
+                        setting.SetValueDirect(value);
+                        result = WslCoreConfigInterface.SetWslConfigSetting(_wslConfig, setting.ConfigSetting);
+                    }
+                    finally
+                    {
+                        setting.ConfigSetting.Dispose();
+                    }
+
+                    if (result != 0)
+                    {
+                        break;
+                    }
+
+                    committed.Add(entry);
+                }
+
+                ReloadConfig_NoLock();
+
+                if (result == 0)
+                {
+                    _pendingValues.Clear();
+                }
+                else
+                {
+                    // Partial failure - only remove successfully-committed entries
+                    // so unapplied entries remain pending.
+                    foreach (var entry in committed)
+                    {
+                        _pendingValues.Remove(entry);
+                    }
+                }
+            }
+            finally
+            {
+                _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            }
+
+            // We entered with pending changes. Fire only if they're now empty (full success).
+            pendingStateChanged = _pendingValues.Count == 0;
+        }
+
+        if (pendingStateChanged)
+        {
+            _onPendingChangesChangedHandler?.Invoke();
+        }
+        _onWslConfigChangedHandler?.Invoke();
         return result;
     }
 
@@ -102,17 +239,54 @@ public class WslConfigService : IWslConfigService, IDisposable
         }
     }
 
+    private PendingChangesChangedEventHandler? _onPendingChangesChangedHandler = null;
+    public event PendingChangesChangedEventHandler PendingChangesChanged
+    {
+        add
+        {
+            _onPendingChangesChangedHandler += value;
+        }
+        remove
+        {
+            _onPendingChangesChangedHandler -= value;
+        }
+    }
+
     private void OnWslConfigFileChanged(object sender, FileSystemEventArgs e)
     {
+        bool hadPending;
         lock (_wslCoreConfigInterfaceLockObj!)
         {
+            hadPending = _pendingValues.Count > 0;
             _wslConfigFileSystemWatcher!.EnableRaisingEvents = false;
-            WslCoreConfigInterface.FreeWslConfig(_wslConfig);
-            _wslConfig = WslCoreConfigInterface.CreateWslConfig(WslCoreConfigInterface.GetWslConfigFilePath());
-            _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            try
+            {
+                ReloadConfig_NoLock();
+                _pendingValues.Clear();
+            }
+            finally
+            {
+                _wslConfigFileSystemWatcher!.EnableRaisingEvents = true;
+            }
         }
 
+        if (hadPending)
+        {
+            _onPendingChangesChangedHandler?.Invoke();
+        }
         _onWslConfigChangedHandler?.Invoke();
+    }
+
+    // Read a single setting from the native config layer (either the user's .wslconfig or built-in defaults).
+    private WslConfigSettingManaged GetPersistedWslConfigSetting(WslConfigEntry wslConfigEntry, bool defaultSetting)
+    {
+        return new WslConfigSettingManaged(WslCoreConfigInterface.GetWslConfigSetting(defaultSetting ? _wslConfigDefaults : _wslConfig, wslConfigEntry));
+    }
+
+    private void ReloadConfig_NoLock()
+    {
+        WslCoreConfigInterface.FreeWslConfig(_wslConfig);
+        _wslConfig = WslCoreConfigInterface.CreateWslConfig(WslCoreConfigInterface.GetWslConfigFilePath());
     }
 }
 
@@ -137,41 +311,79 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
     public NetworkingConfiguration NetworkingConfigurationValue { get { return ConfigSetting.NetworkingConfigurationValue; } }
     public MemoryReclaimMode MemoryReclaimModeValue { get { return ConfigSetting.MemoryReclaimModeValue; } }
 
+    public object GetValueAsObject()
+    {
+        switch (ConfigSetting.ConfigEntry.GetValueKind())
+        {
+            case WslConfigValueKind.String:
+                return ConfigSetting.StringValue;
+            case WslConfigValueKind.Int32:
+                return ConfigSetting.Int32Value;
+            case WslConfigValueKind.UInt64:
+                return ConfigSetting.UInt64Value;
+            case WslConfigValueKind.NetworkingConfiguration:
+                return ConfigSetting.NetworkingConfigurationValue;
+            case WslConfigValueKind.MemoryReclaimMode:
+                return ConfigSetting.MemoryReclaimModeValue;
+            default:
+                return ConfigSetting.BoolValue;
+        }
+    }
+
+    // Apply a plain managed value to the native setting without going through the service.
+    public void SetValueDirect(object value)
+    {
+        switch (ConfigSetting.ConfigEntry.GetValueKind())
+        {
+            case WslConfigValueKind.String:
+                ConfigSetting.StringValue = (string)value;
+                break;
+            case WslConfigValueKind.Int32:
+                ConfigSetting.Int32Value = (int)value;
+                break;
+            case WslConfigValueKind.UInt64:
+                ConfigSetting.UInt64Value = (ulong)value;
+                break;
+            case WslConfigValueKind.NetworkingConfiguration:
+                ConfigSetting.NetworkingConfigurationValue = (NetworkingConfiguration)value;
+                break;
+            case WslConfigValueKind.MemoryReclaimMode:
+                ConfigSetting.MemoryReclaimModeValue = (MemoryReclaimMode)value;
+                break;
+            default:
+                ConfigSetting.BoolValue = (bool)value;
+                break;
+        }
+    }
+
 #nullable enable
     public uint SetValue(object? value)
     {
         if (value == null)
         {
-            throw new ArgumentNullException("value");
+            throw new ArgumentNullException(nameof(value));
         }
 
-        if ("".GetType() == value.GetType())
+        switch (ConfigSetting.ConfigEntry.GetValueKind())
         {
-            ConfigSetting.StringValue = (string)value;
-        }
-        else if (ConfigSetting.UInt64Value.GetType() == value.GetType())
-        {
-            ConfigSetting.UInt64Value = (ulong)value;
-        }
-        else if (ConfigSetting.Int32Value.GetType() == value.GetType())
-        {
-            ConfigSetting.Int32Value = (int)value;
-        }
-        else if (ConfigSetting.BoolValue.GetType() == value.GetType())
-        {
-            ConfigSetting.BoolValue = (bool)value;
-        }
-        else if (ConfigSetting.NetworkingConfigurationValue.GetType() == value.GetType())
-        {
-            ConfigSetting.NetworkingConfigurationValue = (NetworkingConfiguration)value;
-        }
-        else if (ConfigSetting.MemoryReclaimModeValue.GetType() == value.GetType())
-        {
-            ConfigSetting.MemoryReclaimModeValue = (MemoryReclaimMode)value;
-        }
-        else
-        {
-            throw new InvalidDataException();
+            case WslConfigValueKind.String:
+                ConfigSetting.StringValue = (string)value;
+                break;
+            case WslConfigValueKind.Int32:
+                ConfigSetting.Int32Value = (int)value;
+                break;
+            case WslConfigValueKind.UInt64:
+                ConfigSetting.UInt64Value = (ulong)value;
+                break;
+            case WslConfigValueKind.NetworkingConfiguration:
+                ConfigSetting.NetworkingConfigurationValue = (NetworkingConfiguration)value;
+                break;
+            case WslConfigValueKind.MemoryReclaimMode:
+                ConfigSetting.MemoryReclaimModeValue = (MemoryReclaimMode)value;
+                break;
+            default:
+                ConfigSetting.BoolValue = (bool)value;
+                break;
         }
 
         return App.GetService<IWslConfigService>().SetWslConfigSetting(this);
@@ -181,7 +393,7 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
     {
         if (value == null)
         {
-            throw new ArgumentNullException("value");
+            throw new ArgumentNullException(nameof(value));
         }
 
         // Special handling for byte values. Compare using MB since in the UI the user works with MB.
@@ -192,34 +404,8 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
             return ((ulong)value / Constants.MB) == (UInt64Value / Constants.MB);
         }
 
-        if ("".GetType() == value.GetType())
-        {
-            return ConfigSetting.StringValue == (string)value;
-        }
-        else if (ConfigSetting.UInt64Value.GetType() == value.GetType())
-        {
-            return ConfigSetting.UInt64Value == (ulong)value;
-        }
-        else if (ConfigSetting.Int32Value.GetType() == value.GetType())
-        {
-            return ConfigSetting.Int32Value == (int)value;
-        }
-        else if (ConfigSetting.BoolValue.GetType() == value.GetType())
-        {
-            return ConfigSetting.BoolValue == (bool)value;
-        }
-        else if (ConfigSetting.NetworkingConfigurationValue.GetType() == value.GetType())
-        {
-            return ConfigSetting.NetworkingConfigurationValue == (NetworkingConfiguration)value;
-        }
-        else if (ConfigSetting.MemoryReclaimModeValue.GetType() == value.GetType())
-        {
-            return ConfigSetting.MemoryReclaimModeValue == (MemoryReclaimMode)value;
-        }
-        else
-        {
-            throw new InvalidDataException();
-        }
+        // object.Equals handles null on either side (returns true if both null, false if one null).
+        return object.Equals(GetValueAsObject(), value);
     }
 
     public override int GetHashCode()
