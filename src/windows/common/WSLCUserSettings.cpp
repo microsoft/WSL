@@ -37,19 +37,19 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "# https://aka.ms/wslc-settings\n"
     "\n"
     "session:\n"
-    "  # Number of virtual CPUs allocated to the session (default: 4)\n"
-    "  # cpuCount: 4\n"
+    "  # Number of virtual CPUs allocated to the session (e.g. 4 default: all available CPUs)\n"
+    "  # cpuCount: default\n"
     "\n"
-    "  # Memory limit for the session in megabytes (default: 2GB)\n"
-    "  # memorySize: 2GB\n"
+    "  # Memory limit for the session (e.g. 2GB default: half of available memory)\n"
+    "  # memorySize: default\n"
     "\n"
-    "  # Maximum disk image size in megabytes (default: 100GB)\n"
-    "  # maxStorageSize: 100GB\n"
+    "  # Maximum disk image size (default: 1TB)\n"
+    "  # maxStorageSize: 1TB\n"
     "\n"
     "  # Default path for session storage. By default, storage is per-session under:\n"
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli        (standard sessions)\n"
     "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin (elevated sessions)\n"
-    "  # defaultStoragePath: \"\"\n"
+    "  # defaultStoragePath: default\n"
     "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
@@ -186,6 +186,18 @@ namespace {
         {
             // Key absent — silently use the built-in default.
             return;
+        }
+
+        // Check "default"
+        try
+        {
+            if (node->IsScalar() && node->as<std::string>() == "default")
+            {
+                return;
+            }
+        }
+        catch (...)
+        {
         }
 
         try
