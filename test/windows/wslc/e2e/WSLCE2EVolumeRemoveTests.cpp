@@ -23,8 +23,15 @@ class WSLCE2EVolumeRemoveTests
 {
     WSLC_TEST_CLASS(WSLCE2EVolumeRemoveTests)
 
+    TEST_CLASS_SETUP(ClassSetup)
+    {
+        EnsureImageIsLoaded(DebianImage);
+        return true;
+    }
+
     TEST_METHOD_SETUP(MethodSetup)
     {
+        EnsureContainerDoesNotExist(WslcContainerName);
         EnsureVolumeDoesNotExist(TestVolumeName);
         EnsureVolumeDoesNotExist(TestVolumeName2);
         return true;
@@ -32,6 +39,8 @@ class WSLCE2EVolumeRemoveTests
 
     TEST_CLASS_CLEANUP(ClassCleanup)
     {
+        EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureImageIsDeleted(DebianImage);
         EnsureVolumeDoesNotExist(TestVolumeName);
         EnsureVolumeDoesNotExist(TestVolumeName2);
         return true;
@@ -92,13 +101,35 @@ class WSLCE2EVolumeRemoveTests
         VerifyVolumeIsListed(TestVolumeName);
 
         result = RunWslc(std::format(L"volume remove {} {}", TestVolumeName, TestVolumeName2));
-        result.Dump(true);
         result.Verify(
             {.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName2), .ExitCode = 1});
         VerifyVolumeIsNotListed(TestVolumeName);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_VolumeInUse_Fail)
+    {
+        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyVolumeIsListed(TestVolumeName);
+
+        // Create a container that uses the volume to ensure it's in use
+        result = RunWslc(std::format(
+            L"container run -d --name {} -v {}:/data {} sh -c \"echo -n 'WSLC Volume In Use Test' > /data/test.txt && sleep infinity\"",
+            WslcContainerName,
+            TestVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Attempt to remove the volume while it's in use
+        result = RunWslc(std::format(L"volume remove {}", TestVolumeName));
+        result.Verify({.Stdout = L"", .Stderr = std::format(L"Volume '{}' is in use.\r\nError code: ERROR_SHARING_VIOLATION\r\n", TestVolumeName), .ExitCode = 1});
+
+        VerifyVolumeIsListed(TestVolumeName);
+    }
+
 private:
+    const std::wstring WslcContainerName = L"wslc-test-container";
+    const TestImage& DebianImage = DebianTestImage();
     const std::wstring TestVolumeName = L"wslc-e2e-volume-remove";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-remove-2";
     const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
