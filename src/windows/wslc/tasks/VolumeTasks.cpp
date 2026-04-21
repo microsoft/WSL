@@ -115,7 +115,6 @@ void DeleteVolumes(CLIExecutionContext& context)
     auto volumeNames = context.Args.GetAll<ArgType::VolumeName>();
     for (const auto& name : volumeNames)
     {
-        std::optional<wslc_schema::InspectVolume> deleteData;
         if (TryDeleteVolume(session, WideToMultiByte(name)))
         {
             PrintMessage(name);
