@@ -386,8 +386,12 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
-    // Extra unknown keys at any level must not cause errors or warnings.
-    TEST_METHOD(Validation_UnknownKeys_NoErrorsOrWarnings)
+    // -----------------------------------------------------------------------
+    // Unknown key warnings
+    // -----------------------------------------------------------------------
+
+    // Unknown keys in a known section and unknown root sections both produce warnings.
+    TEST_METHOD(Validation_UnknownKeys_WarnsAboutUnknownKeys)
     {
         auto dir = UniqueTempDir();
         WriteFile(
@@ -401,8 +405,77 @@ class WSLCCLISettingsUnitTests
         UserSettingsTest s{dir};
 
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
-        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        // Two warnings: "session.unknownSetting" and "unknownSection".
+        VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
+    }
+
+    // An unknown key under a known section produces a warning with the full path.
+    TEST_METHOD(Validation_UnknownKeys_UnknownInKnownSection)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "  typoSetting: true\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::wstring(L"session.typoSetting"), s.GetWarnings().front().SettingPath);
+    }
+
+    // An unknown root-level section produces a warning.
+    TEST_METHOD(Validation_UnknownKeys_UnknownRootSection)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "badSection:\n"
+            "  key: value\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::wstring(L"badSection"), s.GetWarnings().front().SettingPath);
+    }
+
+    // An unknown root-level scalar key produces a warning.
+    TEST_METHOD(Validation_UnknownKeys_UnknownRootScalar)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "badKey: hello\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::wstring(L"badKey"), s.GetWarnings().front().SettingPath);
+    }
+
+    // A file with only valid known keys produces no warnings.
+    TEST_METHOD(Validation_UnknownKeys_AllKnownKeys_NoWarnings)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 8\n"
+            "  memorySize: 4GB\n"
+            "  maxStorageSize: 50000MB\n"
+            "  defaultStoragePath: \"\"\n"
+            "  networkingMode: nat\n"
+            "  hostFileShareMode: virtiofs\n"
+            "  dnsTunneling: true\n"
+            "credentialStore: wincred\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
     }
 };
 

@@ -229,6 +229,82 @@ namespace {
         (ValidateSetting<static_cast<Setting>(S)>(root, map, warnings), ...);
     }
 
+    // Collects the set of known dot-separated YAML paths from all SettingMapping specializations.
+    template <size_t... S>
+    std::set<std::string> CollectKnownPaths(std::index_sequence<S...>)
+    {
+        std::set<std::string> paths;
+        (paths.insert(std::string(details::SettingMapping<static_cast<Setting>(S)>::YamlPath)), ...);
+        return paths;
+    }
+
+    // Derives the set of known parent prefixes from the known paths.
+    // e.g. "session.cpuCount" contributes "session" as a known prefix.
+    std::set<std::string> CollectKnownPrefixes(const std::set<std::string>& knownPaths)
+    {
+        std::set<std::string> prefixes;
+        for (const auto& path : knownPaths)
+        {
+            auto dotPos = path.rfind('.');
+            if (dotPos != std::string::npos)
+            {
+                prefixes.insert(path.substr(0, dotPos));
+            }
+        }
+        return prefixes;
+    }
+
+    // Recursively walks the YAML tree and warns about keys not in the known set.
+    void WarnUnknownKeys(
+        const YAML::Node& node,
+        const std::string& prefix,
+        const std::set<std::string>& knownPaths,
+        const std::set<std::string>& knownPrefixes,
+        std::vector<Warning>& warnings)
+    {
+        if (!node.IsMap())
+        {
+            return;
+        }
+
+        for (auto it = node.begin(); it != node.end(); ++it)
+        {
+            std::string key;
+            try
+            {
+                key = it->first.as<std::string>();
+            }
+            catch (...)
+            {
+                continue;
+            }
+
+            auto fullPath = prefix.empty() ? key : prefix + "." + key;
+
+            if (it->second.IsMap())
+            {
+                if (knownPrefixes.count(fullPath))
+                {
+                    // Known section — recurse into it.
+                    WarnUnknownKeys(it->second, fullPath, knownPaths, knownPrefixes, warnings);
+                }
+                else
+                {
+                    // Unknown section — warn once, don't recurse.
+                    const auto widePath = MultiByteToWide(fullPath);
+                    warnings.push_back(
+                        {std::format(L"Warning: Unknown setting section '{}'.", widePath), widePath});
+                }
+            }
+            else if (!knownPaths.count(fullPath) && !knownPrefixes.count(fullPath))
+            {
+                const auto widePath = MultiByteToWide(fullPath);
+                warnings.push_back(
+                    {std::format(L"Warning: Unknown setting '{}'.", widePath), widePath});
+            }
+        }
+    }
+
     // Attempts to parse a YAML document from the given file path.
     // Returns an empty optional and pushes a warning if the file exists but fails to parse.
     std::optional<YAML::Node> TryLoadYaml(const std::filesystem::path& path, std::vector<Warning>& warnings)
@@ -292,7 +368,10 @@ UserSettings::UserSettings(const std::filesystem::path& settingsDir)
         constexpr auto settingCount = static_cast<size_t>(Setting::Max);
         ValidateAll(root.value(), m_settings, m_warnings, std::make_index_sequence<settingCount>());
 
-        // TODO: Iterate through all nodes and warn about unknown keys?
+        constexpr auto indexSeq = std::make_index_sequence<settingCount>();
+        auto knownPaths = CollectKnownPaths(indexSeq);
+        auto knownPrefixes = CollectKnownPrefixes(knownPaths);
+        WarnUnknownKeys(root.value(), {}, knownPaths, knownPrefixes, m_warnings);
     }
 
     // Emit any settings load warnings.
