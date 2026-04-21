@@ -941,27 +941,21 @@ extern "C" UINT __stdcall RepairShortcutProperties(MSIHANDLE install)
 
         // Repair WSL Settings.lnk — only on workstation (MsiNTProductType = 1).
         // The server shortcut does not use IsSystemComponent (matches original WiX authoring).
+        if (!IsWindowsServer())
         {
-            // Use GetVersionEx to check for workstation vs server
-            OSVERSIONINFOEXW osvi{};
-            osvi.dwOSVersionInfoSize = sizeof(osvi);
-            #pragma warning(suppress: 4996) // GetVersionExW is deprecated but sufficient for product type check
-            if (GetVersionExW(reinterpret_cast<OSVERSIONINFOW*>(&osvi)) && osvi.wProductType == VER_NT_WORKSTATION)
+            auto wslSettingsShortcut = programsFolderStr + L"\\WSL Settings.lnk";
+            if (GetFileAttributesW(wslSettingsShortcut.c_str()) != INVALID_FILE_ATTRIBUTES)
             {
-                auto wslSettingsShortcut = programsFolderStr + L"\\WSL Settings.lnk";
-                if (GetFileAttributesW(wslSettingsShortcut.c_str()) != INVALID_FILE_ATTRIBUTES)
-                {
-                    PROPVARIANT pvSystemComponent{};
-                    pvSystemComponent.vt = VT_BOOL;
-                    pvSystemComponent.boolVal = VARIANT_TRUE;
+                PROPVARIANT pvSystemComponent{};
+                pvSystemComponent.vt = VT_BOOL;
+                pvSystemComponent.boolVal = VARIANT_TRUE;
 
-                    auto hr = SetShortcutPropertiesWithRetry(wslSettingsShortcut.c_str(), {
-                        {c_pkeyAppUserModelIsSystemComponent, pvSystemComponent}});
+                auto hr = SetShortcutPropertiesWithRetry(wslSettingsShortcut.c_str(), {
+                    {c_pkeyAppUserModelIsSystemComponent, pvSystemComponent}});
 
-                    WSL_LOG("RepairShortcutProperty",
-                        TraceLoggingValue(wslSettingsShortcut.c_str(), "shortcut"),
-                        TraceLoggingValue(hr, "result"));
-                }
+                WSL_LOG("RepairShortcutProperty",
+                    TraceLoggingValue(wslSettingsShortcut.c_str(), "shortcut"),
+                    TraceLoggingValue(hr, "result"));
             }
         }
     }
