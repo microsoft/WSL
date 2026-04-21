@@ -19,6 +19,7 @@ Abstract:
 #include <evntprov.h>
 #include <objbase.h>
 #include <wil/resource.h>
+#include <wil/result.h>
 #include <exception>
 #include <type_traits>
 #include <utility>
