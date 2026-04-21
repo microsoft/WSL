@@ -885,6 +885,10 @@ Fallback alla rete NAT.</value>
     <value>Versione di Windows {}. {} non dispone delle funzionalità necessarie</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
+    <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Il firewall Hyper-V non è supportato</value>
   </data>
@@ -964,6 +968,10 @@ Fallback alla rete NAT.</value>
   </data>
   <data name="MessageUpdateFailed" xml:space="preserve">
     <value>Aggiornamento non riuscito (codice di uscita: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallNoArguments" xml:space="preserve">
+    <value>{} non accetta argomenti. Per annullare la registrazione di una distribuzione, usare {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUninstallFailed" xml:space="preserve">
@@ -1878,6 +1886,41 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Numero di millisecondi di inattività di una macchina virtuale prima dell'arresto.</value>
+  </data>
+  <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
+    <value>Apply changes</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
+    <value>WSL Shutdown Required</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
+    <value>Le modifiche alle impostazioni di WSL richiedono un arresto e un riavvio di WSL per essere finalizzate. L'arresto causerà la terminazione di eventuali sessioni WSL attive.</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
+    <value>Shutdown WSL now</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
+    <value>Later</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
+    <value>Unable to apply changes</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
+    <value>Non è stato possibile salvare le modifiche alle impostazioni in sospeso. Codice errore: {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
+    <value>Le impostazioni sono state salvate, ma l'arresto di WSL non è riuscito: {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for exception message</comment>
+  </data>
+  <data name="Settings_BooleanTrueText" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="Settings_BooleanFalseText" xml:space="preserve">
+    <value>Off</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>Compila, esegui, esegui il debug e profila le app in esecuzione in WSL da Visual Studio</value>

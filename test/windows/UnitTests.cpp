@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 
 #include "Common.h"
+#include "install.h"
 #include <AclAPI.h>
 #include <fstream>
 #include <filesystem>
@@ -169,10 +170,8 @@ class UnitTests
         }
     }
 
-    TEST_METHOD(SystemdSafeMode)
+    WSL2_TEST_METHOD(SystemdSafeMode)
     {
-        WSL2_TEST_ONLY();
-
         SKIP_TEST_UNSTABLE(); // TODO: Re-enable when this issue is solved in main.
 
         auto revert = EnableSystemd();
@@ -189,19 +188,15 @@ class UnitTests
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
     }
 
-    TEST_METHOD(SystemdDisabled)
+    WSL2_TEST_METHOD(SystemdDisabled)
     {
-        WSL2_TEST_ONLY();
-
         // tests that systemd does not run without the wsl.conf option enabled
         // run and check the output of systemctl --system
         VERIFY_IS_FALSE(IsSystemdRunning(L"--system", 1));
     }
 
-    TEST_METHOD(SystemdSystem)
+    WSL2_TEST_METHOD(SystemdSystem)
     {
-        WSL2_TEST_ONLY();
-
         auto cleanup = wil::scope_exit([] {
             // clean up wsl.conf file
             const std::wstring disableSystemdCmd(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
@@ -213,22 +208,22 @@ class UnitTests
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
 
         // Validate that systemd-networkd-wait-online.service is masked.
-        auto [out, _] =
-            LxsstuLaunchWslAndCaptureOutput(L"systemctl status systemd-networkd-wait-online.service  | grep -iF Loaded:");
-
-        VERIFY_ARE_EQUAL(out, L"     Loaded: masked (Reason: Unit systemd-networkd-wait-online.service is masked.)\n");
+        std::wstring out;
+        std::wstring err;
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"systemctl show -p LoadState systemd-networkd-wait-online.service");
+        VERIFY_ARE_EQUAL(out, L"LoadState=masked\n");
 
         // Validate that NetworkManager-wait-online.service is masked.
-        auto [outNm, __] =
-            LxsstuLaunchWslAndCaptureOutput(L"systemctl status NetworkManager-wait-online.service  | grep -iF Loaded:");
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"systemctl show -p LoadState NetworkManager-wait-online.service");
+        VERIFY_ARE_EQUAL(out, L"LoadState=masked\n");
 
-        VERIFY_ARE_EQUAL(outNm, L"     Loaded: masked (Reason: Unit NetworkManager-wait-online.service is masked.)\n");
+        // Validate that console-getty.service is masked (tty devices are shared at VM level across distros).
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"systemctl show -p LoadState console-getty.service");
+        VERIFY_ARE_EQUAL(out, L"LoadState=masked\n");
     }
 
-    TEST_METHOD(SystemdUser)
+    WSL2_TEST_METHOD(SystemdUser)
     {
-        WSL2_TEST_ONLY();
-
         // enable systemd before creating the user.
         // if not called first, the runtime directories needed for --user will not have been created
         auto cleanup = EnableSystemd();
@@ -334,9 +329,10 @@ class UnitTests
         return false;
     }
 
-    TEST_METHOD(SystemdNoClearTmpUnit)
+    WSL2_TEST_METHOD(SystemdNoClearTmpUnit)
     {
-        WSL2_TEST_ONLY();
+        // The X11 socket is only created when gui applications are enabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
 
         // ensures that we don't leave state on exit
         auto cleanup = EnableSystemd("initTimeout=0");
@@ -349,12 +345,10 @@ class UnitTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
     }
 
-    TEST_METHOD(SystemdBinfmtIsRestored)
+    WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
     {
-        WSL2_TEST_ONLY();
-
         // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
 
         auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
@@ -404,10 +398,8 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dup", L"Dup"));
     }
 
-    TEST_METHOD(Epoll)
+    WSL1_TEST_METHOD(Epoll)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests epoll", L"Epoll"));
     }
 
@@ -423,17 +415,13 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests flock", L"Flock"));
     }
 
-    TEST_METHOD(Fork)
+    WSL1_TEST_METHOD(Fork)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests fork", L"Fork"));
     }
 
-    TEST_METHOD(FsCommonLxFs)
+    WSL1_TEST_METHOD(FsCommonLxFs)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests fscommon", L"fscommon_lxfs"));
     }
 
@@ -442,10 +430,8 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests get_set_id", L"get_set_id"));
     }
 
-    TEST_METHOD(Inotify)
+    WSL1_TEST_METHOD(Inotify)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests inotify", L"INOTIFY"));
     }
 
@@ -473,45 +459,33 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests mprotect", L"mprotect"));
     }
 
-    TEST_METHOD(Pipe)
+    WSL1_TEST_METHOD(Pipe)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests pipe", L"Pipe"));
     }
 
-    TEST_METHOD(Sched)
+    WSL1_TEST_METHOD(Sched)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests sched", L"sched"));
     }
 
-    TEST_METHOD(SocketNonblocking)
+    WSL1_TEST_METHOD(SocketNonblocking)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests socket_nonblock", L"socket_nonblocking"));
     }
 
-    TEST_METHOD(Splice)
+    WSL1_TEST_METHOD(Splice)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests splice", L"Splice"));
     }
 
-    TEST_METHOD(Sysfs)
+    WSL1_TEST_METHOD(Sysfs)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests sysfs", L"SysFs"));
     }
 
-    TEST_METHOD(Tty)
+    WSL1_TEST_METHOD(Tty)
     {
-        WSL1_TEST_ONLY();
-
         auto OriginalHandles = UseOriginalStdHandles();
 
         auto Restore = wil::scope_exit([&OriginalHandles]() { RestoreTestStdHandles(OriginalHandles); });
@@ -519,10 +493,8 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests tty", L"tty"));
     }
 
-    TEST_METHOD(Utimensat)
+    WSL1_TEST_METHOD(Utimensat)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests utimensat", L"Utimensat"));
     }
 
@@ -546,10 +518,8 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests vfsaccess", L"vfsaccess"));
     }
 
-    TEST_METHOD(DevPt)
+    WSL1_TEST_METHOD(DevPt)
     {
-        WSL1_TEST_ONLY();
-
         auto OriginalHandles = UseOriginalStdHandles();
 
         auto Restore = wil::scope_exit([&OriginalHandles]() { RestoreTestStdHandles(OriginalHandles); });
@@ -559,17 +529,13 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests dev_pt_2", L"dev_pt_2"));
     }
 
-    TEST_METHOD(Timer)
+    WSL1_TEST_METHOD(Timer)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests timer", L"timer"));
     }
 
-    TEST_METHOD(SysInfo)
+    WSL1_TEST_METHOD(SysInfo)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests sysinfo", L"Sysinfo"));
     }
 
@@ -578,10 +544,8 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests timerfd", L"timerfd"));
     }
 
-    TEST_METHOD(Ioprio)
+    WSL1_TEST_METHOD(Ioprio)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests ioprio", L"Ioprio"));
     }
 
@@ -699,10 +663,8 @@ class UnitTests
             LxsstuLaunchWsl(L"stat -c %U /data/test/default_user_test | grep -iF kerneltest", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
-    TEST_METHOD(Execve)
+    WSL1_TEST_METHOD(Execve)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests execve", L"Execve"));
     }
 
@@ -711,10 +673,8 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests xattr", L"xattr"));
     }
 
-    TEST_METHOD(Namespace)
+    WSL1_TEST_METHOD(Namespace)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests namespace", L"Namespace"));
     }
 
@@ -748,17 +708,13 @@ class UnitTests
         }
     }
 
-    TEST_METHOD(Netlink)
+    WSL1_TEST_METHOD(Netlink)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests netlink", L"Netlink"));
     }
 
-    TEST_METHOD(Random)
+    WSL1_TEST_METHOD(Random)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests random", L"random"));
     }
 
@@ -767,31 +723,23 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests keymgmt", L"Keymgmt"));
     }
 
-    TEST_METHOD(Shm)
+    WSL1_TEST_METHOD(Shm)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests shm", L"shm"));
     }
 
-    TEST_METHOD(Sem)
+    WSL1_TEST_METHOD(Sem)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests sem", L"sem"));
     }
 
-    TEST_METHOD(Ttys)
+    WSL1_TEST_METHOD(Ttys)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests ttys", L"Ttys"));
     }
 
-    TEST_METHOD(OverlayFs)
+    WSL1_TEST_METHOD(OverlayFs)
     {
-        WSL1_TEST_ONLY();
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests overlayfs", L"OverlayFs"));
     }
 
@@ -1747,10 +1695,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VerifyOutput(L"--install foo", AddCrlf(WslInstallHelpMessage), -1);
     }
 
-    TEST_METHOD(TestExistingSwapVhd)
+    WSL2_TEST_METHOD(TestExistingSwapVhd)
     {
-        WSL2_TEST_ONLY();
-
         // Create a 100MB swap vhdx.
         auto swapVhd = wil::GetCurrentDirectoryW<std::wstring>() + L"\\TestSwap.vhdx";
 
@@ -1826,17 +1772,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(L"SigBlk:\t0000000000000000\n", output);
     }
 
-    TEST_METHOD(InitReadonly)
+    WSL2_TEST_METHOD(InitReadonly)
     {
-        WSL2_TEST_ONLY();
-
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L" grep '^rootfs /init rootfs ro,' /proc/self/mounts", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
-    TEST_METHOD(GpuMounts)
+    WSL2_TEST_METHOD(GpuMounts)
     {
-        WSL2_TEST_ONLY();
-
         auto ValidateGpuMounts = [](HANDLE Token) {
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(
@@ -1949,10 +1891,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validate(longHostName, wsl::shared::string::MultiByteToWide(longHostName.substr(0, 64)));
     }
 
-    TEST_METHOD(WslConfWarnings)
+    WSL2_TEST_METHOD(WslConfWarnings)
     {
-        WSL2_TEST_ONLY();
-
         DistroFileChange configChange(L"/etc/wsl.conf", false);
 
         auto validateWarnings = [&configChange](const std::wstring& config, const std::wstring& expectedWarnings) {
@@ -2002,10 +1942,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
-    TEST_METHOD(Warnings)
+    WSL2_TEST_METHOD(Warnings)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange configChange(LxssGenerateTestConfig());
 
         auto validateWarnings = [&configChange](
@@ -2193,10 +2131,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
-    TEST_METHOD(Processors)
+    WSL2_TEST_METHOD(Processors)
     {
-        WSL2_TEST_ONLY();
-
         WslConfigChange configChange(LxssGenerateTestConfig() + L"\nprocessors=1");
 
         auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"nproc --all");
@@ -2204,10 +2140,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
-    TEST_METHOD(GuiApplications)
+    WSL2_TEST_METHOD(GuiApplications)
     {
-        WSL2_TEST_ONLY();
-
         auto validateEnvironment = [&](bool systemdEnabled) {
             WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = true}));
 
@@ -2273,10 +2207,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateEnvironment(true);
     }
 
-    TEST_METHOD(GuiApplicationsSystemd)
+    WSL2_TEST_METHOD(GuiApplicationsSystemd)
     {
-        WSL2_TEST_ONLY();
-
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
         wslConf.SetContent(L"[boot]\nsystemd=true\n");
         WslConfigChange config{LxssGenerateTestConfig({.guiApplications = true})};
@@ -2372,7 +2304,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             {
                 LogInfo("Validating signature for: %ls", e.path().c_str());
 
-                wsl::windows::common::wslutil::ValidateFileSignature(e.path().c_str());
+                wsl::windows::common::install::ValidateFileSignature(e.path().c_str());
                 signedFiles++;
             }
         }
@@ -2381,10 +2313,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_NOT_EQUAL(signedFiles, 0);
     }
 
-    TEST_METHOD(CorruptedVhd)
+    WSL2_TEST_METHOD(CorruptedVhd)
     {
-        WSL2_TEST_ONLY();
-
         // Create a 100MB vhd without a filesystem.
         auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
         auto vhdPath = distroPath / L"CorruptedTest.vhdx";
@@ -2629,10 +2559,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         cleanup.release();
     }
 
-    TEST_METHOD(ManualDistroShutdown)
+    WSL2_TEST_METHOD(ManualDistroShutdown)
     {
-        WSL2_TEST_ONLY();
-
         // Terminate a distribution from within WSL. This command should be terminated by the VM terminating
         LxsstuLaunchWsl(L"echo foo > /dev/shm/bar ; reboot -f ; sleep 1d");
 
@@ -2652,10 +2580,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(out, L"ok");
     }
 
-    TEST_METHOD(KernelModules)
+    WSL2_TEST_METHOD(KernelModules)
     {
-        WSL2_TEST_ONLY();
-
         // Get the kernel version and strip off everything after the first dash.
         std::wstring kernelVersion{TEXT(KERNEL_VERSION)};
         auto position = kernelVersion.find_first_of(L"-");
@@ -2748,10 +2674,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         ValidateOutput(L"dmesg | grep -iF \"failed to load module 'not-found'\" | wc -l", L"1\n", L"", 0);
     }
 
-    TEST_METHOD(CrashCollection)
+    WSL2_TEST_METHOD(CrashCollection)
     {
-        WSL2_TEST_ONLY();
-
         const auto folder = std::filesystem::absolute(L"test-crash-dumps");
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -2899,10 +2823,82 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
-    TEST_METHOD(Resize)
+    WSL2_TEST_METHOD(MoveVhdOwnership)
     {
-        WSL2_TEST_ONLY();
+        constexpr auto name = L"move-owner-test-distro";
+        constexpr auto moveElevatedFolder = L"move-owner-elevated";
+        constexpr auto moveNonElevatedFolder = L"move-owner-non-elevated";
 
+        // Import a WSL2 distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            std::filesystem::remove_all(moveElevatedFolder);
+            std::filesystem::remove_all(moveNonElevatedFolder);
+        });
+
+        auto verifyVhdOwner = [](const std::wstring& path) {
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                path.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+
+            auto userToken = wil::open_current_access_token(TOKEN_QUERY);
+            auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
+
+            VERIFY_IS_TRUE(EqualSid(ownerSid, tokenUser->User.Sid));
+        };
+
+        const auto nonElevatedToken = GetNonElevatedToken();
+
+        // Move as elevated, launch as non-elevated.
+        // This is the primary bug scenario: MoveFileEx sets owner to BUILTIN\Administrators,
+        // then HcsGrantVmAccess fails with E_ACCESSDENIED when impersonating the non-elevated user.
+        {
+            WslShutdown();
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, moveElevatedFolder)), 0L);
+
+            auto vhdPath = std::format(L"{}\\ext4.vhdx", moveElevatedFolder);
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+            verifyVhdOwner(vhdPath);
+
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+
+        // Move as non-elevated, launch as elevated.
+        {
+            WslShutdown();
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(
+                    std::format(L"--manage {} --move {}", name, moveNonElevatedFolder),
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nonElevatedToken.get()),
+                0L);
+
+            auto vhdPath = std::format(L"{}\\ext4.vhdx", moveNonElevatedFolder);
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+            verifyVhdOwner(vhdPath);
+
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+
+        // Also launch as non-elevated after the non-elevated move.
+        {
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+    }
+
+    WSL2_TEST_METHOD(Resize)
+    {
         constexpr auto name = L"resize-test-distro";
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
@@ -2938,10 +2934,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         }
     }
 
-    TEST_METHOD(FileOffsets)
+    WSL2_TEST_METHOD(FileOffsets)
     {
-        WSL2_TEST_ONLY();
-
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(L"output.txt"); });
 
         std::ofstream file("output.txt");
@@ -2971,9 +2965,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_IS_TRUE(isDriveMountingEnabled());
     }
 
-    TEST_METHOD(WriteWslConfig)
+    WSL2_TEST_METHOD(WriteWslConfig)
     {
-        WSL2_TEST_ONLY();
         WSL_SETTINGS_TEST();
 
         auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath();
@@ -3828,7 +3821,7 @@ localhostForwarding=true
         validateUidChange(L"root", 0, L"The operation completed successfully. \r\n", L"", 0);
 
         const std::wstring invalidUser = L"Nonexistent";
-        validateUidChange(invalidUser, 0, L"", L"/usr/bin/id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
+        validateUidChange(invalidUser, 0, L"", L"id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
@@ -3952,7 +3945,7 @@ localhostForwarding=true
             VERIFY_ARE_EQUAL(ExpectedVersion, version);
         };
 
-        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"12");
+        validateFlavorVersion(LXSS_DISTRO_NAME_TEST_L, L"debian", L"13");
 
         constexpr auto testTar = L"exported-distro.tar";
         constexpr auto tmpDistroName = L"tmpdistro";
@@ -4052,10 +4045,10 @@ VERSION_ID="Invalid|Format"
         // Verify that importing a distribution with an os-release as then converting works as well
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--import {} . {} --version {}", tmpDistroName, g_testDistroPath, convertVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--set-version {} {}", tmpDistroName, currentVersion).c_str()), 0L);
-        validateFlavorVersion(tmpDistroName, L"debian", L"12");
+        validateFlavorVersion(tmpDistroName, L"debian", L"13");
     }
 
     TEST_METHOD(DistributionId)
@@ -6261,10 +6254,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
     }
 
-    TEST_METHOD(CustomModulesVhd)
+    WSL2_TEST_METHOD(CustomModulesVhd)
     {
-        WSL2_TEST_ONLY();
-
 #ifdef WSL_DEV_INSTALL_PATH
 
         auto modulesPath = std::format(L"{}\\modules.vhd", WSL_DEV_INSTALL_PATH);
@@ -6431,26 +6422,21 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     // See https://github.com/microsoft/WSL/issues/13173.
     TEST_METHOD(SetSidNoWarning)
     {
-        auto [out, err] =
-            LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,stderr");
 
         VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
         VERIFY_ARE_EQUAL(err, L"");
     }
 
-    TEST_METHOD(WslDebug)
+    WSL2_TEST_METHOD(WslDebug)
     {
-        WSL2_TEST_ONLY();
-
         // Verify that hvsocket debug events are logged to dmesg.
         WslConfigChange config(LxssGenerateTestConfig({.kernelCommandLine = L"WSL_DEBUG=hvsocket"}));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"dmesg | grep -iF 'vmbus_send_tl_connect_request'"), 0L);
     }
 
-    TEST_METHOD(CGroupv1)
+    WSL2_TEST_METHOD(CGroupv1)
     {
-        WSL2_TEST_ONLY();
-
         auto expectedMount = [](const char* path, const wchar_t* expected) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
 
@@ -6485,19 +6471,15 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             std::wstring::npos);
     }
 
-    TEST_METHOD(InitPermissions)
+    WSL2_TEST_METHOD(InitPermissions)
     {
-        WSL2_TEST_ONLY();
-
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"stat -c %a /init");
 
         VERIFY_ARE_EQUAL(out, L"755\n");
     }
 
-    TEST_METHOD(ExportImportVhd)
+    WSL2_TEST_METHOD(ExportImportVhd)
     {
-        WSL2_TEST_ONLY();
-
         WslShutdown();
 
         constexpr auto vhdPath = L"exported-test-distro.vhd";
@@ -6558,6 +6540,46 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
             L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(BytesToHex)
+    {
+        using wsl::windows::common::string::BytesToHex;
+
+        VERIFY_ARE_EQUAL(BytesToHex({}), L"0x");
+        VERIFY_ARE_EQUAL(BytesToHex({0x0F}), L"0x0f");
+        VERIFY_ARE_EQUAL(BytesToHex({0xDE, 0xAD, 0xBE, 0xEF}), L"0xdeadbeef");
+        VERIFY_ARE_EQUAL(BytesToHex({0x00, 0x00}), L"0x0000");
+        VERIFY_ARE_EQUAL(BytesToHex({0xFF, 0xFF}), L"0xffff");
+    }
+
+    WSL2_TEST_METHOD(InteractiveMount)
+    {
+        // Add a fake interactive mount helper.
+        DistroFileChange mountHelper(L"/sbin/mount.hang", false);
+        mountHelper.SetContent(
+            L"#!/bin/sh\n"
+            L"read pass < /dev/tty\n");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod +x /sbin/mount.hang"), (DWORD)0);
+
+        // Don't keep the original fstab as it can be missing on the pipeline.
+        DistroFileChange fstab(L"/etc/fstab", false);
+        fstab.SetContent(L"none /mnt/ttytest hang 0 0\n");
+
+        // Restart the distro with this mount.
+        WslShutdown();
+        wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(L"echo booted").c_str());
+        auto result = process.RunAndCaptureOutput(60 * 1000);
+        VERIFY_ARE_EQUAL(result.Stdout, L"booted\n");
+        VERIFY_ARE_EQUAL(result.ExitCode, 0);
+    }
+
+    TEST_METHOD(UninstallRejectsArguments)
+    {
+        VerifyOutput(
+            L"--uninstall Distro",
+            wsl::shared::Localization::MessageUninstallNoArguments(WSL_UNINSTALL_ARG, WSL_UNREGISTER_ARG) + L"\r\n",
+            -1);
     }
 
 }; // namespace UnitTests

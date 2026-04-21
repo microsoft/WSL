@@ -64,6 +64,15 @@ try
 #endif
     }
 
+    if (MessageSize > 4 * 1024 * 1024) // 4 MiB
+    {
+#if defined(_MSC_VER)
+        THROW_HR_MSG(E_UNEXPECTED, "Message size too large: %llu", MessageSize);
+#elif defined(__GNUC__)
+        THROW_UNEXCEPTED();
+#endif
+    }
+
     if (Buffer.size() < MessageSize)
     {
         Buffer.resize(MessageSize);
@@ -86,18 +95,18 @@ try
 
             LOG_HR_MSG(
                 E_UNEXPECTED,
-                "Socket closed while reading message. Size: %u, type: %i, sequence: %u",
+                "Socket closed while reading message. Size: %u, type: %i, id: %u",
                 Header->MessageSize,
                 Header->MessageType,
-                Header->SequenceNumber);
+                Header->TransactionId);
 
 #elif defined(__GNUC__)
 
             LOG_ERROR(
-                "Socket closed while reading message. Size: {}, type: {}, sequence: {}",
+                "Socket closed while reading message. Size: {}, type: {}, id: {}",
                 Header->MessageSize,
                 Header->MessageType,
-                Header->SequenceNumber);
+                Header->TransactionId);
 
 #endif
 

@@ -527,7 +527,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
 
-    m_miniInitChannel.SendMessage<LX_MINI_INIT_EARLY_CONFIG_MESSAGE>(message.Span());
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send<LX_MINI_INIT_EARLY_CONFIG_MESSAGE>(message.Span());
 
     {
         ExecutionContext context(Context::ConfigureNetworking);
@@ -537,7 +538,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
         // Create hvsocket connection for DNS tunneling if enabled.
         wil::unique_socket dnsTunnelingSocket;
-        if (m_vmConfig.EnableDnsTunneling)
+        if (message->EnableDnsTunneling)
         {
             dnsTunnelingSocket = AcceptConnection(m_vmConfig.KernelBootTimeout);
         }
@@ -1098,7 +1099,8 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
 
             auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_terminatingEvent.get()};
 
-            const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
+            auto transaction = channel.ReceiveTransaction();
+            const auto& message = transaction.Receive<LX_PROCESS_CRASH>();
             const char* process = reinterpret_cast<const char*>(&message.Buffer);
 
             constexpr auto dumpExtension = ".dmp";
@@ -1146,7 +1148,7 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
             wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
             THROW_LAST_ERROR_IF(!file);
 
-            channel.SendResultMessage<std::int32_t>(0);
+            transaction.SendResultMessage<std::int32_t>(0);
 
             wsl::windows::common::relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
         }
@@ -1206,7 +1208,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->SharedMemoryRootOffset, sharedMemoryRoot);
     message.WriteString(message->InstallPathOffset, installPath);
     message.WriteString(message->UserProfileOffset, userProfile);
-    m_miniInitChannel.SendMessage<LX_MINI_INIT_MESSAGE>(message.Span());
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
 
     return CreateInstanceInternal(
         InstanceId, Configuration, ReceiveTimeout, DefaultUid, ClientLifetimeId, WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), ConnectPort);
@@ -1555,8 +1558,8 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
-    // If using virtio-9p, enable SWIOTLB as a perf optimization (will cause VM to consume 64MB more memory).
-    if (m_vmConfig.EnableVirtio9p)
+    // If using virtio features, enable SWIOTLB as a perf optimization (will cause VM to consume 64MB more memory).
+    if (m_vmConfig.EnableVirtio9p || m_vmConfig.EnableVirtioFs || m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
     {
         kernelCmdLine += L" swiotlb=force";
     }
@@ -1844,7 +1847,8 @@ void WslCoreVm::InitializeGuest()
     }
 
     // Send the message.
-    m_miniInitChannel.SendMessage<LX_MINI_INIT_CONFIG_MESSAGE>(message.Span());
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send<LX_MINI_INIT_CONFIG_MESSAGE>(message.Span());
 
     // If port tracker or localhost relay are enabled, establish a connection with the guest and start processing messages.
     switch (message->NetworkingConfiguration.PortTrackerType)
@@ -1931,9 +1935,7 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
 
 bool WslCoreVm::IsDnsTunnelingSupported() const
 {
-    WI_ASSERT(
-        m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored ||
-        m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy);
+    WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored);
 
     return SUCCEEDED_LOG(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
 }
@@ -1980,7 +1982,8 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
     message.WriteString(message->OptionsOffset, Options);
 
     // Send the message.
-    m_miniInitChannel.SendMessage<LX_MINI_INIT_MOUNT_MESSAGE>(message.Span());
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send<LX_MINI_INIT_MOUNT_MESSAGE>(message.Span());
 
     // Accept a connection from mini_init
     wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
@@ -2108,7 +2111,8 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
     {
         auto lock = m_lock.lock_exclusive();
 
-        m_miniInitChannel.SendMessage(message);
+        auto transaction = m_miniInitChannel.StartTransaction();
+        transaction.Send(message);
         channel = {
             AcceptConnection(m_vmConfig.KernelBootTimeout),
             "WaitForPmem",
@@ -2417,7 +2421,8 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     message.ScsiLun = Lun;
     message.NewSize = NewSize;
 
-    m_miniInitChannel.SendMessage(message);
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send(message);
 
     wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "ResizeDistribution", m_terminatingEvent.get()};
     auto outputChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
@@ -2494,7 +2499,8 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     message.Header.MessageSize = sizeof(message);
     message.ScsiLun = State.Lun;
 
-    m_miniInitChannel.SendMessage(message);
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send(message);
 
     // Accept a connection from mini_init.
     wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
@@ -2509,7 +2515,8 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ const AttachedD
     message.WriteString(Name);
 
     // Send the message.
-    m_miniInitChannel.SendMessage<LX_MINI_INIT_UNMOUNT_MESSAGE>(message.Span());
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send<LX_MINI_INIT_UNMOUNT_MESSAGE>(message.Span());
 
     // Accept a connection from mini_init.
     wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
@@ -2575,7 +2582,8 @@ try
             {
                 wsl::windows::common::wslutil::SetThreadDescription(L"VirtioFs - Request");
 
-                auto [message, span] = channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+                auto transaction = channel.ReceiveTransaction();
+                auto [message, span] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
                 if (message == nullptr)
                 {
                     return;
@@ -2589,7 +2597,7 @@ try
                     response.WriteString(response->TagOffset, tag);
                     response.WriteString(response->SourceOffset, source);
 
-                    channel.SendMessage<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE>(response.Span());
+                    transaction.Send<LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE>(response.Span());
                 };
 
                 if (message->MessageType == LxInitMessageAddVirtioFsDevice)
@@ -2829,6 +2837,24 @@ void WslCoreVm::ValidateNetworkingMode()
 
                 m_vmConfig.FirewallConfig.reset();
             }
+        }
+    }
+
+    // If mirrored networking was requested, ensure IPv6 is not disabled on the host using registry,
+    // as this is not supported by mirrored networking.
+    // Note: Disabling IPv6 using Set-NetAdapterBinding is supported.
+    if (m_vmConfig.NetworkingMode == NetworkingMode::Mirrored)
+    {
+        constexpr DWORD c_ipv6Disabled = 0xFF;
+        DWORD disabledComponents = 0;
+        wil::reg::get_value_dword_nothrow(
+            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", &disabledComponents);
+
+        if (disabledComponents == c_ipv6Disabled)
+        {
+            m_vmConfig.NetworkingMode = NetworkingMode::Nat;
+            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingNotSupportedReason(
+                Localization::MessageMirroredNetworkingNotSupportedIpv6Disabled()));
         }
     }
 

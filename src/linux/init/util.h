@@ -35,7 +35,8 @@ Abstract:
 
 namespace wsl::shared {
 class SocketChannel;
-}
+class Transaction;
+} // namespace wsl::shared
 
 namespace wsl::linux {
 struct WslDistributionConfig;
@@ -191,7 +192,8 @@ Return Value:
     _exit(1);
 }
 
-int UtilCreateProcessAndWait(const char* File, const char* const Argv[], int* Status = nullptr, const std::map<std::string, std::string>& Env = {});
+int UtilCreateProcessAndWait(
+    const char* File, const char* const Argv[], int* Status = nullptr, const std::map<std::string, std::string>& Env = {}, bool DetachTerminal = false);
 
 template <typename TMethod>
 void UtilCreateWorkerThread(const char* Name, TMethod&& ThreadFunction)
@@ -311,4 +313,4 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
-int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<gsl::byte> Buffer);
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);
