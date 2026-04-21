@@ -47,33 +47,40 @@ WslCoreInstance::WslCoreInstance(
     //
     // N.B. The Stop event is fired by WslTelemetryActivityScope even if ReceiveMessage throws, so
     //      the backend can distinguish "init daemon mount failed with a surfaced error" from a
-    //      real silent hang (where no Stop is ever observed).
+    //      real silent hang (where no Stop is ever observed). The scope is narrowed to the receive
+    //      + immediate field capture so the reported duration reflects the wait, not the rest of
+    //      the constructor. The span references channel-owned memory that remains valid for the
+    //      rest of this constructor since no further receive is issued.
     int initResult = 0;
     int failureStep = 0;
-    WslTelemetryActivityScope waitForCreateInstanceResultActivity([&](const GUID& activityId, HRESULT hr) {
-        WSL_LOG_TELEMETRY_ACTIVITY_STOP(
-            activityId,
+    gsl::span<gsl::byte> span;
+    LX_MINI_INIT_CREATE_INSTANCE_RESULT result{};
+    {
+        WslTelemetryActivityScope waitForCreateInstanceResultActivity([&](const GUID& activityId, HRESULT hr) {
+            WSL_LOG_TELEMETRY_ACTIVITY_STOP(
+                activityId,
+                "WaitForCreateInstanceResult",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+                TraceLoggingValue(InstanceId, "instanceId"),
+                TraceLoggingHResult(hr, "hr"),
+                TraceLoggingValue(initResult, "initResult"),
+                TraceLoggingValue(failureStep, "failureStep"));
+        });
+
+        WSL_LOG_TELEMETRY_ACTIVITY_START(
+            waitForCreateInstanceResultActivity.ActivityId(),
             "WaitForCreateInstanceResult",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
             TraceLoggingValue(InstanceId, "instanceId"),
-            TraceLoggingHResult(hr, "hr"),
-            TraceLoggingValue(initResult, "initResult"),
-            TraceLoggingValue(failureStep, "failureStep"));
-    });
+            TraceLoggingValue(m_socketTimeout, "timeoutMs"));
 
-    WSL_LOG_TELEMETRY_ACTIVITY_START(
-        waitForCreateInstanceResultActivity.ActivityId(),
-        "WaitForCreateInstanceResult",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
-        TraceLoggingValue(InstanceId, "instanceId"),
-        TraceLoggingValue(m_socketTimeout, "timeoutMs"));
+        result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
+        initResult = result.Result;
+        failureStep = static_cast<int>(result.FailureStep);
+    }
 
-    gsl::span<gsl::byte> span;
-    const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
-    initResult = result.Result;
-    failureStep = static_cast<int>(result.FailureStep);
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -448,26 +455,32 @@ void WslCoreInstance::Initialize()
     // N.B. The receive below has no explicit timeout and WslCorePort's channel has no exit event,
     //      so if the init daemon hangs during config processing (e.g. systemd startup, mount),
     //      this can block indefinitely. WslTelemetryActivityScope ensures a Stop is always emitted
-    //      on success or exception paths; only a true hang produces "Start without Stop".
-    WslTelemetryActivityScope waitForInitConfigResponseActivity([&](const GUID& activityId, HRESULT hr) {
-        WSL_LOG_TELEMETRY_ACTIVITY_STOP(
-            activityId,
+    //      on success or exception paths; only a true hang produces "Start without Stop". The
+    //      scope is narrowed to the receive so the reported duration reflects the wait, not the
+    //      subsequent interop-server launch. The span references channel-owned memory that stays
+    //      valid for the rest of Initialize() since no further receive is issued.
+    gsl::span<gsl::byte> span;
+    LX_INIT_CONFIGURATION_INFORMATION_RESPONSE response{};
+    {
+        WslTelemetryActivityScope waitForInitConfigResponseActivity([&](const GUID& activityId, HRESULT hr) {
+            WSL_LOG_TELEMETRY_ACTIVITY_STOP(
+                activityId,
+                "WaitForInitConfigResponse",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+                TraceLoggingValue(m_instanceId, "instanceId"),
+                TraceLoggingHResult(hr, "hr"));
+        });
+
+        WSL_LOG_TELEMETRY_ACTIVITY_START(
+            waitForInitConfigResponseActivity.ActivityId(),
             "WaitForInitConfigResponse",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-            TraceLoggingValue(m_instanceId, "instanceId"),
-            TraceLoggingHResult(hr, "hr"));
-    });
+            TraceLoggingValue(m_instanceId, "instanceId"));
 
-    WSL_LOG_TELEMETRY_ACTIVITY_START(
-        waitForInitConfigResponseActivity.ActivityId(),
-        "WaitForInitConfigResponse",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-        TraceLoggingValue(m_instanceId, "instanceId"));
-
-    gsl::span<gsl::byte> span;
-    const auto& response = m_initChannel->GetChannel().ReceiveMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
+        response = m_initChannel->GetChannel().ReceiveMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
+    }
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;

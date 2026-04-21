@@ -4,12 +4,12 @@ Backend changes required to consume the new TraceLogging **Activity** (Start/Sto
 
 ## Problem
 
-Today the backend classifies each `CreateInstance` attempt using a 2-state machine with three events:
+Today the backend classifies each `CreateInstance` attempt using a 2-state machine driven by three events and one silence timer:
 
-- `CreateInstanceBegin` (or `CreateInstanceBeginNoPrecedingError`)
+- `CreateInstanceBegin` (or `CreateInstanceBeginNoPrecedingError`) — transitions into state 2
 - `CreateInstanceEnd` → **complete**
 - `UserVisibleErrorPostBegin` → **fail**
-- 3 min silence → **timeout**
+- 3 min silence (no event) → **timeout**
 
 ```mermaid
 stateDiagram-v2

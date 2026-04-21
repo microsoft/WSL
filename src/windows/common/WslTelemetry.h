@@ -17,8 +17,11 @@ Abstract:
 #include <windows.h>
 #include <winmeta.h>
 #include <evntprov.h>
+#include <objbase.h>
 #include <wil/resource.h>
+#include <exception>
 #include <type_traits>
+#include <utility>
 #include <TraceLoggingProvider.h>
 #include <TraceLoggingActivity.h>
 #include "traceloggingconfig.h"
