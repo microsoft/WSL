@@ -1027,10 +1027,11 @@ class WSLCTests
         }
 
         // Validate that LoadImage is aborted when the session terminates.
+        // N.B. The read pipe must support overlapped IO so the relay's event-based cancellation works.
+        // CreatePipe creates synchronous pipes where ReadFile blocks the thread, preventing
+        // WaitForMultipleObjects from detecting the session terminating event.
         {
-            wil::unique_handle pipeRead;
-            wil::unique_handle pipeWrite;
-            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+            auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(2, true, false);
 
             std::promise<HRESULT> terminateResult;
             wil::unique_event testCompleted{wil::EventOptions::ManualReset};
@@ -1130,10 +1131,9 @@ class WSLCTests
         }
 
         // Validate that ImportImage is aborted when the session terminates.
+        // N.B. See the equivalent LoadImage test for why overlapped pipes are required here.
         {
-            wil::unique_handle pipeRead;
-            wil::unique_handle pipeWrite;
-            VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 2));
+            auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(2, true, false);
 
             std::promise<HRESULT> terminateResult;
             wil::unique_event testCompleted{wil::EventOptions::ManualReset};
