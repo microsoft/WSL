@@ -147,7 +147,11 @@ public:
     explicit WslTelemetryActivityScope(TStopEmit stopEmit) :
         m_stopEmit(std::move(stopEmit)), m_uncaughtOnEntry(std::uncaught_exceptions())
     {
-        LOG_IF_FAILED(CoCreateGuid(&m_activityId));
+        // Throw on failure rather than falling back to GUID_NULL: if we can't allocate a unique
+        // ActivityId, two unrelated activities on the same thread would both use GUID_NULL and
+        // the backend could not distinguish their Start/Stop pairs, silently degrading the
+        // "unmatched Start => timeout" classification. Callers already propagate exceptions.
+        THROW_IF_FAILED(CoCreateGuid(&m_activityId));
     }
 
     ~WslTelemetryActivityScope() noexcept

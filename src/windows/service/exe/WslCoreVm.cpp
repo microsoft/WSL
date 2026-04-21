@@ -1379,10 +1379,10 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
 
     // N.B. The launch-init Send can appear to succeed locally even when the hvsocket is silently
     //      broken (e.g. after sleep/wake). WslTelemetryActivityScope fires the Stop event even
-    //      if Send throws, distinguishing a surfaced failure from a silent hang. Master-branch
-    //      change 14455 wraps the Send in a single-shot transaction; the transaction object is
-    //      only used by this Send (no reply on the same id within this function), so scoping it
-    //      inside the activity block preserves the original semantics.
+    //      if Send throws, distinguishing a surfaced failure from a silent hang. The Send is
+    //      wrapped in a single-shot transaction; because the transaction object is only used by
+    //      this Send (no reply on the same id within this function), scoping it inside the
+    //      activity block preserves the original semantics.
     {
         WslTelemetryActivityScope sendLaunchInitActivity([&](const GUID& activityId, HRESULT hr) {
             WSL_LOG_TELEMETRY_ACTIVITY_STOP(
