@@ -75,70 +75,107 @@ private:
         TelemetryPrivacyDataTag(Tag), \
         __VA_ARGS__);
 
+// Emit the Start (opcode=1) event for a TraceLogging Activity. The ActivityId is a GUID that
+// correlates this Start with the matching Stop event; the backend joins on it instead of the
+// event name (Start and Stop share the same name, distinguished only by Opcode).
+#define WSL_LOG_TELEMETRY_ACTIVITY_START(ActivityIdGuid, Name, Tag, ...) \
+    TraceLoggingWriteActivity( \
+        g_hTraceLoggingProvider, \
+        Name, \
+        &(ActivityIdGuid), \
+        nullptr, \
+        TraceLoggingOpcode(WINEVENT_OPCODE_START), \
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"), \
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), \
+        TelemetryPrivacyDataTag(Tag), \
+        __VA_ARGS__);
+
+// Emit the Stop (opcode=2) event for a TraceLogging Activity. Must use the same ActivityId and
+// event Name as the matching Start.
+#define WSL_LOG_TELEMETRY_ACTIVITY_STOP(ActivityIdGuid, Name, Tag, ...) \
+    TraceLoggingWriteActivity( \
+        g_hTraceLoggingProvider, \
+        Name, \
+        &(ActivityIdGuid), \
+        nullptr, \
+        TraceLoggingOpcode(WINEVENT_OPCODE_STOP), \
+        TraceLoggingValue(WSL_PACKAGE_VERSION, "wslVersion"), \
+        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), \
+        TelemetryPrivacyDataTag(Tag), \
+        __VA_ARGS__);
+
 #ifdef __cplusplus
 
-// RAII helper that ensures a paired End telemetry event is always emitted, including when
-// the enclosing scope exits via exception. On destruction:
-//   - If the stack is unwinding due to an uncaught exception, the HRESULT passed to the end
-//     lambda is E_FAIL (a sentinel meaning "this step terminated because an exception was in
-//     flight"; the specific HRESULT is captured by the outer CreateInstance scope's explicit
-//     try/catch + scope_exit_log pattern).
-//   - Otherwise (normal exit), the HRESULT passed is S_OK.
+// RAII helper for TraceLogging Activities. Allocates an ActivityId on construction and invokes
+// the Stop emitter on destruction with:
+//   - hr == S_OK when the scope exits normally, or
+//   - hr == E_FAIL when the scope is unwinding due to an uncaught exception.
 //
-// N.B. We deliberately do NOT call wil::ResultFromCaughtException() from the destructor.
-//      WIL's contract requires it to be called from within a catch(...) handler; calling it
-//      during stack unwinding (from a destructor) is undefined and can std::terminate. The
-//      outer CreateInstance scope already captures the specific HRESULT via the idiomatic
-//      "init result=E_UNEXPECTED; try { ...; result=S_OK; } catch(...) { result=RFCE(); throw; }"
-//      pattern (see LxssUserSession.cpp _CreateInstance). This scope only needs to surface
-//      "did this step unwind?" for the inner phase attribution.
+// Used together with WSL_LOG_TELEMETRY_ACTIVITY_START / _STOP so Start/Stop share the same
+// ActivityId and Opcode-based correlation carries the backend join without an application-level
+// pairId field.
 //
-// This lets the backend state machine distinguish three outcomes per inner step:
-//   1. Normal success           -> End event emitted with hr == S_OK
-//   2. Step failed / unwound    -> End event emitted with hr == E_FAIL
-//   3. Real silent hang         -> No End event ever emitted (feeds timeout categorization)
+// Why E_FAIL on unwind instead of wil::ResultFromCaughtException(): RFCE must be called from
+// inside a catch(...) handler; invoking it from a destructor during unwinding is undefined and
+// can std::terminate. The outer CreateInstance scope captures the specific HRESULT via the
+// idiomatic "result=E_UNEXPECTED; try { ...; result=S_OK; } catch(...) { result=RFCE(); throw; }"
+// pattern (see LxssUserSession.cpp _CreateInstance). This scope only surfaces "did this step
+// unwind?" for phase attribution.
 //
-// Usage (caller emits Begin first, scope emits End on destruction):
-//   WSL_LOG_TELEMETRY("XxxBegin", PDT_ProductAndServicePerformance, ...);
-//   auto scope = WslTelemetryScope([&](HRESULT hr) {
-//       WSL_LOG_TELEMETRY("XxxEnd", PDT_ProductAndServicePerformance,
-//                         ..., TraceLoggingHResult(hr, "hr"));
+// The backend state machine distinguishes three outcomes per inner step:
+//   1. Normal success          -> Stop emitted with hr == S_OK
+//   2. Step failed / unwound   -> Stop emitted with hr == E_FAIL
+//   3. Real silent hang        -> No Stop ever emitted (feeds timeout categorization)
+//
+// Usage:
+//   WslTelemetryActivityScope activity([&](const GUID& id, HRESULT hr) {
+//       WSL_LOG_TELEMETRY_ACTIVITY_STOP(id, "Xxx", PDT_ProductAndServicePerformance,
+//           TraceLoggingValue(vmId, "vmId"),
+//           TraceLoggingHResult(hr, "hr"));
 //   });
+//   WSL_LOG_TELEMETRY_ACTIVITY_START(activity.ActivityId(), "Xxx",
+//       PDT_ProductAndServicePerformance,
+//       TraceLoggingValue(vmId, "vmId"));
 //   // ...work, may throw...
-template <typename TEndEmit>
-class WslTelemetryScope
+template <typename TStopEmit>
+class WslTelemetryActivityScope
 {
 public:
-    explicit WslTelemetryScope(TEndEmit endEmit) :
-        m_endEmit(std::move(endEmit)), m_uncaughtOnEntry(std::uncaught_exceptions())
+    explicit WslTelemetryActivityScope(TStopEmit stopEmit) :
+        m_stopEmit(std::move(stopEmit)), m_uncaughtOnEntry(std::uncaught_exceptions())
     {
+        LOG_IF_FAILED(CoCreateGuid(&m_activityId));
     }
 
-    ~WslTelemetryScope() noexcept
+    ~WslTelemetryActivityScope() noexcept
     {
-        // Use a sentinel HRESULT when unwinding; the outer scope records the specific
-        // exception HRESULT from its catch handler.
         const HRESULT hr = (std::uncaught_exceptions() > m_uncaughtOnEntry) ? E_FAIL : S_OK;
 
         try
         {
-            m_endEmit(hr);
+            m_stopEmit(m_activityId, hr);
         }
         CATCH_LOG();
     }
 
-    WslTelemetryScope(const WslTelemetryScope&) = delete;
-    WslTelemetryScope& operator=(const WslTelemetryScope&) = delete;
-    WslTelemetryScope(WslTelemetryScope&&) = delete;
-    WslTelemetryScope& operator=(WslTelemetryScope&&) = delete;
+    const GUID& ActivityId() const noexcept
+    {
+        return m_activityId;
+    }
+
+    WslTelemetryActivityScope(const WslTelemetryActivityScope&) = delete;
+    WslTelemetryActivityScope& operator=(const WslTelemetryActivityScope&) = delete;
+    WslTelemetryActivityScope(WslTelemetryActivityScope&&) = delete;
+    WslTelemetryActivityScope& operator=(WslTelemetryActivityScope&&) = delete;
 
 private:
-    TEndEmit m_endEmit;
+    GUID m_activityId{};
+    TStopEmit m_stopEmit;
     int m_uncaughtOnEntry;
 };
 
 // Deduction guide so callers do not need to spell out the lambda type.
-template <typename TEndEmit>
-WslTelemetryScope(TEndEmit) -> WslTelemetryScope<TEndEmit>;
+template <typename TStopEmit>
+WslTelemetryActivityScope(TStopEmit) -> WslTelemetryActivityScope<TStopEmit>;
 
 #endif // __cplusplus

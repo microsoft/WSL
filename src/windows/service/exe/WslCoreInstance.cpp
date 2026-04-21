@@ -45,21 +45,15 @@ WslCoreInstance::WslCoreInstance(
 
     // Read a message from the init daemon. This will let us know if anything failed during startup.
     //
-    // N.B. The End event is fired by WslTelemetryScope even if ReceiveMessage throws, so the
-    //      backend can distinguish "init daemon mount failed with a surfaced error" from a real
-    //      silent hang (where no End is ever observed).
-    WSL_LOG_TELEMETRY(
-        "WaitForCreateInstanceResultBegin",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
-        TraceLoggingValue(InstanceId, "instanceId"),
-        TraceLoggingValue(m_socketTimeout, "timeoutMs"));
-
+    // N.B. The Stop event is fired by WslTelemetryActivityScope even if ReceiveMessage throws, so
+    //      the backend can distinguish "init daemon mount failed with a surfaced error" from a
+    //      real silent hang (where no Stop is ever observed).
     int initResult = 0;
     int failureStep = 0;
-    auto waitForCreateInstanceResultEnd = WslTelemetryScope([&](HRESULT hr) {
-        WSL_LOG_TELEMETRY(
-            "WaitForCreateInstanceResultEnd",
+    WslTelemetryActivityScope waitForCreateInstanceResultActivity([&](const GUID& activityId, HRESULT hr) {
+        WSL_LOG_TELEMETRY_ACTIVITY_STOP(
+            activityId,
+            "WaitForCreateInstanceResult",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
             TraceLoggingValue(InstanceId, "instanceId"),
@@ -67,6 +61,14 @@ WslCoreInstance::WslCoreInstance(
             TraceLoggingValue(initResult, "initResult"),
             TraceLoggingValue(failureStep, "failureStep"));
     });
+
+    WSL_LOG_TELEMETRY_ACTIVITY_START(
+        waitForCreateInstanceResultActivity.ActivityId(),
+        "WaitForCreateInstanceResult",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(InstanceId, "instanceId"),
+        TraceLoggingValue(m_socketTimeout, "timeoutMs"));
 
     gsl::span<gsl::byte> span;
     const auto& result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
@@ -399,25 +401,28 @@ void WslCoreInstance::Initialize()
     //
     // N.B. This can block on m_drvfsInitialResult.get(), which waits on a std::future with no
     //      timeout. If the DrvFs init thread hangs (e.g. Plan9 server startup issue), this can
-    //      stall the entire create-instance flow. The End event is fired via WslTelemetryScope
-    //      even if the wait throws, so a surfaced failure is distinguishable from a real hang.
+    //      stall the entire create-instance flow. The Stop event is fired via
+    //      WslTelemetryActivityScope even if the wait throws, so a surfaced failure is
+    //      distinguishable from a real hang.
     if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING))
     {
-        WSL_LOG_TELEMETRY(
-            "WaitForDrvFsInitBegin",
-            PDT_ProductAndServicePerformance,
-            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-            TraceLoggingValue(m_instanceId, "instanceId"));
-
-        auto waitForDrvFsInitEnd = WslTelemetryScope([&](HRESULT hr) {
-            WSL_LOG_TELEMETRY(
-                "WaitForDrvFsInitEnd",
+        WslTelemetryActivityScope waitForDrvFsInitActivity([&](const GUID& activityId, HRESULT hr) {
+            WSL_LOG_TELEMETRY_ACTIVITY_STOP(
+                activityId,
+                "WaitForDrvFsInit",
                 PDT_ProductAndServicePerformance,
                 TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
                 TraceLoggingValue(m_instanceId, "instanceId"),
                 TraceLoggingHResult(hr, "hr"),
                 TraceLoggingValue(static_cast<int>(drvfsMount), "drvfsMount"));
         });
+
+        WSL_LOG_TELEMETRY_ACTIVITY_START(
+            waitForDrvFsInitActivity.ActivityId(),
+            "WaitForDrvFsInit",
+            PDT_ProductAndServicePerformance,
+            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(m_instanceId, "instanceId"));
 
         drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
@@ -442,22 +447,24 @@ void WslCoreInstance::Initialize()
     //
     // N.B. The receive below has no explicit timeout and WslCorePort's channel has no exit event,
     //      so if the init daemon hangs during config processing (e.g. systemd startup, mount),
-    //      this can block indefinitely. WslTelemetryScope ensures an End is always emitted on
-    //      success or exception paths; only a true hang produces "Begin without End".
-    WSL_LOG_TELEMETRY(
-        "WaitForInitConfigResponseBegin",
-        PDT_ProductAndServicePerformance,
-        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-        TraceLoggingValue(m_instanceId, "instanceId"));
-
-    auto waitForInitConfigResponseEnd = WslTelemetryScope([&](HRESULT hr) {
-        WSL_LOG_TELEMETRY(
-            "WaitForInitConfigResponseEnd",
+    //      this can block indefinitely. WslTelemetryActivityScope ensures a Stop is always emitted
+    //      on success or exception paths; only a true hang produces "Start without Stop".
+    WslTelemetryActivityScope waitForInitConfigResponseActivity([&](const GUID& activityId, HRESULT hr) {
+        WSL_LOG_TELEMETRY_ACTIVITY_STOP(
+            activityId,
+            "WaitForInitConfigResponse",
             PDT_ProductAndServicePerformance,
             TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
             TraceLoggingValue(m_instanceId, "instanceId"),
             TraceLoggingHResult(hr, "hr"));
     });
+
+    WSL_LOG_TELEMETRY_ACTIVITY_START(
+        waitForInitConfigResponseActivity.ActivityId(),
+        "WaitForInitConfigResponse",
+        PDT_ProductAndServicePerformance,
+        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(m_instanceId, "instanceId"));
 
     gsl::span<gsl::byte> span;
     const auto& response = m_initChannel->GetChannel().ReceiveMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);

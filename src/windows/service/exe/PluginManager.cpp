@@ -178,24 +178,26 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
     {
         if (e.hooks.OnVMStarted != nullptr)
         {
-            // N.B. Begin/End telemetry is emitted per plugin so the backend can attribute hangs to
-            //      a specific third-party plugin (e.g. Docker Desktop) when no End event arrives.
-            //      The End is fired by WslTelemetryScope even if the plugin or ThrowIfPluginError
-            //      throws, so only a real hang produces "Begin without End".
-            WSL_LOG_TELEMETRY(
-                "PluginOnVmStartedBegin",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"));
-
-            auto pluginOnVmStartedEnd = WslTelemetryScope([&](HRESULT hr) {
-                WSL_LOG_TELEMETRY(
-                    "PluginOnVmStartedEnd",
+            // N.B. Start/Stop telemetry is emitted per plugin so the backend can attribute hangs to
+            //      a specific third-party plugin (e.g. Docker Desktop) when no Stop event arrives.
+            //      The Stop is fired by WslTelemetryActivityScope even if the plugin or
+            //      ThrowIfPluginError throws, so only a real hang produces "Start without Stop".
+            WslTelemetryActivityScope pluginOnVmStartedActivity([&](const GUID& activityId, HRESULT hr) {
+                WSL_LOG_TELEMETRY_ACTIVITY_STOP(
+                    activityId,
+                    "PluginOnVmStarted",
                     PDT_ProductAndServicePerformance,
                     TraceLoggingValue(e.name.c_str(), "Plugin"),
                     TraceLoggingValue(Session->UserSid, "Sid"),
                     TraceLoggingHResult(hr, "hr"));
             });
+
+            WSL_LOG_TELEMETRY_ACTIVITY_START(
+                pluginOnVmStartedActivity.ActivityId(),
+                "PluginOnVmStarted",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->UserSid, "Sid"));
 
             ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), Session->SessionId, e.name.c_str());
         }
@@ -227,26 +229,28 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
     {
         if (e.hooks.OnDistributionStarted != nullptr)
         {
-            // N.B. Begin/End telemetry is emitted per plugin so the backend can attribute hangs to
-            //      a specific third-party plugin (e.g. Docker Desktop) when no End event arrives.
-            //      The End is fired by WslTelemetryScope even if the plugin or ThrowIfPluginError
-            //      throws, so only a real hang produces "Begin without End".
-            WSL_LOG_TELEMETRY(
-                "PluginOnDistroStartedBegin",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"),
-                TraceLoggingValue(Distribution->Id, "DistributionId"));
-
-            auto pluginOnDistroStartedEnd = WslTelemetryScope([&](HRESULT hr) {
-                WSL_LOG_TELEMETRY(
-                    "PluginOnDistroStartedEnd",
+            // N.B. Start/Stop telemetry is emitted per plugin so the backend can attribute hangs to
+            //      a specific third-party plugin (e.g. Docker Desktop) when no Stop event arrives.
+            //      The Stop is fired by WslTelemetryActivityScope even if the plugin or
+            //      ThrowIfPluginError throws, so only a real hang produces "Start without Stop".
+            WslTelemetryActivityScope pluginOnDistributionStartedActivity([&](const GUID& activityId, HRESULT hr) {
+                WSL_LOG_TELEMETRY_ACTIVITY_STOP(
+                    activityId,
+                    "PluginOnDistributionStarted",
                     PDT_ProductAndServicePerformance,
                     TraceLoggingValue(e.name.c_str(), "Plugin"),
                     TraceLoggingValue(Session->UserSid, "Sid"),
                     TraceLoggingValue(Distribution->Id, "DistributionId"),
                     TraceLoggingHResult(hr, "hr"));
             });
+
+            WSL_LOG_TELEMETRY_ACTIVITY_START(
+                pluginOnDistributionStartedActivity.ActivityId(),
+                "PluginOnDistributionStarted",
+                PDT_ProductAndServicePerformance,
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->UserSid, "Sid"),
+                TraceLoggingValue(Distribution->Id, "DistributionId"));
 
             ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), Session->SessionId, e.name.c_str());
         }
