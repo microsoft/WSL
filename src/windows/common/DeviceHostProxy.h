@@ -85,12 +85,12 @@ private:
         RemoteFileSystemInfo(const RemoteFileSystemInfo&) = delete;
         RemoteFileSystemInfo& operator=(const RemoteFileSystemInfo&) = delete;
 
-        GUID ImplementationClsid;
+        GUID ImplementationClsid{};
         std::wstring Tag;
-        DWORD Cookie{};
+        DWORD Cookie = 0;
 
     private:
-        IGlobalInterfaceTable* m_git{};
+        IGlobalInterfaceTable* m_git = nullptr;
     };
 
     wil::com_ptr<IGlobalInterfaceTable> m_git;
