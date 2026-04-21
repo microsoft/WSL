@@ -2038,6 +2038,8 @@ try
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
     }
 
+    auto removeNetworkCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_dockerClient->RemoveNetwork(name); });
+
     // Inspect the newly created network to cache full properties (IPAM, Scope, etc.)
     // since CreateNetworkResponse only returns {Id, Warning}.
     docker_schema::Network full;
@@ -2070,6 +2072,8 @@ try
     WI_VERIFY(inserted);
 
     WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(full.Id.c_str(), "NetworkId"));
+
+    removeNetworkCleanup.release();
 
     return S_OK;
 }
