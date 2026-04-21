@@ -210,6 +210,9 @@ jobs:
               Copy-Item -Path "bin\${{ parameters.platform }}\release\wsl.msi" -Destination "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).${{ parameters.platform }}.msi"
               Copy-Item -Path "bin\${{ parameters.platform }}\release\installer.msix" -Destination "$(ob_outputDirectory)\installer\installer.${{ parameters.platform }}.msix"
               if (Test-Path "generated\dev-cert.pfx") { Copy-Item "generated\dev-cert.pfx" "$(ob_outputDirectory)\installer\dev-cert.pfx" }
+              New-Item -ItemType Directory -Path "$(ob_outputDirectory)\sdk\${{ parameters.platform }}" -Force
+              Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.lib" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.lib"
+              Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
 
       - powershell: |
           $binFolder = ".\bin\${{ parameters.platform }}\Release"
