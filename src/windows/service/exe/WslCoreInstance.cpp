@@ -54,7 +54,7 @@ WslCoreInstance::WslCoreInstance(
     int initResult = 0;
     int failureStep = 0;
     gsl::span<gsl::byte> span;
-    LX_MINI_INIT_CREATE_INSTANCE_RESULT result{};
+    const LX_MINI_INIT_CREATE_INSTANCE_RESULT* resultPtr = nullptr;
     {
         WslTelemetryActivityScope waitForCreateInstanceResultActivity([&](const GUID& activityId, HRESULT hr) {
             WSL_LOG_TELEMETRY_ACTIVITY_STOP(
@@ -76,11 +76,12 @@ WslCoreInstance::WslCoreInstance(
             TraceLoggingValue(InstanceId, "instanceId"),
             TraceLoggingValue(m_socketTimeout, "timeoutMs"));
 
-        result = m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
-        initResult = result.Result;
-        failureStep = static_cast<int>(result.FailureStep);
+        resultPtr = &m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
+        initResult = resultPtr->Result;
+        failureStep = static_cast<int>(resultPtr->FailureStep);
     }
 
+    const auto& result = *resultPtr;
     if (result.WarningsOffset != 0)
     {
         for (const auto& e : wsl::shared::string::Split<char>(wsl::shared::string::FromSpan(span, result.WarningsOffset), '\n'))
@@ -462,7 +463,7 @@ void WslCoreInstance::Initialize()
     //      subsequent interop-server launch. The span references channel-owned memory that stays
     //      valid for the rest of Initialize() since no further receive is issued.
     gsl::span<gsl::byte> span;
-    LX_INIT_CONFIGURATION_INFORMATION_RESPONSE response{};
+    const LX_INIT_CONFIGURATION_INFORMATION_RESPONSE* responsePtr = nullptr;
     {
         WslTelemetryActivityScope waitForInitConfigResponseActivity([&](const GUID& activityId, HRESULT hr) {
             WSL_LOG_TELEMETRY_ACTIVITY_STOP(
@@ -481,8 +482,10 @@ void WslCoreInstance::Initialize()
             TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
             TraceLoggingValue(m_instanceId, "instanceId"));
 
-        response = transaction.Receive<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
+        responsePtr = &transaction.Receive<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
     }
+
+    const auto& response = *responsePtr;
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;
