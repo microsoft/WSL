@@ -1110,13 +1110,14 @@ try
         wsl::shared::MessageWriter<LX_INIT_QUERY_ENVIRONMENT_VARIABLE> Message(LxInitMessageQueryEnvironmentVariable);
         Message.WriteString(Name);
 
-        channel.SendMessage<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message.Span());
+        auto transaction = channel.StartTransaction();
+        transaction.Send<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message.Span());
 
         //
         // Read a response, this will contain the environment variable value if it exists.
         //
 
-        Value = channel.ReceiveMessage<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>().Buffer;
+        Value = transaction.Receive<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>().Buffer;
 
         //
         // Set the environment variable for future queries.
@@ -1195,8 +1196,9 @@ Return Value:
         Message.MessageType = LxInitMessageQueryFeatureFlags;
         Message.MessageSize = sizeof(Message);
 
-        channel.SendMessage(Message);
-        FeatureFlags = channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
+        auto transaction = channel.StartTransaction();
+        transaction.Send(Message);
+        FeatureFlags = transaction.Receive<RESULT_MESSAGE<int32_t>>().Result;
     }
 
     UtilSetFeatureFlags(FeatureFlags, FeatureFlagEnv == nullptr);
@@ -1264,9 +1266,10 @@ try
     Message.MessageType = LxInitMessageQueryNetworkingMode;
     Message.MessageSize = sizeof(Message);
 
-    channel.SendMessage(Message);
+    auto transaction = channel.StartTransaction();
+    transaction.Send(Message);
 
-    const auto& response = channel.ReceiveMessage<RESULT_MESSAGE<uint8_t>>();
+    const auto& response = transaction.Receive<RESULT_MESSAGE<uint8_t>>();
     auto NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(response.Result);
 
     THROW_ERRNO_IF(EINVAL, NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy);
@@ -1358,9 +1361,10 @@ try
     THROW_LAST_ERROR_IF(channel.Socket() < 0);
 
     wsl::shared::MessageWriter<LX_INIT_QUERY_VM_ID> Message(LxInitMessageQueryVmId);
-    channel.SendMessage<LX_INIT_QUERY_VM_ID>(Message.Span());
+    auto transaction = channel.StartTransaction();
+    transaction.Send<LX_INIT_QUERY_VM_ID>(Message.Span());
 
-    return channel.ReceiveMessage<LX_INIT_QUERY_VM_ID>().Buffer;
+    return transaction.Receive<LX_INIT_QUERY_VM_ID>().Buffer;
 }
 catch (...)
 {
@@ -2594,13 +2598,38 @@ int UtilSaveBlockedSignals(const sigset_t& SignalMask)
     return sigprocmask(SIG_BLOCK, &SignalMask, &g_originalSignals);
 }
 
+// Returns true for signals that should not be saved/restored:
+// SIGKILL/SIGSTOP — not settable per POSIX.
+// SIGCONT — left at default to allow process resumption.
+// SIGHUP — handled separately by the caller.
+// 32-34 — internal NPTL signals (__SIGRTMIN through __SIGRTMIN+2) reserved
+//         by glibc for thread cancellation and other runtime use.
+static bool SkipSignal(unsigned int Signal)
+{
+    switch (Signal)
+    {
+    case SIGKILL:
+    case SIGSTOP:
+    case SIGCONT:
+    case SIGHUP:
+    case 32:
+    case 33:
+    case 34:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 int UtilSaveSignalHandlers(struct sigaction* SavedSignalActions)
 
 /*++
 
 Routine Description:
 
-    This routine saves all settable signal handlers except SIGHUP.
+    This routine saves all settable signal handlers, skipping signals
+    listed in SkipSignal() (non-settable, SIGHUP, and internal NPTL signals).
 
 Arguments:
 
@@ -2615,15 +2644,8 @@ Return Value:
 {
     for (unsigned int Index = 1; Index < _NSIG; Index += 1)
     {
-        switch (Index)
+        if (SkipSignal(Index))
         {
-        case SIGKILL:
-        case SIGSTOP:
-        case SIGCONT:
-        case SIGHUP:
-        case 32:
-        case 33:
-        case 34:
             continue;
         }
 
@@ -2642,8 +2664,8 @@ int UtilSetSignalHandlers(struct sigaction* SavedSignalActions, bool Ignore)
 
 Routine Description:
 
-    This routine sets all settable signal handlers except SIGHUP to the given
-    handler.
+    This routine sets all settable signal handlers to the given handler,
+    skipping signals listed in SkipSignal().
 
 Arguments:
 
@@ -2662,15 +2684,8 @@ Return Value:
 
     for (unsigned int Index = 1; Index < _NSIG; Index += 1)
     {
-        switch (Index)
+        if (SkipSignal(Index))
         {
-        case SIGKILL:
-        case SIGSTOP:
-        case SIGCONT:
-        case SIGHUP:
-        case 32:
-        case 33:
-        case 34:
             continue;
         }
 
@@ -3333,7 +3348,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<gsl::byte> Buffer)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3342,7 +3357,7 @@ int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<g
         return -1;
     }
 
-    auto sendResult = [&](unsigned long Result) { channel.SendResultMessage<int32_t>(Result); };
+    auto sendResult = [&](unsigned long Result) { Transaction.SendResultMessage<int32_t>(Result); };
 
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false)};

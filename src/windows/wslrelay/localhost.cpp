@@ -81,7 +81,8 @@ void wsl::windows::wslrelay::localhost::RelayWorker(_In_ wsl::shared::SocketChan
 
     for (;;)
     {
-        auto [Message, Span] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+        auto Transaction = Channel.ReceiveTransaction();
+        auto [Message, Span] = Transaction.ReceiveOrClosed<MESSAGE_HEADER>();
         if (Message == nullptr)
         {
             break;
@@ -151,7 +152,7 @@ void wsl::windows::wslrelay::localhost::RelayWorker(_In_ wsl::shared::SocketChan
                 }
             }
 
-            Channel.SendMessage(Response);
+            Transaction.Send(Response);
             break;
         }
 

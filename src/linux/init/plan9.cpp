@@ -157,13 +157,14 @@ try
     std::vector<gsl::byte> Buffer;
     for (;;)
     {
-        auto [Message, _] = channel.ReceiveMessageOrClosed<LX_INIT_STOP_PLAN9_SERVER>();
+        auto transaction = channel.ReceiveTransaction();
+        auto [Message, _] = transaction.ReceiveOrClosed<LX_INIT_STOP_PLAN9_SERVER>();
         if (Message == nullptr)
         {
             _exit(0);
         }
 
-        channel.SendResultMessage<bool>(StopPlan9Server(fileSystem, Message->Force));
+        transaction.SendResultMessage<bool>(StopPlan9Server(fileSystem, Message->Force));
     }
 }
 CATCH_LOG();
