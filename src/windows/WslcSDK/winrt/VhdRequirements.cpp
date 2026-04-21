@@ -17,12 +17,19 @@ Abstract:
 #include "Microsoft.WSL.Containers.VhdRequirements.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-VhdRequirements::VhdRequirements(hstring const& name, uint64_t sizeInBytes, winrt::Microsoft::WSL::Containers::VhdType const& type) :
-    m_name(winrt::to_string(name))
+
+VhdRequirements::VhdRequirements(hstring const& name, uint64_t sizeInBytes, VhdType const& type) :
+    m_name(winrt::to_string(name)), m_sizeInBytes(sizeInBytes), m_type(type)
 {
-    m_vhdRequirements.name = m_name.c_str();
-    m_vhdRequirements.sizeBytes = sizeInBytes;
-    m_vhdRequirements.type = static_cast<WslcVhdType>(type);
+    if (name.empty() || sizeInBytes == 0)
+    {
+        throw hresult_invalid_argument();
+    }
+
+    if (type != VhdType::Dynamic)
+    {
+        throw hresult_not_implemented();
+    }
 }
 
 hstring VhdRequirements::Name()
@@ -30,18 +37,72 @@ hstring VhdRequirements::Name()
     return winrt::to_hstring(m_name);
 }
 
-uint64_t VhdRequirements::SizeInBytes()
+void VhdRequirements::Name(hstring const& value)
 {
-    return m_vhdRequirements.sizeBytes;
+    if (m_vhdRequirements)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    if (value.empty())
+    {
+        throw hresult_invalid_argument();
+    }
+
+    m_name = winrt::to_string(value);
 }
 
-winrt::Microsoft::WSL::Containers::VhdType VhdRequirements::Type()
+uint64_t VhdRequirements::SizeInBytes()
 {
-    return static_cast<winrt::Microsoft::WSL::Containers::VhdType>(m_vhdRequirements.type);
+    return m_sizeInBytes;
+}
+
+void VhdRequirements::SizeInBytes(uint64_t value)
+{
+    if (m_vhdRequirements)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    if (value == 0)
+    {
+        throw hresult_invalid_argument();
+    }
+
+    m_sizeInBytes = value;
+}
+
+VhdType VhdRequirements::Type()
+{
+    return m_type;
+}
+
+void VhdRequirements::Type(VhdType const& value)
+{
+    if (m_vhdRequirements)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    if (value != VhdType::Dynamic)
+    {
+        throw hresult_not_implemented();
+    }
+
+    m_type = value;
 }
 
 WslcVhdRequirements* VhdRequirements::ToStructPointer()
 {
-    return &m_vhdRequirements;
+    if (!m_vhdRequirements)
+    {
+        m_vhdRequirements = std::make_unique<WslcVhdRequirements>();
+        m_vhdRequirements->name = m_name.c_str();
+        m_vhdRequirements->sizeBytes = m_sizeInBytes;
+        m_vhdRequirements->type = static_cast<WslcVhdType>(m_type);
+    }
+
+    return m_vhdRequirements.get();
 }
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

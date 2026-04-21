@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #pragma once
+#include <cstdint>
 
 constexpr uint32_t s_DefaultCPUCount = 2;
 constexpr uint32_t s_DefaultMemoryMB = 2000;

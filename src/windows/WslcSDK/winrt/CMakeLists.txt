@@ -2,16 +2,46 @@ add_idl_winrt(wslcsdkwinrtidl "wslcsdk.idl")
 set_target_properties(wslcsdkwinrtidl PROPERTIES FOLDER windows)
 
 set(SOURCES
+    Container.cpp
+    ContainerNamedVolume.cpp
+    ContainerPortMapping.cpp
+    ContainerSettings.cpp
+    ContainerVolume.cpp
+    ImageInfo.cpp
+    ImageProgress.cpp
+    InstallProgress.cpp
+    Process.cpp
+    ProcessSettings.cpp
+    PullImageOptions.cpp
+    PushImageOptions.cpp
+    ServiceVersion.cpp
     Session.cpp
     SessionSettings.cpp
+    TagImageOptions.cpp
     VhdRequirements.cpp
+    WslcService.cpp
 )
 
 set(HEADERS
+    Container.h
+    ContainerNamedVolume.h
+    ContainerPortMapping.h
+    ContainerSettings.h
+    ContainerVolume.h
     Helpers.h
+    ImageInfo.h
+    ImageProgress.h
+    InstallProgress.h
+    Process.h
+    ProcessSettings.h
+    PullImageOptions.h
+    PushImageOptions.h
+    ServiceVersion.h
     Session.h
     SessionSettings.h
+    TagImageOptions.h
     VhdRequirements.h
+    WslcService.h
 )
 
 add_library(wslcsdkwinrt STATIC ${SOURCES} ${HEADERS})
