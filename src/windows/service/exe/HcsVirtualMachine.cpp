@@ -21,7 +21,6 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
-#include "WslCoreNetworkingSupport.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -355,19 +354,7 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::ConfigureNetworking(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket)
 try
 {
-    // Ensure the RPC thread is in MTA, otherwise COM calls towards the virtionet device will fail with RPC_E_WRONG_THREAD.
-
-    if constexpr (wsl::shared::Debug)
-    {
-        APTTYPE aptType;
-        APTTYPEQUALIFIER aptQualifier;
-        THROW_IF_FAILED(CoGetApartmentType(&aptType, &aptQualifier));
-        THROW_HR_IF_MSG(
-            RPC_E_WRONG_THREAD, aptType != APTTYPE_MTA, "ConfigureNetworking must run in MTA, current apartment type: %d", aptType);
-
-        std::lock_guard lock(m_lock);
-    }
-
+    std::lock_guard lock(m_lock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkEngine != nullptr);
 
     if (m_networkingMode == WSLCNetworkingModeNone)
