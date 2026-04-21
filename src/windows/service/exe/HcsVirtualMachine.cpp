@@ -355,17 +355,19 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::ConfigureNetworking(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket)
 try
 {
-    // Ensure the RPC thread is in the MTA so that COM proxies created here
-    // (e.g., IPlan9FileSystem via AddGuestDevice) can be used from any MTA thread,
-    // including the NotifyNetworkConnectivityHintChange callback thread.
-    const auto com = wsl::core::networking::InitializeCOMState();
+    // Ensure the RPC thread is in MTA, otherwise COM calls towards the virtionet device will fail with RPC_E_WRONG_THREAD.
 
-    APTTYPE aptType;
-    APTTYPEQUALIFIER aptQualifier;
-    THROW_IF_FAILED(CoGetApartmentType(&aptType, &aptQualifier));
-    THROW_HR_IF_MSG(RPC_E_WRONG_THREAD, aptType != APTTYPE_MTA, "ConfigureNetworking must run in MTA, current apartment type: %d", aptType);
+    if constexpr (wsl::shared::Debug)
+    {
+        APTTYPE aptType;
+        APTTYPEQUALIFIER aptQualifier;
+        THROW_IF_FAILED(CoGetApartmentType(&aptType, &aptQualifier));
+        THROW_HR_IF_MSG(
+            RPC_E_WRONG_THREAD, aptType != APTTYPE_MTA, "ConfigureNetworking must run in MTA, current apartment type: %d", aptType);
 
-    std::lock_guard lock(m_lock);
+        std::lock_guard lock(m_lock);
+    }
+
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkEngine != nullptr);
 
     if (m_networkingMode == WSLCNetworkingModeNone)

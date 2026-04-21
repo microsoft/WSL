@@ -28,8 +28,7 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
-class HcsVirtualMachine
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachine>
+class HcsVirtualMachine : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachine>
 {
 public:
     HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings);

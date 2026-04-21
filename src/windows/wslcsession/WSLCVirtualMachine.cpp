@@ -307,7 +307,6 @@ void WSLCVirtualMachine::Initialize()
         CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
     }
 
-    
     // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
     ConfigureNetworking();
 }
