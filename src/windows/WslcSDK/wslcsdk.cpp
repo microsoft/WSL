@@ -1549,8 +1549,8 @@ try
             };
         }
 
-        wsl::windows::common::WindowsUpdateContext context;
-        context.RunUpdateFlow(true, callback);
+        wsl::windows::common::WindowsUpdateContext wuContext;
+        wuContext.RunUpdateFlow(true, callback);
     }
 
     return S_OK;
