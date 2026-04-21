@@ -2138,15 +2138,20 @@ class NetworkTests
 
     static void VerifyPortZeroRebindSucceeds()
     {
-        HMODULE hModule = nullptr;
-        THROW_LAST_ERROR_IF(!GetModuleHandleExW(
-            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            reinterpret_cast<LPCWSTR>(&VerifyPortZeroRebindSucceeds),
-            &hModule));
-        auto dllPath = wil::GetModuleFileNameW(hModule);
-        std::filesystem::path binaryPath = std::filesystem::path(dllPath.get()).parent_path() / L"port_rebind_test";
-        auto cmd = std::format(L"bash -c \"\\\"$(wslpath '{}')\\\"\"", binaryPath.wstring());
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(cmd.c_str()), 0L);
+        // Verify that bind(0) -> close -> immediate rebind on the same port succeeds.
+        // Uses a perl one-liner to perform the entire sequence in a single process,
+        // matching the semantics of a native C test (no SO_REUSEADDR, same-process rebind).
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"perl -MSocket -e '"
+                            L"socket(S1,AF_INET,SOCK_STREAM,0) or die;"
+                            L"bind(S1,sockaddr_in(0,INADDR_ANY)) or die;"
+                            L"my $port=(sockaddr_in(getsockname(S1)))[0];"
+                            L"close(S1);"
+                            L"socket(S2,AF_INET,SOCK_STREAM,0) or die;"
+                            L"bind(S2,sockaddr_in($port,INADDR_ANY)) or die;"
+                            L"close(S2)"
+                            L"'"),
+            0L);
     }
 
     template <typename T>
