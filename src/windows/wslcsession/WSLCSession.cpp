@@ -2027,10 +2027,9 @@ try
         ipam.Config.emplace().push_back(std::move(ipamConfig));
     }
 
-    docker_schema::CreateNetworkResponse response;
     try
     {
-        response = m_dockerClient->CreateNetwork(request);
+        m_dockerClient->CreateNetwork(request);
     }
     catch (const DockerHTTPException& e)
     {
@@ -2039,10 +2038,38 @@ try
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
     }
 
-    auto [it, inserted] = m_networks.insert({name, NetworkEntry{response.Id, driver}});
+    // Inspect the newly created network to cache full properties (IPAM, Scope, etc.)
+    // since CreateNetworkResponse only returns {Id, Warning}.
+    docker_schema::Network full;
+    try
+    {
+        full = m_dockerClient->InspectNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect newly created network '%hs'", name.c_str());
+    }
+
+    NetworkEntry entry;
+    entry.Id = full.Id;
+    entry.Driver = full.Driver;
+    entry.Scope = full.Scope;
+    entry.Internal = full.Internal;
+    entry.Labels = full.Labels;
+    entry.IPAM.Driver = full.IPAM.Driver;
+    if (full.IPAM.Config)
+    {
+        auto& cfgs = entry.IPAM.Config.emplace();
+        for (const auto& c : *full.IPAM.Config)
+        {
+            cfgs.push_back({c.Subnet, c.Gateway});
+        }
+    }
+
+    auto [it, inserted] = m_networks.insert({name, std::move(entry)});
     WI_VERIFY(inserted);
 
-    WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(response.Id.c_str(), "NetworkId"));
+    WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(full.Id.c_str(), "NetworkId"));
 
     return S_OK;
 }
@@ -2136,39 +2163,26 @@ try
     ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    std::lock_guard networksLock(m_networksLock);
 
-    {
-        std::lock_guard networksLock(m_networksLock);
+    auto it = m_networks.find(name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
 
-        auto it = m_networks.find(name);
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
-    }
-
-    docker_schema::Network network;
-    try
-    {
-        network = m_dockerClient->InspectNetwork(name);
-    }
-    catch (const DockerHTTPException& e)
-    {
-        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect network '%hs'", name.c_str());
-    }
+    const auto& entry = it->second;
 
     wslc_schema::InspectNetwork result;
-    result.Id = network.Id;
-    result.Name = network.Name;
-    result.Driver = network.Driver;
-    result.Scope = network.Scope;
-    result.Internal = network.Internal;
-    result.Labels = network.Labels;
+    result.Id = entry.Id;
+    result.Name = name;
+    result.Driver = entry.Driver;
+    result.Scope = entry.Scope;
+    result.Internal = entry.Internal;
+    result.Labels = entry.Labels;
 
-    result.IPAM.Driver = network.IPAM.Driver;
-    if (network.IPAM.Config)
+    result.IPAM.Driver = entry.IPAM.Driver;
+    if (entry.IPAM.Config)
     {
         auto& configs = result.IPAM.Config.emplace();
-        for (const auto& cfg : *network.IPAM.Config)
+        for (const auto& cfg : *entry.IPAM.Config)
         {
             wslc_schema::InspectIPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
@@ -2554,7 +2568,23 @@ void WSLCSession::RecoverExistingNetworks()
         {
             WI_ASSERT(!m_networks.contains(network.Name));
 
-            auto [_, inserted] = m_networks.insert({network.Name, NetworkEntry{network.Id, network.Driver}});
+            NetworkEntry entry;
+            entry.Id = network.Id;
+            entry.Driver = network.Driver;
+            entry.Scope = network.Scope;
+            entry.Internal = network.Internal;
+            entry.Labels = network.Labels;
+            entry.IPAM.Driver = network.IPAM.Driver;
+            if (network.IPAM.Config)
+            {
+                auto& cfgs = entry.IPAM.Config.emplace();
+                for (const auto& c : *network.IPAM.Config)
+                {
+                    cfgs.push_back({c.Subnet, c.Gateway});
+                }
+            }
+
+            auto [_, inserted] = m_networks.insert({network.Name, std::move(entry)});
             WI_VERIFY(inserted);
         }
         CATCH_LOG_MSG("Failed to recover network: %hs", network.Name.c_str());
