@@ -127,6 +127,7 @@ add_executable(
   Views/Settings/NetworkingPage.xaml.cs
   Views/Settings/OptionalFeaturesPage.xaml
   Views/Settings/OptionalFeaturesPage.xaml.cs
+  Views/Settings/SettingsApplyHelper.cs
   Views/Settings/ShellPage.xaml
   Views/Settings/ShellPage.xaml.cs
   Windows/OOBEWindow.xaml

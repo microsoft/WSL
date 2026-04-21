@@ -95,18 +95,18 @@ try
 
             LOG_HR_MSG(
                 E_UNEXPECTED,
-                "Socket closed while reading message. Size: %u, type: %i, sequence: %u",
+                "Socket closed while reading message. Size: %u, type: %i, id: %u",
                 Header->MessageSize,
                 Header->MessageType,
-                Header->SequenceNumber);
+                Header->TransactionId);
 
 #elif defined(__GNUC__)
 
             LOG_ERROR(
-                "Socket closed while reading message. Size: {}, type: {}, sequence: {}",
+                "Socket closed while reading message. Size: {}, type: {}, id: {}",
                 Header->MessageSize,
                 Header->MessageType,
-                Header->SequenceNumber);
+                Header->TransactionId);
 
 #endif
 
