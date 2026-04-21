@@ -120,7 +120,8 @@ wil::com_ptr<IPlan9FileSystem> DeviceHostProxy::GetRemoteFileSystem(const GUID& 
             // This is required because we might be running under MTA or NA depending on which class we were called from.
 
             wil::com_ptr<IPlan9FileSystem> instance;
-            THROW_IF_FAILED(m_git->GetInterfaceFromGlobal(entry.Cookie, __uuidof(IPlan9FileSystem), reinterpret_cast<void**>(instance.put())));
+            THROW_IF_FAILED(
+                m_git->GetInterfaceFromGlobal(entry.Cookie, __uuidof(IPlan9FileSystem), reinterpret_cast<void**>(instance.put())));
             return instance;
         }
     }
