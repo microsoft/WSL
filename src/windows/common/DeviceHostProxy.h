@@ -44,18 +44,15 @@ public:
 private:
     struct RemoteFileSystemInfo
     {
-        RemoteFileSystemInfo(GUID ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Instance, IGlobalInterfaceTable* git) :
-            ImplementationClsid{ImplementationClsid}, Tag{Tag}
+        RemoteFileSystemInfo(GUID ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Instance) :
+            ImplementationClsid{ImplementationClsid}, Tag{Tag}, Instance{Instance}
         {
-            THROW_IF_FAILED(git->RegisterInterfaceInGlobal(Instance.get(), __uuidof(IPlan9FileSystem), &Cookie));
         }
 
         GUID ImplementationClsid;
         std::wstring Tag;
-        DWORD Cookie{};
+        wil::com_ptr<IPlan9FileSystem> Instance;
     };
-
-    wil::com_ptr<IGlobalInterfaceTable> m_git;
 
     std::wstring m_systemId;
     GUID m_runtimeId;

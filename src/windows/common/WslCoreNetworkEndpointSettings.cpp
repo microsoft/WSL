@@ -154,7 +154,7 @@ std::wstring wsl::core::networking::NetworkSettings::GetBestGatewayMacAddress(AD
     {
         LOG_HR_MSG(
             HRESULT_FROM_WIN32(result),
-            "Failed to resolve gateway MAC address for: %ls, interface: %ul",
+            "Failed to resolve gateway MAC address for: %ls, interface: %lu",
             windows::common::string::SockAddrInetToWstring(gatewayAddress).c_str(),
             InterfaceIndex);
 

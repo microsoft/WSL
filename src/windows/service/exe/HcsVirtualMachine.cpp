@@ -21,6 +21,7 @@ Abstract:
 #include "wslutil.h"
 #include "lxinitshared.h"
 #include "DnsResolver.h"
+#include "WslCoreNetworkingSupport.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -354,6 +355,16 @@ CATCH_RETURN()
 HRESULT HcsVirtualMachine::ConfigureNetworking(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket)
 try
 {
+    // Ensure the RPC thread is in the MTA so that COM proxies created here
+    // (e.g., IPlan9FileSystem via AddGuestDevice) can be used from any MTA thread,
+    // including the NotifyNetworkConnectivityHintChange callback thread.
+    const auto com = wsl::core::networking::InitializeCOMState();
+
+    APTTYPE aptType;
+    APTTYPEQUALIFIER aptQualifier;
+    THROW_IF_FAILED(CoGetApartmentType(&aptType, &aptQualifier));
+    THROW_HR_IF_MSG(RPC_E_WRONG_THREAD, aptType != APTTYPE_MTA, "ConfigureNetworking must run in MTA, current apartment type: %d", aptType);
+
     std::lock_guard lock(m_lock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkEngine != nullptr);
 

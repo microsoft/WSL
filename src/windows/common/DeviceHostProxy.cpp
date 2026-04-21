@@ -26,7 +26,6 @@ DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId
     m_systemId{VmId}, m_runtimeId{RuntimeId}, m_system{wsl::windows::common::hcs::OpenComputeSystem(VmId.c_str(), GENERIC_ALL)}, m_shutdown{false}
 {
     m_devicesShutdown = false;
-    m_git = wil::CoCreateInstance<IGlobalInterfaceTable>(CLSID_StdGlobalInterfaceTable, CLSCTX_INPROC_SERVER);
 }
 
 GUID DeviceHostProxy::AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag)
@@ -104,7 +103,7 @@ void DeviceHostProxy::AddRemoteFileSystem(const GUID& ImplementationClsid, const
         THROW_HR_IF(E_INVALIDARG, entry.ImplementationClsid == ImplementationClsid && entry.Tag == Tag);
     }
 
-    m_fileSystems.emplace_back(ImplementationClsid, Tag, Plan9Fs, m_git.get());
+    m_fileSystems.emplace_back(ImplementationClsid, Tag, Plan9Fs);
 }
 
 wil::com_ptr<IPlan9FileSystem> DeviceHostProxy::GetRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag)
@@ -116,9 +115,7 @@ wil::com_ptr<IPlan9FileSystem> DeviceHostProxy::GetRemoteFileSystem(const GUID& 
     {
         if (entry.ImplementationClsid == ImplementationClsid && entry.Tag == Tag)
         {
-            wil::com_ptr<IPlan9FileSystem> instance;
-            THROW_IF_FAILED(m_git->GetInterfaceFromGlobal(entry.Cookie, __uuidof(IPlan9FileSystem), reinterpret_cast<void**>(instance.put())));
-            return instance;
+            return entry.Instance;
         }
     }
 
@@ -129,11 +126,6 @@ void DeviceHostProxy::Shutdown()
 {
     {
         auto lock = m_lock.lock_exclusive();
-        for (auto& entry : m_fileSystems)
-        {
-            LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(entry.Cookie));
-        }
-
         m_fileSystems.clear();
         m_shutdown = true;
     }
