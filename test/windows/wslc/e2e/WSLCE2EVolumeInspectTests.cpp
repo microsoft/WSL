@@ -96,10 +96,7 @@ class WSLCE2EVolumeInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_NotFound)
     {
         auto result = RunWslc(std::format(L"volume inspect {}", TestVolumeName1));
-        result.Verify(
-            {.Stdout = L"[]\r\n",
-             .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName1),
-             .ExitCode = 1});
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName1), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_MixedFoundNotFound)
@@ -111,9 +108,7 @@ class WSLCE2EVolumeInspectTests
 
         // Inspect both volumes in the same command, expecting one to be found and the other to not be found
         result = RunWslc(std::format(L"volume inspect {} {}", TestVolumeName1, TestVolumeName2));
-        result.Verify(
-            {.Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName2),
-             .ExitCode = 1});
+        result.Verify({.Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName2), .ExitCode = 1});
 
         // Verify found volume
         auto inspectData =

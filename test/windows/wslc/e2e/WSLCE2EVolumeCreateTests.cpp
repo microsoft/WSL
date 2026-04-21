@@ -50,8 +50,7 @@ class WSLCE2EVolumeCreateTests
         auto volumeName = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(volumeName.empty());
 
-        auto deleteVolume = wil::scope_exit([&]()
-        {
+        auto deleteVolume = wil::scope_exit([&]() {
             auto deleteResult = RunWslc(std::format(L"volume rm {}", volumeName));
             deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
         });
@@ -137,7 +136,7 @@ private:
         options << L"The following options are available:\r\n"                      //
                 << L"  -d,--driver    Specify volume driver name (default vhd)\r\n" //
                 << L"  -o,--opt       Set driver specific options\r\n"              //
-                << L"  --label        Volume metadata setting\r\n"                //
+                << L"  --label        Volume metadata setting\r\n"                  //
                 << L"  --session      Specify the session to use\r\n"               //
                 << L"  -?,--help      Shows help about the selected command\r\n"    //
                 << L"\r\n";

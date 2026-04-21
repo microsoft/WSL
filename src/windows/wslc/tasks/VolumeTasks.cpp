@@ -124,8 +124,8 @@ void DeleteVolumes(CLIExecutionContext& context)
         {
             PrintMessage(name);
         }
-         else
-        {   
+        else
+        {
             context.ExitCode = 1;
         }
     }
@@ -152,7 +152,7 @@ void InspectVolumes(CLIExecutionContext& context)
             result.push_back(*inspectData);
         }
         else
-        {   
+        {
             context.ExitCode = 1;
         }
     }

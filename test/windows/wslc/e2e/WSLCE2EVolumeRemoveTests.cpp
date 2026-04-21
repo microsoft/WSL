@@ -82,10 +82,7 @@ class WSLCE2EVolumeRemoveTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_NotFound)
     {
         auto result = RunWslc(std::format(L"volume remove {}", TestVolumeName));
-        result.Verify(
-            {.Stdout = L"",
-             .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName),
-             .ExitCode = 1});
+        result.Verify({.Stdout = L"", .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_MixedFoundNotFound)
@@ -97,9 +94,7 @@ class WSLCE2EVolumeRemoveTests
         result = RunWslc(std::format(L"volume remove {} {}", TestVolumeName, TestVolumeName2));
         result.Dump(true);
         result.Verify(
-            {.Stdout = std::format(L"{}\r\n", TestVolumeName),
-             .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName2),
-             .ExitCode = 1});
+            {.Stdout = std::format(L"{}\r\n", TestVolumeName), .Stderr = std::format(L"Volume not found: '{}'\r\n", TestVolumeName2), .ExitCode = 1});
         VerifyVolumeIsNotListed(TestVolumeName);
     }
 
