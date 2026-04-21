@@ -213,26 +213,28 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
     // This can be either an existing named volume or a new named volume that will be created.
     if (VolumeMount::IsValidNamedVolumeName(rawHostPath))
     {
-        // TODO: Handle named volume reference in the request.
-        // For now we will ignore this and treat named volumes as a relative path.
+        vm.m_isNamedVolume = true;
+        vm.m_host = rawHostPath;
     }
-
-    // Not a named volume, so it must be a path.
-    // Use wil::GetFullPathNameW to resolve relative paths against the CWD.
-    std::wstring resolvedHostPath;
-    if (FAILED(wil::GetFullPathNameW(rawHostPath.c_str(), resolvedHostPath)))
+    else
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
-    }
+        // Not a named volume, so it must be a path.
+        // Use wil::GetFullPathNameW to resolve relative paths against the CWD.
+        std::wstring resolvedHostPath;
+        if (FAILED(wil::GetFullPathNameW(rawHostPath.c_str(), resolvedHostPath)))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
+        }
 
-    // GetFileAttributesW validates the resolved path syntax without requiring existence.
-    // ERROR_INVALID_NAME indicates illegal characters in the path (e.g. ":" as a component).
-    if (GetFileAttributesW(resolvedHostPath.c_str()) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_INVALID_NAME)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
-    }
+        // GetFileAttributesW validates the resolved path syntax without requiring existence.
+        // ERROR_INVALID_NAME indicates illegal characters in the path (e.g. ":" as a component).
+        if (GetFileAttributesW(resolvedHostPath.c_str()) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_INVALID_NAME)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
+        }
 
-    vm.m_hostPath = std::move(resolvedHostPath);
+        vm.m_host = std::move(resolvedHostPath);
+    }
 
     return vm;
 }

@@ -52,13 +52,11 @@ static bool TryInspectVolume(Session& session, const std::string& volumeName, st
     {
         if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
         {
-            PrintMessage(std::format(L"Volume not found: '{}'", MultiByteToWide(volumeName)), stderr);
+            PrintMessage(Localization::MessageWslcVolumeNotFound(volumeName.c_str()), stderr);
             return false;
         }
-        else
-        {
-            throw;
-        }
+
+        throw;
     }
 }
 
@@ -73,13 +71,11 @@ static bool TryDeleteVolume(Session& session, const std::string& volumeName)
     {
         if (ex.GetErrorCode() == WSLC_E_VOLUME_NOT_FOUND)
         {
-            PrintMessage(std::format(L"Volume not found: '{}'", MultiByteToWide(volumeName)), stderr);
+            PrintMessage(Localization::MessageWslcVolumeNotFound(volumeName.c_str()), stderr);
             return false;
         }
-        else
-        {
-            throw;
-        }
+
+        throw;
     }
 }
 
