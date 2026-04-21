@@ -497,7 +497,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             TraceLoggingValue(m_runtimeId, "vmId"),
             TraceLoggingValue(m_vmConfig.KernelBootTimeout, "timeoutMs"));
 
-        m_miniInitChannel = wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
+        m_miniInitChannel =
+            wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
     }
 
     // Accept the connection from the Linux guest for notifications.
