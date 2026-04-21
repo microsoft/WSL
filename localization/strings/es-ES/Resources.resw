@@ -1894,7 +1894,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>WSL Shutdown Required</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
-    <value>Changed WSL settings require a WSL shutdown and restart to finalize. Shutting down will cause any active WSL sessions to terminate.</value>
+    <value>La configuración de WSL modificada requiere un apagado y reinicio de WSL para finalizar. Si se cierra, finalizarán todas las sesiones de WSL activas.</value>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
     <value>Shutdown WSL now</value>
@@ -1909,11 +1909,11 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Close</value>
   </data>
   <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
-    <value>Failed to save pending settings changes. Error code: {0}</value>
+    <value>No se pudieron guardar los cambios de configuración pendientes. Código de error: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
-    <value>Settings were saved, but shutting down WSL failed: {0}</value>
+    <value>Se guardó la configuración, pero se produjo un error al cerrar WSL: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
   <data name="Settings_BooleanTrueText" xml:space="preserve">
