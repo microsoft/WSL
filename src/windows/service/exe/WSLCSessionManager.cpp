@@ -60,6 +60,14 @@ struct SessionSettings
         return settings::UserSettings(localAppData / L"wslc");
     }
 
+    // Get default memory size. Half of available memory.
+    static uint32_t DefultMemorySize()
+    {
+        MEMORYSTATUSEX memInfo{sizeof(MEMORYSTATUSEX)};
+        THROW_IF_WIN32_BOOL_FALSE(GlobalMemoryStatusEx(&memInfo));
+        return static_cast<uint32_t>(memInfo.ullTotalPhys / (2 * _1MB));
+    }
+
     // Default session: name and storage path determined from caller's token.
     static std::unique_ptr<SessionSettings> Default(HANDLE UserToken, const std::wstring& ResolvedName)
     {
@@ -88,8 +96,10 @@ private:
     {
         Settings.DisplayName = DisplayName.c_str();
         Settings.StoragePath = StoragePath.c_str();
-        Settings.CpuCount = userSettings.Get<settings::Setting::SessionCpuCount>();
-        Settings.MemoryMb = userSettings.Get<settings::Setting::SessionMemoryMb>();
+        auto cpuCount = userSettings.Get<settings::Setting::SessionCpuCount>();
+        Settings.CpuCount = cpuCount > 0 ? cpuCount : wsl::windows::common::wslutil::GetLogicalProcessorCount();
+        auto memoryMb = userSettings.Get<settings::Setting::SessionMemoryMb>();
+        Settings.MemoryMb = memoryMb > 0 ? memoryMb : SessionSettings::DefultMemorySize();
         Settings.MaximumStorageSizeMb = userSettings.Get<settings::Setting::SessionStorageSizeMb>();
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();

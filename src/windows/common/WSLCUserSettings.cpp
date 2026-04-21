@@ -35,6 +35,7 @@ namespace wsl::windows::wslc::settings {
 static constexpr std::string_view s_DefaultSettingsTemplate =
     "# wslc user settings\n"
     "# https://aka.ms/wslc-settings\n"
+    "# All settings support string value \"default\" which use built-in defaults.\n"
     "\n"
     "session:\n"
     "  # Number of virtual CPUs allocated to the session (e.g. 4 default: all available CPUs)\n"
@@ -47,8 +48,8 @@ static constexpr std::string_view s_DefaultSettingsTemplate =
     "  # maxStorageSize: 1TB\n"
     "\n"
     "  # Default path for session storage. By default, storage is per-session under:\n"
-    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli        (standard sessions)\n"
-    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin (elevated sessions)\n"
+    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-<user>        (standard sessions)\n"
+    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin-<user>  (elevated sessions)\n"
     "  # defaultStoragePath: default\n"
     "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
