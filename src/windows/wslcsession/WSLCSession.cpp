@@ -54,7 +54,7 @@ std::string IndentLines(const std::string& input, const std::string& prefix)
     return result;
 }
 
-void ValidateName(LPCSTR Name, size_t maxLength = WSLC_MAX_CONTAINER_NAME_LENGTH)
+void ValidateName(LPCSTR Name, size_t maxLength)
 {
     const auto& locale = std::locale::classic();
     size_t i = 0;
@@ -1536,7 +1536,7 @@ try
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr)
     {
-        ValidateName(containerOptions->Name);
+        ValidateName(containerOptions->Name, WSLC_MAX_CONTAINER_NAME_LENGTH);
     }
 
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLC_MAX_IMAGE_NAME_LENGTH);
@@ -1581,7 +1581,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    ValidateName(Id);
+    ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH);
 
     // Look for an exact ID match first.
     auto lock = m_lock.lock_shared();
@@ -1856,7 +1856,7 @@ try
 
     if (Options->Name != nullptr && Options->Name[0] != '\0')
     {
-        ValidateName(Options->Name);
+        ValidateName(Options->Name, WSLC_MAX_VOLUME_NAME_LENGTH);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(Options->Name));
     }
 
@@ -1888,7 +1888,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
-    ValidateName(name.c_str());
+    ValidateName(name.c_str(), WSLC_MAX_VOLUME_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -1953,7 +1953,7 @@ try
     *Output = nullptr;
 
     std::string name = Name;
-    ValidateName(name.c_str());
+    ValidateName(name.c_str(), WSLC_MAX_VOLUME_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
     std::lock_guard volumesLock(m_volumesLock);
