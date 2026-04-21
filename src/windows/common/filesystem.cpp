@@ -838,12 +838,11 @@ std::string wsl::windows::common::filesystem::GetLinuxHostName()
 {
     DWORD size = 0;
     WI_VERIFY(GetComputerNameExA(ComputerNamePhysicalDnsHostname, nullptr, &size) == FALSE);
-    std::string hostName(size, '\0');
+    std::string hostName(size - 1, '\0');
     THROW_LAST_ERROR_IF(!GetComputerNameExA(ComputerNamePhysicalDnsHostname, hostName.data(), &size));
 
-    WI_ASSERT((size <= LX_HOST_NAME_MAX) && (hostName.size() == size + 1));
+    WI_ASSERT((size <= LX_HOST_NAME_MAX) && (hostName.size() == size));
 
-    hostName.resize(size);
     return wsl::shared::string::CleanHostname(hostName);
 }
 
