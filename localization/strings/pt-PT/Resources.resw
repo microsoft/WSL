@@ -1903,11 +1903,11 @@ Também pode aceder a mais Opções remotas do VS Code através da paleta de com
     <value>Close</value>
   </data>
   <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
-    <value>Failed to save pending settings changes. Error code: {0}</value>
+    <value>Falha ao guardar alterações de definições pendentes. Código de erro: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
-    <value>Settings were saved, but shutting down WSL failed: {0}</value>
+    <value>As definições foram guardadas, mas o encerramento do WSL falhou: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
   <data name="Settings_BooleanTrueText" xml:space="preserve">
