@@ -209,8 +209,9 @@ Return Value:
     QueryPortMessage.MessageType = LxInitMessageQueryDrvfsElevated;
     QueryPortMessage.MessageSize = sizeof(QueryPortMessage);
 
-    channel.SendMessage(QueryPortMessage);
-    return channel.ReceiveMessage<RESULT_MESSAGE<bool>>().Result;
+    auto transaction = channel.StartTransaction();
+    transaction.Send(QueryPortMessage);
+    return transaction.Receive<RESULT_MESSAGE<bool>>().Result;
 }
 
 int MountFilesystem(const char* FsType, const char* Source, const char* Target, const char* Options, int* ExitCode)

@@ -20,6 +20,7 @@ Abstract:
 #include <set>
 #include <string_view>
 #include <optional>
+#include <functional>
 #include "SocketChannel.h"
 #include "WslDistributionConfig.h"
 
@@ -399,7 +400,7 @@ std::set<std::pair<unsigned int, std::string>> ConfigGetMountedDrvFsVolumes(void
 std::vector<std::pair<std::string, std::string>> ConfigGetWslgEnvironmentVariables(const wsl::linux::WslDistributionConfig& Config);
 
 void ConfigHandleInteropMessage(
-    wsl::shared::SocketChannel& ResponseChannel,
+    wsl::shared::Transaction& Transaction,
     wsl::shared::SocketChannel& InteropChannel,
     bool Elevated,
     gsl::span<gsl::byte> Message,
@@ -408,7 +409,7 @@ void ConfigHandleInteropMessage(
 
 void ConfigInitializeCgroups(wsl::linux::WslDistributionConfig& Config);
 
-int ConfigInitializeInstance(wsl::shared::SocketChannel& Channel, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config);
+int ConfigInitializeInstance(const std::function<void(const gsl::span<gsl::byte>&)>& SendResponse, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config);
 
 void ConfigMountDrvFsVolumes(unsigned int DrvFsVolumes, uid_t OwnerUid, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config);
 
@@ -420,7 +421,7 @@ int ConfigRegisterBinfmtInterpreter(void);
 
 int ConfigSetMountNamespace(bool Elevated);
 
-int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::SocketChannel& Channel, const wsl::linux::WslDistributionConfig& Config);
+int ConfigRemountDrvFs(gsl::span<gsl::byte> Buffer, wsl::shared::Transaction& Transaction, const wsl::linux::WslDistributionConfig& Config);
 
 int ConfigRemountDrvFsImpl(gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config);
 

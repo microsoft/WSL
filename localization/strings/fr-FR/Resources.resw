@@ -886,6 +886,10 @@ Retour à la mise en réseau NAT.</value>
     <value>Windows version {}. {} ne dispose pas des fonctionnalités requises</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
+    <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Le pare-feu Hyper-V n’est pas pris en charge</value>
   </data>
@@ -1883,6 +1887,41 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Nombre de millisecondes pendant lesquelles une machine virtuelle est inactive, avant d’être éteinte.</value>
+  </data>
+  <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
+    <value>Apply changes</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
+    <value>WSL Shutdown Required</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
+    <value>Les paramètres WSL modifiés nécessitent un arrêt et un redémarrage WSL pour finalisation. L’arrêt entraîne l’arrêt de toutes les sessions WSL actives.</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
+    <value>Shutdown WSL now</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
+    <value>Later</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
+    <value>Unable to apply changes</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
+    <value>Échec de l’enregistrement des modifications des paramètres en attente. Code d’erreur : {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
+    <value>Les paramètres ont été enregistrés, mais l’arrêt de WSL a échoué : {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for exception message</comment>
+  </data>
+  <data name="Settings_BooleanTrueText" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="Settings_BooleanFalseText" xml:space="preserve">
+    <value>Off</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>Créer, exécuter, déboguer et profiler vos applications exécutées sur WSL dans Visual Studio</value>
