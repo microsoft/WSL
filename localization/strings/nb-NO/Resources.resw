@@ -744,6 +744,11 @@ Hvis du vil ha mer informasjon, kan du gå til https://aka.ms/wslinstall</value>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>Kjøring av feilsøkingsskallet krever kjøring wsl.exe som administrator.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection is enabled and your distributions may be registered under a different account.
+For more information on Admin Protection, please visit https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>Installasjonsprosessen for distribusjonen {} mislyktes med avslutningskoden: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
