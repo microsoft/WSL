@@ -95,4 +95,5 @@ if ($AttachDebugger)
     Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
 }
 
-exit ($teProcess | Wait-Process -PassThru).ExitCode
+$teProcess | Wait-Process
+exit $teProcess.ExitCode
