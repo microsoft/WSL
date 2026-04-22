@@ -590,8 +590,8 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WithLabel_Success)
     {
-        auto result = RunWslc(
-            std::format(L"container run --name {} --label A=1 --label B=2 {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container run --name {} --label A=1 --label B=2 {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"hello\n", .Stderr = L"", .ExitCode = 0});
 
         auto inspect = InspectContainer(WslcContainerName);

@@ -595,8 +595,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_WithLabel_Success)
     {
-        auto result = RunWslc(
-            std::format(L"container create --name {} --label A=1 --label B=2 {}", WslcContainerName, DebianImage.NameAndTag()));
+        auto result =
+            RunWslc(std::format(L"container create --name {} --label A=1 --label B=2 {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto inspect = InspectContainer(WslcContainerName);
