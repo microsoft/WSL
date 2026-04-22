@@ -8,12 +8,13 @@ Module Name:
 
 Abstract:
 
-    RAII guard that watches a scoped operation. On the fast path (operation completes under
-    the slow threshold) nothing is emitted. When the slow threshold is crossed the guard
-    emits a `SlowOperationStarted` telemetry event plus a `SlowOperation` debug log so the
-    backend can attribute where time is spent; on scope exit it emits a terminating
-    `SlowOperationEnded` event carrying the final elapsed time and hr (E_FAIL if the
-    scope exits via exception, S_OK otherwise).
+    RAII guard that watches a scoped operation. A threadpool timer is armed in the
+    constructor for `SlowThreshold` (10 s default). On the fast path (scope exits
+    before the threshold) the destructor cancels the timer and nothing is emitted.
+    If the threshold is reached first -- including while the scope is still running
+    or hung indefinitely -- the timer callback fires once, emitting a single
+    `SlowOperation` telemetry event plus a matching debug log so the backend can
+    attribute where time is spent.
 
     Usage:
 
@@ -26,7 +27,6 @@ Abstract:
 
 #include <windows.h>
 #include <wil/resource.h>
-#include <atomic>
 #include <chrono>
 
 class WslSlowOperation
@@ -47,16 +47,7 @@ public:
 private:
     static void CALLBACK OnTimerFired(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_TIMER) noexcept;
 
-    void EmitSlowThresholdCrossed() noexcept;
-
     const char* const m_name;
     const std::chrono::milliseconds m_slowThreshold;
-    const std::chrono::steady_clock::time_point m_start;
-    const int m_uncaughtOnEntry;
-
-    // Set to true by the timer callback when the slow threshold is crossed; read by the
-    // destructor to decide whether to emit SlowOperationEnded. exchange() in the callback
-    // is defensive (the timer is a single-shot so the callback only runs once anyway).
-    std::atomic<bool> m_fired{false};
     wil::unique_threadpool_timer m_timer;
 };
