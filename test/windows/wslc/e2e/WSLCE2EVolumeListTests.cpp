@@ -77,7 +77,7 @@ class WSLCE2EVolumeListTests
         result = RunWslc(L"volume list --format json");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
-        auto volumes = FromJson<std::vector<VolumeInformation>>(result.Stdout.value().c_str());
+        auto volumes = FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(2U, volumes.size());
 
         std::vector<std::string> names;

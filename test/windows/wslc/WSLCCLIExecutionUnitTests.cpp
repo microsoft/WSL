@@ -99,7 +99,7 @@ class WSLCCLIExecutionUnitTests
             }
             else if (dataType == Data::Volumes)
             {
-                std::vector<wsl::windows::wslc::models::VolumeInformation> volumes;
+                std::vector<WSLCVolumeInformation> volumes;
                 dataMap.Add<Data::Volumes>(std::move(volumes));
                 handled = true;
             }

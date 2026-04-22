@@ -218,7 +218,7 @@ void VerifyVolumeIsListed(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::VolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -234,7 +234,7 @@ void VerifyVolumeIsNotListed(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::VolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
@@ -412,7 +412,7 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
 {
     auto result = RunWslc(L"volume list --format json");
     result.Verify({.Stderr = L"", .ExitCode = 0});
-    auto volumes = wsl::shared::FromJson<std::vector<wsl::windows::wslc::models::VolumeInformation>>(result.Stdout.value().c_str());
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
     for (const auto& vol : volumes)
     {
         if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))

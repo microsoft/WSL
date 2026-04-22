@@ -22,7 +22,7 @@ struct VolumeService
 {
     static WSLCVolumeInformation Create(models::Session& session, const models::CreateVolumeOptions& createOptions);
     static void Delete(models::Session& session, const std::string& name);
-    static std::vector<models::VolumeInformation> List(models::Session& session);
+    static std::vector<WSLCVolumeInformation> List(models::Session& session);
     static wsl::windows::common::wslc_schema::InspectVolume Inspect(models::Session& session, const std::string& name);
 };
 } // namespace wsl::windows::wslc::services

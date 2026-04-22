@@ -19,14 +19,6 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-struct VolumeInformation
-{
-    std::string Name;
-    std::string Driver;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(VolumeInformation, Name, Driver);
-};
-
 struct CreateVolumeOptions
 {
     std::string Name;
