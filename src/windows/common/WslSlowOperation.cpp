@@ -70,7 +70,7 @@ WslSlowOperation::~WslSlowOperation() noexcept
         WSL_LOG_TELEMETRY(
             "SlowOperationEnded",
             PDT_ProductAndServicePerformance,
-            TraceLoggingString(m_name, "name"),
+            TraceLoggingValue(m_name, "name"),
             TraceLoggingInt64(elapsed.count(), "elapsedMs"),
             TraceLoggingHResult(hr, "hr"));
     }
@@ -94,9 +94,9 @@ try
     WSL_LOG_TELEMETRY(
         "SlowOperationStarted",
         PDT_ProductAndServicePerformance,
-        TraceLoggingString(m_name, "name"),
+        TraceLoggingValue(m_name, "name"),
         TraceLoggingInt64(m_slowThreshold.count(), "thresholdMs"));
 
-    WSL_LOG("SlowOperation", TraceLoggingString(m_name, "name"), TraceLoggingInt64(m_slowThreshold.count(), "thresholdMs"));
+    WSL_LOG("SlowOperation", TraceLoggingValue(m_name, "name"), TraceLoggingInt64(m_slowThreshold.count(), "thresholdMs"));
 }
 CATCH_LOG()
