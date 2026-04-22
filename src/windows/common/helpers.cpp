@@ -215,7 +215,7 @@ void wsl::windows::common::helpers::ConnectPipe(_In_ HANDLE Pipe, _In_ DWORD Tim
             }
 
             const auto Result = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(WaitHandles.size()), WaitHandles.data(), FALSE, Timeout);
-            if (!ExitEvents.empty() && Result > WAIT_OBJECT_0 && Result <= WAIT_OBJECT_0 + WaitHandles.size())
+            if (!ExitEvents.empty() && Result > WAIT_OBJECT_0 && Result < WAIT_OBJECT_0 + WaitHandles.size())
             {
                 THROW_HR(E_ABORT);
             }
@@ -372,7 +372,7 @@ std::string wsl::windows::common::helpers::GetLinuxTimezone(_In_opt_ HANDLE User
 
         THROW_HR_IF_MSG(E_FAIL, (U_FAILURE(status) != false), "%hs", u_errorName(status));
 
-        timezone.resize(buffer.size());
+        timezone.resize(size);
         u_UCharsToChars(buffer.data(), timezone.data(), static_cast<int32_t>(timezone.size()));
     }
     CATCH_LOG()

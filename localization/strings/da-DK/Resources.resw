@@ -879,6 +879,10 @@ Går tilbage til NAT-netværk.</value>
     <value>Windows-version {}. {} har ikke de nødvendige funktioner</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
+    <value>IPv6 er deaktiveret på værten på en ikke-understøttet måde (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
+  </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V-firewall understøttes ikke</value>
   </data>
@@ -1876,6 +1880,41 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Det antal millisekunder, en VM er inaktiv, før den lukkes.</value>
+  </data>
+  <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
+    <value>Anvend ændringer</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
+    <value>Nedlukning af WSL påkrævet</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
+    <value>Ændrede WSL-indstillinger kræver WSL-lukning og genstart for at fuldføre. Hvis du lukker, afbrydes alle aktive WSL-sessioner.</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
+    <value>Luk WSL ned nu</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
+    <value>Senere</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
+    <value>Kunne ikke anvende ændringer</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
+    <value>Luk</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
+    <value>De ventende ændringer af indstillingerne kunne ikke gemmes. Fejlkode: {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
+    <value>Indstillingerne blev gemt, men WSL kunne ikke lukkes: {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for exception message</comment>
+  </data>
+  <data name="Settings_BooleanTrueText" xml:space="preserve">
+    <value>Til</value>
+  </data>
+  <data name="Settings_BooleanFalseText" xml:space="preserve">
+    <value>Fra</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>Byg, kør, foretag fejlfinding og profilér dine apps, der kører på WSL, fra Visual Studio</value>
