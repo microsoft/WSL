@@ -31,6 +31,7 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
 void AttachContainer::operator()(CLIExecutionContext& context) const
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -290,6 +291,14 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         for (const auto& value : tmpfs)
         {
             options.Tmpfs.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Label))
+    {
+        for (const auto& label : context.Args.GetAll<ArgType::Label>())
+        {
+            options.Labels.push_back(ParseKeyValueOption(label));
         }
     }
 

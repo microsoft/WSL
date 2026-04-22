@@ -66,8 +66,9 @@ struct InspectContainer
     InspectHostConfig HostConfig;
     std::map<std::string, std::vector<InspectPortBinding>> Ports;
     std::vector<InspectMount> Mounts;
+    std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Ports, Mounts);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Ports, Mounts, Labels);
 };
 
 struct ImageConfig

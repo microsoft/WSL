@@ -41,6 +41,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
         // Argument::Create(ArgType::GroupId),
         Argument::Create(ArgType::Interactive),
+        Argument::Create(ArgType::Label, false, NO_LIMIT),
         Argument::Create(ArgType::Name),
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),

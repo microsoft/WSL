@@ -17,6 +17,7 @@ Abstract:
 #include <wslservice.h>
 #include <wslc.h>
 #include <string>
+#include <string.hpp>
 
 namespace wsl::windows::wslc::models {
 
@@ -42,6 +43,7 @@ struct ContainerOptions
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
     std::vector<std::string> Tmpfs;
+    std::vector<std::pair<std::string, std::string>> Labels;
 };
 
 struct CreateContainerResult
@@ -282,3 +284,19 @@ private:
     std::string m_options;
 };
 } // namespace wsl::windows::wslc::models
+
+namespace wsl::windows::wslc {
+
+inline std::pair<std::string, std::string> ParseKeyValueOption(const std::wstring& option)
+{
+    auto pos = option.find('=');
+    if (pos == std::wstring::npos)
+    {
+        return {wsl::windows::common::string::WideToMultiByte(option), std::string()};
+    }
+
+    return {wsl::windows::common::string::WideToMultiByte(option.substr(0, pos)),
+            wsl::windows::common::string::WideToMultiByte(option.substr(pos + 1))};
+}
+
+} // namespace wsl::windows::wslc
