@@ -2857,13 +2857,10 @@ void LxssUserSessionImpl::_CreateVm()
 
         // Validate that the swap file path does not point to any distribution's data VHD.
         // Using a distribution's VHD as swap would destroy its filesystem with mkswap.
-        if (!config.SwapFilePath.empty())
+        const auto resolvedSwapPath = wsl::windows::common::wslutil::GetResultantSwapPath(config.SwapFilePath);
+        if (resolvedSwapPath.has_value())
         {
-            auto swapFilePath = config.SwapFilePath;
-            if (!wsl::windows::common::string::IsPathComponentEqual(swapFilePath.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension))
-            {
-                swapFilePath += wsl::windows::common::wslutil::c_vhdxFileExtension;
-            }
+            auto swapFilePath = resolvedSwapPath.value();
 
             std::error_code error;
             auto canonicalSwapPath = std::filesystem::weakly_canonical(swapFilePath, error);
@@ -2872,6 +2869,8 @@ void LxssUserSessionImpl::_CreateVm()
                 LOG_WIN32(error.value());
                 canonicalSwapPath = std::move(swapFilePath);
             }
+
+            canonicalSwapPath = canonicalSwapPath.lexically_normal();
 
             const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
             for (const auto& distro : _EnumerateDistributions(lxssKey.get()))
@@ -2895,7 +2894,9 @@ void LxssUserSessionImpl::_CreateVm()
                     canonicalDistroPath = std::move(distroVhdPath);
                 }
 
-                if (wsl::windows::common::string::IsPathComponentEqual(canonicalSwapPath.native(), canonicalDistroPath.native()))
+                canonicalDistroPath = canonicalDistroPath.lexically_normal();
+
+                if (_wcsicmp(canonicalSwapPath.c_str(), canonicalDistroPath.c_str()) == 0)
                 {
                     auto distroName = distro.Read(Property::Name);
                     THROW_HR_WITH_USER_ERROR(

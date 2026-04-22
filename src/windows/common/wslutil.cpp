@@ -971,6 +971,22 @@ bool wsl::windows::common::wslutil::IsVhdFile(_In_ const std::filesystem::path& 
            wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdxFileExtension);
 }
 
+std::optional<std::filesystem::path> wsl::windows::common::wslutil::GetResultantSwapPath(_In_ const std::filesystem::path& swapFilePath)
+{
+    if (swapFilePath.empty())
+    {
+        return std::nullopt;
+    }
+
+    auto resultPath = swapFilePath;
+    if (!wsl::windows::common::string::IsPathComponentEqual(resultPath.extension().native(), c_vhdxFileExtension))
+    {
+        resultPath += c_vhdxFileExtension;
+    }
+
+    return resultPath;
+}
+
 std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
 {
     std::vector<DWORD> pids(1024);
