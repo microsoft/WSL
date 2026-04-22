@@ -1882,6 +1882,7 @@ try
 
     // Default driver to "guest" if not specified.
     std::string driver = (Options->Driver != nullptr && *Options->Driver != '\0') ? Options->Driver : WSLCGuestVolumeDriver;
+    
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver && driver != WSLCGuestVolumeDriver);
 
