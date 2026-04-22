@@ -524,16 +524,12 @@ wsl::windows::common::wslutil::GetDefaultVersion(void)
 
 namespace {
 
-// Returns true if the current process is running as a shadow admin under
-// Windows Admin Protection. Caches the DLL lookup on first call.
+// Returns true if Windows Admin Protection (shadow admin) is enabled on
+// this system. The message is shown for both elevated and non-elevated
+// callers because either side may be missing the other's distributions.
+// Caches the DLL lookup on first call.
 bool IsAdminProtectionEnabled()
 {
-    const auto token = wil::open_current_access_token();
-    if (!wsl::windows::common::security::IsTokenElevated(token.get()))
-    {
-        return false;
-    }
-
     using ShadowAdminEnabledFn = BOOL(WINAPI)();
     static std::optional<LxssDynamicFunction<ShadowAdminEnabledFn>> s_fn;
     static std::once_flag s_initFlag;
