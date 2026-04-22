@@ -60,7 +60,7 @@ class WSLCE2EVolumeRemoveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Valid)
     {
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyVolumeIsListed(TestVolumeName);
@@ -73,9 +73,9 @@ class WSLCE2EVolumeRemoveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_Multiple_Valid)
     {
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName2));
+        result = RunWslc(std::format(L"volume create {}", TestVolumeName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyVolumeIsListed(TestVolumeName);
@@ -96,7 +96,7 @@ class WSLCE2EVolumeRemoveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_MixedFoundNotFound)
     {
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VerifyVolumeIsListed(TestVolumeName);
 
@@ -108,7 +108,7 @@ class WSLCE2EVolumeRemoveTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Remove_VolumeInUse_Fail)
     {
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VerifyVolumeIsListed(TestVolumeName);
 
@@ -136,7 +136,6 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const std::wstring TestVolumeName = L"wslc-e2e-volume-remove";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-remove-2";
-    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
 
     std::wstring GetHelpMessage() const
     {

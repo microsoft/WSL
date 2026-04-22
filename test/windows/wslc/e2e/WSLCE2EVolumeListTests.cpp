@@ -54,9 +54,9 @@ class WSLCE2EVolumeListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_QuietOption_OutputsNamesOnly)
     {
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName2));
+        result = RunWslc(std::format(L"volume create {}", TestVolumeName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(L"volume list --quiet");
@@ -69,9 +69,9 @@ class WSLCE2EVolumeListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_List_JsonFormat)
     {
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName2));
+        result = RunWslc(std::format(L"volume create {}", TestVolumeName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(L"volume list --format json");
@@ -94,7 +94,6 @@ class WSLCE2EVolumeListTests
 private:
     const std::wstring TestVolumeName = L"wslc-e2e-volume-list";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-list-2";
-    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
 
     std::wstring GetHelpMessage() const
     {
