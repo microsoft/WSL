@@ -321,7 +321,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Create the utility VM and store the runtime ID.
     std::wstring json = GenerateConfigJson();
-    m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
+    {
+        WslSlowOperation slowOperation{"HcsCreateSystem"};
+        m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
+    }
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
@@ -346,6 +349,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Start the utility VM.
     try
     {
+        WslSlowOperation slowOperation{"HcsStartSystem"};
         wsl::windows::common::hcs::StartComputeSystem(m_system.get(), json.c_str());
     }
     catch (...)
@@ -436,13 +440,20 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
-    m_miniInitChannel = wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
+    {
+        WslSlowOperation slowOperation{"WaitForMiniInitConnect"};
+        m_miniInitChannel =
+            wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
+    }
 
     // Accept the connection from the Linux guest for notifications.
     m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
 
     // Receive and parse the guest kernel version
-    ReadGuestCapabilities();
+    {
+        WslSlowOperation slowOperation{"ReadGuestCapabilities"};
+        ReadGuestCapabilities();
+    }
 
     // Mount the system distro.
     // N.B. If using SCSI, the system distro is added during VM creation.
@@ -532,6 +543,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     {
         ExecutionContext context(Context::ConfigureNetworking);
+        WslSlowOperation slowOperation{"ConfigureNetworking"};
 
         // Accept the connection from the guest network service and create the channel.
         wsl::core::GnsChannel gnsChannel(AcceptConnection(m_vmConfig.KernelBootTimeout));
@@ -551,7 +563,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         wsl::windows::common::hcs::unique_hcn_network natNetwork;
         if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
         {
-            natNetwork = wsl::core::NatNetworking::CreateNetwork(m_vmConfig);
+            {
+                WslSlowOperation slowOperation{"CreateNatNetwork"};
+                natNetwork = wsl::core::NatNetworking::CreateNetwork(m_vmConfig);
+            }
             if (!natNetwork)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNetworkInitializationFailedFallback2(
@@ -660,7 +675,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Perform additional initialization.
-    InitializeGuest();
+    {
+        WslSlowOperation slowOperation{"InitializeGuest"};
+        InitializeGuest();
+    }
 }
 
 WslCoreVm::~WslCoreVm() noexcept
@@ -1168,7 +1186,11 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
 {
     // Add the VHD to the machine.
     auto lock = m_lock.lock_exclusive();
-    const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    ULONG lun = 0;
+    {
+        WslSlowOperation slowOperation{"AttachDistroVhd"};
+        lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    }
 
     // Launch the init daemon and create the instance.
     int flags = LxMiniInitMessageFlagNone;
@@ -1208,8 +1230,11 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->SharedMemoryRootOffset, sharedMemoryRoot);
     message.WriteString(message->InstallPathOffset, installPath);
     message.WriteString(message->UserProfileOffset, userProfile);
-    auto transaction = m_miniInitChannel.StartTransaction();
-    transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
+    {
+        WslSlowOperation slowOperation{"SendLaunchInit"};
+        auto transaction = m_miniInitChannel.StartTransaction();
+        transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
+    }
 
     return CreateInstanceInternal(
         InstanceId, Configuration, ReceiveTimeout, DefaultUid, ClientLifetimeId, WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), ConnectPort);
@@ -1232,7 +1257,11 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     WI_ClearFlagIf(localConfig.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING, !m_vmConfig.EnableHostFileSystemAccess);
 
     // Establish a communication channel with the init daemon.
-    auto initSocket = AcceptConnection(ReceiveTimeout);
+    wil::unique_socket initSocket;
+    {
+        WslSlowOperation slowOperation{"WaitForInitDaemonConnect"};
+        initSocket = AcceptConnection(ReceiveTimeout);
+    }
 
     // If the system distro is enabled, establish a communication channel with its init daemon.
     wil::unique_socket systemDistroSocket;
