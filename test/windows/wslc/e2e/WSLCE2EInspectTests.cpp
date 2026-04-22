@@ -39,6 +39,13 @@ class WSLCE2EInspectTests
         return true;
     }
 
+    TEST_METHOD_SETUP(MethodSetup)
+    {
+        EnsureContainerDoesNotExist(WslcContainerName);
+        EnsureContainerDoesNotExist(DebianImage.Name);
+        return true;
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_HelpCommand)
     {
         auto result = RunWslc(L"inspect --help");
@@ -100,6 +107,23 @@ class WSLCE2EInspectTests
         VERIFY_ARE_EQUAL(WslcContainerName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Volume_Success)
+    {
+        EnsureVolumeDoesNotExist(WslcVolumeName);
+
+        auto createResult = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, WslcVolumeName));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(WslcVolumeName); });
+
+        auto result = RunWslc(std::format(L"inspect {}", WslcVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+        VERIFY_ARE_EQUAL(WslcVolumeName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_Container_PriorityOverImage)
     {
         // When a container and image share the same name and no --type is specified,
@@ -141,6 +165,51 @@ class WSLCE2EInspectTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_PriorityOverVolume)
+    {
+        // When an image and volume share the same name and no --type is specified,
+        // the image should be returned (image is checked before volume in InspectTasks).
+        EnsureVolumeDoesNotExist(DebianImage.Name);
+        auto createResult = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, DebianImage.Name));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(DebianImage.Name); });
+
+        // No type specified
+        {
+            auto result = RunWslc(std::format(L"inspect {}", DebianImage.Name));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectImage>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_IS_TRUE(inspectData[0].RepoTags.has_value());
+            VERIFY_ARE_EQUAL(1u, inspectData[0].RepoTags.value().size());
+            VERIFY_ARE_EQUAL(DebianImage.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData[0].RepoTags.value()[0]));
+        }
+
+        // With --type image
+        {
+            auto result = RunWslc(std::format(L"inspect --type image {}", DebianImage.Name));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectImage>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_IS_TRUE(inspectData[0].RepoTags.has_value());
+            VERIFY_ARE_EQUAL(1u, inspectData[0].RepoTags.value().size());
+            VERIFY_ARE_EQUAL(DebianImage.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData[0].RepoTags.value()[0]));
+        }
+
+        // With --type volume
+        {
+            auto result = RunWslc(std::format(L"inspect --type volume {}", DebianImage.Name));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Inspect_MultipleObjects)
     {
         EnsureContainerDoesNotExist(WslcContainerName);
@@ -170,7 +239,7 @@ class WSLCE2EInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Inspect_InvalidTypeValue)
     {
         auto result = RunWslc(std::format(L"inspect --type invalid {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container.\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container, volume.\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidFormatError)
@@ -191,6 +260,8 @@ private:
     const std::wstring WslcContainerName = L"wslc-inspect-test-container";
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
+    const std::wstring WslcVolumeName = L"wslc-inspect-test-volume";
+    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
@@ -227,7 +298,7 @@ private:
         options << L"The following options are available:\r\n"                 //
                 << L"  -t,--type    Type of the object to inspect\r\n"         //
                 << L"  --session    Specify the session to use\r\n"            //
-                << L"  -h,--help    Shows help about the selected command\r\n" //
+                << L"  -?,--help    Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
     }

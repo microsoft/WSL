@@ -180,9 +180,13 @@ InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstri
     {
         return InspectType::Container;
     }
+    else if (IsEqual(input, L"volume"))
+    {
+        return InspectType::Volume;
+    }
     else
     {
-        constexpr std::wstring_view supportedValues = L"image, container";
+        constexpr std::wstring_view supportedValues = L"image, container, volume";
         throw ArgumentException(Localization::WSLCCLI_InvalidInspectError(argName, input, supportedValues));
     }
 }
