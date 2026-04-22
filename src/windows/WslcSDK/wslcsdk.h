@@ -560,7 +560,8 @@ typedef struct WslcVersion
 } WslcVersion;
 STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version);
 
-typedef __callback void(CALLBACK* WslcInstallCallback)(_In_ WslcComponentFlags component, _In_ uint32_t progressSteps, _In_ uint32_t totalSteps, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcInstallCallback)(
+    _In_ WslcComponentFlags component, _In_ uint32_t progressSteps, _In_ uint32_t totalSteps, _In_opt_ PVOID context);
 
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
 

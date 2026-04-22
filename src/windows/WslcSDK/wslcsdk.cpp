@@ -533,6 +533,7 @@ try
     else
     {
         internalType->vhdRequirements = {};
+        internalType->vhdRequirements.sizeBytes = s_DefaultStorageSize;
     }
 
     return S_OK;
