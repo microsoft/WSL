@@ -98,8 +98,7 @@ class WSLCE2EVolumeCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Create_WithLabel_Success)
     {
-        auto result =
-            RunWslc(std::format(L"volume create --label A=1 --label B=2 {}", TestVolumeName));
+        auto result = RunWslc(std::format(L"volume create --label A=1 --label B=2 {}", TestVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestVolumeName, result.GetStdoutOneLine());
 
@@ -146,12 +145,12 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                      //
+        options << L"The following options are available:\r\n"                        //
                 << L"  -d,--driver    Specify volume driver name (default guest)\r\n" //
-                << L"  -o,--opt       Set driver specific options\r\n"              //
-                << L"  --label        Volume metadata setting\r\n"                  //
-                << L"  --session      Specify the session to use\r\n"               //
-                << L"  -?,--help      Shows help about the selected command\r\n"    //
+                << L"  -o,--opt       Set driver specific options\r\n"                //
+                << L"  --label        Volume metadata setting\r\n"                    //
+                << L"  --session      Specify the session to use\r\n"                 //
+                << L"  -?,--help      Shows help about the selected command\r\n"      //
                 << L"\r\n";
         return options.str();
     }
