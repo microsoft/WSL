@@ -1506,17 +1506,20 @@ CATCH_RETURN();
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 try
 {
+    HRESULT result = S_OK;
     bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
     bool needsRuntime = NeedsWslRuntimeInstalled();
 
     if (!needsVirtualMachine && !needsRuntime)
     {
-        return S_OK;
+        return result;
     }
 
     // Installing these components requires elevation.
     auto token = wil::open_current_access_token();
-    RETURN_HR_IF(E_ACCESSDENIED, !wsl::windows::common::security::IsTokenElevated(token.get()));
+    RETURN_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        !wsl::windows::common::security::IsTokenElevated(token.get()) && !wsl::windows::common::security::IsTokenLocalSystem(token.get()));
 
     if (needsVirtualMachine)
     {
@@ -1526,7 +1529,11 @@ try
         }
 
         auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameVmp, false);
-        if (exitCode != 0 && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED)
+        if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+        {
+            result = HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
+        }
+        else if (exitCode != 0)
         {
             THROW_HR_WITH_USER_ERROR(
                 WSL_E_INSTALL_COMPONENT_FAILED,
@@ -1553,7 +1560,7 @@ try
         wuContext.RunUpdateFlow(true, callback);
     }
 
-    return S_OK;
+    return result;
 }
 CATCH_RETURN();
 

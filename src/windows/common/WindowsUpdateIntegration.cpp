@@ -38,7 +38,7 @@ namespace anon {
     struct DownloadProgressChangedCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDownloadProgressChangedCallback>
     {
-        DownloadProgressChangedCallback(std::function<void(uint32_t)> progress) : m_progress(progress)
+        DownloadProgressChangedCallback(std::function<void(uint32_t)> progress) : m_progress(std::move(progress))
         {
         }
 
@@ -83,7 +83,7 @@ namespace anon {
     struct InstallationProgressChangedCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IInstallationProgressChangedCallback>
     {
-        InstallationProgressChangedCallback(std::function<void(uint32_t)> progress) : m_progress(progress)
+        InstallationProgressChangedCallback(std::function<void(uint32_t)> progress) : m_progress(std::move(progress))
         {
         }
 
@@ -182,7 +182,38 @@ size_t WindowsUpdateContext::SearchForUpdates()
 
     if (resultCode == OperationResultCode::orcSucceededWithErrors)
     {
-        // TODO: Consider logging from the warnings
+        wil::com_ptr<IUpdateExceptionCollection> warnings;
+        if (SUCCEEDED_LOG(searchResult->get_Warnings(&warnings)) && warnings)
+        {
+            LONG warningCount{};
+            if (SUCCEEDED_LOG(warnings->get_Count(&warningCount)))
+            {
+                for (LONG i = 0; i < warningCount; ++i)
+                {
+                    wil::com_ptr<IUpdateException> warning;
+                    if (FAILED_LOG(warnings->get_Item(i, &warning)) || !warning)
+                    {
+                        continue;
+                    }
+
+                    wil::unique_bstr message;
+                    LONG hr{};
+                    UpdateExceptionContext context{};
+                    warning->get_Message(&message);
+                    warning->get_HResult(&hr);
+                    warning->get_Context(&context);
+
+                    TraceLoggingWriteTagged(
+                        *m_activity,
+                        "SearchWarning",
+                        TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+                        TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage),
+                        TraceLoggingHResult(hr, "warningHResult"),
+                        TraceLoggingUInt32(static_cast<uint32_t>(context), "warningContext"),
+                        TraceLoggingWideString(message.get(), "warningMessage"));
+                }
+            }
+        }
     }
 
     THROW_IF_FAILED(searchResult->get_Updates(&m_updates));
@@ -199,7 +230,7 @@ size_t WindowsUpdateContext::GetUpdateCount() const
     return static_cast<size_t>(result);
 }
 
-void WindowsUpdateContext::DownloadUpdates(std::function<void(uint32_t)> progress) const
+void WindowsUpdateContext::DownloadUpdates(const std::function<void(uint32_t)>& progress) const
 {
     TraceLoggingWriteTagged(
         *m_activity, "DownloadUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
@@ -255,7 +286,7 @@ void WindowsUpdateContext::DownloadUpdates(std::function<void(uint32_t)> progres
     THROW_IF_FAILED(downloadHResult);
 }
 
-void WindowsUpdateContext::InstallUpdates(std::function<void(uint32_t)> progress) const
+void WindowsUpdateContext::InstallUpdates(const std::function<void(uint32_t)>& progress) const
 {
     TraceLoggingWriteTagged(
         *m_activity, "InstallUpdates", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
@@ -284,7 +315,7 @@ void WindowsUpdateContext::InstallUpdates(std::function<void(uint32_t)> progress
     THROW_IF_FAILED(installationHResult);
 }
 
-void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, std::function<void(uint32_t)> progress)
+void WindowsUpdateContext::RunUpdateFlow(bool forceInstall, const std::function<void(uint32_t)>& progress)
 {
     TraceLoggingWriteTagged(
         *m_activity, "RunUpdateFlow", TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES), TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));

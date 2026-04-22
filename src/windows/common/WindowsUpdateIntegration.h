@@ -56,11 +56,11 @@ struct WindowsUpdateContext
 
     // Downloads any updates that are not yet downloaded.
     // Calls the progress callback, if provided, with the overall download progress estimate.
-    void DownloadUpdates(std::function<void(uint32_t)> progress = {}) const;
+    void DownloadUpdates(const std::function<void(uint32_t)>& progress = {}) const;
 
     // Installs any updates that were found.
     // Calls the progress callback, if provided, with the overall install progress estimate.
-    void InstallUpdates(std::function<void(uint32_t)> progress = {}) const;
+    void InstallUpdates(const std::function<void(uint32_t)>& progress = {}) const;
 
     static constexpr uint32_t DownloadProgressPercent = 70;
     static constexpr uint32_t InstallProgressPercent = 30;
@@ -69,7 +69,7 @@ struct WindowsUpdateContext
     // When `forceInstall` is true, `EnsureProductRegistryEntry` is called.
     // Calls the progress callback, if provided, with the overall update progress estimate.
     //  Download and install phases are split according to the values defined above.
-    void RunUpdateFlow(bool forceInstall = false, std::function<void(uint32_t)> progress = {});
+    void RunUpdateFlow(bool forceInstall = false, const std::function<void(uint32_t)>& progress = {});
 
 private:
     using ActivityType = TraceLoggingActivity<g_hTraceLoggingProvider, MICROSOFT_KEYWORD_MEASURES>;
