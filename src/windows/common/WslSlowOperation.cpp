@@ -20,6 +20,8 @@ Abstract:
 #include "precomp.h"
 #include "WslSlowOperation.h"
 
+#include <exception>
+
 namespace {
 FILETIME RelativeFileTime(std::chrono::milliseconds Relative) noexcept
 {
