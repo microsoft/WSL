@@ -886,7 +886,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
-    <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <value>主机上以不受支持的方式禁用了 IPv6 (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -1888,25 +1888,25 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
-    <value>Apply changes</value>
+    <value>应用更改</value>
   </data>
   <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
-    <value>WSL Shutdown Required</value>
+    <value>需要关闭 WSL</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
     <value>更改的 WSL 设置需要关闭 WSL 并重启才能完成。关闭将导致任何活动的 WSL 会话终止。</value>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
-    <value>Shutdown WSL now</value>
+    <value>立即关闭 WSL</value>
   </data>
   <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
-    <value>Later</value>
+    <value>以后再说</value>
   </data>
   <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
-    <value>Unable to apply changes</value>
+    <value>无法应用更改</value>
   </data>
   <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
-    <value>Close</value>
+    <value>关闭</value>
   </data>
   <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
     <value>未能保存挂起的设置更改。错误代码： {0}</value>
@@ -1917,10 +1917,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
   <data name="Settings_BooleanTrueText" xml:space="preserve">
-    <value>On</value>
+    <value>开</value>
   </data>
   <data name="Settings_BooleanFalseText" xml:space="preserve">
-    <value>Off</value>
+    <value>关</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>通过 Visual Studio 构建、运行、调试和分析运行于 WSL 上的应用</value>

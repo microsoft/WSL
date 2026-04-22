@@ -880,7 +880,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
-    <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <value>Az IPv6 nem támogatott módon van letiltva a gazdagépen (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -1882,25 +1882,25 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
     <value>A virtuális gép üresjárati ideje ezredmásodpercben a leállítás előtt.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
-    <value>Apply changes</value>
+    <value>Módosítások alkalmazása</value>
   </data>
   <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
-    <value>WSL Shutdown Required</value>
+    <value>Le kell állítani a WSL-t</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
-    <value>Changed WSL settings require a WSL shutdown and restart to finalize. Shutting down will cause any active WSL sessions to terminate.</value>
+    <value>A módosított WSL-beállítások véglegesítéséhez le kell állítani és újra kell indítani a WSL-t. A leállítás megszakítja az összes aktív WSL-munkamenetet.</value>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
-    <value>Shutdown WSL now</value>
+    <value>WSL leállítása most</value>
   </data>
   <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
-    <value>Later</value>
+    <value>Később</value>
   </data>
   <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
-    <value>Unable to apply changes</value>
+    <value>A módosítások alkalmazása nem sikerült</value>
   </data>
   <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
-    <value>Close</value>
+    <value>Bezárás</value>
   </data>
   <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
     <value>Nem sikerült menteni a függőben lévő beállítások módosításait. Hibakód: {0}</value>
@@ -1911,10 +1911,10 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
   <data name="Settings_BooleanTrueText" xml:space="preserve">
-    <value>On</value>
+    <value>Bekapcsolva</value>
   </data>
   <data name="Settings_BooleanFalseText" xml:space="preserve">
-    <value>Off</value>
+    <value>Kikapcsolva</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>WSL-en futó alkalmazásokat készíthet, futtathat, profilozhat és végezhet rajtuk hibakeresést a Visual Studio segítségével</value>
