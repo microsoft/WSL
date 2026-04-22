@@ -858,8 +858,13 @@ try
             if (State == Pending)
             {
                 CancelIoEx(Handle, &Overlapped);
-                DWORD bytesRead{};
-                GetOverlappedResult(Handle, &Overlapped, &bytesRead, TRUE);
+
+                // Poll for completion instead of using GetOverlappedResult(TRUE) which waits
+                // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
+                while (!HasOverlappedIoCompleted(&Overlapped))
+                {
+                    SwitchToThread();
+                }
             }
         }
     };
@@ -1128,19 +1133,13 @@ ReadHandle::~ReadHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        DWORD bytesRead{};
-        if (CancelIoEx(Handle.Get(), &Overlapped))
+        CancelIoEx(Handle.Get(), &Overlapped);
+
+        // Poll for completion instead of using GetOverlappedResult(TRUE) which waits
+        // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
+        while (!HasOverlappedIoCompleted(&Overlapped))
         {
-            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
-            {
-                auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-            }
-        }
-        else
-        {
-            // ERROR_NOT_FOUND is returned if there was no IO to cancel.
-            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+            SwitchToThread();
         }
     }
 }
@@ -1235,14 +1234,13 @@ SingleAcceptHandle::~SingleAcceptHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
+        CancelIoEx(ListenSocket.Get(), &Overlapped);
 
-        DWORD bytesProcessed{};
-        DWORD flagsReturned{};
-        if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
+        // Poll for completion instead of using WSAGetOverlappedResult(fWait=TRUE) which waits
+        // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
+        while (!HasOverlappedIoCompleted(&Overlapped))
         {
-            auto error = GetLastError();
-            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            SwitchToThread();
         }
     }
 }
@@ -1452,19 +1450,13 @@ WriteHandle::~WriteHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        DWORD bytesRead{};
-        if (CancelIoEx(Handle.Get(), &Overlapped))
+        CancelIoEx(Handle.Get(), &Overlapped);
+
+        // Poll for completion instead of using GetOverlappedResult(TRUE) which waits
+        // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
+        while (!HasOverlappedIoCompleted(&Overlapped))
         {
-            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
-            {
-                auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-            }
-        }
-        else
-        {
-            // ERROR_NOT_FOUND is returned if there was no IO to cancel.
-            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+            SwitchToThread();
         }
     }
 }
