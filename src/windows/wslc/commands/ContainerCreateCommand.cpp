@@ -45,6 +45,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         // Argument::Create(ArgType::NoDNS),
         // Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Publish, false, NO_LIMIT),
+        Argument::Create(ArgType::PublishAll),
         Argument::Create(ArgType::Remove),
         // Argument::Create(ArgType::Scheme),
         Argument::Create(ArgType::Session),

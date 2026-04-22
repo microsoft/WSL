@@ -45,6 +45,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
 
     auto containerFlags = WSLCContainerFlagsNone;
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsRm, options.Remove);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);

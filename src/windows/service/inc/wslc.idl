@@ -245,9 +245,10 @@ typedef enum _WSLCContainerFlags
     WSLCContainerFlagsRm = 1, // Delete the container when it exits. TODO: Implement.
     WSLCContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
     WSLCContainerFlagsInit = 4, // Run the container under an init process.
+    WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
 } WSLCContainerFlags;
 
-cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit)")
+cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
 

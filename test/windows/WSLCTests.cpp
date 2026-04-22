@@ -5582,6 +5582,76 @@ class WSLCTests
         VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*m_defaultSession).first, E_INVALIDARG);
     }
 
+    WSLC_TEST_METHOD(PublishAllExposedPorts)
+    {
+        // Build a test image with EXPOSE directives.
+        auto contextDir = std::filesystem::current_path() / "build-context-publish-all";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(DeleteImageNoThrow("wslc-test-publish-all:latest", WSLCDeleteImageFlagsForce).first);
+
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM python:3.12-alpine\n";
+            dockerfile << "EXPOSE 8080/tcp\n";
+            dockerfile << "EXPOSE 9090/tcp\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-publish-all:latest"));
+
+        // Run a container with --publish-all using the API.
+        {
+            WSLCContainerLauncher launcher(
+                "wslc-test-publish-all:latest",
+                "test-publish-all",
+                {"python3", "-m", "http.server", "--bind", "::", "8080"},
+                {"PYTHONUNBUFFERED=1"});
+
+            launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto initProcess = container.GetInitProcess();
+
+            WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
+
+            // Verify the container has port mappings for the exposed ports.
+            auto inspectData = container.Inspect();
+            VERIFY_IS_TRUE(inspectData.Ports.contains("8080/tcp"));
+            VERIFY_IS_TRUE(inspectData.Ports.contains("9090/tcp"));
+
+            // Verify we can connect to the 8080 exposed port from the host.
+            auto portBindings8080 = inspectData.Ports["8080/tcp"];
+            VERIFY_ARE_EQUAL(1u, portBindings8080.size());
+            auto hostPort8080 = std::stoi(portBindings8080[0].HostPort);
+            VERIFY_IS_TRUE(hostPort8080 > 0);
+
+            ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort8080).c_str(), 200);
+
+            // Verify the second exposed port got a mapping too.
+            auto portBindings9090 = inspectData.Ports["9090/tcp"];
+            VERIFY_ARE_EQUAL(1u, portBindings9090.size());
+            auto hostPort9090 = std::stoi(portBindings9090[0].HostPort);
+            VERIFY_IS_TRUE(hostPort9090 > 0);
+
+            // The two host ports must be different.
+            VERIFY_ARE_NOT_EQUAL(hostPort8080, hostPort9090);
+        }
+    }
+
+    WSLC_TEST_METHOD(PublishAllImageNotFound)
+    {
+        // Verify that using PublishAll with a nonexistent image still returns IMAGE_NOT_FOUND.
+        WSLCContainerLauncher launcher("invalid-image-name:nonexistent", "dummy-publish-all", {"/bin/cat"});
+        launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
+
+        auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+        VERIFY_ARE_EQUAL(hresult, WSLC_E_IMAGE_NOT_FOUND);
+    }
+
     void ValidateContainerVolumes(bool enableVirtioFs)
     {
         auto restore = ResetTestSession();

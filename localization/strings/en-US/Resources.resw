@@ -2549,6 +2549,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
     <value>Publish a port from a container to host</value>
   </data>
+  <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
+    <value>Publish all exposed ports to random host ports</value>
+  </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Outputs the container IDs only</value>
   </data>
