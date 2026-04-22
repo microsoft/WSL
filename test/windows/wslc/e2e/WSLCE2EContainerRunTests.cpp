@@ -561,6 +561,18 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Hostname)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --hostname my-test-host {} hostname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Hostname_ShortFlag)
+    {
+        auto result = RunWslc(std::format(L"container run --rm -h my-short-host {} hostname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-short-host\n", .Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume

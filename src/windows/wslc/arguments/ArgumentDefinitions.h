@@ -57,6 +57,7 @@ _(Format,         "format",              NO_ALIAS,          Kind::Value,       L
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     Localization::WSLCCLI_ForwardArgsDescription()) \
 /*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GroupIdArgDescription())*/ \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
+_(Hostname,       "hostname",            L"h",              Kind::Value,       Localization::WSLCCLI_HostnameArgDescription()) \
 _(ImageForce,     "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ImageForceArgDescription()) \
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ImageIdArgDescription()) \
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
