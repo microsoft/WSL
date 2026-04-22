@@ -4085,7 +4085,7 @@ class WSLCTests
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-        VERIFY_FAILED(m_defaultSession->CreateNetwork(&options));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
@@ -4107,7 +4107,7 @@ class WSLCTests
 
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-        VERIFY_FAILED(m_defaultSession->CreateNetwork(&options));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
 
         wil::unique_cotaskmem_ansistring output;
         VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
