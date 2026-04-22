@@ -171,7 +171,7 @@ private:
         const auto* bufferStart = reinterpret_cast<char*>(m_buffer.data());
 
         // Validate that 'Index' is actually within the bounds of our buffer
-        assert(indexPtr >= bufferStart && indexPtr + sizeof(index) <= bufferStart + m_buffer.size());
+        assert(indexPtr >= bufferStart && indexPtr + sizeof(Index) <= bufferStart + m_buffer.size());
 
         return static_cast<size_t>(indexPtr - bufferStart);
     }
