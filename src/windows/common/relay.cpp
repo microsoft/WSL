@@ -849,7 +849,10 @@ try
 
         Input(HANDLE Handle, LARGE_INTEGER Offset, size_t BufferSize) : Handle(Handle), Offset(Offset), Buffer(BufferSize)
         {
-            Overlapped.hEvent = Event.get();
+            // Set the low bit of hEvent to skip IOCP completion port notification (see OVERLAPPED docs).
+            // This ensures the event is signaled directly on IO completion, which is required for
+            // handles that may be associated with an IO completion port.
+            Overlapped.hEvent = reinterpret_cast<HANDLE>(reinterpret_cast<ULONG_PTR>(Event.get()) | 1);
         }
 
         ~Input()
@@ -858,13 +861,8 @@ try
             if (State == Pending)
             {
                 CancelIoEx(Handle, &Overlapped);
-
-                // Poll for completion instead of using GetOverlappedResult(TRUE) which waits
-                // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
-                while (!HasOverlappedIoCompleted(&Overlapped))
-                {
-                    SwitchToThread();
-                }
+                DWORD unused{};
+                GetOverlappedResult(Handle, &Overlapped, &unused, TRUE);
             }
         }
     };
@@ -1126,7 +1124,10 @@ HANDLE EventHandle::GetHandle() const
 ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
     Handle(std::move(MovedHandle)), OnRead(OnRead), Offset(InitializeFileOffset(Handle.Get()))
 {
-    Overlapped.hEvent = Event.get();
+    // Set the low bit of hEvent to skip IOCP completion port notification (see OVERLAPPED docs).
+    // This ensures the event is signaled directly on IO completion, which is required for
+    // handles that may be associated with an IO completion port.
+    Overlapped.hEvent = reinterpret_cast<HANDLE>(reinterpret_cast<ULONG_PTR>(Event.get()) | 1);
 }
 
 ReadHandle::~ReadHandle()
@@ -1134,13 +1135,8 @@ ReadHandle::~ReadHandle()
     if (State == IOHandleStatus::Pending)
     {
         CancelIoEx(Handle.Get(), &Overlapped);
-
-        // Poll for completion instead of using GetOverlappedResult(TRUE) which waits
-        // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
-        while (!HasOverlappedIoCompleted(&Overlapped))
-        {
-            SwitchToThread();
-        }
+        DWORD unused{};
+        GetOverlappedResult(Handle.Get(), &Overlapped, &unused, TRUE);
     }
 }
 
@@ -1227,7 +1223,10 @@ HANDLE ReadHandle::GetHandle() const
 SingleAcceptHandle::SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted) :
     ListenSocket(std::move(ListenSocket)), AcceptedSocket(std::move(AcceptedSocket)), OnAccepted(std::move(OnAccepted))
 {
-    Overlapped.hEvent = Event.get();
+    // Set the low bit of hEvent to skip IOCP completion port notification (see OVERLAPPED docs).
+    // This ensures the event is signaled directly on IO completion, which is required for
+    // handles that may be associated with an IO completion port.
+    Overlapped.hEvent = reinterpret_cast<HANDLE>(reinterpret_cast<ULONG_PTR>(Event.get()) | 1);
 }
 
 SingleAcceptHandle::~SingleAcceptHandle()
@@ -1235,13 +1234,8 @@ SingleAcceptHandle::~SingleAcceptHandle()
     if (State == IOHandleStatus::Pending)
     {
         CancelIoEx(ListenSocket.Get(), &Overlapped);
-
-        // Poll for completion instead of using WSAGetOverlappedResult(fWait=TRUE) which waits
-        // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
-        while (!HasOverlappedIoCompleted(&Overlapped))
-        {
-            SwitchToThread();
-        }
+        DWORD unused{};
+        WSAGetOverlappedResult(reinterpret_cast<SOCKET>(ListenSocket.Get()), &Overlapped, &unused, TRUE, nullptr);
     }
 }
 
@@ -1443,7 +1437,10 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Buffer) :
     Handle(std::move(MovedHandle)), Buffer(Buffer), Offset(InitializeFileOffset(Handle.Get()))
 {
-    Overlapped.hEvent = Event.get();
+    // Set the low bit of hEvent to skip IOCP completion port notification (see OVERLAPPED docs).
+    // This ensures the event is signaled directly on IO completion, which is required for
+    // handles that may be associated with an IO completion port.
+    Overlapped.hEvent = reinterpret_cast<HANDLE>(reinterpret_cast<ULONG_PTR>(Event.get()) | 1);
 }
 
 WriteHandle::~WriteHandle()
@@ -1451,13 +1448,8 @@ WriteHandle::~WriteHandle()
     if (State == IOHandleStatus::Pending)
     {
         CancelIoEx(Handle.Get(), &Overlapped);
-
-        // Poll for completion instead of using GetOverlappedResult(TRUE) which waits
-        // on Overlapped.hEvent. The event won't be signaled for IOCP-associated handles.
-        while (!HasOverlappedIoCompleted(&Overlapped))
-        {
-            SwitchToThread();
-        }
+        DWORD unused{};
+        GetOverlappedResult(Handle.Get(), &Overlapped, &unused, TRUE);
     }
 }
 
