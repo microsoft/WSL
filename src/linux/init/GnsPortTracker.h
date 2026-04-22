@@ -21,16 +21,21 @@
 class GnsPortTracker
 {
 public:
-    GnsPortTracker(std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel, NetlinkChannel&& netlinkChannel, std::shared_ptr<SecCompDispatcher> seccompDispatcher);
+    GnsPortTracker(
+        std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
+        NetlinkChannel&& netlinkChannel,
+        std::shared_ptr<SecCompDispatcher> seccompDispatcher,
+        std::shared_ptr<std::mutex> channelMutex);
 
-    GnsPortTracker(const GnsPortTracker&) = delete;
-    GnsPortTracker(GnsPortTracker&&) = delete;
-    GnsPortTracker& operator=(const GnsPortTracker&) = delete;
-    GnsPortTracker& operator=(GnsPortTracker&&) = delete;
+    NON_COPYABLE(GnsPortTracker);
+    NON_MOVABLE(GnsPortTracker);
 
     void Run();
 
     int ProcessSecCompNotification(seccomp_notif* notification);
+
+    // Called from the eBPF ring buffer callback thread to handle port-0 bind resolution.
+    void OnBindEvent(void* data);
 
     struct PortAllocation
     {
@@ -94,27 +99,10 @@ public:
         }
     };
 
-    struct DeferredPortLookup
-    {
-        pid_t Pid;
-        wil::unique_fd DuplicatedSocketFd; // Duplicated via pidfd_getfd while process was stopped
-        int Protocol;
-
-        DeferredPortLookup(pid_t Pid, wil::unique_fd DuplicatedSocketFd, int Protocol) :
-            Pid(Pid), DuplicatedSocketFd(std::move(DuplicatedSocketFd)), Protocol(Protocol)
-        {
-        }
-
-        DeferredPortLookup(DeferredPortLookup&&) = default;
-        DeferredPortLookup& operator=(DeferredPortLookup&&) = default;
-        DeferredPortLookup(const DeferredPortLookup&) = delete;
-        DeferredPortLookup& operator=(const DeferredPortLookup&) = delete;
-    };
-
     struct BindCall
     {
         std::optional<PortAllocation> Request;
-        std::optional<DeferredPortLookup> PortZeroBind;
+        bool IsPortZeroBind = false;
         std::uint64_t CallId;
     };
 
@@ -144,16 +132,14 @@ private:
 
     static int GetSocketProtocol(int Pid, int Fd);
 
-    static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
-
-    void ResolvePortZeroBind(DeferredPortLookup lookup);
-
-    void RunDeferredResolve();
-
     void TrackPort(PortAllocation allocation);
 
+    // Protects m_allocatedPorts for concurrent access from the main loop and the eBPF callback thread.
+    std::mutex m_portsMutex;
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
+
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
+    std::shared_ptr<std::mutex> m_channelMutex;
     NetlinkChannel m_channel;
     std::promise<PortRefreshResult> m_allocatedPortsRefresh;
 
@@ -163,15 +149,6 @@ private:
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
 
     std::string m_networkNamespace;
-
-    std::mutex m_deferredMutex;
-    std::condition_variable m_deferredCv;
-    std::deque<DeferredPortLookup> m_deferredQueue;
-
-    // Resolved port-0 allocations posted by the background RunDeferredResolve thread
-    // for the main Run() loop to process (keeps SocketChannel access single-threaded).
-    std::mutex m_resolvedMutex;
-    std::deque<PortAllocation> m_resolvedQueue;
 };
 
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& portAllocation);

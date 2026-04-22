@@ -3538,7 +3538,7 @@ wil::unique_fd RegisterSeccompHook()
 
 Routine Description:
 
-    Register a seccomp notification for bind() & ioctl(*, TUNSETIFF, *) calls.
+    Register a seccomp notification for bind() & ioctl(*, SIOCSIFFLAGS, *) calls.
 
 Arguments:
 
@@ -3566,7 +3566,7 @@ Return Value:
         // If syscall_nr == __NR_bind then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_bind, 3, 0),
-        // if (syscall_nr == __NR_bind) then continue else goto allow:
+        // if (syscall_nr == __NR_ioctl) then continue else goto allow:
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, __NR_ioctl, 0, 3),
         // if (syscall arg1 == SIOCSIFFLAGS) goto user_notify else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(1)),

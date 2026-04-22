@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "common.h"
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -12,10 +13,11 @@
 #include <netinet/ip.h>
 #include <sys/syscall.h>
 #include <linux/unistd.h>
-#include <linux/sock_diag.h>
-#include <linux/inet_diag.h>
 #include <lxwil.h>
+#include <net/if.h>
 #include <linux/if_tun.h>
+
+#include <bpf/libbpf.h>
 
 #include "util.h"
 #include "SocketChannel.h"
@@ -25,8 +27,8 @@
 #include "CommandLine.h"
 #include "NetlinkChannel.h"
 #include "NetlinkTransactionError.h"
-
-#define TCP_LISTEN 10
+#include "listen_monitor.h"
+#include "listen_monitor.skel.h"
 
 namespace {
 
@@ -149,64 +151,6 @@ void ListenThread(sockaddr_vm hvSocketAddress, int listenSocket)
     return;
 }
 
-std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
-{
-    std::vector<sockaddr_storage> sockets{};
-    try
-    {
-        inet_diag_req_v2 message{};
-        message.sdiag_protocol = IPPROTO_TCP;
-        message.idiag_states = (1 << TCP_LISTEN);
-
-        auto onMessage = [&](const NetlinkResponse& response) {
-            for (const auto& e : response.Messages<inet_diag_msg>(SOCK_DIAG_BY_FAMILY))
-            {
-                const auto* payload = e.Payload();
-                sockaddr_storage sock{};
-
-                if (payload->idiag_family == AF_INET)
-                {
-                    auto* ipv4 = reinterpret_cast<sockaddr_in*>(&sock);
-                    ipv4->sin_family = AF_INET;
-                    ipv4->sin_addr.s_addr = payload->id.idiag_src[0];
-                    ipv4->sin_port = payload->id.idiag_sport;
-                }
-                else if (payload->idiag_family == AF_INET6)
-                {
-                    auto* ipv6 = reinterpret_cast<sockaddr_in6*>(&sock);
-                    ipv6->sin6_family = AF_INET6;
-                    static_assert(sizeof(ipv6->sin6_addr.s6_addr32) == sizeof(payload->id.idiag_src));
-                    memcpy(ipv6->sin6_addr.s6_addr32, payload->id.idiag_src, sizeof(ipv6->sin6_addr.s6_addr32));
-                    ipv6->sin6_port = payload->id.idiag_sport;
-                }
-
-                sockets.emplace_back(sock);
-            }
-        };
-
-        // Query IPv4 listening sockets.
-        {
-            message.sdiag_family = AF_INET;
-            auto transaction = channel.CreateTransaction(message, SOCK_DIAG_BY_FAMILY, NLM_F_DUMP);
-            transaction.Execute(onMessage);
-        }
-
-        // Query IPv6 listening sockets.
-        {
-            message.sdiag_family = AF_INET6;
-            auto transaction = channel.CreateTransaction(message, SOCK_DIAG_BY_FAMILY, NLM_F_DUMP);
-            transaction.Execute(onMessage);
-        }
-    }
-    catch (const NetlinkTransactionError& e)
-    {
-        // Log but don't fail - network state might be temporarily unavailable
-        LOG_ERROR("Failed to query listening sockets via sock_diag: {}", e.what());
-    }
-
-    return sockets;
-}
-
 int SendRelayListenerSocket(wsl::shared::SocketChannel& channel, int hvSocketPort)
 try
 {
@@ -265,87 +209,91 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-bool IsSameSockAddr(const sockaddr_storage& left, const sockaddr_storage& right)
+extern "C" int OnListenMonitorEvent(void* ctx, void* data, size_t dataSz) noexcept
+try
 {
-    if (left.ss_family != right.ss_family)
+    auto* channel = static_cast<wsl::shared::SocketChannel*>(ctx);
+    const auto* event = static_cast<const listen_event*>(data);
+
+    sockaddr_storage sock{};
+    if (event->family == AF_INET)
     {
-        return false;
+        auto* ipv4 = reinterpret_cast<sockaddr_in*>(&sock);
+        ipv4->sin_family = AF_INET;
+        ipv4->sin_addr.s_addr = event->addr4;
+        ipv4->sin_port = htons(event->port);
+    }
+    else if (event->family == AF_INET6)
+    {
+        auto* ipv6 = reinterpret_cast<sockaddr_in6*>(&sock);
+        ipv6->sin6_family = AF_INET6;
+        memcpy(ipv6->sin6_addr.s6_addr, event->addr6, sizeof(ipv6->sin6_addr.s6_addr));
+        ipv6->sin6_port = htons(event->port);
+    }
+    else
+    {
+        return 0;
     }
 
-    if (left.ss_family == AF_INET)
+    if (event->is_listen)
     {
-        auto leftIpv4 = reinterpret_cast<const sockaddr_in*>(&left);
-        auto rightIpv4 = reinterpret_cast<const sockaddr_in*>(&right);
-        return (leftIpv4->sin_addr.s_addr == rightIpv4->sin_addr.s_addr && leftIpv4->sin_port == rightIpv4->sin_port);
+        StartHostListener(*channel, sock);
     }
-    else if (left.ss_family == AF_INET6)
+    else
     {
-        auto leftIpv6 = reinterpret_cast<const sockaddr_in6*>(&left);
-        auto rightIpv6 = reinterpret_cast<const sockaddr_in6*>(&right);
-        return (leftIpv6->sin6_port == rightIpv6->sin6_port && memcmp(&leftIpv6->sin6_addr, &rightIpv6->sin6_addr, sizeof(in6_addr)) == 0);
+        StopHostListener(*channel, sock);
     }
 
-    FATAL_ERROR("Unrecognized socket family {}", left.ss_family);
-    return false;
+    return 0;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION_MSG("Error processing listen monitor event");
+    return 0;
 }
 
-// Monitor listening TCP sockets using sock_diag netlink interface.
 int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
 {
-    NetlinkChannel netlinkChannel(SOCK_RAW, NETLINK_SOCK_DIAG);
-    std::vector<sockaddr_storage> relays{};
-    int result = 0;
+    auto* skel = listen_monitor_bpf__open_and_load();
+    if (!skel)
+    {
+        LOG_ERROR("Failed to open/load listen monitor BPF program, {}", errno);
+        return -1;
+    }
+
+    auto destroySkel = wil::scope_exit([&] { listen_monitor_bpf__destroy(skel); });
+
+    if (listen_monitor_bpf__attach(skel) != 0)
+    {
+        LOG_ERROR("Failed to attach listen monitor BPF program, {}", errno);
+        return -1;
+    }
+
+    auto* rb = ring_buffer__new(bpf_map__fd(skel->maps.events), OnListenMonitorEvent, &channel, nullptr);
+    if (!rb)
+    {
+        LOG_ERROR("Failed to create ring buffer, {}", errno);
+        return -1;
+    }
+
+    auto destroyRb = wil::scope_exit([&] { ring_buffer__free(rb); });
+
+    GNS_LOG_INFO("BPF listen monitor attached and running");
 
     for (;;)
     {
-        auto sockets = QueryListeningSockets(netlinkChannel);
-
-        // Stop any relays that no longer match listening ports.
-        std::erase_if(relays, [&](const auto& entry) {
-            auto found =
-                std::find_if(sockets.begin(), sockets.end(), [&](const auto& socket) { return IsSameSockAddr(entry, socket); });
-
-            bool remove = (found == sockets.end());
-            if (remove)
-            {
-                if (StopHostListener(channel, entry) < 0)
-                {
-                    result = -1;
-                }
-            }
-
-            return remove;
-        });
-
-        // Create relays for any new ports.
-        std::for_each(sockets.begin(), sockets.end(), [&](const auto& socket) {
-            auto found =
-                std::find_if(relays.begin(), relays.end(), [&](const auto& entry) { return IsSameSockAddr(entry, socket); });
-
-            if (found == relays.end())
-            {
-                if (StartHostListener(channel, socket) < 0)
-                {
-                    result = -1;
-                }
-                else
-                {
-                    relays.push_back(socket);
-                }
-            }
-        });
-
-        // Ensure all start / stop operations were successful.
-        if (result < 0)
+        int err = ring_buffer__poll(rb, -1);
+        if (err == -EINTR)
         {
-            break;
+            continue;
         }
 
-        // Sleep before scanning again.
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (err < 0)
+        {
+            LOG_ERROR("ring_buffer__poll failed, {}", err);
+            return -1;
+        }
     }
-
-    return result;
 }
 } // namespace
 
@@ -466,9 +414,11 @@ int RunPortTracker(int Argc, char** Argv)
 
     auto channel = NetlinkChannel::FromFd(NetlinkSocketFd);
 
+    auto channelMutex = std::make_shared<std::mutex>();
+
     auto seccompDispatcher = std::make_shared<SecCompDispatcher>(BpfFd);
 
-    GnsPortTracker portTracker(hvSocketChannel, std::move(channel), seccompDispatcher);
+    GnsPortTracker portTracker(hvSocketChannel, std::move(channel), seccompDispatcher, channelMutex);
 
     seccompDispatcher->RegisterHandler(
         __NR_bind, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
@@ -483,7 +433,7 @@ int RunPortTracker(int Argc, char** Argv)
     });
 #endif
 
-    seccompDispatcher->RegisterHandler(__NR_ioctl, [hvSocketChannel, seccompDispatcher](auto notification) -> int {
+    seccompDispatcher->RegisterHandler(__NR_ioctl, [hvSocketChannel, seccompDispatcher, channelMutex](auto notification) -> int {
         LX_GNS_TUN_BRIDGE_REQUEST request{};
         request.Header.MessageType = LxGnsMessageIfStateChangeRequest;
         request.Header.MessageSize = sizeof(request);
@@ -497,6 +447,8 @@ int RunPortTracker(int Argc, char** Argv)
         auto& ifRequest = *reinterpret_cast<ifreq*>(ifreqMemory->data());
         memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
         request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
+
+        std::lock_guard lock(*channelMutex);
         const auto& reply = hvSocketChannel->Transaction(request);
 
         return reply.Result;
