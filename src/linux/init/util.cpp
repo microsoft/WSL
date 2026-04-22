@@ -172,6 +172,7 @@ Return Value:
     if (!InteropConnection)
     {
         LOG_ERROR("accept4 failed {}", errno);
+        return {};
     }
 
     timeval Timeout{};
@@ -784,10 +785,6 @@ Return Value:
         if (Output)
         {
             (*Output) += Buffer.data();
-            if (Result < 0)
-            {
-                goto ErrorExit;
-            }
         }
         else
         {

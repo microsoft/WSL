@@ -324,7 +324,7 @@ try
 
             sched_param Parameter{};
             Parameter.sched_priority = 0;
-            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) < 0);
+            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) != 0);
 
             //
             // Periodically check if the machine is idle by querying procfs for CPU usage.
@@ -342,7 +342,7 @@ try
             long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
             long long int ReclaimWindow[20] = {}; // 10 minutes
             long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling;
+            bool ReclaimIdling = false;
 
             //
             // Fall back to drop cache if the required cgroup path is not present.
@@ -429,7 +429,7 @@ try
                 if (PageReportingOrder != 0 && (Start - Stop) > IdleThreshold)
                 {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
-                    const long long int Stop = GetUserCpuTime();
+                    Stop = GetUserCpuTime();
                     THROW_LAST_ERROR_IF(Stop == -1);
                     if ((Stop - Start) < IdleThreshold)
                     {
@@ -471,7 +471,7 @@ Return Value:
         return {};
     }
 
-    struct sockaddr_nl Address;
+    struct sockaddr_nl Address{};
     Address.nl_family = AF_NETLINK;
     if (bind(Fd.get(), (struct sockaddr*)&Address, sizeof(Address)) < 0)
     {
@@ -587,7 +587,7 @@ Return Value:
     std::string content = wsl::shared::string::ReadFile<char, char>(std::format("/sys/block/{}/dev", BlockDeviceName).c_str());
     auto separator = content.find(':');
 
-    if (separator == 0 || separator - 1 >= content.size() || separator == std::string::npos)
+    if (separator == std::string::npos || separator == 0 || separator + 1 == content.size())
     {
         LOG_ERROR("Failed to parse device number '{}' for device '{}'", content.c_str(), BlockDeviceName.c_str());
         THROW_ERRNO(EINVAL);

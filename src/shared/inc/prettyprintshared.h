@@ -85,7 +85,7 @@ inline void PrettyPrint(std::stringstream& Out, const T (&Value)[Size])
     Out << "[";
     for (auto i = 0; i < Size; i++)
     {
-        if (i > 0 && i < Size - 1)
+        if (i > 0 && i < Size)
         {
             Out << ",";
         }

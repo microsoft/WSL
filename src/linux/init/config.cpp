@@ -2247,7 +2247,7 @@ try
     const auto* Message = gslhelpers::try_get_struct<LX_INIT_MOUNT_DRVFS>(Buffer);
     if (!Message)
     {
-        LOG_ERROR("Unexpected sizeof for LX_INIT_MOUNT_DRVFS: {}u", Buffer.size());
+        LOG_ERROR("Unexpected sizeof for LX_INIT_MOUNT_DRVFS: {}", Buffer.size());
         return -1;
     }
 

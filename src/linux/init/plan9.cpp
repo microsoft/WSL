@@ -184,7 +184,7 @@ void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, b
     limit.rlim_cur = limit.rlim_max;
     if (setrlimit(RLIMIT_NOFILE, &limit) < 0)
     {
-        LOG_ERROR("setrlimit(RLIMIT_NOFILE, {}lu, {}lu) failed {}", limit.rlim_cur, limit.rlim_max, errno);
+        LOG_ERROR("setrlimit(RLIMIT_NOFILE, {}, {}) failed {}", limit.rlim_cur, limit.rlim_max, errno);
     }
 
     // Open the root.

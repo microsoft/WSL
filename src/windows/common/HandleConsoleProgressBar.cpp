@@ -22,7 +22,7 @@ HandleConsoleProgressBar::HandleConsoleProgressBar(HANDLE handle, std::wstring&&
 {
     // If this file isn't a disk file, we can't show actual progress. Just show an indicator in that case
     LARGE_INTEGER fileSize{};
-    if (GetFileType(handle) != FILE_TYPE_DISK || FAILED(GetFileSizeEx(handle, &fileSize)))
+    if (GetFileType(handle) != FILE_TYPE_DISK || !GetFileSizeEx(handle, &fileSize))
     {
         m_progressBar.emplace<ConsoleProgressIndicator>(std::move(message));
     }
