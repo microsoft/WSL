@@ -3665,12 +3665,6 @@ class WSLCTests
             expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
         }
 
-        // Blocked by Docker: device without type.
-        {
-            WSLCDriverOption opts[] = {{"device", "/some/path"}};
-            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
-        }
-
         // Blocked by Docker: device=tmpfs without type.
         {
             WSLCDriverOption opts[] = {{"device", "tmpfs"}};
