@@ -155,19 +155,34 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
-    // An empty settings file is valid YAML (null document); all settings use
-    // their defaults with no warnings.
-    TEST_METHOD(LoadSettings_EmptySettings_AllDefaultsNoWarnings)
+    // An empty settings file is valid YAML (null document) but not a mapping;
+    // a structure warning is emitted and all settings use defaults.
+    TEST_METHOD(LoadSettings_EmptySettings_WarnsInvalidStructure)
     {
         auto dir = UniqueTempDir();
         WriteFile(dir / L"settings.yaml", "");
 
         UserSettingsTest s{dir};
 
-        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+    }
+
+    // A non-map root (e.g. bare scalar) is valid YAML but invalid structure;
+    // a warning is emitted and all settings use defaults.
+    TEST_METHOD(LoadSettings_NonMapRoot_WarnsInvalidStructure)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "just a string\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
     }
 
     // When the settings file fails to parse, the type is Default and a warning is emitted.
