@@ -4026,12 +4026,15 @@ class WSLCTests
     {
         WSLCNetworkOptions options{};
         options.Name = "bad-driver-net";
-        options.Driver = "overlay";
         options.DriverOpts = nullptr;
         options.DriverOptsCount = 0;
 
-        VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
-        ValidateCOMErrorMessageContains(L"Unsupported network driver:");
+        for (const char* driver : {"overlay", "Bridge", ""})
+        {
+            options.Driver = driver;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
+            ValidateCOMErrorMessageContains(L"Unsupported network driver:");
+        }
     }
 
     WSLC_TEST_METHOD(NetworkCreateReservedNameTest)
@@ -4064,6 +4067,81 @@ class WSLCTests
 
         VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->CreateNetwork(&options));
         ValidateCOMErrorMessageContains(L"invalid name!");
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInvalidSubnetTest)
+    {
+        const std::string networkName = "bad-subnet-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "not-a-cidr"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = opts;
+        options.DriverOptsCount = ARRAYSIZE(opts);
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_FAILED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(0u, networks.size());
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateInvalidGatewayTest)
+    {
+        const std::string networkName = "bad-gateway-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.27.0.0/16"}, {"Gateway", "999.999.999.999"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = opts;
+        options.DriverOptsCount = ARRAYSIZE(opts);
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_FAILED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
+        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
+        VERIFY_ARE_EQUAL(0u, networks.size());
+    }
+
+    WSLC_TEST_METHOD(NetworkCreateWithGatewayTest)
+    {
+        const std::string networkName = "gateway-test-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.31.0.0/16"}, {"Gateway", "172.31.0.1"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = opts;
+        options.DriverOptsCount = ARRAYSIZE(opts);
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(std::string("172.31.0.0/16"), inspect.IPAM.Config->at(0).Subnet);
+        VERIFY_ARE_EQUAL(std::string("172.31.0.1"), inspect.IPAM.Config->at(0).Gateway);
     }
 
     WSLC_TEST_METHOD(NetworkSessionRecoveryTest)
