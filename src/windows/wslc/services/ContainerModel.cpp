@@ -221,9 +221,10 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
         // Not a named volume, so it must be a path.
         // Use wil::GetFullPathNameW to resolve relative paths against the CWD.
         std::wstring resolvedHostPath;
-        if (FAILED(wil::GetFullPathNameW(rawHostPath.c_str(), resolvedHostPath)))
+        const auto hr = wil::GetFullPathNameW(rawHostPath.c_str(), resolvedHostPath);
+        if (FAILED(hr))
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
+            THROW_HR_WITH_USER_ERROR(hr, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
         }
 
         // GetFileAttributesW validates the resolved path syntax without requiring existence.
