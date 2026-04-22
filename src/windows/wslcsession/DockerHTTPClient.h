@@ -152,6 +152,7 @@ public:
     common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
     void RemoveNetwork(const std::string& Name);
     std::vector<common::docker_schema::Network> ListNetworks();
+    common::docker_schema::Network InspectNetwork(const std::string& Name);
 
     // Image management.
     struct ListImagesFilters

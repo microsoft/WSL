@@ -14,8 +14,6 @@ Abstract:
 
 #pragma once
 
-#include <string>
-
 namespace wsl::windows::service::wslc {
 
 // Label key used to identify WSLC-managed Docker networks.
@@ -28,10 +26,26 @@ inline bool IsReservedNetworkName(const std::string& name)
     return name == "bridge" || name == "host" || name == "none";
 }
 
+struct NetworkIPAMConfig
+{
+    std::string Subnet;
+    std::string Gateway;
+};
+
+struct NetworkIPAM
+{
+    std::string Driver;
+    std::optional<std::vector<NetworkIPAMConfig>> Config;
+};
+
 struct NetworkEntry
 {
     std::string Id;
     std::string Driver;
+    std::string Scope;
+    bool Internal{false};
+    std::map<std::string, std::string> Labels;
+    NetworkIPAM IPAM;
 };
 
 } // namespace wsl::windows::service::wslc

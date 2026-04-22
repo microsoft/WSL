@@ -453,6 +453,11 @@ std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
 }
 
+docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)
+{
+    return Transaction<docker_schema::EmptyRequest, docker_schema::Network>(verb::get, URL::Create("/networks/{}", Name));
+}
+
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
