@@ -886,7 +886,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
-    <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <value>호스트에서 지원하지 않는 방식으로 IPv6가 비활성화되어 있습니다(HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff).</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -1888,25 +1888,25 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>VM이 종료되기 전에 유휴 상태인 시간(밀리초)입니다.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
-    <value>Apply changes</value>
+    <value>변경 내용 적용</value>
   </data>
   <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
-    <value>WSL Shutdown Required</value>
+    <value>WSL 종료 필요</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
     <value>변경된 WSL 설정을 완료하려면 WSL을 종료하고 다시 시작해야 합니다. 종료하면 활성 WSL 세션이 종료됩니다.</value>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
-    <value>Shutdown WSL now</value>
+    <value>지금 WSL 종료</value>
   </data>
   <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
-    <value>Later</value>
+    <value>나중에</value>
   </data>
   <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
-    <value>Unable to apply changes</value>
+    <value>변경 내용을 적용할 수 없음</value>
   </data>
   <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
-    <value>Close</value>
+    <value>닫기</value>
   </data>
   <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
     <value>보류 중인 설정 변경 내용을 저장하지 못했습니다. 오류 코드: {0}</value>
@@ -1917,10 +1917,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
   <data name="Settings_BooleanTrueText" xml:space="preserve">
-    <value>On</value>
+    <value>켜짐</value>
   </data>
   <data name="Settings_BooleanFalseText" xml:space="preserve">
-    <value>Off</value>
+    <value>꺼짐</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>Visual Studio에서 WSL로 실행 중인 앱을 빌드, 실행, 디버그 및 프로파일링하기</value>
