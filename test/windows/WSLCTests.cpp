@@ -1050,10 +1050,12 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
-            auto restore = ResetTestSession();
-
             auto hr = terminateResult.get_future().get();
             VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
+
+            // Reset the session after the future is resolved to avoid destroying the COM proxy
+            // while the operation thread's COM call may still be in-flight.
+            auto restore = ResetTestSession();
         }
     }
 
@@ -1153,10 +1155,12 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
-            auto restore = ResetTestSession();
-
             auto hr = terminateResult.get_future().get();
             VERIFY_IS_TRUE(hr == E_ABORT || hr == HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED));
+
+            // Reset the session after the future is resolved to avoid destroying the COM proxy
+            // while the operation thread's COM call may still be in-flight.
+            auto restore = ResetTestSession();
         }
     }
 
@@ -2449,14 +2453,16 @@ class WSLCTests
         // but that's OK since we can also accept that error code here (E_ABORT).
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
 
-        auto reset = ResetTestSession();
-
         auto hr = result.get_future().get();
         if (hr != E_ABORT && hr != HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED))
         {
             LogError("Unexpected result: 0x%08X", hr);
             VERIFY_FAIL();
         }
+
+        // Reset the session after the future is resolved to avoid destroying the COM proxy
+        // while the operation thread's COM call may still be in-flight.
+        auto reset = ResetTestSession();
     }
 
     WSLC_TEST_METHOD(ExportContainer)
