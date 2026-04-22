@@ -4087,9 +4087,8 @@ class WSLCTests
 
         VERIFY_FAILED(m_defaultSession->CreateNetwork(&options));
 
-        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(0u, networks.size());
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
     }
 
     WSLC_TEST_METHOD(NetworkCreateInvalidGatewayTest)
@@ -4110,9 +4109,8 @@ class WSLCTests
 
         VERIFY_FAILED(m_defaultSession->CreateNetwork(&options));
 
-        wil::unique_cotaskmem_array_ptr<WSLCNetworkInformation> networks;
-        VERIFY_SUCCEEDED(m_defaultSession->ListNetworks(networks.addressof(), networks.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(0u, networks.size());
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, m_defaultSession->InspectNetwork(networkName.c_str(), &output));
     }
 
     WSLC_TEST_METHOD(NetworkCreateWithGatewayTest)
