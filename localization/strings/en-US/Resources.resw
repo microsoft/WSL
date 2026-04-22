@@ -2531,6 +2531,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
     <value>Set metadata on an object</value>
   </data>
+  <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
+    <value>Label key cannot be empty</value>
+  </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Name of the container</value>
   </data>

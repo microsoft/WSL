@@ -20,6 +20,7 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
+#include "VolumeModel.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
@@ -298,7 +299,8 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     {
         for (const auto& label : context.Args.GetAll<ArgType::Label>())
         {
-            options.Labels.push_back(ParseKeyValueOption(label));
+            auto parsed = Label::Parse(label);
+            options.Labels.emplace_back(parsed.Key(), parsed.Value());
         }
     }
 
