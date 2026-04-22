@@ -245,7 +245,7 @@ class WSLCE2EInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidFormatError)
     {
         // Image name cannot be upper case, but root inspect command should skip this error and continue with the inspect instead of failing
-        auto result = RunWslc(std::format(L"inspect UPPER_CASE_INVALID_IMAGE", DebianImage.NameAndTag(), InvalidImage.NameAndTag()));
+        auto result = RunWslc(L"inspect UPPER_CASE_INVALID_IMAGE");
         result.Verify({.Stdout = L"[]\r\n", .Stderr = L"Object not found: UPPER_CASE_INVALID_IMAGE\r\n", .ExitCode = 1});
     }
 
