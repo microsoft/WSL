@@ -363,13 +363,18 @@ void DockerHTTPClient::SignalContainer(const std::string& Id, std::optional<WSLC
     Transaction(verb::post, url);
 }
 
-void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force)
+void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes)
 {
     auto url = URL::Create("/containers/{}", Id);
 
     if (Force)
     {
         url.SetParameter("force", true);
+    }
+
+    if (DeleteVolumes)
+    {
+        url.SetParameter("v", true);
     }
 
     Transaction(verb::delete_, url);
@@ -446,6 +451,11 @@ void DockerHTTPClient::RemoveNetwork(const std::string& Name)
 std::vector<docker_schema::Network> DockerHTTPClient::ListNetworks()
 {
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Network>>(verb::get, URL::Create("/networks"));
+}
+
+docker_schema::Network DockerHTTPClient::InspectNetwork(const std::string& Name)
+{
+    return Transaction<docker_schema::EmptyRequest, docker_schema::Network>(verb::get, URL::Create("/networks/{}", Name));
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)

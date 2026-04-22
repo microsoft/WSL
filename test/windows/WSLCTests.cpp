@@ -1925,34 +1925,101 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
 
-        WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
-        auto container = launcher.Launch(*m_defaultSession);
-        auto result = container.GetInitProcess();
+        // Lists anonymous docker volume names via the VM's docker CLI.
+        // TODO: Add proper support so we can list via session's API instead.
+        auto listAnonymousVolumes = [&]() {
+            auto result = ExpectCommandResult(
+                m_defaultSession.get(), {"/usr/bin/docker", "volume", "ls", "-q", "-f", "label=com.docker.volume.anonymous"}, 0);
+            std::vector<std::string> names;
+            std::stringstream ss(result.Output[1]);
+            std::string line;
+            while (std::getline(ss, line))
+            {
+                if (!line.empty())
+                {
+                    names.push_back(line);
+                }
+            }
+            return names;
+        };
 
-        auto containerId = container.Id();
+        // Session-restart scenario: an anonymous volume-backed container survives a session reset.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess();
 
-        ValidateProcessOutput(result, {});
+            auto containerId = container.Id();
 
-        ResetTestSession();
+            ValidateProcessOutput(result, {});
 
-        container.SetDeleteOnClose(false);
+            ResetTestSession();
 
-        // Manually cleanup the container since the session has been reset.
-        auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            wil::com_ptr<IWSLCContainer> container;
-            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &container));
+            container.SetDeleteOnClose(false);
 
-            VERIFY_SUCCEEDED(container->Delete(WSLCDeleteFlagsForce));
-        });
+            // Manually cleanup the container and delete anonymous volumes since the session has been reset.
+            auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                wil::com_ptr<IWSLCContainer> container;
+                VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &container));
 
-        // Validate that the session is correctly restarted.
-        wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
-        wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
+                VERIFY_SUCCEEDED(container->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
+            });
 
-        VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+            // Validate that the session is correctly restarted.
+            wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
+            wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
 
-        VERIFY_ARE_EQUAL(containers.size(), 1);
-        VERIFY_ARE_EQUAL(containers[0].Id, containerId);
+            VERIFY_SUCCEEDED(
+                m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+
+            VERIFY_ARE_EQUAL(containers.size(), 1);
+            VERIFY_ARE_EQUAL(containers[0].Id, containerId);
+        }
+
+        // Delete container without WSLCDeleteFlagsDeleteVolumes -> anonymous volume is leaked.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-leak", {"test", "-d", "/volume"});
+            auto container = launcher.Launch(*m_defaultSession);
+            container.GetInitProcess().Wait();
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+
+            // Anonymous volume was NOT deleted by Docker.
+            auto leaked = listAnonymousVolumes();
+            VERIFY_ARE_EQUAL(leaked.size(), 1u);
+
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "volume", "prune", "-f"});
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+        }
+
+        // Delete container with WSLCDeleteFlagsDeleteVolumes -> anonymous volume is cleaned up.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-rm", {"sleep", "99999"});
+            auto container = launcher.Launch(*m_defaultSession);
+            container.SetDeleteOnClose(false);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+
+            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsDeleteVolumes));
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+        }
+
+        // Container with WSLCContainerFlagsRm -> anonymous volume cleaned up when the container auto-removes on exit.
+        {
+            WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-delete-vol-rm", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsRm);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+        }
     }
 
     WSLC_TEST_METHOD(TagImage)
@@ -4073,6 +4140,69 @@ class WSLCTests
         VERIFY_ARE_EQUAL(2u, networks.size());
     }
 
+    WSLC_TEST_METHOD(NetworkInspectTest)
+    {
+        const std::string networkName = "test-inspect-network";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = nullptr;
+        options.DriverOptsCount = 0;
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        VERIFY_ARE_EQUAL(inspect.Name, networkName);
+        VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
+        VERIFY_IS_FALSE(inspect.Id.empty());
+        VERIFY_IS_FALSE(inspect.Internal);
+    }
+
+    WSLC_TEST_METHOD(NetworkInspectWithSubnetTest)
+    {
+        const std::string networkName = "test-inspect-subnet-net";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCDriverOption subnetOpt[] = {{"Subnet", "172.30.0.0/16"}};
+
+        WSLCNetworkOptions options{};
+        options.Name = networkName.c_str();
+        options.Driver = "bridge";
+        options.DriverOpts = subnetOpt;
+        options.DriverOptsCount = ARRAYSIZE(subnetOpt);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&options));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        VERIFY_ARE_EQUAL(inspect.Name, networkName);
+        VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
+        VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
+        VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
+        VERIFY_ARE_EQUAL(std::string("172.30.0.0/16"), inspect.IPAM.Config->at(0).Subnet);
+    }
+
+    WSLC_TEST_METHOD(NetworkInspectNotFoundTest)
+    {
+        wil::unique_cotaskmem_ansistring output;
+        auto hr = m_defaultSession->InspectNetwork("nonexistent-network", &output);
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, hr);
+        ValidateCOMErrorMessageContains(L"nonexistent-network");
+    }
+
     WSLC_TEST_METHOD(CreateContainer)
     {
         // Test a simple container start.
@@ -4583,7 +4713,8 @@ class WSLCTests
             expectOpen("", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: ''");
 
-            expectOpen("non-existing-container", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            expectOpen("non-existing-container", WSLC_E_CONTAINER_NOT_FOUND);
+            ValidateCOMErrorMessage(L"Container 'non-existing-container' not found.");
 
             expectOpen("/", E_INVALIDARG);
             ValidateCOMErrorMessage(L"Invalid name: '/'");
@@ -4779,7 +4910,7 @@ class WSLCTests
         // Verify that trying to open a non existing container fails.
         {
             wil::com_ptr<IWSLCContainer> sameContainer;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("does-not-exist", &sameContainer), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("does-not-exist", &sameContainer), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Validate that container names are unique.
@@ -4912,12 +5043,12 @@ class WSLCTests
             ValidateCOMErrorMessage(
                 std::format(L"Container '{}' is running and cannot be removed. Either stop the container before removing or use forced remove (-f).", id));
 
+            // Validate that invalid flags are rejected.
+            VERIFY_ARE_EQUAL(container.Get().Delete(static_cast<WSLCDeleteFlags>(0x4)), E_INVALIDARG);
+
             // Verify that a running container can be deleted with the force flag.
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsForce));
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsForce), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
-
-            // Validate that invalid flags are rejected.
-            VERIFY_ARE_EQUAL(container.Get().Delete(static_cast<WSLCDeleteFlags>(0x2)), E_INVALIDARG);
         }
     }
 
@@ -5524,7 +5655,7 @@ class WSLCTests
 
                 VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEACCES));
 
-                // Validate that port 1234 is still available.
+                // Validate that port 1236 is still available (was cleaned up after failure).
                 VERIFY_IS_TRUE(!!bindSocket(1236));
             }
         }
@@ -6269,7 +6400,7 @@ class WSLCTests
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Phase 3: Create new session from same storage, verify the container is not listed.
@@ -6278,7 +6409,7 @@ class WSLCTests
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
     }
 
@@ -6346,7 +6477,7 @@ class WSLCTests
         wil::com_ptr<IWSLCContainer> container;
         auto hr = session->OpenContainer(containerName.c_str(), &container);
 
-        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(hr, WSLC_E_CONTAINER_NOT_FOUND);
     }
 
     TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
@@ -6958,7 +7089,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that a container with the Rm flag is automatically deleted when the init process is killed.
@@ -6977,7 +7108,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that a container with the Rm flag is automatically deleted when the container is killed.
@@ -6996,7 +7127,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-kill", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-kill", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that the container autoremove flag is applied when the container exits on its own.
@@ -7011,7 +7142,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
         }
 
         // Test that the Rm flag is persisted across wslc sessions.
@@ -7036,8 +7167,8 @@ class WSLCTests
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLCContainer> notFound;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
 
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
@@ -7072,7 +7203,7 @@ class WSLCTests
 
         // Validate that the container is not found if we try to open it by name or id, or found in the container list.
         wil::com_ptr<IWSLCContainer> notFound;
-        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove-stdout", &notFound), WSLC_E_CONTAINER_NOT_FOUND);
 
         wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
         wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
@@ -7445,7 +7576,7 @@ class WSLCTests
 
             // Validate that the container can't be opened anymore.
             wil::com_ptr<IWSLCContainer> dummy;
-            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerId.c_str(), &dummy), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(containerId.c_str(), &dummy), WSLC_E_CONTAINER_NOT_FOUND);
 
             VERIFY_ARE_EQUAL(container.Get().Delete(WSLCDeleteFlagsNone), RPC_E_DISCONNECTED);
         }

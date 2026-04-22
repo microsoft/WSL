@@ -125,8 +125,7 @@ void ListImages(CLIExecutionContext& context)
                 MultiByteToWide(image.Tag.value_or("<untagged>")),
                 MultiByteToWide(TruncateId(image.Id, trunc)),
                 ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
-                // Dividing by 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1000 * 1000)),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / WSLC_IMAGE_1MB),
             });
         }
 
@@ -237,5 +236,27 @@ void TagImage(CLIExecutionContext& context)
     auto& source = context.Args.Get<ArgType::Source>();
     auto& target = context.Args.Get<ArgType::Target>();
     services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
+}
+
+void PruneImages(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    bool all = context.Args.Contains(ArgType::All);
+    auto result = ImageService::Prune(session, all);
+
+    for (const auto& image : result.UntaggedImages)
+    {
+        PrintMessage(Localization::WSLCCLI_ImagePruneUntagged(image));
+    }
+
+    for (const auto& image : result.DeletedImages)
+    {
+        PrintMessage(Localization::WSLCCLI_ImagePruneDeleted(image));
+    }
+
+    PrintMessage(L"");
+    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
 }
 } // namespace wsl::windows::wslc::task

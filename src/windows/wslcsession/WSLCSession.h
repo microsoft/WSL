@@ -135,6 +135,7 @@ public:
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
+    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
     IFACEMETHOD(Terminate()) override;
 
@@ -163,9 +164,14 @@ private:
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
-    void OnDockerdLog(const gsl::span<char>& Data);
+    void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
+    void OnContainerdExited();
     void OnDockerdExited();
+    ServiceRunningProcess StartProcess(
+        const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
+    void StartContainerd();
     void StartDockerd();
+    int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingVolumes();
@@ -177,7 +183,7 @@ private:
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
-    wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
 
@@ -194,6 +200,7 @@ private:
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;
+    std::optional<ServiceRunningProcess> m_containerdProcess;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;

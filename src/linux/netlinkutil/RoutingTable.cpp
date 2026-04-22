@@ -111,6 +111,10 @@ void RoutingTable::ModifyRouteImpl(const Route& route, Operation action)
     {
         ModifyLoopbackRouteImpl<TAddr>(route, operation, flags);
     }
+    else if (route.defaultRoute && route.IsOnlink())
+    {
+        ModifyDefaultLinkLocalRouteImpl<TAddr>(route, operation, flags);
+    }
     else if (route.defaultRoute)
     {
         ModifyDefaultRouteImpl<TAddr>(route, operation, flags);
@@ -181,7 +185,7 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 {
     if (!route.to.has_value() || !route.via.has_value())
     {
-        throw RuntimeErrorWithSourceLocation(std::format("Loopback route {} missing destination or gateway address", utils::Stringify(route)));
+        throw RuntimeErrorWithSourceLocation(std::format("Loopback route {} missing destination or next hop", utils::Stringify(route)));
     }
 
     struct Message : RouteMessage
@@ -193,8 +197,8 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.to.value().Addr().c_str(),
+        route.via.value().Addr().c_str(),
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
@@ -222,7 +226,7 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 
         message.route.rtm_flags |= RTNH_F_ONLINK;
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ({}) RTA_PRIORITY ([not set])",
+            "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ({}) RTA_PRIORITY ([not set])",
             route.to.value().Addr().c_str(),
             route.via.value().Addr().c_str());
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
@@ -231,11 +235,43 @@ void RoutingTable::ModifyLoopbackRouteImpl(const Route& route, int operation, in
 }
 
 template <typename TAddr>
+void RoutingTable::ModifyDefaultLinkLocalRouteImpl(const Route& route, int operation, int flags)
+{
+    if (route.via.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Default route has unexpected next hop");
+    }
+    if (route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Default route has unexpected destination address");
+    }
+
+    struct Message : RouteMessage
+    {
+        utils::IntegerAttribute metric;
+    } __attribute__((packed));
+
+    GNS_LOG_INFO(
+        "SendMessage Route (default onlink), operation ({}), netLinkflags ({})",
+        RouteOperationToString(operation),
+        NetLinkFormatFlagsToString(flags).c_str());
+
+    SendMessage<Message>(route, operation, flags, [&](Message& message) {
+        GNS_LOG_INFO("Netlink message configuration: RTA_DST ([not set]) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})", route.metric);
+        utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
+    });
+}
+
+template <typename TAddr>
 void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int flags)
 {
     if (!route.via.has_value())
     {
-        throw RuntimeErrorWithSourceLocation("Default route is missing its gateway address");
+        throw RuntimeErrorWithSourceLocation("Default route is missing its next hop");
+    }
+    if (route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Default route has unexpected destination address");
     }
 
     struct Message : RouteMessage
@@ -246,15 +282,15 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        "[empty]",
+        route.via.value().Addr().c_str(),
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ([not set]) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
-            route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
+            "Netlink message configuration: RTA_DST ([not set]) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
+            route.via.value().Addr().c_str(),
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
@@ -264,6 +300,15 @@ void RoutingTable::ModifyDefaultRouteImpl(const Route& route, int operation, int
 template <typename TAddr>
 void RoutingTable::ModifyLinkLocalRouteImpl(const Route& route, int operation, int flags)
 {
+    if (!route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Link-local route is missing its destination address");
+    }
+    if (route.via.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Link-local route has unexpected next hop");
+    }
+
     struct Message : RouteMessage
     {
         utils::AddressAttribute<TAddr> to;
@@ -272,15 +317,15 @@ void RoutingTable::ModifyLinkLocalRouteImpl(const Route& route, int operation, i
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.to.value().Addr().c_str(),
+        "[empty]",
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
-            route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
+            "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
+            route.to.value().Addr().c_str(),
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
@@ -294,6 +339,10 @@ void RoutingTable::ModifyOfflinkRouteImpl(const Route& route, int operation, int
     {
         throw RuntimeErrorWithSourceLocation("Offlink route is missing its next hop");
     }
+    if (!route.to.has_value())
+    {
+        throw RuntimeErrorWithSourceLocation("Offlink route is missing its destination address");
+    }
 
     struct Message : RouteMessage
     {
@@ -304,16 +353,16 @@ void RoutingTable::ModifyOfflinkRouteImpl(const Route& route, int operation, int
 
     GNS_LOG_INFO(
         "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
-        route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-        route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.to.value().Addr().c_str(),
+        route.via.value().Addr().c_str(),
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
-            route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-            route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+            "Netlink message configuration: RTA_DST ({}) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
+            route.to.value().Addr().c_str(),
+            route.via.value().Addr().c_str(),
             route.metric);
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
         utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);

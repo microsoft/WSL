@@ -14,6 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSessionDefaults.h"
 #include "ImageModel.h"
+#include "VolumeModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -213,6 +214,36 @@ void VerifyImageIsListed(const TestImage& image)
     VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
 }
 
+void VerifyVolumeIsListed(const std::wstring& volumeName)
+{
+    auto result = RunWslc(L"volume list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    for (const auto& vol : volumes)
+    {
+        if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Volume '{}' not found in volume list output", volumeName).c_str());
+}
+
+void VerifyVolumeIsNotListed(const std::wstring& volumeName)
+{
+    auto result = RunWslc(L"volume list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    for (const auto& vol : volumes)
+    {
+        if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
+        {
+            VERIFY_FAIL(std::format(L"Volume '{}' found in volume list output", volumeName).c_str());
+        }
+    }
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -236,6 +267,15 @@ wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
     return inspectData[0];
 }
 
+wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName)
+{
+    auto result = RunWslc(std::format(L"volume inspect {}", volumeName));
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
+}
+
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     auto listResult = RunWslc(L"container list --no-trunc --all");
@@ -249,16 +289,18 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
             if (line.find(L"running") != std::wstring::npos)
             {
                 auto result = RunWslc(std::format(L"container kill {}", containerName));
-                // Tolerate ERROR_NOT_FOUND - container already stopped/removed
-                if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"ERROR_NOT_FOUND") == std::wstring::npos))
+                // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already stopped/removed
+                if (result.ExitCode != 0 &&
+                    (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
                 {
                     result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
                 }
             }
 
             auto result = RunWslc(std::format(L"container remove --force {}", containerName));
-            // Tolerate ERROR_NOT_FOUND - container already removed
-            if (result.ExitCode != 0 && (!result.Stderr.has_value() || result.Stderr.value().find(L"ERROR_NOT_FOUND") == std::wstring::npos))
+            // Tolerate WSLC_E_CONTAINER_NOT_FOUND - container already removed
+            if (result.ExitCode != 0 &&
+                (!result.Stderr.has_value() || result.Stderr.value().find(L"WSLC_E_CONTAINER_NOT_FOUND") == std::wstring::npos))
             {
                 result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
             }
@@ -363,6 +405,22 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         {
             auto result = RunWslc(std::format(L"session terminate \"{}\"", targetSession));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
+}
+
+void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
+{
+    auto result = RunWslc(L"volume list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    for (const auto& vol : volumes)
+    {
+        if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
+        {
+            auto deleteResult = RunWslc(std::format(L"volume rm {}", volumeName));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
     }
