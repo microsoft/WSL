@@ -790,7 +790,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_WATCH_PRO
                 }
                 else
                 {
-                    LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status)
+                    LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status);
                 }
 
                 Channel.SendMessage(message);

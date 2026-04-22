@@ -593,15 +593,6 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Create_WorkDir_ShortAlias)
-    {
-        auto result = RunWslc(std::format(L"container create --name {} -w /tmp {} pwd", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
-        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
-    }
-
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -674,7 +665,7 @@ private:
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -h,--help         Shows help about the selected command\r\n"
+                << L"  -?,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

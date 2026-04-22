@@ -24,6 +24,7 @@ cpp_quote("#endif")
 #define WSLC_MAX_IMAGE_NAME_LENGTH 255
 #define WSLC_MAX_VOLUME_NAME_LENGTH 255
 #define WSLC_MAX_VOLUME_DRIVER_LENGTH 255
+#define WSLC_MAX_NETWORK_NAME_LENGTH 255
 #define WSLC_CONTAINER_ID_LENGTH 64
 #define WSLC_MAX_BINDING_ADDRESS_LENGTH 45
 
@@ -31,6 +32,7 @@ cpp_quote("#define WSLC_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_IMAGE_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_NAME_LENGTH 255")
 cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
+cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 
@@ -478,10 +480,11 @@ typedef enum _WSLCDeleteFlags
 {
     WSLCDeleteFlagsNone = 0,
     WSLCDeleteFlagsForce = 1,
-    // TODO: Flags to remove anonymous volumes, bridge links, etc.
+    WSLCDeleteFlagsDeleteVolumes = 2,
+    // TODO: Flags to remove bridge links, etc.
 } WSLCDeleteFlags;
 
-cpp_quote("#define WSLCDeleteFlagsValid (WSLCDeleteFlagsForce)")
+cpp_quote("#define WSLCDeleteFlagsValid (WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCDeleteFlags);")
 
@@ -544,9 +547,10 @@ typedef enum _WSLCBuildImageFlags
     WSLCBuildImageFlagsNone = 0,
     WSLCBuildImageFlagsVerbose = 1, // Show all build progress including internal steps.
     WSLCBuildImageFlagsNoCache = 2, // Do not use cache when building the image.
+    WSLCBuildImageFlagsPull = 4,    // Always attempt to pull a newer version of the image.
 } WSLCBuildImageFlags;
 
-cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache)")
+cpp_quote("#define WSLCBuildImageFlagsValid (WSLCBuildImageFlagsVerbose | WSLCBuildImageFlagsNoCache | WSLCBuildImageFlagsPull)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCBuildImageFlags);")
 
@@ -556,6 +560,7 @@ typedef struct _WSLCBuildImageOptions
     WSLCHandle DockerfileHandle;
     WSLCStringArray Tags;
     WSLCStringArray BuildArgs; // KEY=VALUE pairs passed as --build-arg to docker.
+    LPCSTR Target;             // Target build stage name passed as --target to docker.
     WSLCBuildImageFlags Flags; // WSLCBuildImageFlags
 } WSLCBuildImageOptions;
 
@@ -590,6 +595,23 @@ typedef struct _WSLCPruneVolumesResults
     ULONG VolumesCount;
     ULONGLONG SpaceReclaimed;
 } WSLCPruneVolumesResults;
+
+typedef struct _WSLCNetworkOptions
+{
+    LPCSTR Name;
+    LPCSTR Driver;
+    [unique, size_is(DriverOptsCount)] const WSLCDriverOption* DriverOpts;
+    ULONG DriverOptsCount;
+    [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
+    ULONG LabelsCount;
+} WSLCNetworkOptions;
+
+typedef struct _WSLCNetworkInformation
+{
+    char Name[WSLC_MAX_NETWORK_NAME_LENGTH + 1];
+    char Id[WSLC_CONTAINER_ID_LENGTH + 1];
+    char Driver[64];
+} WSLCNetworkInformation;
 
 typedef struct _WSLCPruneLabelFilter
 {
@@ -719,6 +741,11 @@ interface IWSLCSession : IUnknown
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
     HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT PruneVolumes([in, unique] const WSLCPruneVolumesOptions* Options, [out] WSLCPruneVolumesResults* Results);
+
+    // Network management.
+    HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options);
+    HRESULT DeleteNetwork([in] LPCSTR Name);
+    HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
 }
 
 //
@@ -807,3 +834,4 @@ cpp_quote("#define WSLC_E_CONTAINER_NOT_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FAC
 cpp_quote("#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 6) /* 0x80040606 */")
 cpp_quote("#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7) /* 0x80040607 */")
 cpp_quote("#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8) /* 0x80040608 */")
+cpp_quote("#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9) /* 0x80040609 */")

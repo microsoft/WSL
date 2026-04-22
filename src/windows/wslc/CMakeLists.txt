@@ -14,7 +14,10 @@ target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUB
 target_link_libraries(wslclib
                       ${COMMON_LINK_LIBRARIES}
                       yaml-cpp
-                      common)
+                      common
+                      advapi32
+                      crypt32)
+
 
 target_precompile_headers(wslclib REUSE_FROM common)
 set_target_properties(wslclib PROPERTIES FOLDER windows)

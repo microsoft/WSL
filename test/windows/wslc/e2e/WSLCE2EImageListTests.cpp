@@ -167,7 +167,7 @@ private:
                 << L"  -q,--quiet  Outputs the container IDs only\r\n"
                 << L"  --session   Specify the session to use\r\n"
                 << L"  --verbose   Output verbose details\r\n"
-                << L"  -h,--help   Shows help about the selected command\r\n"
+                << L"  -?,--help   Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

@@ -42,6 +42,7 @@ enum class Setting : size_t
     SessionNetworkingMode,
     SessionHostFileShareMode,
     SessionDnsTunneling,
+    CredentialStore,
 
     Max
 };
@@ -50,6 +51,12 @@ enum class HostFileShareMode
 {
     Plan9,
     VirtioFs
+};
+
+enum class CredentialStoreType
+{
+    WinCred,
+    File
 };
 
 namespace details {
@@ -83,6 +90,7 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode, WSLCNetworkingModeVirtioProxy, "session.networkingMode")
     DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,  HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
     DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,               true,                          "session.dnsTunneling")
+    DEFINE_SETTING_MAPPING(CredentialStore,            std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on

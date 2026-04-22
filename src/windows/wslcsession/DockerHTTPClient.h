@@ -133,7 +133,7 @@ public:
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
     void StopContainer(const std::string& Id, std::optional<WSLCSignal> Signal, std::optional<ULONG> TimeoutSeconds);
-    void DeleteContainer(const std::string& Id, bool Force);
+    void DeleteContainer(const std::string& Id, bool Force, bool DeleteVolumes = false);
     void SignalContainer(const std::string& Id, std::optional<WSLCSignal> Signal);
     common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
     common::docker_schema::InspectExec InspectExec(const std::string& Id);
@@ -147,6 +147,11 @@ public:
     common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
     void RemoveVolume(const std::string& Name);
     std::vector<common::docker_schema::Volume> ListVolumes();
+
+    // Network management.
+    common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);
+    void RemoveNetwork(const std::string& Name);
+    std::vector<common::docker_schema::Network> ListNetworks();
 
     // Image management.
     struct ListImagesFilters

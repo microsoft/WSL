@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainer.h"
 #include "WSLCVhdVolume.h"
 #include "WSLCVolumeMetadata.h"
+#include "WSLCNetworkMetadata.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
@@ -128,6 +129,11 @@ public:
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneVolumes)(_In_opt_ const WSLCPruneVolumesOptions* Options, _Out_ WSLCPruneVolumesResults* Results) override;
 
+    // Network management.
+    IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
+    IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
+    IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
+
     IFACEMETHOD(Terminate()) override;
 
     // ISupportErrorInfo
@@ -155,12 +161,18 @@ private:
     void ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLCContainerImpl* Container);
-    void OnDockerdLog(const gsl::span<char>& Data);
+    void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
+    void OnContainerdExited();
     void OnDockerdExited();
+    ServiceRunningProcess StartProcess(
+        const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
+    void StartContainerd();
     void StartDockerd();
+    int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
     void RecoverExistingVolumes();
+    void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
     void StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback);
@@ -168,11 +180,11 @@ private:
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
-    wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
 
-    // N.B. m_lock must be acquired before acquiring m_volumesLock or m_containersLock.
+    // N.B. m_lock must be acquired before acquiring m_volumesLock, m_containersLock, or m_networksLock.
     // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.
     // This allows independent operations to proceed while volume/container bookkeeping remains synchronized.
     std::mutex m_containersLock;
@@ -180,9 +192,12 @@ private:
     std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
     std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>> m_volumes;
     std::unordered_set<std::string> m_anonymousVolumes; // TODO: Implement proper anonymous volume support.
+    std::mutex m_networksLock;
+    std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     wil::srwlock m_lock;
     IORelay m_ioRelay;
+    std::optional<ServiceRunningProcess> m_containerdProcess;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;

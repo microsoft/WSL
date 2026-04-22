@@ -156,6 +156,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_CONTAINER_IS_RUNNING),
     X(WSLC_E_SESSION_RESERVED),
     X(WSLC_E_INVALID_SESSION_NAME),
+    X(WSLC_E_NETWORK_NOT_FOUND),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED)};
 
@@ -1448,17 +1449,15 @@ std::string wsl::windows::common::wslutil::Base64Decode(const std::string& encod
     return result;
 }
 
-std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& username, const std::string& password, const std::string& serverAddress)
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& username, const std::string& password)
 {
-    nlohmann::json authJson = {{"username", username}, {"password", password}, {"serveraddress", serverAddress}};
-
+    nlohmann::json authJson = {{"username", username}, {"password", password}};
     return Base64Encode(authJson.dump());
 }
 
-std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& identityToken, const std::string& serverAddress)
+std::string wsl::windows::common::wslutil::BuildRegistryAuthHeader(const std::string& identityToken)
 {
-    nlohmann::json authJson = {{"identitytoken", identityToken}, {"serveraddress", serverAddress}};
-
+    nlohmann::json authJson = {{"identitytoken", identityToken}};
     return Base64Encode(authJson.dump());
 }
 

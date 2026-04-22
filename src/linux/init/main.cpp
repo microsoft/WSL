@@ -3608,7 +3608,13 @@ Return Value:
         .filter = Filter,
     };
 
-    wil::unique_fd Fd{syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER, &Prog)};
+    wil::unique_fd Fd{syscall(
+        __NR_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER | SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV, &Prog)};
+    if (!Fd && errno == EINVAL)
+    {
+        LOG_INFO("seccomp failed with EINVAL with SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV, retrying without it.");
+        Fd = syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_NEW_LISTENER, &Prog);
+    }
     if (!Fd)
     {
         LOG_ERROR("Failed to register bpf syscall hook, {}", errno);

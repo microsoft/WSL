@@ -2630,13 +2630,38 @@ int UtilSaveBlockedSignals(const sigset_t& SignalMask)
     return sigprocmask(SIG_BLOCK, &SignalMask, &g_originalSignals);
 }
 
+// Returns true for signals that should not be saved/restored:
+// SIGKILL/SIGSTOP — not settable per POSIX.
+// SIGCONT — left at default to allow process resumption.
+// SIGHUP — handled separately by the caller.
+// 32-34 — internal NPTL signals (__SIGRTMIN through __SIGRTMIN+2) reserved
+//         by glibc for thread cancellation and other runtime use.
+static bool SkipSignal(unsigned int Signal)
+{
+    switch (Signal)
+    {
+    case SIGKILL:
+    case SIGSTOP:
+    case SIGCONT:
+    case SIGHUP:
+    case 32:
+    case 33:
+    case 34:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 int UtilSaveSignalHandlers(struct sigaction* SavedSignalActions)
 
 /*++
 
 Routine Description:
 
-    This routine saves all settable signal handlers except SIGHUP.
+    This routine saves all settable signal handlers, skipping signals
+    listed in SkipSignal() (non-settable, SIGHUP, and internal NPTL signals).
 
 Arguments:
 
@@ -2651,15 +2676,8 @@ Return Value:
 {
     for (unsigned int Index = 1; Index < _NSIG; Index += 1)
     {
-        switch (Index)
+        if (SkipSignal(Index))
         {
-        case SIGKILL:
-        case SIGSTOP:
-        case SIGCONT:
-        case SIGHUP:
-        case 32:
-        case 33:
-        case 34:
             continue;
         }
 
@@ -2678,8 +2696,8 @@ int UtilSetSignalHandlers(struct sigaction* SavedSignalActions, bool Ignore)
 
 Routine Description:
 
-    This routine sets all settable signal handlers except SIGHUP to the given
-    handler.
+    This routine sets all settable signal handlers to the given handler,
+    skipping signals listed in SkipSignal().
 
 Arguments:
 
@@ -2698,15 +2716,8 @@ Return Value:
 
     for (unsigned int Index = 1; Index < _NSIG; Index += 1)
     {
-        switch (Index)
+        if (SkipSignal(Index))
         {
-        case SIGKILL:
-        case SIGSTOP:
-        case SIGCONT:
-        case SIGHUP:
-        case 32:
-        case 33:
-        case 34:
             continue;
         }
 

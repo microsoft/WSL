@@ -16,10 +16,12 @@ Abstract:
 // Include all commands that parent to the root.
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
+#include "RegistryCommand.h"
 #include "SessionCommand.h"
 #include "SettingsCommand.h"
 #include "InspectCommand.h"
 #include "VersionCommand.h"
+#include "VolumeCommand.h"
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
@@ -30,8 +32,10 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
+    commands.push_back(std::make_unique<RegistryCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
     commands.push_back(std::make_unique<SettingsCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumeCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
@@ -41,8 +45,11 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
     commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
+    commands.push_back(std::make_unique<RegistryLoginCommand>(FullName()));
+    commands.push_back(std::make_unique<RegistryLogoutCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerLogsCommand>(FullName()));
     commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
+    commands.push_back(std::make_unique<ImagePushCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<ImageRemoveCommand>(FullName(), true));
     commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));

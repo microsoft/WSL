@@ -43,6 +43,7 @@ class WSLCE2EContainerRunTests
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(PythonImage);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), nullptr));
@@ -56,6 +57,7 @@ class WSLCE2EContainerRunTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
 
         EnvTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
         EnvTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
@@ -559,10 +561,31 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_WorkDir_ShortAlias)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
-        auto result = RunWslc(std::format(L"container run --rm -w /tmp {} pwd", DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
+        // Create a named volume
+        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, WslcVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Create a container with --rm that uses the named volume and writes a file to it
+        result = RunWslc(std::format(
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'WSLC Named Volume Test' > /data/test.txt\"",
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Create another container that mounts the same named volume and verify the file content
+        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/test.txt", WslcVolumeName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"WSLC Named Volume Test", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_NotFound_Fail)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'WSLC Named Volume Test' > /data/test.txt\"",
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", WslcVolumeName), .ExitCode = 1});
     }
 
 private:
@@ -588,6 +611,10 @@ private:
     const uint16_t ContainerTestPort = 8080;
     const uint16_t HostTestPort1 = 1234;
     const uint16_t HostTestPort2 = 1235;
+
+    // Test named volume
+    const std::wstring WslcVolumeName = L"wslc-test-volume";
+    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
 
     std::wstring GetHelpMessage() const
     {
@@ -640,7 +667,7 @@ private:
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
                 << L"  -v,--volume       Bind mount a volume to the container\r\n"
                 << L"  -w,--workdir      Working directory inside the container\r\n"
-                << L"  -h,--help         Shows help about the selected command\r\n"
+                << L"  -?,--help         Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }
