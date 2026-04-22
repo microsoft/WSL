@@ -254,11 +254,7 @@ namespace {
     }
 
     // Iteratively walks the YAML tree and warns about keys not in the known set.
-    void WarnUnknownKeys(
-        const YAML::Node& root,
-        const std::set<std::string>& knownPaths,
-        const std::set<std::string>& knownPrefixes,
-        std::vector<Warning>& warnings)
+    void WarnUnknownKeys(const YAML::Node& root, const std::set<std::string>& knownPaths, const std::set<std::string>& knownPrefixes, std::vector<Warning>& warnings)
     {
         // Stack of (node, prefix) pairs to process.
         std::vector<std::pair<YAML::Node, std::string>> stack;
@@ -279,8 +275,7 @@ namespace {
                 catch (...)
                 {
                     auto location = prefix.empty() ? std::wstring(L"root") : MultiByteToWide(prefix);
-                    warnings.push_back(
-                        {std::format(L"Warning: Non-string key in section '{}'.", location), location});
+                    warnings.push_back({std::format(L"Warning: Non-string key in section '{}'.", location), location});
                     continue;
                 }
 
@@ -297,16 +292,14 @@ namespace {
                     {
                         // Unknown section — warn once, don't traverse.
                         const auto widePath = MultiByteToWide(fullPath);
-                        warnings.push_back(
-                            {std::format(L"Warning: Unknown setting section '{}'.", widePath), widePath});
+                        warnings.push_back({std::format(L"Warning: Unknown setting section '{}'.", widePath), widePath});
                     }
                 }
                 else if (!knownPaths.count(fullPath) && !knownPrefixes.count(fullPath))
                 {
                     // Unknown setting
                     const auto widePath = MultiByteToWide(fullPath);
-                    warnings.push_back(
-                        {std::format(L"Warning: Unknown setting '{}'.", widePath), widePath});
+                    warnings.push_back({std::format(L"Warning: Unknown setting '{}'.", widePath), widePath});
                 }
             }
         }
@@ -382,7 +375,9 @@ UserSettings::UserSettings(const std::filesystem::path& settingsDir)
         else
         {
             m_warnings.push_back(
-                {std::format(L"Warning: '{}' is empty or has invalid structure. Expected a YAML mapping.", m_settingsPath.filename().wstring()), {}});
+                {std::format(
+                     L"Warning: '{}' is empty or has invalid structure. Expected a YAML mapping.", m_settingsPath.filename().wstring()),
+                 {}});
         }
     }
 

@@ -316,16 +316,10 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
-        VERIFY_ARE_EQUAL(
-            static_cast<int>(WSLCNetworkingModeVirtioProxy),
-            static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
-        VERIFY_ARE_EQUAL(
-            static_cast<int>(HostFileShareMode::VirtioFs),
-            static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeVirtioProxy), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
-        VERIFY_ARE_EQUAL(
-            static_cast<int>(CredentialStoreType::WinCred),
-            static_cast<int>(s.Get<Setting::CredentialStore>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
     // "default" on a single setting uses the built-in default for that setting
@@ -383,9 +377,7 @@ class WSLCCLISettingsUnitTests
         // Both should be rejected by their validators and produce warnings.
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 2u);
         // Values still fall back to built-in defaults.
-        VERIFY_ARE_EQUAL(
-            static_cast<int>(WSLCNetworkingModeVirtioProxy),
-            static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeVirtioProxy), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
