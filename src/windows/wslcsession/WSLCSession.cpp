@@ -1880,9 +1880,8 @@ try
     RETURN_HR_IF_NULL(E_POINTER, VolumeInfo);
     ZeroMemory(VolumeInfo, sizeof(*VolumeInfo));
 
-    // Default driver to "guest" if not specified. "guest" delegates storage to docker's built-in
-    // "local" driver inside the VM. "vhd" is still supported as an explicit opt-in.
-    std::string driver = (Options->Driver != nullptr && *Options->Driver != '\0') ? Options->Driver : WSLCGuestVolumeDriver;
+    // Default driver to "vhd" if not specified.
+    std::string driver = (Options->Driver != nullptr && *Options->Driver != '\0') ? Options->Driver : WSLCVhdVolumeDriver;
     THROW_HR_WITH_USER_ERROR_IF(
         E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver && driver != WSLCGuestVolumeDriver);
 

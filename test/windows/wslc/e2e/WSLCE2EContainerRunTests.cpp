@@ -561,28 +561,10 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_Vhd_NamedVolume_Success)
-    {
-        // Create a named volume
-        auto result = RunWslc(std::format(L"volume create {}", WslcVolumeName));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Create a container with --rm that uses the named volume and writes a file to it
-        result = RunWslc(std::format(
-            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'WSLC Named Volume Test' > /data/test.txt\"",
-            WslcVolumeName,
-            DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Create another container that mounts the same named volume and verify the file content
-        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/test.txt", WslcVolumeName, DebianImage.NameAndTag()));
-        result.Verify({.Stdout = L"WSLC Named Volume Test", .Stderr = L"", .ExitCode = 0});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume
-        auto result = RunWslc(std::format(L"volume create {}", WslcVolumeName));
+        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, WslcVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Create a container with --rm that uses the named volume and writes a file to it
