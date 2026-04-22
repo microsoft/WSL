@@ -14,6 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "VolumeModel.h"
 
+using namespace wsl::shared;
 using namespace wsl::windows::common::string;
 
 namespace wsl::windows::wslc::models {
