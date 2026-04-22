@@ -100,6 +100,37 @@ std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
     return {static_cast<uint16_t>(portNum), protocol};
 }
 
+// Binds an anonymous TCP socket on the given address to obtain an ephemeral port from the OS.
+uint16_t AllocateEphemeralPort(int family, const char* address)
+{
+    wil::unique_socket sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
+    THROW_LAST_ERROR_IF(!sock);
+
+    SOCKADDR_INET addr{};
+    addr.si_family = static_cast<ADDRESS_FAMILY>(family);
+
+    if (family == AF_INET)
+    {
+        THROW_LAST_ERROR_IF(inet_pton(AF_INET, address, &addr.Ipv4.sin_addr) != 1);
+        addr.Ipv4.sin_port = 0;
+    }
+    else
+    {
+        THROW_LAST_ERROR_IF(inet_pton(AF_INET6, address, &addr.Ipv6.sin6_addr) != 1);
+        addr.Ipv6.sin6_port = 0;
+    }
+
+    THROW_LAST_ERROR_IF(bind(sock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+
+    int addrLen = sizeof(addr);
+    THROW_LAST_ERROR_IF(getsockname(sock.get(), reinterpret_cast<sockaddr*>(&addr), &addrLen) == SOCKET_ERROR);
+
+    uint16_t port = (family == AF_INET6) ? ntohs(addr.Ipv6.sin6_port) : ntohs(addr.Ipv4.sin_port);
+    THROW_HR_IF_MSG(E_UNEXPECTED, port == 0, "OS returned ephemeral port 0");
+
+    return port;
+}
+
 // Builds port mapping list from container options and returns the network mode string.
 std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
     const std::vector<_WSLCPortMapping>& requestedPorts, WSLCContainerNetworkType networkType, WSLCVirtualMachine& virtualMachine)
@@ -1263,8 +1294,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             {
                 auto [port, protocol] = ParseExposedPortKey(portKey);
 
+                // Only TCP localhost mappings are currently supported by the relay path.
+                if (protocol != IPPROTO_TCP)
+                {
+                    continue;
+                }
+
                 auto& createdPort = ports.emplace_back();
-                createdPort.HostPort = 0;
+                createdPort.HostPort = AllocateEphemeralPort(AF_INET, "127.0.0.1");
+                createdPort.Family = AF_INET;
                 createdPort.ContainerPort = port;
                 createdPort.Protocol = protocol;
                 strcpy_s(createdPort.BindingAddress, "127.0.0.1");

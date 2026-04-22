@@ -5604,12 +5604,14 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-publish-all:latest"));
 
         // Run a container with --publish-all using the API.
+        // Use bridged networking (matching the CLI default) since port relay requires it.
         {
             WSLCContainerLauncher launcher(
                 "wslc-test-publish-all:latest",
                 "test-publish-all",
                 {"python3", "-m", "http.server", "--bind", "::", "8080"},
-                {"PYTHONUNBUFFERED=1"});
+                {"PYTHONUNBUFFERED=1"},
+                WSLCContainerNetworkTypeBridged);
 
             launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
 
@@ -5645,7 +5647,8 @@ class WSLCTests
     WSLC_TEST_METHOD(PublishAllImageNotFound)
     {
         // Verify that using PublishAll with a nonexistent image still returns IMAGE_NOT_FOUND.
-        WSLCContainerLauncher launcher("invalid-image-name:nonexistent", "dummy-publish-all", {"/bin/cat"});
+        WSLCContainerLauncher launcher(
+            "invalid-image-name:nonexistent", "dummy-publish-all", {"/bin/cat"}, {}, WSLCContainerNetworkTypeBridged);
         launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
 
         auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
