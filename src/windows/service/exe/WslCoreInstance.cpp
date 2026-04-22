@@ -44,43 +44,14 @@ WslCoreInstance::WslCoreInstance(
     m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
 
     // Read a message from the init daemon. This will let us know if anything failed during startup.
-    //
-    // N.B. The Stop event is fired by WslTelemetryActivityScope even if ReceiveMessage throws, so
-    //      the backend can distinguish "init daemon mount failed with a surfaced error" from a
-    //      real silent hang (where no Stop is ever observed). The scope is narrowed to the receive
-    //      + immediate field capture so the reported duration reflects the wait, not the rest of
-    //      the constructor. The span references channel-owned memory that remains valid for the
-    //      rest of this constructor since no further receive is issued.
-    int initResult = 0;
-    int failureStep = 0;
+    // The WslSlowOperation scope is narrowed to the receive so the reported duration reflects the
+    // wait, not the rest of the constructor.
     gsl::span<gsl::byte> span;
     const LX_MINI_INIT_CREATE_INSTANCE_RESULT* resultPtr = nullptr;
     {
-        WslTelemetryActivityScope waitForCreateInstanceResultActivity([&](const GUID& activityId, HRESULT hr) {
-            WSL_LOG_TELEMETRY_ACTIVITY_STOP(
-                activityId,
-                "WaitForCreateInstanceResult",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
-                TraceLoggingValue(InstanceId, "instanceId"),
-                TraceLoggingHResult(hr, "hr"),
-                TraceLoggingValue(initResult, "initResult"),
-                TraceLoggingValue(failureStep, "failureStep"));
-        });
-
-        WSL_LOG_TELEMETRY_ACTIVITY_START(
-            waitForCreateInstanceResultActivity.ActivityId(),
-            "WaitForCreateInstanceResult",
-            PDT_ProductAndServicePerformance,
-            TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
-            TraceLoggingValue(InstanceId, "instanceId"),
-            TraceLoggingValue(m_socketTimeout, "timeoutMs"));
-
+        WslSlowOperation slowOperation{"WaitForCreateInstanceResult"};
         resultPtr = &m_initChannel->GetChannel().ReceiveMessage<LX_MINI_INIT_CREATE_INSTANCE_RESULT>(&span, m_socketTimeout);
-        initResult = resultPtr->Result;
-        failureStep = static_cast<int>(resultPtr->FailureStep);
     }
-
     const auto& result = *resultPtr;
     if (result.WarningsOffset != 0)
     {
@@ -410,29 +381,10 @@ void WslCoreInstance::Initialize()
     //
     // N.B. This can block on m_drvfsInitialResult.get(), which waits on a std::future with no
     //      timeout. If the DrvFs init thread hangs (e.g. Plan9 server startup issue), this can
-    //      stall the entire create-instance flow. The Stop event is fired via
-    //      WslTelemetryActivityScope even if the wait throws, so a surfaced failure is
-    //      distinguishable from a real hang.
+    //      stall the entire create-instance flow.
     if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING))
     {
-        WslTelemetryActivityScope waitForDrvFsInitActivity([&](const GUID& activityId, HRESULT hr) {
-            WSL_LOG_TELEMETRY_ACTIVITY_STOP(
-                activityId,
-                "WaitForDrvFsInit",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-                TraceLoggingValue(m_instanceId, "instanceId"),
-                TraceLoggingHResult(hr, "hr"),
-                TraceLoggingValue(static_cast<int>(drvfsMount), "drvfsMount"));
-        });
-
-        WSL_LOG_TELEMETRY_ACTIVITY_START(
-            waitForDrvFsInitActivity.ActivityId(),
-            "WaitForDrvFsInit",
-            PDT_ProductAndServicePerformance,
-            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-            TraceLoggingValue(m_instanceId, "instanceId"));
-
+        WslSlowOperation slowOperation{"WaitForDrvFsInit"};
         drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
 
@@ -457,34 +409,14 @@ void WslCoreInstance::Initialize()
     //
     // N.B. The receive below has no explicit timeout and WslCorePort's channel has no exit event,
     //      so if the init daemon hangs during config processing (e.g. systemd startup, mount),
-    //      this can block indefinitely. WslTelemetryActivityScope ensures a Stop is always emitted
-    //      on success or exception paths; only a true hang produces "Start without Stop". The
-    //      scope is narrowed to the receive so the reported duration reflects the wait, not the
-    //      subsequent interop-server launch. The span references channel-owned memory that stays
-    //      valid for the rest of Initialize() since no further receive is issued.
+    //      this can block indefinitely. The WslSlowOperation scope is narrowed to the receive so
+    //      the reported duration reflects the wait, not the subsequent interop-server launch.
     gsl::span<gsl::byte> span;
     const LX_INIT_CONFIGURATION_INFORMATION_RESPONSE* responsePtr = nullptr;
     {
-        WslTelemetryActivityScope waitForInitConfigResponseActivity([&](const GUID& activityId, HRESULT hr) {
-            WSL_LOG_TELEMETRY_ACTIVITY_STOP(
-                activityId,
-                "WaitForInitConfigResponse",
-                PDT_ProductAndServicePerformance,
-                TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-                TraceLoggingValue(m_instanceId, "instanceId"),
-                TraceLoggingHResult(hr, "hr"));
-        });
-
-        WSL_LOG_TELEMETRY_ACTIVITY_START(
-            waitForInitConfigResponseActivity.ActivityId(),
-            "WaitForInitConfigResponse",
-            PDT_ProductAndServicePerformance,
-            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
-            TraceLoggingValue(m_instanceId, "instanceId"));
-
+        WslSlowOperation slowOperation{"WaitForInitConfigResponse"};
         responsePtr = &transaction.Receive<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
     }
-
     const auto& response = *responsePtr;
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;

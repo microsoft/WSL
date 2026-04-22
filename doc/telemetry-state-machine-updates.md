@@ -1,111 +1,73 @@
-# Telemetry State Machine Updates
+# Slow Operation Telemetry
 
-Backend changes required to consume the new TraceLogging **Activity** (Start/Stop) events added to `CreateInstance`. Without these changes, the new events are ignored and the existing `timeout` bucket does not shrink.
+WSL emits `SlowOperationStarted` / `SlowOperationEnded` events when a guarded step in the
+create-instance flow (HCS operations, guest boot waits, networking setup, plugin hooks,
+init-daemon waits) exceeds a fixed slow threshold. This replaces the earlier
+Begin/End-per-step design: on a fast startup, **no** new events are emitted. Events only
+show up when a step is actually slow, which makes triage queries straightforward.
 
-## Problem
+## Thresholds
 
-Today the backend classifies each `CreateInstance` attempt using a 2-state machine driven by three events and one silence timer:
-
-- `CreateInstanceBegin` (or `CreateInstanceBeginNoPrecedingError`) — transitions into state 2
-- `CreateInstanceEnd` → **complete**
-- `UserVisibleErrorPostBegin` → **fail**
-- 3 min silence (no event) → **timeout**
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> State1: UserVisibleError
-    [*] --> State2: CreateInstanceBeginNoPrecedingError
-    State1 --> State2: CreateInstanceBegin
-    State2 --> Complete: CreateInstanceEnd
-    State2 --> Fail: UserVisibleErrorPostBegin
-    State2 --> Timeout: 3 min silence
-    State1 --> Timeout: 3 min silence
-```
-
-The `timeout` bucket mixes two very different failures:
-
-- **Real hangs** — code stuck in an `INFINITE`-timeout receive / plugin callback.
-- **Slow but successful** — startup eventually succeeds past the 3-min window (e.g. HNS takes 3+ min).
-
-Both collapse into the same opaque label, making triage impossible.
-
-## New events
-
-The client PR adds 15 TraceLogging **Activity** pairs between `CreateInstanceBegin` and `CreateInstanceEnd`. Each pair shares a single event name and a per-invocation `ActivityId` GUID; the **Start** event has `Opcode == 1` and the **Stop** event has `Opcode == 2`. All carry `PDT_ProductAndServicePerformance`, key identifiers (`vmId` / `distroName` / `instanceId`), and the Stop variant carries an `hr` HRESULT for error attribution.
-
-| Phase | Activity name | Typical cause of hang |
+| Threshold | Default | What happens |
 |---|---|---|
-| VM lifecycle | `HcsCreateSystem`, `HcsStartSystem` | HCS service unresponsive |
-| VM boot | `WaitForMiniInitConnect`, `ReadGuestCapabilities` | Kernel boot / hvsocket broken |
-| Networking | `ConfigureNetworking`, `CreateNatNetwork` | HNS slow (common false-positive source) |
-| VM finalize | `InitializeGuest` | Guest config message stuck |
-| Instance disk | `AttachDistroVhd` | VHD attach on bad / BitLocker storage |
-| Instance launch | `SendLaunchInit`, `WaitForInitDaemonConnect` | hvsocket write / guest init start |
-| Instance init | `WaitForCreateInstanceResult` | ext4 mount / journal recovery |
-| Instance init | `WaitForDrvFsInit` | Plan9 / virtiofs setup |
-| Instance init | `WaitForInitConfigResponse` | systemd startup |
-| Plugins | `PluginOnVmStarted`, `PluginOnDistributionStarted` | 3rd-party plugin (e.g. Docker Desktop) |
+| Slow | 10 s | `SlowOperationStarted` telemetry + `WSL_LOG` debug entry |
+| User-visible | 60 s | Plus a warning surfaced to the user via `EMIT_USER_WARNING` |
 
-## Required backend changes
+Both thresholds are encoded in `WslSlowOperation` (see `src/windows/common/WslSlowOperation.h`).
+The RAII guard emits a single timestamped `SlowOperationStarted` when its threadpool timer
+fires, re-arms for the remainder of the user-visible threshold, and emits
+`SlowOperationEnded` with the final `elapsedMs` and `hr` on destruction — including when
+the scope exits via exception.
 
-### 1. Join Start and Stop by (EventName, ActivityId), not event name alone
+## Events
 
-Start and Stop share the same `EventName`, distinguished by `Opcode` (1 vs 2). Queries must include `Opcode` in the filter or projection, and pair Start with Stop on `ActivityId`. A Start without a matching Stop on the same `ActivityId` is the signal of a silent hang for that phase.
+### `SlowOperationStarted`
 
-### 2. Reset the 3-min timer on any progress event (required)
+Emitted once per guarded scope, only when the slow threshold is crossed.
 
-All 30 new events (15 Starts + 15 Stops) must be registered as **progress events**. Receiving any of them in state 2 resets the 3-min silence timer without transitioning state.
-
-### 3. Split the timeout bucket by last Start without matching Stop (required)
-
-When state 2 times out, emit a sub-label based on the last `Start` observed whose `ActivityId` has no matching `Stop`.
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> State1: UserVisibleError
-    [*] --> State2: CreateInstanceBeginNoPrecedingError
-    State1 --> State2: CreateInstanceBegin
-    State2 --> State2: any ProgressEvent (reset timer)
-    State2 --> Complete: CreateInstanceEnd
-    State2 --> Fail: UserVisibleErrorPostBegin
-    State2 --> TimeoutCategorized: 3 min silence<br/>(label by last unmatched Start)
-    State1 --> TimeoutNoBegin: 3 min silence
-
-    Complete --> [*]
-    Fail --> [*]
-    TimeoutCategorized --> [*]
-    TimeoutNoBegin --> [*]
-```
-
-Mapping from last `Start` (no matching Stop on the same `ActivityId`) → timeout sub-label:
-
-| Last unmatched Start | Timeout sub-label | Root cause |
+| Field | Type | Notes |
 |---|---|---|
-| *(none)* | `Timeout_EarlyHang` | Stuck before any VM work |
-| `HcsCreateSystem` | `Timeout_HcsCreate` | HCS service unresponsive |
-| `HcsStartSystem` | `Timeout_HcsStart` | HCS start hung |
-| `WaitForMiniInitConnect` | `Timeout_KernelBoot` | Kernel / hvsocket broken |
-| `ReadGuestCapabilities` | `Timeout_GuestCaps` | mini_init not responding |
-| `ConfigureNetworking` (no `CreateNatNetwork` in flight) | `Timeout_NetworkConfig` | GNS or other net init |
-| `CreateNatNetwork` | `Timeout_Hns` | HNS slow / wedged (often false positive) |
-| `InitializeGuest` | `Timeout_InitializeGuest` | Guest config stuck |
-| `AttachDistroVhd` | `Timeout_AttachVhd` | VHD attach failed |
-| `SendLaunchInit` | `Timeout_SendLaunchInit` | hvsocket write stuck |
-| `WaitForInitDaemonConnect` | `Timeout_InitDaemonConnect` | init not coming up |
-| `WaitForCreateInstanceResult` | `Timeout_InitMount` | ext4 mount / journal recovery |
-| `WaitForDrvFsInit` | `Timeout_DrvFs` | Plan9 / virtiofs setup |
-| `WaitForInitConfigResponse` | `Timeout_InitConfigResp` | systemd startup stuck |
-| `PluginOnVmStarted` | `Timeout_PluginOnVm` | (attach `Plugin` name) |
-| `PluginOnDistributionStarted` | `Timeout_PluginOnDistribution` | (attach `Plugin` name) |
+| `wslVersion` | string | Via `WSL_LOG_TELEMETRY` |
+| `name` | string | Phase identifier (see table below) |
+| `thresholdMs` | int64 | The threshold that was crossed (10000) |
 
-### 4. Exception safety — `hr != S_OK` is not a hang
+### `SlowOperationEnded`
 
-The client uses `WslTelemetryActivityScope` RAII so a Stop event is always emitted, even on exception. The backend should treat this as three distinct outcomes:
+Emitted on scope exit, only when `SlowOperationStarted` was already emitted for that scope.
 
-| Observed | Meaning |
+| Field | Type | Notes |
+|---|---|---|
+| `wslVersion` | string | Via `WSL_LOG_TELEMETRY` |
+| `name` | string | Matches the Started event |
+| `elapsedMs` | int64 | Total wall-clock time the scope took |
+| `userVisible` | bool | True if the user-visible threshold was also crossed |
+| `hr` | HRESULT | `S_OK` on normal exit, `E_FAIL` if the scope exited via exception |
+
+A `SlowOperationStarted` without a matching `SlowOperationEnded` indicates a true silent
+hang (process terminated before the scope returned). Pair by thread-id + `name` + time.
+
+## Guarded phases
+
+| `name` | Typical cause when slow |
 |---|---|
-| `Start` + `Stop` with `hr == S_OK` | Step succeeded |
-| `Start` + `Stop` with `hr != S_OK` | Step failed, error surfaced — **not** a hang |
-| `Start` with no matching `Stop` on same `ActivityId` | Real silent hang → feeds timeout categorization |
+| `HcsCreateSystem`, `HcsStartSystem` | HCS service unresponsive |
+| `WaitForMiniInitConnect`, `ReadGuestCapabilities` | Kernel boot / hvsocket broken |
+| `ConfigureNetworking`, `CreateNatNetwork` | HNS slow (common false-positive source) |
+| `InitializeGuest` | Guest config message stuck |
+| `AttachDistroVhd` | VHD attach on bad / BitLocker storage |
+| `SendLaunchInit`, `WaitForInitDaemonConnect` | hvsocket write / guest init start |
+| `WaitForCreateInstanceResult` | ext4 mount / journal recovery |
+| `WaitForDrvFsInit` | Plan9 / virtiofs setup |
+| `WaitForInitConfigResponse` | systemd startup |
+| `PluginOnVmStarted`, `PluginOnDistributionStarted` | 3rd-party plugin (e.g. Docker Desktop) |
+
+## Backend integration
+
+No state-machine changes are required on the backend. Queries that previously looked at
+the opaque `timeout` bucket for `CreateInstance` can now be refined by joining
+`SlowOperationStarted` on the same process/thread within the timeout window:
+
+- `SlowOperationStarted` present, `SlowOperationEnded` absent → true hang, bucket by `name`.
+- Both present with `hr == S_OK` → slow but completed. `elapsedMs` gives the actual duration.
+- Both present with `hr != S_OK` → slow and surfaced a failure; the normal error events
+  carry the root cause.

@@ -134,6 +134,7 @@ Abstract:
 
 // Telemetry Header
 #include "WslTelemetry.h"
+#include "WslSlowOperation.h"
 
 // LxCore headers
 #include <lxcoreapi.h>
