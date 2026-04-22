@@ -528,6 +528,7 @@ private:
             {L"registry", Localization::WSLCCLI_RegistryCommandDesc()},
             {L"session", Localization::WSLCCLI_SessionCommandDesc()},
             {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},
+            {L"volume", Localization::WSLCCLI_VolumeCommandDesc()},
             {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
             {L"build", Localization::WSLCCLI_ImageBuildDesc()},
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},

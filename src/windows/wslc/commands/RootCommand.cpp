@@ -20,6 +20,7 @@ Abstract:
 #include "SessionCommand.h"
 #include "SettingsCommand.h"
 #include "VersionCommand.h"
+#include "VolumeCommand.h"
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
@@ -33,6 +34,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<RegistryCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
     commands.push_back(std::make_unique<SettingsCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumeCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));

@@ -224,9 +224,9 @@ private:
 
 struct VolumeMount
 {
-    std::wstring HostPath() const
+    std::wstring Host() const
     {
-        return m_hostPath;
+        return m_host;
     }
 
     std::string ContainerPath() const
@@ -239,14 +239,20 @@ struct VolumeMount
         return m_isReadOnlyMode;
     }
 
+    bool IsNamedVolume() const
+    {
+        return m_isNamedVolume;
+    }
+
     static bool IsValidNamedVolumeName(const std::wstring& name);
 
     static VolumeMount Parse(const std::wstring& value);
 
 private:
-    std::wstring m_hostPath;
+    std::wstring m_host;
     std::string m_containerPath;
     bool m_isReadOnlyMode = false;
+    bool m_isNamedVolume = false;
 
     static bool IsReadOnlyMode(const std::wstring& mode)
     {

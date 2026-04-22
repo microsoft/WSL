@@ -14,6 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSessionDefaults.h"
 #include "ImageModel.h"
+#include "VolumeModel.h"
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
@@ -213,6 +214,36 @@ void VerifyImageIsListed(const TestImage& image)
     VERIFY_FAIL(std::format(L"Image '{}' not found in image list output", image.NameAndTag()).c_str());
 }
 
+void VerifyVolumeIsListed(const std::wstring& volumeName)
+{
+    auto result = RunWslc(L"volume list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    for (const auto& vol : volumes)
+    {
+        if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Volume '{}' not found in volume list output", volumeName).c_str());
+}
+
+void VerifyVolumeIsNotListed(const std::wstring& volumeName)
+{
+    auto result = RunWslc(L"volume list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    for (const auto& vol : volumes)
+    {
+        if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
+        {
+            VERIFY_FAIL(std::format(L"Volume '{}' found in volume list output", volumeName).c_str());
+        }
+    }
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -232,6 +263,15 @@ wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
     auto result = RunWslc(std::format(L"image inspect {}", imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(result.Stdout.value().c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
+}
+
+wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName)
+{
+    auto result = RunWslc(std::format(L"volume inspect {}", volumeName));
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
     return inspectData[0];
 }
@@ -365,6 +405,22 @@ void EnsureSessionIsTerminated(const std::wstring& sessionName)
         {
             auto result = RunWslc(std::format(L"session terminate \"{}\"", targetSession));
             result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
+}
+
+void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
+{
+    auto result = RunWslc(L"volume list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto volumes = wsl::shared::FromJson<std::vector<WSLCVolumeInformation>>(result.Stdout.value().c_str());
+    for (const auto& vol : volumes)
+    {
+        if (vol.Name == wsl::shared::string::WideToMultiByte(volumeName))
+        {
+            auto deleteResult = RunWslc(std::format(L"volume rm {}", volumeName));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
             break;
         }
     }
