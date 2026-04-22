@@ -472,6 +472,38 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(std::wstring(L"badKey"), s.GetWarnings().front().SettingPath);
     }
 
+    // A complex YAML key (sequence) cannot be converted to string;
+    // a non-string key warning is emitted.
+    TEST_METHOD(Validation_UnknownKeys_ComplexKey_WarnsNonStringKey)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "  [1, 2]: value\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::wstring(L"session"), s.GetWarnings().front().SettingPath);
+    }
+
+    // A complex YAML key (map) at root level warns with "root" location.
+    TEST_METHOD(Validation_UnknownKeys_ComplexKeyAtRoot_WarnsNonStringKey)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "{a: b}: value\n"
+            "credentialStore: wincred\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::wstring(L"root"), s.GetWarnings().front().SettingPath);
+    }
+
     // A file with only valid known keys produces no warnings.
     TEST_METHOD(Validation_UnknownKeys_AllKnownKeys_NoWarnings)
     {
