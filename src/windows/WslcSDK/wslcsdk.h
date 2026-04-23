@@ -562,6 +562,8 @@ STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version);
 
 typedef __callback void(CALLBACK* WslcInstallCallback)(_In_ WslcComponentFlags component, _In_ uint32_t progress, _In_ uint32_t total, _In_opt_ PVOID context);
 
+// Callbacks will only be made for components that are actively installed by this call.
+// That list can be acquired prior to this call with `WslcCanRun`.
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
 
 EXTERN_C_END

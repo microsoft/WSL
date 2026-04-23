@@ -282,6 +282,7 @@ add_compile_definitions(UNICODE
                         WSL_PACKAGE_VERSION_REVISION=${PACKAGE_VERSION_REVISION}
                         DISTRO_HOSTTYPE="${DISTRO_HOSTTYPE}"
                         WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS}
+                        DCAT_PRODUCT_NAME=R"\(${DCAT_PRODUCT_NAME}\)"
                         DCAT_REGISTRATION_KEY=R"\(${DCAT_REGISTRATION_KEY}\)")
 
 if (${OFFICIAL_BUILD})

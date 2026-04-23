@@ -2282,18 +2282,6 @@ class WslcSdkTests
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Stub tests for unimplemented (E_NOTIMPL) functions.
-    // Each of these confirms the current state of the SDK; once the underlying
-    // function is implemented the assertion below will catch it and the test
-    // should be updated to exercise the real behaviour.
-    // -----------------------------------------------------------------------
-
-    WSLC_TEST_METHOD(InstallWithDependenciesNotImplemented)
-    {
-        VERIFY_ARE_EQUAL(WslcInstallWithDependencies(nullptr, nullptr), E_NOTIMPL);
-    }
-
     // Negative tests: handle lifecycle and invalid state transitions
 
     WSLC_TEST_METHOD(ReleaseNullSessionHandle)

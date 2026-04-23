@@ -17,7 +17,10 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
+#include "Localization.h"
+#include "WslInstall.h"
 #include "wslutil.h"
+#include "WindowsUpdateIntegration.h"
 
 using namespace std::string_view_literals;
 using namespace wsl::windows::common::wslutil;
@@ -1503,9 +1506,61 @@ CATCH_RETURN();
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 try
 {
-    UNREFERENCED_PARAMETER(progressCallback);
-    UNREFERENCED_PARAMETER(context);
-    return E_NOTIMPL;
+    HRESULT result = S_OK;
+    bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
+    bool needsRuntime = NeedsWslRuntimeInstalled();
+
+    if (!needsVirtualMachine && !needsRuntime)
+    {
+        return result;
+    }
+
+    // Installing these components requires elevation.
+    auto token = wil::open_current_access_token();
+    RETURN_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        !wsl::windows::common::security::IsTokenElevated(token.get()) && !wsl::windows::common::security::IsTokenLocalSystem(token.get()));
+
+    if (needsVirtualMachine)
+    {
+        if (progressCallback)
+        {
+            progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 0, 1, context);
+        }
+
+        auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameVmp, false);
+        if (exitCode == ERROR_SUCCESS_REBOOT_REQUIRED)
+        {
+            result = HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
+        }
+        else if (exitCode != 0)
+        {
+            THROW_HR_WITH_USER_ERROR(
+                WSL_E_INSTALL_COMPONENT_FAILED,
+                wsl::shared::Localization::MessageOptionalComponentInstallFailed(WslInstall::c_optionalFeatureNameVmp, exitCode));
+        }
+
+        if (progressCallback)
+        {
+            progressCallback(WSLC_COMPONENT_FLAG_VIRTUAL_MACHINE_PLATFORM, 1, 1, context);
+        }
+    }
+
+    if (needsRuntime)
+    {
+        std::function<void(uint32_t)> callback;
+        if (progressCallback)
+        {
+            callback = [progressCallback, context](uint32_t progress) {
+                progressCallback(WSLC_COMPONENT_FLAG_WSL_PACKAGE, progress, 100, context);
+            };
+        }
+
+        wsl::windows::common::WindowsUpdateContext wuContext;
+        wuContext.RunUpdateFlow(true, callback);
+    }
+
+    return result;
 }
 CATCH_RETURN();
 
