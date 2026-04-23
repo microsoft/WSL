@@ -244,7 +244,20 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
 
     for (auto it = m_allocatedPorts.begin(); it != m_allocatedPorts.end();)
     {
-        if (Ports.find(it->first) == Ports.end())
+        // Ports contains the list of all Linux sockets currently active and stores the source port used by each socket
+        // Sockets can use a source port even though an explicit bind() was not made for that port. As long as there
+        // is a socket using the source port, we should not deallocate it yet.
+        //
+        // For example, a listening socket on port X and a socket accepted from that listening socket will both use port X.
+        // Even if the listening socket is closed the accepted socket may still be using the same port.
+        //
+        // Port allocations are done based on protocol+port so we don't need the socket to explicitly match the address or family
+        // of the bind request that is tracked in m_allocatedPorts, it just needs to match the port number and protocol.
+        const auto matchCondition = [&](const PortAllocation& p) {
+            return p.Port == it->first.Port && p.Protocol == it->first.Protocol;
+        };
+
+        if (std::find_if(Ports.begin(), Ports.end(), matchCondition) == Ports.end())
         {
             if (!it->second.has_value() || it->second.value() < Timestamp)
             {
