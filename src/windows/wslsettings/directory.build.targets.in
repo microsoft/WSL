@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <!-- Disable the Roslyn shared compiler server (VBCSCompiler) to avoid intermittent CS0016 errors
+    <!-- Disable the Roslyn shared compiler server (VBCSCompiler) to avoid intermittent CS0016 errors -->
     <UseSharedCompilation>false</UseSharedCompilation>
   </PropertyGroup>
   <ItemGroup>
