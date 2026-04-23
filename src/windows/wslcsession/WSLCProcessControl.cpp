@@ -41,7 +41,7 @@ const wil::unique_event& WSLCProcessControl::GetExitEvent() const
     return m_exitEvent;
 }
 
-DockerContainerProcessControl::DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker) :
+DockerContainerProcessControl::DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker) :
     m_container(&Container),
     m_client(DockerClient),
     m_trackingReference(EventTracker.RegisterContainerStateUpdates(
@@ -114,7 +114,7 @@ void DockerContainerProcessControl::OnContainerReleased() noexcept
 }
 
 DockerExecProcessControl::DockerExecProcessControl(
-    WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker) :
+    WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker) :
     m_container(&Container),
     m_id(Id),
     m_client(DockerClient),

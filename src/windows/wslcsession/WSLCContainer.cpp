@@ -21,6 +21,7 @@ Abstract:
 #include "WSLCContainer.h"
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
+#include "WSLCVolumes.h"
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
@@ -31,6 +32,7 @@ using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
+using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VMPortMapping;
@@ -40,9 +42,9 @@ using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
 using wsl::windows::service::wslc::WSLCPortMapping;
 using wsl::windows::service::wslc::WSLCSession;
-using wsl::windows::service::wslc::WSLCVhdVolumeImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 using wsl::windows::service::wslc::WSLCVolumeMount;
+using wsl::windows::service::wslc::WSLCVolumes;
 
 using namespace wsl::windows::common::relay;
 using namespace wsl::windows::common::docker_schema;
@@ -258,10 +260,7 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
     return wsl::shared::ToJson(wrapper);
 }
 
-void ProcessNamedVolumes(
-    const WSLCContainerOptions& containerOptions,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
-    wsl::windows::common::docker_schema::CreateContainer& request)
+void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, WSLCVolumes& volumes, wsl::windows::common::docker_schema::CreateContainer& request)
 {
     THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
 
@@ -274,7 +273,7 @@ void ProcessNamedVolumes(
         std::string volumeName = nv.Name;
 
         THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(nv.Name), !sessionVolumes.contains(volumeName));
+            WSLC_E_VOLUME_NOT_FOUND, Localization::MessageWslcVolumeNotFound(nv.Name), !volumes.ContainsVolume(volumeName));
 
         wsl::windows::common::docker_schema::Mount mount{};
         mount.Source = std::move(volumeName);
@@ -286,21 +285,29 @@ void ProcessNamedVolumes(
     }
 }
 
-void ValidateNamedVolumes(
-    const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
-    const std::unordered_set<std::string>& anonymousVolumes)
+std::unordered_set<std::string> GetAnonymousVolumeNames(
+    const wsl::windows::common::docker_schema::InspectContainer& inspectData)
 {
-    for (const auto& mount : mounts)
+    // Build a set of all volumes mounted on the container.
+    std::unordered_set<std::string> volumeNames;
+    for (const auto& mount : inspectData.Mounts)
     {
         if (mount.Type == "volume" && !mount.Name.empty())
         {
-            THROW_HR_WITH_USER_ERROR_IF(
-                WSLC_E_VOLUME_NOT_FOUND,
-                Localization::MessageWslcVolumeNotFound(mount.Name),
-                !sessionVolumes.contains(mount.Name) && !anonymousVolumes.contains(mount.Name));
+            volumeNames.insert(mount.Name);
         }
     }
+
+    // Remove any volumes that were user specified in the HostConfig.Mounts.
+    for (const auto& mount : inspectData.HostConfig.Mounts)
+    {
+        if (!mount.Source.empty() && mount.Type == "volume")
+        {
+            volumeNames.erase(mount.Source);
+        }
+    }
+
+    return volumeNames;
 }
 
 } // namespace
@@ -359,8 +366,9 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::vector<WSLCVolumeMount>&& volumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
+    std::unordered_set<std::string>&& anonymousVolumes,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
-    ContainerEventTracker& EventTracker,
+    DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     IORelay& Relay,
     WSLCContainerState InitialState,
@@ -374,6 +382,7 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_networkingMode(NetworkMode),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
+    m_dockerVolumeNames(std::move(anonymousVolumes)),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, std::move(onDeleted))),
@@ -784,6 +793,11 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
+    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
+    {
+        m_wslcSession.DeleteContainerVolumes(m_dockerVolumeNames);
+    }
+
     Transition(WslcContainerStateDeleted);
     ReleaseResources();
 }
@@ -1038,9 +1052,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    WSLCVolumes& volumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-    ContainerEventTracker& EventTracker,
+    DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     IORelay& IoRelay)
 {
@@ -1137,9 +1151,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
     }
 
-    // Build volume list from container options.
-    std::vector<WSLCVolumeMount> volumes;
-    volumes.reserve(containerOptions.VolumesCount);
+    // Build bind mount list from container options.
+    std::vector<WSLCVolumeMount> volumeMounts;
+    volumeMounts.reserve(containerOptions.VolumesCount);
 
     std::vector<std::string> binds;
     binds.reserve(containerOptions.VolumesCount);
@@ -1188,7 +1202,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             }
         }
 
-        volumes.push_back(WSLCVolumeMount{hostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly), sourceFilename});
+        volumeMounts.push_back(WSLCVolumeMount{hostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly), sourceFilename});
 
         auto options = volume.ReadOnly ? "ro" : "rw";
         auto bindSource = sourceFilename.empty() ? parentVMPath : std::format("{}/{}", parentVMPath, sourceFilename);
@@ -1214,7 +1228,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
     }
 
-    ProcessNamedVolumes(containerOptions, sessionVolumes, request);
+    ProcessNamedVolumes(containerOptions, volumes, request);
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions, virtualMachine);
@@ -1241,7 +1255,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCContainerMetadataV1 metadata;
     metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
-    metadata.Volumes = volumes;
+    metadata.Volumes = volumeMounts;
 
     for (const auto& e : ports)
     {
@@ -1264,6 +1278,15 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);
 
+    // Wait for the container create event to be delivered on the Docker event stream.
+    // Docker emits volume create events before the container create event, so once this returns
+    // we are guaranteed that all anonymous volumes created by Docker have been processed by the
+    // event tracker's volume callback and are already tracked in WSLCVolumes.
+    EventTracker.WaitForObjectCreated(result.Id);
+
+    // Identify the anonymous volumes so we know which ones to delete with the container.
+    auto anonymousVolumes = GetAnonymousVolumeNames(inspectData);
+
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
@@ -1271,9 +1294,10 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         CleanContainerName(inspectData.Name),
         std::string(containerOptions.Image),
         containerOptions.ContainerNetwork.ContainerNetworkType,
-        std::move(volumes),
+        std::move(volumeMounts),
         std::move(ports),
         std::move(labels),
+        std::move(anonymousVolumes),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -1291,17 +1315,14 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
-    const std::unordered_set<std::string>& anonymousVolumes,
+    WSLCVolumes& volumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-    ContainerEventTracker& EventTracker,
+    DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     IORelay& ioRelay)
 {
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
-
-    ValidateNamedVolumes(dockerContainer.Mounts, sessionVolumes, anonymousVolumes);
 
     auto labels(dockerContainer.Labels);
     auto metadataIt = labels.find(WSLCContainerMetadataLabel);
@@ -1349,6 +1370,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::move(metadata.Volumes),
         std::move(ports),
         std::move(labels),
+        std::unordered_set<std::string>{},
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -1358,7 +1380,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
-    // Restore the state change timestamp from Docker inspect data.
+    // Restore the state change timestamp and identify implicit volumes from Docker inspect data.
     try
     {
         auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
@@ -1369,6 +1391,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         {
             container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
         }
+
+        container->m_dockerVolumeNames = GetAnonymousVolumeNames(inspectData);
     }
     CATCH_LOG();
 

@@ -17,10 +17,9 @@ Abstract:
 #include "wslc.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
-#include "WSLCVhdVolume.h"
-#include "WSLCVolumeMetadata.h"
+#include "WSLCVolumes.h"
 #include "WSLCNetworkMetadata.h"
-#include "ContainerEventTracker.h"
+#include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
 #include <unordered_map>
@@ -151,8 +150,12 @@ public:
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);
 
+
+
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
+
+    void DeleteContainerVolumes(_In_ const std::unordered_set<std::string>& VolumeNames);
 
 private:
     ULONG m_id = 0;
@@ -172,7 +175,6 @@ private:
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, const WSLCHandle ImageHandle);
     void RecoverExistingContainers();
-    void RecoverExistingVolumes();
     void RecoverExistingNetworks();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);
@@ -180,19 +182,18 @@ private:
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLCVirtualMachine> m_virtualMachine;
-    std::optional<ContainerEventTracker> m_eventTracker;
+    std::optional<DockerEventTracker> m_eventTracker;
     wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
 
-    // N.B. m_lock must be acquired before acquiring m_volumesLock, m_containersLock, or m_networksLock.
-    // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.
-    // This allows independent operations to proceed while volume/container bookkeeping remains synchronized.
+    // N.B. m_lock must be acquired before acquiring m_containersLock or m_networksLock.
+    // These locks protect m_containers without requiring an exclusive m_lock.
+    // This allows independent operations to proceed while container bookkeeping remains synchronized.
+    // WSLCVolumes has its own internal srwlock and does not require m_lock.
     std::mutex m_containersLock;
-    std::mutex m_volumesLock;
     std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
-    std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>> m_volumes;
-    std::unordered_set<std::string> m_anonymousVolumes; // TODO: Implement proper anonymous volume support.
+    std::optional<WSLCVolumes> m_volumes;
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};

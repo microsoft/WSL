@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 #include "wslc.h"
 #include "DockerHTTPClient.h"
-#include "ContainerEventTracker.h"
+#include "DockerEventTracker.h"
 
 namespace wsl::windows::service::wslc {
 
@@ -42,7 +42,7 @@ protected:
 class DockerContainerProcessControl : public WSLCProcessControl
 {
 public:
-    DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker);
+    DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker);
     ~DockerContainerProcessControl();
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
@@ -55,13 +55,13 @@ private:
     std::mutex m_lock;
     DockerHTTPClient& m_client;
     WSLCContainerImpl* m_container{};
-    ContainerEventTracker::ContainerTrackingReference m_trackingReference;
+    DockerEventTracker::EventTrackingReference m_trackingReference;
 };
 
 class DockerExecProcessControl : public WSLCProcessControl
 {
 public:
-    DockerExecProcessControl(WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker);
+    DockerExecProcessControl(WSLCContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker);
     ~DockerExecProcessControl();
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
@@ -79,7 +79,7 @@ private:
     std::optional<int> m_pid{};
     DockerHTTPClient& m_client;
     WSLCContainerImpl* m_container{};
-    ContainerEventTracker::ContainerTrackingReference m_trackingReference;
+    DockerEventTracker::EventTrackingReference m_trackingReference;
 };
 
 class VMProcessControl : public WSLCProcessControl

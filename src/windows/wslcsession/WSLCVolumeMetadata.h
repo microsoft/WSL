@@ -24,6 +24,9 @@ constexpr auto WSLCVolumeMetadataLabel = "com.microsoft.wsl.volume.metadata";
 // Volume driver name for VHD-backed volumes.
 constexpr auto WSLCVhdVolumeDriver = "vhd";
 
+// Volume driver name for guest-backed volumes (passthrough to docker's built-in "local" driver).
+constexpr auto WSLCGuestVolumeDriver = "guest";
+
 struct WSLCVolumeMetadata
 {
     std::string Driver;

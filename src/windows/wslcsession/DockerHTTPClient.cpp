@@ -427,6 +427,11 @@ docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::Create
     return Transaction<docker_schema::CreateVolume>(verb::post, URL::Create("/volumes/create"), Request);
 }
 
+docker_schema::Volume DockerHTTPClient::InspectVolume(const std::string& Name)
+{
+    return Transaction<docker_schema::EmptyRequest, docker_schema::Volume>(verb::get, URL::Create("/volumes/{}", Name));
+}
+
 void DockerHTTPClient::RemoveVolume(const std::string& Name)
 {
     Transaction(verb::delete_, URL::Create("/volumes/{}", Name));
