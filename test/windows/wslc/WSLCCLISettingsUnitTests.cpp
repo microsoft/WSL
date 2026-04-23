@@ -26,6 +26,7 @@ using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
 using namespace WEX::Common;
 using namespace WEX::TestExecution;
+using Loc = wsl::shared::Localization;
 
 namespace WSLCCLISettingsUnitTests {
 
@@ -163,7 +164,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Settings file is empty or has invalid structure. Expected a YAML mapping."),
+            Loc::WSLCUserSettings_Warning_InvalidStructure(),
             s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
@@ -182,7 +183,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Settings file is empty or has invalid structure. Expected a YAML mapping."),
+            Loc::WSLCUserSettings_Warning_InvalidStructure(),
             s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
     }
@@ -197,6 +198,7 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        // Parse errors include yaml-cpp details, so just check the prefix.
         // Parse errors include yaml-cpp details, so just check the prefix.
         VERIFY_IS_TRUE(s.GetWarnings().front().Message.starts_with(L"Warning: Settings file could not be parsed:"));
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
@@ -217,7 +219,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Invalid value for setting 'session.cpuCount'. Using default. Line: 2."),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.cpuCount", 2),
             s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(std::wstring(L"session.cpuCount"), s.GetWarnings().front().SettingPath);
     }
@@ -233,7 +235,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Invalid value for setting 'session.memorySize'. Using default. Line: 2."),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.memorySize", 2),
             s.GetWarnings().front().Message);
     }
 
@@ -248,7 +250,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Invalid value for setting 'session.maxStorageSize'. Using default. Line: 2."),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.maxStorageSize", 2),
             s.GetWarnings().front().Message);
     }
 
@@ -264,7 +266,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Invalid type for setting 'session.cpuCount'. Using default. Line: 2."),
+            Loc::WSLCUserSettings_Warning_InvalidType(L"session.cpuCount", 2),
             s.GetWarnings().front().Message);
     }
 
@@ -366,10 +368,10 @@ class WSLCCLISettingsUnitTests
         // Both should be rejected by their validators and produce warnings.
         VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Invalid value for setting 'session.networkingMode'. Using default. Line: 2."),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.networkingMode", 2),
             s.GetWarnings()[0].Message);
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Invalid value for setting 'credentialStore'. Using default. Line: 3."),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"credentialStore", 3),
             s.GetWarnings()[1].Message);
         // Values still fall back to built-in defaults.
         VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeVirtioProxy), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
@@ -387,7 +389,7 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Invalid value for setting 'credentialStore'. Using default. Line: 1."),
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"credentialStore", 1),
             s.GetWarnings().front().Message);
     }
 
@@ -414,9 +416,9 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
         // Root-level keys are processed before nested keys due to stack-based traversal.
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Unknown setting section 'unknownSection'. Line: 4."), s.GetWarnings()[0].Message);
+            Loc::WSLCUserSettings_Warning_UnknownSection(L"unknownSection", 4), s.GetWarnings()[0].Message);
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Unknown setting 'session.unknownSetting'. Line: 3."), s.GetWarnings()[1].Message);
+            Loc::WSLCUserSettings_Warning_UnknownKey(L"session.unknownSetting", 3), s.GetWarnings()[1].Message);
     }
 
     // An unknown key under a known section produces a warning with the full path.
@@ -433,7 +435,7 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Unknown setting 'session.typoSetting'. Line: 3."), s.GetWarnings().front().Message);
+            Loc::WSLCUserSettings_Warning_UnknownKey(L"session.typoSetting", 3), s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(std::wstring(L"session.typoSetting"), s.GetWarnings().front().SettingPath);
     }
 
@@ -450,7 +452,7 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Unknown setting section 'badSection'. Line: 1."), s.GetWarnings().front().Message);
+            Loc::WSLCUserSettings_Warning_UnknownSection(L"badSection", 1), s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(std::wstring(L"badSection"), s.GetWarnings().front().SettingPath);
     }
 
@@ -468,7 +470,7 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Unknown setting 'badKey'. Line: 3."), s.GetWarnings().front().Message);
+            Loc::WSLCUserSettings_Warning_UnknownKey(L"badKey", 3), s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(std::wstring(L"badKey"), s.GetWarnings().front().SettingPath);
     }
 
@@ -487,7 +489,7 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Non-string key in section 'session'. Line: 3."), s.GetWarnings().front().Message);
+            Loc::WSLCUserSettings_Warning_NonStringKey(L"session", 3), s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(std::wstring(L"session"), s.GetWarnings().front().SettingPath);
     }
 
@@ -504,7 +506,7 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(
-            std::wstring(L"Warning: Non-string key in section 'root'. Line: 1."), s.GetWarnings().front().Message);
+            Loc::WSLCUserSettings_Warning_NonStringKey(L"root", 1), s.GetWarnings().front().Message);
         VERIFY_ARE_EQUAL(std::wstring(L"root"), s.GetWarnings().front().SettingPath);
     }
 
