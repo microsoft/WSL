@@ -623,8 +623,8 @@ class WSLCE2EContainerCreateTests
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.find(L"nameserver 1.1.1.1") != std::wstring::npos);
-        VERIFY_IS_TRUE(result.Stdout.find(L"nameserver 8.8.8.8") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSSearch)
@@ -637,7 +637,7 @@ class WSLCE2EContainerCreateTests
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.find(L"search example.com test.local") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"search example.com test.local") != std::wstring::npos);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSOption)
@@ -650,7 +650,7 @@ class WSLCE2EContainerCreateTests
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        VERIFY_IS_TRUE(result.Stdout.find(L"options ndots:5 timeout:3") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5 timeout:3") != std::wstring::npos);
     }
 
 private:
