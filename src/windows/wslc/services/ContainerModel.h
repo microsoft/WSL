@@ -41,6 +41,11 @@ struct ContainerOptions
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
+    std::optional<std::string> Hostname{};
+    std::optional<std::string> Domainname{};
+    std::vector<std::string> DnsServers;
+    std::vector<std::string> DnsSearchDomains;
+    std::vector<std::string> DnsOptions;
     std::vector<std::string> Tmpfs;
 };
 

@@ -113,6 +113,31 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
     }
 
+    if (options.Hostname.has_value())
+    {
+        containerLauncher.SetHostname(std::string(options.Hostname.value()));
+    }
+
+    if (options.Domainname.has_value())
+    {
+        containerLauncher.SetDomainname(std::string(options.Domainname.value()));
+    }
+
+    if (!options.DnsServers.empty())
+    {
+        containerLauncher.SetDnsServers(std::vector<std::string>(options.DnsServers));
+    }
+
+    if (!options.DnsSearchDomains.empty())
+    {
+        containerLauncher.SetDnsSearchDomains(std::vector<std::string>(options.DnsSearchDomains));
+    }
+
+    if (!options.DnsOptions.empty())
+    {
+        containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
+    }
+
     for (const auto& tmpfsSpec : options.Tmpfs)
     {
         auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
