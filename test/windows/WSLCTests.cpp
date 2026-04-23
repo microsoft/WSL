@@ -3437,42 +3437,38 @@ class WSLCTests
         VERIFY_ARE_EQUAL(m_defaultSession->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     }
 
-    WSLC_TEST_METHOD(NamedVolumesTest)
+    // Exercises behavior that all volume drivers must implement identically:
+    // create, duplicate-name rejection, multi-mount, cross-container read/write,
+    // in-use deletion rejection, and clean deletion after the referencing container is removed.
+    void ValidateNamedVolumeContract(std::string_view driver, const WSLCDriverOption* driverOpts, ULONG driverOptsCount)
     {
-        const std::string volumeName = "wslc-test-named-volume";
-        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
+        const std::string driverStr(driver);
+        const std::string volumeName = std::format("wslc-test-named-volume-{}", driver);
 
         // Best-effort cleanup in case of leftovers from a previous failed run.
         LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
-        auto cleanup = wil::scope_exit([&]() {
-            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
-            std::error_code ec;
-            std::filesystem::remove(volumeVhdPath, ec);
-        });
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
-
-        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.Driver = driverStr.c_str();
         volumeOptions.DriverOpts = driverOpts;
-        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+        volumeOptions.DriverOptsCount = driverOptsCount;
 
         // Create volume and validate duplicate volume name handling.
         WSLCVolumeInformation volInfo{};
         VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
         VERIFY_ARE_EQUAL(std::string(volInfo.Name), volumeName);
-        VERIFY_ARE_EQUAL(std::string(volInfo.Driver), std::string("vhd"));
+        VERIFY_ARE_EQUAL(std::string(volInfo.Driver), driverStr);
         VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
-
-        // Verify volume VHD exists and mount point is present in the VM.
-        VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
-        ExpectMount(m_defaultSession.get(), std::format("/mnt/wslc-volumes/{}", volumeName), std::optional<std::string>{"*ext4*"});
 
         // Verify the same named volume can be mounted more than once with different container paths.
         {
             WSLCContainerLauncher duplicateNamedVolumes(
-                "debian:latest", "named-volume-dup", {"/bin/sh", "-c", "echo duplicated >/data-a/dup.txt ; cat /data-b/dup.txt"});
+                "debian:latest",
+                std::format("named-volume-dup-{}", driver),
+                {"/bin/sh", "-c", "echo duplicated >/data-a/dup.txt ; cat /data-b/dup.txt"});
             duplicateNamedVolumes.AddNamedVolume(volumeName, "/data-a", false);
             duplicateNamedVolumes.AddNamedVolume(volumeName, "/data-b", true);
 
@@ -3484,14 +3480,17 @@ class WSLCTests
         // Verify CreateContainer with named volume mounts the volume into the container.
         {
             WSLCContainerLauncher writer(
-                "debian:latest", "named-volume-writer", {"/bin/sh", "-c", "echo wslc-named-volume >/data/marker.txt"});
+                "debian:latest",
+                std::format("named-volume-writer-{}", driver),
+                {"/bin/sh", "-c", "echo wslc-named-volume >/data/marker.txt"});
             writer.AddNamedVolume(volumeName, "/data", false);
 
             auto writerContainer = writer.Launch(*m_defaultSession);
             auto writerProcess = writerContainer.GetInitProcess();
             ValidateProcessOutput(writerProcess, {});
 
-            WSLCContainerLauncher reader("debian:latest", "named-volume-reader", {"/bin/sh", "-c", "cat /data/marker.txt"});
+            WSLCContainerLauncher reader(
+                "debian:latest", std::format("named-volume-reader-{}", driver), {"/bin/sh", "-c", "cat /data/marker.txt"});
             reader.AddNamedVolume(volumeName, "/data", true);
 
             auto readerContainer = reader.Launch(*m_defaultSession);
@@ -3500,7 +3499,7 @@ class WSLCTests
         }
 
         // Verify we cannot delete a named volume while a container references it.
-        WSLCContainerLauncher holder("debian:latest", "named-volume-holder", {"sleep", "99999"});
+        WSLCContainerLauncher holder("debian:latest", std::format("named-volume-holder-{}", driver), {"sleep", "99999"});
         holder.AddNamedVolume(volumeName, "/data", false);
 
         auto [holderCreateResult, holderContainerResult] = holder.CreateNoThrow(*m_defaultSession);
@@ -3516,44 +3515,69 @@ class WSLCTests
         VERIFY_SUCCEEDED(holderContainer.Get().Delete(WSLCDeleteFlagsNone));
         VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
 
-        ExpectMount(m_defaultSession.get(), std::format("/mnt/wslc-volumes/{}", volumeName), std::nullopt);
-        VERIFY_IS_FALSE(std::filesystem::exists(volumeVhdPath));
-
         cleanup.release();
     }
 
-    WSLC_TEST_METHOD(NamedVolumesSessionRecovery)
+    WSLC_TEST_METHOD(NamedVolumesVhd)
     {
-        const std::string volumeName = "wslc-test-named-volume";
-        const std::string containerName = "wslc-test-container";
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        ValidateNamedVolumeContract("vhd", driverOpts, ARRAYSIZE(driverOpts));
+
+        // VHD-driver-specific: validate the host-side .vhdx artifact and the
+        // /mnt/wslc-volumes ext4 mount inside the VM appear and disappear with
+        // the volume.
+        const std::string volumeName = "wslc-test-named-volume-vhd-host";
         const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
-
-        // Best-effort cleanup in case prior failed runs left artifacts behind.
-        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
-        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
-        {
-            std::error_code ec;
-            std::filesystem::remove(volumeVhdPath, ec);
-        }
-
-        auto cleanup = wil::scope_exit([&]() {
-            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
-            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
-
-            std::error_code ec;
-            std::filesystem::remove(volumeVhdPath, ec);
-        });
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
-
-        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        volumeOptions.Driver = "vhd";
         volumeOptions.DriverOpts = driverOpts;
         volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
 
         WSLCVolumeInformation volInfo{};
         VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
         VERIFY_IS_TRUE(std::filesystem::exists(volumeVhdPath));
+        ExpectMount(m_defaultSession.get(), std::format("/mnt/wslc-volumes/{}", volumeName), std::optional<std::string>{"*ext4*"});
+
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        cleanup.release();
+
+        ExpectMount(m_defaultSession.get(), std::format("/mnt/wslc-volumes/{}", volumeName), std::nullopt);
+        VERIFY_IS_FALSE(std::filesystem::exists(volumeVhdPath));
+    }
+
+    WSLC_TEST_METHOD(NamedVolumesGuest)
+    {
+        ValidateNamedVolumeContract("guest", nullptr, 0);
+    }
+
+    // Verifies that a container using a named volume survives a session restart and the volume's data is preserved.
+    void ValidateNamedVolumeRecoveryContract(std::string_view driver, const WSLCDriverOption* driverOpts, ULONG driverOptsCount)
+    {
+        const std::string driverStr(driver);
+        const std::string volumeName = std::format("wslc-test-named-volume-{}", driver);
+        const std::string containerName = std::format("wslc-test-container-{}", driver);
+
+        // Best-effort cleanup in case prior failed runs left artifacts behind.
+        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+        auto cleanup = wil::scope_exit([&]() {
+            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rm", "-f", containerName});
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        });
+
+        WSLCVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Driver = driverStr.c_str();
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = driverOptsCount;
+
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
 
         // Create a container that uses the named volume and writes a marker.
         {
@@ -3576,15 +3600,55 @@ class WSLCTests
 
         // Verify the named volume still contains the marker after restart.
         {
-            WSLCContainerLauncher reader("debian:latest", "wslc-test-container-reader", {"/bin/sh", "-c", "cat /data/marker.txt"});
+            WSLCContainerLauncher reader(
+                "debian:latest", std::format("{}-reader", containerName), {"/bin/sh", "-c", "cat /data/marker.txt"});
             reader.AddNamedVolume(volumeName, "/data", true);
 
             auto readerContainer = reader.Launch(*m_defaultSession);
             auto readerProcess = readerContainer.GetInitProcess();
             ValidateProcessOutput(readerProcess, {{1, "named-volume-recovery\n"}});
         }
+    }
 
-        // Stop the session, delete the backing VHD, and restart.
+    WSLC_TEST_METHOD(NamedVolumeRecovery)
+    {
+        ValidateNamedVolumeRecoveryContract("guest", nullptr, 0);
+    }
+
+    WSLC_TEST_METHOD(NamedVolumesVhdSessionRecovery)
+    {
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
+        ValidateNamedVolumeRecoveryContract("vhd", driverOpts, ARRAYSIZE(driverOpts));
+
+        // Re-create the volume (the recovery helper cleans up on exit) so we
+        // can test the "delete VHD while session is down" scenario.
+        const std::string volumeName = "wslc-test-named-volume-vhd";
+        const std::string containerName = "wslc-test-container-vhd";
+
+        WSLCVolumeOptions volumeOptions{};
+        volumeOptions.Name = volumeName.c_str();
+        volumeOptions.Driver = "vhd";
+        volumeOptions.DriverOpts = driverOpts;
+        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        WSLCVolumeInformation volInfo{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+
+        // Create a container that depends on the volume so we can verify it
+        // gets dropped when the backing .vhdx is removed.
+        {
+            WSLCContainerLauncher writer("debian:latest", containerName, {"/bin/sh", "-c", "echo vhd-recovery >/data/marker.txt"});
+            writer.AddNamedVolume(volumeName, "/data", false);
+
+            auto writerContainer = writer.Launch(*m_defaultSession);
+            writerContainer.SetDeleteOnClose(false);
+
+            auto writerProcess = writerContainer.GetInitProcess();
+            ValidateProcessOutput(writerProcess, {});
+        }
+
+        const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
+
         {
             auto restartSession = ResetTestSession();
 
@@ -3602,7 +3666,86 @@ class WSLCTests
         VERIFY_ARE_EQUAL(m_defaultSession->DeleteVolume(volumeName.c_str()), WSLC_E_VOLUME_NOT_FOUND);
     }
 
-    WSLC_TEST_METHOD(NamedVolumeOptionsParseTest)
+    WSLC_TEST_METHOD(NamedVolumeGuestDriverOptsTest)
+    {
+        const std::string volumeName = "wslc-test-vol";
+        LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        auto expectReject = [&](const WSLCDriverOption* opts, ULONG optsCount, const std::wstring& expectedMessage) {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+            WSLCVolumeOptions volumeOptions{};
+            volumeOptions.Name = volumeName.c_str();
+            volumeOptions.Driver = "guest";
+            volumeOptions.DriverOpts = opts;
+            volumeOptions.DriverOptsCount = optsCount;
+
+            WSLCVolumeInformation volInfo{};
+            VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&volumeOptions, &volInfo), E_INVALIDARG);
+            ValidateCOMErrorMessageContains(expectedMessage);
+        };
+
+        auto expectAccept = [&](const WSLCDriverOption* opts, ULONG optsCount) {
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
+
+            WSLCVolumeOptions volumeOptions{};
+            volumeOptions.Name = volumeName.c_str();
+            volumeOptions.Driver = "guest";
+            volumeOptions.DriverOpts = opts;
+            volumeOptions.DriverOptsCount = optsCount;
+
+            WSLCVolumeInformation volInfo{};
+            VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        };
+
+        // Allowed: no options (nullptr).
+        expectAccept(nullptr, 0);
+
+        // Allowed: type=tmpfs with device=tmpfs.
+        {
+            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"device", "tmpfs"}};
+            expectAccept(opts, ARRAYSIZE(opts));
+        }
+
+        // Allowed: type=tmpfs with device=tmpfs and o= suboptions.
+        {
+            WSLCDriverOption opts[] = {{"type", "tmpfs"}, {"device", "tmpfs"}, {"o", "size=100m,uid=1000"}};
+            expectAccept(opts, ARRAYSIZE(opts));
+        }
+
+        // Blocked: type=none (bind mount).
+        {
+            WSLCDriverOption opts[] = {{"type", "none"}};
+            expectReject(opts, ARRAYSIZE(opts), L"unsupported volume driver options: type=none");
+        }
+
+        // Blocked: type=nfs.
+        {
+            WSLCDriverOption opts[] = {{"type", "nfs"}};
+            expectReject(opts, ARRAYSIZE(opts), L"unsupported volume driver options: type=nfs");
+        }
+
+        // Blocked by Docker: device without type.
+        {
+            WSLCDriverOption opts[] = {{"device", "/some/path"}};
+            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+        }
+
+        // Blocked by Docker: device=tmpfs without type.
+        {
+            WSLCDriverOption opts[] = {{"device", "tmpfs"}};
+            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+        }
+
+        // Blocked by Docker: device and o without type.
+        {
+            WSLCDriverOption opts[] = {{"device", "tmpfs"}, {"o", "size=100m"}};
+            expectReject(opts, ARRAYSIZE(opts), L"create wslc-test-vol: missing required option: \"type\"");
+        }
+    }
+
+    WSLC_TEST_METHOD(NamedVolumeVhdOptionsParseTest)
     {
         const std::string volumeName = "wslc-volume-name";
 
@@ -3616,6 +3759,7 @@ class WSLCTests
 
             WSLCVolumeOptions volumeOptions{};
             volumeOptions.Name = volumeName.c_str();
+            volumeOptions.Driver = "vhd";
             volumeOptions.DriverOpts = opts;
             volumeOptions.DriverOptsCount = optsCount;
 
@@ -3666,12 +3810,12 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ListAndInspectNamedVolumesTest)
     {
-        const std::string volumeName1 = "wsla-test-vol1";
-        const std::string volumeName2 = "wsla-test-vol2";
+        const std::string vhdVolumeName = "wsla-test-vol-vhd";
+        const std::string guestVolumeName = "wsla-test-vol-guest";
 
         auto cleanup = wil::scope_exit([&]() {
-            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName1.c_str()));
-            LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName2.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(vhdVolumeName.c_str()));
+            LOG_IF_FAILED(m_defaultSession->DeleteVolume(guestVolumeName.c_str()));
         });
 
         // Verify empty list is returned when no volumes exist.
@@ -3679,57 +3823,85 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, volumes.size());
 
-        // Create first volume and verify list returns one entry.
-        WSLCVolumeOptions volumeOptions{};
-        volumeOptions.Name = volumeName1.c_str();
-
+        // Create a VHD volume and verify list returns one entry.
         WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
-        volumeOptions.DriverOpts = driverOpts;
-        volumeOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
+        WSLCVolumeOptions vhdOptions{};
+        vhdOptions.Name = vhdVolumeName.c_str();
+        vhdOptions.Driver = "vhd";
+        vhdOptions.DriverOpts = driverOpts;
+        vhdOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+
         WSLCVolumeInformation volInfo{};
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&vhdOptions, &volInfo));
 
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
-        VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName1);
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Name), vhdVolumeName);
         VERIFY_ARE_EQUAL(std::string(volumes[0].Driver), std::string("vhd"));
 
-        // Create second volume and verify list returns two entries.
-        volumeOptions.Name = volumeName2.c_str();
-        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&volumeOptions, &volInfo));
+        // Verify that a guest volume cannot be created with the same name as an existing vhd volume.
+        WSLCVolumeOptions duplicateGuestOptions{};
+        duplicateGuestOptions.Name = vhdVolumeName.c_str();
+        duplicateGuestOptions.Driver = "guest";
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&duplicateGuestOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+        // Create a guest volume and verify both drivers show up in the list.
+        WSLCVolumeOptions guestOptions{};
+        guestOptions.Name = guestVolumeName.c_str();
+        guestOptions.Driver = "guest";
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&guestOptions, &volInfo));
+
+        // Verify that a vhd volume cannot be created with the same name as an existing guest volume.
+        WSLCVolumeOptions duplicateVhdOptions{};
+        duplicateVhdOptions.Name = guestVolumeName.c_str();
+        duplicateVhdOptions.Driver = "vhd";
+        duplicateVhdOptions.DriverOpts = driverOpts;
+        duplicateVhdOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
+        VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&duplicateVhdOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, volumes.size());
 
-        std::set<std::string> names;
+        std::map<std::string, std::string> namesToDrivers;
         for (const auto& v : volumes)
         {
-            names.insert(v.Name);
-            VERIFY_ARE_EQUAL(std::string(v.Driver), std::string("vhd"));
+            namesToDrivers.emplace(v.Name, v.Driver);
         }
 
-        VERIFY_IS_TRUE(names.contains(volumeName1));
-        VERIFY_IS_TRUE(names.contains(volumeName2));
+        VERIFY_ARE_EQUAL(namesToDrivers[vhdVolumeName], std::string("vhd"));
+        VERIFY_ARE_EQUAL(namesToDrivers[guestVolumeName], std::string("guest"));
 
-        // Verify InspectVolume returns correct details.
+        // Verify InspectVolume returns correct details for the VHD volume (driver opts present).
         wil::unique_cotaskmem_ansistring output;
-        VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(volumeName1.c_str(), &output));
+        VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(vhdVolumeName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
-        VERIFY_ARE_EQUAL(inspect.Name, volumeName1);
-        VERIFY_ARE_EQUAL(inspect.Driver, std::string("vhd"));
-        VERIFY_IS_TRUE(inspect.DriverOpts.contains("SizeBytes"));
+        auto vhdInspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
+        VERIFY_ARE_EQUAL(vhdInspect.Name, vhdVolumeName);
+        VERIFY_ARE_EQUAL(vhdInspect.Driver, std::string("vhd"));
+        VERIFY_IS_TRUE(vhdInspect.DriverOpts.contains("SizeBytes"));
+
+        // Verify InspectVolume returns correct details for the guest volume (no driver opts).
+        output.reset();
+        VERIFY_SUCCEEDED(m_defaultSession->InspectVolume(guestVolumeName.c_str(), &output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        auto guestInspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
+        VERIFY_ARE_EQUAL(guestInspect.Name, guestVolumeName);
+        VERIFY_ARE_EQUAL(guestInspect.Driver, std::string("guest"));
+        VERIFY_IS_TRUE(guestInspect.DriverOpts.empty());
 
         // Verify InspectVolume fails for a non-existent volume.
         output.reset();
         VERIFY_ARE_EQUAL(m_defaultSession->InspectVolume("does-not-exist", &output), WSLC_E_VOLUME_NOT_FOUND);
 
-        // Delete first volume and verify list returns one entry.
-        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(volumeName1.c_str()));
+        // Delete the VHD volume and verify only the guest volume remains.
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(vhdVolumeName.c_str()));
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
-        VERIFY_ARE_EQUAL(std::string(volumes[0].Name), volumeName2);
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Name), guestVolumeName);
+        VERIFY_ARE_EQUAL(std::string(volumes[0].Driver), std::string("guest"));
     }
 
     WSLC_TEST_METHOD(NetworkCreateDeleteListTest)
