@@ -16,12 +16,14 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "Exceptions.h"
+#include "Localization.h"
 #include <charconv>
 #include <format>
 #include <unordered_map>
 #include <wslc.h>
 
 using namespace wsl::windows::common;
+using namespace wsl::shared;
 using namespace wsl::shared::string;
 
 namespace wsl::windows::wslc {
@@ -45,6 +47,17 @@ void Argument::Validate(const ArgMap& execArgs) const
     case ArgType::Volume:
         validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
+
+    case ArgType::WorkDir:
+    {
+        const auto& value = execArgs.Get<ArgType::WorkDir>();
+        if (value.empty() ||
+            std::all_of(value.begin(), value.end(), [](wchar_t c) { return std::iswspace(static_cast<wint_t>(c)); }))
+        {
+            throw ArgumentException(std::format(L"Invalid {} argument value: working directory cannot be empty or whitespace", m_name));
+        }
+        break;
+    }
 
     default:
         break;
@@ -121,13 +134,12 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
     // failure since we also know it failed to be found in the map.
     catch (ArgumentException)
     {
-        throw ArgumentException(std::format(
-            L"Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).", argName, input));
+        throw ArgumentException(Localization::WSLCCLI_InvalidSignalError(argName, input));
     }
 
     if (signalValue < MIN_SIGNAL || signalValue > MAX_SIGNAL)
     {
-        throw ArgumentException(std::format(L"Invalid {} value: {} is out of valid range ({}-{}).", argName, input, MIN_SIGNAL, MAX_SIGNAL));
+        throw ArgumentException(Localization::WSLCCLI_SignalOutOfRangeError(argName, input, MIN_SIGNAL, MAX_SIGNAL));
     }
 
     return static_cast<WSLCSignal>(signalValue);
@@ -155,6 +167,27 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
     {
         throw ArgumentException(std::format(
             L"Invalid {} value: {} is not a recognized format type. Supported format types are: json, table.", argName, input));
+    }
+}
+
+InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (IsEqual(input, L"image"))
+    {
+        return InspectType::Image;
+    }
+    else if (IsEqual(input, L"container"))
+    {
+        return InspectType::Container;
+    }
+    else if (IsEqual(input, L"volume"))
+    {
+        return InspectType::Volume;
+    }
+    else
+    {
+        constexpr std::wstring_view supportedValues = L"image, container, volume";
+        throw ArgumentException(Localization::WSLCCLI_InvalidInspectError(argName, input, supportedValues));
     }
 }
 

@@ -10,6 +10,6 @@ set(SOURCES
 set_source_files_properties(${SOURCES} PROPERTIES GENERATED TRUE)
 
 add_library(wslserviceproxystub SHARED ${SOURCES})
-add_dependencies(wslserviceproxystub wslserviceidl wslcidl)
+add_dependencies(wslserviceproxystub wslserviceidl)
 target_link_libraries(wslserviceproxystub ${COMMON_LINK_LIBRARIES})
 set_target_properties(wslserviceproxystub PROPERTIES FOLDER windows)

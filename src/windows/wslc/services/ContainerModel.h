@@ -38,7 +38,12 @@ struct ContainerOptions
     bool TTY = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
+    std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
+    std::optional<std::string> User{};
+    std::optional<std::string> Hostname{};
+    std::optional<std::string> Domainname{};
+    std::vector<std::string> Tmpfs;
 };
 
 struct CreateContainerResult
@@ -59,6 +64,16 @@ struct KillContainerOptions
     int Signal = WSLCSignalSIGKILL;
 };
 
+struct PortInformation
+{
+    uint16_t HostPort{};
+    uint16_t ContainerPort{};
+    int Protocol{}; // IP protocol number (e.g., IPPROTO_TCP or IPPROTO_UDP)
+    std::string BindingAddress;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(PortInformation, HostPort, ContainerPort, Protocol, BindingAddress);
+};
+
 struct ContainerInformation
 {
     std::string Id;
@@ -67,8 +82,9 @@ struct ContainerInformation
     WSLCContainerState State;
     ULONGLONG StateChangedAt{};
     ULONGLONG CreatedAt{};
+    std::vector<PortInformation> Ports;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ContainerInformation, Id, Name, Image, State, StateChangedAt, CreatedAt, Ports);
 };
 
 struct EnvironmentVariable
@@ -210,9 +226,9 @@ private:
 
 struct VolumeMount
 {
-    std::wstring HostPath() const
+    std::wstring Host() const
     {
-        return m_hostPath;
+        return m_host;
     }
 
     std::string ContainerPath() const
@@ -224,12 +240,21 @@ struct VolumeMount
     {
         return m_isReadOnlyMode;
     }
+
+    bool IsNamedVolume() const
+    {
+        return m_isNamedVolume;
+    }
+
+    static bool IsValidNamedVolumeName(const std::wstring& name);
+
     static VolumeMount Parse(const std::wstring& value);
 
 private:
-    std::wstring m_hostPath;
+    std::wstring m_host;
     std::string m_containerPath;
     bool m_isReadOnlyMode = false;
+    bool m_isNamedVolume = false;
 
     static bool IsReadOnlyMode(const std::wstring& mode)
     {
@@ -240,5 +265,22 @@ private:
     {
         return IsReadOnlyMode(mode) || mode == L"rw";
     }
+};
+
+struct TmpfsMount
+{
+    std::string ContainerPath() const
+    {
+        return m_containerPath;
+    }
+    std::string Options() const
+    {
+        return m_options;
+    }
+    static TmpfsMount Parse(const std::string& value);
+
+private:
+    std::string m_containerPath;
+    std::string m_options;
 };
 } // namespace wsl::windows::wslc::models

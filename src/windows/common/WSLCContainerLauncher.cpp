@@ -11,6 +11,8 @@ Abstract:
     This file contains the implementation for WSLCContainerLauncher.
 
 --*/
+
+#include "precomp.h"
 #include "WSLCContainerLauncher.h"
 
 using wsl::windows::common::ClientRunningWSLCProcess;
@@ -37,7 +39,7 @@ void RunningWSLCContainer::Reset()
     if (m_container && m_deleteOnClose)
     {
         // Attempt to stop and delete the container.
-        LOG_IF_FAILED(m_container->Delete(WSLCDeleteFlagsForce));
+        LOG_IF_FAILED(m_container->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
     }
 
     m_container.reset();
@@ -94,13 +96,27 @@ void WSLCContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort
 {
     THROW_HR_IF(E_INVALIDARG, Family != AF_INET && Family != AF_INET6);
 
-    auto& inserted = m_bindingAddressStorage.emplace_back(BindingAddress.value_or(Family == AF_INET ? "127.0.0.1" : "::1"));
-    m_ports.emplace_back(WSLCPortMapping{
+    WSLCPortMapping port{
         .HostPort = WindowsPort,
         .ContainerPort = ContainerPort,
         .Family = Family,
         .Protocol = Protocol,
-        .BindingAddress = inserted.c_str()});
+    };
+
+    if (BindingAddress.has_value())
+    {
+        THROW_HR_IF(E_INVALIDARG, BindingAddress->size() > WSLC_MAX_BINDING_ADDRESS_LENGTH);
+        THROW_HR_IF_MSG(
+            E_INVALIDARG, strcpy_s(port.BindingAddress, BindingAddress->c_str()) != 0, "Invalid address: %hs", BindingAddress->c_str());
+    }
+    else
+    {
+        static_assert(sizeof("127.0.0.1") <= WSLC_MAX_BINDING_ADDRESS_LENGTH + 1, "Default IPv4 binding address too long");
+        static_assert(sizeof("::1") <= WSLC_MAX_BINDING_ADDRESS_LENGTH + 1, "Default IPv6 binding address too long");
+        THROW_HR_IF(E_INVALIDARG, strcpy_s(port.BindingAddress, Family == AF_INET ? "127.0.0.1" : "::1") != 0);
+    }
+
+    m_ports.push_back(port);
 }
 
 void WSLCContainerLauncher::SetName(std::string&& Name)

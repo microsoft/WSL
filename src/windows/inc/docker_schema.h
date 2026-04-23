@@ -48,9 +48,50 @@ struct EmptyRequest
     using TResponse = void;
 };
 
+struct AuthRequest
+{
+    using TResponse = struct AuthResponse;
+
+    std::string username;
+    std::string password;
+    std::string serveraddress;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(AuthRequest, username, password, serveraddress);
+};
+
+struct AuthResponse
+{
+    std::string Status;
+    std::optional<std::string> IdentityToken;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AuthResponse, Status, IdentityToken);
+};
+
+struct VolumeUsageData
+{
+    int64_t Size{-1};
+    int64_t RefCount{-1};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VolumeUsageData, Size, RefCount);
+};
+
+struct Volume
+{
+    std::string Name;
+    std::string Driver;
+    std::string Mountpoint;
+    std::string CreatedAt;
+    std::optional<std::map<std::string, std::string>> Options;
+    std::optional<std::map<std::string, std::string>> Labels;
+    std::optional<std::map<std::string, std::string>> Status;
+    std::optional<VolumeUsageData> UsageData;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, CreatedAt, Options, Labels, Status, UsageData);
+};
+
 struct CreateVolume
 {
-    using TResponse = void;
+    using TResponse = Volume;
 
     std::string Name;
     std::string Driver;
@@ -60,22 +101,61 @@ struct CreateVolume
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateVolume, Name, Driver, DriverOpts, Labels);
 };
 
-struct Volume
-{
-    std::string Name;
-    std::string Driver;
-    std::string Mountpoint;
-    std::map<std::string, std::string> Options;
-    std::map<std::string, std::string> Labels;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Volume, Name, Driver, Mountpoint, Options, Labels);
-};
-
 struct ListVolumesResponse
 {
     std::vector<Volume> Volumes;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ListVolumesResponse, Volumes);
+};
+
+struct IPAMConfig
+{
+    std::string Subnet;
+    std::string Gateway;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAMConfig, Subnet, Gateway);
+};
+
+struct IPAM
+{
+    std::string Driver;
+    std::optional<std::vector<IPAMConfig>> Config;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(IPAM, Driver, Config);
+};
+
+struct CreateNetworkResponse
+{
+    std::string Id;
+    std::string Warning;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetworkResponse, Id, Warning);
+};
+
+struct CreateNetwork
+{
+    using TResponse = CreateNetworkResponse;
+
+    std::string Name;
+    std::string Driver;
+    bool Internal{};
+    std::optional<IPAM> IPAM;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetwork, Name, Driver, Internal, IPAM, Labels);
+};
+
+struct Network
+{
+    std::string Id;
+    std::string Name;
+    std::string Driver;
+    std::string Scope;
+    bool Internal{};
+    IPAM IPAM;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Network, Id, Name, Driver, Scope, Internal, IPAM, Labels);
 };
 
 struct EmptyObject
@@ -145,8 +225,8 @@ struct CreateContainer
     std::string Domainname;
     std::optional<std::string> StopSignal;
     std::optional<std::string> WorkingDir;
-    std::vector<std::string> Cmd;
-    std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
     std::map<std::string, std::string> Labels;
@@ -206,34 +286,6 @@ struct InspectExec
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectExec, Pid, ExitCode, Running);
 };
 
-struct PruneContainerLabelFilter
-{
-    std::map<std::string, bool> presentLabels;
-    std::map<std::string, bool> absentLabels;
-    std::optional<std::uint64_t> until;
-};
-
-inline void to_json(nlohmann::json& j, const PruneContainerLabelFilter& object)
-{
-    j = nlohmann::json{};
-    if (!object.presentLabels.empty())
-    {
-        j["label"] = object.presentLabels;
-    }
-
-    if (!object.absentLabels.empty())
-    {
-        j["label!"] = object.absentLabels;
-    }
-
-    // This is required because docker crashes if 'until' is null.
-    // TODO: Open a PR to fix this directly in moby.
-    if (object.until.has_value())
-    {
-        j["until"] = nlohmann::json{{std::to_string(object.until.value()), true}};
-    }
-}
-
 struct PruneContainerResult
 {
     std::optional<std::vector<std::string>> ContainersDeleted; // Null if no containers were deleted.
@@ -260,6 +312,14 @@ struct DeletedImage
     std::string Deleted;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeletedImage, Untagged, Deleted);
+};
+
+struct PruneImageResult
+{
+    std::optional<std::vector<DeletedImage>> ImagesDeleted;
+    uint64_t SpaceReclaimed{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PruneImageResult, ImagesDeleted, SpaceReclaimed);
 };
 
 struct ImportStatus

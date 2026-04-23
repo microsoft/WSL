@@ -44,8 +44,8 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
     {
     case ArgumentSet::Run:
         return {
-            Argument::Create(ArgType::ContainerId, true), // Required positional argument
-            Argument::Create(ArgType::Command, false),    // Optional positional argument
+            Argument::Create(ArgType::ImageId, true),  // Required positional argument
+            Argument::Create(ArgType::Command, false), // Optional positional argument
             Argument::Create(ArgType::ForwardArgs, false),
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Interactive),
@@ -75,43 +75,51 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
 // clang-format off
 #define WSLC_PARSER_TEST_CASES \
 /* Simple case with required arg and simple other args */ \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -h)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose cont1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -?)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose image1)") \
 \
 /* Value tests, flag and non-flag, multi-value */ \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --publish=80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --publish 80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 -p 443:443 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 -p=443:443 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --verbose --verbose cont1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --publish=80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --publish 80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 -p 443:443 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 -p=443:443 image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --verbose --verbose image1)") \
 \
 /* Flag parse tests */ \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -v cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -vi cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -ivp- cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -piv cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -piv=80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -piv 80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -ivp 80:80 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -ivp=80:80 cont1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -? image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -?i image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -i?p- image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi?=80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? 80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p 80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p=80:80 image1)") \
 \
 /* Validation tests */ \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal 9 cont1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -t blah)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -t 5)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal 9 image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -t blah image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -t 5 image1)") \
 \
 /* Multi-positional tests */ \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1 command)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1 command --f -z forward hello world)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1 command forward hello world)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1 command forward"hello world")") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1 command f="hello world" forward echo)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc cont1 -v command f="hello world" forward echo)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1 \\command\\?"" --f -z forward hello world)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command --f -z forward hello world)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command forward hello world)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command forward"hello world")") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 command f="hello world" forward echo)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose image1 command f="hello world" forward echo)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc image1 \\command\\?"" --f -z forward hello world)") \
+\
+/* Once the image name is parsed, the next token becomes the optional <command> positional \
+ * and everything after that goes into ForwardArgs. Neither <command> nor ForwardArgs are  \
+ * interpreted as wslc options. The second case uses '\' + newline between tokens, which   \
+ * CommandLineToArgvW passes through as literal '\' tokens that the container shell        \
+ * handles correctly. */ \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc jrottenberg/ffmpeg:4.4-alpine ffmpeg -i http://url/to/media.mp4 -stats)") \
+WSLC_PARSER_TEST_CASE(Run, true, L"wslc jrottenberg/ffmpeg:4.4-alpine \\\nffmpeg \\\n-i http://url/to/media.mp4 \\\n-stats") \
 \
 /* List cases with multiple args and flags that can come after the optional multi-positional. */ \
 WSLC_PARSER_TEST_CASE(List, true, LR"(wslc)") \

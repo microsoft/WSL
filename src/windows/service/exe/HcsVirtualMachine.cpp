@@ -43,7 +43,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
-    m_featureFlags = static_cast<WSLCFeatureFlags>(Settings->FeatureFlags);
+    m_featureFlags = Settings->FeatureFlags;
     m_networkingMode = Settings->NetworkingMode;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
 
@@ -110,10 +110,11 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
+    // N.B. 'DmesgOutput' needs to be duplicated since COM will close it when this call completes.
     wil::unique_handle dmesgOutputHandle;
-    if (Settings->DmesgOutput != 0)
+    if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
     {
-        dmesgOutputHandle.reset(wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Settings->DmesgOutput)));
+        dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
     m_dmesgCollector = DmesgCollector::Create(
@@ -368,11 +369,17 @@ try
     if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
         THROW_HR_IF(E_INVALIDARG, DnsSocket == nullptr);
-        THROW_HR_IF_MSG(
-            E_NOTIMPL, m_networkingMode == WSLCNetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
 
-        THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
-        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
+        const auto result = wsl::core::networking::DnsResolver::LoadDnsResolverMethods();
+        if (FAILED(result))
+        {
+            LOG_HR_MSG(result, "Failed to load DNS resolver methods, DNS tunneling will be disabled");
+            WI_ClearFlag(m_featureFlags, WslcFeatureFlagsDnsTunneling);
+        }
+        else
+        {
+            dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
+        }
     }
     else
     {
@@ -382,34 +389,41 @@ try
     if (m_networkingMode == WSLCNetworkingModeNAT)
     {
         // TODO: refactor this to avoid using wsl config
-        wsl::core::Config config(nullptr);
-        if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(config))
+        m_natConfig.emplace(nullptr);
+        if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(*m_natConfig))
         {
-            config.FirewallConfig.reset();
+            m_natConfig->FirewallConfig.reset();
         }
 
         // Enable DNS tunneling if a DNS socket was provided
         if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
-            config.EnableDnsTunneling = true;
+            WI_ASSERT(dnsSocketHandle);
+
+            m_natConfig->EnableDnsTunneling = true;
             in_addr address{};
             WI_VERIFY(inet_pton(AF_INET, LX_INIT_DNS_TUNNELING_IP_ADDRESS, &address) == 1);
-            config.DnsTunnelingIpAddress = address.S_un.S_addr;
+            m_natConfig->DnsTunnelingIpAddress = address.S_un.S_addr;
         }
 
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
-            wsl::core::NatNetworking::CreateNetwork(config),
+            wsl::core::NatNetworking::CreateNetwork(*m_natConfig),
             wsl::core::GnsChannel(std::move(gnsSocketHandle)),
-            config,
+            *m_natConfig,
             std::move(dnsSocketHandle),
             nullptr);
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
         wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
+        if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
+        {
+            WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunnelingSocket);
+        }
+
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, std::move(dnsSocketHandle));
     }
     else
     {

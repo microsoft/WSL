@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 // Container Remove Command
@@ -34,12 +35,12 @@ std::vector<Argument> ContainerRemoveCommand::GetArguments() const
 
 std::wstring ContainerRemoveCommand::ShortDescription() const
 {
-    return {L"Remove containers."};
+    return Localization::WSLCCLI_ContainerRemoveDesc();
 }
 
 std::wstring ContainerRemoveCommand::LongDescription() const
 {
-    return {L"Removes containers."};
+    return Localization::WSLCCLI_ContainerRemoveLongDesc();
 }
 
 void ContainerRemoveCommand::ExecuteInternal(CLIExecutionContext& context) const

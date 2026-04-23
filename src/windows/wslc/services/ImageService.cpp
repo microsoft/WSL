@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "ImageService.h"
+#include "RegistryService.h"
 #include "SessionService.h"
 #include <wslutil.h>
 #include <HandleConsoleProgressBar.h>
@@ -63,6 +64,13 @@ wil::unique_hfile ResolveBuildFile(const std::filesystem::path& contextPath)
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcBuildFileNotFound(contextPath));
 }
 
+std::string GetServerFromImage(const std::string& image)
+{
+    auto [repo, tag] = wsl::windows::common::wslutil::ParseImage(image);
+    auto [server, path] = wsl::windows::common::wslutil::NormalizeRepo(repo);
+    return server;
+}
+
 } // namespace
 
 namespace wsl::windows::wslc::services {
@@ -76,7 +84,8 @@ void ImageService::Build(
     const std::vector<std::wstring>& tags,
     const std::vector<std::wstring>& buildArgs,
     const std::wstring& dockerfilePath,
-    bool verbose,
+    const std::wstring& target,
+    WSLCBuildImageFlags flags,
     IProgressCallback* callback,
     HANDLE cancelEvent)
 {
@@ -122,13 +131,16 @@ void ImageService::Build(
     std::vector<LPCSTR> buildArgPointers;
     toMultiByte(buildArgs, buildArgStrings, buildArgPointers);
 
+    auto targetStr = wsl::windows::common::string::WideToMultiByte(target);
+
     auto contextPathStr = absolutePath.wstring();
     WSLCBuildImageOptions options{
         .ContextPath = contextPathStr.c_str(),
         .DockerfileHandle = ToCOMInputHandle(dockerfileHandle),
         .Tags = {tagPointers.data(), static_cast<ULONG>(tagPointers.size())},
         .BuildArgs = {buildArgPointers.data(), static_cast<ULONG>(buildArgPointers.size())},
-        .Verbose = verbose,
+        .Target = targetStr.empty() ? nullptr : targetStr.c_str(),
+        .Flags = flags,
     };
 
     THROW_IF_FAILED(session.Get()->BuildImage(&options, callback, cancelEvent));
@@ -145,7 +157,18 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
     {
         const WSLCImageInformation& image = *ptr;
         ImageInformation info{};
-        info.Name = image.Image;
+
+        // Parse the image reference — dangling images have no repo/tag
+        std::string imageRef = image.Image;
+        if (imageRef != "<none>:<none>")
+        {
+            auto parsed = wsl::windows::common::wslutil::ParseImage(imageRef);
+            info.Repository = parsed.first;
+            info.Tag = parsed.second;
+        }
+
+        info.Id = image.Hash;
+        info.Created = image.Created;
         info.Size = image.Size;
         result.push_back(info);
     }
@@ -185,7 +208,26 @@ void ImageService::Delete(wsl::windows::wslc::models::Session& session, const st
 
 void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
+    auto server = GetServerFromImage(image);
+    auto auth = RegistryService::Get(server);
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), auth.c_str(), callback));
+}
+
+void ImageService::Tag(wsl::windows::wslc::models::Session& session, const std::string& sourceImage, const std::string& targetImage)
+{
+    EnumReferenceFormat format;
+    auto [repo, tag] = ParseImage(targetImage, &format);
+    if (format == EnumReferenceFormat::Digest)
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcTagImageInvalidFormat(targetImage.c_str()));
+    }
+
+    WSLCTagImageOptions options{};
+    options.Image = sourceImage.c_str();
+    options.Repo = repo.c_str();
+    options.Tag = tag ? tag->c_str() : "";
+
+    THROW_IF_FAILED(session.Get()->TagImage(&options));
 }
 
 InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session, const std::string& image)
@@ -195,8 +237,11 @@ InspectImage ImageService::Inspect(wsl::windows::wslc::models::Session& session,
     return wsl::shared::FromJson<InspectImage>(inspectData.get());
 }
 
-void ImageService::Push()
+void ImageService::Push(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
+    auto server = GetServerFromImage(image);
+    auto auth = RegistryService::Get(server);
+    THROW_IF_FAILED(session.Get()->PushImage(image.c_str(), auth.c_str(), callback));
 }
 
 void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, const std::wstring& output, HANDLE cancelEvent)
@@ -205,16 +250,42 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
         CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!outputFile);
 
+    Save(session, image, outputFile.get(), cancelEvent);
+}
+
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent)
+{
     wsl::windows::common::HandleConsoleProgressBar progressBar(
-        outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
-    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
+        outputHandle, L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), image.c_str(), nullptr, cancelEvent));
 }
 
-void ImageService::Tag()
+wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
 {
-}
+    WSLCPruneImagesOptions options{};
+    if (all)
+    {
+        WI_SetFlag(options.Flags, WSLCPruneImagesFlagsDanglingFalse);
+    }
 
-void ImageService::Prune()
-{
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+    ULONGLONG spaceReclaimed = 0;
+    THROW_IF_FAILED(session.Get()->PruneImages(&options, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
+
+    wsl::windows::wslc::models::PruneImagesResult result;
+    result.SpaceReclaimed = spaceReclaimed;
+    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    {
+        if (ptr->Type == WSLCDeletedImageTypeDeleted)
+        {
+            result.DeletedImages.push_back(ptr->Image);
+        }
+        else
+        {
+            result.UntaggedImages.push_back(ptr->Image);
+        }
+    }
+
+    return result;
 }
 } // namespace wsl::windows::wslc::services

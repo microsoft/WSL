@@ -19,6 +19,7 @@ set(SOURCES
 
     # Volume management
     WSLCVhdVolume.cpp
+    WSLCGuestVolume.cpp
 
     # Supporting classes
     ContainerEventTracker.cpp
@@ -42,10 +43,12 @@ set(HEADERS
     WSLCSessionReference.h
     WSLCVirtualMachine.h
     WSLCVhdVolume.h
+    WSLCGuestVolume.h
+    IWSLCVolume.h
     WSLCVolumeMetadata.h)
 
 add_executable(wslcsession WIN32 ${SOURCES} ${HEADERS})
-add_dependencies(wslcsession wslcidl)
+add_dependencies(wslcsession wslserviceidl)
 add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
 target_link_libraries(wslcsession

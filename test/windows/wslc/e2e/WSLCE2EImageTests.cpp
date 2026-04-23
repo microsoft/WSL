@@ -15,30 +15,29 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
+#include "Argument.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EImageTests
 {
     WSLC_TEST_CLASS(WSLCE2EImageTests)
 
-    TEST_METHOD(WSLCE2E_Image_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Image_HelpCommand)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"image --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_NoSubcommand_ShowsHelp)
+    WSLC_TEST_METHOD(WSLCE2E_Image_NoSubcommand_ShowsHelp)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"image");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Image_InvalidCommand_DisplaysErrorMessage)
+    WSLC_TEST_METHOD(WSLCE2E_Image_InvalidCommand_DisplaysErrorMessage)
     {
-        WSL2_TEST_ONLY();
         auto result = RunWslc(L"image INVALID_CMD");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
@@ -57,7 +56,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Image command.\r\n\r\n";
+        return Localization::WSLCCLI_ImageCommandLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -67,18 +66,32 @@ private:
 
     std::wstring GetAvailableCommands() const
     {
+        std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
+            {L"build", Localization::WSLCCLI_ImageBuildDesc()},
+            {L"remove", Localization::WSLCCLI_ImageRemoveDesc()},
+            {L"inspect", Localization::WSLCCLI_ImageInspectDesc()},
+            {L"list", Localization::WSLCCLI_ImageListDesc()},
+            {L"load", Localization::WSLCCLI_ImageLoadDesc()},
+            {L"prune", Localization::WSLCCLI_ImagePruneDesc()},
+            {L"pull", Localization::WSLCCLI_ImagePullDesc()},
+            {L"push", Localization::WSLCCLI_ImagePushDesc()},
+            {L"save", Localization::WSLCCLI_ImageSaveDesc()},
+            {L"tag", Localization::WSLCCLI_ImageTagDesc()},
+        };
+
+        size_t maxLen = 0;
+        for (const auto& [name, _] : entries)
+        {
+            maxLen = (std::max)(maxLen, name.size());
+        }
+
         std::wstringstream commands;
-        commands << L"The following sub-commands are available:\r\n"
-                 << L"  build    Build an image from a Dockerfile.\r\n"
-                 << L"  remove   Remove images.\r\n"
-                 << L"  inspect  Inspect images.\r\n"
-                 << L"  list     List images.\r\n"
-                 << L"  load     Load images.\r\n"
-                 << L"  pull     Pull images.\r\n"
-                 << L"  save     Save images.\r\n"
-                 << L"\r\n"
-                 << L"For more details on a specific command, pass it the help argument. [-h]\r\n"
-                 << L"\r\n";
+        commands << Localization::WSLCCLI_AvailableSubcommands() << L"\r\n";
+        for (const auto& [name, desc] : entries)
+        {
+            commands << L"  " << name << std::wstring(maxLen - name.size() + 2, L' ') << desc << L"\r\n";
+        }
+        commands << L"\r\n" << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L"]\r\n" << L"\r\n";
         return commands.str();
     }
 
@@ -86,7 +99,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n"
-                << L"  -h,--help  Shows help about the selected command\r\n"
+                << L"  -?,--help  Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

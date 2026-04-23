@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    PullImageCallback.h
+    ImageProgressCallback.h
 
 Abstract:
 
-    This file contains the PullImageCallback definition
+    This file contains the ImageProgressCallback definition
 
 --*/
 #pragma once
@@ -35,7 +35,7 @@ private:
 };
 
 // TODO: Handle terminal resizes.
-class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") PullImageCallback
+class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") ImageProgressCallback
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
 {
 public:

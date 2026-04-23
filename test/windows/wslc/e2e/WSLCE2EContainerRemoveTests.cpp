@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EContainerRemoveTests
 {
@@ -43,26 +44,25 @@ class WSLCE2EContainerRemoveTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Remove_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"container remove --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Remove_NotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_NotFound)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container remove {}", WslcContainerName));
-        result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stdout = L"",
+             .Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+             .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Remove_Valid)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Valid)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
@@ -81,9 +81,8 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Remove_ById_Valid)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_ById_Valid)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
@@ -100,9 +99,8 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Remove_Force_RunningContainer)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Force_RunningContainer)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
 
         // Run a container so it is in running state
@@ -131,9 +129,8 @@ class WSLCE2EContainerRemoveTests
         VerifyContainerIsNotListed(WslcContainerName);
     }
 
-    TEST_METHOD(WSLCE2E_Container_Remove_Multiple_Valid)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Remove_Multiple_Valid)
     {
-        WSL2_TEST_ONLY();
         VerifyContainerIsNotListed(WslcContainerName);
         VerifyContainerIsNotListed(WslcContainerName2);
 
@@ -178,7 +175,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Removes containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerRemoveLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -204,7 +201,7 @@ private:
         options << L"The following options are available:\r\n" //
                 << L"  -f,--force      Delete containers even if they are running\r\n"
                 << L"  --session       Specify the session to use\r\n"
-                << L"  -h,--help       Shows help about the selected command\r\n"
+                << L"  -?,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

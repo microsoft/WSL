@@ -46,7 +46,9 @@ extends:
     - template: build-stage.yml@self
       parameters:
         isRelease: false
+        includePackageStage: false
 
     - template: test-stage.yml@self
       parameters:
+        includePackageStage: false
         rs_prerelease_only: true

@@ -17,6 +17,7 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 
 namespace WSLCE2ETests {
+using namespace wsl::shared;
 
 class WSLCE2EContainerStopTests
 {
@@ -43,18 +44,14 @@ class WSLCE2EContainerStopTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_HelpCommand)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_HelpCommand)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(L"container stop --help");
         result.Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignal)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignal)
     {
-        WSL2_TEST_ONLY();
-
         auto result = RunWslc(std::format(L"container run --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -69,10 +66,8 @@ class WSLCE2EContainerStopTests
         }
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_KillsRunningContainer)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_KillsRunningContainer)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -90,10 +85,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_ByName)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_ByName)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -111,20 +104,37 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_NotFound)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_AlreadyStopped)
     {
-        WSL2_TEST_ONLY();
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
 
+        // Stop the container
+        result = RunWslc(std::format(L"container stop {} -t 0", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyContainerIsListed(containerId, L"exited");
+
+        // Stop again - should succeed without error
+        result = RunWslc(std::format(L"container stop {} -t 0", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyContainerIsListed(containerId, L"exited");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_NotFound)
+    {
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container stop {} -t 0", WslcContainerName));
-        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+             .ExitCode = 1});
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_TargetedContainerOnly)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_TargetedContainerOnly)
     {
-        WSL2_TEST_ONLY();
-
         // Run first container in background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -150,10 +160,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(secondContainerId, L"running");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_SignalByName)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_SignalByName)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -171,10 +179,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"exited");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignalName)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_InvalidSignalName)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -192,10 +198,8 @@ class WSLCE2EContainerStopTests
         VerifyContainerIsListed(containerId, L"running");
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_InvalidTimeout)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_InvalidTimeout)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -233,10 +237,8 @@ class WSLCE2EContainerStopTests
         }
     }
 
-    TEST_METHOD(WSLCE2E_Container_Stop_ValidTimeoutNegativeOne)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stop_ValidTimeoutNegativeOne)
     {
-        WSL2_TEST_ONLY();
-
         // Run a container in the background
         auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
@@ -272,7 +274,7 @@ private:
 
     std::wstring GetDescription() const
     {
-        return L"Stops containers.\r\n\r\n";
+        return Localization::WSLCCLI_ContainerStopLongDesc() + L"\r\n\r\n";
     }
 
     std::wstring GetUsage() const
@@ -294,7 +296,7 @@ private:
                 << L"  --session       Specify the session to use\r\n"
                 << L"  -s,--signal     Signal to send (default: SIGTERM)\r\n"
                 << L"  -t,--time       Time in seconds to wait before executing (default 5)\r\n"
-                << L"  -h,--help       Shows help about the selected command\r\n"
+                << L"  -?,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

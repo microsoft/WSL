@@ -58,6 +58,8 @@ class WSLCCLIParserUnitTests
 
         for (const auto& testCase : testCases)
         {
+            bool succeeded = false;
+
             try
             {
                 Log::Comment(String().Format(L"Testing: %ls", testCase.commandLine.c_str()));
@@ -73,16 +75,48 @@ class WSLCCLIParserUnitTests
                     stateMachine.ThrowIfError();
                 }
 
-                if (testCase.commandLine.find(L"cont1") != std::wstring::npos)
+                // Validate count limits and required arguments, mirroring Command::ValidateArguments.
+                // Skip all validation if --help is present, as Command::ValidateArguments does.
+                if (!args.Contains(ArgType::Help))
+                {
+                    for (const auto& arg : GetArgumentsForSet(testCase.argumentSet))
+                    {
+                        if (arg.Required() && !args.Contains(arg.Type()))
+                        {
+                            throw ArgumentException(std::wstring(L"Required argument missing: ") + arg.Name());
+                        }
+
+                        if ((arg.Limit() > 0) && (arg.Limit() < args.Count(arg.Type())))
+                        {
+                            throw ArgumentException(std::wstring(L"Too many values for argument: ") + arg.Name());
+                        }
+
+                        if (args.Contains(arg.Type()))
+                        {
+                            arg.Validate(args);
+                        }
+                    }
+                }
+
+                succeeded = true;
+
+                if (testCase.commandLine.find(L"image1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::Run)
+                {
+                    VERIFY_IS_TRUE(args.Contains(ArgType::ImageId));
+                    auto imageId = args.Get<ArgType::ImageId>();
+                    VERIFY_ARE_EQUAL(L"image1", imageId);
+                }
+
+                if (testCase.commandLine.find(L"cont1") != std::wstring::npos && testCase.argumentSet == ArgumentSet::List)
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ContainerId));
                     auto containerId = args.Get<ArgType::ContainerId>();
                     VERIFY_ARE_EQUAL(L"cont1", containerId);
                 }
 
-                if (testCase.commandLine.find(L"rm") != std::wstring::npos)
+                if (testCase.commandLine.find(L"--rm") != std::wstring::npos)
                 {
-                    // Ensure 'rm' was parsed wherever it was found.
+                    // Ensure '--rm' was parsed wherever it was found.
                     VERIFY_IS_TRUE(args.Contains(ArgType::Remove));
                 }
 
@@ -99,7 +133,7 @@ class WSLCCLIParserUnitTests
                     auto forwardArgs = args.Get<ArgType::ForwardArgs>();
                     std::wstring forwardArgsConcat = wsl::shared::string::Join(forwardArgs, L' ');
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"hello world") != std::wstring::npos); // Forward args should contain hello world
-                    VERIFY_IS_TRUE(forwardArgsConcat.find(L"cont1") == std::wstring::npos); // Forward args should not contain the containerId
+                    VERIFY_IS_TRUE(forwardArgsConcat.find(L"image1") == std::wstring::npos); // Forward args should not contain the imageId
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"command") == std::wstring::npos); // Forward args should not contain the command
                     LogComment(L"Forwarded Args: " + forwardArgsConcat);
                 }
@@ -134,6 +168,8 @@ class WSLCCLIParserUnitTests
                     Log::Comment(String().Format(L"Test case threw expected exception: %hs", ex.what()));
                 }
             }
+
+            VERIFY_ARE_EQUAL(testCase.expectedResult, succeeded, String().Format(L"Command line: %ls", testCase.commandLine.c_str()));
         }
     }
 };

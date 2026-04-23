@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    UserSettings.h
+    WSLCUserSettings.h
 
 Abstract:
 
@@ -40,8 +40,23 @@ enum class Setting : size_t
     SessionStorageSizeMb,
     SessionStoragePath,
     SessionNetworkingMode,
+    SessionHostFileShareMode,
+    SessionDnsTunneling,
+    CredentialStore,
 
     Max
+};
+
+enum class HostFileShareMode
+{
+    Plan9,
+    VirtioFs
+};
+
+enum class CredentialStoreType
+{
+    WinCred,
+    File
 };
 
 namespace details {
@@ -68,11 +83,14 @@ namespace details {
         static std::optional<value_t> Validate(const yaml_t& value);               \
     };
 
-    DEFINE_SETTING_MAPPING(SessionCpuCount,       uint32_t,    uint32_t,           4,                             "session.cpuCount")
-    DEFINE_SETTING_MAPPING(SessionMemoryMb,       std::string, uint32_t,           2048,                          "session.memorySize")
-    DEFINE_SETTING_MAPPING(SessionStorageSizeMb,  std::string, uint32_t,           102400,                        "session.maxStorageSize")
-    DEFINE_SETTING_MAPPING(SessionStoragePath,    std::string, std::wstring,       {},                            "session.defaultStoragePath")
-    DEFINE_SETTING_MAPPING(SessionNetworkingMode, std::string, WSLCNetworkingMode, WSLCNetworkingModeVirtioProxy, "session.networkingMode")
+    DEFINE_SETTING_MAPPING(SessionCpuCount,          uint32_t,    uint32_t,           4,                             "session.cpuCount")
+    DEFINE_SETTING_MAPPING(SessionMemoryMb,          std::string, uint32_t,           2048,                          "session.memorySize")
+    DEFINE_SETTING_MAPPING(SessionStorageSizeMb,     std::string, uint32_t,           102400,                        "session.maxStorageSize")
+    DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::wstring,       {},                            "session.defaultStoragePath")
+    DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode, WSLCNetworkingModeVirtioProxy, "session.networkingMode")
+    DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,  HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
+    DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,               true,                          "session.dnsTunneling")
+    DEFINE_SETTING_MAPPING(CredentialStore,            std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
 
 #undef DEFINE_SETTING_MAPPING
     // clang-format on
@@ -146,9 +164,7 @@ public:
     // Overwrites the settings file with the commented-out defaults template.
     void Reset() const;
 
-protected:
-    // Loads settings from an explicit directory. Used by the singleton (via
-    // the private zero-arg constructor) and by test subclasses.
+    // Loads settings from an explicit directory.
     explicit UserSettings(const std::filesystem::path& settingsDir);
     ~UserSettings() = default;
 

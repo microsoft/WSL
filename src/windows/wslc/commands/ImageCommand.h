@@ -146,11 +146,56 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Push Command
+struct ImagePushCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"push";
+    ImagePushCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Save Command
 struct ImageSaveCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"save";
     ImageSaveCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Tag Command
+struct ImageTagCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"tag";
+    ImageTagCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
+// Prune Command
+struct ImagePruneCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"prune";
+    ImagePruneCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

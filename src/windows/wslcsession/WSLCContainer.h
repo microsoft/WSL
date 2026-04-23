@@ -93,6 +93,7 @@ public:
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
     WSLCContainerState State() const noexcept;
+    std::vector<WSLCPortMapping> GetPorts() const;
 
     __requires_lock_held(m_lock) void Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt = std::nullopt) noexcept;
 
@@ -111,7 +112,7 @@ public:
         const WSLCContainerOptions& Options,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
-        const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& SessionVolumes,
+        const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& SessionVolumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -121,7 +122,8 @@ public:
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
-        const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+        const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
+        const std::unordered_set<std::string>& anonymousVolumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,

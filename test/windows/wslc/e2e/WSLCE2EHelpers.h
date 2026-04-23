@@ -18,6 +18,7 @@ Abstract:
 #include <chrono>
 #include <wslc_schema.h>
 #include <ContainerModel.h>
+#include <WSLCContainerLauncher.h>
 
 namespace WSLCE2ETests {
 
@@ -37,8 +38,6 @@ namespace VT {
 
     // Prompt patterns used in WSLC.
     constexpr auto SESSION_PROMPT = VT_B_START VT_RED "root@ [ " VT_RESET "/" VT_RED " ]# ";
-    constexpr auto CONTAINER_PROMPT = VT_B_START "root@:/# ";
-    constexpr auto CONTAINER_ATTACH_PROMPT = VT_CR VT_ERASE_LINE VT_CR "root@:/# ";
 
     // Constexpr representations of the control sequences for use in tests.
     constexpr auto B_START = VT_B_START;
@@ -56,29 +55,20 @@ namespace VT {
 #undef VT_ERASE_LINE
 #undef VT_CR
 
-    // Helper function to build container prompt with container ID (first 12 chars)
-    // Example: root@2a88a6f4b7c8:/#
-    inline std::string BuildContainerPrompt(const std::string& containerId, bool withBracketedPaste = true)
+    // Helper function to build container prompt
+    inline std::string BuildContainerPrompt(const std::string& prompt, bool withBracketedPaste = true)
     {
-        const std::string shortId = containerId.substr(0, 12);
         if (withBracketedPaste)
         {
-            return std::format("{}root@{}:/# ", B_START, shortId);
+            return std::format("{}{}", B_START, prompt);
         }
-        return std::format("root@{}:/# ", shortId);
+        return std::format("{}", prompt);
     }
 
-    // Helper function to build container prompt by inspecting the container
-    std::string InspectAndBuildContainerPrompt(const std::wstring& containerNameOrId, bool withBracketedPaste = true);
-
-    inline std::string BuildContainerAttachPrompt(const std::string& containerId)
+    inline std::string BuildContainerAttachPrompt(const std::string& prompt)
     {
-        const std::string shortId = containerId.substr(0, 12);
-        return std::format("{}{}{}root@{}:/# ", CR, ERASE_LINE, CR, shortId);
+        return std::format("{}{}{}{}", CR, ERASE_LINE, CR, prompt);
     }
-
-    // Helper function to build container attach prompt by inspecting the container
-    std::string InspectAndBuildContainerAttachPrompt(const std::wstring& containerNameOrId);
 } // namespace VT
 
 struct TestImage
@@ -130,10 +120,14 @@ private:
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status, const std::wstring& sessionName = L"");
 void VerifyImageIsUsed(const TestImage& image);
 void VerifyImageIsNotUsed(const TestImage& image);
+void VerifyImageIsListed(const TestImage& image);
+void VerifyVolumeIsListed(const std::wstring& volumeName);
+void VerifyVolumeIsNotListed(const std::wstring& volumeName);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
 wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
+wsl::windows::common::wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName);
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
@@ -141,6 +135,10 @@ void EnsureImageIsLoaded(const TestImage& image, const std::wstring& sessionName
 void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
+void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
+
+void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
+std::wstring GetPythonHttpServerScript(uint16_t port);
 
 // Default timeout of 0 will execute once.
 template <typename IntervalRep, typename IntervalPeriod, typename TimeoutRep, typename TimeoutPeriod>
@@ -187,4 +185,15 @@ inline void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
     VerifyContainerIsNotListed(containerNameOrId, std::chrono::milliseconds(0), std::chrono::milliseconds(0));
 }
+
+wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession();
+
+// Starts a local registry container with host networking using the COM API.
+// Returns the running container (holds it alive) and the registry address (e.g. "127.0.0.1:PORT").
+std::pair<wsl::windows::common::RunningWSLCContainer, std::string> StartLocalRegistry(
+    IWSLCSession& session, const std::string& username = "", const std::string& password = "", USHORT port = 5000);
+
+// Tags an image for a registry and returns the full registry image reference (e.g. "127.0.0.1:PORT/debian:latest").
+std::wstring TagImageForRegistry(const std::wstring& imageName, const std::wstring& registryAddress);
+
 } // namespace WSLCE2ETests

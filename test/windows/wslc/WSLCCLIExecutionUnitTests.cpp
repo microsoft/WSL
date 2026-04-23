@@ -20,6 +20,8 @@ Abstract:
 
 #include "Command.h"
 #include "RootCommand.h"
+#include "ContainerCommand.h"
+#include "ContainerTasks.h"
 
 using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
@@ -95,6 +97,12 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Images>(std::move(images));
                 handled = true;
             }
+            else if (dataType == Data::Volumes)
+            {
+                std::vector<WSLCVolumeInformation> volumes;
+                dataMap.Add<Data::Volumes>(std::move(volumes));
+                handled = true;
+            }
 
             if (!handled)
             {
@@ -114,6 +122,166 @@ class WSLCCLIExecutionUnitTests
 
         // Other more complex EnumVariantMap tests are in the Args unit tests.
         // This one will just verify all the data types in the Data Map work as expected.
+    }
+
+    // Test: SetContainerOptionsFromArgs sets WorkingDirectory when --workdir is provided
+    TEST_METHOD(SetContainerOptionsFromArgs_WithWorkDir_SetsWorkingDirectory)
+    {
+        CLIExecutionContext context;
+        context.Args.Add<ArgType::WorkDir>(std::wstring{L"/app"});
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
+    }
+
+    // Test: SetContainerOptionsFromArgs leaves WorkingDirectory empty when --workdir is not provided
+    TEST_METHOD(SetContainerOptionsFromArgs_WithoutWorkDir_WorkingDirectoryIsEmpty)
+    {
+        CLIExecutionContext context;
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.WorkingDirectory.empty());
+    }
+
+    // Test: Full parse of 'exec --workdir "" cont1 cmd' rejects empty working directory
+    TEST_METHOD(ExecCommand_ParseWorkDirEmptyValue_ThrowsArgumentException)
+    {
+        // Invoke ContainerExecCommand parsing directly with the subcommand arguments it accepts.
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir \"\" cont1 sh");
+
+        ContainerExecCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    // Test: Full parse of 'exec --workdir /path cont1 cmd' sets WorkingDirectory
+    TEST_METHOD(ExecCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
+    {
+        // Invoke ContainerExecCommand parsing directly with the subcommand arguments it accepts.
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir /tmp/mydir cont1 sh");
+
+        ContainerExecCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/tmp/mydir"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'exec -w /path cont1 cmd' (short alias) sets WorkingDirectory
+    TEST_METHOD(ExecCommand_ParseWorkDirShortOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc -w /app cont1 sh");
+
+        ContainerExecCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'run --workdir "" image cmd' rejects empty working directory
+    TEST_METHOD(RunCommand_ParseWorkDirEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir \"\" ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    // Test: Full parse of 'run --workdir /path image cmd' sets WorkingDirectory
+    TEST_METHOD(RunCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir /tmp/mydir ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/tmp/mydir"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'run -w /path image cmd' (short alias) sets WorkingDirectory
+    TEST_METHOD(RunCommand_ParseWorkDirShortOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc -w /app ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'create --workdir "" image cmd' rejects empty working directory
+    TEST_METHOD(CreateCommand_ParseWorkDirEmptyValue_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir \"\" ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    // Test: Full parse of 'create --workdir /path image cmd' sets WorkingDirectory
+    TEST_METHOD(CreateCommand_ParseWorkDirLongOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --workdir /tmp/mydir ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/tmp/mydir"), options.WorkingDirectory);
+    }
+
+    // Test: Full parse of 'create -w /path image cmd' (short alias) sets WorkingDirectory
+    TEST_METHOD(CreateCommand_ParseWorkDirShortOption_SetsWorkingDirectory)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc -w /app ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
     }
 
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
