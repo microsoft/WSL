@@ -603,6 +603,54 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Domainname)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --domainname my-test-domain {} dnsdomainname", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"my-test-domain\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSSearch)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns-search example.com --dns-search test.local {} cat /etc/resolv.conf",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"search example.com test.local") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSOption)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --dns-option ndots:5 --dns-option timeout:3 {} cat /etc/resolv.conf",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5 timeout:3") != std::wstring::npos);
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -662,6 +710,10 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
+                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
+                << L"  --dns-option      Set DNS options\r\n"
+                << L"  --dns-search      Set DNS search domains\r\n"
+                << L"  --domainname      Container domain name\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"

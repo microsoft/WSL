@@ -43,10 +43,11 @@ _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Force,          "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,         "detach",              L"d",              Kind::Flag,        Localization::WSLCCLI_DetachArgDescription()) \
-/*_(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSArgDescription())*/ \
+_(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSArgDescription()) \
 /*_(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSDomainArgDescription())*/ \
-/*_(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSOptionArgDescription())*/ \
-/*_(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSSearchArgDescription())*/ \
+_(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSOptionArgDescription()) \
+_(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSSearchArgDescription()) \
+_(Domainname,     "domainname",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DomainnameArgDescription()) \
 _(Driver,         "driver",              L"d",              Kind::Value,       Localization::WSLCCLI_DriverArgDescription("guest")) \
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EntrypointArgDescription()) \
 _(Env,            "env",                 L"e",              Kind::Value,       Localization::WSLCCLI_EnvArgDescription()) \
