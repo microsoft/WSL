@@ -35,7 +35,8 @@ Abstract:
 
 namespace wsl::shared {
 class SocketChannel;
-}
+class Transaction;
+} // namespace wsl::shared
 
 namespace wsl::linux {
 struct WslDistributionConfig;
@@ -322,4 +323,4 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
-int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<gsl::byte> Buffer);
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);

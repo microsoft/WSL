@@ -209,7 +209,8 @@ try
 {
     auto message = SockToRelayMessage(sock);
     message.Header.MessageType = LxGnsMessagePortListenerRelayStart;
-    channel.SendMessage(message);
+    auto transaction = channel.StartTransaction();
+    transaction.Send(message);
 
     return 0;
 }
@@ -220,7 +221,8 @@ try
 {
     auto message = SockToRelayMessage(sock);
     message.Header.MessageType = LxGnsMessagePortListenerRelayStop;
-    channel.SendMessage(message);
+    auto transaction = channel.StartTransaction();
+    transaction.Send(message);
 
     return 0;
 }

@@ -13,12 +13,41 @@
         },
         {
             "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/libarchive/libarchive",
+                    "commitHash": "b439d586f53911c84be5e380445a8a259e19114c"
+                }
+            }
+        },
+        {
+            "component": {
                 "type": "other",
                 "other": {
                     "name": "libarchive",
                     "version": "3.7.7",
                     "downloadUrl": "https://github.com/libarchive/libarchive/releases/download/v3.7.7/libarchive-3.7.7.tar.gz",
                     "hash": "sha1:918692098b11db61aff23684ab04f375e4a68f69"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/boostorg/boost",
+                    "commitHash": "1bed2b0712b2119f20d66c5053def9173c8462a5"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "boost",
+                    "version": "1.90.0",
+                    "downloadUrl": "https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz",
+                    "hash": "sha256:5e93d582aff26868d581a52ae78c7d8edf3f3064742c6e77901a1f18a437eea9"
                 }
             }
         },

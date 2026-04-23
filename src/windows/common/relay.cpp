@@ -341,7 +341,7 @@ bool wsl::windows::common::relay::InterruptableWait(_In_ HANDLE WaitObject, _In_
     const DWORD waitResult = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(waitObjects.size()), waitObjects.data(), FALSE, INFINITE);
     if (waitResult != WAIT_OBJECT_0)
     {
-        if (waitResult > WAIT_OBJECT_0 && waitResult <= WAIT_OBJECT_0 + waitObjects.size())
+        if (waitResult > WAIT_OBJECT_0 && waitResult < WAIT_OBJECT_0 + waitObjects.size())
         {
             return false;
         }
