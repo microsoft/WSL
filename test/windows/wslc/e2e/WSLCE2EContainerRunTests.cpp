@@ -575,8 +575,8 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNS)
     {
-        auto result = RunWslc(std::format(
-            L"container run --rm --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
+        auto result =
+            RunWslc(std::format(L"container run --rm --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
         VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
@@ -585,8 +585,7 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSSearch)
     {
         auto result = RunWslc(std::format(
-            L"container run --rm --dns-search example.com --dns-search test.local {} cat /etc/resolv.conf",
-            DebianImage.NameAndTag()));
+            L"container run --rm --dns-search example.com --dns-search test.local {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout->find(L"search example.com test.local") != std::wstring::npos);
     }
@@ -594,8 +593,7 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSOption)
     {
         auto result = RunWslc(std::format(
-            L"container run --rm --dns-option ndots:5 --dns-option timeout:3 {} cat /etc/resolv.conf",
-            DebianImage.NameAndTag()));
+            L"container run --rm --dns-option ndots:5 --dns-option timeout:3 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5 timeout:3") != std::wstring::npos);
     }

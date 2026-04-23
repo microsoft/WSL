@@ -616,9 +616,7 @@ class WSLCE2EContainerCreateTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNS)
     {
         auto result = RunWslc(std::format(
-            L"container create --name {} --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+            L"container create --name {} --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
