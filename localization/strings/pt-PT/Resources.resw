@@ -744,6 +744,11 @@ Para obter informações, visite https://aka.ms/wslinstall</value>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>A execução da shell de depuração requer a execução de wsl.exe como Administrador.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection está ativada e as suas distribuições podem ser registadas numa conta diferente.
+Para mais informações sobre Admin Protection, visite https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>O processo de instalação da distribuição "{}" falhou com o código de saída: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

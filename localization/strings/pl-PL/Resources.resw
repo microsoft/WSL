@@ -744,6 +744,11 @@ Aby uzyskać informacje, odwiedź stronę https://aka.ms/wslinstall</value>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>Uruchomienie powłoki debugowania wymaga uruchomienia programu wsl.exe jako administrator.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection jest włączona, a Twoje dystrybucje mogą być zarejestrowane na innym koncie.
+Więcej informacji na temat Admin Protection można znaleźć na stronie https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>Proces instalacji dystrybucji „{}” nie powiódł się. Kod zakończenia: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
