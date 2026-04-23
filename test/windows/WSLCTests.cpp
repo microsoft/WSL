@@ -5766,6 +5766,7 @@ class WSLCTests
             std::filesystem::remove_all(contextDir, ec);
         });
 
+        // TODO: Add test coverage for exposed UDP ports once supported.
         {
             std::ofstream dockerfile(contextDir / "Dockerfile");
             dockerfile << "FROM python:3.12-alpine\n";

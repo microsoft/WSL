@@ -66,7 +66,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-                    "Port mappingsspecific host IPs or UDP protocol are not currently supported");
+                    "Port mappings with specific host IPs or UDP protocol are not currently supported");
             }
         }
 

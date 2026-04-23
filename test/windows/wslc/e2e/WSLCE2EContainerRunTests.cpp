@@ -454,7 +454,7 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = L"Port mappingsspecific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n",
+            {.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n",
              .ExitCode = 1});
     }
 
@@ -463,7 +463,7 @@ class WSLCE2EContainerRunTests
     {
         auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
         result.Verify(
-            {.Stderr = L"Port mappingsspecific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n",
+            {.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n",
              .ExitCode = 1});
     }
 

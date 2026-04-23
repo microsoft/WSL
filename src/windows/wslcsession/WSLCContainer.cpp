@@ -83,12 +83,22 @@ std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
     auto slashPos = key.find('/');
     THROW_HR_IF_MSG(E_INVALIDARG, slashPos == std::string::npos, "Invalid exposed port format: %hs", key.c_str());
 
-    auto portNum = std::stoi(key.substr(0, slashPos));
-    THROW_HR_IF_MSG(E_INVALIDARG, portNum < 1 || portNum > 65535, "Exposed port out of range: %hs", key.c_str());
+    auto portStr = std::string_view(key.c_str(), slashPos);
+
+    uint16_t port{};
+    auto result = std::from_chars(portStr.data(), portStr.data() + portStr.size(), port);
+    if (result.ec != std::errc{} || result.ptr != portStr.data() + portStr.size() || port == 0)
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid port number in exposed port: %hs", key.c_str());
+    }
 
     auto protoStr = key.substr(slashPos + 1);
-    int protocol = IPPROTO_TCP;
-    if (protoStr == "udp")
+    int protocol{};
+    if (protoStr == "tcp")
+    {
+        protocol = IPPROTO_TCP;
+    }
+    else if (protoStr == "udp")
     {
         protocol = IPPROTO_UDP;
     }
@@ -97,7 +107,7 @@ std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
         THROW_HR_IF_MSG(E_INVALIDARG, protoStr != "tcp", "Unsupported protocol in exposed port: %hs", key.c_str());
     }
 
-    return {static_cast<uint16_t>(portNum), protocol};
+    return {static_cast<uint16_t>(port), protocol};
 }
 
 // Temporary solution to allocate an ephemeral port.
