@@ -49,8 +49,7 @@ const char* Basename(const char* Path) noexcept
 }
 } // namespace
 
-SlowOperationWatcher::SlowOperationWatcher(
-    _In_z_ const char* Name, std::chrono::milliseconds SlowThreshold, std::source_location Location) :
+SlowOperationWatcher::SlowOperationWatcher(_In_z_ const char* Name, std::chrono::milliseconds SlowThreshold, std::source_location Location) :
     m_name(Name), m_slowThreshold(SlowThreshold), m_location(Location)
 {
     m_timer.reset(CreateThreadpoolTimer(OnTimerFired, this, nullptr));
