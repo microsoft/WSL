@@ -201,15 +201,13 @@ namespace {
             else
             {
                 const auto widePath = MultiByteToWide(path);
-                warnings.push_back(
-                    {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidValue(widePath, node->Mark().line + 1), widePath});
+                warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_InvalidValue(widePath, node->Mark().line + 1), widePath});
             }
         }
         catch (...)
         {
             const auto widePath = MultiByteToWide(path);
-            warnings.push_back(
-                {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidType(widePath, node->Mark().line + 1), widePath});
+            warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_InvalidType(widePath, node->Mark().line + 1), widePath});
         }
     }
 
@@ -245,11 +243,7 @@ namespace {
     }
 
     // Iteratively walks the YAML tree and warns about keys not in the known set.
-    void WarnUnknownKeys(
-        const YAML::Node& root,
-        const std::set<std::string>& knownPaths,
-        const std::set<std::string>& knownPrefixes,
-        std::vector<Warning>& warnings)
+    void WarnUnknownKeys(const YAML::Node& root, const std::set<std::string>& knownPaths, const std::set<std::string>& knownPrefixes, std::vector<Warning>& warnings)
     {
         // Stack of (node, prefix) pairs to process.
         std::vector<std::pair<YAML::Node, std::string>> stack;
@@ -271,8 +265,7 @@ namespace {
                 {
                     auto location = prefix.empty() ? std::wstring(L"root") : MultiByteToWide(prefix);
                     warnings.push_back(
-                        {wsl::shared::Localization::WSLCUserSettings_Warning_NonStringKey(location, it->first.Mark().line + 1),
-                         location});
+                        {wsl::shared::Localization::WSLCUserSettings_Warning_NonStringKey(location, it->first.Mark().line + 1), location});
                     continue;
                 }
 
@@ -290,8 +283,7 @@ namespace {
                         // Unknown section — warn once, don't traverse.
                         const auto widePath = MultiByteToWide(fullPath);
                         warnings.push_back(
-                            {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownSection(widePath, it->first.Mark().line + 1),
-                             widePath});
+                            {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownSection(widePath, it->first.Mark().line + 1), widePath});
                     }
                 }
                 else if (!knownPaths.count(fullPath) && !knownPrefixes.count(fullPath))
@@ -299,8 +291,7 @@ namespace {
                     // Unknown setting
                     const auto widePath = MultiByteToWide(fullPath);
                     warnings.push_back(
-                        {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownKey(widePath, it->first.Mark().line + 1),
-                         widePath});
+                        {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownKey(widePath, it->first.Mark().line + 1), widePath});
                 }
             }
         }
@@ -318,8 +309,7 @@ namespace {
             // emit a warning so the user understands why settings were ignored.
             if (err != ENOENT)
             {
-                warnings.push_back(
-                    {wsl::shared::Localization::WSLCUserSettings_Warning_FailedToOpen(err), {}});
+                warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_FailedToOpen(err), {}});
             }
 
             return std::nullopt;
@@ -331,8 +321,7 @@ namespace {
         }
         catch (const std::exception& e)
         {
-            warnings.push_back(
-                {wsl::shared::Localization::WSLCUserSettings_Warning_ParseError(MultiByteToWide(e.what())), {}});
+            warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_ParseError(MultiByteToWide(e.what())), {}});
             return std::nullopt;
         }
     }
