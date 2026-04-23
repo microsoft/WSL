@@ -35,21 +35,17 @@ namespace wsl::windows::wslc::settings {
 static constexpr std::string_view s_DefaultSettingsTemplate =
     "# wslc user settings\n"
     "# https://aka.ms/wslc-settings\n"
+    "# All settings support string value \"default\" which uses built-in defaults.\n"
     "\n"
     "session:\n"
-    "  # Number of virtual CPUs allocated to the session (default: 4)\n"
-    "  # cpuCount: 4\n"
+    "  # Number of virtual CPUs allocated to the session (e.g. 4 default: all available CPUs)\n"
+    "  # cpuCount: default\n"
     "\n"
-    "  # Memory limit for the session in megabytes (default: 2GB)\n"
-    "  # memorySize: 2GB\n"
+    "  # Memory limit for the session (e.g. 2GB default: half of available memory)\n"
+    "  # memorySize: default\n"
     "\n"
-    "  # Maximum disk image size in megabytes (default: 100GB)\n"
-    "  # maxStorageSize: 100GB\n"
-    "\n"
-    "  # Default path for session storage. By default, storage is per-session under:\n"
-    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli        (standard sessions)\n"
-    "  #   %LocalAppData%\\wslc\\sessions\\wslc-cli-admin (elevated sessions)\n"
-    "  # defaultStoragePath: \"\"\n"
+    "  # Maximum disk image size (e.g. 500GB default: 1TB)\n"
+    "  # maxStorageSize: default\n"
     "\n"
     "# Credential storage backend: \"wincred\" or \"file\" (default: wincred)\n"
     "# credentialStore: wincred\n";
@@ -81,12 +77,6 @@ namespace details {
     WSLC_VALIDATE_SETTING(SessionStorageSizeMb)
     {
         return ParseSettingsMemoryValue(value);
-    }
-
-    // yaml_t = std::string (UTF-8 from yaml-cpp), value_t = std::wstring
-    WSLC_VALIDATE_SETTING(SessionStoragePath)
-    {
-        return MultiByteToWide(value);
     }
 
     WSLC_VALIDATE_SETTING(SessionNetworkingMode)
@@ -188,6 +178,18 @@ namespace {
             return;
         }
 
+        // Check "default"
+        try
+        {
+            if (node->IsScalar() && node->as<std::string>() == "default")
+            {
+                return;
+            }
+        }
+        catch (...)
+        {
+        }
+
         try
         {
             auto rawValue = node->as<typename details::SettingMapping<S>::yaml_t>();
@@ -214,6 +216,82 @@ namespace {
     void ValidateAll(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings, std::index_sequence<S...>)
     {
         (ValidateSetting<static_cast<Setting>(S)>(root, map, warnings), ...);
+    }
+
+    // Collects the set of known dot-separated YAML paths from all SettingMapping specializations.
+    template <size_t... S>
+    std::set<std::string> CollectKnownPaths(std::index_sequence<S...>)
+    {
+        std::set<std::string> paths;
+        (paths.insert(std::string(details::SettingMapping<static_cast<Setting>(S)>::YamlPath)), ...);
+        return paths;
+    }
+
+    // Derives the set of all prefixes from the known paths.
+    // e.g. "a.b.c" contributes both "a" and "a.b" as known prefixes.
+    std::set<std::string> CollectKnownPrefixes(const std::set<std::string>& knownPaths)
+    {
+        std::set<std::string> prefixes;
+        for (const auto& path : knownPaths)
+        {
+            for (size_t pos = path.find('.'); pos != std::string::npos; pos = path.find('.', pos + 1))
+            {
+                prefixes.insert(path.substr(0, pos));
+            }
+        }
+        return prefixes;
+    }
+
+    // Iteratively walks the YAML tree and warns about keys not in the known set.
+    void WarnUnknownKeys(const YAML::Node& root, const std::set<std::string>& knownPaths, const std::set<std::string>& knownPrefixes, std::vector<Warning>& warnings)
+    {
+        // Stack of (node, prefix) pairs to process.
+        std::vector<std::pair<YAML::Node, std::string>> stack;
+        stack.emplace_back(root, std::string{});
+
+        while (!stack.empty())
+        {
+            auto [node, prefix] = std::move(stack.back());
+            stack.pop_back();
+
+            for (auto it = node.begin(); it != node.end(); ++it)
+            {
+                std::string key;
+                try
+                {
+                    key = it->first.as<std::string>();
+                }
+                catch (...)
+                {
+                    auto location = prefix.empty() ? std::wstring(L"root") : MultiByteToWide(prefix);
+                    warnings.push_back({std::format(L"Warning: Non-string key in section '{}'.", location), location});
+                    continue;
+                }
+
+                auto fullPath = prefix.empty() ? key : prefix + '.' + key;
+
+                if (it->second.IsMap())
+                {
+                    if (knownPrefixes.count(fullPath))
+                    {
+                        // Known section — add to stack to traverse.
+                        stack.emplace_back(it->second, fullPath);
+                    }
+                    else
+                    {
+                        // Unknown section — warn once, don't traverse.
+                        const auto widePath = MultiByteToWide(fullPath);
+                        warnings.push_back({std::format(L"Warning: Unknown setting section '{}'.", widePath), widePath});
+                    }
+                }
+                else if (!knownPaths.count(fullPath) && !knownPrefixes.count(fullPath))
+                {
+                    // Unknown setting
+                    const auto widePath = MultiByteToWide(fullPath);
+                    warnings.push_back({std::format(L"Warning: Unknown setting '{}'.", widePath), widePath});
+                }
+            }
+        }
     }
 
     // Attempts to parse a YAML document from the given file path.
@@ -272,14 +350,24 @@ UserSettings::UserSettings(const std::filesystem::path& settingsDir)
     if (root.has_value())
     {
         m_type = UserSettingsType::Standard;
-    }
 
-    if (root.has_value())
-    {
-        constexpr auto settingCount = static_cast<size_t>(Setting::Max);
-        ValidateAll(root.value(), m_settings, m_warnings, std::make_index_sequence<settingCount>());
+        if (root->IsMap())
+        {
+            constexpr auto settingCount = static_cast<size_t>(Setting::Max);
+            ValidateAll(root.value(), m_settings, m_warnings, std::make_index_sequence<settingCount>());
 
-        // TODO: Iterate through all nodes and warn about unknown keys?
+            constexpr auto indexSeq = std::make_index_sequence<settingCount>();
+            auto knownPaths = CollectKnownPaths(indexSeq);
+            auto knownPrefixes = CollectKnownPrefixes(knownPaths);
+            WarnUnknownKeys(root.value(), knownPaths, knownPrefixes, m_warnings);
+        }
+        else
+        {
+            m_warnings.push_back(
+                {std::format(
+                     L"Warning: '{}' is empty or has invalid structure. Expected a YAML mapping.", m_settingsPath.filename().wstring()),
+                 {}});
+        }
     }
 
     // Emit any settings load warnings.
