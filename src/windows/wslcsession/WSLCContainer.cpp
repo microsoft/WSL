@@ -285,31 +285,6 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, WSLCVolum
     }
 }
 
-std::unordered_set<std::string> GetAnonymousVolumeNames(
-    const wsl::windows::common::docker_schema::InspectContainer& inspectData)
-{
-    // Build a set of all volumes mounted on the container.
-    std::unordered_set<std::string> volumeNames;
-    for (const auto& mount : inspectData.Mounts)
-    {
-        if (mount.Type == "volume" && !mount.Name.empty())
-        {
-            volumeNames.insert(mount.Name);
-        }
-    }
-
-    // Remove any volumes that were user specified in the HostConfig.Mounts.
-    for (const auto& mount : inspectData.HostConfig.Mounts)
-    {
-        if (!mount.Source.empty() && mount.Type == "volume")
-        {
-            volumeNames.erase(mount.Source);
-        }
-    }
-
-    return volumeNames;
-}
-
 } // namespace
 
 ContainerPortMapping::ContainerPortMapping(VMPortMapping&& VmMapping, uint16_t ContainerPort) :
@@ -366,7 +341,6 @@ WSLCContainerImpl::WSLCContainerImpl(
     std::vector<WSLCVolumeMount>&& volumes,
     std::vector<ContainerPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
-    std::unordered_set<std::string>&& anonymousVolumes,
     std::function<void(const WSLCContainerImpl*)>&& onDeleted,
     DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -382,7 +356,6 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_networkingMode(NetworkMode),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
-    m_dockerVolumeNames(std::move(anonymousVolumes)),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(this, std::move(onDeleted))),
@@ -793,9 +766,12 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
+    // Wait for the container destroy event on the Docker event stream.
+    // Docker emits volume destroy events before the container destroy event, so once this returns
+    // we are guaranteed that all anonymous volumes deleted with the container have been removed from tracking.
     if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
     {
-        m_wslcSession.DeleteContainerVolumes(m_dockerVolumeNames);
+        m_eventTracker.WaitForObjectDestroyed(m_id);
     }
 
     Transition(WslcContainerStateDeleted);
@@ -1284,9 +1260,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // event tracker's volume callback and are already tracked in WSLCVolumes.
     EventTracker.WaitForObjectCreated(result.Id);
 
-    // Identify the anonymous volumes so we know which ones to delete with the container.
-    auto anonymousVolumes = GetAnonymousVolumeNames(inspectData);
-
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,
         virtualMachine,
@@ -1297,7 +1270,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::move(volumeMounts),
         std::move(ports),
         std::move(labels),
-        std::move(anonymousVolumes),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -1370,7 +1342,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         std::move(metadata.Volumes),
         std::move(ports),
         std::move(labels),
-        std::unordered_set<std::string>{},
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -1380,7 +1351,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
-    // Restore the state change timestamp and identify implicit volumes from Docker inspect data.
+    // Restore the state change timestamp from Docker inspect data.
     try
     {
         auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
@@ -1391,8 +1362,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         {
             container->m_stateChangedAt = ParseDockerTimestamp(timestamp);
         }
-
-        container->m_dockerVolumeNames = GetAnonymousVolumeNames(inspectData);
     }
     CATCH_LOG();
 

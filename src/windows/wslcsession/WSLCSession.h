@@ -150,12 +150,8 @@ public:
     UserHandle OpenUserHandle(WSLCHandle Handle);
     void ReleaseUserHandle(HANDLE Handle);
 
-
-
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
-
-    void DeleteContainerVolumes(_In_ const std::unordered_set<std::string>& VolumeNames);
 
 private:
     ULONG m_id = 0;

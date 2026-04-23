@@ -26,8 +26,7 @@ DockerEventTracker::EventTrackingReference::EventTrackingReference(DockerEventTr
 {
 }
 
-DockerEventTracker::EventTrackingReference& DockerEventTracker::EventTrackingReference::operator=(
-    DockerEventTracker::EventTrackingReference&& other) noexcept
+DockerEventTracker::EventTrackingReference& DockerEventTracker::EventTrackingReference::operator=(DockerEventTracker::EventTrackingReference&& other) noexcept
 {
     Reset();
     m_id = other.m_id;
@@ -61,8 +60,7 @@ DockerEventTracker::EventTrackingReference::~EventTrackingReference() noexcept
     Reset();
 }
 
-DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay) :
-    m_sessionId(sessionId)
+DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay) : m_sessionId(sessionId)
 {
     auto onChunk = [this](const gsl::span<char>& buffer) {
         if (!buffer.empty()) // docker inserts empty lines between events, skip those.
@@ -105,12 +103,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     auto parsed = nlohmann::json::parse(event);
 
     auto action = parsed.find("Action");
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        action == parsed.end(),
-        "Failed to parse json: %.*hs",
-        static_cast<int>(event.size()),
-        event.data());
+    THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
     auto timeEntry = parsed.find("time");
     THROW_HR_IF_MSG(
@@ -151,8 +144,16 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     {
         std::lock_guard lock{m_lock};
         m_createdObjects.insert(containerId);
-        m_createdObjectCV.notify_all();
+        m_objectStateChanged.notify_all();
         return;
+    }
+
+    // Track container destroy events for WaitForObjectDestroyed() and clean up create tracking.
+    if (action == "destroy")
+    {
+        std::lock_guard lock{m_lock};
+        m_createdObjects.erase(containerId);
+        m_objectStateChanged.notify_all();
     }
 
     auto it = events.find(action);
@@ -223,11 +224,23 @@ void DockerEventTracker::WaitForObjectCreated(const std::string& ObjectId)
     std::unique_lock lock{m_lock};
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_TIMEOUT),
-        !m_createdObjectCV.wait_for(lock, c_timeout, [&]() { return m_createdObjects.contains(ObjectId); }),
+        !m_objectStateChanged.wait_for(lock, c_timeout, [&]() { return m_createdObjects.contains(ObjectId); }),
         "Timed out waiting for Docker create event for object '%hs'",
         ObjectId.c_str());
 
     m_createdObjects.erase(ObjectId);
+}
+
+void DockerEventTracker::WaitForObjectDestroyed(const std::string& ObjectId)
+{
+    constexpr auto c_timeout = std::chrono::seconds{60};
+
+    std::unique_lock lock{m_lock};
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+        !m_objectStateChanged.wait_for(lock, c_timeout, [&]() { return !m_createdObjects.contains(ObjectId); }),
+        "Timed out waiting for Docker destroy event for object '%hs'",
+        ObjectId.c_str());
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerStateUpdates(

@@ -73,10 +73,8 @@ public:
     EventTrackingReference RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept;
     void UnregisterCallback(size_t Id) noexcept;
 
-    // Blocks until the event stream has delivered a create event for the given object ID.
-    // Because Docker emits events in order, waiting for a container create event guarantees
-    // that all preceding volume create events have already been processed.
     void WaitForObjectCreated(const std::string& ObjectId);
+    void WaitForObjectDestroyed(const std::string& ObjectId);
 
 private:
     void OnEvent(const std::string_view& event);
@@ -100,9 +98,8 @@ private:
     std::vector<ContainerCallback> m_containerCallbacks;
     std::vector<VolumeCallback> m_volumeCallbacks;
 
-    // Tracks object IDs that have been seen via create events, used by WaitForObjectCreated().
     std::unordered_set<std::string> m_createdObjects;
-    std::condition_variable_any m_createdObjectCV;
+    std::condition_variable_any m_objectStateChanged;
 
     ULONG m_sessionId{};
     std::recursive_mutex m_lock;

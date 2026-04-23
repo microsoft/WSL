@@ -14,8 +14,7 @@ using wsl::windows::service::wslc::WSLCVolumes;
 namespace wsl::windows::service::wslc {
 
 WSLCVolumes::WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker) :
-    m_dockerClient(dockerClient),
-    m_virtualMachine(virtualMachine)
+    m_dockerClient(dockerClient), m_virtualMachine(virtualMachine)
 {
     // Recover existing volumes from Docker.
     for (const auto& volume : dockerClient.ListVolumes())
@@ -44,6 +43,14 @@ std::unique_ptr<IWSLCVolume> WSLCVolumes::OpenDockerVolume(const wsl::windows::c
         {
             opened = WSLCVhdVolumeImpl::Open(vol, m_virtualMachine, m_dockerClient);
         }
+        else if (metadata.Driver == WSLCGuestVolumeDriver)
+        {
+            opened = WSLCGuestVolumeImpl::Open(vol, m_dockerClient);
+        }
+        else
+        {
+            THROW_HR_MSG(E_UNEXPECTED, "Unrecognized WSLC volume driver: %hs", metadata.Driver.c_str());
+        }
     }
     else if (vol.Driver == "local")
     {
@@ -53,6 +60,8 @@ std::unique_ptr<IWSLCVolume> WSLCVolumes::OpenDockerVolume(const wsl::windows::c
     {
         THROW_HR_MSG(E_UNEXPECTED, "Unrecognized volume driver: %hs", vol.Driver.c_str());
     }
+
+    THROW_HR_IF_NULL_MSG(E_UNEXPECTED, opened, "Volume driver returned null for volume: %hs", vol.Name.c_str());
 
     WSL_LOG("VolumeOpened", TraceLoggingValue(vol.Name.c_str(), "VolumeName"), TraceLoggingValue(vol.Driver.c_str(), "Driver"));
 

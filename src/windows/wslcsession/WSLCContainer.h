@@ -64,10 +64,10 @@ public:
         std::vector<WSLCVolumeMount>&& volumes,
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
-        std::unordered_set<std::string>&& anonymousVolumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
+        WSLCVolumes& Volumes,
         IORelay& Relay,
         WSLCContainerState InitialState,
         std::uint64_t CreatedAt,
@@ -169,7 +169,6 @@ private:
     WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;
     std::vector<WSLCVolumeMount> m_mountedVolumes;
-    std::unordered_set<std::string> m_dockerVolumeNames;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
     DockerEventTracker& m_eventTracker;

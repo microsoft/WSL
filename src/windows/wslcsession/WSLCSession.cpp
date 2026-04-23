@@ -2520,17 +2520,6 @@ void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.get() == Container; }) == 1);
 }
 
-void WSLCSession::DeleteContainerVolumes(const std::unordered_set<std::string>& VolumeNames)
-{
-    if (m_volumes)
-    {
-        for (const auto& name : VolumeNames)
-        {
-            m_volumes->OnVolumeDeleted(name);
-        }
-    }
-}
-
 HRESULT WSLCSession::GetState(_Out_ WSLCSessionState* State)
 {
     *State = m_terminated ? WSLCSessionStateTerminated : WSLCSessionStateRunning;
