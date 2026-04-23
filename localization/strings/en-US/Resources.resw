@@ -2532,6 +2532,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Provides path to the tar archive file containing the image</value>
   </data>
+  <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
+    <value>Container host name</value>
+  </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Name of the container</value>
   </data>

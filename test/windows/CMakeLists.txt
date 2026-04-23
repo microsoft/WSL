@@ -10,7 +10,8 @@ set(SOURCES
     PolicyTests.cpp
     InstallerTests.cpp
     WSLCTests.cpp
-    WslcSdkTests.cpp)
+    WslcSdkTests.cpp
+    WindowsUpdateTests.cpp)
 
 set(HEADERS
     Common.h

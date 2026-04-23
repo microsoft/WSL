@@ -593,6 +593,16 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Hostname)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --hostname my-test-host {} hostname", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -655,6 +665,7 @@ private:
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
+                << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
