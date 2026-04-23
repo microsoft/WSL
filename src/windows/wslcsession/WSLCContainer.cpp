@@ -100,7 +100,8 @@ std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
     return {static_cast<uint16_t>(portNum), protocol};
 }
 
-// Binds an anonymous TCP socket on the given address to obtain an ephemeral port from the OS.
+// Temporary solution to allocate an ephemeral port.
+// TODO: Remove once the port relay can allocate ephemeral ports.
 uint16_t AllocateEphemeralPort(int family, const char* address)
 {
     wil::unique_socket sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
@@ -114,10 +115,14 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
         THROW_LAST_ERROR_IF(inet_pton(AF_INET, address, &addr.Ipv4.sin_addr) != 1);
         addr.Ipv4.sin_port = 0;
     }
-    else
+    else if (family == AF_INET6)
     {
         THROW_LAST_ERROR_IF(inet_pton(AF_INET6, address, &addr.Ipv6.sin6_addr) != 1);
         addr.Ipv6.sin6_port = 0;
+    }
+    else
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected address family: %i", family);
     }
 
     THROW_LAST_ERROR_IF(bind(sock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
@@ -133,7 +138,7 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
 
 // Builds port mapping list from container options and returns the network mode string.
 std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
-    const std::vector<_WSLCPortMapping>& requestedPorts, WSLCContainerNetworkType networkType, WSLCVirtualMachine& virtualMachine)
+    std::vector<_WSLCPortMapping>& requestedPorts, WSLCContainerNetworkType networkType, WSLCVirtualMachine& virtualMachine)
 {
     // Determine network mode string.
     std::string networkMode;
@@ -163,8 +168,13 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
     std::vector<ContainerPortMapping> ports;
     ports.reserve(requestedPorts.size());
 
-    for (const auto& e : requestedPorts)
+    for (auto& e : requestedPorts)
     {
+        if (e.HostPort == WSLC_EPHEMERAL_PORT)
+        {
+            e.HostPort = AllocateEphemeralPort(e.Family, e.BindingAddress);
+        }
+
         auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(e), e.ContainerPort);
 
         // Only allocate port for bridged network. Host mode ports are allocated when the container starts.
@@ -1276,6 +1286,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         auto& port = ports.emplace_back();
         port.HostPort = containerOptions.Ports[i].HostPort;
         port.ContainerPort = containerOptions.Ports[i].ContainerPort;
+        port.Family = containerOptions.Ports[i].Family;
         port.Protocol = containerOptions.Ports[i].Protocol;
         strcpy_s(port.BindingAddress, containerOptions.Ports[i].BindingAddress);
     }
@@ -1301,7 +1312,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
                 }
 
                 auto& createdPort = ports.emplace_back();
-                createdPort.HostPort = AllocateEphemeralPort(AF_INET, "127.0.0.1");
+                createdPort.HostPort = WSLC_EPHEMERAL_PORT;
                 createdPort.Family = AF_INET;
                 createdPort.ContainerPort = port;
                 createdPort.Protocol = protocol;

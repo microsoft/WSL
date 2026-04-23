@@ -423,24 +423,48 @@ class WSLCE2EContainerRunTests
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral)
     {
-        auto result = RunWslc(std::format(L"container run -p 80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        // Start a container with an ephemeral host port mapping (-p 8080 means host picks a random port)
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {} {} {}",
+            WslcContainerName,
+            ContainerTestPort,
+            PythonImage.NameAndTag(),
+            GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Inspect the container to find the allocated host port
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+
+        auto hostPort = std::stoi(portBindings[0].HostPort);
+        VERIFY_IS_TRUE(hostPort > 0);
+
+        // Verify we can connect to the server on the ephemeral port
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort).c_str(), HTTP_STATUS_OK, true);
     }
 
     // https://github.com/microsoft/WSL/issues/14433
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
     {
         auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = L"Port mappingsspecific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n",
+             .ExitCode = 1});
     }
 
     // https://github.com/microsoft/WSL/issues/14433
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
     {
         auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = L"Port mappingsspecific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n",
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
@@ -660,6 +684,7 @@ private:
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
+                << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"

@@ -152,6 +152,7 @@ namespace {
     std::optional<YAML::Node> NavigateYamlPath(const YAML::Node& root, std::string_view path)
     {
         YAML::Node current = root;
+
         auto subPaths = wsl::shared::string::Split(std::string{path}, '.');
         for (auto const& subPath : subPaths)
         {

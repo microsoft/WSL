@@ -5604,7 +5604,6 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-publish-all:latest"));
 
         // Run a container with --publish-all using the API.
-        // Use bridged networking (matching the CLI default) since port relay requires it.
         {
             WSLCContainerLauncher launcher(
                 "wslc-test-publish-all:latest",
@@ -6347,8 +6346,7 @@ class WSLCTests
             auto container = launcher.Create(*session);
             container.SetDeleteOnClose(false);
 
-            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
-        }
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);}
 
         // Recover the container in a new session, start it and verify volume and port mapping works.
         {

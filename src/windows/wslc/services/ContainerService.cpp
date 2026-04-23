@@ -61,12 +61,12 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
             // - Ephemeral host port mappings
             // - Host port mappings with a specific host IP
             // - Host port mappings with UDP protocol
-            if (portMapping.HostPort().IsEphemeral() || portMapping.HostIP().has_value() ||
+            if (portMapping.HostIP().has_value() ||
                 portMapping.PortProtocol() == PublishPort::Protocol::UDP)
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-                    "Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported");
+                    "Port mappingsspecific host IPs or UDP protocol are not currently supported");
             }
         }
 
