@@ -569,8 +569,7 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Domainname)
     {
-        auto result = RunWslc(
-            std::format(L"container run --rm --domainname my-test-domain {} dnsdomainname", DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --rm --domainname my-test-domain {} dnsdomainname", DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"my-test-domain\n", .Stderr = L"", .ExitCode = 0});
     }
 
