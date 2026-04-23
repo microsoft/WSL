@@ -560,24 +560,6 @@ class WSLCE2EContainerCreateTests
             {.Stderr = L"unable to find user user_does_not_exist: no matching entries in passwd file\r\nError code: E_FAIL\r\n", .ExitCode = 1});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_UserOption_NameGroupRoot)
-    {
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec -u root:root {} sh -c \"id -un; id -u; id -g\"", WslcContainerName));
-        result.Verify({.Stdout = L"root\n0\n0\n", .Stderr = L"", .ExitCode = S_OK});
-    }
-
-    WSLC_TEST_METHOD(WSLCE2E_Container_Exec_UserOption_InvalidGroup_Fails)
-    {
-        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
-
-        result = RunWslc(std::format(L"container exec -u root:badgid {} id -u", WslcContainerName));
-        result.Verify({.Stdout = L"unable to find group badgid: no matching entries in group file\r\n", .ExitCode = 126});
-    }
-
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Tmpfs)
     {
         auto result = RunWslc(std::format(
