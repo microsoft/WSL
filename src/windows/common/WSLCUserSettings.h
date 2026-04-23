@@ -38,7 +38,6 @@ enum class Setting : size_t
     SessionCpuCount = 0,
     SessionMemoryMb,
     SessionStorageSizeMb,
-    SessionStoragePath,
     SessionNetworkingMode,
     SessionHostFileShareMode,
     SessionDnsTunneling,
@@ -86,7 +85,6 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionCpuCount,          uint32_t,    uint32_t,            0,                             "session.cpuCount")
     DEFINE_SETTING_MAPPING(SessionMemoryMb,          std::string, uint32_t,            0,                             "session.memorySize")
     DEFINE_SETTING_MAPPING(SessionStorageSizeMb,     std::string, uint32_t,            1048576,                       "session.maxStorageSize")
-    DEFINE_SETTING_MAPPING(SessionStoragePath,       std::string, std::wstring,        {},                            "session.defaultStoragePath")
     DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode,  WSLCNetworkingModeVirtioProxy, "session.networkingMode")
     DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,   HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
     DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,                true,                          "session.dnsTunneling")

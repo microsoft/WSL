@@ -94,7 +94,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
-        VERIFY_ARE_EQUAL(std::wstring{}, map.GetOrDefault<Setting::SessionStoragePath>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(map.GetOrDefault<Setting::CredentialStore>()));
     }
 
@@ -122,7 +121,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
-        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -150,8 +148,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(8u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(4096u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(20000u, s.Get<Setting::SessionStorageSizeMb>());
-        // Unspecified setting falls back to built-in default.
-        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
         VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
     }
 
@@ -252,30 +248,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_TRUE(s.GetWarnings().size() >= 1u);
     }
 
-    // A valid defaultStoragePath string must survive the UTF-8 → wstring round-trip.
-    TEST_METHOD(Validation_StoragePath_NonEmpty_RoundTrips)
-    {
-        auto dir = UniqueTempDir();
-        WriteFile(dir / L"settings.yaml", "session:\n  defaultStoragePath: \"C:\\\\TestFolder\"\n");
-
-        UserSettingsTest s{dir};
-
-        VERIFY_ARE_EQUAL(std::wstring(L"C:\\TestFolder"), s.Get<Setting::SessionStoragePath>());
-        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-    }
-
-    // An empty defaultStoragePath string is valid.
-    TEST_METHOD(Validation_StoragePath_Empty_IsValid)
-    {
-        auto dir = UniqueTempDir();
-        WriteFile(dir / L"settings.yaml", "session:\n  defaultStoragePath: \"\"\n");
-
-        UserSettingsTest s{dir};
-
-        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
-        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
-    }
-
     // Absent keys must silently use defaults — no warnings emitted.
     TEST_METHOD(Validation_AbsentKeys_NoWarningsAndDefaults)
     {
@@ -288,7 +260,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
-        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
     }
 
     // The string "default" for any setting must silently use the built-in
@@ -302,7 +273,6 @@ class WSLCCLISettingsUnitTests
             "  cpuCount: default\n"
             "  memorySize: default\n"
             "  maxStorageSize: default\n"
-            "  defaultStoragePath: default\n"
             "  networkingMode: default\n"
             "  hostFileShareMode: default\n"
             "  dnsTunneling: default\n"
@@ -315,7 +285,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
         VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
-        VERIFY_ARE_EQUAL(std::wstring{}, s.Get<Setting::SessionStoragePath>());
         VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeVirtioProxy), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
         VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
         VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
@@ -506,7 +475,6 @@ class WSLCCLISettingsUnitTests
             "  cpuCount: 8\n"
             "  memorySize: 4GB\n"
             "  maxStorageSize: 50000MB\n"
-            "  defaultStoragePath: \"\"\n"
             "  networkingMode: nat\n"
             "  hostFileShareMode: virtiofs\n"
             "  dnsTunneling: true\n"

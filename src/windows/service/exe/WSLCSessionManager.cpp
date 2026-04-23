@@ -74,10 +74,7 @@ struct SessionSettings
         auto userSettings = LoadUserSettings(UserToken);
         auto localAppData = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken);
 
-        auto customPath = userSettings.Get<settings::Setting::SessionStoragePath>();
-        std::filesystem::path basePath =
-            customPath.empty() ? (localAppData / wsl::windows::wslc::DefaultStorageSubPath) : std::filesystem::path{customPath};
-        auto storagePath = (basePath / ResolvedName).wstring();
+        auto storagePath = (localAppData / wsl::windows::wslc::DefaultStorageSubPath / ResolvedName).wstring();
 
         return std::unique_ptr<SessionSettings>(
             new SessionSettings(std::wstring(ResolvedName), std::move(storagePath), WSLCSessionStorageFlagsNone, userSettings));

@@ -79,12 +79,6 @@ namespace details {
         return ParseSettingsMemoryValue(value);
     }
 
-    // yaml_t = std::string (UTF-8 from yaml-cpp), value_t = std::wstring
-    WSLC_VALIDATE_SETTING(SessionStoragePath)
-    {
-        return MultiByteToWide(value);
-    }
-
     WSLC_VALIDATE_SETTING(SessionNetworkingMode)
     {
         if (value == "none")
