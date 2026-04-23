@@ -37,6 +37,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         // Argument::Create(ArgType::DNSDomain),
         // Argument::Create(ArgType::DNSOption),
         // Argument::Create(ArgType::DNSSearch),
+        Argument::Create(ArgType::Domainname),
         Argument::Create(ArgType::Entrypoint),
         Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),

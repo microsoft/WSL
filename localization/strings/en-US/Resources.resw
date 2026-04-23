@@ -2619,6 +2619,9 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Set DNS search domains</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
+    <value>Container domain name</value>
+  </data>
   <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
     <value>Group Id for the process</value>
   </data>

@@ -567,6 +567,12 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Domainname)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --domainname my-test-domain {} dnsdomainname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-test-domain\n", .Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume
@@ -660,6 +666,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
+                << L"  --domainname      Container domain name\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
