@@ -2132,6 +2132,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Unsupported volume type: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslcUnsupportedVolumeDriverOpts" xml:space = "preserve" >
+    <value>unsupported volume driver options: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcVolumeInUse" xml:space = "preserve" >
     <value>Volume '{}' is in use.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2534,6 +2538,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
     <value>Label key cannot be empty</value>
   </data>
+  <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
+    <value>Container host name</value>
+  </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Name of the container</value>
   </data>
@@ -2657,6 +2664,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Invalid format type specified. Supported format types are: json, table</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
+    <value>Invalid {} value: {} is not a recognized inspect type. Supported inspect types are: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2749,5 +2760,21 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
     <value>Invalid volume specifications: '{}'. Host path '{}' is not a valid Windows path.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
+    <value>Name or Id of any object type</value>
+  </data>
+  <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
+    <value>Type of the object to inspect</value>
+  </data>
+  <data name="WSLCCLI_InspectDesc" xml:space="preserve">
+    <value>Inspect objects.</value>
+  </data>
+  <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
+    <value>Inspect objects.</value>
+  </data>
+  <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
+    <value>Object not found: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

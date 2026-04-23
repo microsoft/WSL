@@ -561,6 +561,12 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Hostname)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --hostname my-test-host {} hostname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume
@@ -668,6 +674,7 @@ private:
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
+                << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  -l,--label        Set metadata on an object\r\n"
                 << L"  --name            Name of the container\r\n"

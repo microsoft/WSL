@@ -40,6 +40,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
         // Argument::Create(ArgType::GroupId),
+        Argument::Create(ArgType::Hostname),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Label, false, NO_LIMIT),
         Argument::Create(ArgType::Name),

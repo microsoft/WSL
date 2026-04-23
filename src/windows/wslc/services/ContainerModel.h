@@ -41,6 +41,7 @@ struct ContainerOptions
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
+    std::optional<std::string> Hostname{};
     std::vector<std::string> Tmpfs;
     std::vector<std::pair<std::string, std::string>> Labels;
 };

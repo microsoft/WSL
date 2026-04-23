@@ -57,6 +57,7 @@ _(Format,         "format",              NO_ALIAS,          Kind::Value,       L
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     Localization::WSLCCLI_ForwardArgsDescription()) \
 /*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GroupIdArgDescription())*/ \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
+_(Hostname,       "hostname",            L"h",              Kind::Value,       Localization::WSLCCLI_HostnameArgDescription()) \
 _(ImageForce,     "force",               L"f",              Kind::Flag,        Localization::WSLCCLI_ImageForceArgDescription()) \
 _(ImageId,        "image",               NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ImageIdArgDescription()) \
 _(Input,          "input",               L"i",              Kind::Value,       Localization::WSLCCLI_InputArgDescription()) \
@@ -67,6 +68,7 @@ _(Name,           "name",                NO_ALIAS,          Kind::Value,       L
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
+_(ObjectId,       "object-id",           NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ObjectIdArgDescription()) \
 _(Options,        "opt",                 L"o",              Kind::Value,       Localization::WSLCCLI_OptionsArgDescription()) \
 _(Output,         "output",              L"o",              Kind::Value,       Localization::WSLCCLI_OutputArgDescription()) \
 _(Password,       "password",            L"p",              Kind::Value,       Localization::WSLCCLI_LoginPasswordArgDescription()) \
@@ -89,6 +91,7 @@ _(Target,         "target",              NO_ALIAS,          Kind::Positional,  L
 _(Time,           "time",                L"t",              Kind::Value,       Localization::WSLCCLI_TimeArgDescription()) \
 _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        Localization::WSLCCLI_TTYArgDescription()) \
+_(Type,           "type",                L"t",              Kind::Value,       Localization::WSLCCLI_TypeArgDescription()) \
 _(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription()) \
 _(Username,       "username",            L"u",              Kind::Value,       Localization::WSLCCLI_LoginUsernameArgDescription()) \
 _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \

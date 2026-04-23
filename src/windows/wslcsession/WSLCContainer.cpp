@@ -31,6 +31,7 @@ using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
+using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VMPortMapping;
@@ -40,7 +41,6 @@ using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
 using wsl::windows::service::wslc::WSLCPortMapping;
 using wsl::windows::service::wslc::WSLCSession;
-using wsl::windows::service::wslc::WSLCVhdVolumeImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 using wsl::windows::service::wslc::WSLCVolumeMount;
 
@@ -260,7 +260,7 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
 
 void ProcessNamedVolumes(
     const WSLCContainerOptions& containerOptions,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
     THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
@@ -288,7 +288,7 @@ void ProcessNamedVolumes(
 
 void ValidateNamedVolumes(
     const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     const std::unordered_set<std::string>& anonymousVolumes)
 {
     for (const auto& mount : mounts)
@@ -1041,7 +1041,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1294,7 +1294,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     const std::unordered_set<std::string>& anonymousVolumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
