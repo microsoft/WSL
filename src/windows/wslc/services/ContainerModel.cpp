@@ -332,4 +332,50 @@ TmpfsMount TmpfsMount::Parse(const std::string& value)
     result.m_options = value.substr(colonPos + 1);
     return result;
 }
+
+CidFile::CidFile(const std::optional<std::wstring>& path)
+{
+    if (!path.has_value())
+    {
+        return;
+    }
+
+    m_path = *path;
+    auto [file, openError] = wil::try_create_new_file(std::filesystem::path(*m_path).c_str(), GENERIC_WRITE);
+    if (!file.is_valid())
+    {
+        if (openError == ERROR_FILE_EXISTS || openError == ERROR_ALREADY_EXISTS)
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(openError), Localization::WSLCCLI_CIDFileAlreadyExistsError(*m_path));
+        }
+
+        const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(openError));
+        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(openError), Localization::MessageWslcFailedToOpenFile(*m_path, errorMessage));
+    }
+
+    m_file = std::move(file);
+}
+
+CidFile::~CidFile()
+{
+    if (m_committed || !m_path.has_value())
+    {
+        return;
+    }
+
+    m_file.reset();
+    std::error_code ec;
+    std::filesystem::remove(std::filesystem::path(*m_path), ec);
+}
+
+void CidFile::Commit(const std::string& containerId)
+{
+    if (m_file)
+    {
+        DWORD bytesWritten{};
+        THROW_IF_WIN32_BOOL_FALSE(::WriteFile(m_file.get(), containerId.data(), static_cast<DWORD>(containerId.size()), &bytesWritten, nullptr));
+    }
+
+    m_committed = true;
+}
 } // namespace wsl::windows::wslc::models

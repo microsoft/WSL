@@ -39,40 +39,6 @@ static void SetContainerArguments(WSLCProcessOptions& options, std::vector<const
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static void WriteContainerIdToFile(const std::optional<std::wstring>& cidFilePath, const std::string& containerId)
-{
-    if (!cidFilePath.has_value())
-    {
-        return;
-    }
-
-    const auto path = std::filesystem::path(cidFilePath.value());
-    HANDLE file = ::CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE)
-    {
-        const auto error = ::GetLastError();
-        if (error == ERROR_FILE_EXISTS || error == ERROR_ALREADY_EXISTS)
-        {
-            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::WSLCCLI_CIDFileAlreadyExistsError(*cidFilePath));
-        }
-
-        const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(error));
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::MessageWslcFailedToOpenFile(*cidFilePath, errorMessage));
-    }
-
-    DWORD bytesWritten{};
-    const bool writeSuccess = ::WriteFile(file, containerId.data(), static_cast<DWORD>(containerId.size()), &bytesWritten, nullptr) != FALSE;
-    const HRESULT closeResult = ::CloseHandle(file) ? S_OK : HRESULT_FROM_WIN32(GetLastError());
-    if (!writeSuccess || bytesWritten != containerId.size())
-    {
-        const auto error = writeSuccess ? ERROR_WRITE_FAULT : ::GetLastError();
-        const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(error));
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(error), Localization::MessageWslcFailedToWriteFile(*cidFilePath, errorMessage));
-    }
-
-    THROW_IF_FAILED(closeResult);
-}
-
 static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& session, const std::string& image, const ContainerOptions& options)
 {
     auto processFlags = WSLCProcessFlagsNone;
@@ -347,13 +313,17 @@ std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
+    // Reserve the CID file (fails if it already exists) before creating the container so a
+    // container isn't created when the caller-requested path can't be written. The file is
+    // removed automatically if we don't reach Commit() below.
+    CidFile cidFile(runOptions.CidFile);
+
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions);
     auto& container = runningContainer.Get();
 
     WSLCContainerId containerId{};
     THROW_IF_FAILED(container.GetId(containerId));
-    WriteContainerIdToFile(runOptions.CidFile, containerId);
 
     // Start the created container
     WSLCContainerStartFlags startFlags{};
@@ -362,6 +332,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
+    cidFile.Commit(containerId);
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
@@ -376,12 +347,13 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
+    CidFile cidFile(runOptions.CidFile);
     auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
     THROW_IF_FAILED(container.GetId(id));
-    WriteContainerIdToFile(runOptions.CidFile, id);
+    cidFile.Commit(id);
     return {.Id = id};
 }
 

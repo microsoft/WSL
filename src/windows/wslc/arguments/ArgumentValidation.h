@@ -64,7 +64,4 @@ FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring
 InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
-
-void ValidateCidFile(const std::wstring& cidFile);
-
 } // namespace wsl::windows::wslc::validation
