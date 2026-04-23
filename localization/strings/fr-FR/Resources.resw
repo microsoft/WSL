@@ -751,6 +751,11 @@ Pour plus d’informations, visitez https://aka.ms/wslinstall</value>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>L'exécution du shell de débogage nécessite l'exécution de wsl.exe en tant qu'administrateur.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection est activée et vos distributions peuvent être enregistrées sous un autre compte.
+Pour plus d’informations sur Admin Protection, veuillez consulter https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>Le processus d’installation de la distribution « {} » a échoué avec le code de sortie : {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1904,7 +1909,7 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
     <value>Plus tard</value>
   </data>
   <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
-    <value>Redémarrer pour appliquer les modifications</value>
+    <value>Nous ne pouvons pas appliquer les modifications</value>
   </data>
   <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
     <value>Fermer</value>
