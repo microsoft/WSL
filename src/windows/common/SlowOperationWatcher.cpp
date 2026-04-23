@@ -23,13 +23,9 @@ Abstract:
 namespace {
 FILETIME RelativeFileTime(std::chrono::milliseconds Relative) noexcept
 {
-    // Negative FILETIME means "relative to now", in 100ns units.
-    ULARGE_INTEGER due{};
-    due.QuadPart = static_cast<ULONGLONG>(-(Relative.count() * 10'000LL));
-    FILETIME ft{};
-    ft.dwLowDateTime = due.LowPart;
-    ft.dwHighDateTime = due.HighPart;
-    return ft;
+    // Negative FILETIME means "relative to now", in 100ns units. Matches the pattern used
+    // elsewhere in the service (see Lifetime.cpp).
+    return wil::filetime::from_int64(-wil::filetime_duration::one_millisecond * Relative.count());
 }
 
 // std::source_location::file_name() returns the path as the compiler saw it, which on
@@ -53,7 +49,7 @@ SlowOperationWatcher::SlowOperationWatcher(_In_z_ const char* Name, std::chrono:
     m_name(Name), m_slowThreshold(SlowThreshold), m_location(Location)
 {
     m_timer.reset(CreateThreadpoolTimer(OnTimerFired, this, nullptr));
-    THROW_LAST_ERROR_IF_NULL(m_timer.get());
+    THROW_IF_NULL_ALLOC(m_timer.get());
 
     FILETIME due = RelativeFileTime(m_slowThreshold);
     SetThreadpoolTimer(m_timer.get(), &due, 0, 0);
