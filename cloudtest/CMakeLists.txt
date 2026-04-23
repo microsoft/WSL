@@ -10,7 +10,7 @@ if (${TARGET_PLATFORM} STREQUAL x64)
       
 
     set(CLOUDTEST_TEST_PACKAGES "Test_Packages_2025_07_28")
-    set(DUMPTOOL_DROP "DumpTool_X64_2025-01-27")
+    set(DUMPTOOL_DROP "DumpTool_X64_2026-04-23")
 elseif (${TARGET_PLATFORM} STREQUAL arm64)
     set(CLOUDTEST_IMAGES)
 else()
