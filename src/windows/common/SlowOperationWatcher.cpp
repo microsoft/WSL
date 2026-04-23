@@ -31,6 +31,22 @@ FILETIME RelativeFileTime(std::chrono::milliseconds Relative) noexcept
     ft.dwHighDateTime = due.HighPart;
     return ft;
 }
+
+// std::source_location::file_name() returns the path as the compiler saw it, which on
+// MSVC is an absolute build-agent path. Strip to the basename so telemetry groups the
+// same file across different build environments without leaking machine-specific paths.
+const char* Basename(const char* Path) noexcept
+{
+    const char* result = Path;
+    for (const char* p = Path; *p != '\0'; ++p)
+    {
+        if (*p == '\\' || *p == '/')
+        {
+            result = p + 1;
+        }
+    }
+    return result;
+}
 } // namespace
 
 SlowOperationWatcher::SlowOperationWatcher(
@@ -59,7 +75,7 @@ try
         PDT_ProductAndServicePerformance,
         TraceLoggingValue(self->m_name, "name"),
         TraceLoggingInt64(self->m_slowThreshold.count(), "thresholdMs"),
-        TraceLoggingValue(self->m_location.file_name(), "file"),
+        TraceLoggingValue(Basename(self->m_location.file_name()), "file"),
         TraceLoggingValue(self->m_location.function_name(), "function"),
         TraceLoggingUInt32(self->m_location.line(), "line"));
 }
