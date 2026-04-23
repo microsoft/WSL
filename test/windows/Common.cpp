@@ -662,7 +662,7 @@ void CaptureLiveDump()
 {
     auto PrivilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
 
-    const std::wstring targetFile = g_dumpFolder + L"\\livedump.dmp";
+    const std::wstring targetFile = std::format(L"{}\\livedump.{:%FT_%H-%M-%S}.dmp", g_dumpFolder, std::chrono::system_clock::now());
     LogInfo("Writing livedump in: %ls", targetFile.c_str());
 
     wsl::windows::common::SubProcess dumpProcess{nullptr, std::format(L"{} \"{}\"", g_dumpToolPath->c_str(), targetFile.c_str()).c_str()};
