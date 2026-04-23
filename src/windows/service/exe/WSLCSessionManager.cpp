@@ -61,7 +61,7 @@ struct SessionSettings
     }
 
     // Get default memory size. Half of available memory.
-    static uint32_t DefultMemorySize()
+    static uint32_t DefaultMemoryMb()
     {
         MEMORYSTATUSEX memInfo{sizeof(MEMORYSTATUSEX)};
         THROW_IF_WIN32_BOOL_FALSE(GlobalMemoryStatusEx(&memInfo));
@@ -99,7 +99,7 @@ private:
         auto cpuCount = userSettings.Get<settings::Setting::SessionCpuCount>();
         Settings.CpuCount = cpuCount > 0 ? cpuCount : wsl::windows::common::wslutil::GetLogicalProcessorCount();
         auto memoryMb = userSettings.Get<settings::Setting::SessionMemoryMb>();
-        Settings.MemoryMb = memoryMb > 0 ? memoryMb : SessionSettings::DefultMemorySize();
+        Settings.MemoryMb = memoryMb > 0 ? memoryMb : SessionSettings::DefaultMemoryMb();
         Settings.MaximumStorageSizeMb = userSettings.Get<settings::Setting::SessionStorageSizeMb>();
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
