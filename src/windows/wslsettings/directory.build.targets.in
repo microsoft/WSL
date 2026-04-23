@@ -1,4 +1,8 @@
 <Project>
+  <PropertyGroup>
+    <!-- Disable the Roslyn shared compiler server (VBCSCompiler) to avoid intermittent CS0016 errors
+    <UseSharedCompilation>false</UseSharedCompilation>
+  </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Update="Microsoft.Windows.SDK.NET.Ref" RuntimeFrameworkVersion="${WINDOWS_SDK_DOTNET_VERSION}" TargetingPackVersion="${WINDOWS_SDK_DOTNET_VERSION}" />
     <!-- The below can be removed when the OneBranch pipeline container image is updated to use a newer version of the dotnet SDK -->
