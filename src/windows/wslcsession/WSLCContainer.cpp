@@ -104,7 +104,7 @@ std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
     }
     else
     {
-        THROW_HR_IF_MSG(E_INVALIDARG, protoStr != "tcp", "Unsupported protocol in exposed port: %hs", key.c_str());
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported protocol in exposed port: %hs", key.c_str());
     }
 
     return {static_cast<uint16_t>(port), protocol};
@@ -122,13 +122,11 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
 
     if (family == AF_INET)
     {
-        THROW_LAST_ERROR_IF(inet_pton(AF_INET, address, &addr.Ipv4.sin_addr) != 1);
-        addr.Ipv4.sin_port = 0;
+        THROW_HR_IF_MSG(E_INVALIDARG, inet_pton(AF_INET, address, &addr.Ipv4.sin_addr) != 1, "Failed to parse ip address: %hs", address);
     }
     else if (family == AF_INET6)
     {
-        THROW_LAST_ERROR_IF(inet_pton(AF_INET6, address, &addr.Ipv6.sin6_addr) != 1);
-        addr.Ipv6.sin6_port = 0;
+        THROW_HR_IF_MSG(E_INVALIDARG, inet_pton(AF_INET6, address, &addr.Ipv6.sin6_addr) != 1, "Failed to parse ip address: %hs", address);
     }
     else
     {

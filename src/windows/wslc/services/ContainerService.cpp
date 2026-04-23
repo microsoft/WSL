@@ -58,11 +58,9 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         {
             // https://github.com/microsoft/WSL/issues/14433
             // The following scenarios are currently not implemented:
-            // - Ephemeral host port mappings
             // - Host port mappings with a specific host IP
             // - Host port mappings with UDP protocol
-            if (portMapping.HostIP().has_value() ||
-                portMapping.PortProtocol() == PublishPort::Protocol::UDP)
+            if (portMapping.HostIP().has_value() || portMapping.PortProtocol() == PublishPort::Protocol::UDP)
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),

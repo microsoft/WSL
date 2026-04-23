@@ -5819,8 +5819,7 @@ class WSLCTests
     WSLC_TEST_METHOD(PublishAllImageNotFound)
     {
         // Verify that using PublishAll with a nonexistent image still returns IMAGE_NOT_FOUND.
-        WSLCContainerLauncher launcher(
-            "invalid-image-name:nonexistent", "dummy-publish-all", {"/bin/cat"}, {}, WSLCContainerNetworkTypeBridged);
+        WSLCContainerLauncher launcher("invalid-image-name:nonexistent", "dummy-publish-all", {"/bin/cat"}, {}, WSLCContainerNetworkTypeBridged);
         launcher.SetContainerFlags(WSLCContainerFlagsPublishAll);
 
         auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
@@ -6519,7 +6518,8 @@ class WSLCTests
             auto container = launcher.Create(*session);
             container.SetDeleteOnClose(false);
 
-            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);}
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+        }
 
         // Recover the container in a new session, start it and verify volume and port mapping works.
         {
