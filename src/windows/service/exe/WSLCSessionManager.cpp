@@ -453,10 +453,10 @@ HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
 
 HRESULT WSLCSessionManager::GetMinimumSupportedClientVersion(_Out_ WSLCVersion* Version)
 {
-    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 8, 0};
+    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 0};
 
     // If the current version is below the minimum version, return the current version for convenience.
-    // TODO: Remove once 2.8.0 is published.
+    // TODO: Remove once 2.9.0 is published.
     if constexpr (wsl::shared::PackageVersion < c_minClientVersion)
     {
         Version->Major = WSL_PACKAGE_VERSION_MAJOR;

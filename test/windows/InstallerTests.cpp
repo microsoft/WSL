@@ -18,6 +18,7 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslcsdk.h"
 
 using namespace wsl::windows::common::registry;
 
@@ -418,6 +419,41 @@ class InstallerTests
         UninstallMsi();
         InstallGitHubRelease(L"2.0.2");
         CallWslUpdateViaMsi();
+    }
+
+    WSLC_TEST_METHOD(WslcSdkVersionDetection)
+    {
+        auto restore = wil::scope_exit([this]() { InstallMsi(); });
+
+        UninstallMsi();
+
+        // Validate that the SDK detects that the WSL package is not installed.
+        WslcComponentFlags flags{};
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+
+        // Validate that the SDK detects that the installed version of WSL is too old.
+        InstallGitHubRelease(L"2.0.2");
+
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+
+        restore.reset();
+
+        // Validate that the SDK supports the current package.
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, 0);
+
+        // TODO: Add test coverage for a more recent version of the package that doesn't support the SDK, if ever needed.
+        // In the meantime, the below block can be commented to manual test this scenario with a manual code change.
+        /*VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE);
+
+        WslcSessionSettings sessionSettings{};
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"should-fail", L"C:\\", &sessionSettings));
+
+        WslcSession session{};
+        VERIFY_ARE_EQUAL(WslcCreateSession(&sessionSettings, &session, nullptr), WSLC_E_SDK_UPDATE_NEEDED);*/
     }
 
     TEST_METHOD(MsrdcPluginKey)
@@ -1089,4 +1125,95 @@ class InstallerTests
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
     }
+
+    /*
+     TODO: Uncomment when the functionality is implemented in the SDK.
+    TEST_METHOD(WSLCInstall)
+    {
+        auto expectComponents = [](WslInstallComponent expected) {
+            WslInstallComponent components{};
+            VERIFY_SUCCEEDED(WslQueryMissingComponents(&components));
+
+            VERIFY_ARE_EQUAL(components, expected);
+        };
+
+        VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslPackage, nullptr, nullptr), E_INVALIDARG);
+
+        // TODO: remove once 2.7.0 is released.
+        RegistryKeyChange<std::wstring> version(HKEY_LOCAL_MACHINE, LXSS_REGISTRY_PATH "\\MSI", L"Version", L"2.7.0");
+
+        expectComponents(WslInstallComponentNone);
+
+        // Validate that a package < 2.7 is handled correctly.
+        {
+            version.Set(L"2.6.0");
+            expectComponents(WslInstallComponentWslPackage);
+        }
+
+        version.Set(L"2.7.0");
+
+        // Validate that a missing package is detected.
+        expectComponents(WslInstallComponentNone);
+        UninstallMsi();
+
+        expectComponents(WslInstallComponentWslPackage);
+
+        {
+            UniqueWebServer fileServer(L"http://127.0.0.1:12346/", std::filesystem::path(m_msiPath));
+            VERIFY_SUCCEEDED(WslSetPackageUrl(L"http://127.0.0.1:12346/"));
+
+            WslInstallComponent progressedComponents{};
+            auto callback = [](WslInstallComponent Component, uint64_t progress, uint64_t total, void* Context) {
+                *reinterpret_cast<WslInstallComponent*>(Context) |= Component;
+            };
+
+            VERIFY_SUCCEEDED(WslInstallComponents(WslInstallComponentWslPackage, callback, &progressedComponents));
+            VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslPackage);
+
+            ValidateInstalledVersion(WIDEN(WSL_PACKAGE_VERSION));
+            version.Set(L"2.7.0");
+
+            expectComponents(WslInstallComponentNone);
+
+            progressedComponents = WslInstallComponentNone;
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentVMPOC, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentVMPOC);
+
+            progressedComponents = WslInstallComponentNone;
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslOC, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslOC);
+        }
+
+        {
+            VERIFY_SUCCEEDED(WslSetPackageUrl(L"http://127.0.0.1:12346/"));
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslPackage, nullptr, nullptr), WININET_E_CANNOT_CONNECT);
+        }
+    }
+
+    // This test case requires a machine without the OC's enabled.
+    TEST_METHOD(WSLCInstallManual)
+    {
+        WslInstallComponent components{};
+        VERIFY_SUCCEEDED(WslQueryMissingComponents(&components));
+
+        if (!WI_IsAnyFlagSet(components, WslInstallComponentWslOC | WslInstallComponentVMPOC))
+        {
+            LogSkipped("OC are installed, skipping test. Flags: %i", components);
+            return;
+        }
+
+        auto expectedComponents = WslInstallComponentVMPOC;
+        WI_SetFlagIf(expectedComponents, WslInstallComponentWslOC, !wsl::windows::common::helpers::IsWindows11OrAbove());
+
+        VERIFY_ARE_EQUAL(components, expectedComponents);
+
+        WslInstallComponent progressedComponents{};
+        auto callback = [](WslInstallComponent Component, uint64_t progress, uint64_t total, void* Context) {
+            *reinterpret_cast<WslInstallComponent*>(Context) |= Component;
+        };
+
+        VERIFY_ARE_EQUAL(WslInstallComponents(components, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, expectedComponents);
+    }
+    */
 };
