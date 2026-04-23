@@ -249,7 +249,7 @@ class WSLCTests
 
         VERIFY_SUCCEEDED(sessionManager->GetMinimumSupportedClientVersion(&version));
 
-        if (WSL_PACKAGE_VERSION_MAJOR < 2 || (WSL_PACKAGE_VERSION_MAJOR == 2 && WSL_PACKAGE_VERSION_MINOR < 8))
+        if (WSL_PACKAGE_VERSION_MAJOR < 2 || (WSL_PACKAGE_VERSION_MAJOR == 2 && WSL_PACKAGE_VERSION_MINOR < 9))
         {
             VERIFY_ARE_EQUAL(version.Major, WSL_PACKAGE_VERSION_MAJOR);
             VERIFY_ARE_EQUAL(version.Minor, WSL_PACKAGE_VERSION_MINOR);

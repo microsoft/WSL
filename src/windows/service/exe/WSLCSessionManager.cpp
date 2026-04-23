@@ -422,16 +422,23 @@ WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl) : COMImplCl
 }
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
+try
 {
+    RETURN_HR_IF(E_POINTER, Version == nullptr);
+
     Version->Major = WSL_PACKAGE_VERSION_MAJOR;
     Version->Minor = WSL_PACKAGE_VERSION_MINOR;
     Version->Revision = WSL_PACKAGE_VERSION_REVISION;
 
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLCSessionManager::GetMinimumSupportedClientVersion(_Out_ WSLCVersion* Version)
+try
 {
+    RETURN_HR_IF(E_POINTER, Version == nullptr);
+
     constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 0};
 
     // If the current version is below the minimum version, return the current version for convenience.
@@ -451,6 +458,7 @@ HRESULT WSLCSessionManager::GetMinimumSupportedClientVersion(_Out_ WSLCVersion* 
 
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
 {
