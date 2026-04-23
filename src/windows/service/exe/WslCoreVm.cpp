@@ -322,7 +322,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Create the utility VM and store the runtime ID.
     std::wstring json = GenerateConfigJson();
     {
-        WslSlowOperation slowOperation{"HcsCreateSystem"};
+        SlowOperationWatcher slowOperation{"HcsCreateSystem"};
         m_system = wsl::windows::common::hcs::CreateComputeSystem(m_machineId.c_str(), json.c_str());
     }
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
@@ -349,7 +349,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Start the utility VM.
     try
     {
-        WslSlowOperation slowOperation{"HcsStartSystem"};
+        SlowOperationWatcher slowOperation{"HcsStartSystem"};
         wsl::windows::common::hcs::StartComputeSystem(m_system.get(), json.c_str());
     }
     catch (...)
@@ -441,7 +441,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
     {
-        WslSlowOperation slowOperation{"WaitForMiniInitConnect"};
+        SlowOperationWatcher slowOperation{"WaitForMiniInitConnect"};
         m_miniInitChannel =
             wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
     }
@@ -451,7 +451,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Receive and parse the guest kernel version
     {
-        WslSlowOperation slowOperation{"ReadGuestCapabilities"};
+        SlowOperationWatcher slowOperation{"ReadGuestCapabilities"};
         ReadGuestCapabilities();
     }
 
@@ -543,7 +543,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     {
         ExecutionContext context(Context::ConfigureNetworking);
-        WslSlowOperation slowOperation{"ConfigureNetworking"};
+        SlowOperationWatcher slowOperation{"ConfigureNetworking"};
 
         // Accept the connection from the guest network service and create the channel.
         wsl::core::GnsChannel gnsChannel(AcceptConnection(m_vmConfig.KernelBootTimeout));
@@ -564,7 +564,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
         {
             {
-                WslSlowOperation slowOperation{"CreateNatNetwork"};
+                SlowOperationWatcher slowOperation{"CreateNatNetwork"};
                 natNetwork = wsl::core::NatNetworking::CreateNetwork(m_vmConfig);
             }
             if (!natNetwork)
@@ -676,7 +676,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Perform additional initialization.
     {
-        WslSlowOperation slowOperation{"InitializeGuest"};
+        SlowOperationWatcher slowOperation{"InitializeGuest"};
         InitializeGuest();
     }
 }
@@ -1188,7 +1188,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     auto lock = m_lock.lock_exclusive();
     ULONG lun = 0;
     {
-        WslSlowOperation slowOperation{"AttachDistroVhd"};
+        SlowOperationWatcher slowOperation{"AttachDistroVhd"};
         lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
     }
 
@@ -1231,7 +1231,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->InstallPathOffset, installPath);
     message.WriteString(message->UserProfileOffset, userProfile);
     {
-        WslSlowOperation slowOperation{"SendLaunchInit"};
+        SlowOperationWatcher slowOperation{"SendLaunchInit"};
         auto transaction = m_miniInitChannel.StartTransaction();
         transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
     }
@@ -1259,7 +1259,7 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     // Establish a communication channel with the init daemon.
     wil::unique_socket initSocket;
     {
-        WslSlowOperation slowOperation{"WaitForInitDaemonConnect"};
+        SlowOperationWatcher slowOperation{"WaitForInitDaemonConnect"};
         initSocket = AcceptConnection(ReceiveTimeout);
     }
 

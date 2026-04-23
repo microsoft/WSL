@@ -181,7 +181,7 @@ void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLV
             WSL_LOG(
                 "PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
 
-            WslSlowOperation slowOperation{"PluginOnVmStarted"};
+            SlowOperationWatcher slowOperation{"PluginOnVmStarted"};
             ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), Session->SessionId, e.name.c_str());
         }
     }
@@ -218,7 +218,7 @@ void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, 
                 TraceLoggingValue(Session->UserSid, "Sid"),
                 TraceLoggingValue(Distribution->Id, "DistributionId"));
 
-            WslSlowOperation slowOperation{"PluginOnDistributionStarted"};
+            SlowOperationWatcher slowOperation{"PluginOnDistributionStarted"};
             ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), Session->SessionId, e.name.c_str());
         }
     }
