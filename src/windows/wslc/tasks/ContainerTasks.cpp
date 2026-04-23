@@ -283,6 +283,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Hostname = WideToMultiByte(context.Args.Get<ArgType::Hostname>());
     }
 
+    if (context.Args.Contains(ArgType::Domainname))
+    {
+        options.Domainname = WideToMultiByte(context.Args.Get<ArgType::Domainname>());
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());

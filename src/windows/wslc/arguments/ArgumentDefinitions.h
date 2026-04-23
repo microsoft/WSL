@@ -47,6 +47,7 @@ _(Detach,         "detach",              L"d",              Kind::Flag,        L
 /*_(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSDomainArgDescription())*/ \
 /*_(DNSOption,      "dns-option",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSOptionArgDescription())*/ \
 /*_(DNSSearch,      "dns-search",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DNSSearchArgDescription())*/ \
+_(Domainname,     "domainname",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_DomainnameArgDescription()) \
 _(Driver,         "driver",              L"d",              Kind::Value,       Localization::WSLCCLI_DriverArgDescription("vhd")) \
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_EntrypointArgDescription()) \
 _(Env,            "env",                 L"e",              Kind::Value,       Localization::WSLCCLI_EnvArgDescription()) \

@@ -118,6 +118,11 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetHostname(std::string(options.Hostname.value()));
     }
 
+    if (options.Domainname.has_value())
+    {
+        containerLauncher.SetDomainname(std::string(options.Domainname.value()));
+    }
+
     for (const auto& tmpfsSpec : options.Tmpfs)
     {
         auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);

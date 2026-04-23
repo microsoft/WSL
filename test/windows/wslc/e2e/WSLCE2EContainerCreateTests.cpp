@@ -603,6 +603,18 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Domainname)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --domainname my-test-domain {} dnsdomainname",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stdout = L"my-test-domain\n", .Stderr = L"", .ExitCode = 0});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -662,6 +674,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
+                << L"  --domainname      Container domain name\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
