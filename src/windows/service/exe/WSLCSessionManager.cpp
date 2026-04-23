@@ -301,14 +301,6 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionInformation** Session
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
 }
 
-
-void WSLCSessionManagerImpl::GetVersion(_Out_ WSLCVersion* Version)
-{
-    Version->Major = WSL_PACKAGE_VERSION_MAJOR;
-    Version->Minor = WSL_PACKAGE_VERSION_MINOR;
-    Version->Revision = WSL_PACKAGE_VERSION_REVISION;
-}
-
 void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
@@ -440,10 +432,10 @@ HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
 
 HRESULT WSLCSessionManager::GetMinimumSupportedClientVersion(_Out_ WSLCVersion* Version)
 {
-    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 8, 0};
+    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 0};
 
     // If the current version is below the minimum version, return the current version for convenience.
-    // TODO: Remove once 2.8.0 is published.
+    // TODO: Remove once 2.9.0 is published.
     if constexpr (wsl::shared::PackageVersion < c_minClientVersion)
     {
         Version->Major = WSL_PACKAGE_VERSION_MAJOR;

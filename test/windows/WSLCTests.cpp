@@ -240,10 +240,8 @@ class WSLCTests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
-    TEST_METHOD(GetMinimumSupportedVersion)
+    WSLC_TEST_METHOD(GetMinimumSupportedVersion)
     {
-        WSL2_TEST_ONLY();
-
         wil::com_ptr<IWSLCSessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
 

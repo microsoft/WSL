@@ -1529,12 +1529,14 @@ try
 {
     HRESULT result = S_OK;
     bool needsVirtualMachine = NeedsVirtualMachineServicesInstalled();
-    bool needsRuntime = NeedsWslRuntimeInstalled();
+    auto runtimeResult = CreateSessionManagerRaw().second;
 
-    if (!needsVirtualMachine && !needsRuntime)
+    if (!needsVirtualMachine && SUCCEEDED(runtimeResult))
     {
         return result;
     }
+
+    THROW_HR_IF(runtimeResult, runtimeResult != REGDB_E_CLASSNOTREG && runtimeResult != WSLC_E_SDK_UPDATE_NEEDED);
 
     // Installing these components requires elevation.
     auto token = wil::open_current_access_token();
@@ -1567,7 +1569,7 @@ try
         }
     }
 
-    if (needsRuntime)
+    if (!SUCCEEDED(runtimeResult))
     {
         std::function<void(uint32_t)> callback;
         if (progressCallback)
