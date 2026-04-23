@@ -1186,11 +1186,9 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
 {
     // Add the VHD to the machine.
     auto lock = m_lock.lock_exclusive();
-    ULONG lun = 0;
-    {
-        SlowOperationWatcher slowOperation{"AttachDistroVhd"};
-        lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
-    }
+    SlowOperationWatcher slowOperation{"AttachDistroVhd"};
+    const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    slowOperation.Reset();
 
     // Launch the init daemon and create the instance.
     int flags = LxMiniInitMessageFlagNone;
@@ -1257,11 +1255,9 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
     WI_ClearFlagIf(localConfig.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING, !m_vmConfig.EnableHostFileSystemAccess);
 
     // Establish a communication channel with the init daemon.
-    wil::unique_socket initSocket;
-    {
-        SlowOperationWatcher slowOperation{"WaitForInitDaemonConnect"};
-        initSocket = AcceptConnection(ReceiveTimeout);
-    }
+    SlowOperationWatcher slowOperation{"WaitForInitDaemonConnect"};
+    auto initSocket = AcceptConnection(ReceiveTimeout);
+    slowOperation.Reset();
 
     // If the system distro is enabled, establish a communication channel with its init daemon.
     wil::unique_socket systemDistroSocket;
