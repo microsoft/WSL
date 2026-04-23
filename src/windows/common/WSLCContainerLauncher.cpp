@@ -11,6 +11,8 @@ Abstract:
     This file contains the implementation for WSLCContainerLauncher.
 
 --*/
+
+#include "precomp.h"
 #include "WSLCContainerLauncher.h"
 
 using wsl::windows::common::ClientRunningWSLCProcess;
@@ -37,7 +39,7 @@ void RunningWSLCContainer::Reset()
     if (m_container && m_deleteOnClose)
     {
         // Attempt to stop and delete the container.
-        LOG_IF_FAILED(m_container->Delete(WSLCDeleteFlagsForce));
+        LOG_IF_FAILED(m_container->Delete(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes));
     }
 
     m_container.reset();

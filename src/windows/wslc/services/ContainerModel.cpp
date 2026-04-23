@@ -150,13 +150,21 @@ void PublishPort::Validate() const
     }
 }
 
+// Returns true if the given string is a valid Docker named volume name.
+// Based on Docker's named volume validation: ^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,}$
+// Source: https://github.com/moby/moby/blob/master/volume/validate.go
+bool VolumeMount::IsValidNamedVolumeName(const std::wstring& name)
+{
+    static const std::wregex namedVolumeRegex(LR"(^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,}$)");
+    return std::regex_match(name, namedVolumeRegex);
+}
+
 VolumeMount VolumeMount::Parse(const std::wstring& value)
 {
     auto lastColon = value.rfind(':');
     if (lastColon == std::wstring::npos)
     {
-        THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG, std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeInvalidSpec(value, Localization::WSLCCLI_VolumeFormatUsage()));
     }
 
     VolumeMount vm;
@@ -167,17 +175,13 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
         vm.m_isReadOnlyMode = IsReadOnlyMode(lastToken);
         if (lastColon == 0)
         {
-            THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG,
-                std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeInvalidSpec(value, Localization::WSLCCLI_VolumeFormatUsage()));
         }
 
         splitColon = value.rfind(':', lastColon - 1);
         if (splitColon == std::wstring::npos)
         {
-            THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG,
-                std::format(L"Invalid volume specifications: '{}'. Expected format: <host path>:<container path>[:mode]", value));
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeInvalidSpec(value, Localization::WSLCCLI_VolumeFormatUsage()));
         }
 
         vm.m_containerPath = WideToMultiByte(value.substr(splitColon + 1, lastColon - splitColon - 1));
@@ -187,20 +191,50 @@ VolumeMount VolumeMount::Parse(const std::wstring& value)
         vm.m_containerPath = WideToMultiByte(lastToken);
     }
 
-    vm.m_hostPath = value.substr(0, splitColon);
-
-    if (vm.m_hostPath.empty())
+    if (vm.m_containerPath.empty())
     {
         THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG,
-            std::format(L"Invalid volume specifications: '{}'. Host path cannot be empty. Expected format: <host path>:<container path>[:mode]", value));
+            E_INVALIDARG, Localization::WSLCCLI_VolumeContainerPathEmpty(value, Localization::WSLCCLI_VolumeFormatUsage()));
     }
 
-    if (!vm.m_containerPath.empty() && vm.m_containerPath[0] != '/')
+    if (vm.m_containerPath[0] != '/')
     {
         THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG,
-            std::format(L"Invalid volume specifications: '{}'. Container path must be an absolute path (starting with '/'). Expected format: <host path>:<container path>[:mode]", value));
+            E_INVALIDARG, Localization::WSLCCLI_VolumeContainerPathNotAbsolute(value, Localization::WSLCCLI_VolumeFormatUsage()));
+    }
+
+    const auto rawHostPath = value.substr(0, splitColon);
+    if (rawHostPath.empty())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathEmpty(value, Localization::WSLCCLI_VolumeFormatUsage()));
+    }
+
+    // This is where we need to check if the user is referencing a named volume.
+    // This can be either an existing named volume or a new named volume that will be created.
+    if (VolumeMount::IsValidNamedVolumeName(rawHostPath))
+    {
+        vm.m_isNamedVolume = true;
+        vm.m_host = rawHostPath;
+    }
+    else
+    {
+        // Not a named volume, so it must be a path.
+        // Use wil::GetFullPathNameW to resolve relative paths against the CWD.
+        std::wstring resolvedHostPath;
+        const auto hr = wil::GetFullPathNameW(rawHostPath.c_str(), resolvedHostPath);
+        if (FAILED(hr))
+        {
+            THROW_HR_WITH_USER_ERROR(hr, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
+        }
+
+        // GetFileAttributesW validates the resolved path syntax without requiring existence.
+        // ERROR_INVALID_NAME indicates illegal characters in the path (e.g. ":" as a component).
+        if (GetFileAttributesW(resolvedHostPath.c_str()) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_INVALID_NAME)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_VolumeHostPathInvalid(value, rawHostPath));
+        }
+
+        vm.m_host = std::move(resolvedHostPath);
     }
 
     return vm;

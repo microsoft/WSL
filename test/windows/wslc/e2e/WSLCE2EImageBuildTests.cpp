@@ -121,6 +121,68 @@ class WSLCE2EImageBuildTests
         VERIFY_ARE_EQUAL(std::string("wslc_e2e_test"), it->second);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Pull_Success)
+    {
+        SKIP_TEST_UNSTABLE(); // TODO: Enable when a private image source is available.
+
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-pull";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFile(dockerfilePath, "FROM debian:latest\nCMD [\"echo\", \"pull-ok\"]\n");
+
+        // Build with --pull --verbose. When --pull causes docker to resolve the base image
+        // from the registry, the FROM step includes a @sha256: digest (e.g.
+        // "FROM docker.io/library/debian:latest@sha256:..."). Without --pull, no digest appears.
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --pull --verbose", contextDir.wstring(), dockerfilePath.wstring(), BuiltImagePull.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        VERIFY_IS_TRUE(buildResult.Stdout.has_value());
+        VERIFY_IS_TRUE(buildResult.Stdout->find(L"@sha256:") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Build_Target_Success)
+    {
+        auto testRoot = std::filesystem::current_path() / L"wslc-e2e-build-target";
+        auto cleanup = SetupTestDirectory(testRoot);
+
+        auto contextDir = testRoot / L"context";
+        std::error_code ec;
+        std::filesystem::create_directories(contextDir, ec);
+        THROW_HR_IF(E_FAIL, ec.value() != 0 || !std::filesystem::exists(contextDir));
+
+        auto dockerfilePath = testRoot / L"Dockerfile";
+        WriteTestFile(
+            dockerfilePath,
+            "FROM debian:latest AS build-stage\n"
+            "RUN echo build > /stage.txt\n"
+            "\n"
+            "FROM debian:latest AS final-stage\n"
+            "COPY --from=build-stage /stage.txt /stage.txt\n"
+            "CMD [\"cat\", \"/stage.txt\"]\n");
+
+        auto buildResult = RunWslc(std::format(
+            L"build \"{}\" -f \"{}\" -t {} --target build-stage", contextDir.wstring(), dockerfilePath.wstring(), BuiltImageTarget.NameAndTag()));
+        buildResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspectData = InspectImage(BuiltImageTarget.NameAndTag());
+        VERIFY_IS_TRUE(inspectData.RepoTags.has_value());
+        VERIFY_ARE_EQUAL(1u, inspectData.RepoTags.value().size());
+        VERIFY_ARE_EQUAL(BuiltImageTarget.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData.RepoTags.value()[0]));
+
+        // Verify that --target stopped at build-stage: the image should NOT have the CMD
+        // from final-stage. If --target were ignored, the CMD would be ["cat", "/stage.txt"].
+        VERIFY_IS_TRUE(inspectData.Config.has_value());
+        const std::vector<std::string> finalStageCmd{"cat", "/stage.txt"};
+        VERIFY_IS_TRUE(!inspectData.Config.value().Cmd.has_value() || inspectData.Config.value().Cmd.value() != finalStageCmd);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Image_Build_DockerfileInContextDir_Success)
     {
         BuildFromContextFile(L"Dockerfile", BuiltImageDockerfile);
@@ -167,10 +229,9 @@ class WSLCE2EImageBuildTests
         WriteTestFile(containerfilePath, "FROM debian:latest\n");
 
         // Deny read access so wslc cannot open the file.
-        SetReadAccess(containerfilePath, DENY_ACCESS);
+        SetPathAccess(containerfilePath, GENERIC_READ, DENY_ACCESS);
 
-        auto restore =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [containerfilePath]() { SetReadAccess(containerfilePath, GRANT_ACCESS); });
+        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [containerfilePath]() { DeleteFileW(containerfilePath.c_str()); });
 
         auto absoluteContainerfilePath = std::filesystem::absolute(containerfilePath);
         auto buildResult = RunWslc(std::format(L"build \"{}\"", testRoot.wstring()));
@@ -184,6 +245,8 @@ private:
     const TestImage BuiltImage{L"wslc-e2e-build-empty-context", L"latest", L""};
     const TestImage BuiltImageTag1{L"wslc-e2e-build-args-tags", L"v1", L""};
     const TestImage BuiltImageTag2{L"wslc-e2e-build-args-tags", L"v2", L""};
+    const TestImage BuiltImagePull{L"wslc-e2e-build-pull", L"latest", L""};
+    const TestImage BuiltImageTarget{L"wslc-e2e-build-target", L"latest", L""};
     const TestImage BuiltImageDockerfile{L"wslc-e2e-build-dockerfile-ctx", L"latest", L""};
     const TestImage BuiltImageContainerfile{L"wslc-e2e-build-containerfile-ctx", L"latest", L""};
 
@@ -208,6 +271,8 @@ private:
         EnsureImageIsDeleted(BuiltImage);
         EnsureImageIsDeleted(BuiltImageTag1);
         EnsureImageIsDeleted(BuiltImageTag2);
+        EnsureImageIsDeleted(BuiltImagePull);
+        EnsureImageIsDeleted(BuiltImageTarget);
         EnsureImageIsDeleted(BuiltImageDockerfile);
         EnsureImageIsDeleted(BuiltImageContainerfile);
     }
@@ -234,29 +299,6 @@ private:
         file << content;
         THROW_HR_IF(E_FAIL, !file.good());
         file.close();
-    }
-
-    static void SetReadAccess(const std::filesystem::path& path, ACCESS_MODE Mode)
-    {
-        auto [everyoneSid, everyoneSidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
-
-        EXPLICIT_ACCESSW ea{};
-        ea.grfAccessPermissions = FILE_GENERIC_READ;
-        ea.grfAccessMode = Mode;
-        ea.grfInheritance = NO_INHERITANCE;
-        ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-        ea.Trustee.ptstrName = static_cast<LPWSTR>(everyoneSid);
-
-        PACL acl = nullptr;
-        wil::unique_hlocal descriptor;
-        THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
-            path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
-
-        wsl::windows::common::security::unique_acl newAcl;
-        THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &ea, acl, &newAcl));
-
-        THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
-            const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
     }
 };
 } // namespace WSLCE2ETests

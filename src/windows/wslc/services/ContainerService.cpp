@@ -16,7 +16,7 @@ Abstract:
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "ImageService.h"
-#include "PullImageCallback.h"
+#include "ImageProgressCallback.h"
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
@@ -118,9 +118,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     for (const auto& volumeSpec : options.Volumes)
     {
         auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = volume.HostPath();
+        auto host = volume.Host();
         auto container = volume.ContainerPath();
-        containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+        if (volume.IsNamedVolume())
+        {
+            containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
+        }
+        else
+        {
+            containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+        }
     }
 
     containerLauncher.SetContainerFlags(containerFlags);
@@ -137,6 +144,21 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetUser(std::move(user));
     }
 
+    if (!options.WorkingDirectory.empty())
+    {
+        containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
+    }
+
+    if (options.Hostname.has_value())
+    {
+        containerLauncher.SetHostname(std::string(options.Hostname.value()));
+    }
+
+    if (options.Domainname.has_value())
+    {
+        containerLauncher.SetDomainname(std::string(options.Domainname.value()));
+    }
+
     for (const auto& tmpfsSpec : options.Tmpfs)
     {
         auto tmpfsMount = TmpfsMount::Parse(tmpfsSpec);
@@ -148,7 +170,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     {
         {
             // Attempt to pull the image if not found
-            PullImageCallback callback;
+            ImageProgressCallback callback;
             PrintMessage(Localization::WSLCCLI_ImageNotFoundPulling(wsl::shared::string::MultiByteToWide(image)), stderr);
             ImageService imageService;
             imageService.Pull(session, image, &callback);
@@ -327,7 +349,6 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 {
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions);
-    runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
 
     WSLCContainerId containerId{};
@@ -338,6 +359,9 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
     WSLCContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLCContainerStartFlagsAttach, !runOptions.Detach);
     THROW_IF_FAILED(container.Start(startFlags, nullptr)); // TODO: Error message, detach keys
+
+    // Disable auto-delete only after successful start
+    runningContainer.SetDeleteOnClose(false);
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
@@ -366,7 +390,7 @@ int ContainerService::Start(Session& session, const std::string& id, bool attach
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     WSLCContainerStartFlags flags = attach ? WSLCContainerStartFlagsAttach : WSLCContainerStartFlagsNone;
-    THROW_IF_FAILED(container->Start(flags, nullptr));
+    THROW_IF_FAILED_EXCEPT(container->Start(flags, nullptr), WSLC_E_CONTAINER_IS_RUNNING);
 
     if (!attach)
     {
@@ -388,7 +412,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Stop(options.Signal, options.Timeout));
+    THROW_IF_FAILED_EXCEPT(container->Stop(options.Signal, options.Timeout), WSLC_E_CONTAINER_NOT_RUNNING);
 }
 
 void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal signal)

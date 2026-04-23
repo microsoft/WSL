@@ -36,7 +36,7 @@ class WSLCE2EContainerTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = S_OK});
+        RunWslc(L"container --help").Verify({.Stdout = GetHelpMessage(), .Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
@@ -102,7 +102,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
-                << L"  -h,--help  Shows help about the selected command\r\n\r\n";
+                << L"  -?,--help  Shows help about the selected command\r\n\r\n";
         return options.str();
     }
 };

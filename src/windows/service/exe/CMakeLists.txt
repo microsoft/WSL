@@ -71,7 +71,8 @@ target_link_libraries(wslservice
                       legacy_stdio_definitions
                       VirtDisk.lib
                       Winhttp.lib
-                      Synchronization.lib)
+                      Synchronization.lib
+                      yaml-cpp)
 
 target_precompile_headers(wslservice REUSE_FROM common)
 set_target_properties(wslservice PROPERTIES FOLDER windows)

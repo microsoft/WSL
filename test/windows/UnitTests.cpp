@@ -208,16 +208,18 @@ class UnitTests
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
 
         // Validate that systemd-networkd-wait-online.service is masked.
-        auto [out, _] =
-            LxsstuLaunchWslAndCaptureOutput(L"systemctl status systemd-networkd-wait-online.service  | grep -iF Loaded:");
-
-        VERIFY_ARE_EQUAL(out, L"     Loaded: masked (Reason: Unit systemd-networkd-wait-online.service is masked.)\n");
+        std::wstring out;
+        std::wstring err;
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"systemctl show -p LoadState systemd-networkd-wait-online.service");
+        VERIFY_ARE_EQUAL(out, L"LoadState=masked\n");
 
         // Validate that NetworkManager-wait-online.service is masked.
-        auto [outNm, __] =
-            LxsstuLaunchWslAndCaptureOutput(L"systemctl status NetworkManager-wait-online.service  | grep -iF Loaded:");
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"systemctl show -p LoadState NetworkManager-wait-online.service");
+        VERIFY_ARE_EQUAL(out, L"LoadState=masked\n");
 
-        VERIFY_ARE_EQUAL(outNm, L"     Loaded: masked (Reason: Unit NetworkManager-wait-online.service is masked.)\n");
+        // Validate that console-getty.service is masked (tty devices are shared at VM level across distros).
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"systemctl show -p LoadState console-getty.service");
+        VERIFY_ARE_EQUAL(out, L"LoadState=masked\n");
     }
 
     WSL2_TEST_METHOD(SystemdUser)
@@ -329,6 +331,9 @@ class UnitTests
 
     WSL2_TEST_METHOD(SystemdNoClearTmpUnit)
     {
+        // The X11 socket is only created when gui applications are enabled.
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+
         // ensures that we don't leave state on exit
         auto cleanup = EnableSystemd("initTimeout=0");
 
@@ -960,7 +965,7 @@ class UnitTests
             VERIFY_IS_FALSE(!vhdFile);
         }
 
-        auto validateOutput = [](LPCWSTR commandLine, LPCWSTR expectedOutput, DWORD expectedExitCode = -1) {
+        auto validateOutput = [](LPCWSTR commandLine, const std::wstring& expectedOutput, DWORD expectedExitCode = -1) {
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(commandLine, expectedExitCode);
             VERIFY_ARE_EQUAL(expectedOutput, out);
             VERIFY_ARE_EQUAL(L"", err);
@@ -968,10 +973,22 @@ class UnitTests
 
         auto version = LxsstuVmMode() ? 2 : 1;
         auto commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, tarFileName, version);
-        validateOutput(
-            commandLine.c_str(),
-            L"The supplied install location is already in use.\r\n"
-            L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+        if (LxsstuVmMode())
+        {
+            validateOutput(
+                commandLine.c_str(),
+                std::format(
+                    L"Failed to create disk '{}ext4.vhdx': The file exists. \r\n"
+                    L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n",
+                    LXSST_IMPORT_DISTRO_TEST_DIR));
+        }
+        else
+        {
+            validateOutput(
+                commandLine.c_str(),
+                L"The file exists. \r\n"
+                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+        }
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
         validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
@@ -983,6 +1000,25 @@ class UnitTests
                 commandLine.c_str(),
                 L"This operation is only supported by WSL2.\r\n"
                 L"Error code: Wsl/Service/RegisterDistro/WSL_E_WSL2_NEEDED\r\n");
+        }
+
+        //
+        // Verify that importing a distribution with a different name into the same path as an
+        // already registered distribution (test_distro) returns the path-already-exists error.
+        //
+
+        {
+            const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+            VERIFY_IS_TRUE(!!distroKey);
+
+            auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+            VERIFY_IS_FALSE(basePath.empty());
+
+            commandLine = std::format(L"--import path-conflict-distro \"{}\" \"{}\" --version {}", basePath, tarFileName, version);
+            validateOutput(
+                commandLine.c_str(),
+                L"The supplied install location is already in use.\r\n"
+                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
         }
 
         //
@@ -2793,6 +2829,80 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+        }
+    }
+
+    WSL2_TEST_METHOD(MoveVhdOwnership)
+    {
+        constexpr auto name = L"move-owner-test-distro";
+        constexpr auto moveElevatedFolder = L"move-owner-elevated";
+        constexpr auto moveNonElevatedFolder = L"move-owner-non-elevated";
+
+        // Import a WSL2 distro.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", name));
+            std::filesystem::remove_all(moveElevatedFolder);
+            std::filesystem::remove_all(moveNonElevatedFolder);
+        });
+
+        auto verifyVhdOwner = [](const std::wstring& path) {
+            PSID ownerSid = nullptr;
+            wil::unique_hlocal descriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                path.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &ownerSid, nullptr, nullptr, nullptr, &descriptor));
+
+            auto userToken = wil::open_current_access_token(TOKEN_QUERY);
+            auto tokenUser = wil::get_token_information<TOKEN_USER>(userToken.get());
+
+            VERIFY_IS_TRUE(EqualSid(ownerSid, tokenUser->User.Sid));
+        };
+
+        const auto nonElevatedToken = GetNonElevatedToken();
+
+        // Move as elevated, launch as non-elevated.
+        // This is the primary bug scenario: MoveFileEx sets owner to BUILTIN\Administrators,
+        // then HcsGrantVmAccess fails with E_ACCESSDENIED when impersonating the non-elevated user.
+        {
+            WslShutdown();
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--manage {} --move {}", name, moveElevatedFolder)), 0L);
+
+            auto vhdPath = std::format(L"{}\\ext4.vhdx", moveElevatedFolder);
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+            verifyVhdOwner(vhdPath);
+
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+
+        // Move as non-elevated, launch as elevated.
+        {
+            WslShutdown();
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(
+                    std::format(L"--manage {} --move {}", name, moveNonElevatedFolder),
+                    nullptr,
+                    nullptr,
+                    nullptr,
+                    nonElevatedToken.get()),
+                0L);
+
+            auto vhdPath = std::format(L"{}\\ext4.vhdx", moveNonElevatedFolder);
+            VERIFY_IS_TRUE(std::filesystem::exists(vhdPath));
+            verifyVhdOwner(vhdPath);
+
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+            VERIFY_ARE_EQUAL(out, L"ok\n");
+        }
+
+        // Also launch as non-elevated after the non-elevated move.
+        {
+            WslShutdown();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name), 0, nullptr, nonElevatedToken.get());
+            VERIFY_ARE_EQUAL(out, L"ok\n");
         }
     }
 
@@ -5361,7 +5471,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Cannot create a file when that file already exists. \r\n"
                     L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
 
                 VERIFY_ARE_EQUAL(err, L"");
@@ -5372,7 +5482,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Cannot create a file when that file already exists. \r\n"
                     L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
 
                 VERIFY_ARE_EQUAL(err, L"");

@@ -68,6 +68,7 @@ static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f
+static wil::unique_mta_usage_cookie g_mtaCookie;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -1974,6 +1975,8 @@ Return Value:
 {
     wsl::windows::common::wslutil::InitializeWil();
 
+    THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
+
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG
     wil::g_fResultFailFastUnknownExceptions = false;
@@ -2188,6 +2191,7 @@ Return Value:
     }
 
     WslTraceLoggingUninitialize();
+    g_mtaCookie.reset();
 
     return true;
 }
@@ -2843,6 +2847,10 @@ std::filesystem::path GetTestImagePath(std::string_view imageName)
     {
         result /= L"HelloWorldSaved.tar";
     }
+    else if (imageName == "wslc-registry:latest")
+    {
+        result /= L"wslc-registry.tar";
+    }
     else
     {
         THROW_HR_MSG(E_INVALIDARG, "Unknown test image: %hs", imageName.data());
@@ -2902,4 +2910,27 @@ void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry
     {
         sendRequest();
     }
+}
+
+void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)
+{
+    auto [everyoneSid, everyoneSidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
+
+    EXPLICIT_ACCESSW ea{};
+    ea.grfAccessPermissions = Permissions;
+    ea.grfAccessMode = Mode;
+    ea.grfInheritance = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea.Trustee.ptstrName = static_cast<LPWSTR>(everyoneSid);
+
+    PACL acl = nullptr;
+    wil::unique_hlocal descriptor;
+    THROW_IF_WIN32_ERROR(
+        GetNamedSecurityInfoW(path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
+
+    wsl::windows::common::security::unique_acl newAcl;
+    THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &ea, acl, &newAcl));
+
+    THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+        const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
 }

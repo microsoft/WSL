@@ -79,6 +79,7 @@ public:
     void SetDnsSearchDomains(std::vector<std::string>&& DnsSearchDomains);
     void SetDnsOptions(std::vector<std::string>&& DnsOptions);
 
+    using WSLCProcessLauncher::FormatResult;
     using WSLCProcessLauncher::SetUser;
     using WSLCProcessLauncher::SetWorkingDirectory;
 

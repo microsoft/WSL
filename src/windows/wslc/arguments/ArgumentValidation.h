@@ -15,6 +15,7 @@ Abstract:
 
 #include "Exceptions.h"
 #include "ContainerModel.h"
+#include "InspectModel.h"
 #include <string>
 #include <vector>
 #include <charconv>
@@ -59,6 +60,8 @@ WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring
 
 void ValidateFormatTypeFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
 FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
+
+InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstring& argName);
 
 void ValidateVolumeMount(const std::vector<std::wstring>& values);
 

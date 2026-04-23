@@ -127,6 +127,20 @@ std::wstring WSLCExecutionResult::GetStdoutOneLine() const
     return stdoutLines[0];
 }
 
+bool WSLCExecutionResult::StdoutContainsLine(const std::wstring& expectedLine) const
+{
+    VERIFY_IS_TRUE(Stdout.has_value());
+    for (const auto& line : GetStdoutLines())
+    {
+        if (line == expectedLine)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType elevationType)
 {
     auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
@@ -147,6 +161,63 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine, ElevationType eleva
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected, ElevationType elevationType)
 {
     RunWslc(cmd, elevationType).Verify(expected);
+}
+
+WSLCExecutionResult RunWslcAndRedirectToFile(const std::wstring& commandLine, std::optional<std::filesystem::path> outputPath, ElevationType elevationType)
+{
+    auto cmd = L"\"" + GetWslcPath() + L"\" " + commandLine;
+    wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
+
+    // If running non-elevated we need to keep the token alive until it completes.
+    wil::unique_handle nonElevatedToken;
+    if (elevationType == ElevationType::NonElevated)
+    {
+        nonElevatedToken = GetNonElevatedPrimaryToken();
+        process.SetToken(nonElevatedToken.get());
+    }
+
+    auto [parentStderrRead, childStderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(childStderrWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+    wil::unique_hfile redirectedStdout;
+    HANDLE stdoutHandle = nullptr;
+
+    std::wstring effectiveCommandLine = commandLine;
+    if (outputPath.has_value())
+    {
+        SECURITY_ATTRIBUTES securityAttributes{};
+        securityAttributes.nLength = sizeof(securityAttributes);
+        securityAttributes.bInheritHandle = TRUE;
+        redirectedStdout.reset(CreateFileW(
+            outputPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ, &securityAttributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(!redirectedStdout);
+        stdoutHandle = redirectedStdout.get();
+        effectiveCommandLine = std::format(L"{} > \"{}\"", commandLine, outputPath->wstring());
+    }
+    else
+    {
+        // Open CONOUT$ so the child process receives a real console handle regardless of
+        // how the test runner has configured its own stdout (e.g. piped in CI).  This
+        // makes IsConsoleHandle() return true inside wslc, which is the condition under
+        // test in WSLCE2E_Image_Save_ToTerminal_Fail.
+        SECURITY_ATTRIBUTES securityAttributes{};
+        securityAttributes.nLength = sizeof(securityAttributes);
+        securityAttributes.bInheritHandle = TRUE;
+        redirectedStdout.reset(
+            CreateFileW(L"CONOUT$", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &securityAttributes, OPEN_EXISTING, 0, nullptr));
+        THROW_LAST_ERROR_IF(!redirectedStdout);
+        stdoutHandle = redirectedStdout.get();
+    }
+
+    process.SetStdHandles(nullptr, stdoutHandle, childStderrWrite.get());
+
+    const auto processHandle = process.Start();
+    childStderrWrite.reset();
+
+    const auto exitCode = wsl::windows::common::SubProcess::GetExitCode(processHandle.get());
+    const auto stdErrOutput = wsl::shared::string::MultiByteToWide(ReadToString(parentStderrRead.get()));
+
+    return {.CommandLine = std::move(effectiveCommandLine), .Stdout = L"", .Stderr = stdErrOutput, .ExitCode = exitCode};
 }
 
 std::wstring GetWslcHeader()

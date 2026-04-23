@@ -18,6 +18,7 @@ Abstract:
 #include <Windows.h>
 #include <WexTestClass.h>
 #include "Invocation.h"
+#include "TableOutput.h"
 
 namespace WSLCTestHelpers {
 
@@ -60,4 +61,21 @@ inline void LogComment(const std::wstring& message)
 {
     WEX::Logging::Log::Comment(reinterpret_cast<const char8_t*>(WStringToUTF8(message).c_str()));
 }
+
+// Helper: capture all lines emitted by a TableOutput into a vector<wstring>.
+template <size_t N>
+struct TableOutputCapture
+{
+    std::vector<std::wstring> lines;
+    wsl::windows::wslc::TableOutput<N> table;
+
+    // Forwards constructor arguments straight to TableOutput.
+    template <typename... Args>
+    explicit TableOutputCapture(Args&&... args) : table(std::forward<Args>(args)...)
+    {
+        table.SetOutputFunction([this](const std::wstring& line) { lines.push_back(line); });
+        // Pin the console width so shrinking tests are deterministic.
+        table.SetConsoleWidthOverride(120);
+    }
+};
 } // namespace WSLCTestHelpers

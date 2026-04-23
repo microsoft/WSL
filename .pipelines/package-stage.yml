@@ -1,0 +1,241 @@
+parameters:
+  - name: isRelease
+    type: boolean
+    default: true
+
+  - name: nugetPackages
+    type: object
+    default:
+      - Microsoft.WSL.PluginApi.nuspec
+
+  - name: pool
+    type: string
+    default: ''
+
+  - name: esrp
+    type: object
+    default:
+      ConnectedServiceName: "AzureConnection-AME"
+      signConfigType: "inlineSignParams"
+      SessionTimeout: 60
+      MaxConcurrency: 50
+      MaxRetryAttempts: 5
+      ServiceEndpointUrl: $(EsrpServiceEndpointUrl)
+      AuthAKVName: $(EsrpAuthAKVName)
+      AuthSignCertName: $(EsrpAuthSignCertName)
+      AppRegistrationClientId: $(EsrpAppRegistrationClientId)
+      AppRegistrationTenantId: $(EsrpAppRegistrationTenantId)
+      EsrpClientId: $(EsrpClientId)
+
+stages:
+  - stage: package
+    dependsOn: [build_x64, build_arm64]
+    jobs:
+      - job: package
+        displayName: "Create msixbundle & appxupload"
+        timeoutInMinutes: 60
+
+        ${{ if eq(parameters.pool, '') }}:
+          pool: {'type': 'windows'}
+
+        ${{ else }}:
+          pool: ${{ parameters.pool }}
+
+        variables:
+          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+          ob_artifactBaseName: 'drop_wsl'
+          ob_artifactSuffix: '_package'
+          buildStagePackageVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_PACKAGE_VERSION'] ]
+          buildStageNugetVersion: $[ stageDependencies.build_x64.build_x64.outputs['version.WSL_NUGET_PACKAGE_VERSION'] ]
+
+        steps:
+          - task: PowerShell@2
+            displayName: "Set package version from build stage"
+            name: version
+            inputs:
+              targetType: inline
+              script: |
+                Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$(buildStagePackageVersion)"
+                Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$(buildStageNugetVersion)"
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download x64 build artifact
+            inputs:
+              artifact: "drop_wsl_build"
+              path: $(Pipeline.Workspace)\drop_x64
+
+          - task: DownloadPipelineArtifact@2
+            displayName: Download arm64 build artifact
+            inputs:
+              artifact: "drop_wsl_build_arm64"
+              path: $(Pipeline.Workspace)\drop_arm64
+
+          - powershell: |
+              $version = "$(version.WSL_PACKAGE_VERSION)"
+
+              # Place per-platform msix files where cmake's bundle target expects them
+              foreach ($arch in @(
+                  @{platform="x64"; dir="X64"},
+                  @{platform="arm64"; dir="arm64"}
+              )) {
+                  $dest = "bin\$($arch.dir)\Release"
+                  New-Item -ItemType Directory -Path $dest -Force
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\installer\installer.$($arch.platform).msix" "$dest\installer.msix"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.lib" "$dest\wslcsdk.lib"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.dll" "$dest\wslcsdk.dll"
+              }
+
+              # Copy MSIs to the output bundle directory
+              $bundleDir = "$(ob_outputDirectory)\bundle"
+              New-Item -ItemType Directory -Path $bundleDir -Force
+              Copy-Item "$(Pipeline.Workspace)\drop_x64\bundle\wsl.${version}.x64.msi" "$bundleDir\"
+              Copy-Item "$(Pipeline.Workspace)\drop_arm64\bundle\wsl.${version}.arm64.msi" "$bundleDir\"
+            displayName: Stage build artifacts
+
+          - task: CMake@1
+            displayName: "CMake configure (bundle-only)"
+            inputs:
+              workingDirectory: "."
+              cmakeArgs: . -DBUNDLE_ONLY=TRUE -DCMAKE_BUILD_TYPE=Release -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION)
+
+          - script: cmake --build . --config Release --target bundle -- -m
+            displayName: Create msixbundle
+
+          - powershell: |
+              Copy-Item "bundle\Release\*.msixbundle" "$(ob_outputDirectory)\bundle\"
+            displayName: Copy bundle to output
+
+          - ${{ if eq(parameters.isRelease, true) }}:
+            - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+              displayName: "Sign the bundle"
+              inputs:
+                ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
+                signConfigType: ${{ parameters.esrp.signConfigType }}
+                SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
+                MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
+                MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
+                ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
+                AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
+                AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
+                AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
+                AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
+                FolderPath: "$(ob_outputDirectory)\\bundle"
+                Pattern: "*.msixbundle"
+                UseMSIAuthentication: true
+                EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
+                inlineOperation: |
+                  [
+                        {
+                            "KeyCode": "CP-230012",
+                            "OperationCode": "SigntoolSign",
+                            "Parameters" : {
+                                  "OpusName" : "Microsoft",
+                                  "OpusInfo" : "http://www.microsoft.com",
+                                  "FileDigest" : "/fd \"SHA256\"",
+                                  "PageHash" : "/NPH",
+                                  "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                              },
+                              "ToolName" : "sign",
+                              "ToolVersion" : "1.0"
+                          },
+                          {
+                              "KeyCode" : "CP-230012",
+                              "OperationCode" : "SigntoolVerify",
+                              "Parameters" : {},
+                              "ToolName" : "sign",
+                              "ToolVersion" : "1.0"
+                          }
+                    ]
+
+          - ${{ if not(eq(parameters.isRelease, true)) }}:
+            - powershell: |
+                # Sign the bundle with the dev cert from the x64 build
+                $cert = "$(Pipeline.Workspace)\drop_x64\installer\dev-cert.pfx"
+                if (-not (Test-Path $cert)) { throw "Dev cert not found at $cert" }
+                $bundle = Get-ChildItem "$(ob_outputDirectory)\bundle\*.msixbundle" | Select-Object -First 1
+                $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction Stop | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+                & $signtool sign /a /v /fd SHA256 /f $cert $bundle.FullName
+              displayName: Sign bundle with dev cert
+
+          - powershell: |
+              $version = "$(version.WSL_PACKAGE_VERSION)"
+
+              # Collect PDBs from both platforms
+              foreach ($source in @(
+                  @{arch="x64"; drop="$(Pipeline.Workspace)\drop_x64\pdb\x64\Release"},
+                  @{arch="ARM64"; drop="$(Pipeline.Workspace)\drop_arm64\pdb\arm64\Release"}
+              ))
+              {
+                  $pdbFolder = Join-Path $(ob_outputDirectory) "pdb\$($source.arch)\Release"
+                  New-Item -ItemType Directory -Path $pdbFolder -Force
+                  if (Test-Path $source.drop) {
+                      Copy-Item -Path "$($source.drop)\*" -Destination $pdbFolder -Recurse
+                  }
+              }
+            displayName: Collect symbols from both platforms
+
+          - powershell: |
+              $version = "$(version.WSL_PACKAGE_VERSION)"
+
+              mkdir appxsym
+              foreach ($arch in @("x64", "ARM64"))
+              {
+                  Get-ChildItem -Path $(ob_outputDirectory)\pdb\$arch\release\*.pdb -Exclude wsltests.pdb | Compress-Archive -DestinationPath appxsym/Microsoft.WSL_${version}_$arch.zip
+                  Copy-Item -Path appxsym/Microsoft.WSL_${version}_$arch.zip -Destination appxsym/Microsoft.WSL_${version}_$arch.appxsym
+              }
+              mkdir $(ob_outputDirectory)/appxupload
+              Get-ChildItem -Path appxsym/*.appxsym,$(ob_outputDirectory)/bundle/Microsoft.WSL_${version}_x64_ARM64.msixbundle | Compress-Archive -DestinationPath $(ob_outputDirectory)/appxupload/Microsoft.WSL_${version}_x64_ARM64.zip
+              Move-Item -Path $(ob_outputDirectory)/appxupload/Microsoft.WSL_${version}_x64_ARM64.zip -Destination $(ob_outputDirectory)/appxupload/Microsoft.WSL_${version}_x64_ARM64.appxupload
+              rm appxsym/*.appxsym
+
+            displayName: Create appxupload
+            condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+
+          - script: md.exe $(ob_outputDirectory)\nuget
+            displayName: "Create the nuget directory"
+
+          - ${{ each package in parameters.nugetPackages }}:
+              - script: nuget.exe pack ${{ package }} -OutputDirectory $(ob_outputDirectory)\nuget -NonInteractive
+                displayName: Build ${{ package }}
+
+          - ${{ if eq(parameters.isRelease, true) }}:
+              - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+                displayName: "Sign nuget packages"
+                inputs:
+                  ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
+                  signConfigType: ${{ parameters.esrp.signConfigType }}
+                  SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
+                  MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
+                  MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
+                  ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
+                  AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
+                  AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
+                  AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
+                  AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
+                  FolderPath: '$(ob_outputDirectory)\nuget'
+                  Pattern: "*.nupkg"
+                  UseMSIAuthentication: true
+                  EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
+                  inlineOperation: |
+                    [
+                        {
+                            "KeyCode": "CP-401405",
+                            "OperationCode": "NuGetSign",
+                            "Parameters" : {},
+                              "ToolName" : "sign",
+                              "ToolVersion" : "1.0"
+                          },
+                          {
+                              "KeyCode" : "CP-401405",
+                              "OperationCode" : "NuGetVerify",
+                              "Parameters" : {},
+                              "ToolName" : "sign",
+                              "ToolVersion" : "1.0"
+                          }
+                    ]
+
+          - ${{ if ne(parameters.pool, '') }}:
+            - task: PublishPipelineArtifact@1
+              inputs:
+                targetPath: $(ob_outputDirectory)
+                artifactName: $(ob_artifactBaseName)$(ob_artifactSuffix)

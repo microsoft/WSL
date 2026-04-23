@@ -37,9 +37,11 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         // Argument::Create(ArgType::DNSDomain),
         // Argument::Create(ArgType::DNSOption),
         // Argument::Create(ArgType::DNSSearch),
+        Argument::Create(ArgType::Domainname),
         Argument::Create(ArgType::Entrypoint),
         Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
+        Argument::Create(ArgType::Hostname),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Name),
         // Argument::Create(ArgType::NoDNS),
@@ -54,6 +56,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::User),
         Argument::Create(ArgType::Volume, false, NO_LIMIT),
         // Argument::Create(ArgType::Virtual),
+        Argument::Create(ArgType::WorkDir),
     };
     // clang-format on
 }
