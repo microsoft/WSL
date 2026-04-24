@@ -61,10 +61,7 @@ class WSLCE2EContainerInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_ContainerNotFound)
     {
         auto result = RunWslc(std::format(L"container inspect {}", TestContainerName1));
-        result.Verify(
-            {.Stdout = L"[]\r\n",
-             .Stderr = std::format(L"Container '{}' not found.\r\n", TestContainerName1),
-             .ExitCode = 1});
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Container '{}' not found.\r\n", TestContainerName1), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_Success)
@@ -153,8 +150,8 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                   //
-                << L"  --session       Specify the session to use\r\n"           //
+        options << L"The following options are available:\r\n"                    //
+                << L"  --session       Specify the session to use\r\n"            //
                 << L"  -?,--help       Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();

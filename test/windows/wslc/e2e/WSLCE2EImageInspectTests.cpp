@@ -51,10 +51,7 @@ class WSLCE2EImageInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
     {
         auto result = RunWslc(std::format(L"image inspect {}", InvalidImage.NameAndTag()));
-        result.Verify(
-            {.Stdout = L"[]\r\n",
-             .Stderr = std::format(L"Image '{}' not found.\r\n", InvalidImage.NameAndTag()),
-             .ExitCode = 1});
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Image '{}' not found.\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_Success)
