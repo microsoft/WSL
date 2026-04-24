@@ -82,9 +82,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     for (const auto& volumeSpec : options.Volumes)
     {
         auto volume = VolumeMount::Parse(volumeSpec);
-        auto host = volume.HostPath();
+        auto host = volume.Host();
         auto container = volume.ContainerPath();
-        containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+        if (volume.IsNamedVolume())
+        {
+            containerLauncher.AddNamedVolume(string::WideToMultiByte(host), container, volume.IsReadOnly());
+        }
+        else
+        {
+            containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+        }
     }
 
     containerLauncher.SetContainerFlags(containerFlags);
@@ -104,6 +111,31 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     if (!options.WorkingDirectory.empty())
     {
         containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
+    }
+
+    if (options.Hostname.has_value())
+    {
+        containerLauncher.SetHostname(std::string(options.Hostname.value()));
+    }
+
+    if (options.Domainname.has_value())
+    {
+        containerLauncher.SetDomainname(std::string(options.Domainname.value()));
+    }
+
+    if (!options.DnsServers.empty())
+    {
+        containerLauncher.SetDnsServers(std::vector<std::string>(options.DnsServers));
+    }
+
+    if (!options.DnsSearchDomains.empty())
+    {
+        containerLauncher.SetDnsSearchDomains(std::vector<std::string>(options.DnsSearchDomains));
+    }
+
+    if (!options.DnsOptions.empty())
+    {
+        containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
     }
 
     for (const auto& tmpfsSpec : options.Tmpfs)

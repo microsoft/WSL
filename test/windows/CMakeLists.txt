@@ -1,6 +1,17 @@
 set(SOURCES
+    SimpleTests.cpp
+    UnitTests.cpp
+    MountTests.cpp
+    NetworkTests.cpp
+    Plan9Tests.cpp
+    DrvFsTests.cpp
     Common.cpp
-    WSLCTests.cpp)
+    PluginTests.cpp
+    PolicyTests.cpp
+    InstallerTests.cpp
+    WSLCTests.cpp
+    WslcSdkTests.cpp
+    WindowsUpdateTests.cpp)
 
 set(HEADERS
     Common.h
@@ -32,6 +43,7 @@ target_link_libraries(wsltests
 
 add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk)
 add_subdirectory(testplugin)
+add_subdirectory(wslc)
 
 # For prettier source tree browsing
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})

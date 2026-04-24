@@ -284,9 +284,6 @@ void WSLCVirtualMachine::Initialize()
 
     m_processExitThread = std::thread(std::bind(&WSLCVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
 
-    // Configure networking
-    ConfigureNetworking();
-
     // Mount VHDs
     const auto rootDevice = GetVhdDevicePath(0);
     Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLC_MOUNT::Chroot | WSLC_MOUNT::OverlayFs);
@@ -309,6 +306,9 @@ void WSLCVirtualMachine::Initialize()
         options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
         CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
     }
+
+    // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
+    ConfigureNetworking();
 }
 
 WSLCVirtualMachine::~WSLCVirtualMachine()

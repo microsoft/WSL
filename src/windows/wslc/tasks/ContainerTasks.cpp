@@ -278,6 +278,46 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Entrypoint.push_back(WideToMultiByte(context.Args.Get<ArgType::Entrypoint>()));
     }
 
+    if (context.Args.Contains(ArgType::Hostname))
+    {
+        options.Hostname = WideToMultiByte(context.Args.Get<ArgType::Hostname>());
+    }
+
+    if (context.Args.Contains(ArgType::Domainname))
+    {
+        options.Domainname = WideToMultiByte(context.Args.Get<ArgType::Domainname>());
+    }
+
+    if (context.Args.Contains(ArgType::DNS))
+    {
+        auto dnsServers = context.Args.GetAll<ArgType::DNS>();
+        options.DnsServers.reserve(options.DnsServers.size() + dnsServers.size());
+        for (const auto& value : dnsServers)
+        {
+            options.DnsServers.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::DNSSearch))
+    {
+        auto dnsSearch = context.Args.GetAll<ArgType::DNSSearch>();
+        options.DnsSearchDomains.reserve(options.DnsSearchDomains.size() + dnsSearch.size());
+        for (const auto& value : dnsSearch)
+        {
+            options.DnsSearchDomains.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::DNSOption))
+    {
+        auto dnsOptions = context.Args.GetAll<ArgType::DNSOption>();
+        options.DnsOptions.reserve(options.DnsOptions.size() + dnsOptions.size());
+        for (const auto& value : dnsOptions)
+        {
+            options.DnsOptions.emplace_back(WideToMultiByte(value));
+        }
+    }
+
     if (context.Args.Contains(ArgType::User))
     {
         options.User = WideToMultiByte(context.Args.Get<ArgType::User>());

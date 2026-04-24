@@ -51,7 +51,7 @@ class WSLCVolumeMountUnitTests
         {
             WEX::Logging::Log::Comment(std::format(L"Testing volume argument: '{}'", std::get<0>(arg)).c_str());
             auto result = VolumeMount::Parse(std::get<0>(arg));
-            VERIFY_ARE_EQUAL(std::get<1>(arg), result.HostPath());
+            VERIFY_ARE_EQUAL(std::get<1>(arg), result.Host());
             VERIFY_ARE_EQUAL(std::get<2>(arg), result.ContainerPath());
             VERIFY_ARE_EQUAL(std::get<3>(arg), result.IsReadOnly());
         }

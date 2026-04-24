@@ -43,6 +43,7 @@ class WSLCE2EContainerRunTests
         EnsureContainerDoesNotExist(WslcContainerName2);
         EnsureImageIsDeleted(DebianImage);
         EnsureImageIsDeleted(PythonImage);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
 
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName.c_str(), nullptr));
         VERIFY_IS_TRUE(::SetEnvironmentVariableW(HostEnvVariableName2.c_str(), nullptr));
@@ -56,6 +57,7 @@ class WSLCE2EContainerRunTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(WslcContainerName2);
+        EnsureVolumeDoesNotExist(WslcVolumeName);
 
         EnvTestFile1 = wsl::windows::common::filesystem::GetTempFilename();
         EnvTestFile2 = wsl::windows::common::filesystem::GetTempFilename();
@@ -559,6 +561,70 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Hostname)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --hostname my-test-host {} hostname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Domainname)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --domainname my-test-domain {} dnsdomainname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-test-domain\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNS)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSSearch)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --dns-search example.com --dns-search test.local {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"search example.com test.local") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSOption)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --dns-option ndots:5 --dns-option timeout:3 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5 timeout:3") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
+    {
+        // Create a named volume
+        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, WslcVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Create a container with --rm that uses the named volume and writes a file to it
+        result = RunWslc(std::format(
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'WSLC Named Volume Test' > /data/test.txt\"",
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Create another container that mounts the same named volume and verify the file content
+        result = RunWslc(std::format(L"container run --rm --volume {}:/data {} cat /data/test.txt", WslcVolumeName, DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"WSLC Named Volume Test", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_NotFound_Fail)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --volume {}:/data {} sh -c \"echo -n 'WSLC Named Volume Test' > /data/test.txt\"",
+            WslcVolumeName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", WslcVolumeName), .ExitCode = 1});
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -582,6 +648,10 @@ private:
     const uint16_t ContainerTestPort = 8080;
     const uint16_t HostTestPort1 = 1234;
     const uint16_t HostTestPort2 = 1235;
+
+    // Test named volume
+    const std::wstring WslcVolumeName = L"wslc-test-volume";
+    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
 
     std::wstring GetHelpMessage() const
     {
@@ -621,9 +691,14 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
+                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
+                << L"  --dns-option      Set DNS options\r\n"
+                << L"  --dns-search      Set DNS search domains\r\n"
+                << L"  --domainname      Container domain name\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
+                << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
