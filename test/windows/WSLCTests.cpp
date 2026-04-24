@@ -5284,6 +5284,57 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerCustomNetworkTest)
+    {
+        const std::string networkName = "custom-net-test";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.30.0.0/16"}};
+
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        networkOptions.DriverOpts = opts;
+        networkOptions.DriverOptsCount = ARRAYSIZE(opts);
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-network", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string(networkName));
+
+        auto container = launcher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, networkName);
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGTERM, 0));
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+        VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkNotFoundTest)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-network-notfound", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string("nonexistent-net"));
+
+        auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, retVal.first);
+        ValidateCOMErrorMessageContains(L"nonexistent-net");
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkMissingNameTest)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-network-noname", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+
+        auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+        ValidateCOMErrorMessageContains(L"Container network name is required");
+    }
+
     WSLC_TEST_METHOD(ContainerInspect)
     {
         // Helper to verify port mappings.

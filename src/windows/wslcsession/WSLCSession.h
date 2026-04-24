@@ -137,6 +137,8 @@ public:
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
+    bool HasNetwork(const std::string& Name);
+
     IFACEMETHOD(Terminate()) override;
 
     // ISupportErrorInfo
