@@ -40,6 +40,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
 
+    case ArgType::Network:
+        validation::ValidateNetworkType(execArgs.GetAll<ArgType::Network>(), m_name);
+        break;
+
     case ArgType::Time:
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
@@ -188,6 +192,35 @@ InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstri
     {
         constexpr std::wstring_view supportedValues = L"image, container, volume";
         throw ArgumentException(Localization::WSLCCLI_InvalidInspectError(argName, input, supportedValues));
+    }
+}
+
+void ValidateNetworkType(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetNetworkTypeFromString(value, argName);
+    }
+}
+
+WSLCContainerNetworkType GetNetworkTypeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    if (IsEqual(input, L"none"))
+    {
+        return WSLCContainerNetworkTypeNone;
+    }
+    else if (IsEqual(input, L"host"))
+    {
+        return WSLCContainerNetworkTypeHost;
+    }
+    else if (IsEqual(input, L"bridge"))
+    {
+        return WSLCContainerNetworkTypeBridged;
+    }
+    else
+    {
+        throw ArgumentException(
+            std::format(L"Invalid {} argument value: '{}'. Expected one of: none, host, bridge", argName, input));
     }
 }
 

@@ -651,6 +651,32 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5 timeout:3") != std::wstring::npos);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_None)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --network none --name {} {} cat /etc/resolv.conf", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        std::wstring containerId = result.GetStdoutOneLine();
+        VerifyContainerIsListed(containerId, L"created");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_Host)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --network host --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        std::wstring containerId = result.GetStdoutOneLine();
+        VerifyContainerIsListed(containerId, L"created");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_Invalid)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --network invalid --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.ExitCode = 1});
+        VERIFY_IS_TRUE(result.Stderr->find(L"Invalid") != std::wstring::npos);
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -720,6 +746,7 @@ private:
                 << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
+                << L"  --network         Connect a container to a network (none, host, bridge)\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"

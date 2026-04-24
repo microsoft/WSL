@@ -65,7 +65,8 @@ _(Input,          "input",               L"i",              Kind::Value,       L
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Label,          "label",               NO_ALIAS,          Kind::Value,       L"Volume metadata setting") \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NameArgDescription()) \
-/*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/ \
+_(Network,        "network",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_NetworkArgDescription()) \
+/*_(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoDNSArgDescription())*/\
 _(NoCache,        "no-cache",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoCacheArgDescription()) \
 _(NoPrune,        "no-prune",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoPruneArgDescription()) \
 _(NoTrunc,        "no-trunc",            NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_NoTruncArgDescription()) \
@@ -85,9 +86,9 @@ _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        L
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SessionIdPositionalArgDescription()) \
-_(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
 _(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription(L"SIGKILL")) \
 _(Source,         "source",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SourceArgDescription()) \
+_(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
 _(Tag,            "tag",                 L"t",              Kind::Value,       Localization::WSLCCLI_TagArgDescription()) \
 _(Target,         "target",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,           "time",                L"t",              Kind::Value,       Localization::WSLCCLI_TimeArgDescription()) \

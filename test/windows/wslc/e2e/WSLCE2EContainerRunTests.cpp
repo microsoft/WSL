@@ -641,6 +641,27 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", WslcVolumeName), .ExitCode = 1});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_None)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --network none {} echo hello", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(*result.Stdout, L"hello\r\n");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_Host)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --network host {} echo hello", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(*result.Stdout, L"hello\r\n");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Network_Invalid)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --network invalid {} echo hello", DebianImage.NameAndTag()));
+        result.Verify({.ExitCode = 1});
+        VERIFY_IS_TRUE(result.Stderr->find(L"Invalid") != std::wstring::npos);
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -716,6 +737,7 @@ private:
                 << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
+                << L"  --network         Connect a container to a network (none, host, bridge)\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
