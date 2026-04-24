@@ -233,8 +233,6 @@ void DockerEventTracker::WaitForObjectCreated(const std::string& ObjectId)
         !m_objectStateChanged.wait_for(lock, c_timeout, [&]() { return m_createdObjects.contains(ObjectId); }),
         "Timed out waiting for Docker create event for object '%hs'",
         ObjectId.c_str());
-
-    m_createdObjects.erase(ObjectId);
 }
 
 void DockerEventTracker::WaitForObjectDestroyed(const std::string& ObjectId)

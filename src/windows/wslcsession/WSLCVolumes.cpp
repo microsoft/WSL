@@ -28,6 +28,7 @@ WSLCVolumes::WSLCVolumes(
     m_dockerClient(dockerClient), m_virtualMachine(virtualMachine), m_storagePath(storagePath)
 {
     // Recover existing volumes from Docker.
+    auto lock = m_lock.lock_exclusive();
     for (const auto& volume : dockerClient.ListVolumes())
     {
         try

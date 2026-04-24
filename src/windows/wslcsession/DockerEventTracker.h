@@ -66,8 +66,6 @@ public:
     DockerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay);
     ~DockerEventTracker();
 
-    void Stop();
-
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept;
