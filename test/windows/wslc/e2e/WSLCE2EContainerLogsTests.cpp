@@ -96,6 +96,30 @@ class WSLCE2EContainerLogsTests
         VERIFY_IS_TRUE(lines[0].find(L"hello") != std::wstring::npos);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Logs_FollowOption)
+    {
+        // Run a detached container that outputs lines with a delay between them
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} {} sh -c \"echo first && sleep 2 && echo second\"",
+            WslcContainerName,
+            DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Start following logs interactively — this blocks until the container exits
+        auto session = RunWslcInteractive(std::format(L"container logs --follow {}", WslcContainerName));
+        VERIFY_IS_TRUE(session.IsRunning(), L"Follow session should be running");
+
+        // Expect the first line of output
+        session.ExpectStdout("first\n");
+
+        // Expect the second line which comes after the sleep
+        session.ExpectStdout("second\n");
+
+        // The container exits after printing second, so follow should terminate
+        auto exitCode = session.Wait(30000);
+        VERIFY_ARE_EQUAL(0, exitCode);
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-e2e-container-logs";
     const TestImage& DebianImage = DebianTestImage();
