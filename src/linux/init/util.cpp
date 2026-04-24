@@ -172,6 +172,7 @@ Return Value:
     if (!InteropConnection)
     {
         LOG_ERROR("accept4 failed {}", errno);
+        return {};
     }
 
     timeval Timeout{};
@@ -786,10 +787,6 @@ Return Value:
         if (Output)
         {
             (*Output) += Buffer.data();
-            if (Result < 0)
-            {
-                goto ErrorExit;
-            }
         }
         else
         {
@@ -1112,13 +1109,14 @@ try
         wsl::shared::MessageWriter<LX_INIT_QUERY_ENVIRONMENT_VARIABLE> Message(LxInitMessageQueryEnvironmentVariable);
         Message.WriteString(Name);
 
-        channel.SendMessage<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message.Span());
+        auto transaction = channel.StartTransaction();
+        transaction.Send<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message.Span());
 
         //
         // Read a response, this will contain the environment variable value if it exists.
         //
 
-        Value = channel.ReceiveMessage<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>().Buffer;
+        Value = transaction.Receive<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>().Buffer;
 
         //
         // Set the environment variable for future queries.
@@ -1197,8 +1195,9 @@ Return Value:
         Message.MessageType = LxInitMessageQueryFeatureFlags;
         Message.MessageSize = sizeof(Message);
 
-        channel.SendMessage(Message);
-        FeatureFlags = channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
+        auto transaction = channel.StartTransaction();
+        transaction.Send(Message);
+        FeatureFlags = transaction.Receive<RESULT_MESSAGE<int32_t>>().Result;
     }
 
     UtilSetFeatureFlags(FeatureFlags, FeatureFlagEnv == nullptr);
@@ -1266,9 +1265,10 @@ try
     Message.MessageType = LxInitMessageQueryNetworkingMode;
     Message.MessageSize = sizeof(Message);
 
-    channel.SendMessage(Message);
+    auto transaction = channel.StartTransaction();
+    transaction.Send(Message);
 
-    const auto& response = channel.ReceiveMessage<RESULT_MESSAGE<uint8_t>>();
+    const auto& response = transaction.Receive<RESULT_MESSAGE<uint8_t>>();
     auto NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(response.Result);
 
     THROW_ERRNO_IF(EINVAL, NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy);
@@ -1360,9 +1360,10 @@ try
     THROW_LAST_ERROR_IF(channel.Socket() < 0);
 
     wsl::shared::MessageWriter<LX_INIT_QUERY_VM_ID> Message(LxInitMessageQueryVmId);
-    channel.SendMessage<LX_INIT_QUERY_VM_ID>(Message.Span());
+    auto transaction = channel.StartTransaction();
+    transaction.Send<LX_INIT_QUERY_VM_ID>(Message.Span());
 
-    return channel.ReceiveMessage<LX_INIT_QUERY_VM_ID>().Buffer;
+    return transaction.Receive<LX_INIT_QUERY_VM_ID>().Buffer;
 }
 catch (...)
 {
@@ -3380,7 +3381,7 @@ Return Value:
     return 0;
 }
 
-int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<gsl::byte> Buffer)
+int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
 {
     auto* Message = gslhelpers::try_get_struct<CREATE_PROCESS_MESSAGE>(Buffer);
     if (!Message)
@@ -3389,7 +3390,7 @@ int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<g
         return -1;
     }
 
-    auto sendResult = [&](unsigned long Result) { channel.SendResultMessage<int32_t>(Result); };
+    auto sendResult = [&](unsigned long Result) { Transaction.SendResultMessage<int32_t>(Result); };
 
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false)};
