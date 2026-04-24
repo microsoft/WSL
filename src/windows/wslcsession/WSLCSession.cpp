@@ -2282,6 +2282,7 @@ CATCH_RETURN();
 
 bool WSLCSession::HasNetwork(const std::string& Name)
 {
+    ValidateName(Name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
     std::lock_guard networksLock(m_networksLock);
     return m_networks.contains(Name);
 }
