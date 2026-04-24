@@ -952,7 +952,7 @@ try
         HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(path), "Path is not a directory: '%ls'", WindowsPath);
 
     const bool readOnly = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly);
-    auto normalizedPath = path.lexically_normal().wstring();
+    auto normalizedPath = std::filesystem::weakly_canonical(path).wstring();
     GUID shareGuid{};
     bool reusingShare = false;
 
@@ -994,13 +994,9 @@ try
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
             m_mountedWindowsFolders.erase(mountIt);
-            if (!reusingShare)
+            if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
             {
-                if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
-                {
-                    m_virtioFsShares.erase({normalizedPath, readOnly});
-                }
-
+                m_virtioFsShares.erase({normalizedPath, readOnly});
                 LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
             }
         }
