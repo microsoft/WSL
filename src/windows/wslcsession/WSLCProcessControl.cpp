@@ -44,7 +44,7 @@ const wil::unique_event& WSLCProcessControl::GetExitEvent() const
 DockerContainerProcessControl::DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker) :
     m_container(&Container),
     m_client(DockerClient),
-    m_trackingReference(EventTracker.RegisterContainerStateUpdates(
+    m_eventTrackingReference(EventTracker.RegisterContainerStateUpdates(
         Container.ID(),
         std::bind(&DockerContainerProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
@@ -103,7 +103,7 @@ void DockerContainerProcessControl::OnContainerReleased() noexcept
     // N.B. The caller might keep a reference to the process even after the container is released.
     // If that happens, make sure that the state tracking can't outlive the session.
     // This is safe to call without the lock because removing the tracking reference is protected by the event tracker lock.
-    m_trackingReference.Reset();
+    m_eventTrackingReference.Reset();
 
     // Signal the exit event to prevent callers from being blocked on it.
     if (!m_exitEvent.is_signaled())
@@ -118,7 +118,7 @@ DockerExecProcessControl::DockerExecProcessControl(
     m_container(&Container),
     m_id(Id),
     m_client(DockerClient),
-    m_trackingReference(EventTracker.RegisterExecStateUpdates(
+    m_eventTrackingReference(EventTracker.RegisterExecStateUpdates(
         Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)))
 {
 }
@@ -197,7 +197,7 @@ void DockerExecProcessControl::OnContainerReleased() noexcept
     // If that happens, make sure that the state tracking can't outlive the session.
     // This is safe to call without the lock because removing the tracking reference is protected by the event tracker lock.
 
-    m_trackingReference.Reset();
+    m_eventTrackingReference.Reset();
 
     // Signal the exit event to prevent callers being blocked on it.
     if (!m_exitEvent.is_signaled())

@@ -55,7 +55,7 @@ private:
     std::mutex m_lock;
     DockerHTTPClient& m_client;
     WSLCContainerImpl* m_container{};
-    DockerEventTracker::EventTrackingReference m_trackingReference;
+    DockerEventTracker::EventTrackingReference m_eventTrackingReference;
 };
 
 class DockerExecProcessControl : public WSLCProcessControl
@@ -79,7 +79,7 @@ private:
     std::optional<int> m_pid{};
     DockerHTTPClient& m_client;
     WSLCContainerImpl* m_container{};
-    DockerEventTracker::EventTrackingReference m_trackingReference;
+    DockerEventTracker::EventTrackingReference m_eventTrackingReference;
 };
 
 class VMProcessControl : public WSLCProcessControl
