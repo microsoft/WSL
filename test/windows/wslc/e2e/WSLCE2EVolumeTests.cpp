@@ -71,6 +71,7 @@ private:
             {L"remove", Localization::WSLCCLI_VolumeRemoveDesc()},
             {L"inspect", Localization::WSLCCLI_VolumeInspectDesc()},
             {L"list", Localization::WSLCCLI_VolumeListDesc()},
+            {L"prune", Localization::WSLCCLI_VolumePruneDesc()},
         };
 
         size_t maxLen = 0;

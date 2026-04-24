@@ -14,6 +14,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentValidation.h"
 #include "CLIExecutionContext.h"
+#include "ImageModel.h"
 #include "VolumeModel.h"
 #include "VolumeService.h"
 #include "VolumeTasks.h"
@@ -202,5 +203,22 @@ void ListVolumes(CLIExecutionContext& context)
     default:
         THROW_HR(E_UNEXPECTED);
     }
+}
+
+void PruneVolumes(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    bool all = context.Args.Contains(ArgType::All);
+    auto result = VolumeService::Prune(session, all);
+
+    for (const auto& volume : result.DeletedVolumes)
+    {
+        PrintMessage(Localization::WSLCCLI_VolumePruneDeleted(volume));
+    }
+
+    PrintMessage(L"");
+    PrintMessage(Localization::WSLCCLI_VolumePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
 }
 } // namespace wsl::windows::wslc::task

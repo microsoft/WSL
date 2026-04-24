@@ -27,4 +27,10 @@ struct CreateVolumeOptions
     std::vector<std::pair<std::string, std::string>> Labels{};
 };
 
+struct PruneVolumesResult
+{
+    std::vector<std::string> DeletedVolumes;
+    ULONGLONG SpaceReclaimed{};
+};
+
 } // namespace wsl::windows::wslc::models
