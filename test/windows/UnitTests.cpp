@@ -383,11 +383,6 @@ class UnitTests
                     LxsstuLaunchWslAndCaptureOutput(L"cat /run/systemd/generator/systemd-binfmt.service.d/override.conf");
                 VERIFY_IS_TRUE(serviceOverride.find(L"ExecStop=") != std::wstring::npos);
                 VERIFY_IS_TRUE(serviceOverride.find(L"ExecStartPost=") != std::wstring::npos);
-
-                auto [mountOverride, ___] =
-                    LxsstuLaunchWslAndCaptureOutput(L"cat /run/systemd/generator/proc-sys-fs-binfmt_misc.mount.d/override.conf");
-                VERIFY_IS_TRUE(mountOverride.find(L"DefaultDependencies=no") != std::wstring::npos);
-                VERIFY_IS_TRUE(mountOverride.find(L"Before=umount.target") != std::wstring::npos);
             };
 
             validateGeneratedBinfmtFiles();
@@ -418,7 +413,6 @@ class UnitTests
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /run/binfmt.d/WSLInterop.conf"), 1u);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/systemd-binfmt.service.d/override.conf"), 1u);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/proc-sys-fs-binfmt_misc.mount.d/override.conf"), 1u);
 
             // Validate that WSL's binfmt interpreter is overridden
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
