@@ -804,10 +804,21 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 {
-    // Acquire an exclusive lock since this method modifies m_state.
-    auto lock = m_lock.lock_exclusive();
+    {
+        // Acquire an exclusive lock since this method modifies m_state.
+        auto lock = m_lock.lock_exclusive();
 
-    DeleteExclusiveLockHeld(Flags);
+        DeleteExclusiveLockHeld(Flags);
+    }
+
+    // Wait for the container destroy event on the Docker event stream after releasing m_lock.
+    // Docker emits volume destroy events before the container destroy event, so once this returns
+    // we are guaranteed that all anonymous volumes deleted with the container have been removed from tracking.
+    // N.B. This must be done outside m_lock to avoid an ABBA deadlock with the relay thread.
+    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
+    {
+        m_eventTracker.WaitForObjectDestroyed(m_id);
+    }
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
@@ -828,14 +839,6 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
         m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
-
-    // Wait for the container destroy event on the Docker event stream.
-    // Docker emits volume destroy events before the container destroy event, so once this returns
-    // we are guaranteed that all anonymous volumes deleted with the container have been removed from tracking.
-    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
-    {
-        m_eventTracker.WaitForObjectDestroyed(m_id);
-    }
 
     Transition(WslcContainerStateDeleted);
     ReleaseResources();
