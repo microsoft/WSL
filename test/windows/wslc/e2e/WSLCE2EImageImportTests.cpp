@@ -63,8 +63,7 @@ class WSLCE2EImageImportTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Import the tarball as a new image with a tag
-        auto importResult =
-            RunWslc(std::format(L"image import \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
+        auto importResult = RunWslc(std::format(L"image import \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify the imported image is listed
@@ -96,8 +95,7 @@ class WSLCE2EImageImportTests
         saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
 
         // Import using the root 'import' alias
-        auto importResult =
-            RunWslc(std::format(L"import \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
+        auto importResult = RunWslc(std::format(L"import \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify the imported image is listed
@@ -134,9 +132,9 @@ private:
     std::wstring GetAvailableCommands() const
     {
         std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"                                             //
-                 << L"  file       " << Localization::WSLCCLI_ImportFileArgDescription() << L"\r\n"          //
-                 << L"  image      " << Localization::WSLCCLI_ImageIdArgDescription() << L"\r\n"             //
+        commands << L"The following arguments are available:\r\n"                                   //
+                 << L"  file       " << Localization::WSLCCLI_ImportFileArgDescription() << L"\r\n" //
+                 << L"  image      " << Localization::WSLCCLI_ImageIdArgDescription() << L"\r\n"    //
                  << L"\r\n";
         return commands.str();
     }
@@ -144,9 +142,9 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                                                 //
-                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n"             //
-                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"                  //
+        options << L"The following options are available:\r\n"                                    //
+                << L"  --session  " << Localization::WSLCCLI_SessionIdArgDescription() << L"\r\n" //
+                << L"  -?,--help  " << Localization::WSLCCLI_HelpArgDescription() << L"\r\n"      //
                 << L"\r\n";
         return options.str();
     }

@@ -199,8 +199,7 @@ void ImageService::Import(wsl::windows::wslc::models::Session& session, const st
     }
     else
     {
-        imageFile.reset(
-            CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        imageFile.reset(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
         THROW_LAST_ERROR_IF(!imageFile);
 
         LARGE_INTEGER fileSize{};
