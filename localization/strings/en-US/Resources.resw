@@ -2565,6 +2565,13 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Remove the container after it stops</value>
   </data>
+  <data name="WSLCCLI_GpuArgDescription" xml:space="preserve">
+    <value>Enable GPU access in the container</value>
+    <comment>{Locked="GPU"}Technical term should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InitArgDescription" xml:space="preserve">
+    <value>Run an init inside the container that forwards signals and reaps processes</value>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>Session ID</value>
   </data>
