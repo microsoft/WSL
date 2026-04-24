@@ -46,7 +46,7 @@ MODULE_CLEANUP(ModuleCleanup);
 // The watchdog timeout is set to 3 hours.
 //
 
-#define LXSS_WATCHDOG_TIMEOUT (5 * 60 * 1000)
+#define LXSS_WATCHDOG_TIMEOUT (60 * 60 * 1000)
 #define LXSS_WATCHDOG_TIMEOUT_WINDOW 1000
 
 //
