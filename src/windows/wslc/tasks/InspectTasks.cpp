@@ -16,6 +16,7 @@ Abstract:
 #include "InspectTasks.h"
 #include "InspectModel.h"
 #include "ImageService.h"
+#include "NetworkService.h"
 #include "VolumeService.h"
 #include "ContainerService.h"
 
@@ -57,6 +58,11 @@ static bool TryInspectContainer(wsl::windows::wslc::models::Session& session, co
     return TryInspect([&]() { result = services::ContainerService::Inspect(session, containerId); }, WSLC_E_CONTAINER_NOT_FOUND);
 }
 
+static bool TryInspectNetwork(wsl::windows::wslc::models::Session& session, const std::string& networkName, std::optional<wslc_schema::InspectNetwork>& result)
+{
+    return TryInspect([&]() { result = services::NetworkService::Inspect(session, networkName); }, WSLC_E_NETWORK_NOT_FOUND);
+}
+
 static bool TryInspectVolume(wsl::windows::wslc::models::Session& session, const std::string& volumeId, std::optional<wslc_schema::InspectVolume>& result)
 {
     return TryInspect([&]() { result = services::VolumeService::Inspect(session, volumeId); }, WSLC_E_VOLUME_NOT_FOUND);
@@ -80,6 +86,7 @@ void Inspect(CLIExecutionContext& context)
         auto id = WideToMultiByte(objectId);
         std::optional<wslc_schema::InspectContainer> container;
         std::optional<wslc_schema::InspectImage> image;
+        std::optional<wslc_schema::InspectNetwork> network;
         std::optional<wslc_schema::InspectVolume> volume;
 
         if (WI_IsFlagSet(type, InspectType::Container) && TryInspectContainer(session, id, container))
@@ -89,6 +96,10 @@ void Inspect(CLIExecutionContext& context)
         else if (WI_IsFlagSet(type, InspectType::Image) && TryInspectImage(session, id, image))
         {
             array.push_back(std::move(*image));
+        }
+        else if (WI_IsFlagSet(type, InspectType::Network) && TryInspectNetwork(session, id, network))
+        {
+            array.push_back(std::move(*network));
         }
         else if (WI_IsFlagSet(type, InspectType::Volume) && TryInspectVolume(session, id, volume))
         {
