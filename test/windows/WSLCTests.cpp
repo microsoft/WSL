@@ -3163,6 +3163,59 @@ class WSLCTests
         ValidateWindowsMounts(true);
     }
 
+    // Validates that VirtioFs shares are reused across mount/unmount cycles for the same Windows folder.
+    WSLC_TEST_METHOD(WindowsMountsVirtioFsShareReuse)
+    {
+        auto settings = GetDefaultSessionSettings(L"virtiofs-share-reuse-test");
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+
+        auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
+        auto testFolder = std::filesystem::current_path() / "test-folder-share-reuse";
+        std::filesystem::create_directories(testFolder);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        auto getMountSource = [&](const char* mountPoint) -> std::string {
+            auto cmd = std::format("findmnt -n -o SOURCE {}", mountPoint);
+            auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", cmd}, 0);
+            return result.Output[1];
+        };
+
+        // Mount, capture the source (share GUID), unmount, remount, verify same GUID is reused.
+        {
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
+            auto firstSource = getMountSource("/win-path");
+            VERIFY_IS_FALSE(firstSource.empty());
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+            ExpectMount(session.get(), "/win-path", {});
+
+            // Remount the same folder - should reuse the same share GUID.
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
+            auto secondSource = getMountSource("/win-path");
+
+            VERIFY_ARE_EQUAL(firstSource, secondSource);
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+        }
+
+        // Verify that changing the read-only flag produces a different share GUID.
+        {
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
+            auto rwSource = getMountSource("/win-path");
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            auto roSource = getMountSource("/win-path");
+
+            VERIFY_ARE_NOT_EQUAL(rwSource, roSource);
+
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
+        }
+    }
+
     // This test case validates that no file descriptors are leaked to user processes.
     WSLC_TEST_METHOD(Fd)
     {
