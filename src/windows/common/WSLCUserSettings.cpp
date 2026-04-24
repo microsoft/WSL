@@ -202,16 +202,14 @@ namespace {
             {
                 const auto widePath = MultiByteToWide(path);
                 warnings.push_back(
-                    {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidValue(widePath, filePath, node->Mark().line + 1),
-                     widePath});
+                    {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidValue(widePath, filePath, node->Mark().line + 1), widePath});
             }
         }
         catch (...)
         {
             const auto widePath = MultiByteToWide(path);
             warnings.push_back(
-                {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidType(widePath, filePath, node->Mark().line + 1),
-                 widePath});
+                {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidType(widePath, filePath, node->Mark().line + 1), widePath});
         }
     }
 
@@ -251,7 +249,8 @@ namespace {
         const YAML::Node& root,
         const std::set<std::string>& knownPaths,
         const std::set<std::string>& knownPrefixes,
-        const std::wstring& filePath, std::vector<Warning>& warnings)
+        const std::wstring& filePath,
+        std::vector<Warning>& warnings)
     {
         // Stack of (node, prefix) pairs to process.
         std::vector<std::pair<YAML::Node, std::string>> stack;
@@ -273,8 +272,7 @@ namespace {
                 {
                     auto location = prefix.empty() ? std::wstring(L"root") : MultiByteToWide(prefix);
                     warnings.push_back(
-                        {wsl::shared::Localization::WSLCUserSettings_Warning_NonStringKey(location, filePath, it->first.Mark().line + 1),
-                         location});
+                        {wsl::shared::Localization::WSLCUserSettings_Warning_NonStringKey(location, filePath, it->first.Mark().line + 1), location});
                     continue;
                 }
 
@@ -292,7 +290,8 @@ namespace {
                         // Unknown section — warn once, don't traverse.
                         const auto widePath = MultiByteToWide(fullPath);
                         warnings.push_back(
-                            {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownSection(widePath, filePath, it->first.Mark().line + 1),
+                            {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownSection(
+                                 widePath, filePath, it->first.Mark().line + 1),
                              widePath});
                     }
                 }
@@ -301,8 +300,7 @@ namespace {
                     // Unknown setting
                     const auto widePath = MultiByteToWide(fullPath);
                     warnings.push_back(
-                        {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownKey(widePath, filePath, it->first.Mark().line + 1),
-                         widePath});
+                        {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownKey(widePath, filePath, it->first.Mark().line + 1), widePath});
                 }
             }
         }
@@ -320,8 +318,7 @@ namespace {
             // emit a warning so the user understands why settings were ignored.
             if (err != ENOENT)
             {
-                warnings.push_back(
-                    {wsl::shared::Localization::WSLCUserSettings_Warning_FailedToOpen(path.wstring(), err), {}});
+                warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_FailedToOpen(path.wstring(), err), {}});
             }
 
             return std::nullopt;
