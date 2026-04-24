@@ -102,10 +102,8 @@ class WSLCE2EVolumePruneTests
     {
         // Create a volume and a container using it
         RunWslc(std::format(L"volume create --name {}", TestVolumeName1)).Verify({.Stderr = L"", .ExitCode = 0});
-        RunWslc(std::format(L"container run -d --name {} -v {}:/data {} sleep infinity",
-                            TestContainerName,
-                            TestVolumeName1,
-                            DebianImage.NameAndTag()))
+        RunWslc(std::format(
+                    L"container run -d --name {} -v {}:/data {} sleep infinity", TestContainerName, TestVolumeName1, DebianImage.NameAndTag()))
             .Verify({.Stderr = L"", .ExitCode = 0});
 
         auto cleanup = wil::scope_exit([&]() {
