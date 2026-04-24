@@ -2299,6 +2299,12 @@ try
 }
 CATCH_RETURN();
 
+bool WSLCSession::HasNetwork(const std::string& Name)
+{
+    std::lock_guard networksLock(m_networksLock);
+    return m_networks.contains(Name);
+}
+
 HRESULT WSLCSession::Terminate()
 try
 {

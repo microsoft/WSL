@@ -139,6 +139,11 @@ void WSLCContainerLauncher::SetContainerFlags(WSLCContainerFlags Flags)
     m_containerFlags = Flags;
 }
 
+void WSLCContainerLauncher::SetContainerNetworkName(std::string&& name)
+{
+    m_containerNetworkName = std::move(name);
+}
+
 void WSLCContainerLauncher::SetHostname(std::string&& Hostname)
 {
     m_hostname = std::move(Hostname);
@@ -250,6 +255,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
+    options.ContainerNetwork.ContainerNetworkName = m_containerNetworkName.empty() ? nullptr : m_containerNetworkName.c_str();
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
