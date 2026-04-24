@@ -270,6 +270,12 @@ private:
     }
 };
 
+struct PruneContainersResult
+{
+    std::vector<std::string> DeletedContainers;
+    ULONGLONG SpaceReclaimed{};
+};
+
 struct TmpfsMount
 {
     std::string ContainerPath() const
