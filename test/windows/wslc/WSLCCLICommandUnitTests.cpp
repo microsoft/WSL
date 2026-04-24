@@ -13,6 +13,8 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <unordered_map>
+#include <unordered_set>
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
