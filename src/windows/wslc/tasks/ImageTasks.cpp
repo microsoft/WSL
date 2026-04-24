@@ -187,6 +187,22 @@ void LoadImage(CLIExecutionContext& context)
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageLoadNoInputError());
 }
 
+void ImportImage(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Args.Contains(ArgType::ImportFile));
+    auto& session = context.Data.Get<Data::Session>();
+
+    std::string imageName;
+    if (context.Args.Contains(ArgType::ImageId))
+    {
+        imageName = WideToMultiByte(context.Args.Get<ArgType::ImageId>());
+    }
+
+    auto& input = context.Args.Get<ArgType::ImportFile>();
+    services::ImageService::Import(session, input, imageName);
+}
+
 void InspectImages(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));

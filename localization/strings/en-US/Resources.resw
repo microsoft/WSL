@@ -2287,6 +2287,12 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
     <value>Inspect images.</value>
   </data>
+  <data name="WSLCCLI_ImageImportDesc" xml:space="preserve">
+    <value>Import an image from a tarball.</value>
+  </data>
+  <data name="WSLCCLI_ImageImportLongDesc" xml:space="preserve">
+    <value>Imports the contents of a tarball to create a filesystem image. Optionally tag the image with a repository and tag name.</value>
+  </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
     <value>List images.</value>
   </data>
@@ -2528,6 +2534,9 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
     <value>Image name</value>
+  </data>
+  <data name="WSLCCLI_ImportFileArgDescription" xml:space="preserve">
+    <value>File or - to read from stdin</value>
   </data>
   <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
     <value>Provides path to the tar archive file containing the image</value>
