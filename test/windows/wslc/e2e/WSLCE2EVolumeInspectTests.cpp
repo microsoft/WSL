@@ -52,7 +52,7 @@ class WSLCE2EVolumeInspectTests
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_Success)
     {
-        auto result = RunWslc(std::format(L"volume create --driver vhd --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName1));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName1));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestVolumeName1, result.GetStdoutOneLine());
 
@@ -64,16 +64,16 @@ class WSLCE2EVolumeInspectTests
         auto inspect = inspectData[0];
 
         VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), inspect.Name);
-        VERIFY_ARE_EQUAL("vhd", inspect.Driver);
+        VERIFY_ARE_EQUAL("guest", inspect.Driver);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_InspectMultiple_Success)
     {
         // Create two volumes to inspect at the same time
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName1));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName1));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestVolumeName1, result.GetStdoutOneLine());
-        result = RunWslc(std::format(L"volume create --driver vhd --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName2));
+        result = RunWslc(std::format(L"volume create {}", TestVolumeName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestVolumeName2, result.GetStdoutOneLine());
 
@@ -86,11 +86,11 @@ class WSLCE2EVolumeInspectTests
 
         auto inspect1 = inspectData[0];
         VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName1), inspect1.Name);
-        VERIFY_ARE_EQUAL("vhd", inspect1.Driver);
+        VERIFY_ARE_EQUAL("guest", inspect1.Driver);
 
         auto inspect2 = inspectData[1];
         VERIFY_ARE_EQUAL(WideToMultiByte(TestVolumeName2), inspect2.Name);
-        VERIFY_ARE_EQUAL("vhd", inspect2.Driver);
+        VERIFY_ARE_EQUAL("guest", inspect2.Driver);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_NotFound)
@@ -102,7 +102,7 @@ class WSLCE2EVolumeInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Volume_Inspect_MixedFoundNotFound)
     {
         // Create one volume but not the other
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, TestVolumeName1));
+        auto result = RunWslc(std::format(L"volume create {}", TestVolumeName1));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_ARE_EQUAL(TestVolumeName1, result.GetStdoutOneLine());
 
@@ -121,7 +121,6 @@ class WSLCE2EVolumeInspectTests
 private:
     const std::wstring TestVolumeName1 = L"wslc-e2e-volume-inspect-1";
     const std::wstring TestVolumeName2 = L"wslc-e2e-volume-inspect-2";
-    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
 
     std::wstring GetHelpMessage() const
     {

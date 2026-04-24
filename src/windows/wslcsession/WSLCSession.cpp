@@ -2040,6 +2040,12 @@ try
         docker_schema::IPAMConfig ipamConfig;
         ipamConfig.Subnet = it->second;
 
+        auto gatewayIt = driverOpts.find("Gateway");
+        if (gatewayIt != driverOpts.end())
+        {
+            ipamConfig.Gateway = gatewayIt->second;
+        }
+
         auto& ipam = request.IPAM.emplace();
         ipam.Driver = "default";
         ipam.Config.emplace().push_back(std::move(ipamConfig));

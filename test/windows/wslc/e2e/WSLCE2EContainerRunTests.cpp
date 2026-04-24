@@ -617,7 +617,7 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, WslcVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", WslcVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Create a container with --rm that uses the named volume and writes a file to it
@@ -671,7 +671,6 @@ private:
 
     // Test named volume
     const std::wstring WslcVolumeName = L"wslc-test-volume";
-    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
 
     std::wstring GetHelpMessage() const
     {
