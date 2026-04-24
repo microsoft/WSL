@@ -27,8 +27,14 @@ WSLCVolumes::WSLCVolumes(
     DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker, const std::filesystem::path& storagePath) :
     m_dockerClient(dockerClient), m_virtualMachine(virtualMachine), m_storagePath(storagePath)
 {
-    // Recover existing volumes from Docker.
+    // Hold m_lock exclusively across both callback registration and the recovery loop.
+    // This ensures any volume events that arrive while recovering are queued behind us in OnVolumeEvent,
+    // and dedup naturally against entries inserted by recovery (insert is a no-op for existing keys).
     auto lock = m_lock.lock_exclusive();
+
+    m_volumeEventTracking = eventTracker.RegisterVolumeUpdates(
+        std::bind(&WSLCVolumes::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
     for (const auto& volume : dockerClient.ListVolumes())
     {
         try
@@ -37,10 +43,6 @@ WSLCVolumes::WSLCVolumes(
         }
         CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());
     }
-
-    // Register for volume events after recovery is complete.
-    m_volumeEventTracking = eventTracker.RegisterVolumeUpdates(
-        std::bind(&WSLCVolumes::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
 
 __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol)
@@ -83,7 +85,7 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(Name));
     }
 
-    std::string driver = (Driver != nullptr && Driver[0] != '\0') ? Driver : WSLCVhdVolumeDriver;
+    std::string driver = (Driver != nullptr && Driver[0] != '\0') ? Driver : WSLCGuestVolumeDriver;
     std::unique_ptr<IWSLCVolume> volume;
 
     if (driver == WSLCVhdVolumeDriver)
