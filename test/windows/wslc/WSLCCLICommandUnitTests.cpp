@@ -184,22 +184,24 @@ class WSLCCLICommandUnitTests
             VERIFY_IS_NOT_NULL(current.get());
 
             const std::wstring commandFullName(current->FullName());
-            std::unordered_map<std::wstring, std::wstring> seenNames;   // name  -> first arg that claimed it
-            std::unordered_map<std::wstring, std::wstring> seenAliases; // alias  -> first arg that claimed it
+            std::unordered_set<std::wstring> seenNames;
+            std::unordered_set<std::wstring> seenAliases;
 
             for (const auto& arg : current->GetAllArguments())
             {
                 // Check name collision.
                 const auto& name = arg.Name();
-                auto [it, inserted] = seenNames.emplace(name, name);
-                VERIFY_IS_TRUE(inserted, std::format(L"Command '{}' has no duplicate name '--{}'", commandFullName, name).c_str());
+                VERIFY_IS_TRUE(
+                    seenNames.emplace(name).second,
+                    std::format(L"Command '{}' has no duplicate name '--{}'", commandFullName, name).c_str());
 
                 // Check alias collision; skip empty aliases (NO_ALIAS).
                 const auto& alias = arg.Alias();
                 if (!alias.empty())
                 {
-                    auto [it, inserted] = seenAliases.emplace(alias, name);
-                    VERIFY_IS_TRUE(inserted, std::format(L"Command '{}' has no duplicate alias '-{}'", commandFullName, alias).c_str());
+                    VERIFY_IS_TRUE(
+                        seenAliases.emplace(alias).second,
+                        std::format(L"Command '{}' has no duplicate alias '-{}'", commandFullName, alias).c_str());
                 }
             }
 
