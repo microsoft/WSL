@@ -75,9 +75,7 @@ class WSLCE2ENetworkCreateTests
     {
         auto result = RunWslc(std::format(L"network create --driver invalid_driver {}", TestNetworkName));
         result.Verify(
-            {.Stdout = L"",
-             .Stderr = std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG\r\n"),
-             .ExitCode = 1});
+            {.Stdout = L"", .Stderr = std::format(L"Unsupported network driver: 'invalid_driver'\r\nError code: E_INVALIDARG\r\n"), .ExitCode = 1});
 
         VerifyNetworkIsNotListed(TestNetworkName);
     }
@@ -130,12 +128,12 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                              //
-                << L"  -d,--driver    Specify volume driver name (default guest)\r\n"       //
-                << L"  -o,--opt       Set driver specific options\r\n"                      //
-                << L"  --label        Volume metadata setting\r\n"                          //
-                << L"  --session      Specify the session to use\r\n"                       //
-                << L"  -?,--help      Shows help about the selected command\r\n"            //
+        options << L"The following options are available:\r\n"                        //
+                << L"  -d,--driver    Specify volume driver name (default guest)\r\n" //
+                << L"  -o,--opt       Set driver specific options\r\n"                //
+                << L"  --label        Volume metadata setting\r\n"                    //
+                << L"  --session      Specify the session to use\r\n"                 //
+                << L"  -?,--help      Shows help about the selected command\r\n"      //
                 << L"\r\n";
         return options.str();
     }
