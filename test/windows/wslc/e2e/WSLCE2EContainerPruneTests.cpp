@@ -66,8 +66,7 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_StoppedContainer)
     {
         // Create a stopped container
-        RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()))
-            .Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(TestContainerName1, L"created");
 
@@ -84,10 +83,8 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_MultipleStoppedContainers)
     {
         // Create two stopped containers
-        RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()))
-            .Verify({.Stderr = L"", .ExitCode = 0});
-        RunWslc(std::format(L"container create --name {} {}", TestContainerName2, DebianImage.NameAndTag()))
-            .Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container create --name {} {}", TestContainerName2, DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
 
         VerifyContainerIsListed(TestContainerName1, L"created");
         VerifyContainerIsListed(TestContainerName2, L"created");
@@ -122,8 +119,7 @@ class WSLCE2EContainerPruneTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Prune_IdempotentSecondPrune)
     {
         // Create and prune a container, then prune again
-        RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()))
-            .Verify({.Stderr = L"", .ExitCode = 0});
+        RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag())).Verify({.Stderr = L"", .ExitCode = 0});
 
         RunWslc(L"container prune").Verify({.Stderr = L"", .ExitCode = 0});
         VerifyContainerIsNotListed(TestContainerName1);
