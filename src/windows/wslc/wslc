@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+#
+# Copyright (c) Microsoft. All rights reserved.
+#
+# Shell script to allow running wslc from within a WSL distribution
+# without needing the .exe extension (e.g. 'wslc' instead of 'wslc.exe').
+
+WSL_PATH="$(dirname "$(realpath "$0")")"
+WSLC_EXE="$WSL_PATH/wslc.exe"
+
+exec "$WSLC_EXE" "$@"
