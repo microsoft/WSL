@@ -56,8 +56,8 @@ class WSLCE2EContainerLogsTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Success)
     {
-        auto result = RunWslc(
-            std::format(L"container run --name {} {} sh -c \"echo hello && echo world\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container run --name {} {} sh -c \"echo hello && echo world\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container logs {}", WslcContainerName));
@@ -82,8 +82,8 @@ class WSLCE2EContainerLogsTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_TimestampsOption)
     {
-        auto result = RunWslc(
-            std::format(L"container run --name {} {} sh -c \"echo hello\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto result =
+            RunWslc(std::format(L"container run --name {} {} sh -c \"echo hello\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container logs --timestamps {}", WslcContainerName));
@@ -100,9 +100,7 @@ class WSLCE2EContainerLogsTests
     {
         // Run a detached container that outputs lines with a delay between them
         auto result = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"echo first && sleep 2 && echo second\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+            L"container run -d --name {} {} sh -c \"echo first && sleep 2 && echo second\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Start following logs interactively — this blocks until the container exits
@@ -148,8 +146,8 @@ private:
     std::wstring GetAvailableCommands() const
     {
         std::wstringstream commands;
-        commands << L"The following arguments are available:\r\n"  //
-                 << L"  container-id    Container name or id\r\n"  //
+        commands << L"The following arguments are available:\r\n" //
+                 << L"  container-id    Container name or id\r\n" //
                  << L"\r\n";
         return commands.str();
     }
@@ -157,14 +155,14 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"                                          //
-                << L"  --session       Specify the session to use\r\n"                                  //
-                << L"  -f,--follow     Follow log output\r\n"                                           //
-                << L"  -n,--tail       Number of lines to show from the end of the logs\r\n"            //
-                << L"  --since         Show logs since timestamp (e.g. unix timestamp)\r\n"             //
-                << L"  --until         Show logs before timestamp (e.g. unix timestamp)\r\n"            //
-                << L"  --timestamps    Show timestamps in log output\r\n"                               //
-                << L"  -?,--help       Shows help about the selected command\r\n"                       //
+        options << L"The following options are available:\r\n"                               //
+                << L"  --session       Specify the session to use\r\n"                       //
+                << L"  -f,--follow     Follow log output\r\n"                                //
+                << L"  -n,--tail       Number of lines to show from the end of the logs\r\n" //
+                << L"  --since         Show logs since timestamp (e.g. unix timestamp)\r\n"  //
+                << L"  --until         Show logs before timestamp (e.g. unix timestamp)\r\n" //
+                << L"  --timestamps    Show timestamps in log output\r\n"                    //
+                << L"  -?,--help       Shows help about the selected command\r\n"            //
                 << L"\r\n";
         return options.str();
     }
