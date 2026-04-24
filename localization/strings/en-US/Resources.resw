@@ -2575,11 +2575,17 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Signal to send (default: {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_SinceArgDescription" xml:space="preserve">
+    <value>Show logs since timestamp (e.g. unix timestamp)</value>
+  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Current or existing image reference in the image-name[:tag] format</value>
   </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Number of lines to show from the end of the logs</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>New image reference in the image-name[:tag] format</value>
@@ -2587,9 +2593,18 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
     <value>Time in seconds to wait before executing (default 5)</value>
   </data>
+  <data name="WSLCCLI_TimestampsArgDescription" xml:space="preserve">
+    <value>Show timestamps in log output</value>
+  </data>
   <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
     <value>Open a TTY with the container process.</value>
     <comment>{Locked="TTY"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
+    <value>Type of the object to inspect</value>
+  </data>
+  <data name="WSLCCLI_UntilArgDescription" xml:space="preserve">
+    <value>Show logs before timestamp (e.g. unix timestamp)</value>
   </data>
   <data name="WSLCCLI_VerboseArgDescription" xml:space="preserve">
     <value>Output verbose details</value>
@@ -2763,9 +2778,6 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
     <value>Name or Id of any object type</value>
-  </data>
-  <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
-    <value>Type of the object to inspect</value>
   </data>
   <data name="WSLCCLI_InspectDesc" xml:space="preserve">
     <value>Inspect objects.</value>
