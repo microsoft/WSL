@@ -591,8 +591,7 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Init)
     {
-        auto result = RunWslc(std::format(
-            L"container run --rm --init {} sh -c \"cat /proc/1/comm\"", DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --rm --init {} sh -c \"cat /proc/1/comm\"", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         // When --init is used, PID 1 should be an init process, not the shell
         VERIFY_IS_TRUE(result.Stdout->find(L"sh") == std::wstring::npos, L"PID 1 should not be 'sh' when --init is used");

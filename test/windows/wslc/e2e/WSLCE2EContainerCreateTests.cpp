@@ -654,8 +654,8 @@ class WSLCE2EContainerCreateTests
     {
         // Verify --gpus flag is accepted and a container can be created.
         // Actual GPU functionality depends on host hardware and driver support.
-        auto result = RunWslc(std::format(
-            L"container create --name {} --gpus {} echo gpu-test", WslcContainerName, DebianImage.NameAndTag()));
+        auto result =
+            RunWslc(std::format(L"container create --name {} --gpus {} echo gpu-test", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         std::wstring containerId = result.GetStdoutOneLine();
         VERIFY_IS_FALSE(containerId.empty());
