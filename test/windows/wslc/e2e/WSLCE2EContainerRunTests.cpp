@@ -643,8 +643,8 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopSignal)
     {
-        auto result = RunWslc(
-            std::format(L"container run -d --stop-signal SIGUSR1 --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container run -d --stop-signal SIGUSR1 --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         auto containerId = result.GetStdoutOneLine();
         VerifyContainerIsListed(containerId, L"running");

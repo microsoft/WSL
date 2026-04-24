@@ -213,8 +213,7 @@ ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring&
     auto parsed = wsl::shared::string::ParseMemorySize(narrowInput.c_str());
     if (!parsed.has_value())
     {
-        throw ArgumentException(
-            std::format(L"Invalid {} argument value: '{}'. Expected a memory size (e.g. 64m, 256m, 1g)", argName, input));
+        throw ArgumentException(std::format(L"Invalid {} argument value: '{}'. Expected a memory size (e.g. 64m, 256m, 1g)", argName, input));
     }
 
     return parsed.value();

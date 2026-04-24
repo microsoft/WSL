@@ -662,8 +662,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_ShmSize)
     {
-        auto result = RunWslc(std::format(
-            L"container create --shm-size 128m --name {} {} df -h /dev/shm", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --shm-size 128m --name {} {} df -h /dev/shm", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
