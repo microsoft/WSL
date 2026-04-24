@@ -169,6 +169,47 @@ class WSLCCLICommandUnitTests
 
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
     }
+
+    // Walk every command in the root tree and verify no name or alias argument collisions.
+    TEST_METHOD(AllCommands_NoAmbiguousArgumentNamesOrAliases)
+    {
+        // Starting with the Root command, verify no argument collisions.
+        std::vector<std::unique_ptr<Command>> queue;
+        queue.push_back(std::make_unique<RootCommand>());
+
+        while (!queue.empty())
+        {
+            auto current = std::move(queue.back());
+            queue.pop_back();
+            VERIFY_IS_NOT_NULL(current.get());
+
+            const std::wstring commandFullName(current->FullName());
+            std::unordered_map<std::wstring, std::wstring> seenNames;   // name  -> first arg that claimed it
+            std::unordered_map<std::wstring, std::wstring> seenAliases; // alias  -> first arg that claimed it
+
+            for (const auto& arg : current->GetAllArguments())
+            {
+                // Check name collision.
+                const auto& name = arg.Name();
+                auto [it, inserted] = seenNames.emplace(name, name);
+                VERIFY_IS_TRUE(inserted, std::format(L"Command '{}' has no duplicate name '--{}'", commandFullName, name).c_str());
+
+                // Check alias collision; skip empty aliases (NO_ALIAS).
+                const auto& alias = arg.Alias();
+                if (!alias.empty())
+                {
+                    auto [it, inserted] = seenAliases.emplace(alias, name);
+                    VERIFY_IS_TRUE(inserted, std::format(L"Command '{}' has no duplicate alias '-{}'", commandFullName, alias).c_str());
+                }
+            }
+
+            // Add any subcommands of this command to the queue.
+            for (auto& sub : current->GetCommands())
+            {
+                queue.push_back(std::move(sub));
+            }
+        }
+    }
 };
 
 } // namespace WSLCCLICommandUnitTests
