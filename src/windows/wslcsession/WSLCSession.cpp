@@ -1593,7 +1593,6 @@ try
             *containerOptions,
             *this,
             m_virtualMachine.value(),
-            *m_volumes,
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -1881,8 +1880,6 @@ try
     RETURN_HR_IF_NULL(E_POINTER, VolumeInfo);
     ZeroMemory(VolumeInfo, sizeof(*VolumeInfo));
 
-    std::string driver = (Options->Driver != nullptr && *Options->Driver != '\0') ? Options->Driver : WSLCVhdVolumeDriver;
-
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCVolumeMetadataLabel);
 
@@ -1894,7 +1891,8 @@ try
         ValidateName(Options->Name, WSLC_MAX_VOLUME_NAME_LENGTH);
     }
 
-    *VolumeInfo = m_volumes->CreateVolume(Options->Name, driver, std::move(driverOpts), std::move(labels), m_storageVhdPath.parent_path());
+    *VolumeInfo =
+        m_volumes->CreateVolume(Options->Name, Options->Driver, std::move(driverOpts), std::move(labels), m_storageVhdPath.parent_path());
     return S_OK;
 }
 CATCH_RETURN();
@@ -1905,13 +1903,11 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
-    std::string name = Name;
-    ValidateName(name.c_str(), WSLC_MAX_VOLUME_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
-    m_volumes->DeleteVolume(name);
+    m_volumes->DeleteVolume(Name);
     return S_OK;
 }
 CATCH_RETURN();
@@ -2542,7 +2538,6 @@ void WSLCSession::RecoverExistingContainers()
                 dockerContainer,
                 *this,
                 m_virtualMachine.value(),
-                *m_volumes,
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),

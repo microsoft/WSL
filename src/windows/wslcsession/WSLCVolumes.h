@@ -24,27 +24,22 @@ public:
 
     WSLCVolumeInformation CreateVolume(
         _In_opt_ LPCSTR Name,
-        _In_ const std::string& Driver,
+        _In_opt_ LPCSTR Driver,
         _In_ std::map<std::string, std::string>&& DriverOpts,
         _In_ std::map<std::string, std::string>&& Labels,
         _In_ const std::filesystem::path& StoragePath);
 
-    void DeleteVolume(_In_ const std::string& Name);
+    void DeleteVolume(_In_ LPCSTR Name);
 
     std::vector<WSLCVolumeInformation> ListVolumes() const;
     std::string InspectVolume(_In_ const std::string& Name) const;
-    bool ContainsVolume(_In_ const std::string& Name) const;
-
-    // Opens a volume by name. Used to track volumes Docker implicitly created for VOLUME directives.
-    void OpenVolume(_In_ const std::string& VolumeName);
-
-    // Removes a volume from tracking. Called when Docker deletes a volume (e.g. container delete with -v).
-    void OnVolumeDeleted(_In_ const std::string& VolumeName);
 
 private:
-    std::unique_ptr<IWSLCVolume> OpenDockerVolume(const wsl::windows::common::docker_schema::Volume& vol);
+    void OpenVolume(_In_ const std::string& VolumeName);
+    __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);
 
     void OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t eventTime);
+    void OnVolumeDeleted(_In_ const std::string& VolumeName);
 
     mutable wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;

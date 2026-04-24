@@ -30,7 +30,6 @@ namespace wsl::windows::service::wslc {
 
 class WSLCContainer;
 class WSLCSession;
-class WSLCVolumes;
 
 struct ContainerPortMapping
 {
@@ -67,7 +66,6 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
-        WSLCVolumes& Volumes,
         IORelay& Relay,
         WSLCContainerState InitialState,
         std::uint64_t CreatedAt,
@@ -114,7 +112,6 @@ public:
         const WSLCContainerOptions& Options,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
-        WSLCVolumes& volumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -124,7 +121,6 @@ public:
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
-        WSLCVolumes& volumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,

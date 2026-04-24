@@ -78,7 +78,7 @@ public:
         return m_virtualMachinePath;
     }
 
-    void OnDeleted();
+    void OnDeleted() override;
 
 private:
     void Detach();

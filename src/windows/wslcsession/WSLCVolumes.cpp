@@ -21,7 +21,7 @@ WSLCVolumes::WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& vir
     {
         try
         {
-            m_volumes.insert({volume.Name, OpenDockerVolume(volume)});
+            OpenVolumeExclusiveLockHeld(volume);
         }
         CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());
     }
@@ -31,7 +31,7 @@ WSLCVolumes::WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& vir
         std::bind(&WSLCVolumes::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
 
-std::unique_ptr<IWSLCVolume> WSLCVolumes::OpenDockerVolume(const wsl::windows::common::docker_schema::Volume& vol)
+__requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol)
 {
     std::unique_ptr<IWSLCVolume> opened;
 
@@ -43,14 +43,6 @@ std::unique_ptr<IWSLCVolume> WSLCVolumes::OpenDockerVolume(const wsl::windows::c
         {
             opened = WSLCVhdVolumeImpl::Open(vol, m_virtualMachine, m_dockerClient);
         }
-        else if (metadata.Driver == WSLCGuestVolumeDriver)
-        {
-            opened = WSLCGuestVolumeImpl::Open(vol, m_dockerClient);
-        }
-        else
-        {
-            THROW_HR_MSG(E_UNEXPECTED, "Unrecognized WSLC volume driver: %hs", metadata.Driver.c_str());
-        }
     }
     else if (vol.Driver == "local")
     {
@@ -61,11 +53,10 @@ std::unique_ptr<IWSLCVolume> WSLCVolumes::OpenDockerVolume(const wsl::windows::c
         THROW_HR_MSG(E_UNEXPECTED, "Unrecognized volume driver: %hs", vol.Driver.c_str());
     }
 
-    THROW_HR_IF_NULL_MSG(E_UNEXPECTED, opened, "Volume driver returned null for volume: %hs", vol.Name.c_str());
-
+    WI_ASSERT(opened != nullptr);
     WSL_LOG("VolumeOpened", TraceLoggingValue(vol.Name.c_str(), "VolumeName"), TraceLoggingValue(vol.Driver.c_str(), "Driver"));
 
-    return opened;
+    m_volumes.insert({vol.Name, std::move(opened)});
 }
 
 void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t)
@@ -81,11 +72,7 @@ void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event
 }
 
 WSLCVolumeInformation WSLCVolumes::CreateVolume(
-    LPCSTR Name,
-    const std::string& Driver,
-    std::map<std::string, std::string>&& DriverOpts,
-    std::map<std::string, std::string>&& Labels,
-    const std::filesystem::path& StoragePath)
+    LPCSTR Name, LPCSTR Driver, std::map<std::string, std::string>&& DriverOpts, std::map<std::string, std::string>&& Labels, const std::filesystem::path& StoragePath)
 {
     auto lock = m_lock.lock_exclusive();
 
@@ -94,19 +81,20 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(Name));
     }
 
+    std::string driver = (Driver != nullptr && Driver[0] != '\0') ? Driver : WSLCVhdVolumeDriver;
     std::unique_ptr<IWSLCVolume> volume;
 
-    if (Driver == WSLCVhdVolumeDriver)
+    if (driver == WSLCVhdVolumeDriver)
     {
         volume = WSLCVhdVolumeImpl::Create(Name, std::move(DriverOpts), std::move(Labels), StoragePath, m_virtualMachine, m_dockerClient);
     }
-    else if (Driver == WSLCGuestVolumeDriver)
+    else if (driver == WSLCGuestVolumeDriver)
     {
         volume = WSLCGuestVolumeImpl::Create(Name, std::move(DriverOpts), std::move(Labels), m_dockerClient);
     }
     else
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(Driver));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver));
     }
 
     const auto& name = volume->Name();
@@ -115,13 +103,15 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
-    WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"), TraceLoggingValue(Driver.c_str(), "Driver"));
+    WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"), TraceLoggingValue(driver.c_str(), "Driver"));
 
     return info;
 }
 
-void WSLCVolumes::DeleteVolume(const std::string& Name)
+void WSLCVolumes::DeleteVolume(LPCSTR Name)
 {
+    THROW_HR_IF(E_POINTER, Name == nullptr);
+
     auto lock = m_lock.lock_exclusive();
 
     auto it = m_volumes.find(Name);
@@ -130,7 +120,7 @@ void WSLCVolumes::DeleteVolume(const std::string& Name)
     it->second->Delete();
     m_volumes.erase(it);
 
-    WSL_LOG("VolumeDeleted", TraceLoggingValue(Name.c_str(), "VolumeName"));
+    WSL_LOG("VolumeDeleted", TraceLoggingValue(Name, "VolumeName"));
 }
 
 std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes() const
@@ -158,12 +148,6 @@ std::string WSLCVolumes::InspectVolume(const std::string& Name) const
     return it->second->Inspect();
 }
 
-bool WSLCVolumes::ContainsVolume(const std::string& Name) const
-{
-    auto lock = m_lock.lock_shared();
-    return m_volumes.contains(Name);
-}
-
 void WSLCVolumes::OpenVolume(const std::string& VolumeName)
 {
     auto lock = m_lock.lock_exclusive();
@@ -176,7 +160,7 @@ void WSLCVolumes::OpenVolume(const std::string& VolumeName)
     try
     {
         auto vol = m_dockerClient.InspectVolume(VolumeName);
-        m_volumes.insert({VolumeName, OpenDockerVolume(vol)});
+        OpenVolumeExclusiveLockHeld(vol);
     }
     CATCH_LOG_MSG("Failed to open volume: %hs", VolumeName.c_str());
 }
@@ -188,7 +172,8 @@ void WSLCVolumes::OnVolumeDeleted(const std::string& VolumeName)
     auto it = m_volumes.find(VolumeName);
     if (it != m_volumes.end())
     {
-        WSL_LOG("VolumeRemovedWithContainer", TraceLoggingValue(VolumeName.c_str(), "VolumeName"));
+        it->second->OnDeleted();
+        WSL_LOG("VolumeRemoved", TraceLoggingValue(VolumeName.c_str(), "VolumeName"));
         m_volumes.erase(it);
     }
 }
