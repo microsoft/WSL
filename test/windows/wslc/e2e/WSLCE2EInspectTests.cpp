@@ -111,7 +111,7 @@ class WSLCE2EInspectTests
     {
         EnsureVolumeDoesNotExist(WslcVolumeName);
 
-        auto createResult = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, WslcVolumeName));
+        auto createResult = RunWslc(std::format(L"volume create {}", WslcVolumeName));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
         auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(WslcVolumeName); });
 
@@ -170,7 +170,7 @@ class WSLCE2EInspectTests
         // When an image and volume share the same name and no --type is specified,
         // the image should be returned (image is checked before volume in InspectTasks).
         EnsureVolumeDoesNotExist(DebianImage.Name);
-        auto createResult = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, DebianImage.Name));
+        auto createResult = RunWslc(std::format(L"volume create {}", DebianImage.Name));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
         auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(DebianImage.Name); });
 
@@ -261,7 +261,6 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
     const std::wstring WslcVolumeName = L"wslc-inspect-test-volume";
-    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;
