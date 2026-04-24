@@ -167,7 +167,7 @@ namespace {
 
     // Validates and stores a single setting from the YAML document.
     template <Setting S>
-    void ValidateSetting(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings)
+    void ValidateSetting(const YAML::Node& root, SettingsMap& map, const std::wstring& filePath, std::vector<Warning>& warnings)
     {
         constexpr auto path = details::SettingMapping<S>::YamlPath;
         auto node = NavigateYamlPath(root, path);
@@ -201,21 +201,25 @@ namespace {
             else
             {
                 const auto widePath = MultiByteToWide(path);
-                warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_InvalidValue(widePath, node->Mark().line + 1), widePath});
+                warnings.push_back(
+                    {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidValue(widePath, filePath, node->Mark().line + 1),
+                     widePath});
             }
         }
         catch (...)
         {
             const auto widePath = MultiByteToWide(path);
-            warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_InvalidType(widePath, node->Mark().line + 1), widePath});
+            warnings.push_back(
+                {wsl::shared::Localization::WSLCUserSettings_Warning_InvalidType(widePath, filePath, node->Mark().line + 1),
+                 widePath});
         }
     }
 
     // Validates all settings via a fold over the Setting enum index sequence.
     template <size_t... S>
-    void ValidateAll(const YAML::Node& root, SettingsMap& map, std::vector<Warning>& warnings, std::index_sequence<S...>)
+    void ValidateAll(const YAML::Node& root, SettingsMap& map, const std::wstring& filePath, std::vector<Warning>& warnings, std::index_sequence<S...>)
     {
-        (ValidateSetting<static_cast<Setting>(S)>(root, map, warnings), ...);
+        (ValidateSetting<static_cast<Setting>(S)>(root, map, filePath, warnings), ...);
     }
 
     // Collects the set of known dot-separated YAML paths from all SettingMapping specializations.
@@ -243,7 +247,11 @@ namespace {
     }
 
     // Iteratively walks the YAML tree and warns about keys not in the known set.
-    void WarnUnknownKeys(const YAML::Node& root, const std::set<std::string>& knownPaths, const std::set<std::string>& knownPrefixes, std::vector<Warning>& warnings)
+    void WarnUnknownKeys(
+        const YAML::Node& root,
+        const std::set<std::string>& knownPaths,
+        const std::set<std::string>& knownPrefixes,
+        const std::wstring& filePath, std::vector<Warning>& warnings)
     {
         // Stack of (node, prefix) pairs to process.
         std::vector<std::pair<YAML::Node, std::string>> stack;
@@ -265,7 +273,8 @@ namespace {
                 {
                     auto location = prefix.empty() ? std::wstring(L"root") : MultiByteToWide(prefix);
                     warnings.push_back(
-                        {wsl::shared::Localization::WSLCUserSettings_Warning_NonStringKey(location, it->first.Mark().line + 1), location});
+                        {wsl::shared::Localization::WSLCUserSettings_Warning_NonStringKey(location, filePath, it->first.Mark().line + 1),
+                         location});
                     continue;
                 }
 
@@ -283,7 +292,8 @@ namespace {
                         // Unknown section — warn once, don't traverse.
                         const auto widePath = MultiByteToWide(fullPath);
                         warnings.push_back(
-                            {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownSection(widePath, it->first.Mark().line + 1), widePath});
+                            {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownSection(widePath, filePath, it->first.Mark().line + 1),
+                             widePath});
                     }
                 }
                 else if (!knownPaths.count(fullPath) && !knownPrefixes.count(fullPath))
@@ -291,7 +301,8 @@ namespace {
                     // Unknown setting
                     const auto widePath = MultiByteToWide(fullPath);
                     warnings.push_back(
-                        {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownKey(widePath, it->first.Mark().line + 1), widePath});
+                        {wsl::shared::Localization::WSLCUserSettings_Warning_UnknownKey(widePath, filePath, it->first.Mark().line + 1),
+                         widePath});
                 }
             }
         }
@@ -309,7 +320,8 @@ namespace {
             // emit a warning so the user understands why settings were ignored.
             if (err != ENOENT)
             {
-                warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_FailedToOpen(err), {}});
+                warnings.push_back(
+                    {wsl::shared::Localization::WSLCUserSettings_Warning_FailedToOpen(path.wstring(), err), {}});
             }
 
             return std::nullopt;
@@ -321,7 +333,8 @@ namespace {
         }
         catch (const std::exception& e)
         {
-            warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_ParseError(MultiByteToWide(e.what())), {}});
+            warnings.push_back(
+                {wsl::shared::Localization::WSLCUserSettings_Warning_ParseError(path.wstring(), MultiByteToWide(e.what())), {}});
             return std::nullopt;
         }
     }
@@ -351,20 +364,21 @@ UserSettings::UserSettings(const std::filesystem::path& settingsDir)
     if (root.has_value())
     {
         m_type = UserSettingsType::Standard;
+        const auto filePath = m_settingsPath.wstring();
 
         if (root->IsMap())
         {
             constexpr auto settingCount = static_cast<size_t>(Setting::Max);
-            ValidateAll(root.value(), m_settings, m_warnings, std::make_index_sequence<settingCount>());
+            ValidateAll(root.value(), m_settings, filePath, m_warnings, std::make_index_sequence<settingCount>());
 
             constexpr auto indexSeq = std::make_index_sequence<settingCount>();
             auto knownPaths = CollectKnownPaths(indexSeq);
             auto knownPrefixes = CollectKnownPrefixes(knownPaths);
-            WarnUnknownKeys(root.value(), knownPaths, knownPrefixes, m_warnings);
+            WarnUnknownKeys(root.value(), knownPaths, knownPrefixes, filePath, m_warnings);
         }
         else
         {
-            m_warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_InvalidStructure(), {}});
+            m_warnings.push_back({wsl::shared::Localization::WSLCUserSettings_Warning_InvalidStructure(filePath), {}});
         }
     }
 
