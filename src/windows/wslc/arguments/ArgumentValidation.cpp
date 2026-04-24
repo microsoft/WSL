@@ -219,8 +219,7 @@ WSLCContainerNetworkType GetNetworkTypeFromString(const std::wstring& input, con
     }
     else
     {
-        throw ArgumentException(
-            std::format(L"Invalid {} argument value: '{}'. Expected one of: none, host, bridge", argName, input));
+        throw ArgumentException(std::format(L"Invalid {} argument value: '{}'. Expected one of: none, host, bridge", argName, input));
     }
 }
 

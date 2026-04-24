@@ -662,8 +662,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_Host)
     {
-        auto result = RunWslc(std::format(
-            L"container create --network host --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        auto result =
+            RunWslc(std::format(L"container create --network host --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         std::wstring containerId = result.GetStdoutOneLine();
         VerifyContainerIsListed(containerId, L"created");
@@ -671,8 +671,8 @@ class WSLCE2EContainerCreateTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Network_Invalid)
     {
-        auto result = RunWslc(std::format(
-            L"container create --network invalid --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(L"container create --network invalid --name {} {} echo hello", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.ExitCode = 1});
         VERIFY_IS_TRUE(result.Stderr->find(L"Invalid") != std::wstring::npos);
     }
