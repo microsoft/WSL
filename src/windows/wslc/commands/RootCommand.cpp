@@ -16,6 +16,7 @@ Abstract:
 // Include all commands that parent to the root.
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
+#include "NetworkCommand.h"
 #include "RegistryCommand.h"
 #include "SessionCommand.h"
 #include "SettingsCommand.h"
@@ -32,6 +33,7 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     std::vector<std::unique_ptr<Command>> commands;
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
+    commands.push_back(std::make_unique<NetworkCommand>(FullName()));
     commands.push_back(std::make_unique<RegistryCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
     commands.push_back(std::make_unique<SettingsCommand>(FullName()));

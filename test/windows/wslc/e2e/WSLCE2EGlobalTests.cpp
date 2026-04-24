@@ -525,6 +525,7 @@ private:
         std::vector<std::pair<std::wstring_view, std::wstring>> entries = {
             {L"container", Localization::WSLCCLI_ContainerCommandDesc()},
             {L"image", Localization::WSLCCLI_ImageCommandDesc()},
+            {L"network", Localization::WSLCCLI_NetworkCommandDesc()},
             {L"registry", Localization::WSLCCLI_RegistryCommandDesc()},
             {L"session", Localization::WSLCCLI_SessionCommandDesc()},
             {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},

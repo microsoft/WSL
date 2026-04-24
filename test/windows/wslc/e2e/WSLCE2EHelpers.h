@@ -123,11 +123,14 @@ void VerifyImageIsNotUsed(const TestImage& image);
 void VerifyImageIsListed(const TestImage& image);
 void VerifyVolumeIsListed(const std::wstring& volumeName);
 void VerifyVolumeIsNotListed(const std::wstring& volumeName);
+void VerifyNetworkIsListed(const std::wstring& networkName);
+void VerifyNetworkIsNotListed(const std::wstring& networkName);
 
 std::string GetHashId(const std::string& id, bool fullId = false);
 wsl::windows::common::wslc_schema::InspectContainer InspectContainer(const std::wstring& containerName);
 wsl::windows::common::wslc_schema::InspectImage InspectImage(const std::wstring& imageName);
 wsl::windows::common::wslc_schema::InspectVolume InspectVolume(const std::wstring& volumeName);
+wsl::windows::common::wslc_schema::InspectNetwork InspectNetwork(const std::wstring& networkName);
 std::vector<wsl::windows::wslc::models::ContainerInformation> ListAllContainers();
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName);
@@ -136,6 +139,7 @@ void EnsureImageIsDeleted(const TestImage& image);
 void EnsureImageContainersAreDeleted(const TestImage& image);
 void EnsureSessionIsTerminated(const std::wstring& sessionName = L"");
 void EnsureVolumeDoesNotExist(const std::wstring& volumeName);
+void EnsureNetworkDoesNotExist(const std::wstring& networkName);
 
 void WriteTestFile(const std::filesystem::path& filePath, const std::vector<std::string>& envVariableLines);
 std::wstring GetPythonHttpServerScript(uint16_t port);
