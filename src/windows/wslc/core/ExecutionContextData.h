@@ -38,6 +38,7 @@ enum class Data : size_t
     ContainerOptions,
     Images,
     Volumes,
+    Networks,
 
     Max
 };
@@ -53,6 +54,7 @@ namespace details {
     DEFINE_DATA_MAPPING(ContainerOptions, wsl::windows::wslc::models::ContainerOptions);
     DEFINE_DATA_MAPPING(Images, std::vector<wsl::windows::wslc::models::ImageInformation>);
     DEFINE_DATA_MAPPING(Volumes, std::vector<WSLCVolumeInformation>);
+    DEFINE_DATA_MAPPING(Networks, std::vector<WSLCNetworkInformation>);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>
