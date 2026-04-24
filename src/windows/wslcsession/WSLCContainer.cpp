@@ -278,7 +278,10 @@ WSLCContainerNetworkType DockerNetworkModeToWSLCNetworkType(const std::string& m
         return WSLCContainerNetworkTypeNone;
     }
 
-    // Any unrecognized mode is a custom user-defined network.
+    // Reject Docker special syntaxes (container:<id>, service:<name>, etc.);
+    // any plain name is treated as a user-defined custom network.
+    THROW_HR_IF_MSG(E_INVALIDARG, mode.empty() || mode.find(':') != std::string::npos, "Unsupported Docker network mode: %hs", mode.c_str());
+
     return WSLCContainerNetworkTypeCustom;
 }
 

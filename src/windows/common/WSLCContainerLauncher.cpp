@@ -139,9 +139,9 @@ void WSLCContainerLauncher::SetContainerFlags(WSLCContainerFlags Flags)
     m_containerFlags = Flags;
 }
 
-void WSLCContainerLauncher::SetContainerNetworkName(std::string&& name)
+void WSLCContainerLauncher::SetContainerNetworkName(std::string&& Name)
 {
-    m_containerNetworkName = std::move(name);
+    m_containerNetworkName = std::move(Name);
 }
 
 void WSLCContainerLauncher::SetHostname(std::string&& Hostname)
