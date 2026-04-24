@@ -227,6 +227,11 @@ private:
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::map<std::string, GUID> m_mountedWindowsFolders;
+
+    // VirtioFs share cache: maps (normalized WindowsPath, readOnly) to share GUID.
+    // Shares are kept alive after unmount for reuse on subsequent mounts of the same folder.
+    std::map<std::pair<std::wstring, bool>, GUID> m_virtioFsShares;
+
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
 };
