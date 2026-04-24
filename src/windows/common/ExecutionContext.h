@@ -11,6 +11,15 @@ namespace wsl::windows::common {
     } \
     THROW_HR(Result)
 
+#define THROW_HR_WITH_USER_ERROR_IF(Result, Message, Condition) \
+    do \
+    { \
+        if (Condition) \
+        { \
+            THROW_HR_WITH_USER_ERROR(Result, Message); \
+        } \
+    } while (0)
+
 #define EMIT_USER_WARNING(Warning) \
     if (::wsl::windows::common::ExecutionContext* context = ::wsl::windows::common::ExecutionContext::Current(); context != nullptr) \
     { \

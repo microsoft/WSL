@@ -305,8 +305,14 @@ For information please visit https://aka.ms/enablevirtualization</value>
     <value>Too many virtual hard disks or physical disks are attached.</value>
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
-    <value>VHD already mounted via wsl.exe --mount, please unmount the disk before launching.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>The virtual disk is already attached.
+Unmount it with 'wsl.exe --unmount &lt;DiskPath&gt;' before attaching again.</value>
+    <comment>{Locked="--unmount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached2" xml:space="preserve">
+    <value>The virtual disk '{}' is already attached.
+Unmount it with 'wsl.exe --unmount &lt;DiskPath&gt;' before attaching again.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--unmount "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>WSL1 is not supported with your current machine configuration.
@@ -1026,7 +1032,12 @@ Falling back to NAT networking.</value>
     <value>Sparse VHD is supported on WSL2 only.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
-    <value>Running WSL as local system is not supported.</value>
+    <value>WSL cannot run under the LocalSystem account.
+Use a standard user account instead.</value>
+  </data>
+  <data name="MessageDetachDiskNotFound" xml:space="preserve">
+    <value>Disk not found: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePerformanceTip" xml:space="preserve">
     <value>Performance Tip:</value>

@@ -858,7 +858,8 @@ void LxssUserSessionImpl::ClearDiskStateInRegistry(_In_ const LPCWSTR Disk)
         }
     }
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !deleted);
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), wsl::shared::Localization::MessageDetachDiskNotFound(Disk ? Disk : L""), !deleted);
 }
 
 HRESULT LxssUserSessionImpl::DetachDisk(_In_ LPCWSTR Disk, _Out_ int* Result, _Out_ int* Step)
