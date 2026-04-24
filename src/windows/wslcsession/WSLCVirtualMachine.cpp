@@ -951,7 +951,11 @@ try
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(path), "Path is not a directory: '%ls'", WindowsPath);
 
+    const bool readOnly = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly);
+    auto normalizedPath = path.lexically_normal().wstring();
     GUID shareGuid{};
+    bool reusingShare = false;
+
     {
         std::lock_guard lock(m_lock);
 
@@ -959,8 +963,27 @@ try
         auto it = m_mountedWindowsFolders.find(LinuxPath);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
 
-        // Delegate to IWSLCVirtualMachine for the privileged share creation
-        THROW_IF_FAILED(m_vm->AddShare(WindowsPath, WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly), &shareGuid));
+        // In VirtioFs mode, try to reuse an existing share for the same Windows path and access mode.
+        if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
+        {
+            auto shareIt = m_virtioFsShares.find({normalizedPath, readOnly});
+            if (shareIt != m_virtioFsShares.end())
+            {
+                shareGuid = shareIt->second;
+                reusingShare = true;
+            }
+        }
+
+        if (!reusingShare)
+        {
+            // Delegate to IWSLCVirtualMachine for the privileged share creation
+            THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
+
+            if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
+            {
+                m_virtioFsShares[{normalizedPath, readOnly}] = shareGuid;
+            }
+        }
 
         m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
     }
@@ -971,7 +994,15 @@ try
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
             m_mountedWindowsFolders.erase(mountIt);
-            LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
+            if (!reusingShare)
+            {
+                if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
+                {
+                    m_virtioFsShares.erase({normalizedPath, readOnly});
+                }
+
+                LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
+            }
         }
     });
 
@@ -988,18 +1019,13 @@ try
         THROW_HR_IF_MSG(E_FAIL, fd < 0, "WSLC_CONNECT failed with %i", fd);
 
         auto mountOptions = std::format(
-            "{},msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap",
-            WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly) ? "ro" : "rw",
-            LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE,
-            fd,
-            fd,
-            shareName);
+            "{},msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap", readOnly ? "ro" : "rw", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, fd, fd, shareName);
 
         Mount(channel, shareName.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags);
     }
     else
     {
-        std::string options = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly) ? "ro" : "rw";
+        std::string options = readOnly ? "ro" : "rw";
         Mount(m_initChannel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
     }
 
@@ -1024,8 +1050,13 @@ try
 
     auto shareId = it->second;
 
-    // Delegate to IWSLCVirtualMachine for the privileged share removal
-    THROW_IF_FAILED(m_vm->RemoveShare(shareId));
+    // Keep the share mounted in virtiofs mode to avoid accumulating devices, which can cause a hang when reached.
+    // TODO: Actually remove the device once this is supported by the device host.
+    if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
+    {
+        // Delegate to IWSLCVirtualMachine for the privileged share removal
+        THROW_IF_FAILED(m_vm->RemoveShare(shareId));
+    }
 
     m_mountedWindowsFolders.erase(it);
 
