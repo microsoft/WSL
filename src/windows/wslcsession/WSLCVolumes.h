@@ -1,4 +1,16 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCVolumes.h
+
+Abstract:
+
+    Contains the definition for WSLCVolumes.
+
+--*/
 
 #pragma once
 
@@ -7,7 +19,6 @@
 #include "DockerHTTPClient.h"
 #include "DockerEventTracker.h"
 #include <unordered_map>
-#include <unordered_set>
 
 namespace wsl::windows::service::wslc {
 
@@ -19,15 +30,14 @@ public:
     NON_COPYABLE(WSLCVolumes);
     NON_MOVABLE(WSLCVolumes);
 
-    WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker);
+    WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker, const std::filesystem::path& storagePath);
     ~WSLCVolumes() = default;
 
     WSLCVolumeInformation CreateVolume(
         _In_opt_ LPCSTR Name,
         _In_opt_ LPCSTR Driver,
         _In_ std::map<std::string, std::string>&& DriverOpts,
-        _In_ std::map<std::string, std::string>&& Labels,
-        _In_ const std::filesystem::path& StoragePath);
+        _In_ std::map<std::string, std::string>&& Labels);
 
     void DeleteVolume(_In_ LPCSTR Name);
 
@@ -46,6 +56,7 @@ private:
 
     DockerHTTPClient& m_dockerClient;
     WSLCVirtualMachine& m_virtualMachine;
+    std::filesystem::path m_storagePath;
     DockerEventTracker::EventTrackingReference m_volumeEventTracking;
 };
 

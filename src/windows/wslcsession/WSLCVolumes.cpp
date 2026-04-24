@@ -1,4 +1,16 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCVolumes.cpp
+
+Abstract:
+
+    Contains the implementation of WSLCVolumes.
+
+--*/
 
 #include "precomp.h"
 #include "WSLCVolumes.h"
@@ -8,13 +20,12 @@
 #include "docker_schema.h"
 
 using wsl::shared::Localization;
-using wsl::windows::service::wslc::DockerHTTPClient;
-using wsl::windows::service::wslc::WSLCVolumes;
 
 namespace wsl::windows::service::wslc {
 
-WSLCVolumes::WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker) :
-    m_dockerClient(dockerClient), m_virtualMachine(virtualMachine)
+WSLCVolumes::WSLCVolumes(
+    DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker, const std::filesystem::path& storagePath) :
+    m_dockerClient(dockerClient), m_virtualMachine(virtualMachine), m_storagePath(storagePath)
 {
     // Recover existing volumes from Docker.
     for (const auto& volume : dockerClient.ListVolumes())
@@ -33,7 +44,7 @@ WSLCVolumes::WSLCVolumes(DockerHTTPClient& dockerClient, WSLCVirtualMachine& vir
 
 __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol)
 {
-    std::unique_ptr<IWSLCVolume> opened;
+    THROW_HR_IF_MSG(E_UNEXPECTED, vol.Driver != "local", "Unrecognized volume driver: %hs", vol.Driver.c_str());
 
     if (vol.Labels.has_value() && vol.Labels->contains(WSLCVolumeMetadataLabel))
     {
@@ -41,22 +52,12 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
 
         if (metadata.Driver == WSLCVhdVolumeDriver)
         {
-            opened = WSLCVhdVolumeImpl::Open(vol, m_virtualMachine, m_dockerClient);
+            m_volumes.insert({vol.Name, WSLCVhdVolumeImpl::Open(vol, m_virtualMachine, m_dockerClient)});
+            return;
         }
     }
-    else if (vol.Driver == "local")
-    {
-        opened = WSLCGuestVolumeImpl::Open(vol, m_dockerClient);
-    }
-    else
-    {
-        THROW_HR_MSG(E_UNEXPECTED, "Unrecognized volume driver: %hs", vol.Driver.c_str());
-    }
 
-    WI_ASSERT(opened != nullptr);
-    WSL_LOG("VolumeOpened", TraceLoggingValue(vol.Name.c_str(), "VolumeName"), TraceLoggingValue(vol.Driver.c_str(), "Driver"));
-
-    m_volumes.insert({vol.Name, std::move(opened)});
+    m_volumes.insert({vol.Name, WSLCGuestVolumeImpl::Open(vol, m_dockerClient)});
 }
 
 void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t)
@@ -72,7 +73,7 @@ void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event
 }
 
 WSLCVolumeInformation WSLCVolumes::CreateVolume(
-    LPCSTR Name, LPCSTR Driver, std::map<std::string, std::string>&& DriverOpts, std::map<std::string, std::string>&& Labels, const std::filesystem::path& StoragePath)
+    LPCSTR Name, LPCSTR Driver, std::map<std::string, std::string>&& DriverOpts, std::map<std::string, std::string>&& Labels)
 {
     auto lock = m_lock.lock_exclusive();
 
@@ -86,7 +87,7 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
 
     if (driver == WSLCVhdVolumeDriver)
     {
-        volume = WSLCVhdVolumeImpl::Create(Name, std::move(DriverOpts), std::move(Labels), StoragePath, m_virtualMachine, m_dockerClient);
+        volume = WSLCVhdVolumeImpl::Create(Name, std::move(DriverOpts), std::move(Labels), m_storagePath, m_virtualMachine, m_dockerClient);
     }
     else if (driver == WSLCGuestVolumeDriver)
     {
@@ -103,8 +104,6 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
-    WSL_LOG("VolumeCreated", TraceLoggingValue(name.c_str(), "VolumeName"), TraceLoggingValue(driver.c_str(), "Driver"));
-
     return info;
 }
 
@@ -119,8 +118,6 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
 
     it->second->Delete();
     m_volumes.erase(it);
-
-    WSL_LOG("VolumeDeleted", TraceLoggingValue(Name, "VolumeName"));
 }
 
 std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes() const
@@ -173,7 +170,6 @@ void WSLCVolumes::OnVolumeDeleted(const std::string& VolumeName)
     if (it != m_volumes.end())
     {
         it->second->OnDeleted();
-        WSL_LOG("VolumeRemoved", TraceLoggingValue(VolumeName.c_str(), "VolumeName"));
         m_volumes.erase(it);
     }
 }

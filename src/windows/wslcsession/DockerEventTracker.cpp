@@ -112,6 +112,29 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
 
     auto actionStr = action->get<std::string>();
 
+    // Track object lifecycle for WaitForObjectCreated/WaitForObjectDestroyed.
+    auto actor = parsed.find("Actor");
+    if (actor != parsed.end())
+    {
+        auto id = actor->find("ID");
+        if (id != actor->end())
+        {
+            auto objectId = id->get<std::string>();
+            if (actionStr == "create")
+            {
+                std::lock_guard lock{m_lock};
+                m_createdObjects.insert(objectId);
+                m_objectStateChanged.notify_all();
+            }
+            else if (actionStr == "destroy")
+            {
+                std::lock_guard lock{m_lock};
+                m_createdObjects.erase(objectId);
+                m_objectStateChanged.notify_all();
+            }
+        }
+    }
+
     // Route events by Type field. Docker uses "container", "volume", "network", etc.
     auto type = parsed.find("Type");
     std::string typeStr = (type != parsed.end()) ? type->get<std::string>() : "container";
@@ -138,23 +161,6 @@ void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const st
     THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Missing Actor.ID in container event");
 
     auto containerId = id->get<std::string>();
-
-    // Track container create events for WaitForObjectCreated().
-    if (action == "create")
-    {
-        std::lock_guard lock{m_lock};
-        m_createdObjects.insert(containerId);
-        m_objectStateChanged.notify_all();
-        return;
-    }
-
-    // Track container destroy events for WaitForObjectDestroyed() and clean up create tracking.
-    if (action == "destroy")
-    {
-        std::lock_guard lock{m_lock};
-        m_createdObjects.erase(containerId);
-        m_objectStateChanged.notify_all();
-    }
 
     auto it = events.find(action);
     if (it == events.end())

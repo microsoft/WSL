@@ -260,7 +260,7 @@ try
     //  Start the event tracker.
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
-    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value());
+    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), m_storageVhdPath.parent_path());
 
     // Recover any existing resources from storage.
     RecoverExistingNetworks();
@@ -1891,8 +1891,7 @@ try
         ValidateName(Options->Name, WSLC_MAX_VOLUME_NAME_LENGTH);
     }
 
-    *VolumeInfo =
-        m_volumes->CreateVolume(Options->Name, Options->Driver, std::move(driverOpts), std::move(labels), m_storageVhdPath.parent_path());
+    *VolumeInfo = m_volumes->CreateVolume(Options->Name, Options->Driver, std::move(driverOpts), std::move(labels));
     return S_OK;
 }
 CATCH_RETURN();
