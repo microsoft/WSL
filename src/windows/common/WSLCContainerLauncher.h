@@ -73,7 +73,7 @@ public:
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetContainerFlags(WSLCContainerFlags Flags);
-    void SetContainerNetworkName(std::string&& name);
+    void SetContainerNetworkName(std::string&& Name);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
     void SetDnsServers(std::vector<std::string>&& DnsServers);
