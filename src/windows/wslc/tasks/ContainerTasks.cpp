@@ -247,6 +247,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Remove = true;
     }
 
+    if (context.Args.Contains(ArgType::StopSignal))
+    {
+        options.StopSignal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::StopSignal>());
+    }
+
+    if (context.Args.Contains(ArgType::ShmSize))
+    {
+        options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));

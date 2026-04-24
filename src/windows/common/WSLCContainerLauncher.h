@@ -72,6 +72,7 @@ public:
     void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLCSignal Signal);
+    void SetShmSize(ULONGLONG ShmSize);
     void SetContainerFlags(WSLCContainerFlags Flags);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
@@ -95,6 +96,7 @@ private:
     WSLCContainerNetworkType m_containerNetworkType;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
+    ULONGLONG m_shmSize = 0;
     WSLCContainerFlags m_containerFlags = WSLCContainerFlagsNone;
     std::string m_hostname;
     std::string m_domainname;
