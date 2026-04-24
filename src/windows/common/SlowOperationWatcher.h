@@ -43,13 +43,19 @@ Abstract:
 class SlowOperationWatcher
 {
 public:
-    // Name must have static storage duration (string literal). It is emitted verbatim into
-    // telemetry, so keep it a short CamelCase phase identifier that the backend query can
-    // switch on (e.g. "WaitForMiniInitConnect").
+    // Name is restricted to a string-literal reference (const char (&)[N]) to guarantee
+    // static storage duration: the raw pointer is dereferenced later from a threadpool
+    // callback, so accepting a `const char*` would make UAF via a temporary (e.g.
+    // std::string::c_str()) easy. Keep Name a short CamelCase phase identifier that the
+    // backend query can switch on (e.g. "WaitForMiniInitConnect").
+    template <size_t N>
     explicit SlowOperationWatcher(
-        _In_z_ const char* Name,
+        const char (&Name)[N],
         std::chrono::milliseconds SlowThreshold = std::chrono::seconds{10},
-        std::source_location Location = std::source_location::current());
+        std::source_location Location = std::source_location::current()) :
+        SlowOperationWatcher(static_cast<const char*>(Name), SlowThreshold, Location)
+    {
+    }
 
     ~SlowOperationWatcher() noexcept = default;
 
@@ -64,6 +70,8 @@ public:
     SlowOperationWatcher& operator=(SlowOperationWatcher&&) = delete;
 
 private:
+    explicit SlowOperationWatcher(_In_z_ const char* Name, std::chrono::milliseconds SlowThreshold, std::source_location Location);
+
     static void CALLBACK OnTimerFired(PTP_CALLBACK_INSTANCE, PVOID Context, PTP_TIMER) noexcept;
 
     const char* const m_name;

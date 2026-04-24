@@ -31,18 +31,17 @@ FILETIME RelativeFileTime(std::chrono::milliseconds Relative) noexcept
 // std::source_location::file_name() returns the path as the compiler saw it, which on
 // MSVC is an absolute build-agent path. Strip to the basename so telemetry groups the
 // same file across different build environments without leaking machine-specific paths.
-const char* Basename(const char* Path) noexcept
+// The substring is taken from the same null-terminated char array, so the returned view's
+// data() is safe to pass to C APIs that expect a null-terminated string.
+constexpr std::string_view Basename(std::string_view Path) noexcept
 {
-    const char* result = Path;
-    for (const char* p = Path; *p != '\0'; ++p)
-    {
-        if (*p == '\\' || *p == '/')
-        {
-            result = p + 1;
-        }
-    }
-    return result;
+    const auto pos = Path.find_last_of("\\/");
+    return pos == std::string_view::npos ? Path : Path.substr(pos + 1);
 }
+
+static_assert(Basename("/foo/bar/test.cpp") == "test.cpp");
+static_assert(Basename("C:\\src\\test.cpp") == "test.cpp");
+static_assert(Basename("no_separator.cpp") == "no_separator.cpp");
 } // namespace
 
 SlowOperationWatcher::SlowOperationWatcher(_In_z_ const char* Name, std::chrono::milliseconds SlowThreshold, std::source_location Location) :
@@ -70,7 +69,7 @@ try
         PDT_ProductAndServicePerformance,
         TraceLoggingValue(self->m_name, "name"),
         TraceLoggingInt64(self->m_slowThreshold.count(), "thresholdMs"),
-        TraceLoggingValue(Basename(self->m_location.file_name()), "file"),
+        TraceLoggingValue(Basename(self->m_location.file_name()).data(), "file"),
         TraceLoggingValue(self->m_location.function_name(), "function"),
         TraceLoggingUInt32(self->m_location.line(), "line"));
 }

@@ -543,7 +543,6 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     {
         ExecutionContext context(Context::ConfigureNetworking);
-        SlowOperationWatcher slowOperation{"ConfigureNetworking"};
 
         // Accept the connection from the guest network service and create the channel.
         wsl::core::GnsChannel gnsChannel(AcceptConnection(m_vmConfig.KernelBootTimeout));
@@ -675,10 +674,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Perform additional initialization.
-    {
-        SlowOperationWatcher slowOperation{"InitializeGuest"};
-        InitializeGuest();
-    }
+    InitializeGuest();
 }
 
 WslCoreVm::~WslCoreVm() noexcept
@@ -1237,11 +1233,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->SharedMemoryRootOffset, sharedMemoryRoot);
     message.WriteString(message->InstallPathOffset, installPath);
     message.WriteString(message->UserProfileOffset, userProfile);
-    {
-        SlowOperationWatcher slowOperation{"SendLaunchInit"};
-        auto transaction = m_miniInitChannel.StartTransaction();
-        transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
-    }
+    auto transaction = m_miniInitChannel.StartTransaction();
+    transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
 
     return CreateInstanceInternal(
         InstanceId, Configuration, ReceiveTimeout, DefaultUid, ClientLifetimeId, WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), ConnectPort);
