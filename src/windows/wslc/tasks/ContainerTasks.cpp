@@ -227,6 +227,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::PublishAll))
+    {
+        options.PublishAll = true;
+    }
+
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAll<ArgType::Volume>();

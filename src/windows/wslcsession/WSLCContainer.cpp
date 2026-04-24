@@ -77,11 +77,77 @@ std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
     return result;
 }
 
-// Builds port mapping list from container options and returns the network mode string.
-std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(const WSLCContainerOptions& options, WSLCVirtualMachine& virtualMachine)
+// Parses a Docker ExposedPorts key (e.g. "8080/tcp", "5432/udp") into port number and protocol.
+std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
 {
-    WSLCContainerNetworkType networkType = options.ContainerNetwork.ContainerNetworkType;
+    auto slashPos = key.find('/');
+    THROW_HR_IF_MSG(E_INVALIDARG, slashPos == std::string::npos, "Invalid exposed port format: %hs", key.c_str());
 
+    auto portStr = std::string_view(key.c_str(), slashPos);
+
+    uint16_t port{};
+    auto result = std::from_chars(portStr.data(), portStr.data() + portStr.size(), port);
+    if (result.ec != std::errc{} || result.ptr != portStr.data() + portStr.size() || port == 0)
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid port number in exposed port: %hs", key.c_str());
+    }
+
+    auto protoStr = key.substr(slashPos + 1);
+    int protocol{};
+    if (protoStr == "tcp")
+    {
+        protocol = IPPROTO_TCP;
+    }
+    else if (protoStr == "udp")
+    {
+        protocol = IPPROTO_UDP;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported protocol in exposed port: %hs", key.c_str());
+    }
+
+    return {static_cast<uint16_t>(port), protocol};
+}
+
+// Temporary solution to allocate an ephemeral port.
+// TODO: Remove once the port relay can allocate ephemeral ports.
+uint16_t AllocateEphemeralPort(int family, const char* address)
+{
+    wil::unique_socket sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
+    THROW_LAST_ERROR_IF(!sock);
+
+    SOCKADDR_INET addr{};
+    addr.si_family = static_cast<ADDRESS_FAMILY>(family);
+
+    if (family == AF_INET)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, inet_pton(AF_INET, address, &addr.Ipv4.sin_addr) != 1, "Failed to parse ip address: %hs", address);
+    }
+    else if (family == AF_INET6)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, inet_pton(AF_INET6, address, &addr.Ipv6.sin6_addr) != 1, "Failed to parse ip address: %hs", address);
+    }
+    else
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected address family: %i", family);
+    }
+
+    THROW_LAST_ERROR_IF(bind(sock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+
+    int addrLen = sizeof(addr);
+    THROW_LAST_ERROR_IF(getsockname(sock.get(), reinterpret_cast<sockaddr*>(&addr), &addrLen) == SOCKET_ERROR);
+
+    uint16_t port = (family == AF_INET6) ? ntohs(addr.Ipv6.sin6_port) : ntohs(addr.Ipv4.sin_port);
+    THROW_HR_IF_MSG(E_UNEXPECTED, port == 0, "OS returned ephemeral port 0");
+
+    return port;
+}
+
+// Builds port mapping list from container options and returns the network mode string.
+std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
+    std::vector<_WSLCPortMapping>& requestedPorts, WSLCContainerNetworkType networkType, WSLCVirtualMachine& virtualMachine)
+{
     // Determine network mode string.
     std::string networkMode;
     if (networkType == WSLCContainerNetworkTypeBridged)
@@ -104,20 +170,25 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(co
     // Validate port mappings.
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        options.PortsCount > 0 && networkType == WSLCContainerNetworkTypeNone,
+        !requestedPorts.empty() && networkType == WSLCContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
     std::vector<ContainerPortMapping> ports;
-    ports.reserve(options.PortsCount);
+    ports.reserve(requestedPorts.size());
 
-    for (ULONG i = 0; i < options.PortsCount; i++)
+    for (auto& e : requestedPorts)
     {
-        auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
+        if (e.HostPort == WSLC_EPHEMERAL_PORT)
+        {
+            e.HostPort = AllocateEphemeralPort(e.Family, e.BindingAddress);
+        }
+
+        auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(e), e.ContainerPort);
 
         // Only allocate port for bridged network. Host mode ports are allocated when the container starts.
         if (networkType == WSLCContainerNetworkTypeBridged)
         {
-            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(options.Ports[i].Family, options.Ports[i].Protocol));
+            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(e.Family, e.Protocol));
         }
     }
 
@@ -1216,11 +1287,54 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     ProcessNamedVolumes(containerOptions, sessionVolumes, request);
 
+    // Prepare port mappings from container options.
+    std::vector<_WSLCPortMapping> ports;
+    for (ULONG i = 0; i < containerOptions.PortsCount; i++)
+    {
+        auto& port = ports.emplace_back();
+        port.HostPort = containerOptions.Ports[i].HostPort;
+        port.ContainerPort = containerOptions.Ports[i].ContainerPort;
+        port.Family = containerOptions.Ports[i].Family;
+        port.Protocol = containerOptions.Ports[i].Protocol;
+        strcpy_s(port.BindingAddress, containerOptions.Ports[i].BindingAddress);
+    }
+
+    // Append exposed ports from the image, if requested.
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPublishAll))
+    {
+        auto imageInfo = DockerClient.InspectImage(containerOptions.Image);
+
+        // Use the resolved image ID so the container is created from the exact same image.
+        request.Image = imageInfo.Id;
+
+        if (imageInfo.Config.has_value() && imageInfo.Config->ExposedPorts.has_value())
+        {
+            for (const auto& [portKey, _] : imageInfo.Config->ExposedPorts.value())
+            {
+                auto [port, protocol] = ParseExposedPortKey(portKey);
+
+                // Only TCP localhost mappings are currently supported by the relay path.
+                if (protocol != IPPROTO_TCP)
+                {
+                    continue;
+                }
+
+                auto& createdPort = ports.emplace_back();
+                createdPort.HostPort = WSLC_EPHEMERAL_PORT;
+                createdPort.Family = AF_INET;
+                createdPort.ContainerPort = port;
+                createdPort.Protocol = protocol;
+                strcpy_s(createdPort.BindingAddress, "127.0.0.1");
+            }
+        }
+    }
+
     // Process port mappings from container options.
-    auto [ports, networkMode] = ProcessPortMappings(containerOptions, virtualMachine);
+    auto [mappedPorts, networkMode] = ProcessPortMappings(ports, containerOptions.ContainerNetwork.ContainerNetworkType, virtualMachine);
+
     request.HostConfig.NetworkMode = networkMode;
 
-    for (const auto& e : ports)
+    for (const auto& e : mappedPorts)
     {
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
         request.ExposedPorts[portKey] = {};
@@ -1243,7 +1357,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
 
-    for (const auto& e : ports)
+    for (const auto& e : mappedPorts)
     {
         metadata.Ports.emplace_back(e.Serialize());
     }
@@ -1272,7 +1386,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::string(containerOptions.Image),
         containerOptions.ContainerNetwork.ContainerNetworkType,
         std::move(volumes),
-        std::move(ports),
+        std::move(mappedPorts),
         std::move(labels),
         std::move(OnDeleted),
         EventTracker,

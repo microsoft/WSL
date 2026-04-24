@@ -721,6 +721,7 @@ private:
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
+                << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
