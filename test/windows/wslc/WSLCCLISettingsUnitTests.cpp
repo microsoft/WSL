@@ -195,7 +195,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
         VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
         // Parse errors include yaml-cpp details, so just check the prefix.
-        // Parse errors include yaml-cpp details, so just check the prefix.
         VERIFY_IS_TRUE(s.GetWarnings().front().Message.starts_with(L"Warning: Settings file could not be parsed:"));
         VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
     }
