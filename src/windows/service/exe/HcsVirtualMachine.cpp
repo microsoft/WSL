@@ -112,6 +112,11 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // TODO: move dmesg collector to user session process.
     // N.B. 'DmesgOutput' needs to be duplicated since COM will close it when this call completes.
     wil::unique_handle dmesgOutputHandle;
+    // All WSLCHandle union members are HANDLE typedefs with the same size and offset,
+    // so accessing .File is safe regardless of the discriminant.
+    static_assert(
+        sizeof(Settings->DmesgOutput.Handle.File) == sizeof(Settings->DmesgOutput.Handle.Pipe) &&
+        sizeof(Settings->DmesgOutput.Handle.File) == sizeof(Settings->DmesgOutput.Handle.Socket));
     if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
     {
         dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
