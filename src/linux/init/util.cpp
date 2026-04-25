@@ -172,6 +172,7 @@ Return Value:
     if (!InteropConnection)
     {
         LOG_ERROR("accept4 failed {}", errno);
+        return {};
     }
 
     timeval Timeout{};
