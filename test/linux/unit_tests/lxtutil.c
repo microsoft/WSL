@@ -144,6 +144,12 @@ Return Value:
     struct stat Stat;
 
     FoundEntries = malloc(Count * sizeof(BOOLEAN));
+    if (FoundEntries == NULL) {
+        Result = LXT_RESULT_FAILURE;
+        LxtLogError("malloc failed for FoundEntries");
+        goto ErrorExit;
+    }
+
     memset(FoundEntries, 0, Count * sizeof(BOOLEAN));
     Directory = opendir(Path);
     if (Directory == NULL)
