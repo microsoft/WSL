@@ -191,9 +191,10 @@ try
 
     // Register the new connection with epoll. EPOLLIN is used to get epoll notifications
     // whenever there is new data on the TCP connection.
+    // N.B. epoll_event.data is a union — only set data.ptr since the dispatch loop
+    // identifies TCP connections via the else branch after checking known fds.
     epoll_event event{};
     event.events = EPOLLIN;
-    event.data.fd = localContext->m_tcpConnection.get();
     event.data.ptr = localContext.get();
     Syscall(epoll_ctl, m_epollFd.get(), EPOLL_CTL_ADD, localContext->m_tcpConnection.get(), &event);
 
