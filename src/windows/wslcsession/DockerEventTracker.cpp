@@ -16,7 +16,6 @@ Abstract:
 #include "WSLCVirtualMachine.h"
 #include <nlohmann/json.hpp>
 
-using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
