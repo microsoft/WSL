@@ -43,6 +43,11 @@ private:
         // Unique query id.
         uint32_t m_id{};
 
+        // Transaction ID field from the original DNS message header (stored in network byte order).
+        // Note: For DNS-over-TCP the tunneled buffer includes a 2-byte length prefix before the
+        // DNS header; this value is taken from the DNS header itself, not assumed to be at offset 0.
+        uint16_t m_dnsTransactionId{};
+
         // Callback to the parent object to notify about the DNS query completion.
         std::function<void(DnsQueryContext*, DNS_QUERY_RAW_RESULT*)> m_handleQueryCompletion;
 
@@ -78,6 +83,10 @@ private:
     // queryResults - structure containing result of the DNS request.
     void HandleDnsQueryCompletion(_Inout_ DnsQueryContext* dnsQueryContext, _Inout_opt_ DNS_QUERY_RAW_RESULT* queryResults) noexcept;
 
+    // Build and send a minimal DNS SERVFAIL response (RFC 1035, RCODE=2) back to the Linux DNS client.
+    // This is used when the Windows DNS API fails, to prevent the Linux client from waiting until timeout.
+    void SendServfailResponse(uint16_t transactionId, const LX_GNS_DNS_CLIENT_IDENTIFIER& dnsClientIdentifier);
+
     void ResolveExternalInterfaceConstraintIndex() noexcept;
 
     // Callback that will be invoked by the DNS API whenever a request finishes. The callback is invoked on success, error or when request is cancelled.
@@ -105,7 +114,7 @@ private:
     _Guarded_by_(m_dnsLock) uint32_t m_currentRequestId = 0;
 
     // Mapping request id to the request context structure.
-    _Guarded_by_(m_dnsLock) std::unordered_map<uint32_t, std::unique_ptr<DnsQueryContext>> m_dnsRequests {};
+    _Guarded_by_(m_dnsLock) std::unordered_map<uint32_t, std::unique_ptr<DnsQueryContext>> m_dnsRequests{};
 
     // Event that is set when all tracked DNS requests have completed.
     wil::unique_event m_allRequestsFinished{wil::EventOptions::ManualReset};
