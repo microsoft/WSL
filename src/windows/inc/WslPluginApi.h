@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 #define WSLPLUGINAPI_ENTRYPOINTV1 WSLPluginAPIV1_EntryPoint
-#define WSL_E_PLUGIN_REQUIRES_UPDATE ((HRESULT)0x8004032AL)
+#define WSL_E_PLUGIN_REQUIRES_UPDATE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x032A)
 
 #define WSL_PLUGIN_REQUIRE_VERSION(_Major, _Minor, _Revision, Api) \
     if (Api->Version.Major < (_Major) || (Api->Version.Major == (_Major) && Api->Version.Minor < (_Minor)) || \
