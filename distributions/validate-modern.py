@@ -68,7 +68,7 @@ warnings = {}
 def subset(inner, outer) -> bool:
     for key, value in inner:
         if key not in outer:
-            return True
+            return False
 
         if not node_equals(value, outer[key]):
             return False
@@ -161,7 +161,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
 
             sys.exit(1 if errors else 0)
 
-    except:
+    except Exception:
         if debug:
             import traceback
             traceback.print_exc()
