@@ -50,7 +50,7 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
 
         print(f'Created pull request: {response.json()["html_url"]}')
 
-    except:
+    except Exception:
         if debug:
             import pdb
             import traceback
