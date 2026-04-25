@@ -277,14 +277,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_TTY_RELAY
             }
             else
             {
-                if (bytesWritten <= pendingStdin.size()) // Partial or complete write
-                {
-                    pendingStdin.erase(pendingStdin.begin(), pendingStdin.begin() + bytesWritten);
-                }
-                else
-                {
-                    LOG_ERROR("Unexpected write result {}, pending={}", bytesWritten, pendingStdin.size());
-                }
+                // write() returns 0..pendingStdin.size(), so this is always a
+                // partial or complete write. Erase the bytes that were written.
+                pendingStdin.erase(pendingStdin.begin(), pendingStdin.begin() + bytesWritten);
             }
         }
 
