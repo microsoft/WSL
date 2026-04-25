@@ -238,6 +238,11 @@ try
     // Only unicast UDP & TCP queries are tunneled. Pass this flag to tell Windows DNS client to *not* resolve using multicast.
     request.queryOptions |= DNS_QUERY_NO_MULTICAST;
 
+    // DnsQueryRaw bypasses the Windows DNS cache internally, which means all responses return with TTL values
+    // reset to their original values. Pass this flag so that the DNS client preserves the real (decremented) TTL
+    // values from cached upstream responses, enabling downstream caches (e.g. systemd-resolved) to use meaningful TTLs.
+    request.queryOptions |= DNS_QUERY_DONT_RESET_TTL_VALUES;
+
     // In a DNS request from Linux there might be DNS records that Windows DNS client does not know how to parse.
     // By default in this case Windows will fail the request. When the flag is enabled, Windows will extract the
     // question from the DNS request and attempt to resolve it, ignoring the unknown records.
@@ -253,7 +258,8 @@ try
     }
 
     // Start the DNS request
-    // N.B. All DNS requests will bypass the Windows DNS cache
+    // N.B. DnsQueryRaw bypasses the Windows DNS cache; DNS_QUERY_DONT_RESET_TTL_VALUES is set above
+    // so that responses carry real TTL values for downstream caching (e.g. systemd-resolved).
     const auto result = s_dnsQueryRaw.value()(&request, &localContext->m_cancelHandle);
     if (result != DNS_REQUEST_PENDING)
     {

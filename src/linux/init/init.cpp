@@ -345,6 +345,15 @@ int GenerateSystemdUnits(int Argc, char** Argv)
         // When multiple distros are running, the second distro's getty fails because the tty is already held.
         THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/console-getty.service", installPath).c_str()) < 0);
 
+        // Enable DNS response caching in systemd-resolved. On some distros (notably Ubuntu) the default
+        // Cache=no-negative discards negative (NODATA/NXDOMAIN) responses, which causes repeated wire
+        // queries for unsupported record types (e.g. AAAA on IPv4-only networks). This override aligns
+        // all distros with the upstream systemd default of Cache=yes, ensuring systemd-resolved provides
+        // effective DNS caching inside the VM.
+        THROW_LAST_ERROR_IF(UtilMkdirPath("/run/systemd/resolved.conf.d", 0755) < 0);
+        constexpr auto* resolvedCacheConfig = "[Resolve]\nCache=yes\n";
+        THROW_LAST_ERROR_IF(WriteToFile("/run/systemd/resolved.conf.d/wsl-dns-cache.conf", resolvedCacheConfig) < 0);
+
         // Only create the wslg unit if both enabled in wsl.conf, and if the wslg folder actually exists.
         if (enableGuiApps && access("/mnt/wslg/runtime-dir", F_OK) == 0)
         {
