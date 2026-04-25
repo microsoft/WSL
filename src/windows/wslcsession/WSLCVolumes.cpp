@@ -148,6 +148,12 @@ std::string WSLCVolumes::InspectVolume(const std::string& Name) const
     return it->second->Inspect();
 }
 
+bool WSLCVolumes::ContainsVolume(const std::string& Name) const
+{
+    auto lock = m_lock.lock_shared();
+    return m_volumes.contains(Name);
+}
+
 void WSLCVolumes::OpenVolume(const std::string& VolumeName)
 {
     auto lock = m_lock.lock_exclusive();

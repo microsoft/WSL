@@ -21,6 +21,7 @@ Abstract:
 #include "WSLCContainer.h"
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
+#include "WSLCVolumes.h"
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
@@ -1395,6 +1396,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
+    WSLCVolumes& volumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     DockerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1402,6 +1404,22 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 {
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
+
+    // Validate that all named volumes mounted by the container were successfully recovered
+    // by the volumes manager. If any are missing (e.g. backing VHD removed while the service was
+    // down), refuse to open the container so it cannot enter a broken state.
+    for (const auto& mount : dockerContainer.Mounts)
+    {
+        if (mount.Type == "volume" && !mount.Name.empty())
+        {
+            THROW_HR_IF_MSG(
+                E_INVALIDARG,
+                !volumes.ContainsVolume(mount.Name),
+                "Cannot open container %hs: referenced volume '%hs' is not available",
+                dockerContainer.Id.c_str(),
+                mount.Name.c_str());
+        }
+    }
 
     auto labels(dockerContainer.Labels);
     auto metadataIt = labels.find(WSLCContainerMetadataLabel);

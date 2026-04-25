@@ -44,6 +44,8 @@ public:
     std::vector<WSLCVolumeInformation> ListVolumes() const;
     std::string InspectVolume(_In_ const std::string& Name) const;
 
+    bool ContainsVolume(_In_ const std::string& Name) const;
+
 private:
     void OpenVolume(_In_ const std::string& VolumeName);
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);

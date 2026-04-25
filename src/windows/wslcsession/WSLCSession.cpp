@@ -2543,6 +2543,7 @@ void WSLCSession::RecoverExistingContainers()
                 dockerContainer,
                 *this,
                 m_virtualMachine.value(),
+                *m_volumes,
                 std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
