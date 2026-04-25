@@ -3670,6 +3670,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(NamedVolumesVhdSessionRecovery)
     {
+
         WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
         ValidateNamedVolumeRecoveryContract("vhd", driverOpts, ARRAYSIZE(driverOpts));
 
@@ -3677,6 +3678,12 @@ class WSLCTests
         // can test the "delete VHD while session is down" scenario.
         const std::string volumeName = "wslc-test-named-volume-vhd";
         const std::string containerName = "wslc-test-container-vhd";
+
+        // Prune containers on exit so this test doesn't leak "wslc-test-container-vhd" on exit.
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            PruneResult result;
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        });
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
