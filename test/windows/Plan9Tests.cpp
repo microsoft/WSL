@@ -504,8 +504,7 @@ class Plan9Tests
         // Verify that Zone.Identifier files can be created with the default configuration.
         CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\default.txt:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
         file.reset();
-        VERIFY_ARE_EQUAL(
-            0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/default.txt:Zone.Identifier'"));
+        VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/default.txt:Zone.Identifier'"));
 
         // Clean up the Zone.Identifier file.
         LxsstuLaunchWsl(L"rm -f '/data/p9_test/default.txt:Zone.Identifier'");
@@ -522,14 +521,12 @@ class Plan9Tests
         // Verify that Zone.Identifier file creation is now blocked.
         CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\blocked.txt:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
         file.reset();
-        VERIFY_ARE_EQUAL(
-            1u, LxsstuLaunchWsl(L"test -e '/data/p9_test/blocked.txt:Zone.Identifier'"));
+        VERIFY_ARE_EQUAL(1u, LxsstuLaunchWsl(L"test -e '/data/p9_test/blocked.txt:Zone.Identifier'"));
 
         // Verify that normal file creation still works.
         CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\normalfile.txt", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
         file.reset();
-        VERIFY_ARE_EQUAL(
-            0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/normalfile.txt'"));
+        VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/normalfile.txt'"));
     }
 
     /* Plan9 Test Helper Methods */
