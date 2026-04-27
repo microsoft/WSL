@@ -163,7 +163,7 @@ private:
         std::atomic<std::uint64_t> EventTime{0};
         wil::slim_event_auto_reset Event;
     } m_stopNotification;
-    
+
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
