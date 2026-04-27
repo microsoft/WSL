@@ -854,8 +854,8 @@ For information please visit https://aka.ms/wslinstall</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSwapFileConflictsWithDistroVhd" xml:space="preserve">
-    <value>The swap file path '{}' specified in .wslconfig conflicts with the data disk for distribution '{}'. Using a distribution's data disk as swap will destroy its contents. Please change the 'swapFile' setting in .wslconfig to a different path.</value>
-    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}{Locked="swapFile"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>The 'swapFile' path '{}' specified in .wslconfig conflicts with the data disk for distribution '{}'. Using a distribution's data disk as swap will destroy its contents. Please change the 'swapFile' setting in .wslconfig to a different path.</value>
+    <comment>{Locked="swapFile"}{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
     <value>Nested virtualization is not supported on this machine.</value>
