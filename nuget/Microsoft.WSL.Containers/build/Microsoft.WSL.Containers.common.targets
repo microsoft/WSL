@@ -7,4 +7,126 @@
     <ItemGroup>
         <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\runtimes\win-$(WSLCSDK_Platform)\wslcsdk.dll" />
     </ItemGroup>
+
+    <!-- ================================================================== -->
+    <!-- Container Image Build Targets                                      -->
+    <!-- ================================================================== -->
+
+    <!-- Default properties -->
+    <PropertyGroup>
+        <!-- Auto-detect wslc CLI from MSI install path. Override with WslcCliPath property if needed. -->
+        <WslcCliPath Condition="'$(WslcCliPath)' == '' AND Exists('$(ProgramW6432)\WSL\wslc.exe')">$(ProgramW6432)\WSL\wslc.exe</WslcCliPath>
+        <!-- Unified intermediate directory: $(IntDir) for C++, $(IntermediateOutputPath) for .NET -->
+        <_WslcIntDir Condition="'$(IntDir)' != ''">$(IntDir)</_WslcIntDir>
+        <_WslcIntDir Condition="'$(_WslcIntDir)' == '' AND '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</_WslcIntDir>
+        <_WslcIntDir Condition="'$(_WslcIntDir)' == ''">obj\</_WslcIntDir>
+    </PropertyGroup>
+
+    <!-- Default metadata for WslcImage items -->
+    <ItemDefinitionGroup>
+        <WslcImage>
+            <Image></Image>
+            <Tag>latest</Tag>
+        </WslcImage>
+    </ItemDefinitionGroup>
+
+    <!-- Check that wslc CLI is installed (invoked via DependsOnTargets from WslcBuildAllImages) -->
+    <Target Name="WslcCheckDependencies">
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; --version"
+              IgnoreExitCode="true"
+              ConsoleToMSBuild="true"
+              StandardOutputImportance="low"
+              StandardErrorImportance="low">
+            <Output TaskParameter="ExitCode" PropertyName="_WslcExitCode" />
+        </Exec>
+
+        <Error Condition="'$(_WslcExitCode)' != '0'"
+               Code="WSLC0001"
+               Text="The wslc CLI at '$(WslcCliPath)' could not be found or did not run successfully. Install WSL by running: wsl --install --no-distribution" />
+    </Target>
+
+    <!-- Validate required metadata on WslcImage items (invoked via DependsOnTargets from WslcBuildAllImages) -->
+    <Target Name="_WslcValidateItems">
+
+        <Error Condition="'%(WslcImage.Dockerfile)' == ''"
+               Code="WSLC0002"
+               Text="WslcImage '%(WslcImage.Identity)' is missing required Dockerfile metadata." />
+
+        <Error Condition="'%(WslcImage.Context)' == ''"
+               Code="WSLC0003"
+               Text="WslcImage '%(WslcImage.Identity)' is missing required Context metadata." />
+
+        <!-- Check for characters invalid in Windows file names: / \ : * ? " < > |
+             XML entities: &quot; = "  &lt; = <  &gt; = >  -->
+        <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
+               Code="WSLC0004"
+               Text="WslcImage The item value '%(WslcImage.Identity)' must be a valid file name." />
+    </Target>
+
+    <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:
+         1. Sources may contain semicolons (multi-directory) which conflict with Properties syntax
+         2. Wildcard expansion in Inputs requires an intermediate ItemGroup (_WslcCollectSources)
+            that must run per-image in a separate evaluation context -->
+    <Target Name="WslcBuildAllImages"
+            AfterTargets="Build"
+            DependsOnTargets="WslcCheckDependencies;_WslcValidateItems"
+            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
+
+        <MSBuild Projects="$(MSBuildProjectFullPath)"
+                 Targets="_WslcBuildSingleImage"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
+    </Target>
+
+    <!--
+        Collect source files for incremental check.
+        Wildcards are expanded here in ItemGroup Include (not in Inputs attribute or MSBuild task Properties,
+        where they get escaped). Sources can be semicolon separated directory paths;
+        each is expanded with **\* to collect all files recursively.
+        If Sources is omitted, fall back to tracking the full Context directory so changes to
+        .dockerignore and other Docker build inputs still invalidate the marker.
+    -->
+    <Target Name="_WslcCollectSources">
+        <ItemGroup>
+            <_WslcSourceDirs Include="$([MSBuild]::Unescape('$(_WslcSourceDir)').Split(';'))" Condition="'$(_WslcSourceDir)' != ''" />
+            <_WslcSourceFiles Include="$(_WslcDockerfile)" />
+            <_WslcSourceFiles Include="%(_WslcSourceDirs.Identity)\**\*" Condition="'%(_WslcSourceDirs.Identity)' != ''" />
+            <_WslcSourceFiles Include="$(_WslcContext)\**\*" Condition="'$(_WslcSourceDir)' == '' AND '$(_WslcContext)' != ''" />
+        </ItemGroup>
+    </Target>
+
+    <!-- Inner target: build a single image with incremental check -->
+    <Target Name="_WslcBuildSingleImage"
+            DependsOnTargets="_WslcCollectSources"
+            Inputs="@(_WslcSourceFiles)"
+            Outputs="$(_WslcIntDir)wslc_$(_WslcName).built">
+
+        <MakeDir Directories="$(_WslcIntDir)" />
+
+        <!-- Resolve image reference: use Image metadata if set, otherwise fall back to Identity -->
+        <PropertyGroup>
+            <_WslcImageRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcImageRef>
+            <_WslcImageRef Condition="'$(_WslcImageRef)' == ''">$(_WslcName)</_WslcImageRef>
+        </PropertyGroup>
+
+        <Message Importance="high"
+                 Text="WSLC: Building image '$(_WslcImageRef):$(_WslcTag)'..." />
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcImageRef):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+              ConsoleToMSBuild="true" />
+
+        <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).built" AlwaysCreate="true" />
+
+        <Message Importance="high"
+                 Text="WSLC: Image '$(_WslcImageRef):$(_WslcTag)' built successfully." />
+    </Target>
+
+    <!-- Clean container artifacts -->
+    <Target Name="WslcClean"
+            AfterTargets="Clean"
+            Condition="'@(WslcImage)' != ''">
+
+        <Delete Files="$(_WslcIntDir)wslc_%(WslcImage.Identity).built" />
+    </Target>
+
 </Project>

@@ -23,4 +23,49 @@
     </ItemDefinitionGroup>
 
     <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
+
+    <!-- ================================================================== -->
+    <!-- C++ specific: Write .tlog files for VS Fast Up-to-Date Check       -->
+    <!-- ================================================================== -->
+
+    <Target Name="_WslcWriteAllTlogs"
+            AfterTargets="WslcBuildAllImages"
+            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != ''">
+
+        <MSBuild Projects="$(MSBuildProjectFullPath)"
+                 Targets="_WslcWriteSingleTlog"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
+    </Target>
+
+    <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles) -->
+    <Target Name="_WslcWriteSingleTlog" DependsOnTargets="_WslcCollectSources">
+        <PropertyGroup>
+            <_WslcTlogToolPath>$([System.IO.Path]::GetFullPath('$(WslcCliPath)'))</_WslcTlogToolPath>
+            <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).built'))</_WslcMarkerFullPath>
+        </PropertyGroup>
+
+        <WriteLinesToFile
+            File="$(_WslcTlogDir)wslc.$(_WslcName).read.1.tlog"
+            Lines="^$(_WslcTlogToolPath);@(_WslcSourceFiles->'%(FullPath)')"
+            Overwrite="true"
+            Encoding="Unicode" />
+
+        <WriteLinesToFile
+            File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
+            Lines="^$(_WslcTlogToolPath);$(_WslcMarkerFullPath)"
+            Overwrite="true"
+            Encoding="Unicode" />
+    </Target>
+
+    <!-- Clean tlog files -->
+    <Target Name="_WslcCleanTlogs"
+            AfterTargets="WslcClean"
+            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != ''">
+        <PropertyGroup>
+            <_WslcTlogDir>$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))</_WslcTlogDir>
+        </PropertyGroup>
+        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).read.1.tlog" />
+        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).write.1.tlog" />
+    </Target>
+
 </Project>
