@@ -751,6 +751,11 @@
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>Для запуска оболочки отладки требуется запуск wsl.exe от имени администратора.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection включена, а ваши дистрибутивы, возможно, зарегистрированы под другой учетной записью.
+Подробнее о Admin Protection можно узнать на https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>Сбой процесса установки для распространения "{}" с кодом завершения: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -887,7 +892,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
-    <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <value>IPv6 отключен в узле неподдерживаемым способом (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -1889,39 +1894,39 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Число миллисекунд бездействия виртуальной машины до ее завершения.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
-    <value>Apply changes</value>
+    <value>Применить изменения</value>
   </data>
   <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
-    <value>WSL Shutdown Required</value>
+    <value>Требуется завершить работу WSL</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
-    <value>Changed WSL settings require a WSL shutdown and restart to finalize. Shutting down will cause any active WSL sessions to terminate.</value>
+    <value>Измененные параметры WSL требуют завершения работы и перезапуска WSL для их применения. Завершение работы приведет к прекращению всех активных сеансов WSL.</value>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
-    <value>Shutdown WSL now</value>
+    <value>Завершить работу WSL сейчас</value>
   </data>
   <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
-    <value>Later</value>
+    <value>Позже</value>
   </data>
   <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
-    <value>Unable to apply changes</value>
+    <value>Не удалось применить изменения</value>
   </data>
   <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
-    <value>Close</value>
+    <value>Закрыть</value>
   </data>
   <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
-    <value>Failed to save pending settings changes. Error code: {0}</value>
+    <value>Не удалось сохранить ожидающие изменения параметров. Код ошибки: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
-    <value>Settings were saved, but shutting down WSL failed: {0}</value>
+    <value>Параметры сохранены, но не удалось завершить работу WSL: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
   <data name="Settings_BooleanTrueText" xml:space="preserve">
-    <value>On</value>
+    <value>Включено</value>
   </data>
   <data name="Settings_BooleanFalseText" xml:space="preserve">
-    <value>Off</value>
+    <value>Отключено</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>Создавайте, запускайте, отлаживайте и профилируйте приложения на WSL из Visual Studio</value>

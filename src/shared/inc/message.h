@@ -167,12 +167,13 @@ private:
 
     size_t GetRelativeIndex(unsigned int& Index)
     {
-        const size_t Offset = reinterpret_cast<char*>(&Index) - reinterpret_cast<char*>(m_buffer.data());
+        const auto* indexPtr = reinterpret_cast<char*>(&Index);
+        const auto* bufferStart = reinterpret_cast<char*>(m_buffer.data());
 
         // Validate that 'Index' is actually within the bounds of our buffer
-        assert(Offset >= 0 && Offset < m_buffer.size());
+        assert(indexPtr >= bufferStart && indexPtr + sizeof(Index) <= bufferStart + m_buffer.size());
 
-        return Offset;
+        return static_cast<size_t>(indexPtr - bufferStart);
     }
 
     void WriteRelativeIndex(size_t Offset, unsigned int Value)
@@ -181,6 +182,5 @@ private:
     }
 
     std::vector<std::byte> m_buffer;
-    size_t m_offset = 0;
 };
 } // namespace wsl::shared

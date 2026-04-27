@@ -33,7 +33,7 @@ struct in6_addr_linux
     } u;
 };
 
-const uint16_t ADDR6_MASK3 = ~in6_addr_linux(IN6ADDR_LOOPBACK_INIT).u.addr32[3];
+const uint32_t ADDR6_MASK3 = ~in6_addr_linux(IN6ADDR_LOOPBACK_INIT).u.addr32[3];
 const uint32_t N_ADDR_LOOPBACK = ntohl(INADDR_LOOPBACK);
 const uint32_t N_ADDR_ANY = ntohl(INADDR_ANY);
 

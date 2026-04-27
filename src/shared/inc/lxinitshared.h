@@ -579,7 +579,7 @@ typedef struct _LX_PROCESS_CRASH
 
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Timestamp), FIELD(Signal), FIELD(Pid), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(Timestamp), FIELD(Signal), FIELD(Pid), BUFFER_FIELD(Buffer));
 
 } LX_PROCESS_CRASH, *PLX_PROCESS_CRASH;
 
@@ -701,7 +701,7 @@ typedef struct _LX_INIT_CREATE_LOGIN_SESSION
     unsigned int Gid;
     char Buffer[]; // Contains username
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Uid), FIELD(Gid), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(Uid), FIELD(Gid), BUFFER_FIELD(Buffer));
 } LX_INIT_CREATE_LOGIN_SESSION, *PLX_INIT_CREATE_LOGIN_SESSION;
 
 //
@@ -716,7 +716,7 @@ typedef struct _LX_INIT_QUERY_ENVIRONMENT_VARIABLE
     MESSAGE_HEADER Header;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), BUFFER_FIELD(Buffer));
 } LX_INIT_QUERY_ENVIRONMENT_VARIABLE, *PLX_INIT_QUERY_ENVIRONMENT_VARIABLE;
 
 typedef struct _LX_GNS_RESULT
@@ -739,7 +739,7 @@ typedef struct _LX_GNS_INTERFACE_CONFIGURATION
     MESSAGE_HEADER Header;
     char Content[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Content));
+    PRETTY_PRINT(FIELD(Header), BUFFER_FIELD(Content));
 } LX_GNS_INTERFACE_CONFIGURATION, *PLX_GNS_INTERFACE_CONFIGURATION;
 
 typedef struct _LX_GNS_NOTIFICATION
@@ -751,7 +751,7 @@ typedef struct _LX_GNS_NOTIFICATION
     GUID AdapterId;
     char Content[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(AdapterId), FIELD(Content));
+    PRETTY_PRINT(FIELD(Header), FIELD(AdapterId), BUFFER_FIELD(Content));
 } LX_GNS_NOTIFICATION, *PLX_GNS_NOTIFICATION;
 
 typedef struct _LX_GNS_PORT_ALLOCATION_REQUEST
@@ -845,7 +845,7 @@ typedef struct _LX_GNS_JSON_MESSAGE
     MESSAGE_HEADER Header;
     char Content[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Content));
+    PRETTY_PRINT(FIELD(Header), BUFFER_FIELD(Content));
 } LX_GNS_JSON_MESSAGE, *PLX_GNS_JSON_MESSAGE;
 
 using PCLX_INIT_NETWORK_INFORMATION = const LX_INIT_NETWORK_INFORMATION*;
@@ -1288,7 +1288,7 @@ typedef struct _LX_MINI_INIT_TELEMETRY_MESSAGE
     bool ShowDrvFsNotification;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ShowDrvFsNotification), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(ShowDrvFsNotification), BUFFER_FIELD(Buffer));
 
 } LX_MINI_INIT_TELEMETRY_MESSAGE, *PLX_MINI_INIT_TELEMETRY_MESSAGE;
 
@@ -1319,7 +1319,7 @@ typedef struct _LX_MINI_INIT_UNMOUNT_MESSAGE
     MESSAGE_HEADER Header;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), BUFFER_FIELD(Buffer));
 } LX_MINI_INIT_UNMOUNT_MESSAGE, *PLX_MINI_INIT_UNMOUNT_MESSAGE;
 
 typedef struct _LX_MINI_INIT_DETACH_MESSAGE
@@ -1368,7 +1368,7 @@ typedef struct _LX_INIT_GUEST_CAPABILITIES
     bool SeccompAvailable;
     char Buffer[]; // Contains the kernel version string
 
-    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), BUFFER_FIELD(Buffer));
 } LX_INIT_GUEST_CAPABILITIES, *PLX_INIT_GUEST_CAPABILITIES;
 
 typedef struct _LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE
@@ -1515,7 +1515,7 @@ typedef struct _LX_INIT_QUERY_VM_ID
     MESSAGE_HEADER Header;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), BUFFER_FIELD(Buffer));
 } LX_INIT_QUERY_VM_ID, *PLX_INIT_QUERY_VM_ID;
 
 template <>

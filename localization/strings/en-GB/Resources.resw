@@ -744,6 +744,11 @@ For information please visit https://aka.ms/wslinstall</value>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>Running the debug shell requires running wsl.exe as Administrator.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection is enabled and your distributions may be registered under a different account.
+For more information on Admin Protection, please visit https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>The installation process for distribution '{}' failed with exit code: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1885,13 +1890,13 @@ You can also access more VS Code Remote options through the command palette with
     <value>Apply changes</value>
   </data>
   <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
-    <value>WSL Shutdown Required</value>
+    <value>WSL Shut-down Required</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
-    <value>Changed WSL settings require a WSL shutdown and restart to finalize. Shutting down will cause any active WSL sessions to terminate.</value>
+    <value>Changed WSL settings require a WSL shut-down and restart to finalise. Shutting down will cause any active WSL sessions to terminate.</value>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
-    <value>Shutdown WSL now</value>
+    <value>Shut-down WSL now</value>
   </data>
   <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
     <value>Later</value>

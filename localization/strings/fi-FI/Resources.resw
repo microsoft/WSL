@@ -744,6 +744,11 @@ Saat lisätietoja osoitteesta https://aka.ms/wslinstall</value>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>Virheenkorjausliittymän suorittaminen edellyttää wsl.exe suorittamista järjestelmänvalvojana.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection on käytössä, ja jakelusi voidaan rekisteröidä toiselle tilille.
+Lisätietoja Admin Protection saat osoitteesta https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>Jakelun {} asennusprosessi epäonnistui, lopetuskoodi: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -880,7 +885,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
-    <value>IPv6 is disabled on the host in an unsupported way (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <value>IPv6 on poistettu käytöstä isäntäkoneessa ei tuetulla tavalla (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
     <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
@@ -1882,39 +1887,39 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
     <value>Virtuaalikoneen käyttämättömyysaika millisekunteina, ennen kuin se sammutetaan.</value>
   </data>
   <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
-    <value>Apply changes</value>
+    <value>Ota muutokset käyttöön</value>
   </data>
   <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
-    <value>WSL Shutdown Required</value>
+    <value>WSL:n sammutus tarvitaan</value>
   </data>
   <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
-    <value>Changed WSL settings require a WSL shutdown and restart to finalize. Shutting down will cause any active WSL sessions to terminate.</value>
+    <value>Muutetut WSL-asetukset vaativat WSL:n sulkemisen ja uudelleenkäynnistyksen, jotta muutokset tulevat voimaan. Sulkeminen lopettaa kaikki aktiiviset WSL-istunnot.</value>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
-    <value>Shutdown WSL now</value>
+    <value>Sammuta WSL nyt</value>
   </data>
   <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
-    <value>Later</value>
+    <value>Myöhemmin</value>
   </data>
   <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
-    <value>Unable to apply changes</value>
+    <value>Muutosten käyttöönotto epäonnistui</value>
   </data>
   <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
-    <value>Close</value>
+    <value>Sulje</value>
   </data>
   <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
-    <value>Failed to save pending settings changes. Error code: {0}</value>
+    <value>Odottavien asetusten muutosten tallentaminen epäonnistui. Virhekoodi: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
   </data>
   <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
-    <value>Settings were saved, but shutting down WSL failed: {0}</value>
+    <value>Asetukset tallennettiin, mutta WSL:n sammuttaminen epäonnistui: {0}</value>
     <comment>{Locked="{0}"}Format placeholder for exception message</comment>
   </data>
   <data name="Settings_BooleanTrueText" xml:space="preserve">
-    <value>On</value>
+    <value>Käytössä</value>
   </data>
   <data name="Settings_BooleanFalseText" xml:space="preserve">
-    <value>Off</value>
+    <value>Ei käytössä</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>Kehitä, suorita ja profiloi sovelluksiasi, jotka toimivat WSL:ssä, sekä korjaa niiden virheitä Visual Studion kautta</value>
