@@ -495,6 +495,43 @@ class Plan9Tests
         VERIFY_ARE_EQUAL(content, L"foo");
     }
 
+    // Tests that the blockZoneIdentifier option prevents creation of Zone.Identifier files.
+    TEST_METHOD(TestBlockZoneIdentifier)
+    {
+        wil::unique_hfile file;
+        IO_STATUS_BLOCK ioStatus;
+
+        // Verify that Zone.Identifier files can be created with the default configuration.
+        CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\default.txt:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
+        file.reset();
+        VERIFY_ARE_EQUAL(
+            0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/default.txt:Zone.Identifier'"));
+
+        // Clean up the Zone.Identifier file.
+        LxsstuLaunchWsl(L"rm -f '/data/p9_test/default.txt:Zone.Identifier'");
+
+        // Enable blockZoneIdentifier and restart the distro to pick up the new config.
+        LxssWriteWslDistroConfig("[fileServer]\nblockZoneIdentifier=true");
+        TerminateDistribution();
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] {
+            LxsstuLaunchWsl(L"-u root rm -f /etc/wsl.conf");
+            TerminateDistribution();
+        });
+
+        // Verify that Zone.Identifier file creation is now blocked.
+        CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\blocked.txt:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
+        file.reset();
+        VERIFY_ARE_EQUAL(
+            1u, LxsstuLaunchWsl(L"test -e '/data/p9_test/blocked.txt:Zone.Identifier'"));
+
+        // Verify that normal file creation still works.
+        CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\normalfile.txt", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
+        file.reset();
+        VERIFY_ARE_EQUAL(
+            0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/normalfile.txt'"));
+    }
+
     /* Plan9 Test Helper Methods */
 
     static wil::unique_hfile CreateTestFile(std::wstring_view path, DWORD desiredAccess, DWORD disposition = OPEN_EXISTING, DWORD flags = 0)
