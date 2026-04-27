@@ -32,6 +32,7 @@ using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::IWSLCVolume;
+using wsl::windows::service::wslc::NetworkEntry;
 using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VMPortMapping;
@@ -146,8 +147,17 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
 
 // Builds port mapping list from container options and returns the network mode string.
 std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
-    std::vector<_WSLCPortMapping>& requestedPorts, WSLCContainerNetworkType networkType, WSLCVirtualMachine& virtualMachine, WSLCSession& session, LPCSTR containerNetworkName)
+    std::vector<_WSLCPortMapping>& requestedPorts,
+    WSLCContainerNetworkType networkType,
+    WSLCVirtualMachine& virtualMachine,
+    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    LPCSTR containerNetworkName)
 {
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        containerNetworkName != nullptr && networkType != WSLCContainerNetworkTypeCustom,
+        "ContainerNetworkName must be null when network type is not Custom");
+
     // Determine network mode string.
     std::string networkMode;
     if (networkType == WSLCContainerNetworkTypeBridged)
@@ -168,7 +178,7 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
             E_INVALIDARG, Localization::MessageWslcContainerNetworkNameRequired(), !containerNetworkName || strlen(containerNetworkName) == 0);
 
         THROW_HR_WITH_USER_ERROR_IF(
-            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(containerNetworkName), !session.HasNetwork(containerNetworkName));
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(containerNetworkName), !sessionNetworks.contains(containerNetworkName));
 
         networkMode = containerNetworkName;
     }
@@ -1124,6 +1134,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
+    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1348,7 +1359,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         ports,
         containerOptions.ContainerNetwork.ContainerNetworkType,
         virtualMachine,
-        wslcSession,
+        sessionNetworks,
         containerOptions.ContainerNetwork.ContainerNetworkName);
 
     request.HostConfig.NetworkMode = networkMode;

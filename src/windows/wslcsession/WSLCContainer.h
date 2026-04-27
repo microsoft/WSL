@@ -23,6 +23,7 @@ Abstract:
 #include "COMImplClass.h"
 #include "wslc_schema.h"
 #include "WSLCContainerMetadata.h"
+#include "WSLCNetworkMetadata.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
 
@@ -113,6 +114,7 @@ public:
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
         const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& SessionVolumes,
+        const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,

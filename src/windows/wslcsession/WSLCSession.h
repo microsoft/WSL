@@ -137,9 +137,6 @@ public:
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
     IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
-    // N.B. Caller must hold m_lock (shared) before calling this method.
-    __requires_lock_held(m_lock) bool HasNetwork(const std::string& Name);
-
     IFACEMETHOD(Terminate()) override;
 
     // ISupportErrorInfo

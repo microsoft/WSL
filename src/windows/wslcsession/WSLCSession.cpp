@@ -1586,13 +1586,14 @@ try
 
     try
     {
-        std::scoped_lock lock(m_containersLock, m_volumesLock);
+        std::scoped_lock lock(m_containersLock, m_volumesLock, m_networksLock);
 
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
             *containerOptions,
             *this,
             m_virtualMachine.value(),
             m_volumes,
+            m_networks,
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -2279,13 +2280,6 @@ try
     return S_OK;
 }
 CATCH_RETURN();
-
-bool WSLCSession::HasNetwork(const std::string& Name)
-{
-    ValidateName(Name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
-    std::lock_guard networksLock(m_networksLock);
-    return m_networks.contains(Name);
-}
 
 HRESULT WSLCSession::Terminate()
 try
