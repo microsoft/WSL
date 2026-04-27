@@ -61,7 +61,7 @@ struct unique_registered_wait
     {
         if (m_handle)
         {
-            UnregisterWaitEx(m_handle, INVALID_HANDLE_VALUE);
+            LOG_LAST_ERROR_IF(!UnregisterWaitEx(m_handle, INVALID_HANDLE_VALUE));
             m_handle = nullptr;
         }
     }
