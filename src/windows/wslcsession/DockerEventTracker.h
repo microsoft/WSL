@@ -72,7 +72,6 @@ public:
     void UnregisterCallback(size_t Id) noexcept;
 
     void WaitForObjectCreated(const std::string& ObjectId);
-    void WaitForObjectDestroyed(const std::string& ObjectId);
 
 private:
     void OnEvent(const std::string_view& event);

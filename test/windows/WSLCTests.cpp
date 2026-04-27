@@ -1947,15 +1947,14 @@ class WSLCTests
         {
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
             auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess();
+            container.SetDeleteOnClose(false);
 
             auto containerId = container.Id();
 
+            auto result = container.GetInitProcess();
             ValidateProcessOutput(result, {});
 
             ResetTestSession();
-
-            container.SetDeleteOnClose(false);
 
             // Manually cleanup the container and delete anonymous volumes since the session has been reset.
             auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {

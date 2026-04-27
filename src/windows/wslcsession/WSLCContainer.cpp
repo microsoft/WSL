@@ -683,10 +683,16 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     }
     else if (event == ContainerEvent::Destroy)
     {
+        // Signal before taking m_lock so any in-flight DeleteExclusiveLockHeld() waiting on the
+        // event take over. Destroy fires at most once per container lifetime.
+        WI_ASSERT(!m_destroyNotification.Event.is_signaled());
+        m_destroyNotification.EventTime.store(eventTime, std::memory_order_release);
+        m_destroyNotification.Event.SetEvent();
+
         auto lock = m_lock.lock_exclusive();
         if (m_state != WslcContainerStateDeleted)
         {
-            Transition(WslcContainerStateDeleted);
+            Transition(WslcContainerStateDeleted, eventTime);
         }
     }
 
@@ -779,21 +785,10 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 {
-    {
-        // Acquire an exclusive lock since this method modifies m_state.
-        auto lock = m_lock.lock_exclusive();
+    // Acquire an exclusive lock since this method modifies m_state.
+    auto lock = m_lock.lock_exclusive();
 
-        DeleteExclusiveLockHeld(Flags);
-    }
-
-    // Wait for the container destroy event on the Docker event stream after releasing m_lock.
-    // Docker emits volume destroy events before the container destroy event, so once this returns
-    // we are guaranteed that all anonymous volumes deleted with the container have been removed from tracking.
-    // N.B. This must be done outside m_lock to avoid an ABBA deadlock with the relay thread.
-    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
-    {
-        m_eventTracker.WaitForObjectDestroyed(m_id);
-    }
+    DeleteExclusiveLockHeld(Flags);
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
@@ -815,7 +810,25 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
-    Transition(WslcContainerStateDeleted);
+    // Wait for the Docker destroy event before transitioning state. Docker emits volume destroy
+    // events before the container destroy event, so once this returns we are guaranteed that any
+    // anonymous volumes deleted with the container have been removed from tracking.
+    // OnEvent() signals m_destroyNotification.Event before attempting to take m_lock, so waiting
+    // here while holding m_lock is safe.
+    std::optional<std::uint64_t> destroyTimestamp;
+    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
+    {
+        if (m_destroyNotification.Event.wait(60'000))
+        {
+            destroyTimestamp = m_destroyNotification.EventTime.load(std::memory_order_acquire);
+        }
+        else
+        {
+            LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_TIMEOUT), "Timed out waiting for destroy event for container '%hs'", m_id.c_str());
+        }
+    }
+
+    Transition(WslcContainerStateDeleted, destroyTimestamp);
     ReleaseResources();
 }
 
@@ -1337,10 +1350,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);
 
-    // Wait for the container create event to be delivered on the Docker event stream.
-    // Docker emits volume create events before the container create event, so once this returns
-    // we are guaranteed that all anonymous volumes created by Docker have been processed by the
-    // event tracker's volume callback and are already tracked in WSLCVolumes.
+    // Wait for the container create event to be delivered on the Docker event stream so that
+    // any events for objects created for the container (e.g. volumes) are guaranteed to have arived
+    // by the time the container is returned to the caller.
     EventTracker.WaitForObjectCreated(result.Id);
 
     auto container = std::make_unique<WSLCContainerImpl>(

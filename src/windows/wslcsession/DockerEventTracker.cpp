@@ -111,7 +111,20 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
 
     auto actionStr = action->get<std::string>();
 
-    // Track object lifecycle for WaitForObjectCreated/WaitForObjectDestroyed.
+    // Route events by Type field. Docker uses "container", "volume", "network", etc.
+    auto type = parsed.find("Type");
+    std::string typeStr = (type != parsed.end()) ? type->get<std::string>() : "container";
+
+    if (typeStr == "container")
+    {
+        OnContainerEvent(parsed, actionStr, eventTime);
+    }
+    else if (typeStr == "volume")
+    {
+        OnVolumeEvent(parsed, actionStr, eventTime);
+    }
+
+    // Track object creation for WaitForObjectCreated.
     auto actor = parsed.find("Actor");
     if (actor != parsed.end())
     {
@@ -125,26 +138,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
                 m_createdObjects.insert(objectId);
                 m_objectStateChanged.notify_all();
             }
-            else if (actionStr == "destroy")
-            {
-                std::lock_guard lock{m_lock};
-                m_createdObjects.erase(objectId);
-                m_objectStateChanged.notify_all();
-            }
         }
-    }
-
-    // Route events by Type field. Docker uses "container", "volume", "network", etc.
-    auto type = parsed.find("Type");
-    std::string typeStr = (type != parsed.end()) ? type->get<std::string>() : "container";
-
-    if (typeStr == "container")
-    {
-        OnContainerEvent(parsed, actionStr, eventTime);
-    }
-    else if (typeStr == "volume")
-    {
-        OnVolumeEvent(parsed, actionStr, eventTime);
     }
 }
 
@@ -231,18 +225,6 @@ void DockerEventTracker::WaitForObjectCreated(const std::string& ObjectId)
         HRESULT_FROM_WIN32(ERROR_TIMEOUT),
         !m_objectStateChanged.wait_for(lock, c_timeout, [&]() { return m_createdObjects.contains(ObjectId); }),
         "Timed out waiting for Docker create event for object '%hs'",
-        ObjectId.c_str());
-}
-
-void DockerEventTracker::WaitForObjectDestroyed(const std::string& ObjectId)
-{
-    constexpr auto c_timeout = std::chrono::seconds{60};
-
-    std::unique_lock lock{m_lock};
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_TIMEOUT),
-        !m_objectStateChanged.wait_for(lock, c_timeout, [&]() { return !m_createdObjects.contains(ObjectId); }),
-        "Timed out waiting for Docker destroy event for object '%hs'",
         ObjectId.c_str());
 }
 

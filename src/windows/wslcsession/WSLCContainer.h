@@ -163,6 +163,12 @@ private:
         wil::slim_event_auto_reset Event;
     } m_stopNotification;
 
+    struct DestroyNotification
+    {
+        std::atomic<std::uint64_t> EventTime{0};
+        wil::slim_event_manual_reset Event;
+    } m_destroyNotification;
+
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
