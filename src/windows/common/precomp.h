@@ -52,6 +52,7 @@ Abstract:
 #include <msi.h>
 #include <AccCtrl.h>
 #include <AclAPI.h>
+#include <wuapi.h>
 #include "windowsdefs.h"
 
 // Annotations

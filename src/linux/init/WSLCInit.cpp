@@ -66,7 +66,7 @@ static WSLCState g_state;
 int CreateCaptureCrashSymlink()
 try
 {
-    THROW_LAST_ERROR_IF(symlink("/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0);
+    THROW_LAST_ERROR_IF(symlink("/init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0);
 
     return 0;
 }
@@ -579,7 +579,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_MOUNT& Me
                     THROW_LAST_ERROR_IF(mount(mountPoint, chrootTarget.c_str(), "none", MS_MOVE, nullptr) < 0);
                 }
 
-                THROW_LAST_ERROR_IF(MountInit(std::format("{}/wsl-init", target).c_str()) < 0); // Required to call /gns later
+                THROW_LAST_ERROR_IF(MountInit(std::format("{}/init", target).c_str()) < 0); // Required to call /gns later
 
                 // If it exists, mount /etc/resolv.conf
                 if (std::filesystem::exists("/etc/resolv.conf"))
@@ -790,7 +790,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_WATCH_PRO
                 }
                 else
                 {
-                    LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status)
+                    LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status);
                 }
 
                 Channel.SendMessage(message);

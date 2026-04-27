@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
+#include "WSLCNetworkMetadata.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -27,6 +28,9 @@ using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
+constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
+constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
+constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
 namespace {
 
@@ -53,7 +57,7 @@ std::string IndentLines(const std::string& input, const std::string& prefix)
     return result;
 }
 
-void ValidateName(LPCSTR Name)
+void ValidateName(LPCSTR Name, size_t maxLength)
 {
     const auto& locale = std::locale::classic();
     size_t i = 0;
@@ -66,7 +70,7 @@ void ValidateName(LPCSTR Name)
         }
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > WSLC_MAX_CONTAINER_NAME_LENGTH);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(Name), i == 0 || i > maxLength);
 }
 
 wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
@@ -239,12 +243,15 @@ try
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
-    // Launch dockerd
+    // Launch containerd first
+    StartContainerd();
+
+    // Launch dockerd with external containerd socket
     StartDockerd();
 
     // Wait for dockerd to be ready before starting the event tracker.
     THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
@@ -254,6 +261,7 @@ try
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
     // Recover any existing containers from storage.
+    RecoverExistingNetworks();
     RecoverExistingVolumes();
     RecoverExistingContainers();
 
@@ -360,52 +368,87 @@ void WSLCSession::OnDockerdExited()
     }
 }
 
-void WSLCSession::OnDockerdLog(const gsl::span<char>& buffer)
+void WSLCSession::OnContainerdExited()
+{
+    if (!m_sessionTerminatingEvent.is_signaled())
+    {
+        WSL_LOG("UnexpectedContainerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
+    }
+}
+
+void WSLCSession::OnProcessLog(const gsl::span<char>& Buffer, PCSTR Source)
 try
 {
-    if (buffer.empty())
+    if (Buffer.empty())
     {
         return;
     }
 
-    constexpr auto c_containerdReadyLogLine = "API listen on /var/run/docker.sock";
+    constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 
-    std::string entry = {buffer.begin(), buffer.end()};
-    WSL_LOG("ContainerdLog", TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
+    std::string entry = {Buffer.begin(), Buffer.end()};
+    WSL_LOG(
+        "ContainerdLog",
+        TraceLoggingValue(Source, "Source"),
+        TraceLoggingValue(entry.c_str(), "Content"),
+        TraceLoggingValue(m_displayName.c_str(), "Name"));
 
-    if (!m_containerdReadyEvent.is_signaled())
+    if (!m_dockerdReadyEvent.is_signaled())
     {
-        if (entry.find(c_containerdReadyLogLine) != std::string::npos)
+        if (entry.find(c_dockerdReadyLogLine) != std::string::npos)
         {
-            m_containerdReadyEvent.SetEvent();
+            m_dockerdReadyEvent.SetEvent();
         }
     }
 }
 CATCH_LOG();
 
+ServiceRunningProcess WSLCSession::StartProcess(
+    const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback)
+{
+    ServiceProcessLauncher launcher{Executable, Args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
+
+    auto process = launcher.Launch(*m_virtualMachine);
+
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        process.GetStdHandle(1), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        process.GetStdHandle(2), [this, LogSource](const auto& data) { OnProcessLog(data, LogSource); }, false));
+
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), std::move(ExitCallback)));
+
+    return process;
+}
+
+void WSLCSession::StartContainerd()
+{
+    constexpr auto c_containerdRoot = "/var/lib/docker/containerd/daemon";
+    constexpr auto c_containerdState = "/run/docker/containerd/daemon";
+
+    std::vector<std::string> args{"/usr/bin/containerd", "--address", c_containerdSocket, "--root", c_containerdRoot, "--state", c_containerdState};
+
+    if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
+    {
+        args.emplace_back("--log-level");
+        args.emplace_back("debug");
+    }
+
+    m_containerdProcess = StartProcess("/usr/bin/containerd", args, "containerd", std::bind(&WSLCSession::OnContainerdExited, this));
+    WSL_LOG("ContainerdStarted");
+}
+
 void WSLCSession::StartDockerd()
 {
-    std::vector<std::string> args{{"/usr/bin/dockerd"}};
+    std::vector<std::string> args{"/usr/bin/dockerd", "--containerd", c_containerdSocket};
 
     if (WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsDebug))
     {
         args.emplace_back("--debug");
     }
 
-    ServiceProcessLauncher launcher{"/usr/bin/dockerd", args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
-
-    m_dockerdProcess = launcher.Launch(*m_virtualMachine);
-
-    // Read stdout & stderr.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        m_dockerdProcess->GetStdHandle(1), [&](const auto& data) { OnDockerdLog(data); }, false));
-
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        m_dockerdProcess->GetStdHandle(2), [&](const auto& data) { OnDockerdLog(data); }, false));
-
-    // Monitor dockerd's exist so we can detect abnormal exits.
-    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(
-        m_dockerdProcess->GetExitEvent(), std::bind(&WSLCSession::OnDockerdExited, this)));
+    m_dockerdProcess = StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this));
+    WSL_LOG("DockerdStarted");
 }
 
 void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& requestContext, LPCSTR Image, LPCSTR OperationName, IProgressCallback* ProgressCallback)
@@ -591,6 +634,15 @@ try
     if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsNoCache))
     {
         buildArgs.push_back("--no-cache");
+    }
+    if (WI_IsFlagSet(Options->Flags, WSLCBuildImageFlagsPull))
+    {
+        buildArgs.push_back("--pull");
+    }
+    if (Options->Target != nullptr && Options->Target[0] != '\0')
+    {
+        buildArgs.push_back("--target");
+        buildArgs.push_back(Options->Target);
     }
     for (ULONG i = 0; i < Options->Tags.Count; i++)
     {
@@ -951,8 +1003,15 @@ void WSLCSession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
     };
 
+    // Shutdown the Docker stream's write side when the user pipe is closed.
+    // This is required for Docker to know when the request body is complete.
+    auto onInputComplete = [socket = Request.stream.native_handle()]() {
+        LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR);
+    };
+
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        userHandle.Get(), common::relay::HandleWrapper{Request.stream.native_handle()}));
+        common::relay::HandleWrapper{userHandle.Get(), std::move(onInputComplete)},
+        common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(
         std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
@@ -1518,7 +1577,7 @@ try
     // Validate that name & images are valid.
     if (containerOptions->Name != nullptr)
     {
-        ValidateName(containerOptions->Name);
+        ValidateName(containerOptions->Name, WSLC_MAX_CONTAINER_NAME_LENGTH);
     }
 
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLC_MAX_IMAGE_NAME_LENGTH);
@@ -1563,7 +1622,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    ValidateName(Id);
+    ValidateName(Id, WSLC_MAX_CONTAINER_NAME_LENGTH);
 
     // Look for an exact ID match first.
     auto lock = m_lock.lock_shared();
@@ -1585,7 +1644,7 @@ try
         }
         catch (DockerHTTPException& e)
         {
-            RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), e.StatusCode() == 404, "Container not found: '%hs'", Id);
+            THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), e.StatusCode() == 404);
             RETURN_HR_IF_MSG(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS, e.StatusCode() == 400, "Ambiguous prefix: '%hs'", Id);
 
             THROW_HR_MSG(E_FAIL, "Unexpected error inspecting container '%hs': %hs", Id, e.what());
@@ -1598,8 +1657,8 @@ try
 
     auto result = wil::ResultFromException([&]() { (*it)->CopyTo(Container); });
 
-    // Return ERROR_NOT_FOUND if the container was found, but is being deleted for consistency.
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == RPC_E_DISCONNECTED);
+    // Return WSLC_E_CONTAINER_NOT_FOUND if the container was found, but is being deleted for consistency.
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_CONTAINER_NOT_FOUND, Localization::MessageWslcContainerNotFound(Id), result == RPC_E_DISCONNECTED);
 
     return result;
 }
@@ -1669,6 +1728,9 @@ HRESULT WSLCSession::PruneContainers(_In_opt_ WSLCPruneLabelFilter* Filters, _In
 try
 {
     COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Result);
+    ZeroMemory(Result, sizeof(*Result));
 
     DockerHTTPClient::PruneContainersFilters filters;
 
@@ -1818,11 +1880,11 @@ try
     RETURN_HR_IF_NULL(E_POINTER, VolumeInfo);
     ZeroMemory(VolumeInfo, sizeof(*VolumeInfo));
 
-    // Default driver to "vhd" if not specified. Currently only "vhd" is supported.
-    // TODO: Add support for docker's builtin volume drivers and change the default to "local"
-    // to match docker's behaviour.
-    std::string driver = (Options->Driver != nullptr) ? Options->Driver : WSLCVhdVolumeDriver;
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver);
+    // Default driver to "guest" if not specified.
+    std::string driver = (Options->Driver != nullptr && *Options->Driver != '\0') ? Options->Driver : WSLCGuestVolumeDriver;
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG, Localization::MessageWslcInvalidVolumeType(driver), driver != WSLCVhdVolumeDriver && driver != WSLCGuestVolumeDriver);
 
     auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
     auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCVolumeMetadataLabel);
@@ -1835,17 +1897,27 @@ try
 
     if (Options->Name != nullptr && Options->Name[0] != '\0')
     {
-        ValidateName(Options->Name);
+        ValidateName(Options->Name, WSLC_MAX_VOLUME_NAME_LENGTH);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_volumes.contains(Options->Name));
     }
 
-    auto volume = WSLCVhdVolumeImpl::Create(
-        Options->Name,
-        std::move(driverOpts),
-        std::move(labels),
-        m_storageVhdPath.parent_path(),
-        m_virtualMachine.value(),
-        m_dockerClient.value());
+    std::unique_ptr<IWSLCVolume> volume;
+    if (driver == WSLCVhdVolumeDriver)
+    {
+        WSL_LOG("VolumeCreatedVhdDriver", TraceLoggingValue(Options->Name ? Options->Name : "", "VolumeName"));
+        volume = WSLCVhdVolumeImpl::Create(
+            Options->Name,
+            std::move(driverOpts),
+            std::move(labels),
+            m_storageVhdPath.parent_path(),
+            m_virtualMachine.value(),
+            m_dockerClient.value());
+    }
+    else
+    {
+        WI_ASSERT(driver == WSLCGuestVolumeDriver);
+        volume = WSLCGuestVolumeImpl::Create(Options->Name, std::move(driverOpts), std::move(labels), m_dockerClient.value());
+    }
 
     const auto& name = volume->Name();
     auto info = volume->GetVolumeInformation();
@@ -1867,7 +1939,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Name);
     std::string name = Name;
-    ValidateName(name.c_str());
+    ValidateName(name.c_str(), WSLC_MAX_VOLUME_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
@@ -1932,7 +2004,7 @@ try
     *Output = nullptr;
 
     std::string name = Name;
-    ValidateName(name.c_str());
+    ValidateName(name.c_str(), WSLC_MAX_VOLUME_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
     std::lock_guard volumesLock(m_volumesLock);
@@ -1955,6 +2027,258 @@ HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WS
     // so WSLC VHD volumes require custom handling.
     return E_NOTIMPL;
 }
+
+int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs)
+{
+    LOG_IF_FAILED(Process.Get().Signal(WSLCSignalSIGTERM));
+
+    try
+    {
+        return Process.Wait(TerminateTimeoutMs);
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        try
+        {
+            LOG_IF_FAILED(Process.Get().Signal(WSLCSignalSIGKILL));
+            return Process.Wait(KillTimeoutMs);
+        }
+        CATCH_LOG();
+    }
+
+    return -1;
+}
+// Network management.
+
+HRESULT WSLCSession::CreateNetwork(const WSLCNetworkOptions* Options)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Name);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Driver);
+
+    std::string name = Options->Name;
+    std::string driver = Options->Driver;
+
+    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidName(name), IsReservedNetworkName(name));
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcInvalidNetworkDriver(driver), driver != WSLCBridgeNetworkDriver);
+
+    auto driverOpts = wslutil::ParseKeyValuePairs(Options->DriverOpts, Options->DriverOptsCount);
+    auto labels = wslutil::ParseKeyValuePairs(Options->Labels, Options->LabelsCount, WSLCNetworkManagedLabel);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard networksLock(m_networksLock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), m_networks.contains(name));
+
+    docker_schema::CreateNetwork request;
+    request.Name = name;
+    request.Driver = driver;
+    request.Labels = labels;
+    request.Labels[WSLCNetworkManagedLabel] = "true";
+
+    if (auto it = driverOpts.find("Internal"); it != driverOpts.end())
+    {
+        request.Internal = (it->second == "true");
+    }
+
+    if (auto it = driverOpts.find("Subnet"); it != driverOpts.end())
+    {
+        docker_schema::IPAMConfig ipamConfig;
+        ipamConfig.Subnet = it->second;
+
+        auto gatewayIt = driverOpts.find("Gateway");
+        if (gatewayIt != driverOpts.end())
+        {
+            ipamConfig.Gateway = gatewayIt->second;
+        }
+
+        auto& ipam = request.IPAM.emplace();
+        ipam.Driver = "default";
+        ipam.Config.emplace().push_back(std::move(ipamConfig));
+    }
+
+    try
+    {
+        m_dockerClient->CreateNetwork(request);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), Localization::MessageWslcNetworkAlreadyExists(name), e.StatusCode() == 409);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to create network '%hs'", name.c_str());
+    }
+
+    auto removeNetworkCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &name]() { m_dockerClient->RemoveNetwork(name); });
+
+    // Inspect the newly created network to cache full properties (IPAM, Scope, etc.)
+    // since CreateNetworkResponse only returns {Id, Warning}.
+    docker_schema::Network full;
+    try
+    {
+        full = m_dockerClient->InspectNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to inspect newly created network '%hs'", name.c_str());
+    }
+
+    NetworkEntry entry;
+    entry.Id = full.Id;
+    entry.Driver = full.Driver;
+    entry.Scope = full.Scope;
+    entry.Internal = full.Internal;
+    entry.Labels = full.Labels;
+    entry.IPAM.Driver = full.IPAM.Driver;
+    if (full.IPAM.Config)
+    {
+        auto& cfgs = entry.IPAM.Config.emplace();
+        for (const auto& c : *full.IPAM.Config)
+        {
+            cfgs.push_back({c.Subnet, c.Gateway});
+        }
+    }
+
+    auto [it, inserted] = m_networks.insert({name, std::move(entry)});
+    WI_VERIFY(inserted);
+
+    WSL_LOG("NetworkCreated", TraceLoggingValue(name.c_str(), "NetworkName"), TraceLoggingValue(full.Id.c_str(), "NetworkId"));
+
+    removeNetworkCleanup.release();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::DeleteNetwork(LPCSTR Name)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Name);
+    std::string name = Name;
+    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    std::lock_guard networksLock(m_networksLock);
+
+    auto it = m_networks.find(name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
+
+    try
+    {
+        m_dockerClient->RemoveNetwork(name);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
+        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete network '%hs'", name.c_str());
+    }
+
+    m_networks.erase(it);
+    WSL_LOG("NetworkDeleted", TraceLoggingValue(name.c_str(), "NetworkName"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::ListNetworks(WSLCNetworkInformation** Networks, ULONG* Count)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Networks);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *Networks = nullptr;
+    *Count = 0;
+
+    auto lock = m_lock.lock_shared();
+    std::lock_guard networksLock(m_networksLock);
+
+    if (m_networks.empty())
+    {
+        return S_OK;
+    }
+
+    auto output = wil::make_unique_cotaskmem<WSLCNetworkInformation[]>(m_networks.size());
+
+    ULONG index = 0;
+    for (const auto& [name, entry] : m_networks)
+    {
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, entry.Id.c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Driver, entry.Driver.c_str()) != 0);
+        index++;
+    }
+
+    *Networks = output.release();
+    *Count = index;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCSession::InspectNetwork(LPCSTR Name, LPSTR* Output)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Name);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
+
+    *Output = nullptr;
+
+    std::string name = Name;
+    ValidateName(name.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+
+    auto lock = m_lock.lock_shared();
+    std::lock_guard networksLock(m_networksLock);
+
+    auto it = m_networks.find(name);
+    THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), it == m_networks.end());
+
+    const auto& entry = it->second;
+
+    wslc_schema::InspectNetwork result;
+    result.Id = entry.Id;
+    result.Name = name;
+    result.Driver = entry.Driver;
+    result.Scope = entry.Scope;
+    result.Internal = entry.Internal;
+    result.Labels = entry.Labels;
+
+    result.IPAM.Driver = entry.IPAM.Driver;
+    if (entry.IPAM.Config)
+    {
+        auto& configs = result.IPAM.Config.emplace();
+        for (const auto& cfg : *entry.IPAM.Config)
+        {
+            wslc_schema::InspectIPAMConfig inspectCfg;
+            inspectCfg.Subnet = cfg.Subnet;
+            inspectCfg.Gateway = cfg.Gateway;
+            configs.push_back(std::move(inspectCfg));
+        }
+    }
+
+    std::string json = wsl::shared::ToJson(result);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLCSession::Terminate()
 try
@@ -1985,9 +2309,11 @@ try
     auto lock = m_lock.lock_exclusive();
     std::lock_guard containersLock(m_containersLock);
     std::lock_guard volumesLock(m_volumesLock);
+    std::lock_guard networksLock(m_networksLock);
 
     m_containers.clear();
     m_volumes.clear();
+    m_networks.clear();
 
     // Stop the IO relay.
     // This stops:
@@ -2005,30 +2331,20 @@ try
     m_eventTracker.reset();
     m_dockerClient.reset();
 
-    // Stop dockerd.
-    // N.B. dockerd wait a couple seconds if there are any outstanding HTTP request sockets opened.
+    // Stop dockerd first, then containerd (dockerd is a client of containerd).
+    // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
     if (m_dockerdProcess.has_value())
     {
-        LOG_IF_FAILED(m_dockerdProcess->Get().Signal(WSLCSignalSIGTERM));
-
-        int exitCode = -1;
-        try
-        {
-            exitCode = m_dockerdProcess->Wait(30 * 1000);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            try
-            {
-                m_dockerdProcess->Get().Signal(WSLCSignalSIGKILL);
-                exitCode = m_dockerdProcess->Wait(10 * 1000);
-            }
-            CATCH_LOG();
-        }
-
-        WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));
+        auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+        WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
         m_dockerdProcess.reset();
+    }
+
+    if (m_containerdProcess.has_value())
+    {
+        auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+        WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
+        m_containerdProcess.reset();
     }
 
     if (m_virtualMachine)
@@ -2304,6 +2620,54 @@ void WSLCSession::RecoverExistingContainers()
         TraceLoggingValue(m_containers.size(), "ContainerCount"));
 }
 
+void WSLCSession::RecoverExistingNetworks()
+{
+    WI_ASSERT(m_dockerClient.has_value());
+    WI_ASSERT(m_virtualMachine.has_value());
+
+    auto networks = m_dockerClient->ListNetworks();
+
+    std::lock_guard networksLock(m_networksLock);
+
+    for (const auto& network : networks)
+    {
+        if (!network.Labels.contains(WSLCNetworkManagedLabel))
+        {
+            continue;
+        }
+
+        try
+        {
+            WI_ASSERT(!m_networks.contains(network.Name));
+
+            NetworkEntry entry;
+            entry.Id = network.Id;
+            entry.Driver = network.Driver;
+            entry.Scope = network.Scope;
+            entry.Internal = network.Internal;
+            entry.Labels = network.Labels;
+            entry.IPAM.Driver = network.IPAM.Driver;
+            if (network.IPAM.Config)
+            {
+                auto& cfgs = entry.IPAM.Config.emplace();
+                for (const auto& c : *network.IPAM.Config)
+                {
+                    cfgs.push_back({c.Subnet, c.Gateway});
+                }
+            }
+
+            auto [_, inserted] = m_networks.insert({network.Name, std::move(entry)});
+            WI_VERIFY(inserted);
+        }
+        CATCH_LOG_MSG("Failed to recover network: %hs", network.Name.c_str());
+    }
+
+    WSL_LOG(
+        "NetworksRecovered",
+        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+        TraceLoggingValue(m_networks.size(), "NetworkCount"));
+}
+
 void WSLCSession::RecoverExistingVolumes()
 {
     WI_ASSERT(m_dockerClient.has_value());
@@ -2325,8 +2689,29 @@ void WSLCSession::RecoverExistingVolumes()
         {
             WI_ASSERT(!m_volumes.contains(volume.Name));
 
-            auto vhdVolume = WSLCVhdVolumeImpl::Open(volume, m_virtualMachine.value(), m_dockerClient.value());
-            auto [_, inserted] = m_volumes.insert({volume.Name, std::move(vhdVolume)});
+            // Peek at the driver field to decide which implementation to use.
+            const auto& metadataJson = volume.Labels->at(WSLCVolumeMetadataLabel);
+            auto metadata = wsl::shared::FromJson<WSLCVolumeMetadata>(metadataJson.c_str());
+
+            std::unique_ptr<IWSLCVolume> recovered;
+            if (metadata.Driver == WSLCVhdVolumeDriver)
+            {
+                recovered = WSLCVhdVolumeImpl::Open(volume, m_virtualMachine.value(), m_dockerClient.value());
+            }
+            else if (metadata.Driver == WSLCGuestVolumeDriver)
+            {
+                recovered = WSLCGuestVolumeImpl::Open(volume, m_dockerClient.value());
+            }
+            else
+            {
+                WSL_LOG(
+                    "VolumeRecoverySkippedUnknownDriver",
+                    TraceLoggingValue(volume.Name.c_str(), "VolumeName"),
+                    TraceLoggingValue(metadata.Driver.c_str(), "Driver"));
+                continue;
+            }
+
+            auto [_, inserted] = m_volumes.insert({volume.Name, std::move(recovered)});
             WI_VERIFY(inserted);
         }
         CATCH_LOG_MSG("Failed to recover volume: %hs", volume.Name.c_str());

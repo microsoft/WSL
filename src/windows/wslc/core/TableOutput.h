@@ -16,6 +16,7 @@ Abstract:
 #include <algorithm>
 #include <array>
 #include <cwchar>
+#include <functional>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -91,26 +92,31 @@ struct TableOutput
     using line_t = std::array<std::wstring, FieldCount>;
     using column_config_t = std::array<ColumnWidthConfig, FieldCount>;
     using column_def_t = std::array<ColumnDefinition, FieldCount>;
+    using OutputFn = std::function<void(const std::wstring&)>;
 
     static constexpr size_t DefaultColumnPadding = 3; // Docker-like spacing between columns
 
     // Constructor with default behavior (no column limits)
     TableOutput(header_t&& header, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
-        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(false), m_columnPadding(columnPadding)
+        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(false), m_columnPadding(columnPadding), m_outputFn(DefaultOutputFn())
     {
         InitializeColumns(std::move(header));
     }
 
     // Constructor with column width configuration (legacy)
     TableOutput(header_t&& header, column_config_t&& config, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
-        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(true), m_columnPadding(columnPadding), m_columnConfigs(std::move(config))
+        m_sizingBuffer(sizingBuffer),
+        m_limitColumnWidths(true),
+        m_columnPadding(columnPadding),
+        m_columnConfigs(std::move(config)),
+        m_outputFn(DefaultOutputFn())
     {
         InitializeColumns(std::move(header));
     }
 
     // Constructor with column definitions (name + config together)
     TableOutput(column_def_t&& columns, size_t sizingBuffer = 50, size_t columnPadding = DefaultColumnPadding) :
-        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(true), m_columnPadding(columnPadding)
+        m_sizingBuffer(sizingBuffer), m_limitColumnWidths(true), m_columnPadding(columnPadding), m_outputFn(DefaultOutputFn())
     {
         header_t headers;
         for (size_t i = 0; i < FieldCount; ++i)
@@ -142,6 +148,26 @@ struct TableOutput
         m_alwaysShowHeader = alwaysShow;
     }
 
+    // Set whether to show the header row
+    void SetShowHeader(bool showHeader)
+    {
+        m_showHeader = showHeader;
+    }
+
+    // Override the output function (e.g. redirect to a stringstream in tests).
+    void SetOutputFunction(OutputFn fn)
+    {
+        FAIL_FAST_IF_MSG(!fn, "OutputFn must not be empty");
+        m_outputFn = std::move(fn);
+    }
+
+    // Override the console width used for column shrinking (useful in tests).
+    // Pass 0 to restore the default behaviour (query the real console).
+    void SetConsoleWidthOverride(size_t width)
+    {
+        m_consoleWidthOverride = width;
+    }
+
     void OutputLine(line_t&& line)
     {
         m_empty = false;
@@ -165,7 +191,7 @@ struct TableOutput
         {
             EvaluateAndFlushBuffer();
         }
-        else if (m_alwaysShowHeader)
+        else if (m_alwaysShowHeader && m_showHeader)
         {
             OutputHeaderOnly();
         }
@@ -196,7 +222,15 @@ private:
     bool m_empty = true;
     bool m_limitColumnWidths = false;
     bool m_alwaysShowHeader = true;
+    bool m_showHeader = true;
     std::wstringstream m_stream;
+    OutputFn m_outputFn;
+    size_t m_consoleWidthOverride = 0;
+
+    static OutputFn DefaultOutputFn()
+    {
+        return [](const std::wstring& line) { detail::PrintTableLine(line, stdout); };
+    }
 
     void InitializeColumns(header_t&& header)
     {
@@ -222,6 +256,11 @@ private:
 
     size_t GetConsoleWidth()
     {
+        if (m_consoleWidthOverride > 0)
+        {
+            return m_consoleWidthOverride;
+        }
+
         CONSOLE_SCREEN_BUFFER_INFO consoleInfo{};
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -370,13 +409,16 @@ private:
             }
         }
 
-        line_t headerLine;
-        for (size_t i = 0; i < FieldCount; ++i)
+        if (m_showHeader)
         {
-            headerLine[i] = m_columns[i].Name.c_str();
-        }
+            line_t headerLine;
+            for (size_t i = 0; i < FieldCount; ++i)
+            {
+                headerLine[i] = m_columns[i].Name.c_str();
+            }
 
-        OutputLineToStream(headerLine);
+            OutputLineToStream(headerLine);
+        }
 
         for (const auto& line : m_buffer)
         {
@@ -424,9 +466,11 @@ private:
             }
         }
 
-        detail::PrintTableLine(m_stream.str(), stdout);
+        const std::wstring rendered = m_stream.str();
         m_stream.str(L"");
         m_stream.clear();
+
+        m_outputFn(rendered);
     }
 };
 

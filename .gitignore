@@ -62,6 +62,8 @@ msixinstaller/x64
 package/x64
 /appx-logs.txt
 tools/clang-format.exe
+tools/hooks/pre-commit
+!/tools/hooks/pre-commit.in
 /linux-crashes
 doc/site/
 directory.build.targets

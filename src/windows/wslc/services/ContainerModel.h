@@ -36,11 +36,17 @@ struct ContainerOptions
     std::string Name;
     bool Remove = false;
     bool TTY = false;
+    bool PublishAll = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
     std::string WorkingDirectory;
     std::vector<std::string> Entrypoint;
     std::optional<std::string> User{};
+    std::optional<std::string> Hostname{};
+    std::optional<std::string> Domainname{};
+    std::vector<std::string> DnsServers;
+    std::vector<std::string> DnsSearchDomains;
+    std::vector<std::string> DnsOptions;
     std::vector<std::string> Tmpfs;
 };
 
@@ -132,13 +138,13 @@ struct PublishPort
 
         constexpr bool IsEphemeral() const noexcept
         {
-            return m_start == EPHEMERAL_PORT && m_end == EPHEMERAL_PORT;
+            return m_start == WSLC_EPHEMERAL_PORT && m_end == WSLC_EPHEMERAL_PORT;
         }
 
         static PublishPort::PortRange ParsePortPart(const std::string& portPart);
         static PublishPort::PortRange Ephemeral() noexcept
         {
-            return {EPHEMERAL_PORT, EPHEMERAL_PORT};
+            return {WSLC_EPHEMERAL_PORT, WSLC_EPHEMERAL_PORT};
         }
 
     private:
@@ -174,7 +180,6 @@ struct PublishPort
 
     static constexpr uint16_t MAX_PORT = std::numeric_limits<uint16_t>::max();
     static constexpr uint16_t MIN_PORT = 1;
-    static constexpr uint16_t EPHEMERAL_PORT = 0;
 
     std::optional<IPAddress> HostIP() const noexcept
     {
@@ -224,9 +229,9 @@ private:
 
 struct VolumeMount
 {
-    std::wstring HostPath() const
+    std::wstring Host() const
     {
-        return m_hostPath;
+        return m_host;
     }
 
     std::string ContainerPath() const
@@ -239,14 +244,20 @@ struct VolumeMount
         return m_isReadOnlyMode;
     }
 
+    bool IsNamedVolume() const
+    {
+        return m_isNamedVolume;
+    }
+
     static bool IsValidNamedVolumeName(const std::wstring& name);
 
     static VolumeMount Parse(const std::wstring& value);
 
 private:
-    std::wstring m_hostPath;
+    std::wstring m_host;
     std::string m_containerPath;
     bool m_isReadOnlyMode = false;
+    bool m_isNamedVolume = false;
 
     static bool IsReadOnlyMode(const std::wstring& mode)
     {

@@ -93,7 +93,9 @@ class WSLCE2EContainerKillTests
         VerifyContainerIsNotListed(WslcContainerName);
 
         auto result = RunWslc(std::format(L"container kill {}", WslcContainerName));
-        result.Verify({.Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
+        result.Verify(
+            {.Stderr = std::format(L"Container '{}' not found.\r\nError code: WSLC_E_CONTAINER_NOT_FOUND\r\n", WslcContainerName),
+             .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Kill_InvalidSignal)
@@ -178,7 +180,7 @@ private:
         options << L"The following options are available:\r\n"
                 << L"  --session       Specify the session to use\r\n"
                 << L"  -s,--signal     Signal to send (default: SIGKILL)\r\n"
-                << L"  -h,--help       Shows help about the selected command\r\n"
+                << L"  -?,--help       Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

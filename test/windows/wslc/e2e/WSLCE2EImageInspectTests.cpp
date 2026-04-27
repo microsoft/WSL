@@ -51,8 +51,7 @@ class WSLCE2EImageInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_ImageNotFound)
     {
         auto result = RunWslc(std::format(L"image inspect {}", InvalidImage.NameAndTag()));
-        auto errorMessage = std::format(L"No such image: {}\r\nError code: WSLC_E_IMAGE_NOT_FOUND\r\n", InvalidImage.NameAndTag());
-        result.Verify({.Stdout = L"", .Stderr = errorMessage, .ExitCode = 1});
+        result.Verify({.Stdout = L"[]\r\n", .Stderr = std::format(L"Image '{}' not found.\r\n", InvalidImage.NameAndTag()), .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Inspect_Success)
@@ -107,7 +106,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"               //
                 << L"  --session  Specify the session to use\r\n"            //
-                << L"  -h,--help  Shows help about the selected command\r\n" //
+                << L"  -?,--help  Shows help about the selected command\r\n" //
                 << L"\r\n";
         return options.str();
     }

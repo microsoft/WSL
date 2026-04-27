@@ -29,12 +29,8 @@ namespace {
     {
         auto isElevated = wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token(TOKEN_QUERY).get());
 
-        const auto& userSettings = wsl::windows::wslc::settings::User();
-        auto customPath = userSettings.Get<wsl::windows::wslc::settings::Setting::SessionStoragePath>();
-
         static const std::filesystem::path basePath =
-            customPath.empty() ? (wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / wsl::windows::wslc::DefaultStorageSubPath)
-                               : std::filesystem::path{customPath};
+            wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / wsl::windows::wslc::DefaultStorageSubPath;
 
         // Session names are now qualified with the username (e.g. "wslc-cli-alice").
         wchar_t username[256 + 1] = {};

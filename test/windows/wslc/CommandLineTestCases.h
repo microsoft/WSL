@@ -21,6 +21,7 @@ Abstract:
 // Root command tests
 COMMAND_LINE_TEST_CASE(L"", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--help", L"root", true)
+COMMAND_LINE_TEST_CASE(L"-?", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
 COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
@@ -93,6 +94,28 @@ COMMAND_LINE_TEST_CASE(L"run -w /app ubuntu echo hello", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --workdir /app ubuntu sh", L"run", true)
 COMMAND_LINE_TEST_CASE(L"run --workdir", L"run", false)                        // Missing value for --workdir
 COMMAND_LINE_TEST_CASE(L"run --workdir \"\" ubuntu echo hello", L"run", false) // Empty working directory
+// DNS tests for container create
+COMMAND_LINE_TEST_CASE(L"create --dns 1.1.1.1 ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --dns 1.1.1.1 --dns 8.8.8.8 ubuntu", L"create", true) // Multiple --dns values
+COMMAND_LINE_TEST_CASE(L"container create --dns-search example.com ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --dns-search example.com --dns-search test.local ubuntu", L"create", true) // Multiple --dns-search values
+COMMAND_LINE_TEST_CASE(L"create --dns-option ndots:5 ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --dns-option ndots:5 --dns-option timeout:3 ubuntu", L"create", true) // Multiple --dns-option values
+COMMAND_LINE_TEST_CASE(L"create --dns 1.1.1.1 --dns-search example.com --dns-option ndots:5 ubuntu", L"create", true) // Combined DNS options
+COMMAND_LINE_TEST_CASE(L"create --dns", L"create", false)        // Missing value for --dns
+COMMAND_LINE_TEST_CASE(L"create --dns-search", L"create", false) // Missing value for --dns-search
+COMMAND_LINE_TEST_CASE(L"create --dns-option", L"create", false) // Missing value for --dns-option
+// DNS tests for container run
+COMMAND_LINE_TEST_CASE(L"run --dns 1.1.1.1 ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --dns 1.1.1.1 --dns 8.8.8.8 ubuntu", L"run", true) // Multiple --dns values
+COMMAND_LINE_TEST_CASE(L"container run --dns-search example.com ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --dns-search example.com --dns-search test.local ubuntu", L"run", true) // Multiple --dns-search values
+COMMAND_LINE_TEST_CASE(L"run --dns-option ndots:5 ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --dns-option ndots:5 --dns-option timeout:3 ubuntu", L"run", true) // Multiple --dns-option values
+COMMAND_LINE_TEST_CASE(L"run --dns 1.1.1.1 --dns-search example.com --dns-option ndots:5 ubuntu", L"run", true) // Combined DNS options
+COMMAND_LINE_TEST_CASE(L"run --dns", L"run", false)        // Missing value for --dns
+COMMAND_LINE_TEST_CASE(L"run --dns-search", L"run", false) // Missing value for --dns-search
+COMMAND_LINE_TEST_CASE(L"run --dns-option", L"run", false) // Missing value for --dns-option
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
