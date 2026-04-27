@@ -751,6 +751,11 @@
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>Для запуска оболочки отладки требуется запуск wsl.exe от имени администратора.</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection включена, а ваши дистрибутивы, возможно, зарегистрированы под другой учетной записью.
+Подробнее о Admin Protection можно узнать на https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>Сбой процесса установки для распространения "{}" с кодом завершения: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

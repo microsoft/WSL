@@ -193,7 +193,6 @@ try
     // whenever there is new data on the TCP connection.
     epoll_event event{};
     event.events = EPOLLIN;
-    event.data.fd = localContext->m_tcpConnection.get();
     event.data.ptr = localContext.get();
     Syscall(epoll_ctl, m_epollFd.get(), EPOLL_CTL_ADD, localContext->m_tcpConnection.get(), &event);
 

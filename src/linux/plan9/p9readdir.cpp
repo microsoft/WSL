@@ -27,7 +27,7 @@ struct dirent* DirectoryEnumerator::Next()
     if (result == nullptr)
     {
         // If errno is still 0, it means EOF is reached which is not an error.
-        THROW_LAST_ERROR_IF(errno != 0)
+        THROW_LAST_ERROR_IF(errno != 0);
     }
     else
     {

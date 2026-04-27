@@ -42,6 +42,7 @@ jobs:
           pipelineArtifactBuildUrl: '$(System.TaskDefinitionsUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)'
           buildDropArtifactName: ""
           timeoutInMinutes: 360
+          sessionTimeout: 360
           cancelTimeoutInMinutes: 420
           TestTimeout: "0.05:00:00"
           parserProperties: "worker:VsTestVersion=V150;session:HoldTrigger=Failure;VstsTestResultAttachmentUploadBehavior=Always"

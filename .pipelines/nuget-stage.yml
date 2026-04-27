@@ -34,7 +34,7 @@ stages:
       displayName: Download nuget artifacts
       inputs:
         artifact: "drop_wsl_package"
-        path: drop
+        path: $(Build.SourcesDirectory)\drop
 
       # Note: this task might fail if there's been no commits between two nightly pipelines, which is fine.
     - ${{ each package in parameters.nugetPackages }}:
@@ -42,7 +42,7 @@ stages:
           displayName: Push nuget/${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg
           inputs:
             command: 'push'
-            packagesToPush: drop/nuget/${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg
+            packagesToPush: $(Build.SourcesDirectory)\drop\nuget\${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg
             nuGetFeedType: 'internal'
             publishVstsFeed: wsl
             allowPackageConflicts: ${{ parameters.isNightly }}
