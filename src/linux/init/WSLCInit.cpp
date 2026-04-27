@@ -263,7 +263,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_TTY_RELAY
 
     while (true)
     {
-        int bytesWritten = 0;
+        ssize_t bytesWritten = 0;
         auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), pendingStdin.empty() ? -1 : 100);
         if (!pendingStdin.empty())
         {
@@ -277,8 +277,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_TTY_RELAY
             }
             else
             {
-                // write() returns 0..pendingStdin.size(), so this is always a
-                // partial or complete write. Erase the bytes that were written.
+                WI_ASSERT(static_cast<size_t>(bytesWritten) <= pendingStdin.size());
+
                 pendingStdin.erase(pendingStdin.begin(), pendingStdin.begin() + bytesWritten);
             }
         }
