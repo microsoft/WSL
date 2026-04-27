@@ -171,7 +171,7 @@ CATCH_LOG();
 
 } // namespace
 
-void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, bool truncateLog, int controlSocket, int serverFd, wil::unique_fd& pipeFd)
+void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, bool truncateLog, int controlSocket, int serverFd, wil::unique_fd& pipeFd, bool blockZoneIdentifier)
 {
     // Initialize logging.
     InitializeLogging(false, LogPlan9Exception);
@@ -190,6 +190,8 @@ void RunPlan9Server(const char* socketPath, const char* logFile, int logLevel, b
     // Open the root.
     wil::unique_fd rootFd{open("/", O_PATH | O_DIRECTORY | O_CLOEXEC)};
     THROW_LAST_ERROR_IF(!rootFd);
+
+    p9fs::SetBlockZoneIdentifier(blockZoneIdentifier);
 
     {
         // Create the file system server.
@@ -299,6 +301,11 @@ try
             {
                 Arguments.emplace_back(LX_INIT_PLAN9_LOG_FILE_ARG);
                 Arguments.emplace_back(Config.Plan9LogFile->c_str());
+            }
+
+            if (Config.Plan9BlockZoneIdentifier)
+            {
+                Arguments.emplace_back(LX_INIT_PLAN9_BLOCK_ZONE_IDENTIFIER_ARG);
             }
 
             Arguments.emplace_back(nullptr);

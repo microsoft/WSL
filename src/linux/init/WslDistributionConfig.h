@@ -73,6 +73,7 @@ struct WslDistributionConfig
     std::optional<std::string> Plan9LogFile;
     int Plan9LogLevel = TRACE_LEVEL_INFORMATION;
     bool Plan9LogTruncate = true;
+    bool Plan9BlockZoneIdentifier = false;
     int Umask = 0022;
     bool AppendGpuLibPath = true;
     bool GpuEnabled = true;
