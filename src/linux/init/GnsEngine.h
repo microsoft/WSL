@@ -21,10 +21,11 @@ public:
         std::optional<GUID> AdapterId;
     };
 
-    using NotificationRoutine = std::function<std::optional<Message>()>;
-    using StatusRoutine = std::function<void(int, const std::string&)>;
+    using NotificationRoutine = std::function<std::optional<Message>(wsl::shared::Transaction&)>;
+    using StatusRoutine = std::function<void(int, const std::string&, wsl::shared::Transaction&)>;
 
     GnsEngine(
+        wsl::shared::SocketChannel& channel,
         const NotificationRoutine& notificationRoutine,
         const StatusRoutine& statusRoutine,
         NetworkManager& manager,
@@ -36,7 +37,7 @@ public:
     void run();
 
 private:
-    std::tuple<bool, int> ProcessNextMessage();
+    std::tuple<bool, int> ProcessNextMessage(wsl::shared::Transaction& transaction);
 
     void ProcessNotification(const nlohmann::json& payload, Interface& interface);
 
@@ -69,6 +70,7 @@ private:
     void ProcessNotificationImpl(
         Interface& interface, const nlohmann::json& payload, void (GnsEngine::*routine)(Interface&, const T&, wsl::shared::hns::ModifyRequestType));
 
+    wsl::shared::SocketChannel& channel;
     const NotificationRoutine& notificationRoutine;
     const StatusRoutine& statusRoutine;
     NetworkManager& manager;

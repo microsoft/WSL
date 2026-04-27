@@ -84,7 +84,8 @@ void WSLCEnableCrashDumpCollection()
     WriteToFile("/proc/sys/kernel/core_pattern", core_pattern);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
 {
     wsl::shared::MessageWriter<WSLC_GET_DISK_RESULT> writer;
 
@@ -100,16 +101,17 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_GET_DISK&
         writer->Result = wil::ResultFromCaughtException();
     }
 
-    Channel.SendMessage<WSLC_GET_DISK::TResponse>(writer.Span());
+    Transaction.Send<WSLC_GET_DISK::TResponse>(writer.Span());
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
-    Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
+    Transaction.SendResultMessage<uint32_t>(SocketAddress.svm_port);
 
     wil::unique_fd Socket{
         UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS, Message.Fd != -1 ? SOCK_CLOEXEC : 0)};
@@ -121,15 +123,16 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_ACCEPT& M
     }
     else
     {
-        Channel.SendResultMessage<int32_t>(Socket.get());
+        Transaction.SendResultMessage<int32_t>(Socket.get());
         Socket.release();
     }
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     int32_t result = -EINVAL;
-    auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
+    auto sendResult = wil::scope_exit([&]() { Transaction.SendResultMessage(result); });
 
     auto fd = UtilConnectVsock(Message.HostPort, true);
     if (!fd)
@@ -142,13 +145,14 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_CONNECT& 
     }
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_UNIX_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_UNIX_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     // Make sure to close the channel since no more messages can be processed after this.
     auto closeChannel = wil::scope_exit([&]() { Channel.Close(); });
 
     int result = -1;
-    auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
+    auto sendResult = wil::scope_exit([&]() { Transaction.SendResultMessage(result); });
 
     const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathOffset);
     THROW_ERRNO_IF(EINVAL, path == nullptr);
@@ -241,7 +245,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_UNIX_CONN
     }
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
 {
     THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
 
@@ -394,7 +399,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_TTY_RELAY
     UtilSocketShutdown(Message.Socket, SHUT_WR);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_FORK& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_FORK& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
@@ -499,10 +505,11 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_FORK& Mes
     }
 
     ListenSocket.reset();
-    Channel.SendMessage(Response);
+    Transaction.Send(Response);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     WSLC_MOUNT_RESULT response{};
     response.Header.MessageType = WSLC_MOUNT_RESULT::Type;
@@ -629,10 +636,11 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_MOUNT& Me
         response.Result = wil::ResultFromCaughtException();
     }
 
-    Channel.SendMessage<WSLC_MOUNT_RESULT>(response);
+    Transaction.Send<WSLC_MOUNT_RESULT>(response);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_EXEC& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_EXEC& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto Executable = wsl::shared::string::FromSpan(Buffer, Message.ExecutableIndex);
     auto ArgumentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.CommandLineIndex);
@@ -644,28 +652,31 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_EXEC& Mes
     execve(Executable, (char* const*)(ArgumentPointers.data()), (char* const*)(EnvironmentPointers.data()));
 
     // Only reached if exec() fails
-    Channel.SendResultMessage<int32_t>(errno);
+    Transaction.SendResultMessage<int32_t>(errno);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_PORT_RELAY& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_PORT_RELAY& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 10, false)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
-    Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
+    Transaction.SendResultMessage<uint32_t>(SocketAddress.svm_port);
     Channel.Close();
     UtilSetThreadName("PortRelay");
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto result = kill(Message.Pid, Message.Signal);
-    Channel.SendResultMessage(result < 0 ? errno : 0);
+    Transaction.SendResultMessage(result < 0 ? errno : 0);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto result = umount(Message.Buffer) < 0 ? errno : 0;
     if (result == 0)
@@ -673,18 +684,19 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_UNMOUNT& 
         result = rmdir(Message.Buffer) < 0 ? errno : 0;
     }
 
-    Channel.SendResultMessage<int32_t>(result);
+    Transaction.SendResultMessage<int32_t>(result);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sync();
 
-    Channel.SendResultMessage<int32_t>(DetachScsiDisk(Message.Lun));
+    Transaction.SendResultMessage<int32_t>(DetachScsiDisk(Message.Lun));
 }
 
 template <typename TMessage, typename... Args>
-void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
+void HandleMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
 {
     if (TMessage::Type == Type)
     {
@@ -695,7 +707,7 @@ void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, co
         }
 
         const auto Message = gslhelpers::try_get_struct<TMessage>(Buffer);
-        HandleMessageImpl(Channel, *Message, Buffer);
+        HandleMessageImpl(Channel, Transaction, *Message, Buffer);
 
         return;
     }
@@ -703,7 +715,7 @@ void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, co
     {
         if constexpr (sizeof...(Args) > 0)
         {
-            HandleMessage<Args...>(Channel, Type, Buffer);
+            HandleMessage<Args...>(Channel, Transaction, Type, Buffer);
         }
         else
         {
@@ -713,7 +725,8 @@ void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, co
     }
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_WATCH_PROCESSES& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_WATCH_PROCESSES& Message, const gsl::span<gsl::byte>& Buffer)
 {
     // Create a signalfd to watch for SIGCHLD
     sigset_t mask{};
@@ -724,7 +737,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_WATCH_PRO
     wil::unique_fd signalFd = signalfd(-1, &mask, SFD_CLOEXEC);
     THROW_LAST_ERROR_IF(signalFd.get() < 0);
 
-    Channel.SendResultMessage<uint32_t>(0);
+    Transaction.SendResultMessage<uint32_t>(0);
 
     // Poll for either a received signal or a new message on the channel.
     pollfd polls[2]{};
@@ -793,6 +806,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_WATCH_PRO
                     LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status);
                 }
 
+                // Async notification - not a transaction reply
                 Channel.SendMessage(message);
             }
 
@@ -818,12 +832,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLC_WATCH_PRO
     }
 }
 
-void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
+void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
 {
     try
     {
         HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT>(
-            Channel, Type, Buffer);
+            Channel, Transaction, Type, Buffer);
     }
     catch (...)
     {
@@ -837,13 +851,14 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
 {
     while (Channel.Connected())
     {
-        auto [Message, Range] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+        auto transaction = Channel.ReceiveTransaction();
+        auto [Message, Range] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
         if (Message == nullptr)
         {
             break;
         }
 
-        ProcessMessage(Channel, Message->MessageType, Range);
+        ProcessMessage(Channel, transaction, Message->MessageType, Range);
     }
 
     LOG_INFO("Process {} exiting", getpid());
