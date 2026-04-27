@@ -158,8 +158,12 @@ private:
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
-    std::mutex m_stopStateLock;
-    std::optional<std::promise<std::uint64_t>> m_stopState;
+    struct StopNotification
+    {
+        std::atomic<std::uint64_t> EventTime{0};
+        wil::slim_event_auto_reset Event;
+    } m_stopNotification;
+    
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
