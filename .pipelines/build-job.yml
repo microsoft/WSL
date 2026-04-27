@@ -214,6 +214,74 @@ jobs:
               Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.lib" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.lib"
               Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
 
+      - task: PowerShell@2
+        displayName: "Create CAB from ${{ parameters.platform }} installer msi"
+        inputs:
+          targetType: inline
+          script: |
+              $arch = '${{ parameters.platform }}'
+              $bundleDir = "$(ob_outputDirectory)\bundle"
+              $msiPath = Join-Path $bundleDir "wsl.$(version.WSL_PACKAGE_VERSION).$arch.msi"
+              $cabPath = Join-Path $bundleDir "wsl.$(version.WSL_PACKAGE_VERSION).$arch.cab"
+
+              if (-not (Test-Path -Path $msiPath)) {
+                  throw "Input MSI not found for architecture '$arch': $msiPath"
+              }
+
+              Write-Host "Creating CAB from MSI: $msiPath -> $cabPath"
+              & makecab.exe $msiPath $cabPath
+
+              if ($LASTEXITCODE -ne 0) {
+                  throw "makecab.exe failed with exit code $LASTEXITCODE for architecture '$arch'."
+              }
+
+              if (-not (Test-Path -Path $cabPath)) {
+                  throw "CAB file was not created at expected path: $cabPath"
+              }
+
+      - ${{ if eq(parameters.isRelease, true) }}:
+          - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+            displayName: "Sign CAB (${{ parameters.platform }})"
+            condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+            inputs:
+              ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
+              signConfigType: ${{ parameters.esrp.signConfigType }}
+              SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
+              MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
+              MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
+              ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
+              AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
+              AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
+              AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
+              AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
+              FolderPath: "$(ob_outputDirectory)\\bundle"
+              Pattern: "*.cab"
+              UseMSIAuthentication: true
+              EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
+              inlineOperation: |
+                [
+                      {
+                          "KeyCode": "CP-230012",
+                          "OperationCode": "SigntoolSign",
+                          "Parameters" : {
+                                "OpusName" : "Microsoft",
+                                "OpusInfo" : "http://www.microsoft.com",
+                                "FileDigest" : "/fd \"SHA256\"",
+                                "PageHash" : "/NPH",
+                                "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                            },
+                            "ToolName" : "sign",
+                            "ToolVersion" : "1.0"
+                        },
+                        {
+                            "KeyCode" : "CP-230012",
+                            "OperationCode" : "SigntoolVerify",
+                            "Parameters" : {},
+                            "ToolName" : "sign",
+                            "ToolVersion" : "1.0"
+                        }
+                  ]
+
       - powershell: |
           $binFolder = ".\bin\${{ parameters.platform }}\Release"
           $pdbFolder = Join-Path $(ob_outputDirectory) "pdb\${{ parameters.platform }}\Release"
