@@ -136,7 +136,7 @@ private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
 
     bool WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const;
-    
+
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();

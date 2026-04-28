@@ -725,8 +725,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 bool WSLCContainerImpl::WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const
 {
     const HANDLE waitHandles[] = {Event.get(), m_wslcSession.SessionTerminatingEvent()};
-    const DWORD waitResult =
-        WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, gsl::narrow<DWORD>(Timeout.count()));
+    const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, gsl::narrow<DWORD>(Timeout.count()));
 
     switch (waitResult)
     {
