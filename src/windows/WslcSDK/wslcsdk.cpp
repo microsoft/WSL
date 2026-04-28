@@ -15,6 +15,7 @@ Abstract:
 
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
+#include "Defaults.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
 #include "Localization.h"
@@ -26,12 +27,6 @@ using namespace std::string_view_literals;
 using namespace wsl::windows::common::wslutil;
 
 namespace {
-constexpr uint32_t s_DefaultCPUCount = 2;
-constexpr uint32_t s_DefaultMemoryMB = 2000;
-// Maximum value per use with HVSOCKET_CONNECT_TIMEOUT_MAX
-constexpr ULONG s_DefaultBootTimeout = 300000;
-// Default to 1 GB
-constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 
 #define WSLC_FLAG_VALUE_ASSERT(_wlsc_name_, _wslc_name_) \
     static_assert(_wlsc_name_ == _wslc_name_, "Flag values differ: " #_wlsc_name_ " != " #_wslc_name_);

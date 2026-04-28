@@ -1,0 +1,81 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Helpers.h
+
+Abstract:
+
+    This file contains helpers for the WinRT wrapper of WSLC SDK.
+
+--*/
+
+#pragma once
+
+#define THROW_MSG_IF_FAILED(hr, msg) \
+    do \
+    { \
+        auto _hr = (hr); \
+        if (FAILED(_hr)) \
+        { \
+            auto _msg = (msg).get(); \
+            if (!_msg) \
+            { \
+                throw winrt::hresult_error(_hr); \
+            } \
+            else \
+            { \
+                throw winrt::hresult_error(_hr, winrt::to_hstring(_msg)); \
+            } \
+        } \
+    } while (0)
+
+template <typename T>
+struct implementation_type;
+
+#define DEFINE_TYPE_HELPERS(__type__) \
+    template <> \
+    struct implementation_type<winrt::Microsoft::WSL::Containers::__type__> \
+    { \
+        using type = winrt::Microsoft::WSL::Containers::implementation::__type__; \
+    };
+
+namespace winrt::Microsoft::WSL::Containers::implementation {
+template <typename T>
+auto* GetStructPointer(const T& obj)
+{
+    return obj ? winrt::get_self<typename implementation_type<T>::type>(obj)->ToStructPointer() : nullptr;
+}
+
+template <typename T>
+auto* GetHandlePointer(const T& obj)
+{
+    return obj ? winrt::get_self<typename implementation_type<T>::type>(obj)->ToHandlePointer() : nullptr;
+}
+
+template <typename T>
+auto GetHandle(const T& obj)
+{
+    return obj ? winrt::get_self<typename implementation_type<T>::type>(obj)->ToHandle() : nullptr;
+}
+
+template <typename T>
+auto* GetStructPointer(const winrt::com_ptr<T>& obj)
+{
+    return obj ? obj->ToStructPointer() : nullptr;
+}
+
+template <typename T>
+auto* GetHandlePointer(const winrt::com_ptr<T>& obj)
+{
+    return obj ? obj->ToHandlePointer() : nullptr;
+}
+
+template <typename T>
+auto GetHandle(const winrt::com_ptr<T>& obj)
+{
+    return obj ? obj->ToHandle() : nullptr;
+}
+} // namespace winrt::Microsoft::WSL::Containers::implementation

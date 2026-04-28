@@ -17,11 +17,15 @@
   </metadata>
   <files>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\WslcSDK\wslcsdk.h" target="include"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\wslcsdkcs.dll" target="lib\${WSL_NUGET_TARGET_FRAMEWORK}"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\wslcsdk.lib" target="runtimes\win-x64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\wslcsdk.dll" target="runtimes\win-x64\native"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\wslcsdk.lib" target="runtimes\win-arm64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\wslcsdk.dll" target="runtimes\win-arm64\native"/>
+
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\${CMAKE_BUILD_TYPE}\wslcsdkcs.dll" target="lib\${WSL_NUGET_TARGET_FRAMEWORK}\"/>
+
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\${CMAKE_BUILD_TYPE}\wslcsdk.lib" target="runtimes\win-x64\"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\${CMAKE_BUILD_TYPE}\wslcsdk.dll" target="runtimes\win-x64\native\"/>
+
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\${CMAKE_BUILD_TYPE}\wslcsdk.lib" target="runtimes\win-arm64\"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\${CMAKE_BUILD_TYPE}\wslcsdk.dll" target="runtimes\win-arm64\native\"/>
+
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\Microsoft.WSL.Containers\**" exclude="**\net\**"/>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\Microsoft.WSL.Containers\build\net\**" target="build\${WSL_NUGET_TARGET_FRAMEWORK}"/>
   </files>
