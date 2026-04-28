@@ -49,7 +49,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Build HCS settings
     hcs::ComputeSystem systemSettings{};
-    systemSettings.Owner = L"WSL";
+    systemSettings.Owner = Settings->DisplayName ? Settings->DisplayName : L"WSLC";
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
 
     // Determine which schema version to use based on the Windows version. Windows 10 does not support
