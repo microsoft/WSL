@@ -308,13 +308,6 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionInformation** Session
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
 }
 
-void WSLCSessionManagerImpl::GetVersion(_Out_ WSLCVersion* Version)
-{
-    Version->Major = WSL_PACKAGE_VERSION_MAJOR;
-    Version->Minor = WSL_PACKAGE_VERSION_MINOR;
-    Version->Revision = WSL_PACKAGE_VERSION_REVISION;
-}
-
 void WSLCSessionManagerImpl::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
@@ -436,9 +429,43 @@ WSLCSessionManager::WSLCSessionManager(WSLCSessionManagerImpl* Impl) : COMImplCl
 }
 
 HRESULT WSLCSessionManager::GetVersion(_Out_ WSLCVersion* Version)
+try
 {
-    return CallImpl(&WSLCSessionManagerImpl::GetVersion, Version);
+    RETURN_HR_IF(E_POINTER, Version == nullptr);
+
+    Version->Major = WSL_PACKAGE_VERSION_MAJOR;
+    Version->Minor = WSL_PACKAGE_VERSION_MINOR;
+    Version->Revision = WSL_PACKAGE_VERSION_REVISION;
+
+    return S_OK;
 }
+CATCH_RETURN();
+
+HRESULT WSLCSessionManager::GetMinimumSupportedClientVersion(_Out_ WSLCVersion* Version)
+try
+{
+    RETURN_HR_IF(E_POINTER, Version == nullptr);
+
+    constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 0};
+
+    // If the current version is below the minimum version, return the current version for convenience.
+    // TODO: Remove once 2.9.0 is published.
+    if constexpr (wsl::shared::PackageVersion < c_minClientVersion)
+    {
+        Version->Major = WSL_PACKAGE_VERSION_MAJOR;
+        Version->Minor = WSL_PACKAGE_VERSION_MINOR;
+        Version->Revision = WSL_PACKAGE_VERSION_REVISION;
+    }
+    else
+    {
+        Version->Major = std::get<0>(c_minClientVersion);
+        Version->Minor = std::get<1>(c_minClientVersion);
+        Version->Revision = std::get<2>(c_minClientVersion);
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
 {
