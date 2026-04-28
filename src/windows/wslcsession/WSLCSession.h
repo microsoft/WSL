@@ -153,6 +153,16 @@ public:
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
 
+    HANDLE SessionTerminatingEvent() const noexcept
+    {
+        return m_sessionTerminatingEvent.get();
+    }
+
+    ULONG Id() const noexcept
+    {
+        return m_id;
+    }
+
 private:
     ULONG m_id = 0;
 
