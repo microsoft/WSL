@@ -275,6 +275,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Remove = true;
     }
 
+    if (context.Args.Contains(ArgType::Network))
+    {
+        options.NetworkType = validation::GetNetworkTypeFromString(context.Args.Get<ArgType::Network>());
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));
