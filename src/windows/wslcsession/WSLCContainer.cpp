@@ -778,7 +778,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
         DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
-        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
+        LOG_WIN32_IF(ERROR_TIMEOUT, !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
     }
 }
 
@@ -794,7 +794,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     // taking m_lock. Callers on the docker event-loop thread (OnEvent) must not wait.
     if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
     {
-        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
+        LOG_WIN32_IF(ERROR_TIMEOUT, !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
     }
 }
 
@@ -1340,8 +1340,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     auto inspectData = DockerClient.InspectContainer(result.Id);
 
     // Wait for the container create event to be delivered on the Docker event stream so that
-    // any events for objects created for the container (e.g. volumes) are guaranteed to have arived
-    // by the time the container is returned to the caller.
+    // any events for objects created for the container (e.g. volumes) are delivered before we return
+    // from this function.
     EventTracker.WaitForObjectCreated(result.Id);
 
     auto container = std::make_unique<WSLCContainerImpl>(
