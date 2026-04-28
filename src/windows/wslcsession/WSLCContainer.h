@@ -134,7 +134,9 @@ private:
 
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
-    void WaitForContainerEvent();
+
+    bool WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const;
+    
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
@@ -161,7 +163,7 @@ private:
     struct StopNotification
     {
         std::atomic<std::uint64_t> EventTime{0};
-        wil::slim_event_auto_reset Event;
+        wil::unique_event Event{wil::EventOptions::None};
     } m_stopNotification;
 
     DockerHTTPClient& m_dockerClient;
