@@ -2237,6 +2237,7 @@ bool WSLCSession::WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::mi
         return true;
     case WAIT_OBJECT_0 + 1:
         THROW_HR_MSG(E_ABORT, "Session %lu is terminating.", m_id);
+        break;
     case WAIT_TIMEOUT:
         return false;
     default:
