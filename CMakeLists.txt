@@ -172,6 +172,10 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
+if (NOT DEFINED WSL_BUILD_SDKCS)
+    set(WSL_BUILD_SDKCS false)
+endif ()
+
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
