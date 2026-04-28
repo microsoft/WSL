@@ -13,11 +13,13 @@ Abstract:
 --*/
 #include "precomp.h"
 #include "DockerEventTracker.h"
+#include "WSLCSession.h"
 #include "WSLCVirtualMachine.h"
 #include <nlohmann/json.hpp>
 
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
+using wsl::windows::service::wslc::WSLCSession;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 DockerEventTracker::EventTrackingReference::EventTrackingReference(DockerEventTracker* tracker, size_t id) noexcept :
@@ -59,7 +61,7 @@ DockerEventTracker::EventTrackingReference::~EventTrackingReference() noexcept
     Reset();
 }
 
-DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay) : m_sessionId(sessionId)
+DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSession& session, IORelay& relay) : m_session(session)
 {
     auto onChunk = [this](const gsl::span<char>& buffer) {
         if (!buffer.empty()) // docker inserts empty lines between events, skip those.
@@ -74,7 +76,7 @@ DockerEventTracker::DockerEventTracker(DockerHTTPClient& dockerClient, ULONG ses
                     "DockerEventParseError",
                     TraceLoggingValue(buffer.data(), "Data"),
                     TraceLoggingValue(wil::ResultFromCaughtException(), "Error"),
-                    TraceLoggingValue(m_sessionId, "SessionId"));
+                    TraceLoggingValue(m_session.Id(), "SessionId"));
             }
         }
     };
@@ -97,7 +99,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
         "DockerEvent",
         TraceLoggingCountedString(
             event.data(), static_cast<UINT16>(std::min(event.size(), static_cast<size_t>(USHRT_MAX))), "Data"),
-        TraceLoggingValue(m_sessionId, "SessionId"));
+        TraceLoggingValue(m_session.Id(), "SessionId"));
 
     auto parsed = nlohmann::json::parse(event);
 
@@ -136,7 +138,12 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
             {
                 std::lock_guard lock{m_lock};
                 m_createdObjects.insert(objectId);
-                m_objectStateChanged.notify_all();
+                m_objectCreated.SetEvent();
+            }
+            else if (actionStr == "destroy")
+            {
+                std::lock_guard lock{m_lock};
+                m_createdObjects.erase(objectId);
             }
         }
     }
@@ -220,12 +227,26 @@ void DockerEventTracker::WaitForObjectCreated(const std::string& ObjectId)
 {
     constexpr auto c_timeout = std::chrono::seconds{60};
 
-    std::unique_lock lock{m_lock};
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_TIMEOUT),
-        !m_objectStateChanged.wait_for(lock, c_timeout, [&]() { return m_createdObjects.contains(ObjectId); }),
-        "Timed out waiting for Docker create event for object '%hs'",
-        ObjectId.c_str());
+    while (true)
+    {
+        {
+            std::lock_guard lock{m_lock};
+            if (m_createdObjects.contains(ObjectId))
+            {
+                return;
+            }
+
+            // Reset under the lock so a concurrent OnEvent() that runs after we release the lock
+            // and before the wait can re-signal the event and unblock us.
+            m_objectCreated.ResetEvent();
+        }
+
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+            !m_session.WaitForEventOrSessionTerminating(m_objectCreated.get(), c_timeout),
+            "Timed out waiting for Docker create event for object '%hs'",
+            ObjectId.c_str());
+    }
 }
 
 DockerEventTracker::EventTrackingReference DockerEventTracker::RegisterContainerStateUpdates(

@@ -163,6 +163,8 @@ public:
         return m_id;
     }
 
+    bool WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const;
+
 private:
     ULONG m_id = 0;
 

@@ -258,7 +258,7 @@ try
     m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
     //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
+    m_eventTracker.emplace(m_dockerClient.value(), *this, m_ioRelay);
 
     m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), m_storageVhdPath.parent_path());
 
@@ -2225,6 +2225,24 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+bool WSLCSession::WaitForEventOrSessionTerminating(HANDLE Event, std::chrono::milliseconds Timeout) const
+{
+    const HANDLE waitHandles[] = {Event, m_sessionTerminatingEvent.get()};
+    const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, gsl::narrow<DWORD>(Timeout.count()));
+
+    switch (waitResult)
+    {
+    case WAIT_OBJECT_0:
+        return true;
+    case WAIT_OBJECT_0 + 1:
+        THROW_HR_MSG(E_ABORT, "Session %lu is terminating.", m_id);
+    case WAIT_TIMEOUT:
+        return false;
+    default:
+        THROW_LAST_ERROR();
+    }
+}
 
 HRESULT WSLCSession::Terminate()
 try

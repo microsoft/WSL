@@ -19,6 +19,7 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
+class WSLCSession;
 class WSLCVirtualMachine;
 
 enum class ContainerEvent
@@ -63,7 +64,7 @@ public:
     using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>, std::uint64_t)>;
     using VolumeEventCallback = std::function<void(const std::string&, VolumeEvent, std::uint64_t)>;
 
-    DockerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay);
+    DockerEventTracker(DockerHTTPClient& dockerClient, WSLCSession& session, IORelay& relay);
     ~DockerEventTracker();
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
@@ -95,10 +96,10 @@ private:
     std::vector<ContainerCallback> m_containerCallbacks;
     std::vector<VolumeCallback> m_volumeCallbacks;
 
-    std::unordered_set<std::string> m_createdObjects;
-    std::condition_variable_any m_objectStateChanged;
+    _Guarded_by_(m_lock) std::unordered_set<std::string> m_createdObjects;
+    _Guarded_by_(m_lock) wil::unique_event m_objectCreated { wil::EventOptions::ManualReset };
 
-    ULONG m_sessionId{};
+    WSLCSession& m_session;
     std::recursive_mutex m_lock;
     std::atomic<size_t> m_callbackId{0};
 };

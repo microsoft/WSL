@@ -701,24 +701,6 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
-bool WSLCContainerImpl::WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const
-{
-    const HANDLE waitHandles[] = {Event.get(), m_wslcSession.SessionTerminatingEvent()};
-    const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, gsl::narrow<DWORD>(Timeout.count()));
-
-    switch (waitResult)
-    {
-    case WAIT_OBJECT_0:
-        return true;
-    case WAIT_OBJECT_0 + 1:
-        THROW_HR_MSG(E_ABORT, "Session %lu is terminating.", m_wslcSession.Id());
-    case WAIT_TIMEOUT:
-        return false;
-    default:
-        THROW_LAST_ERROR();
-    }
-}
-
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
     // Acquire an exclusive lock since this method modifies m_state.
@@ -782,7 +764,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     // Wait for the stop event to get the Docker timestamp.
     // OnEvent() signals the event before taking m_lock, so this won't deadlock.
     std::optional<std::uint64_t> stopTimestamp;
-    if (waitForStop && WaitForEvent(m_stopNotification.Event, 60s))
+    if (waitForStop && m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s))
     {
         stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
     }
@@ -796,7 +778,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
         DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
-        WaitForEvent(m_destroyEvent, 60s);
+        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
     }
 }
 
@@ -812,7 +794,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     // taking m_lock. Callers on the docker event-loop thread (OnEvent) must not wait.
     if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
     {
-        WaitForEvent(m_destroyEvent, 60s);
+        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
     }
 }
 
@@ -1406,7 +1388,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         if (mount.Type == "volume" && !mount.Name.empty())
         {
             THROW_HR_IF_MSG(
-                E_INVALIDARG,
+                E_UNEXPECTED,
                 !volumes.ContainsVolume(mount.Name),
                 "Cannot open container %hs: referenced volume '%hs' is not available",
                 dockerContainer.Id.c_str(),
