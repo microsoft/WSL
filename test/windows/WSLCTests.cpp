@@ -1014,6 +1014,13 @@ class WSLCTests
 
     WSLC_TEST_METHOD(LoadImage)
     {
+        // This test case is hanging on Windows Server SKU's. Skip the test until the issue is resolved.
+        // TODO: Remove once the fix is available.
+        if (IsWindowsServer())
+        {
+            SKIP_TEST_UNSTABLE();
+        }
+
         std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
         wil::unique_handle imageTarFileHandle{
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
