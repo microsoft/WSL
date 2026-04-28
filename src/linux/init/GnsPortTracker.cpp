@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <optional>
 #include <iostream>
+#include <algorithm>
 #include <linux/audit.h> /* Definition of AUDIT_* constants */
 #include <linux/sock_diag.h>
 #include <linux/inet_diag.h>
@@ -248,8 +249,8 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
         // Sockets can use a source port even though an explicit bind() was not made for that port. As long as there
         // is a socket using the source port, we should not deallocate it yet.
         //
-        // For example, a listening socket on port X and a connection socket accepted from that listening socket will both use port X.
-        // Even if the listening socket is closed the connection socket may still be using the same port.
+        // For example, a listening socket on port X and a connection socket accepted from that listening socket will both use
+        // port X. Even if the listening socket is closed the connection socket may still be using the same port.
         //
         // Port allocations are done based on protocol+port so we don't need the socket to explicitly match the address or family
         // of the bind request that is tracked in m_allocatedPorts, it just needs to match the port number and protocol.

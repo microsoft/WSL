@@ -2154,6 +2154,78 @@ class NetworkTests
             0L);
     }
 
+    // Verifies that after a listen socket is closed, the port remains allocated to the guest
+    // as long as an accepted connection in Linux is still using it.
+    static void VerifyAcceptedConnectionPortTracking()
+    {
+        WslKeepAlive keepAlive;
+
+        // Perl server: listen on port 1234, print "listening", accept one connection,
+        // close the listen socket, print "ready", then wait forever to keep the accepted connection alive.
+        auto serverCmd = LxssGenerateWslCommandLine(
+            L"perl -MSocket -e '"
+            L"$|=1;"
+            L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
+            L"bind(S,sockaddr_in(1234,INADDR_ANY)) or die;"
+            L"listen(S,1) or die;"
+            L"print \"listening\\n\";"
+            L"accept(C,S) or die;"
+            L"close(S);"
+            L"print \"ready\\n\";"
+            L"while(1){sleep 1000}"
+            L"'");
+
+        wil::unique_handle serverOutRead;
+        wil::unique_handle serverOutWrite;
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&serverOutRead, &serverOutWrite, nullptr, 0));
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetHandleInformation(serverOutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+        unique_kill_process serverProcess(LxsstuStartProcess(serverCmd.data(), nullptr, serverOutWrite.get()));
+        serverOutWrite.reset();
+
+        // Wait for the server to be listening
+        std::string output;
+        VERIFY_IS_TRUE(FindSubstring(serverOutRead, "listening", output));
+
+        // Perl client: connect to 127.0.0.1:1234, then wait forever to keep the connection alive.
+        auto clientCmd = LxssGenerateWslCommandLine(
+            L"perl -MSocket -e '"
+            L"socket(S,AF_INET,SOCK_STREAM,0) or die;"
+            L"connect(S,sockaddr_in(1234,inet_aton(\"127.0.0.1\"))) or die;"
+            L"while(1){sleep 1000}"
+            L"'");
+
+        unique_kill_process guestClientProcess(LxsstuStartProcess(clientCmd.data()));
+
+        // Wait for the server to accept the connection and close the listen socket
+        VERIFY_IS_TRUE(FindSubstring(serverOutRead, "ready", output));
+
+        // We need to wait > 60 seconds so that the port tracker's deallocation logic kicks in for this port.
+        // See c_bind_timeout_seconds in GnsPortTracker.cpp
+        std::this_thread::sleep_for(std::chrono::seconds(90));
+
+        // Verify the port is still allocated to the guest — host bind should fail
+        BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
+
+        // stop server and client processes
+        serverProcess.reset();
+        guestClientProcess.reset();
+
+        // Verify the port is eventually released and host is able to bind to it
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(1234);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2));
+    }
+
     template <typename T>
     static void VerifyNotBound(T& Address, int AddressFamily, int Protocol)
     {
@@ -4051,6 +4123,16 @@ class MirroredTests
         // this range, so even after the guest releases the port the host still cannot bind
         // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
+    }
+
+    WSL2_TEST_METHOD(AcceptedConnectionPortTracking)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyAcceptedConnectionPortTracking();
     }
 
     WSL2_TEST_METHOD(PortZeroRebindSucceeds)
