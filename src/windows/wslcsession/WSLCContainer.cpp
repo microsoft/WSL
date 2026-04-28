@@ -288,9 +288,15 @@ WSLCContainerNetworkType DockerNetworkModeToWSLCNetworkType(const std::string& m
         return WSLCContainerNetworkTypeNone;
     }
 
+    // Docker treats empty NetworkMode as the default (bridged).
+    if (mode.empty())
+    {
+        return WSLCContainerNetworkTypeBridged;
+    }
+
     // Reject Docker special syntaxes (container:<id>, service:<name>, etc.);
     // any plain name is treated as a user-defined custom network.
-    THROW_HR_IF_MSG(E_INVALIDARG, mode.empty() || mode.find(':') != std::string::npos, "Unsupported Docker network mode: %hs", mode.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, mode.find(':') != std::string::npos, "Unsupported Docker network mode: %hs", mode.c_str());
 
     return WSLCContainerNetworkTypeCustom;
 }
