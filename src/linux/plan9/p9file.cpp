@@ -50,7 +50,7 @@ void SetBlockZoneIdentifier(bool block)
     g_blockZoneIdentifier = block;
 }
 
-bool IsBlockedFileName(std::string_view name)
+static bool IsBlockedFileName(std::string_view name)
 {
     return g_blockZoneIdentifier && name.ends_with(c_zoneIdentifierSuffix);
 }
@@ -560,6 +560,11 @@ Expected<Qid> File::Create(std::string_view name, OpenFlags flags, UINT32 mode, 
 // Creates a subdirectory.
 Expected<Qid> File::MkDir(std::string_view name, UINT32 mode, UINT32 /* gid */)
 {
+    if (IsBlockedFileName(name))
+    {
+        return LxError{LX_EACCES};
+    }
+
     const auto newFileName = ChildPath(name);
 
     // The specified gid is currently ignored. Supporting it would be possible, but it would be
@@ -851,6 +856,11 @@ LX_INT File::Rename(Fid& newParent, std::string_view newName)
 // Creates a symbolic link in a directory.
 Expected<Qid> File::SymLink(std::string_view name, std::string_view target, UINT32 /* gid */)
 {
+    if (IsBlockedFileName(name))
+    {
+        return LxError{LX_EACCES};
+    }
+
     if (m_Root->ReadOnly())
     {
         return LxError{LX_EROFS};
@@ -890,6 +900,11 @@ Expected<UINT32> File::ReadLink(gsl::span<char> name)
 // Creates a hard link in a directory to another file.
 LX_INT File::Link(std::string_view newName, Fid& target)
 {
+    if (IsBlockedFileName(newName))
+    {
+        return LX_EACCES;
+    }
+
     if (!target.IsFile() || !target.IsOnRoot(m_Root))
     {
         return LX_EINVAL;
@@ -918,6 +933,11 @@ LX_INT File::Link(std::string_view newName, Fid& target)
 // Creates a device object in a directory.
 Expected<Qid> File::MkNod(std::string_view name, UINT32 mode, UINT32 major, UINT32 minor, UINT32 gid)
 {
+    if (IsBlockedFileName(name))
+    {
+        return LxError{LX_EACCES};
+    }
+
     if (m_Root->ReadOnly())
     {
         return LxError{LX_EROFS};
