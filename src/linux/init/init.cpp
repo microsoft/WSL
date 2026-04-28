@@ -3246,10 +3246,11 @@ Return Value:
 
 unsigned int StartPlan9(int Argc, char** Argv)
 {
-    constexpr auto* Usage = "Usage: plan9 " LX_INIT_PLAN9_CONTROL_SOCKET_ARG " fd " LX_INIT_PLAN9_SOCKET_PATH_ARG
-                            " path " LX_INIT_PLAN9_SERVER_FD_ARG " fd " LX_INIT_PLAN9_LOG_FILE_ARG
-                            " log-file " LX_INIT_PLAN9_LOG_LEVEL_ARG " level " LX_INIT_PLAN9_PIPE_FD_ARG " fd [--log-truncate]"
-                            " [" LX_INIT_PLAN9_BLOCK_ZONE_IDENTIFIER_ARG "]\n";
+    constexpr auto* Usage =
+        "Usage: plan9 " LX_INIT_PLAN9_CONTROL_SOCKET_ARG " fd " LX_INIT_PLAN9_SOCKET_PATH_ARG " path " LX_INIT_PLAN9_SERVER_FD_ARG
+        " fd " LX_INIT_PLAN9_LOG_FILE_ARG " log-file " LX_INIT_PLAN9_LOG_LEVEL_ARG " level " LX_INIT_PLAN9_PIPE_FD_ARG
+        " fd [--log-truncate]"
+        " [" LX_INIT_PLAN9_BLOCK_ZONE_IDENTIFIER_ARG "]\n";
 
     bool LogTruncate = false;
     bool BlockZoneIdentifier = false;
