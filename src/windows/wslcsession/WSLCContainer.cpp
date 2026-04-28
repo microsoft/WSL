@@ -801,8 +801,11 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 
     // Wait for the stop event to get the Docker timestamp.
-    THROW_WIN32_IF(ERROR_TIMEOUT, !m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s));
-    auto stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
+    std::optional<std::uint64_t> stopTimestamp;
+    if (m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s))
+    {
+        stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
+    }
 
     Transition(WslcContainerStateExited, stopTimestamp);
 
