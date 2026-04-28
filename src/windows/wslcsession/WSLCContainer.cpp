@@ -678,19 +678,27 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         SetExitCode(exitCode.value());
 
+        std::unique_lock stopGuard{m_stopLock, std::try_to_lock};
+
         m_stopNotification.EventTime.store(eventTime, std::memory_order_release);
         m_stopNotification.Event.SetEvent();
 
+        // If Stop() is already in flight, it will wake when the stop event is signaled and take care of cleanup.
+        if (!stopGuard.owns_lock())
+        {
+            return;
+        }
+
         auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
-
-        ReleaseProcesses();
 
         // Don't run the deletion logic if the container is already in a stopped / deleted state.
         // This can happen if Stop()/Delete() is called by the user.
         if (previousState == WslcContainerStateRunning)
         {
             Transition(WslcContainerStateExited, eventTime);
+            ReleaseProcesses();
+
             ReleaseRuntimeResources();
 
             if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
@@ -734,7 +742,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
-    // Acquire an exclusive lock since this method modifies m_state.
+    std::lock_guard stopGuard{m_stopLock};
     auto lock = m_lock.lock_exclusive();
 
     if (m_state == WslcContainerStateExited && !Kill)
@@ -793,12 +801,8 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 
     // Wait for the stop event to get the Docker timestamp.
-    // OnEvent() signals the event before taking m_lock, so this won't deadlock.
-    std::optional<std::uint64_t> stopTimestamp;
-    if (waitForStop && m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s))
-    {
-        stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
-    }
+    THROW_WIN32_IF(ERROR_TIMEOUT, !m_wslcSession.WaitForEventOrSessionTerminating(m_stopNotification.Event.get(), 60s));
+    auto stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
 
     Transition(WslcContainerStateExited, stopTimestamp);
 
@@ -809,7 +813,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
         DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
-        LOG_WIN32_IF(ERROR_TIMEOUT, !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
+        LOG_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
     }
 }
 
@@ -825,7 +829,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     // taking m_lock. Callers on the docker event-loop thread (OnEvent) must not wait.
     if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
     {
-        LOG_WIN32_IF(ERROR_TIMEOUT, !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
+        LOG_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
     }
 }
 

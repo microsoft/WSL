@@ -170,6 +170,10 @@ private:
 
     wil::unique_event m_destroyEvent{wil::EventOptions::ManualReset};
 
+    // Serializes Stop() callers and signals OnEvent that a Stop is in flight.
+    // Must be acquired before m_lock when both are needed.
+    std::mutex m_stopLock;
+
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
