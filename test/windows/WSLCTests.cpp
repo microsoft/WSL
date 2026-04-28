@@ -5337,12 +5337,18 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ContainerCustomNetworkEmptyNameTest)
     {
-        WSLCContainerLauncher launcher(
-            "debian:latest", "test-custom-network-empty", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
-        launcher.SetContainerNetworkName(std::string(""));
+        LPCSTR args[] = {"sleep", "99999"};
 
-        auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-        VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+        WSLCContainerOptions options{};
+        options.Image = "debian:latest";
+        options.Name = "test-custom-network-empty";
+        options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+        options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
+        options.ContainerNetwork.ContainerNetworkName = "";
+
+        wil::com_ptr<IWSLCContainer> container;
+        auto hr = m_defaultSession->CreateContainer(&options, &container);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
         ValidateCOMErrorMessageContains(L"Container network name is required");
     }
 
