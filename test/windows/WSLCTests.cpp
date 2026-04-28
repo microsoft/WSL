@@ -1014,7 +1014,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(LoadImage)
     {
-        // This test case is hanging on Windows Server SKU's. Skip the test until the issue is resolved.
+        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
         // TODO: Remove once the fix is available.
         if (IsWindowsServer())
         {
