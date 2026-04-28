@@ -42,20 +42,25 @@ protected:
 class DockerContainerProcessControl : public WSLCProcessControl
 {
 public:
-    DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient, DockerEventTracker& EventTracker);
+    DockerContainerProcessControl(WSLCContainerImpl& Container, DockerHTTPClient& DockerClient);
     ~DockerContainerProcessControl();
     void Signal(int Signal) override;
     void ResizeTty(ULONG Rows, ULONG Columns) override;
     int GetPid() const override;
     void OnContainerReleased() noexcept;
 
-private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t eventTime);
+    // Records the exit code observed from Docker. Idempotent: first call wins.
+    // Does not signal the exit event; call SignalExit() once the caller is ready
+    // for clients waiting on the exit event to unblock.
+    void SetExitCode(int ExitCode);
 
+    // Signals the exit event. No-op if already signaled or if no exit code has been set.
+    void SignalExit();
+
+private:
     std::mutex m_lock;
     DockerHTTPClient& m_client;
     WSLCContainerImpl* m_container{};
-    DockerEventTracker::EventTrackingReference m_eventTrackingReference;
 };
 
 class DockerExecProcessControl : public WSLCProcessControl

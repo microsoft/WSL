@@ -481,6 +481,24 @@ void WSLCContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noe
     m_processes.erase(remove.begin(), remove.end());
 }
 
+void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
+{
+    std::lock_guard processesLock{m_processesLock};
+    if (m_initProcessControl != nullptr)
+    {
+        m_initProcessControl->SetExitCode(ExitCode);
+    }
+}
+
+void WSLCContainerImpl::SignalInitProcessExit() noexcept
+{
+    std::lock_guard processesLock{m_processesLock};
+    if (m_initProcessControl != nullptr)
+    {
+        m_initProcessControl->SignalExit();
+    }
+}
+
 const std::string& WSLCContainerImpl::Image() const noexcept
 {
     return m_image;
@@ -620,7 +638,7 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to attach to container '%hs' during start", m_id.c_str());
     }
 
-    auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient, m_eventTracker);
+    auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient);
 
     std::lock_guard processesLock{m_processesLock};
     m_initProcessControl = control.get();
@@ -658,6 +676,7 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
+        SetExitCode(exitCode.value());
 
         m_stopNotification.EventTime.store(eventTime, std::memory_order_release);
         m_stopNotification.Event.SetEvent();
@@ -668,17 +687,24 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         ReleaseProcesses();
 
         // Don't run the deletion logic if the container is already in a stopped / deleted state.
-        // This can happen if Delete() is called by the user.
+        // This can happen if Stop()/Delete() is called by the user.
         if (previousState == WslcContainerStateRunning)
         {
             Transition(WslcContainerStateExited, eventTime);
-
             ReleaseRuntimeResources();
 
             if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
             {
                 DeleteExclusiveLockHeld(WSLCDeleteFlagsDeleteVolumes);
             }
+        }
+
+        // Signaling is idempotent and required regardless of who drove the state transition.
+        // The Rm path defers signaling to the Destroy event so callers observe destroy-side
+        // cleanup (e.g. anonymous volume tracking) before init's exit event fires.
+        if (WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm))
+        {
+            SignalInitProcessExit();
         }
     }
     else if (event == ContainerEvent::Destroy)
@@ -687,6 +713,11 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         m_destroyEvent.SetEvent();
 
         auto lock = m_lock.lock_exclusive();
+
+        // Now that destroy has been observed (and any --rm cleanup is reflected in tracking),
+        // it's safe to release waiters on init's exit event.
+        SignalInitProcessExit();
+
         if (m_state != WslcContainerStateDeleted)
         {
             Transition(WslcContainerStateDeleted, eventTime);

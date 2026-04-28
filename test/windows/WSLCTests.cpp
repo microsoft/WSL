@@ -2022,12 +2022,6 @@ class WSLCTests
             VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
 
-            // Wait for the volume destroy event to be processed by the event tracker.
-            wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() { THROW_WIN32_IF(ERROR_RETRY, listAnonymousVolumes().size() != 0u); },
-                std::chrono::milliseconds{100},
-                std::chrono::seconds{10});
-
             VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
         }
     }
