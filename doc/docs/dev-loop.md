@@ -14,9 +14,9 @@ You can also run a WinGet configuration directly for your edition:
 
 ```
 winget configure --enable
-winget configure -f .config/configuration.winget                   # Community (default)
-winget configure -f .config/configuration.vsProfessional.winget    # Professional
-winget configure -f .config/configuration.vsEnterprise.winget      # Enterprise
+winget configure -f tools/configuration.winget                   # Community (default)
+winget configure -f tools/configuration.vsProfessional.winget    # Professional
+winget configure -f tools/configuration.vsEnterprise.winget      # Enterprise
 ```
 
 > **Note:** `winget configure --enable` is required to enable the configuration feature. The `setup-dev-env.ps1` script runs this automatically.

@@ -14,11 +14,12 @@
     .\tools\setup-dev-env.ps1
 #>
 
+#Requires -RunAsAdministrator
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = (Resolve-Path "$PSScriptRoot\..").Path
-$configDir = Join-Path $repoRoot ".config"
+$configDir = $PSScriptRoot
 
 # ── Detect existing VS 2022 edition ─────────────────────────────────
 $configFile = "configuration.winget" # default: Community
