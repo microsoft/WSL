@@ -81,4 +81,22 @@ wsl::windows::common::wslc_schema::InspectVolume VolumeService::Inspect(models::
     THROW_IF_FAILED(session.Get()->InspectVolume(name.c_str(), &output));
     return FromJson<wsl::windows::common::wslc_schema::InspectVolume>(output.get());
 }
+
+models::PruneVolumesResult VolumeService::Prune(models::Session& session, bool all)
+{
+    WSLCPruneVolumesOptions options{};
+    options.All = all;
+
+    WSLCPruneVolumesResults results{};
+    THROW_IF_FAILED(session.Get()->PruneVolumes(&options, &results));
+
+    models::PruneVolumesResult result;
+    result.SpaceReclaimed = results.SpaceReclaimed;
+    for (ULONG i = 0; i < results.VolumesCount; ++i)
+    {
+        result.DeletedVolumes.push_back(results.Volumes[i]);
+    }
+
+    return result;
+}
 } // namespace wsl::windows::wslc::services

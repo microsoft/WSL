@@ -26,6 +26,7 @@ std::vector<std::unique_ptr<Command>> VolumeCommand::GetCommands() const
     commands.push_back(std::make_unique<VolumeRemoveCommand>(FullName()));
     commands.push_back(std::make_unique<VolumeInspectCommand>(FullName()));
     commands.push_back(std::make_unique<VolumeListCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumePruneCommand>(FullName()));
     return commands;
 }
 
