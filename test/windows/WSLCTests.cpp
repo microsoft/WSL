@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
+#include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
@@ -434,6 +435,50 @@ class WSLCTests
             settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x2);
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), E_INVALIDARG);
+        }
+    }
+
+    // Returns the set of VM owner names currently reported by hcsdiag.
+    static std::vector<std::wstring> ListVmOwners()
+    {
+        std::wstring commandLine = L"hcsdiag list -raw";
+        wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+        auto output = process.RunAndCaptureOutput(10000);
+
+        std::vector<std::wstring> owners;
+        auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(output.Stdout), nullptr, false);
+        if (!json.is_array())
+        {
+            return owners;
+        }
+
+        for (const auto& entry : json)
+        {
+            if (entry.contains("Owner") && entry["Owner"].is_string())
+            {
+                owners.push_back(wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>()));
+            }
+        }
+
+        return owners;
+    }
+
+    WSLC_TEST_METHOD(VmOwnerMatchesSessionDisplayName)
+    {
+        // The default session (c_testSessionName) is already running from class setup.
+        // Verify its display name appears as a VM owner in hcsdiag output.
+        auto owners = ListVmOwners();
+
+        auto found = std::ranges::find(owners, c_testSessionName);
+        if (found == owners.end())
+        {
+            LogError("Expected VM owner '%ws' not found. Owners:", c_testSessionName);
+            for (const auto& owner : owners)
+            {
+                LogError("  '%ws'", owner.c_str());
+            }
+
+            VERIFY_FAIL();
         }
     }
 
