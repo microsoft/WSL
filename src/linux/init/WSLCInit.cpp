@@ -268,7 +268,7 @@ void HandleMessageImpl(
 
     while (true)
     {
-        int bytesWritten = 0;
+        ssize_t bytesWritten = 0;
         auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), pendingStdin.empty() ? -1 : 100);
         if (!pendingStdin.empty())
         {
@@ -282,14 +282,9 @@ void HandleMessageImpl(
             }
             else
             {
-                if (bytesWritten <= pendingStdin.size()) // Partial or complete write
-                {
-                    pendingStdin.erase(pendingStdin.begin(), pendingStdin.begin() + bytesWritten);
-                }
-                else
-                {
-                    LOG_ERROR("Unexpected write result {}, pending={}", bytesWritten, pendingStdin.size());
-                }
+                WI_ASSERT(static_cast<size_t>(bytesWritten) <= pendingStdin.size());
+
+                pendingStdin.erase(pendingStdin.begin(), pendingStdin.begin() + bytesWritten);
             }
         }
 
