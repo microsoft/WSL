@@ -683,16 +683,14 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     }
     else if (event == ContainerEvent::Destroy)
     {
-        // Signal before taking m_lock so any in-flight DeleteExclusiveLockHeld() waiting on the
-        // event take over. Destroy fires at most once per container lifetime.
-        WI_ASSERT(!m_destroyNotification.Event.is_signaled());
-        m_destroyNotification.EventTime.store(eventTime, std::memory_order_release);
-        m_destroyNotification.Event.SetEvent();
+        WI_ASSERT(!m_destroyEvent.is_signaled());
+        m_destroyEvent.SetEvent();
 
         auto lock = m_lock.lock_exclusive();
         if (m_state != WslcContainerStateDeleted)
         {
             Transition(WslcContainerStateDeleted, eventTime);
+            ReleaseResources();
         }
     }
 
@@ -798,6 +796,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
         DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
+        WaitForEvent(m_destroyEvent, 60s);
     }
 }
 
@@ -807,6 +806,14 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     auto lock = m_lock.lock_exclusive();
 
     DeleteExclusiveLockHeld(Flags);
+
+    // Wait for the docker destroy event so anonymous volume cleanup is reflected in tracking by
+    // the time we return. Safe to wait here: OnEvent() signals m_destroyEvent before
+    // taking m_lock. Callers on the docker event-loop thread (OnEvent) must not wait.
+    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
+    {
+        WaitForEvent(m_destroyEvent, 60s);
+    }
 }
 
 __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
@@ -828,25 +835,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
-    // Wait for the Docker destroy event before transitioning state. Docker emits volume destroy
-    // events before the container destroy event, so once this returns we are guaranteed that any
-    // anonymous volumes deleted with the container have been removed from tracking.
-    // OnEvent() signals m_destroyNotification.Event before attempting to take m_lock, so waiting
-    // here while holding m_lock is safe.
-    std::optional<std::uint64_t> destroyTimestamp;
-    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
-    {
-        if (m_destroyNotification.Event.wait(60'000))
-        {
-            destroyTimestamp = m_destroyNotification.EventTime.load(std::memory_order_acquire);
-        }
-        else
-        {
-            LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_TIMEOUT), "Timed out waiting for destroy event for container '%hs'", m_id.c_str());
-        }
-    }
-
-    Transition(WslcContainerStateDeleted, destroyTimestamp);
+    Transition(WslcContainerStateDeleted);
     ReleaseResources();
 }
 
