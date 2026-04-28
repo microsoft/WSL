@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 
+#include <poll.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
 #include <sys/epoll.h>
@@ -3427,4 +3428,202 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     }
 
     return 0;
+}
+
+struct RelayDirection
+{
+    int srcFd;
+    int dstFd;
+    bool dstIsSocket;
+    std::vector<gsl::byte> buf;
+    size_t head;
+    size_t tail;
+    bool done;
+
+    size_t Pending() const
+    {
+        return tail - head;
+    }
+};
+
+void UtilRelay(int fd1, int fd2, size_t bufferSize, unsigned flags)
+
+/*++
+
+Routine Description:
+
+    This routine relays data between two file descriptors using non-blocking
+    I/O and poll(). By default the relay is bidirectional; set
+    UtilRelayUnidirectional to only relay fd1 -> fd2.
+
+Arguments:
+
+    fd1 - Supplies the first file descriptor.
+
+    fd2 - Supplies the second file descriptor.
+
+    bufferSize - Supplies the per-direction buffer size in bytes.
+
+    flags - Supplies UtilRelayFlags controlling direction and shutdown behavior.
+
+Return Value:
+
+    None.
+
+--*/
+
+{
+    // Set both fds to non-blocking for the relay loop.
+    for (int fd : {fd1, fd2})
+    {
+        int fl = fcntl(fd, F_GETFL, 0);
+        THROW_LAST_ERROR_IF(fl < 0);
+        THROW_LAST_ERROR_IF(fcntl(fd, F_SETFL, fl | O_NONBLOCK) < 0);
+    }
+
+    const bool bidirectional = (flags & UtilRelayUnidirectional) == 0;
+
+    std::vector<RelayDirection> directions;
+    directions.emplace_back(fd1, fd2, (flags & UtilRelayFd2Socket) != 0, std::vector<gsl::byte>(bufferSize), 0, 0, false);
+    if (bidirectional)
+    {
+        directions.emplace_back(fd2, fd1, (flags & UtilRelayFd1Socket) != 0, std::vector<gsl::byte>(bufferSize), 0, 0, false);
+    }
+
+    // Maximum poll entries: one per direction (either read or write).
+    pollfd pfds[2] = {};
+    int pollDirectionIndex[2] = {};
+
+    for (;;)
+    {
+        if (std::all_of(directions.begin(), directions.end(), [](const auto& direction) { return direction.done; }))
+        {
+            return;
+        }
+
+        // Build the poll set. Each direction is either reading or writing,
+        // never both — wait for the buffer to drain before reading again.
+        int nfds = 0;
+        for (int i = 0; i < directions.size(); i++)
+        {
+            auto& direction = directions[i];
+            if (direction.done)
+            {
+                continue;
+            }
+
+            if (direction.Pending() > 0)
+            {
+                // Buffer has data — poll for write.
+                pfds[nfds] = {direction.dstFd, POLLOUT, 0};
+                pollDirectionIndex[nfds] = i;
+                nfds++;
+            }
+            else
+            {
+                // Buffer is empty — poll for read.
+                pfds[nfds] = {direction.srcFd, POLLIN, 0};
+                pollDirectionIndex[nfds] = i;
+                nfds++;
+            }
+        }
+
+        if (nfds == 0)
+        {
+            return;
+        }
+
+        THROW_LAST_ERROR_IF(poll(pfds, nfds, -1) < 0);
+
+        for (int j = 0; j < nfds; j++)
+        {
+            auto& direction = directions[pollDirectionIndex[j]];
+
+            if (pfds[j].events & POLLOUT)
+            {
+                // can't write to dstFd anymore
+                if (pfds[j].revents & (POLLERR | POLLHUP))
+                {
+                    direction.done = true;
+                    continue;
+                }
+
+                if (!(pfds[j].revents & POLLOUT))
+                {
+                    continue;
+                }
+
+                auto written = TEMP_FAILURE_RETRY(write(direction.dstFd, direction.buf.data() + direction.head, direction.Pending()));
+                if (written < 0)
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                    {
+                        continue;
+                    }
+
+                    direction.done = true;
+                    continue;
+                }
+
+                direction.head += written;
+                if (direction.Pending() == 0)
+                {
+                    direction.head = direction.tail = 0;
+                }
+            }
+            else
+            {
+                if (!(pfds[j].revents & POLLIN))
+                {
+                    if (pfds[j].revents & (POLLERR | POLLHUP))
+                    {
+                        if (direction.dstIsSocket)
+                        {
+                            shutdown(direction.dstFd, SHUT_WR);
+                        }
+
+                        direction.done = true;
+                    }
+
+                    continue;
+                }
+
+                // Buffer is empty — read directly from the start.
+                auto nread = TEMP_FAILURE_RETRY(read(direction.srcFd, direction.buf.data(), direction.buf.size()));
+                if (nread <= 0)
+                {
+                    if (nread < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+                    {
+                        continue;
+                    }
+
+                    if (direction.dstIsSocket)
+                    {
+                        shutdown(direction.dstFd, SHUT_WR);
+                    }
+
+                    direction.done = true;
+                }
+                else
+                {
+                    direction.tail = nread;
+
+                    // Try to write immediately rather than waiting for the next poll.
+                    auto written = TEMP_FAILURE_RETRY(write(direction.dstFd, direction.buf.data(), direction.tail));
+                    if (written > 0)
+                    {
+                        direction.head = written;
+                        if (direction.Pending() == 0)
+                        {
+                            direction.head = direction.tail = 0;
+                        }
+                    }
+                    else if (written < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+                    {
+                        direction.done = true;
+                    }
+                }
+            }
+        }
+    }
 }

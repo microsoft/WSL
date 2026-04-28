@@ -277,6 +277,16 @@ std::pair<std::optional<std::string>, std::optional<std::string>> UtilReadFlavor
 
 ssize_t UtilReadMessageLxBus(int MessageFd, std::vector<gsl::byte>& Buffer, bool ShutdownOnDisconnect);
 
+enum UtilRelayFlags : unsigned
+{
+    UtilRelayNone = 0,
+    UtilRelayFd1Socket = 1 << 0,      // fd1 is a socket
+    UtilRelayFd2Socket = 1 << 1,      // fd2 is a socket
+    UtilRelayUnidirectional = 1 << 2, // only relay fd1 → fd2 (default is bidirectional)
+};
+
+void UtilRelay(int fd1, int fd2, size_t bufferSize, unsigned flags = UtilRelayNone);
+
 int UtilRestoreBlockedSignals();
 
 int UtilSaveBlockedSignals(const sigset_t& NewMask);
