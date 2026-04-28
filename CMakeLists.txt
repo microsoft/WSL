@@ -314,7 +314,6 @@ endif()
 set(CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS} /langversion:latest /debug:full")
 set(CMAKE_DOTNET_SDK "Microsoft.NET.Sdk")
 set(CMAKE_DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
-set(WSL_NUGET_TARGET_FRAMEWORK "net8.0-windows10.0.19041.0")
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
