@@ -152,7 +152,7 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
 void DockerEventTracker::OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::uint64_t eventTime)
 {
     static std::map<std::string, ContainerEvent> events{
-        {"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}, {"exec_die", ContainerEvent::ExecDied}};
+        {"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}, {"destroy", ContainerEvent::Destroy}, {"exec_die", ContainerEvent::ExecDied}};
 
     auto actor = parsed.find("Actor");
     THROW_HR_IF_MSG(E_INVALIDARG, actor == parsed.end(), "Missing Actor in container event");
