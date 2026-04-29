@@ -740,6 +740,24 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
+bool WSLCContainerImpl::WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const
+{
+    const HANDLE waitHandles[] = {Event.get(), m_wslcSession.SessionTerminatingEvent()};
+    const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, gsl::narrow<DWORD>(Timeout.count()));
+
+    switch (waitResult)
+    {
+    case WAIT_OBJECT_0:
+        return true;
+    case WAIT_OBJECT_0 + 1:
+        THROW_HR_MSG(E_ABORT, "Session %lu is terminating.", m_wslcSession.Id());
+    case WAIT_TIMEOUT:
+        return false;
+    default:
+        THROW_LAST_ERROR();
+    }
+}
+
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
     std::lock_guard stopGuard{m_stopLock};
