@@ -19,36 +19,36 @@ using namespace wsl::windows::common::string;
 
 namespace wsl::windows::wslc::models {
 
-Label Label::Parse(const std::wstring& value)
+std::pair<std::string, std::string> Label::Parse(const std::wstring& value)
 {
-    Label result{};
+    std::pair<std::string, std::string> result{};
     auto pos = value.find('=');
     if (pos == std::wstring::npos)
     {
-        result.m_key = WideToMultiByte(value);
+        result.first = WideToMultiByte(value);
     }
     else
     {
-        result.m_key = WideToMultiByte(value.substr(0, pos));
-        result.m_value = WideToMultiByte(value.substr(pos + 1));
+        result.first = WideToMultiByte(value.substr(0, pos));
+        result.second = WideToMultiByte(value.substr(pos + 1));
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_LabelKeyEmptyError(), result.m_key.empty());
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::WSLCCLI_LabelKeyEmptyError(), result.first.empty());
     return result;
 }
 
-DriverOption DriverOption::Parse(const std::wstring& value)
+std::pair<std::string, std::string> DriverOption::Parse(const std::wstring& value)
 {
-    DriverOption result{};
+    std::pair<std::string, std::string> result{};
     auto pos = value.find('=');
     if (pos == std::wstring::npos)
     {
-        result.m_key = WideToMultiByte(value);
+        result.first = WideToMultiByte(value);
         return result;
     }
 
-    result.m_key = WideToMultiByte(value.substr(0, pos));
-    result.m_value = WideToMultiByte(value.substr(pos + 1));
+    result.first = WideToMultiByte(value.substr(0, pos));
+    result.second = WideToMultiByte(value.substr(pos + 1));
     return result;
 }
 

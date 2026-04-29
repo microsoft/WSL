@@ -36,8 +36,8 @@ class WSLCCLILabelParserUnitTests
         for (const auto& [input, expectedKey, expectedValue] : validLabels)
         {
             auto result = models::Label::Parse(input);
-            VERIFY_ARE_EQUAL(expectedKey, result.Key());
-            VERIFY_ARE_EQUAL(expectedValue, result.Value());
+            VERIFY_ARE_EQUAL(expectedKey, result.first);
+            VERIFY_ARE_EQUAL(expectedValue, result.second);
         }
     }
 

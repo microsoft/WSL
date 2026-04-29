@@ -21,40 +21,12 @@ namespace wsl::windows::wslc::models {
 
 struct Label
 {
-    std::string Key() const
-    {
-        return m_key;
-    }
-
-    std::string Value() const
-    {
-        return m_value;
-    }
-
-    static Label Parse(const std::wstring& value);
-
-private:
-    std::string m_key;
-    std::string m_value;
+    static std::pair<std::string, std::string> Parse(const std::wstring& value);
 };
 
 struct DriverOption
 {
-    std::string Key() const
-    {
-        return m_key;
-    }
-
-    std::string Value() const
-    {
-        return m_value;
-    }
-
-    static DriverOption Parse(const std::wstring& value);
-
-private:
-    std::string m_key;
-    std::string m_value;
+    static std::pair<std::string, std::string> Parse(const std::wstring& value);
 };
 
 struct CreateVolumeOptions

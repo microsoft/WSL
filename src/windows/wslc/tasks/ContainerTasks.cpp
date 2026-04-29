@@ -300,7 +300,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         for (const auto& label : context.Args.GetAll<ArgType::Label>())
         {
             auto parsed = Label::Parse(label);
-            options.Labels.emplace_back(parsed.Key(), parsed.Value());
+            options.Labels.emplace_back(parsed.first, parsed.second);
         }
     }
 
