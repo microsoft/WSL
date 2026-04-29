@@ -243,6 +243,12 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
     // - The port has been seen to be allocated (if so, then the timeout is empty)
     // - The timeout has expired
 
+    std::set<std::pair<std::uint16_t, int>> activePortProtocols;
+    for (const auto& p : Ports)
+    {
+        activePortProtocols.emplace(p.Port, p.Protocol);
+    }
+
     for (auto it = m_allocatedPorts.begin(); it != m_allocatedPorts.end();)
     {
         // Ports contains the list of all Linux sockets currently active and stores the source port used by each socket
@@ -254,11 +260,8 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
         //
         // Port allocations are done based on protocol+port so we don't need the socket to explicitly match the address or family
         // of the bind request that is tracked in m_allocatedPorts, it just needs to match the port number and protocol.
-        const auto matchCondition = [&](const PortAllocation& p) {
-            return p.Port == it->first.Port && p.Protocol == it->first.Protocol;
-        };
 
-        if (std::find_if(Ports.begin(), Ports.end(), matchCondition) == Ports.end())
+        if (activePortProtocols.find({it->first.Port, it->first.Protocol}) == activePortProtocols.end())
         {
             if (!it->second.has_value() || it->second.value() < Timestamp)
             {

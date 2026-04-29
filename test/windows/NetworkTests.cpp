@@ -3276,6 +3276,7 @@ class NetworkTests
         char buffer[256];
         DWORD bytesRead;
         const wil::unique_handle readFileThread(OpenThread(THREAD_ALL_ACCESS, false, GetCurrentThreadId()));
+        VERIFY_IS_NOT_NULL(readFileThread.get());
         const wil::unique_handle event(CreateEvent(nullptr, FALSE, FALSE, nullptr));
         VERIFY_ARE_NOT_EQUAL(event.get(), INVALID_HANDLE_VALUE);
 
