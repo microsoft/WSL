@@ -2283,30 +2283,47 @@ CATCH_RETURN();
 HRESULT WSLCSession::Terminate()
 try
 {
+    wil::rwlock_release_exclusive_scope_exit sessionLock;
 
+    // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
+    // This is required because calling CancelIoEx() between two ReadFile() calls does nothing, and therefore could still allow another thread to get stuck doing synchronous IO.
+    while (!sessionLock)
     {
-        std::lock_guard lock(m_userHandlesLock);
+        {
+            std::lock_guard lock(m_userHandlesLock);
 
-        // m_sessionTerminatingEvent is always valid, so it can be signalled without holding m_lock.
-        // This allows a session to be unblocked if a stuck operation is holding m_lock.
-        // N.B. This must happen under m_userHandlesLock to synchronize with potentially running operations.
-        m_sessionTerminatingEvent.SetEvent();
+            // m_sessionTerminatingEvent is always valid, so it can be signalled without holding m_lock.
+            // This allows a session to be unblocked if a stuck operation is holding m_lock.
+            // N.B. This must happen under m_userHandlesLock to synchronize with potentially running operations.
+            if (!m_sessionTerminatingEvent.is_signaled())
+            {
+                m_sessionTerminatingEvent.SetEvent();
+            }
+            else
+            {
+                // If this isn't the first iteration, sleep to present this loop for burning too much CPU.
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
 
-        // Cancel any pending IO on user-provided handles to unblock operations
-        // in case the handles don't support overlapped IO.
-        CancelUserHandleIO();
-    }
+            // Cancel any pending IO on user-provided handles to unblock operations
+            // in case the handles don't support overlapped IO.
+            CancelUserHandleIO();
+        }
 
-    {
-        std::lock_guard comLock(m_userCOMCallbacksLock);
+        {
+            std::lock_guard comLock(m_userCOMCallbacksLock);
 
-        // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
-        // to unblock operations waiting for cross-process COM responses.
-        CancelUserCOMCallbacks();
+            // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
+            // to unblock operations waiting for cross-process COM responses.
+            CancelUserCOMCallbacks();
+        }
+
+        sessionLock = m_lock.try_lock_exclusive();
     }
 
     // Acquire an exclusive lock to ensure that no operation is running.
-    auto lock = m_lock.lock_exclusive();
+    WI_VERIFY(sessionLock);
+
     std::lock_guard containersLock(m_containersLock);
     std::lock_guard volumesLock(m_volumesLock);
     std::lock_guard networksLock(m_networksLock);
