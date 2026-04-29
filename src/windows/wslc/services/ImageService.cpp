@@ -250,12 +250,42 @@ void ImageService::Save(wsl::windows::wslc::models::Session& session, const std:
         CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!outputFile);
 
-    wsl::windows::common::HandleConsoleProgressBar progressBar(
-        outputFile.get(), L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
-    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputFile.get()), image.c_str(), nullptr, cancelEvent));
+    Save(session, image, outputFile.get(), cancelEvent);
 }
 
-void ImageService::Prune()
+void ImageService::Save(wsl::windows::wslc::models::Session& session, const std::string& image, HANDLE outputHandle, HANDLE cancelEvent)
 {
+    wsl::windows::common::HandleConsoleProgressBar progressBar(
+        outputHandle, L"Save in progress.", wsl::windows::common::HandleConsoleProgressBar::Format::FileSize);
+    THROW_IF_FAILED(session.Get()->SaveImage(ToCOMInputHandle(outputHandle), image.c_str(), nullptr, cancelEvent));
+}
+
+wsl::windows::wslc::models::PruneImagesResult ImageService::Prune(wsl::windows::wslc::models::Session& session, bool all)
+{
+    WSLCPruneImagesOptions options{};
+    if (all)
+    {
+        WI_SetFlag(options.Flags, WSLCPruneImagesFlagsDanglingFalse);
+    }
+
+    wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+    ULONGLONG spaceReclaimed = 0;
+    THROW_IF_FAILED(session.Get()->PruneImages(&options, &deletedImages, deletedImages.size_address<ULONG>(), &spaceReclaimed));
+
+    wsl::windows::wslc::models::PruneImagesResult result;
+    result.SpaceReclaimed = spaceReclaimed;
+    for (auto ptr = deletedImages.get(), end = deletedImages.get() + deletedImages.size(); ptr != end; ++ptr)
+    {
+        if (ptr->Type == WSLCDeletedImageTypeDeleted)
+        {
+            result.DeletedImages.push_back(ptr->Image);
+        }
+        else
+        {
+            result.UntaggedImages.push_back(ptr->Image);
+        }
+    }
+
+    return result;
 }
 } // namespace wsl::windows::wslc::services

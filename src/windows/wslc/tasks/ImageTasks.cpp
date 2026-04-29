@@ -23,14 +23,37 @@ Abstract:
 #include "TableOutput.h"
 #include "Task.h"
 #include <format>
+#include <wslutil.h>
 
 using namespace wsl::shared;
+using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+static bool TryInspectImage(Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
+{
+    try
+    {
+        inspectData = ImageService::Inspect(session, imageId);
+        return true;
+    }
+    catch (const wil::ResultException& ex)
+    {
+        if (ex.GetErrorCode() == WSLC_E_IMAGE_NOT_FOUND)
+        {
+            PrintMessage(Localization::MessageWslcImageNotFound(imageId.c_str()), stderr);
+            return false;
+        }
+
+        throw;
+    }
+}
+
 void BuildImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -124,8 +147,7 @@ void ListImages(CLIExecutionContext& context)
                 MultiByteToWide(image.Tag.value_or("<untagged>")),
                 MultiByteToWide(TruncateId(image.Id, trunc)),
                 ContainerService::FormatRelativeTime(image.Created > 0 ? static_cast<ULONGLONG>(image.Created) : 0),
-                // Dividing by 1000*1000 instead of 1024*1024 to be consistent with Docker CLI's definition of megabyte (MB).
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1000 * 1000)),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / WSLC_IMAGE_1MB),
             });
         }
 
@@ -197,8 +219,15 @@ void InspectImages(CLIExecutionContext& context)
     std::vector<wsl::windows::common::wslc_schema::InspectImage> result;
     for (const auto& id : imageIds)
     {
-        auto inspectData = ImageService::Inspect(session, WideToMultiByte(id));
-        result.push_back(inspectData);
+        std::optional<wslc_schema::InspectImage> inspectData;
+        if (TryInspectImage(session, WideToMultiByte(id), inspectData))
+        {
+            result.push_back(*inspectData);
+        }
+        else
+        {
+            context.ExitCode = 1;
+        }
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);
@@ -209,11 +238,24 @@ void SaveImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
-    WI_ASSERT(context.Args.Contains(ArgType::Output));
     auto& session = context.Data.Get<Data::Session>();
     auto& imageId = context.Args.Get<ArgType::ImageId>();
-    auto& output = context.Args.Get<ArgType::Output>();
-    services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+
+    if (context.Args.Contains(ArgType::Output))
+    {
+        auto& output = context.Args.Get<ArgType::Output>();
+        services::ImageService::Save(session, WideToMultiByte(imageId), output, context.CreateCancelEvent());
+    }
+    else
+    {
+        auto stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (wsl::windows::common::wslutil::IsConsoleHandle(stdoutHandle))
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::WSLCCLI_ImageSaveStdoutIsTerminalError());
+        }
+
+        services::ImageService::Save(session, WideToMultiByte(imageId), stdoutHandle, context.CreateCancelEvent());
+    }
 }
 
 void TagImage(CLIExecutionContext& context)
@@ -223,5 +265,27 @@ void TagImage(CLIExecutionContext& context)
     auto& source = context.Args.Get<ArgType::Source>();
     auto& target = context.Args.Get<ArgType::Target>();
     services::ImageService::Tag(session, WideToMultiByte(source), WideToMultiByte(target));
+}
+
+void PruneImages(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    bool all = context.Args.Contains(ArgType::All);
+    auto result = ImageService::Prune(session, all);
+
+    for (const auto& image : result.UntaggedImages)
+    {
+        PrintMessage(Localization::WSLCCLI_ImagePruneUntagged(image));
+    }
+
+    for (const auto& image : result.DeletedImages)
+    {
+        PrintMessage(Localization::WSLCCLI_ImagePruneDeleted(image));
+    }
+
+    PrintMessage(L"");
+    PrintMessage(Localization::WSLCCLI_ImagePruneSpaceReclaimed(static_cast<double>(result.SpaceReclaimed) / WSLC_IMAGE_1MB));
 }
 } // namespace wsl::windows::wslc::task

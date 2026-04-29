@@ -33,8 +33,11 @@ if(WSL_DEV_BINARY_PATH)
     endforeach()
 endif()
 
-# # Uncomment to skip building, packaging and installing wslsettings
-# set(WSL_BUILD_WSL_SETTINGS false)
+# # Uncomment to build, package and install wslsettings
+# set(WSL_BUILD_WSL_SETTINGS true)
+
+# # Uncomment to build the C# WSLC sdk
+# set(WSL_BUILD_SDKCS true)
 
 # # Uncomment to generate a "thin" MSI package which builds and installs faster
 # set(WSL_BUILD_THIN_PACKAGE true)
@@ -44,3 +47,9 @@ endif()
 
 # # Uncomment to reduce the verbosity of the appx package build
 # set(WSL_SILENT_APPX_BUILD true)
+
+# # Uncomment to change the pre-commit hook behavior (default: warn)
+# #   warn  - report formatting issues without blocking the commit
+# #   error - block the commit when formatting issues are found
+# #   fix   - automatically fix formatting and re-stage files
+# set(WSL_PRE_COMMIT_MODE "warn")

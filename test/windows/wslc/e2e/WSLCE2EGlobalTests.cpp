@@ -523,12 +523,13 @@ private:
             {L"registry", Localization::WSLCCLI_RegistryCommandDesc()},
             {L"session", Localization::WSLCCLI_SessionCommandDesc()},
             {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},
+            {L"volume", Localization::WSLCCLI_VolumeCommandDesc()},
             {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
             {L"build", Localization::WSLCCLI_ImageBuildDesc()},
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
             {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
             {L"images", Localization::WSLCCLI_ImageListDesc()},
-            {L"inspect", Localization::WSLCCLI_ContainerInspectDesc()},
+            {L"inspect", Localization::WSLCCLI_InspectDesc()},
             {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
             {L"list", Localization::WSLCCLI_ContainerListDesc()},
             {L"load", Localization::WSLCCLI_ImageLoadDesc()},
@@ -568,7 +569,7 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -v,--version  Show version information for this tool\r\n"
-                << L"  -h,--help     Shows help about the selected command\r\n"
+                << L"  -?,--help     Shows help about the selected command\r\n"
                 << L"\r\n";
         return options.str();
     }

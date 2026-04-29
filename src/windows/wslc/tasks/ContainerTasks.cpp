@@ -24,6 +24,7 @@ Abstract:
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
+using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
@@ -31,6 +32,26 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+static bool TryInspectContainer(Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
+{
+    try
+    {
+        inspectData = ContainerService::Inspect(session, containerId);
+        return true;
+    }
+    catch (const wil::ResultException& ex)
+    {
+        if (ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
+        {
+            PrintMessage(Localization::MessageWslcContainerNotFound(containerId.c_str()), stderr);
+            return false;
+        }
+
+        throw;
+    }
+}
+
 void AttachContainer::operator()(CLIExecutionContext& context) const
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -71,8 +92,15 @@ void InspectContainers(CLIExecutionContext& context)
     std::vector<wsl::windows::common::wslc_schema::InspectContainer> result;
     for (const auto& id : containerIds)
     {
-        auto inspectData = ContainerService::Inspect(session, WideToMultiByte(id));
-        result.push_back(inspectData);
+        std::optional<wslc_schema::InspectContainer> inspectData;
+        if (TryInspectContainer(session, WideToMultiByte(id), inspectData))
+        {
+            result.push_back(*inspectData);
+        }
+        else
+        {
+            context.ExitCode = 1;
+        }
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);
@@ -227,6 +255,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if (context.Args.Contains(ArgType::PublishAll))
+    {
+        options.PublishAll = true;
+    }
+
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAll<ArgType::Volume>();
@@ -276,6 +309,46 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Entrypoint))
     {
         options.Entrypoint.push_back(WideToMultiByte(context.Args.Get<ArgType::Entrypoint>()));
+    }
+
+    if (context.Args.Contains(ArgType::Hostname))
+    {
+        options.Hostname = WideToMultiByte(context.Args.Get<ArgType::Hostname>());
+    }
+
+    if (context.Args.Contains(ArgType::Domainname))
+    {
+        options.Domainname = WideToMultiByte(context.Args.Get<ArgType::Domainname>());
+    }
+
+    if (context.Args.Contains(ArgType::DNS))
+    {
+        auto dnsServers = context.Args.GetAll<ArgType::DNS>();
+        options.DnsServers.reserve(options.DnsServers.size() + dnsServers.size());
+        for (const auto& value : dnsServers)
+        {
+            options.DnsServers.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::DNSSearch))
+    {
+        auto dnsSearch = context.Args.GetAll<ArgType::DNSSearch>();
+        options.DnsSearchDomains.reserve(options.DnsSearchDomains.size() + dnsSearch.size());
+        for (const auto& value : dnsSearch)
+        {
+            options.DnsSearchDomains.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::DNSOption))
+    {
+        auto dnsOptions = context.Args.GetAll<ArgType::DNSOption>();
+        options.DnsOptions.reserve(options.DnsOptions.size() + dnsOptions.size());
+        for (const auto& value : dnsOptions)
+        {
+            options.DnsOptions.emplace_back(WideToMultiByte(value));
+        }
     }
 
     if (context.Args.Contains(ArgType::User))

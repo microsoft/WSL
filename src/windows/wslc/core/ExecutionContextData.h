@@ -17,6 +17,7 @@ Abstract:
 #include "ImageModel.h"
 #include "VersionModel.h"
 #include "SessionModel.h"
+#include "wslc.h"
 
 #include <string>
 
@@ -38,6 +39,7 @@ enum class Data : size_t
     ContainerOptions,
     Images,
     Version,
+    Volumes,
 
     Max
 };
@@ -53,6 +55,7 @@ namespace details {
     DEFINE_DATA_MAPPING(ContainerOptions, wsl::windows::wslc::models::ContainerOptions);
     DEFINE_DATA_MAPPING(Images, std::vector<wsl::windows::wslc::models::ImageInformation>);
     DEFINE_DATA_MAPPING(Version, wsl::windows::wslc::models::VersionInfo);
+    DEFINE_DATA_MAPPING(Volumes, std::vector<WSLCVolumeInformation>);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

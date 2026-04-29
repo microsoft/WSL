@@ -60,12 +60,12 @@
                 "FriendlyName": "openSUSE Tumbleweed",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103.x86_64-1.224-Build1.224.wsl",
-                    "Sha256": "0x394be699da2821b331355f3541e237aa3aa00bc4068f33283d68303d8336d484"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422.x86_64-2.97-Build2.97.wsl",
+                    "Sha256": "0xc0dcf707276626e7a6227404c6a1e351dfdb9d39f2538d2b8a78a2c2e41f5912"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103.aarch64-2.195-Build2.195.wsl",
-                    "Sha256": "0xbcbb88e957091c425ecb42f3076b8882b5976fd94885e453afaee40de3b79470"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422.aarch64-3.82-Build3.82.wsl",
+                    "Sha256": "0x70d02e702b7788c494ad785bc3987ac1361f263af99d2c8180aac269cf0a9747"
                 }
             },
             {
@@ -108,12 +108,12 @@
                 "FriendlyName": "Kali Linux Rolling",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://kali.download/wsl-images/kali-2025.4/kali-linux-2025.4-wsl-rootfs-amd64.wsl",
-                    "Sha256": "86aba7bb3d74d313e349f9f50d3f6119ee3b1491072920d063f17ce9b3f706ab"
+                    "Url": "https://kali.download/wsl-images/kali-2026.1/kali-linux-2026.1-wsl-rootfs-amd64.wsl",
+                    "Sha256": "55c295400603a592d5ccf6a4046bb965f04d2509a62d1752cb2fe586c65deded"
                 },
                 "Arm64Url": {
-                    "Url": "https://kali.download/wsl-images/kali-2025.4/kali-linux-2025.4-wsl-rootfs-arm64.wsl",
-                    "Sha256": "bd8cdfe340ec596e470b6853ac662382897bc656c0ac3d3096eb399d0780e25e"
+                    "Url": "https://kali.download/wsl-images/kali-2026.1/kali-linux-2026.1-wsl-rootfs-arm64.wsl",
+                    "Sha256": "6ecd31844e9c1f0f77c052480ac40aeca24036846428676fa9137b003ab1b8e5"
                 }
             }
         ],
@@ -192,8 +192,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2026.03.01.160197/archlinux-2026.03.01.160197.wsl",
-                    "Sha256": "bd0a3d729742e15599ba0351c800225272bffb5061f2ce7cd16fab753055ca77"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2026.04.01.162669/archlinux-2026.04.01.162669.wsl",
+                    "Sha256": "c1c4387b89bbaf84a79084bc1c51caa54998cd8b0b241a3b4e1c0a89f239c9c5"
                 }
             }
         ],
@@ -325,8 +325,8 @@
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103-WSL.x86_64-26003.9.1368.0-Build9.1368.appx",
-            "Arm64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103-WSL.aarch64-26003.9.741.0-Build9.741.appx",
+            "Amd64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422-WSL.x86_64-26112.10.203.0-Build10.203.appx",
+            "Arm64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422-WSL.aarch64-26112.10.154.0-Build10.154.appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]

@@ -31,6 +31,7 @@ using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
+using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::VMPortMapping;
@@ -40,7 +41,6 @@ using wsl::windows::service::wslc::WSLCContainerMetadata;
 using wsl::windows::service::wslc::WSLCContainerMetadataV1;
 using wsl::windows::service::wslc::WSLCPortMapping;
 using wsl::windows::service::wslc::WSLCSession;
-using wsl::windows::service::wslc::WSLCVhdVolumeImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachine;
 using wsl::windows::service::wslc::WSLCVolumeMount;
 
@@ -77,11 +77,77 @@ std::vector<std::string> StringArrayToVector(const WSLCStringArray& array)
     return result;
 }
 
-// Builds port mapping list from container options and returns the network mode string.
-std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(const WSLCContainerOptions& options, WSLCVirtualMachine& virtualMachine)
+// Parses a Docker ExposedPorts key (e.g. "8080/tcp", "5432/udp") into port number and protocol.
+std::pair<uint16_t, int> ParseExposedPortKey(const std::string& key)
 {
-    WSLCContainerNetworkType networkType = options.ContainerNetwork.ContainerNetworkType;
+    auto slashPos = key.find('/');
+    THROW_HR_IF_MSG(E_INVALIDARG, slashPos == std::string::npos, "Invalid exposed port format: %hs", key.c_str());
 
+    auto portStr = std::string_view(key.c_str(), slashPos);
+
+    uint16_t port{};
+    auto result = std::from_chars(portStr.data(), portStr.data() + portStr.size(), port);
+    if (result.ec != std::errc{} || result.ptr != portStr.data() + portStr.size() || port == 0)
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid port number in exposed port: %hs", key.c_str());
+    }
+
+    auto protoStr = key.substr(slashPos + 1);
+    int protocol{};
+    if (protoStr == "tcp")
+    {
+        protocol = IPPROTO_TCP;
+    }
+    else if (protoStr == "udp")
+    {
+        protocol = IPPROTO_UDP;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported protocol in exposed port: %hs", key.c_str());
+    }
+
+    return {static_cast<uint16_t>(port), protocol};
+}
+
+// Temporary solution to allocate an ephemeral port.
+// TODO: Remove once the port relay can allocate ephemeral ports.
+uint16_t AllocateEphemeralPort(int family, const char* address)
+{
+    wil::unique_socket sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
+    THROW_LAST_ERROR_IF(!sock);
+
+    SOCKADDR_INET addr{};
+    addr.si_family = static_cast<ADDRESS_FAMILY>(family);
+
+    if (family == AF_INET)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, inet_pton(AF_INET, address, &addr.Ipv4.sin_addr) != 1, "Failed to parse ip address: %hs", address);
+    }
+    else if (family == AF_INET6)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, inet_pton(AF_INET6, address, &addr.Ipv6.sin6_addr) != 1, "Failed to parse ip address: %hs", address);
+    }
+    else
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected address family: %i", family);
+    }
+
+    THROW_LAST_ERROR_IF(bind(sock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+
+    int addrLen = sizeof(addr);
+    THROW_LAST_ERROR_IF(getsockname(sock.get(), reinterpret_cast<sockaddr*>(&addr), &addrLen) == SOCKET_ERROR);
+
+    uint16_t port = (family == AF_INET6) ? ntohs(addr.Ipv6.sin6_port) : ntohs(addr.Ipv4.sin_port);
+    THROW_HR_IF_MSG(E_UNEXPECTED, port == 0, "OS returned ephemeral port 0");
+
+    return port;
+}
+
+// Builds port mapping list from container options and returns the network mode string.
+std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
+    std::vector<_WSLCPortMapping>& requestedPorts, WSLCContainerNetworkType networkType, WSLCVirtualMachine& virtualMachine)
+{
     // Determine network mode string.
     std::string networkMode;
     if (networkType == WSLCContainerNetworkTypeBridged)
@@ -104,20 +170,25 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(co
     // Validate port mappings.
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        options.PortsCount > 0 && networkType == WSLCContainerNetworkTypeNone,
+        !requestedPorts.empty() && networkType == WSLCContainerNetworkTypeNone,
         "Port mappings are not supported without networking");
 
     std::vector<ContainerPortMapping> ports;
-    ports.reserve(options.PortsCount);
+    ports.reserve(requestedPorts.size());
 
-    for (ULONG i = 0; i < options.PortsCount; i++)
+    for (auto& e : requestedPorts)
     {
-        auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(options.Ports[i]), options.Ports[i].ContainerPort);
+        if (e.HostPort == WSLC_EPHEMERAL_PORT)
+        {
+            e.HostPort = AllocateEphemeralPort(e.Family, e.BindingAddress);
+        }
+
+        auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(e), e.ContainerPort);
 
         // Only allocate port for bridged network. Host mode ports are allocated when the container starts.
         if (networkType == WSLCContainerNetworkTypeBridged)
         {
-            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(options.Ports[i].Family, options.Ports[i].Protocol));
+            entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(e.Family, e.Protocol));
         }
     }
 
@@ -260,7 +331,7 @@ std::string SerializeContainerMetadata(const WSLCContainerMetadataV1& metadata)
 
 void ProcessNamedVolumes(
     const WSLCContainerOptions& containerOptions,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
     THROW_HR_IF(E_INVALIDARG, containerOptions.NamedVolumesCount > 0 && containerOptions.NamedVolumes == nullptr);
@@ -288,7 +359,7 @@ void ProcessNamedVolumes(
 
 void ValidateNamedVolumes(
     const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     const std::unordered_set<std::string>& anonymousVolumes)
 {
     for (const auto& mount : mounts)
@@ -591,6 +662,9 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     auto portCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() { UnmapPorts(); });
     MapPorts();
 
+    m_stopNotification.Event.ResetEvent();
+    m_stopNotification.EventTime.store(0, std::memory_order_relaxed);
+
     try
     {
         m_dockerClient.StartContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys));
@@ -610,34 +684,32 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
 
-        // If a Stop() call is in progress, provide the timestamp via the promise
-        // and let Stop() handle the state transition.
+        std::unique_lock stopGuard{m_stopLock, std::try_to_lock};
+
+        m_stopNotification.EventTime.store(eventTime, std::memory_order_release);
+        m_stopNotification.Event.SetEvent();
+
+        // If Stop() is already in flight, it will wake when the stop event is signaled and take care of cleanup.
+        if (!stopGuard.owns_lock())
         {
-            std::lock_guard stopLock{m_stopStateLock};
-            if (m_stopState.has_value())
-            {
-                m_stopState->set_value(eventTime);
-                m_stopState.reset();
-                return;
-            }
+            return;
         }
 
         auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
-
-        ReleaseProcesses();
 
         // Don't run the deletion logic if the container is already in a stopped / deleted state.
         // This can happen if Delete() is called by the user.
         if (previousState == WslcContainerStateRunning)
         {
             Transition(WslcContainerStateExited, eventTime);
+            ReleaseProcesses();
 
             ReleaseRuntimeResources();
 
             if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
             {
-                DeleteExclusiveLockHeld(WSLCDeleteFlagsNone);
+                DeleteExclusiveLockHeld(WSLCDeleteFlagsDeleteVolumes);
             }
         }
     }
@@ -657,9 +729,27 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
+bool WSLCContainerImpl::WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const
+{
+    const HANDLE waitHandles[] = {Event.get(), m_wslcSession.SessionTerminatingEvent()};
+    const DWORD waitResult = WaitForMultipleObjects(RTL_NUMBER_OF(waitHandles), waitHandles, FALSE, gsl::narrow<DWORD>(Timeout.count()));
+
+    switch (waitResult)
+    {
+    case WAIT_OBJECT_0:
+        return true;
+    case WAIT_OBJECT_0 + 1:
+        THROW_HR_MSG(E_ABORT, "Session %lu is terminating.", m_wslcSession.Id());
+    case WAIT_TIMEOUT:
+        return false;
+    default:
+        THROW_LAST_ERROR();
+    }
+}
+
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
-    // Acquire an exclusive lock since this method modifies m_state.
+    std::lock_guard stopGuard{m_stopLock};
     auto lock = m_lock.lock_exclusive();
 
     if (m_state == WslcContainerStateExited && !Kill)
@@ -685,26 +775,6 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
     // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
     bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
-
-    // Set up a waitable stop state so OnEvent() can pass the Docker timestamp
-    // back to Stop() without needing to take m_lock.
-    std::future<std::uint64_t> stopFuture;
-    if (waitForStop)
-    {
-        std::lock_guard stopLock{m_stopStateLock};
-        m_stopState.emplace();
-        stopFuture = m_stopState->get_future();
-    }
-
-    // Ensure m_stopState is cleared on all exit paths so OnEvent() doesn't
-    // take the promise path after a failed Stop().
-    auto resetStopState = wil::scope_exit([this, waitForStop]() {
-        if (waitForStop)
-        {
-            std::lock_guard stopLock{m_stopStateLock};
-            m_stopState.reset();
-        }
-    });
 
     try
     {
@@ -738,11 +808,10 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     }
 
     // Wait for the stop event to get the Docker timestamp.
-    // Safe while holding m_lock since OnEvent() uses m_stopStateLock on this path.
     std::optional<std::uint64_t> stopTimestamp;
-    if (stopFuture.wait_for(60s) == std::future_status::ready)
+    if (WaitForEvent(m_stopNotification.Event, 60s))
     {
-        stopTimestamp = stopFuture.get();
+        stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
     }
 
     Transition(WslcContainerStateExited, stopTimestamp);
@@ -753,7 +822,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
-        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce);
+        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
     }
 }
 
@@ -780,7 +849,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
 
     try
     {
-        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce));
+        m_dockerClient.DeleteContainer(m_id, WI_IsFlagSet(Flags, WSLCDeleteFlagsForce), WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
@@ -1038,7 +1107,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1216,11 +1285,54 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     ProcessNamedVolumes(containerOptions, sessionVolumes, request);
 
+    // Prepare port mappings from container options.
+    std::vector<_WSLCPortMapping> ports;
+    for (ULONG i = 0; i < containerOptions.PortsCount; i++)
+    {
+        auto& port = ports.emplace_back();
+        port.HostPort = containerOptions.Ports[i].HostPort;
+        port.ContainerPort = containerOptions.Ports[i].ContainerPort;
+        port.Family = containerOptions.Ports[i].Family;
+        port.Protocol = containerOptions.Ports[i].Protocol;
+        strcpy_s(port.BindingAddress, containerOptions.Ports[i].BindingAddress);
+    }
+
+    // Append exposed ports from the image, if requested.
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsPublishAll))
+    {
+        auto imageInfo = DockerClient.InspectImage(containerOptions.Image);
+
+        // Use the resolved image ID so the container is created from the exact same image.
+        request.Image = imageInfo.Id;
+
+        if (imageInfo.Config.has_value() && imageInfo.Config->ExposedPorts.has_value())
+        {
+            for (const auto& [portKey, _] : imageInfo.Config->ExposedPorts.value())
+            {
+                auto [port, protocol] = ParseExposedPortKey(portKey);
+
+                // Only TCP localhost mappings are currently supported by the relay path.
+                if (protocol != IPPROTO_TCP)
+                {
+                    continue;
+                }
+
+                auto& createdPort = ports.emplace_back();
+                createdPort.HostPort = WSLC_EPHEMERAL_PORT;
+                createdPort.Family = AF_INET;
+                createdPort.ContainerPort = port;
+                createdPort.Protocol = protocol;
+                strcpy_s(createdPort.BindingAddress, "127.0.0.1");
+            }
+        }
+    }
+
     // Process port mappings from container options.
-    auto [ports, networkMode] = ProcessPortMappings(containerOptions, virtualMachine);
+    auto [mappedPorts, networkMode] = ProcessPortMappings(ports, containerOptions.ContainerNetwork.ContainerNetworkType, virtualMachine);
+
     request.HostConfig.NetworkMode = networkMode;
 
-    for (const auto& e : ports)
+    for (const auto& e : mappedPorts)
     {
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
         request.ExposedPorts[portKey] = {};
@@ -1243,7 +1355,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
 
-    for (const auto& e : ports)
+    for (const auto& e : mappedPorts)
     {
         metadata.Ports.emplace_back(e.Serialize());
     }
@@ -1257,8 +1369,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
-    auto deleteOnFailure = wil::scope_exit_log(
-        WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() { DockerClient.DeleteContainer(containerId, true); });
+    auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&DockerClient, containerId = result.Id]() {
+        DockerClient.DeleteContainer(containerId, true, true);
+    });
 
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);
@@ -1271,7 +1384,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         std::string(containerOptions.Image),
         containerOptions.ContainerNetwork.ContainerNetworkType,
         std::move(volumes),
-        std::move(ports),
+        std::move(mappedPorts),
         std::move(labels),
         std::move(OnDeleted),
         EventTracker,
@@ -1290,7 +1403,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
-    const std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>>& sessionVolumes,
+    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     const std::unordered_set<std::string>& anonymousVolumes,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,

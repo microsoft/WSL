@@ -177,7 +177,7 @@ int wsl::windows::common::socket::Send(
         Offset += BytesWritten;
         if (Offset < Buffer.size())
         {
-            WSL_LOG("PartialSocketWrite", TraceLoggingValue(Buffer.size(), "MessagSize"), TraceLoggingValue(Offset, "Offset"));
+            WSL_LOG("PartialSocketWrite", TraceLoggingValue(Buffer.size(), "MessageSize"), TraceLoggingValue(Offset, "Offset"));
         }
     }
 

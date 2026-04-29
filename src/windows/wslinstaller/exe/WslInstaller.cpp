@@ -31,18 +31,26 @@ std::wstring GetMsiPackagePath()
     return (wsl::windows::common::wslutil::GetBasePath() / L"wsl.msi").wstring();
 }
 
-std::optional<std::wstring> GetUpgradeLogFileLocation()
+struct UpgradeLogInfo
+{
+    std::wstring path;
+    bool fromRegistry; // true when the path was explicitly configured via UpgradeLogFile registry value
+};
+
+std::optional<UpgradeLogInfo> GetUpgradeLogFileLocation()
 try
 {
     const auto key = wsl::windows::common::registry::OpenLxssMachineKey();
     const auto path = wsl::windows::common::registry::ReadString(key.get(), L"MSI", L"UpgradeLogFile", L"");
     if (path.empty())
     {
-        return {};
+        // Default to the same path used by wsl --update so all MSI logs
+        // are collected from one location by the diagnostic script.
+        return UpgradeLogInfo{(std::filesystem::temp_directory_path() / L"wsl-install-logs.txt").wstring(), false};
     }
 
     // A canonical path is required because msiexec doesn't like symlinks.
-    return std::filesystem::weakly_canonical(path);
+    return UpgradeLogInfo{std::filesystem::weakly_canonical(path), true};
 }
 catch (...)
 {
@@ -53,6 +61,16 @@ catch (...)
 std::pair<UINT, std::wstring> InstallMsipackageImpl()
 {
     const auto logFile = GetUpgradeLogFileLocation();
+
+    // Delete MSI log on success, preserve on failure for diagnostics (same as wsl --update).
+    // When the UpgradeLogFile registry value is set, always keep the log — the registry key
+    // is explicitly designed to retain MSI logs across installs.
+    auto clearLogs = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&logFile]() {
+        if (logFile.has_value() && !logFile->fromRegistry)
+        {
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(logFile->path.c_str()));
+        }
+    });
 
     std::wstring errors;
     auto messageCallback = [&errors](INSTALLMESSAGE type, LPCWSTR message) {
@@ -77,17 +95,27 @@ std::pair<UINT, std::wstring> InstallMsipackageImpl()
     };
 
     auto result = wsl::windows::common::install::UpgradeViaMsi(
-        GetMsiPackagePath().c_str(), L"SKIPMSIX=1", logFile.has_value() ? logFile->c_str() : nullptr, messageCallback);
+        GetMsiPackagePath().c_str(), L"SKIPMSIX=1", logFile.has_value() ? logFile->path.c_str() : nullptr, messageCallback);
 
     // ERROR_SUCCESS_REBOOT_REQUIRED (3010) means the install succeeded but some files
     // will be replaced on the next reboot. Treat as success since the service runs
     // silently with no user-facing console.
-    if (result == ERROR_SUCCESS_REBOOT_REQUIRED)
+    const bool rebootRequired = (result == ERROR_SUCCESS_REBOOT_REQUIRED);
+    if (rebootRequired)
     {
         result = ERROR_SUCCESS;
     }
 
-    WSL_LOG("MSIUpgradeResult", TraceLoggingValue(result, "result"), TraceLoggingValue(errors.c_str(), "errorMessage"));
+    WSL_LOG(
+        "MSIUpgradeResult",
+        TraceLoggingValue(result, "result"),
+        TraceLoggingValue(rebootRequired, "rebootRequired"),
+        TraceLoggingValue(errors.c_str(), "errorMessage"));
+
+    if (result != ERROR_SUCCESS && result != ERROR_SUCCESS_REBOOT_REQUIRED)
+    {
+        clearLogs.release();
+    }
 
     return {result, errors};
 }

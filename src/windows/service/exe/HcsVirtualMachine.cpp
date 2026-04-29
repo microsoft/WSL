@@ -49,7 +49,7 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     // Build HCS settings
     hcs::ComputeSystem systemSettings{};
-    systemSettings.Owner = L"WSL";
+    systemSettings.Owner = Settings->DisplayName ? Settings->DisplayName : L"WSLC";
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
 
     // Determine which schema version to use based on the Windows version. Windows 10 does not support
@@ -634,7 +634,7 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 
 void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
 {
-    if (m_crashLogCaptured && m_vmSavedStateCaptured)
+    if (m_crashLogCaptured.load() && m_vmSavedStateCaptured.load())
     {
         return;
     }
@@ -643,13 +643,22 @@ void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
 
     if (crashReport.GuestCrashSaveInfo.has_value() && crashReport.GuestCrashSaveInfo->SaveStateFile.has_value())
     {
-        m_vmSavedStateCaptured = true;
-        EnforceVmSavedStateFileLimit();
+        if (!m_vmSavedStateCaptured.exchange(true))
+        {
+            auto resetFlag = wil::scope_exit([&]() noexcept { m_vmSavedStateCaptured.store(false); });
+            EnforceVmSavedStateFileLimit();
+            resetFlag.release();
+        }
     }
 
-    if (!m_crashLogCaptured && !crashReport.CrashLog.empty())
+    if (!crashReport.CrashLog.empty())
     {
-        WriteCrashLog(crashReport.CrashLog);
+        if (!m_crashLogCaptured.exchange(true))
+        {
+            auto resetFlag = wil::scope_exit([&]() noexcept { m_crashLogCaptured.store(false); });
+            WriteCrashLog(crashReport.CrashLog);
+            resetFlag.release();
+        }
     }
 }
 
@@ -716,7 +725,6 @@ void HcsVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
     }
 
     THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
-    m_crashLogCaptured = true;
 }
 
 ULONG HcsVirtualMachine::AllocateLun()

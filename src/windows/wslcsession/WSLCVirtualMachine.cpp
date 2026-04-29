@@ -278,14 +278,12 @@ void WSLCVirtualMachine::Initialize()
     auto [__, ___, childChannel] = Fork(WSLC_FORK::Thread);
 
     WSLC_WATCH_PROCESSES watchMessage{};
-    childChannel.SendMessage(watchMessage);
+    auto watchTransaction = childChannel.StartTransaction();
+    watchTransaction.Send(watchMessage);
 
-    THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
+    THROW_HR_IF(E_FAIL, watchTransaction.Receive<RESULT_MESSAGE<uint32_t>>().Result != 0);
 
     m_processExitThread = std::thread(std::bind(&WSLCVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
-
-    // Configure networking
-    ConfigureNetworking();
 
     // Mount VHDs
     const auto rootDevice = GetVhdDevicePath(0);
@@ -309,6 +307,9 @@ void WSLCVirtualMachine::Initialize()
         options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
         CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
     }
+
+    // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
+    ConfigureNetworking();
 }
 
 WSLCVirtualMachine::~WSLCVirtualMachine()
@@ -567,7 +568,10 @@ WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::share
 {
     WSLC_ACCEPT message{};
     message.Fd = Fd;
-    const auto& response = Channel.Transaction(message);
+
+    auto transaction = Channel.StartTransaction();
+    transaction.Send(message);
+    const auto& response = transaction.Receive<WSLC_ACCEPT::TResponse>();
 
     ConnectedSocket socket;
     socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
@@ -575,7 +579,7 @@ WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::share
     // If the FD was unspecified, read the Linux file descriptor from the guest.
     if (Fd == -1)
     {
-        socket.Fd = Channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
+        socket.Fd = transaction.Receive<RESULT_MESSAGE<int32_t>>().Result;
     }
     else
     {
@@ -678,7 +682,10 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.Socket = tty->Fd;
         relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
-        childChannel.SendMessage(relayMessage);
+        {
+            auto relayTransaction = childChannel.StartTransaction();
+            relayTransaction.Send(relayMessage);
+        }
 
         auto result = ExpectClosedChannelOrError(childChannel);
         if (result != 0)
@@ -687,8 +694,12 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
             THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
 
-        grandChildChannel.SendMessage<WSLC_EXEC>(Message.Span());
-        result = ExpectClosedChannelOrError(grandChildChannel);
+        {
+            auto execTransaction = grandChildChannel.StartTransaction();
+            execTransaction.Send<WSLC_EXEC>(Message.Span());
+            auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
+            result = execResponse != nullptr ? execResponse->Result : 0;
+        }
         if (result != 0)
         {
             setErrno(result);
@@ -699,12 +710,16 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     }
     else
     {
-        childChannel.SendMessage<WSLC_EXEC>(Message.Span());
-        auto result = ExpectClosedChannelOrError(childChannel);
-        if (result != 0)
         {
-            setErrno(result);
-            THROW_HR_MSG(E_FAIL, "errno: %i", result);
+            auto execTransaction = childChannel.StartTransaction();
+            execTransaction.Send<WSLC_EXEC>(Message.Span());
+            auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
+            auto result = execResponse != nullptr ? execResponse->Result : 0;
+            if (result != 0)
+            {
+                setErrno(result);
+                THROW_HR_MSG(E_FAIL, "errno: %i", result);
+            }
         }
     }
 
@@ -951,7 +966,11 @@ try
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(path), "Path is not a directory: '%ls'", WindowsPath);
 
+    const bool readOnly = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly);
+    auto normalizedPath = std::filesystem::weakly_canonical(path).wstring();
     GUID shareGuid{};
+    bool reusingShare = false;
+
     {
         std::lock_guard lock(m_lock);
 
@@ -959,8 +978,27 @@ try
         auto it = m_mountedWindowsFolders.find(LinuxPath);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
 
-        // Delegate to IWSLCVirtualMachine for the privileged share creation
-        THROW_IF_FAILED(m_vm->AddShare(WindowsPath, WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly), &shareGuid));
+        // In VirtioFs mode, try to reuse an existing share for the same Windows path and access mode.
+        if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
+        {
+            auto shareIt = m_virtioFsShares.find({normalizedPath, readOnly});
+            if (shareIt != m_virtioFsShares.end())
+            {
+                shareGuid = shareIt->second;
+                reusingShare = true;
+            }
+        }
+
+        if (!reusingShare)
+        {
+            // Delegate to IWSLCVirtualMachine for the privileged share creation
+            THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
+
+            if (FeatureEnabled(WslcFeatureFlagsVirtioFs))
+            {
+                m_virtioFsShares[{normalizedPath, readOnly}] = shareGuid;
+            }
+        }
 
         m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
     }
@@ -971,7 +1009,11 @@ try
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
             m_mountedWindowsFolders.erase(mountIt);
-            LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
+            if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
+            {
+                m_virtioFsShares.erase({normalizedPath, readOnly});
+                LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
+            }
         }
     });
 
@@ -988,18 +1030,13 @@ try
         THROW_HR_IF_MSG(E_FAIL, fd < 0, "WSLC_CONNECT failed with %i", fd);
 
         auto mountOptions = std::format(
-            "{},msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap",
-            WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly) ? "ro" : "rw",
-            LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE,
-            fd,
-            fd,
-            shareName);
+            "{},msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap", readOnly ? "ro" : "rw", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, fd, fd, shareName);
 
         Mount(channel, shareName.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags);
     }
     else
     {
-        std::string options = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly) ? "ro" : "rw";
+        std::string options = readOnly ? "ro" : "rw";
         Mount(m_initChannel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
     }
 
@@ -1024,8 +1061,13 @@ try
 
     auto shareId = it->second;
 
-    // Delegate to IWSLCVirtualMachine for the privileged share removal
-    THROW_IF_FAILED(m_vm->RemoveShare(shareId));
+    // Keep the share mounted in virtiofs mode to avoid accumulating devices, which can cause a hang when reached.
+    // TODO: Actually remove the device once this is supported by the device host.
+    if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
+    {
+        // Delegate to IWSLCVirtualMachine for the privileged share removal
+        THROW_IF_FAILED(m_vm->RemoveShare(shareId));
+    }
 
     m_mountedWindowsFolders.erase(it);
 
@@ -1170,15 +1212,23 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
 
             auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmTerminatingEvent.get()};
 
-            const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
-            const char* process = reinterpret_cast<const char*>(&message.Buffer);
+            auto transaction = channel.ReceiveTransaction();
+            gsl::span<gsl::byte> responseSpan;
+            const auto& message = transaction.Receive<LX_PROCESS_CRASH>(&responseSpan);
+
+            const auto bufferSize = responseSpan.size_bytes() - offsetof(LX_PROCESS_CRASH, Buffer);
+            const std::string process(message.Buffer, strnlen(message.Buffer, bufferSize));
 
             constexpr auto dumpExtension = ".dmp";
             constexpr auto dumpPrefix = "wsl-crash";
 
             auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
 
-            std::replace_if(filename.begin(), filename.end(), [](auto e) { return !std::isalnum(e) && e != '.' && e != '-'; }, '_');
+            std::replace_if(
+                filename.begin(),
+                filename.end(),
+                [](char e) { return !std::isalnum(static_cast<unsigned char>(e)) && e != '.' && e != '-'; },
+                '_');
 
             auto fullPath = crashDumpFolder / filename;
 
@@ -1187,7 +1237,7 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
                 TraceLoggingValue(fullPath.c_str(), "FullPath"),
                 TraceLoggingValue(message.Pid, "Pid"),
                 TraceLoggingValue(message.Signal, "Signal"),
-                TraceLoggingValue(process, "process"));
+                TraceLoggingValue(process.c_str(), "process"));
 
             filesystem::EnsureDirectory(crashDumpFolder.c_str());
 
@@ -1208,7 +1258,7 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
             THROW_LAST_ERROR_IF(!file);
 
-            channel.SendResultMessage<std::int32_t>(0);
+            transaction.SendResultMessage<std::int32_t>(0);
             relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
         }
         CATCH_LOG()

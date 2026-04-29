@@ -33,7 +33,7 @@ struct in6_addr_linux
     } u;
 };
 
-const uint16_t ADDR6_MASK3 = ~in6_addr_linux(IN6ADDR_LOOPBACK_INIT).u.addr32[3];
+const uint32_t ADDR6_MASK3 = ~in6_addr_linux(IN6ADDR_LOOPBACK_INIT).u.addr32[3];
 const uint32_t N_ADDR_LOOPBACK = ntohl(INADDR_LOOPBACK);
 const uint32_t N_ADDR_ANY = ntohl(INADDR_ANY);
 
@@ -81,7 +81,8 @@ void wsl::windows::wslrelay::localhost::RelayWorker(_In_ wsl::shared::SocketChan
 
     for (;;)
     {
-        auto [Message, Span] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+        auto Transaction = Channel.ReceiveTransaction();
+        auto [Message, Span] = Transaction.ReceiveOrClosed<MESSAGE_HEADER>();
         if (Message == nullptr)
         {
             break;
@@ -151,7 +152,7 @@ void wsl::windows::wslrelay::localhost::RelayWorker(_In_ wsl::shared::SocketChan
                 }
             }
 
-            Channel.SendMessage(Response);
+            Transaction.Send(Response);
             break;
         }
 
@@ -391,13 +392,13 @@ struct PortRelay
         wsl::shared::SocketChannel channel(wsl::windows::common::hvsocket::Connect(VmId, RelayPort), "SocketRelay");
 
         WI_VERIFY(Family == AF_INET || Family == AF_INET6);
-        LX_INIT_START_SOCKET_RELAY message;
+        LX_INIT_START_SOCKET_RELAY message{};
         message.Port = LinuxPort;
         message.Family = Family == AF_INET ? LX_AF_INET : LX_AF_INET6;
-        message.BufferSize = 4096;
+        message.BufferSize = LOCALHOST_RELAY_BUFFER_SIZE;
         channel.SendMessage(message);
 
-        wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket());
+        wsl::windows::common::relay::SocketRelay(WindowsSocket, channel.Socket(), message.BufferSize);
     }
 
     void CompleteAccept()

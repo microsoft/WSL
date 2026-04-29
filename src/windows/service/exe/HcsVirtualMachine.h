@@ -15,6 +15,7 @@ Abstract:
 
 #pragma once
 
+#include <atomic>
 #include "wslc.h"
 #include "hcs.hpp"
 #include "GuestDeviceManager.h"
@@ -93,8 +94,8 @@ private:
 
     std::filesystem::path m_vmSavedStateFile;
     std::filesystem::path m_crashDumpFolder;
-    bool m_vmSavedStateCaptured = false;
-    bool m_crashLogCaptured = false;
+    std::atomic<bool> m_vmSavedStateCaptured = false;
+    std::atomic<bool> m_crashLogCaptured = false;
 
     wil::com_ptr<ITerminationCallback> m_terminationCallback;
 };

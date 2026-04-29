@@ -239,6 +239,11 @@ inline std::string CleanHostname(const std::string_view Hostname)
         }
     }
 
+    if (result.size() > 64)
+    {
+        result.resize(64);
+    }
+
     while (!result.empty() && (result.back() == '.' || result.back() == '-'))
     {
         result.pop_back();
@@ -247,10 +252,6 @@ inline std::string CleanHostname(const std::string_view Hostname)
     if (result.empty())
     {
         result = c_defaultHostName;
-    }
-    else if (result.size() > 64)
-    {
-        result.resize(64);
     }
 
     return result;

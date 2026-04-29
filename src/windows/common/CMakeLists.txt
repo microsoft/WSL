@@ -34,6 +34,7 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
     VirtioNetworking.cpp
     WSLCProcessLauncher.cpp
@@ -50,7 +51,7 @@ set(SOURCES
     wslutil.cpp
     install.cpp
     WSLCUserSettings.cpp
-    )
+    notifications.cpp)
 
 set(HEADERS
     ../../../generated/Localization.h
@@ -116,6 +117,7 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
     VirtioNetworking.h
     WSLCProcessLauncher.h

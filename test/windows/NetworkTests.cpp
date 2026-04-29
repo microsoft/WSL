@@ -345,6 +345,41 @@ class NetworkTests
         VERIFY_ARE_EQUAL(v6State.DefaultRoute->Device, L"eth0");
     }
 
+    WSL2_TEST_METHOD(AddRemoveDefaultOnlinkRoutes)
+    {
+        wsl::shared::hns::Route defaultRouteV4;
+        defaultRouteV4.NextHop = L"0.0.0.0";
+        defaultRouteV4.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
+        defaultRouteV4.Family = AF_INET;
+        defaultRouteV4.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        wsl::shared::hns::Route defaultRouteV6;
+        defaultRouteV6.NextHop = L"::";
+        defaultRouteV6.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
+        defaultRouteV6.Family = AF_INET6;
+        defaultRouteV6.Metric = 1;
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Add, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteExists =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+        const bool defaultV6RouteExists =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") == (DWORD)0;
+
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV4, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+        SendDeviceSettingsRequest(L"eth0", defaultRouteV6, ModifyRequestType::Remove, GuestEndpointResourceType::Route);
+
+        const bool defaultV4RouteRemoved =
+            LxsstuLaunchWsl(L"ip -4 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
+        const bool defaultV6RouteRemoved =
+            LxsstuLaunchWsl(L"ip -6 route show | grep \"default dev eth0\" | grep -w \"metric 1\"") != (DWORD)0;
+
+        VERIFY_IS_TRUE(defaultV4RouteExists);
+        VERIFY_IS_TRUE(defaultV6RouteExists);
+        VERIFY_IS_TRUE(defaultV4RouteRemoved);
+        VERIFY_IS_TRUE(defaultV6RouteRemoved);
+    }
+
     WSL2_TEST_METHOD(SetInterfaceDownAndUp)
     {
         // Disconnect interface
@@ -2101,6 +2136,24 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
+    static void VerifyPortZeroRebindSucceeds()
+    {
+        // Verify that bind(0) -> close -> immediate rebind on the same port succeeds.
+        // Uses a perl one-liner to perform the entire sequence in a single process,
+        // matching the semantics of a native C test (no SO_REUSEADDR, same-process rebind).
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"perl -MSocket -e '"
+                            L"socket(S1,AF_INET,SOCK_STREAM,0) or die;"
+                            L"bind(S1,sockaddr_in(0,INADDR_ANY)) or die;"
+                            L"my $port=(sockaddr_in(getsockname(S1)))[0];"
+                            L"close(S1);"
+                            L"socket(S2,AF_INET,SOCK_STREAM,0) or die;"
+                            L"bind(S2,sockaddr_in($port,INADDR_ANY)) or die;"
+                            L"close(S2)"
+                            L"'"),
+            0L);
+    }
+
     template <typename T>
     static void VerifyNotBound(T& Address, int AddressFamily, int Protocol)
     {
@@ -3813,7 +3866,7 @@ class MirroredTests
         }
     }
 
-    TEST_METHOD(LoopbackExplicit)
+    WSL2_TEST_METHOD(LoopbackExplicit)
     {
         // TODO: re-enable once OS build 29555 loopback regression is resolved.
         SKIP_TEST_UNSTABLE();
@@ -4001,6 +4054,16 @@ class MirroredTests
         // this range, so even after the guest releases the port the host still cannot bind
         // it — the range-level reservation remains, making release unverifiable.
         NetworkTests::VerifyPortZeroBindIsTracked(false);
+    }
+
+    WSL2_TEST_METHOD(PortZeroRebindSucceeds)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyPortZeroRebindSucceeds();
     }
 
     WSL2_TEST_METHOD(ExplicitEphemeralBind)
@@ -4517,6 +4580,22 @@ class MirroredTests
 
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
+
+    WSL2_TEST_METHOD(MirroredFallbackToNatWhenIpv6Disabled)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        // Set the registry key to disable IPv6 globally on the host.
+        RegistryKeyChange<DWORD> disableIpv6(
+            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", 0xFF);
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        // Force a restart so we re-evaluate the networking mode with the regkey set.
+        WslShutdown();
+
+        // Verify WSL is actually running in NAT mode.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
+    }
 };
 
 class BridgedTests
@@ -4805,6 +4884,15 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         NetworkTests::VerifyPortZeroBindIsTracked();
+    }
+
+    WSL2_TEST_METHOD(PortZeroRebindSucceeds)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyPortZeroRebindSucceeds();
     }
 
     WSL2_TEST_METHOD(HttpProxySimple)

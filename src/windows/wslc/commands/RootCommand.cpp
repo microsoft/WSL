@@ -19,7 +19,9 @@ Abstract:
 #include "RegistryCommand.h"
 #include "SessionCommand.h"
 #include "SettingsCommand.h"
+#include "InspectCommand.h"
 #include "VersionCommand.h"
+#include "VolumeCommand.h"
 
 #include "wslutil.h"
 #include "VersionService.h"
@@ -38,12 +40,13 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<RegistryCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
     commands.push_back(std::make_unique<SettingsCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumeCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
     commands.push_back(std::make_unique<ImageListCommand>(FullName(), true));
-    commands.push_back(std::make_unique<ContainerInspectCommand>(FullName()));
+    commands.push_back(std::make_unique<InspectCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
     commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
