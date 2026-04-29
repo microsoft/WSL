@@ -2290,6 +2290,20 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
     <value>View logs for a container.</value>
   </data>
+  <data name="WSLCCLI_ContainerPruneDeleted" xml:space="preserve">
+    <value>Deleted: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerPruneDesc" xml:space="preserve">
+    <value>Remove stopped containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneLongDesc" xml:space="preserve">
+    <value>Removes all stopped containers.</value>
+  </data>
+  <data name="WSLCCLI_ContainerPruneSpaceReclaimed" xml:space="preserve">
+    <value>Total reclaimed space: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
     <value>Remove containers.</value>
   </data>

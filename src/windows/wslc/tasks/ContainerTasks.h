@@ -42,4 +42,5 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context);
 void StartContainer(CLIExecutionContext& context);
 void StopContainers(CLIExecutionContext& context);
 void ViewContainerLogs(CLIExecutionContext& context);
+void PruneContainers(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

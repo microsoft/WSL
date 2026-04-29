@@ -492,4 +492,19 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     // TODO: Handle ctrl-c.
     io.Run({});
 }
+
+models::PruneContainersResult ContainerService::Prune(models::Session& session)
+{
+    WSLCPruneContainersResults results{};
+    THROW_IF_FAILED(session.Get()->PruneContainers(nullptr, 0, 0, &results));
+
+    models::PruneContainersResult result;
+    result.SpaceReclaimed = results.SpaceReclaimed;
+    for (ULONG i = 0; i < results.ContainersCount; ++i)
+    {
+        result.DeletedContainers.push_back(results.Containers[i]);
+    }
+
+    return result;
+}
 } // namespace wsl::windows::wslc::services
