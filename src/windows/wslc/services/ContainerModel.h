@@ -37,6 +37,8 @@ struct ContainerOptions
     bool Remove = false;
     bool TTY = false;
     bool PublishAll = false;
+    WSLCSignal StopSignal = WSLCSignalNone;
+    ULONGLONG ShmSize = 0;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
     std::string WorkingDirectory;
