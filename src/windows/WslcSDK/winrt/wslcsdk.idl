@@ -137,7 +137,7 @@ namespace Microsoft.WSL.Containers
     enum DeleteContainerFlags
     {
         None = 0,
-        Force = 0x01
+        Force = 0x00000001
     };
 
     runtimeclass ContainerSettings
@@ -222,7 +222,7 @@ namespace Microsoft.WSL.Containers
         Int32 ExitCode { get; };
 
         void Signal(Signal signal);
-        Windows.Storage.Streams.IInputStream GetOutputStream(ProcessOutputHandle ioHandle);
+        Windows.Storage.Streams.IInputStream GetOutputStream(ProcessOutputHandle outputHandle);
         Windows.Storage.Streams.IOutputStream GetInputStream();
 
         event ProcessExitHandler Exited;
@@ -238,9 +238,11 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass Version
     {
-        UInt32 Major;
-        UInt32 Minor;
-        UInt32 Revision;
+        Version(UInt32 major, UInt32 minor, UInt32 revision);
+
+        UInt32 Major { get; };
+        UInt32 Minor { get; };
+        UInt32 Revision { get; };
     };
 
     runtimeclass InstallProgress
