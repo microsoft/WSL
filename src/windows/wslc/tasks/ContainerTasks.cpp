@@ -275,6 +275,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Remove = true;
     }
 
+    if (context.Args.Contains(ArgType::Gpu))
+    {
+        options.Gpu = true;
+    }
+
+    if (context.Args.Contains(ArgType::Init))
+    {
+        options.Init = true;
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));

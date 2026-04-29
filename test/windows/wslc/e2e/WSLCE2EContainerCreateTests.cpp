@@ -638,6 +638,31 @@ class WSLCE2EContainerCreateTests
         VERIFY_IS_TRUE(result.Stdout->find(L"search example.com test.local") != std::wstring::npos);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Init)
+    {
+        auto result = RunWslc(std::format(
+            L"container create --name {} --init {} sh -c \"cat /proc/1/comm\"", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container start -a {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        // When --init is used, PID 1 should be an init process, not the shell
+        VERIFY_IS_TRUE(result.Stdout->find(L"sh") == std::wstring::npos, L"PID 1 should not be 'sh' when --init is used");
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_Gpu)
+    {
+        // Verify --gpus flag is accepted and a container can be created.
+        // Actual GPU functionality depends on host hardware and driver support.
+        auto result =
+            RunWslc(std::format(L"container create --name {} --gpus {} echo gpu-test", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        std::wstring containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        VerifyContainerIsListed(containerId, L"created");
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DNSOption)
     {
         auto result = RunWslc(std::format(
@@ -717,7 +742,9 @@ private:
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
+                << L"  --gpus            Enable GPU access in the container\r\n"
                 << L"  -h,--hostname     Container host name\r\n"
+                << L"  --init            Run an init inside the container that forwards signals and reaps processes\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"

@@ -46,6 +46,8 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     auto containerFlags = WSLCContainerFlagsNone;
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsRm, options.Remove);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsInit, options.Init);
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);
