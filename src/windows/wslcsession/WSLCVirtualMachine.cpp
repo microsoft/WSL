@@ -645,24 +645,29 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
 
     // Check if this is a tty or not
     const WSLCProcessFd* tty = nullptr;
-    const WSLCProcessFd* ttyControl = nullptr;
     auto [pid, _, childChannel] = Fork(WSLC_FORK::Process);
 
     std::vector<WSLCVirtualMachine::ConnectedSocket> sockets;
+    ConnectedSocket ttyControlhandle;
     for (const auto& e : Fds)
     {
-        if (e.Type == WSLCFdTypeTty)
-        {
-            THROW_HR_IF_MSG(E_INVALIDARG, tty != nullptr, "Multiple terminal fds specified");
-            tty = &e;
-        }
-        else if (e.Type == WSLCFdTypeTtyControl)
-        {
-            THROW_HR_IF_MSG(E_INVALIDARG, ttyControl != nullptr, "Multiple terminal control fds specified");
-            ttyControl = &e;
-        }
 
-        sockets.emplace_back(ConnectSocket(childChannel, static_cast<int32_t>(e.Fd)));
+        if (e.Type == WSLCFdTypeTtyControl)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, ttyControlhandle.Fd != -1, "Multiple terminal control fds specified");
+
+            ttyControlhandle = ConnectSocket(childChannel, e.Fd);
+        }
+        else
+        {
+            if (e.Type == WSLCFdTypeTty)
+            {
+                THROW_HR_IF_MSG(E_INVALIDARG, tty != nullptr, "Multiple terminal fds specified");
+                tty = &e;
+            }
+
+            sockets.emplace_back(ConnectSocket(childChannel, e.Fd));
+        }
     }
 
     PrepareCommandLine(sockets);
@@ -674,6 +679,16 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     Message.WriteStringArray(Message->CommandLineIndex, Options.CommandLine.Values, Options.CommandLine.Count);
     Message.WriteStringArray(Message->EnvironmentIndex, Options.Environment.Values, Options.Environment.Count);
 
+    // N.B. The process control needs to be registered before the actual exec message is sent. Otherwise, if the process exits quickly, we might receive the exit notification before registering it.
+    std::shared_ptr<VMProcessControl> control;
+    auto registerProcess = [&](int processPid) {
+        control = std::make_shared<VMProcessControl>(*this, processPid, std::move(ttyControlhandle.Socket));
+        {
+            std::lock_guard lock{m_trackedProcessesLock};
+            m_trackedProcesses.emplace_back(control);
+        }
+    };
+
     // If this is an interactive tty, we need a relay process
     if (tty != nullptr)
     {
@@ -681,7 +696,7 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
         WSLC_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.Socket = tty->Fd;
-        relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
+        relayMessage.TtyControl = ttyControlhandle.Fd; // N.B. Fd is set to -1 if unset.
         {
             auto relayTransaction = childChannel.StartTransaction();
             relayTransaction.Send(relayMessage);
@@ -693,6 +708,8 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
             setErrno(result);
             THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
+
+        registerProcess(grandChildPid);
 
         {
             auto execTransaction = grandChildChannel.StartTransaction();
@@ -710,40 +727,26 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     }
     else
     {
+        registerProcess(pid);
+
+        auto execTransaction = childChannel.StartTransaction();
+        execTransaction.Send<WSLC_EXEC>(Message.Span());
+        auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
+        auto result = execResponse != nullptr ? execResponse->Result : 0;
+        if (result != 0)
         {
-            auto execTransaction = childChannel.StartTransaction();
-            execTransaction.Send<WSLC_EXEC>(Message.Span());
-            auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
-            auto result = execResponse != nullptr ? execResponse->Result : 0;
-            if (result != 0)
-            {
-                setErrno(result);
-                THROW_HR_MSG(E_FAIL, "errno: %i", result);
-            }
+            setErrno(result);
+            THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
     }
-
-    wil::unique_socket ttyControlHandle;
 
     std::map<ULONG, TypedHandle> stdHandles;
     for (auto& [fd, handle] : sockets)
     {
-        if (ttyControl != nullptr && fd == ttyControl->Fd)
-        {
-            ttyControlHandle = std::move(handle);
-            continue;
-        }
-
         stdHandles.emplace(fd, TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(handle.release())}, WSLCHandleTypeSocket});
     }
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
-    auto control = std::make_shared<VMProcessControl>(*this, pid, std::move(ttyControlHandle));
-
-    {
-        std::lock_guard lock{m_trackedProcessesLock};
-        m_trackedProcesses.emplace_back(control);
-    }
 
     auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options.Flags);
 
