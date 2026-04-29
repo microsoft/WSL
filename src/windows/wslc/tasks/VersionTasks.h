@@ -14,9 +14,8 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "Task.h"
 
-using wsl::windows::wslc::execution::CLIExecutionContext;
-
 namespace wsl::windows::wslc::task {
+using wsl::windows::wslc::execution::CLIExecutionContext;
 void GetVersionInfo(CLIExecutionContext& context);
 void ListVersionInfo(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task
