@@ -162,6 +162,11 @@ public:
         return m_vmId;
     }
 
+    bool GpuEnabled() const
+    {
+        return FeatureEnabled(WslcFeatureFlagsGPU);
+    }
+
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
 

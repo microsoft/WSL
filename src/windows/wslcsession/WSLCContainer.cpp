@@ -1287,6 +1287,22 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     ProcessNamedVolumes(containerOptions, sessionVolumes, request);
 
+    // Configure GPU support if requested.
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsGpu))
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, !virtualMachine.GpuEnabled(), "WSLCContainerFlagsGpu requires GPU support enabled on the session");
+
+        if (!request.HostConfig.Binds.has_value())
+        {
+            request.HostConfig.Binds = std::vector<std::string>{};
+        }
+
+        request.HostConfig.Binds->push_back("/usr/lib/wsl/lib:/usr/lib/wsl/lib:ro");
+        request.HostConfig.Binds->push_back("/usr/lib/wsl/drivers:/usr/lib/wsl/drivers:ro");
+
+        request.HostConfig.Devices.push_back({"/dev/dxg", "/dev/dxg", "rwm"});
+    }
+
     // Prepare port mappings from container options.
     std::vector<_WSLCPortMapping> ports;
     for (ULONG i = 0; i < containerOptions.PortsCount; i++)

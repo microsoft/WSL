@@ -3317,6 +3317,94 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerGpu)
+    {
+        // Validate that GPU resources are available inside a container when WSLCContainerFlagsGpu is set.
+        {
+            auto settings = GetDefaultSessionSettings(L"container-gpu-test", true);
+            WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsGPU);
+
+            auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslcFeatureFlagsGPU);
+            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
+            LoadTestImage("debian:latest", session.get());
+
+            WSLCContainerLauncher launcher("debian:latest", "test-container-gpu", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeNone);
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto container = launcher.Launch(*session);
+
+            // Validate that /dev/dxg is available as a character device.
+            {
+                auto process = WSLCProcessLauncher({}, {"/bin/sh", "-c", "test -c /dev/dxg"}).Launch(container.Get());
+                ValidateProcessOutput(process, {}, 0);
+            }
+
+            // Validate that the GPU library directory is mounted and contains libraries.
+            {
+                auto process = WSLCProcessLauncher({}, {"/bin/sh", "-c", "test -d /usr/lib/wsl/lib && ls /usr/lib/wsl/lib | grep -q ."}).Launch(container.Get());
+                ValidateProcessOutput(process, {}, 0);
+            }
+
+            // Validate that the GPU drivers directory is mounted and accessible.
+            {
+                auto process = WSLCProcessLauncher({}, {"/bin/sh", "-c", "test -d /usr/lib/wsl/drivers"}).Launch(container.Get());
+                ValidateProcessOutput(process, {}, 0);
+            }
+
+            // Validate that the GPU mount points are read-only.
+            {
+                auto process = WSLCProcessLauncher({}, {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Launch(container.Get());
+                ValidateProcessOutput(process, {}, 1);
+            }
+
+            {
+                auto process = WSLCProcessLauncher({}, {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Launch(container.Get());
+                ValidateProcessOutput(process, {}, 1);
+            }
+
+            // Validate that libdxcore.so is present in the library path.
+            {
+                auto process = WSLCProcessLauncher({}, {"/bin/sh", "-c", "find /usr/lib/wsl/lib -maxdepth 1 -name 'libdxcore.so*' | grep -q ."}).Launch(container.Get());
+                ValidateProcessOutput(process, {}, 0);
+            }
+        }
+
+        // Validate that containers without GPU flag do not have GPU resources.
+        {
+            auto settings = GetDefaultSessionSettings(L"container-no-gpu-test", true);
+            WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsGPU);
+
+            auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslcFeatureFlagsGPU);
+            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
+            WSLCContainerLauncher launcher("debian:latest", "test-container-no-gpu", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeNone);
+
+            auto container = launcher.Launch(*session);
+
+            // Validate that /dev/dxg is not available.
+            {
+                auto process = WSLCProcessLauncher({}, {"/bin/sh", "-c", "test -c /dev/dxg"}).Launch(container.Get());
+                ValidateProcessOutput(process, {}, 1);
+            }
+        }
+
+        // Validate that setting GPU flag on a non-GPU session fails.
+        {
+            auto settings = GetDefaultSessionSettings(L"container-gpu-no-session");
+            WI_ClearFlag(settings.FeatureFlags, WslcFeatureFlagsGPU);
+
+            auto createNewSession = WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslcFeatureFlagsGPU);
+            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
+            WSLCContainerLauncher launcher("debian:latest", "test-container-gpu-fail", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeNone);
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto [hr, _] = launcher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+    }
+
     WSLC_TEST_METHOD(Modules)
     {
         // Sanity check.

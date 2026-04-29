@@ -186,6 +186,15 @@ struct Mount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Name, Target, Source, Type, ReadOnly);
 };
 
+struct DeviceMapping
+{
+    std::string PathOnHost;
+    std::string PathInContainer;
+    std::string CgroupPermissions;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeviceMapping, PathOnHost, PathInContainer, CgroupPermissions);
+};
+
 struct PortMapping
 {
     std::string HostIp;
@@ -205,8 +214,9 @@ struct HostConfig
     std::optional<std::vector<std::string>> DnsOptions;
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
+    std::vector<DeviceMapping> Devices;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices);
 };
 
 struct CreateContainer
