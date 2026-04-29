@@ -1161,6 +1161,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.Domainname = containerOptions.DomainName;
     }
 
+    request.HostConfig.Privileged = true;
+
     if (containerOptions.DnsServers.Count > 0)
     {
         THROW_HR_IF_NULL_MSG(
