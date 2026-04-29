@@ -454,6 +454,7 @@ int Install(_In_ std::wstring_view commandLine)
     std::optional<ULONG> version;
     std::optional<uint64_t> vhdSize;
     bool fixedVhd = false;
+    bool inPlace = false;
     bool installWslOptionalComponent = false;
     bool noLaunchAfterInstall = false;
     bool noDistribution = false;
@@ -476,6 +477,7 @@ int Install(_In_ std::wstring_view commandLine)
     parser.AddArgument(g_promptBeforeExit, WSL_INSTALL_ARG_PROMPT_BEFORE_EXIT_OPTION);
     parser.AddArgument(SizeString(vhdSize), WSL_INSTALL_ARG_VHD_SIZE);
     parser.AddArgument(fixedVhd, WSL_INSTALL_ARG_FIXED_VHD);
+    parser.AddArgument(inPlace, WSL_INSTALL_ARG_IN_PLACE);
 
     parser.Parse();
 
@@ -505,40 +507,85 @@ int Install(_In_ std::wstring_view commandLine)
                 E_INVALIDARG, Localization::MessageArgumentsNotValidTogether(WSL_INSTALL_ARG_FROM_FILE_LONG, WSL_INSTALL_ARG_DIST_OPTION_LONG));
         }
 
-        wil::unique_hfile diskFile;
-        HANDLE file{};
-        if (fromFile.value() == WSL_IMPORT_ARG_STDIN)
+        const bool isVhd = fromFile.value() != WSL_IMPORT_ARG_STDIN &&
+                           wsl::windows::common::wslutil::IsVhdFile(std::filesystem::path{fromFile.value()});
+
+        // --in-place is only valid for VHD files.
+        if (inPlace && !isVhd)
         {
-            file = GetStdHandle(STD_INPUT_HANDLE);
-            fromFile = L"<stdin>";
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageArgumentRequiresVhdPath(WSL_INSTALL_ARG_IN_PLACE));
+        }
+
+        // --fixed-vhd is not valid when importing an existing VHD file.
+        if (isVhd && fixedVhd)
+        {
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG, Localization::MessageArgumentsNotValidTogether(WSL_INSTALL_ARG_FIXED_VHD, WSL_INSTALL_ARG_FROM_FILE_LONG));
+        }
+
+        GUID id{};
+        std::wstring distroName;
+
+        if (isVhd && inPlace)
+        {
+            // Install a VHD in-place: use the VHD where it sits (no copy).
+            const auto vhdPath = wsl::windows::common::filesystem::GetFullPath(fromFile->c_str());
+
+            wsl::windows::common::wslutil::PrintMessage(Localization::MessageInstalling(fromFile->c_str()));
+
+            SvcComm service;
+            id = service.ImportDistributionInplace(name.has_value() ? name->c_str() : nullptr, vhdPath.c_str(), TRUE);
+
+            // Query the name if it was auto-discovered by the service (e.g. from /etc/wsl-distribution.conf).
+            wil::unique_cotaskmem_string queriedName;
+            ULONG ver, uid, envCount, fl;
+            wil::unique_cotaskmem_array_ptr<wil::unique_cotaskmem_ansistring> env;
+            service.GetDistributionConfiguration(&id, &queriedName, &ver, &uid, &envCount, &env, &fl);
+            distroName = queriedName.get();
         }
         else
         {
-            diskFile.reset(CreateFileW(
-                fromFile->c_str(), GENERIC_READ, (FILE_SHARE_READ | FILE_SHARE_DELETE), nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            wil::unique_hfile diskFile;
+            HANDLE file{};
+            if (fromFile.value() == WSL_IMPORT_ARG_STDIN)
+            {
+                file = GetStdHandle(STD_INPUT_HANDLE);
+                fromFile = L"<stdin>";
+            }
+            else
+            {
+                diskFile.reset(CreateFileW(
+                    fromFile->c_str(), GENERIC_READ, (FILE_SHARE_READ | FILE_SHARE_DELETE), nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 
-            THROW_LAST_ERROR_IF(!diskFile);
+                THROW_LAST_ERROR_IF(!diskFile);
 
-            file = diskFile.get();
+                file = diskFile.get();
+            }
+
+            wsl::windows::common::wslutil::PrintMessage(Localization::MessageInstalling(fromFile->c_str()));
+            wsl::windows::common::HandleConsoleProgressBar progressBar(file, Localization::MessageImportProgress());
+
+            ULONG flags = isVhd ? LXSS_IMPORT_DISTRO_FLAGS_VHD : 0;
+            WI_SetFlagIf(flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD, fixedVhd);
+
+            SvcComm service;
+            auto [registeredId, installedName] = service.RegisterDistribution(
+                name.has_value() ? name->c_str() : nullptr,
+                version.value_or(LXSS_WSL_VERSION_DEFAULT),
+                file,
+                location.has_value() ? location->c_str() : nullptr,
+                flags,
+                vhdSize);
+
+            id = registeredId;
+            distroName = installedName.get();
         }
 
-        wsl::windows::common::wslutil::PrintMessage(Localization::MessageInstalling(fromFile->c_str()));
-        wsl::windows::common::HandleConsoleProgressBar progressBar(file, Localization::MessageImportProgress());
-
-        SvcComm service;
-        auto [id, installedName] = service.RegisterDistribution(
-            name.has_value() ? name->c_str() : nullptr,
-            version.value_or(LXSS_WSL_VERSION_DEFAULT),
-            file,
-            location.has_value() ? location->c_str() : nullptr,
-            fixedVhd ? LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD : 0,
-            vhdSize);
-
-        wsl::windows::common::wslutil::PrintMessage(Localization::MessageDistributionInstalled(installedName.get()), stdout);
+        wsl::windows::common::wslutil::PrintMessage(Localization::MessageDistributionInstalled(distroName.c_str()), stdout);
 
         if (!noLaunchAfterInstall)
         {
-            wsl::windows::common::wslutil::PrintMessage(Localization::MessageLaunchingDistro(installedName.get()), stdout);
+            wsl::windows::common::wslutil::PrintMessage(Localization::MessageLaunchingDistro(distroName.c_str()), stdout);
 
             LaunchProcessOptions options{};
             options.DistroGuid = id;
@@ -546,6 +593,12 @@ int Install(_In_ std::wstring_view commandLine)
         }
 
         return 0;
+    }
+
+    if (inPlace)
+    {
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG, Localization::MessageArgumentNotValidWithout(WSL_INSTALL_ARG_IN_PLACE, WSL_INSTALL_ARG_FROM_FILE_LONG));
     }
 
     bool rebootRequired = InstallPrerequisites(installWslOptionalComponent);

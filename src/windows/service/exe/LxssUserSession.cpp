@@ -300,7 +300,7 @@ try
 CATCH_RETURN()
 
 HRESULT STDMETHODCALLTYPE LxssUserSession::ImportDistributionInplace(
-    _In_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid)
+    _In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid)
 try
 {
     ServiceExecutionContext context(Error);
@@ -308,7 +308,7 @@ try
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->ImportDistributionInplace(DistributionName, VhdPath, pDistroGuid);
+    return session->ImportDistributionInplace(DistributionName, VhdPath, EnableOobe, pDistroGuid);
 }
 CATCH_RETURN()
 
@@ -1294,11 +1294,14 @@ PSID LxssUserSessionImpl::GetUserSid()
 }
 
 HRESULT
-LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _Out_ GUID* pDistroGuid)
+LxssUserSessionImpl::ImportDistributionInplace(_In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ GUID* pDistroGuid)
 {
     ExecutionContext context(Context::RegisterDistro);
 
-    s_ValidateDistroName(DistributionName);
+    if (DistributionName != nullptr)
+    {
+        s_ValidateDistroName(DistributionName);
+    }
 
     // Return an error if the path is not absolute or does not have a valid VHD file extension.
     const std::filesystem::path path{VhdPath};
@@ -1323,9 +1326,9 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
         LX_UID_ROOT,
         nullptr,
         path.filename().c_str(),
-        false);
+        EnableOobe);
 
-    auto configuration = s_GetDistributionConfiguration(registration);
+    auto configuration = s_GetDistributionConfiguration(registration, DistributionName == nullptr);
 
     // Declare a scope exit variable to clean up on failure.
     const wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
@@ -1542,17 +1545,30 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
         {
             if (WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_VHD))
             {
-                auto runAsUser = wil::impersonate_token(userToken.get());
-                auto vhdFile = wsl::core::filesystem::CreateFile(
-                    configuration.VhdFilePath.c_str(),
-                    GENERIC_WRITE,
-                    (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
-                    CREATE_NEW,
-                    FILE_ATTRIBUTE_NORMAL,
-                    GetUserSid());
+                {
+                    auto runAsUser = wil::impersonate_token(userToken.get());
+                    auto vhdFile = wsl::core::filesystem::CreateFile(
+                        configuration.VhdFilePath.c_str(),
+                        GENERIC_WRITE,
+                        (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
+                        CREATE_NEW,
+                        FILE_ATTRIBUTE_NORMAL,
+                        GetUserSid());
 
-                deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
-                wsl::windows::common::relay::InterruptableRelay(FileHandle, vhdFile.get(), clientProcess.get(), LXSS_RELAY_BUFFER_SIZE);
+                    deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
+                    wsl::windows::common::relay::InterruptableRelay(FileHandle, vhdFile.get(), clientProcess.get(), LXSS_RELAY_BUFFER_SIZE);
+                }
+
+                // Run a utility VM to read distribution metadata from the copied VHD.
+                const auto vmContext = _RunUtilityVmSetup(configuration, LxMiniInitMessageImportInplace);
+                auto* channel = dynamic_cast<WslCoreInstance::WslCorePort*>(vmContext.instance->GetInitPort().get());
+
+                gsl::span<gsl::byte> span;
+                const auto& message = channel->GetChannel().ReceiveMessage<LX_MINI_INIT_IMPORT_RESULT>(&span);
+
+                THROW_HR_IF(WSL_E_IMPORT_FAILED, (message.Result != 0));
+
+                _ProcessImportResultMessage(message, span, lxssKey.get(), configuration, registration);
             }
             else
             {

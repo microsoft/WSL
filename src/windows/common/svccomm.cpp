@@ -890,12 +890,12 @@ GUID wsl::windows::common::SvcComm::GetDistributionId(_In_ LPCWSTR Name, _In_ UL
     return DistroId;
 }
 
-GUID wsl::windows::common::SvcComm::ImportDistributionInplace(_In_ LPCWSTR Name, _In_ LPCWSTR VhdPath) const
+GUID wsl::windows::common::SvcComm::ImportDistributionInplace(_In_ LPCWSTR Name, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe) const
 {
     ClientExecutionContext context;
 
     GUID DistroGuid;
-    THROW_IF_FAILED(m_userSession->ImportDistributionInplace(Name, VhdPath, context.OutError(), &DistroGuid));
+    THROW_IF_FAILED(m_userSession->ImportDistributionInplace(Name, VhdPath, EnableOobe, context.OutError(), &DistroGuid));
 
     return DistroGuid;
 }

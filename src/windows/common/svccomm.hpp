@@ -75,7 +75,7 @@ public:
 
     GUID GetDistributionId(_In_ LPCWSTR Name, _In_ ULONG Flags = 0) const;
 
-    GUID ImportDistributionInplace(_In_ LPCWSTR Name, _In_ LPCWSTR VhdPath) const;
+    GUID ImportDistributionInplace(_In_opt_ LPCWSTR Name, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe = FALSE) const;
 
     MountResult MountDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags, _In_ ULONG PartitionIndex, _In_opt_ LPCWSTR Name, _In_opt_ LPCWSTR Type, _In_opt_ LPCWSTR Options) const;
 

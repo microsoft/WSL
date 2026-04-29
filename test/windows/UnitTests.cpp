@@ -1314,6 +1314,11 @@ class UnitTests
         ValidateErrorMessage(
             L"--install foo --fixed-vhd", L"Argument --fixed-vhd requires the --vhd-size argument.", L"Wsl/E_INVALIDARG");
 
+        ValidateErrorMessage(
+            L"--install --from-file fake.tar --in-place",
+            L"Argument --in-place is only valid with a .vhd or .vhdx file.",
+            L"Wsl/E_INVALIDARG");
+
         {
             UniqueWebServer server(c_testDistributionEndpoint, c_testDistributionJson);
             RegistryKeyChange<std::wstring> keyChange(
@@ -1486,7 +1491,11 @@ Arguments for managing Windows Subsystem for Linux:
                 Create a fixed-size disk to store the distribution.
 
             --from-file <Path>
-                Install a distribution from a local file.
+                Install a distribution from a local file. Supports tar and .vhd/.vhdx files.
+
+            --in-place
+                When used with --from-file for a .vhd or .vhdx file, installs the distribution
+                using the VHD where it is located without copying it.
 
             --legacy
                 Use the legacy distribution manifest.
@@ -4520,6 +4529,80 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
             // Validate that the shortcut is gone
             VERIFY_IS_FALSE(std::filesystem::exists(shortcutPath));
+
+            // Fake VHD file (not a valid VHD) should fail with --install --from-file --in-place
+            {
+                constexpr auto fakeVhdName = L"fake-in-place.vhdx";
+                auto fakeCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                    LxsstuLaunchWsl(std::format(L"--unregister fake-in-place").c_str());
+                    DeleteFileW(fakeVhdName);
+                });
+
+                wil::unique_handle fakeVhd{CreateFile(fakeVhdName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                VERIFY_IS_TRUE(!!fakeVhd);
+                constexpr auto fakeContent = "not a real vhd";
+                DWORD written{};
+                VERIFY_IS_TRUE(WriteFile(fakeVhd.get(), fakeContent, static_cast<DWORD>(strlen(fakeContent)), &written, nullptr));
+                fakeVhd.reset();
+
+                auto [fakeOut, fakeErr] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--install --no-launch --from-file {} --in-place --name fake-in-place", fakeVhdName), -1);
+
+                VERIFY_IS_TRUE(fakeOut.find(L"Error code:") != std::wstring::npos);
+            }
+
+            // Successful in-place install with default name from wsl-distribution.conf
+            {
+                constexpr auto inPlaceDefaultName = L"install-in-place-default";
+                constexpr auto inPlaceDefaultVhd = L"install-in-place-default.vhdx";
+                auto inPlaceDefaultCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                    LxsstuLaunchWsl(std::format(L"--unregister {}", inPlaceDefaultName).c_str());
+                    DeleteFileW(inPlaceDefaultVhd);
+                });
+
+                CreateVhdFromManifest(std::format(L"[oobe]\ndefaultName = {}", inPlaceDefaultName).c_str(), inPlaceDefaultVhd);
+
+                InstallFromTar(inPlaceDefaultVhd, L"--in-place");
+                ValidateDistributionStarts(inPlaceDefaultName);
+
+                auto defaultDistroKey = OpenDistributionKey(inPlaceDefaultName);
+                VERIFY_IS_TRUE(!!defaultDistroKey);
+
+                VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(defaultDistroKey.get(), nullptr, L"RunOOBE", 0), 1);
+            }
+
+            // Successful in-place install with --name override
+            {
+                constexpr auto inPlaceNamedName = L"install-in-place-named";
+                constexpr auto inPlaceNamedVhd = L"install-in-place-named.vhdx";
+                auto inPlaceNamedCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                    LxsstuLaunchWsl(std::format(L"--unregister {}", inPlaceNamedName).c_str());
+                    DeleteFileW(inPlaceNamedVhd);
+                });
+
+                CreateVhdFromManifest(L"", inPlaceNamedVhd);
+
+                InstallFromTar(inPlaceNamedVhd, std::format(L"--in-place --name {}", inPlaceNamedName).c_str());
+                ValidateDistributionStarts(inPlaceNamedName);
+
+                auto namedDistroKey = OpenDistributionKey(inPlaceNamedName);
+                VERIFY_IS_TRUE(!!namedDistroKey);
+
+                VERIFY_ARE_EQUAL(wsl::windows::common::registry::ReadDword(namedDistroKey.get(), nullptr, L"RunOOBE", 0), 1);
+            }
+
+            // In-place install with no default name and no --name should fail
+            {
+                constexpr auto inPlaceNoNameVhd = L"install-in-place-no-name.vhdx";
+                auto inPlaceNoNameCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFileW(inPlaceNoNameVhd); });
+
+                CreateVhdFromManifest(L"", inPlaceNoNameVhd);
+
+                auto [noNameOut, noNameErr] = LxsstuLaunchWslAndCaptureOutput(
+                    std::format(L"--install --no-launch --from-file {} --in-place", inPlaceNoNameVhd), -1);
+
+                VERIFY_IS_TRUE(noNameOut.find(L"Error code:") != std::wstring::npos);
+            }
         }
 
         // Distribution with overridden default location

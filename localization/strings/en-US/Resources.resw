@@ -434,7 +434,11 @@ Arguments for managing Windows Subsystem for Linux:
                 Create a fixed-size disk to store the distribution.
 
             --from-file &lt;Path&gt;
-                Install a distribution from a local file.
+                Install a distribution from a local file. Supports tar and .vhd/.vhdx files.
+
+            --in-place
+                When used with --from-file for a .vhd or .vhdx file, installs the distribution
+                using the VHD where it is located without copying it.
 
             --legacy
                 Use the legacy distribution manifest.
@@ -591,6 +595,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--in-place
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
@@ -817,6 +822,10 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
   </data>
   <data name="MessageArgumentNotValidWithout" xml:space="preserve">
     <value>Argument {} requires the {} argument.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentRequiresVhdPath" xml:space="preserve">
+    <value>Argument {} is only valid with a .vhd or .vhdx file.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
