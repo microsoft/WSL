@@ -690,41 +690,17 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         }
 
         auto lock = m_lock.lock_exclusive();
-        auto previousState = m_state;
 
-        // Don't run the deletion logic if the container is already in a stopped / deleted state.
-        // This can happen if Stop()/Delete() is called by the user.
-        if (previousState == WslcContainerStateRunning)
-        {
-            Transition(WslcContainerStateExited, eventTime);
-            ReleaseProcesses();
-
-            ReleaseRuntimeResources();
-
-            if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
-            {
-                DeleteExclusiveLockHeld(WSLCDeleteFlagsDeleteVolumes);
-            }
-        }
-
-        // Signaling is idempotent and required regardless of who drove the state transition.
-        // The Rm path defers signaling to the Destroy event so callers observe destroy-side
-        // cleanup (e.g. anonymous volume tracking) before init's exit event fires.
-        if (WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm))
-        {
-            SignalInitProcessExit();
-        }
+        OnStopped(eventTime);
     }
     else if (event == ContainerEvent::Destroy)
     {
+        SignalInitProcessExit();
+
         WI_ASSERT(!m_destroyEvent.is_signaled());
         m_destroyEvent.SetEvent();
 
         auto lock = m_lock.lock_exclusive();
-
-        // Now that destroy has been observed (and any --rm cleanup is reflected in tracking),
-        // it's safe to release waiters on init's exit event.
-        SignalInitProcessExit();
 
         if (m_state != WslcContainerStateDeleted)
         {
@@ -825,16 +801,36 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
         stopTimestamp = m_stopNotification.EventTime.load(std::memory_order_acquire);
     }
 
-    Transition(WslcContainerStateExited, stopTimestamp);
-
-    ReleaseProcesses();
-
-    ReleaseRuntimeResources();
+    OnStopped(stopTimestamp);
 
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
-        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
         m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
+    }
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::OnStopped(std::optional<std::uint64_t> stopTimestamp)
+{
+    ReleaseProcesses();
+    ReleaseRuntimeResources();
+
+    // Only drive state transition + auto-delete if we're still Running. A concurrent
+    // Delete() may have already moved us to Deleted.
+    if (m_state == WslcContainerStateRunning)
+    {
+        Transition(WslcContainerStateExited, stopTimestamp);
+
+        if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
+        {
+            DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
+        }
+    }
+
+    // For the Rm path, defer init-exit signaling to OnEvent(Destroy) so callers waiting
+    // on init exit observe destroy-side cleanup (e.g. anonymous volume tracking) first.
+    if (WI_IsFlagClear(m_containerFlags, WSLCContainerFlagsRm))
+    {
+        SignalInitProcessExit();
     }
 }
 
