@@ -5412,7 +5412,7 @@ class WSLCTests
         auto container = launcher.Launch(*m_defaultSession);
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
 
-        VERIFY_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), m_defaultSession->DeleteNetwork(networkName.c_str()));
     }
 
     WSLC_TEST_METHOD(ContainerCustomNetworkPortMappingTest)
