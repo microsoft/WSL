@@ -134,7 +134,9 @@ private:
 
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
-    void WaitForContainerEvent();
+
+    bool WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const;
+
     __requires_exclusive_lock_held(m_lock) void ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
@@ -158,8 +160,16 @@ private:
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
 
-    std::mutex m_stopStateLock;
-    std::optional<std::promise<std::uint64_t>> m_stopState;
+    struct StopNotification
+    {
+        std::atomic<std::uint64_t> EventTime{0};
+        wil::unique_event Event{wil::EventOptions::None};
+    } m_stopNotification;
+
+    // Serializes Stop() callers and signals OnEvent that a Stop is in flight.
+    // Must be acquired before m_lock when both are needed.
+    std::mutex m_stopLock;
+
     DockerHTTPClient& m_dockerClient;
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
