@@ -293,7 +293,7 @@ void WSLCVirtualMachine::Initialize()
     Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLC_MOUNT::KernelModules);
 
     // Configure GPU mounts if enabled
-    MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
+    MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
 
     // Configure cold discard hint size for page reporting.
     // This sets the minimum order of pages that will be reported as free to the hypervisor.
