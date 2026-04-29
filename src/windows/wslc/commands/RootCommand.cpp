@@ -23,8 +23,13 @@ Abstract:
 #include "VersionCommand.h"
 #include "VolumeCommand.h"
 
+#include "wslutil.h"
+#include "VersionService.h"
+
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::shared;
+using namespace wsl::windows::common;
+using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
@@ -82,7 +87,7 @@ void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     if (context.Args.Contains(ArgType::Version))
     {
-        VersionCommand::PrintVersion();
+        wslutil::PrintMessage(VersionService::GetVersionString());
         return;
     }
 

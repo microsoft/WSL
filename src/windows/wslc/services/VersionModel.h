@@ -1,0 +1,56 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    VersionModel.h
+
+Abstract:
+
+    This file contains the VersionModel definitions
+--*/
+
+#pragma once
+
+namespace wsl::windows::wslc::models {
+
+struct ClientVersion
+{
+    std::string Version = WSL_PACKAGE_VERSION;
+    std::string GitCommit = COMMIT_HASH;
+    std::string Built = __DATE__ " " __TIME__;
+    std::string Os = "windows";
+
+#if defined(_AMD64_)
+    std::string Arch = "amd64";
+#elif defined(_ARM64_)
+    std::string Arch = "arm64";
+#else
+    std::string Arch = "unknown";
+#endif
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ClientVersion, Version, GitCommit, Built, Os, Arch);
+};
+
+struct ServerVersion
+{
+    std::string Kernel = KERNEL_VERSION;
+    std::string WSLg = WSLG_VERSION;
+    std::string MSRDC = MSRDC_VERSION;
+    std::string Direct3D = DIRECT3D_VERSION;
+    std::string DXCore = DXCORE_VERSION;
+    std::string Windows = wsl::windows::common::helpers::GetWindowsVersionString();
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ServerVersion, Kernel, WSLg, MSRDC, Direct3D, DXCore, Windows);
+};
+
+struct VersionInfo
+{
+    ClientVersion Client{};
+    ServerVersion Server{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(VersionInfo, Client, Server);
+};
+
+} // namespace wsl::windows::wslc::models
