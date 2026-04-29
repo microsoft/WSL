@@ -172,6 +172,10 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
+if (NOT DEFINED WSL_BUILD_SDKCS)
+    set(WSL_BUILD_SDKCS false)
+endif ()
+
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
@@ -311,9 +315,11 @@ if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
 endif()
 
-set(CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS} /langversion:latest /debug:full")
-set(CMAKE_DOTNET_SDK "Microsoft.NET.Sdk")
-set(CMAKE_DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
+if (WSL_BUILD_SDKCS OR WSL_BUILD_WSL_SETTINGS)
+    set(CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS} /langversion:latest /debug:full")
+    set(CMAKE_DOTNET_SDK "Microsoft.NET.Sdk")
+    set(CMAKE_DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
+endif()
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
@@ -541,7 +547,10 @@ add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
-add_subdirectory(src/windows/WslcSDK/csharp)
+
+if (WSL_BUILD_SDKCS)
+    add_subdirectory(src/windows/WslcSDK/csharp)
+endif()
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)
