@@ -495,6 +495,58 @@ class Plan9Tests
         VERIFY_ARE_EQUAL(content, L"foo");
     }
 
+    // N.B. Rename, symlink, and link with ':' cannot be tested — the IO manager intercepts ':'
+    //      as an alternate data stream operation.
+    TEST_METHOD(TestBlockZoneIdentifier)
+    {
+        wil::unique_hfile file;
+        IO_STATUS_BLOCK ioStatus;
+
+        // Use CreateFileNt since xx:xx is not a valid path for standard Windows file APIs
+        // Verify that Zone.Identifier files can be created with the default configuration.
+        auto status = CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\default.txt:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
+        VERIFY_NT_SUCCESS(status);
+        file.reset();
+        VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/default.txt:Zone.Identifier'"));
+        LxsstuLaunchWsl(L"rm -f '/data/p9_test/default.txt:Zone.Identifier'");
+
+        // Verify that Zone.Identifier directories can be created with the default configuration.
+        status = CreateFileNt(
+            &file, LXSST_P9_TEST_DIR L"\\defaultdir:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE, FILE_ATTRIBUTE_DIRECTORY, FILE_DIRECTORY_FILE);
+        VERIFY_NT_SUCCESS(status);
+        file.reset();
+        VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"test -d '/data/p9_test/defaultdir:Zone.Identifier'"));
+        LxsstuLaunchWsl(L"rm -rf '/data/p9_test/defaultdir:Zone.Identifier'");
+
+        // Enable blockZoneIdentifier and restart the distro to pick up the new config.
+        LxssWriteWslDistroConfig("[fileServer]\nblockZoneIdentifier=true");
+        TerminateDistribution();
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] {
+            LxsstuLaunchWsl(L"-u root rm -f /etc/wsl.conf");
+            TerminateDistribution();
+        });
+
+        // Verify that Zone.Identifier file creation is now blocked.
+        status = CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\blocked.txt:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
+        VERIFY_ARE_EQUAL(static_cast<NTSTATUS>(0xC0000022) /* STATUS_ACCESS_DENIED */, status);
+        file.reset();
+        VERIFY_ARE_EQUAL(1u, LxsstuLaunchWsl(L"test -e '/data/p9_test/blocked.txt:Zone.Identifier'"));
+
+        // Verify that Zone.Identifier directory creation is now blocked.
+        status = CreateFileNt(
+            &file, LXSST_P9_TEST_DIR L"\\blockeddir:Zone.Identifier", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE, FILE_ATTRIBUTE_DIRECTORY, FILE_DIRECTORY_FILE);
+        VERIFY_ARE_EQUAL(static_cast<NTSTATUS>(0xC0000022) /* STATUS_ACCESS_DENIED */, status);
+        file.reset();
+        VERIFY_ARE_EQUAL(1u, LxsstuLaunchWsl(L"test -d '/data/p9_test/blockeddir:Zone.Identifier'"));
+
+        // Verify that normal file creation still works.
+        status = CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\normalfile.txt", FILE_GENERIC_WRITE, ioStatus, FILE_CREATE);
+        VERIFY_NT_SUCCESS(status);
+        file.reset();
+        VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"test -e '/data/p9_test/normalfile.txt'"));
+    }
+
     /* Plan9 Test Helper Methods */
 
     static wil::unique_hfile CreateTestFile(std::wstring_view path, DWORD desiredAccess, DWORD disposition = OPEN_EXISTING, DWORD flags = 0)

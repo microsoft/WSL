@@ -3246,11 +3246,14 @@ Return Value:
 
 unsigned int StartPlan9(int Argc, char** Argv)
 {
-    constexpr auto* Usage = "Usage: plan9 " LX_INIT_PLAN9_CONTROL_SOCKET_ARG " fd " LX_INIT_PLAN9_SOCKET_PATH_ARG
-                            " path " LX_INIT_PLAN9_SERVER_FD_ARG " fd " LX_INIT_PLAN9_LOG_FILE_ARG
-                            " log-file " LX_INIT_PLAN9_LOG_LEVEL_ARG " level " LX_INIT_PLAN9_PIPE_FD_ARG " fd [--log-truncate]\n";
+    constexpr auto* Usage =
+        "Usage: plan9 " LX_INIT_PLAN9_CONTROL_SOCKET_ARG " fd " LX_INIT_PLAN9_SOCKET_PATH_ARG " path " LX_INIT_PLAN9_SERVER_FD_ARG
+        " fd " LX_INIT_PLAN9_LOG_FILE_ARG " log-file " LX_INIT_PLAN9_LOG_LEVEL_ARG " level " LX_INIT_PLAN9_PIPE_FD_ARG
+        " fd [--log-truncate]"
+        " [" LX_INIT_PLAN9_BLOCK_ZONE_IDENTIFIER_ARG "]\n";
 
     bool LogTruncate = false;
+    bool BlockZoneIdentifier = false;
     int LogLevel = TRACE_LEVEL_INFORMATION;
     wil::unique_fd PipeFd;
     const char* SocketPath{};
@@ -3266,6 +3269,7 @@ unsigned int StartPlan9(int Argc, char** Argv)
     parser.AddArgument(Integer{LogLevel}, LX_INIT_PLAN9_LOG_LEVEL_ARG);
     parser.AddArgument(UniqueFd{PipeFd}, LX_INIT_PLAN9_PIPE_FD_ARG);
     parser.AddArgument(LogTruncate, LX_INIT_PLAN9_TRUNCATE_LOG_ARG);
+    parser.AddArgument(BlockZoneIdentifier, LX_INIT_PLAN9_BLOCK_ZONE_IDENTIFIER_ARG);
 
     try
     {
@@ -3277,7 +3281,7 @@ unsigned int StartPlan9(int Argc, char** Argv)
         return 1;
     }
 
-    RunPlan9Server(SocketPath, LogFile, LogLevel, LogTruncate, ControlSocket.get(), ServerFd.get(), PipeFd);
+    RunPlan9Server(SocketPath, LogFile, LogLevel, LogTruncate, ControlSocket.get(), ServerFd.get(), PipeFd, BlockZoneIdentifier);
 
     return 0;
 }

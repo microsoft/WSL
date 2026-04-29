@@ -22,4 +22,6 @@ public:
 
 std::unique_ptr<IPlan9FileSystem> CreateFileSystem(int socket);
 
+void SetBlockZoneIdentifier(bool block);
+
 } // namespace p9fs

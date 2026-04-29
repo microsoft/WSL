@@ -16,6 +16,7 @@ namespace p9fs {
 constexpr std::string_view c_drvfsFsType = "drvfs"sv;
 constexpr std::string_view c_p9FsType = "9p"sv;
 constexpr std::string_view c_virtioFsType = "virtiofs"sv;
+constexpr std::string_view c_zoneIdentifierSuffix = ":Zone.Identifier"sv;
 
 struct OpenFlagMapping
 {
@@ -41,6 +42,18 @@ const OpenFlagMapping c_openFlagsMapping[] = {
     {OpenFlags::NoAccessTime, O_NOATIME},
     {OpenFlags::CloseOnExec, O_CLOEXEC},
     {OpenFlags::Sync, O_SYNC}};
+
+static bool g_blockZoneIdentifier = false;
+
+void SetBlockZoneIdentifier(bool block)
+{
+    g_blockZoneIdentifier = block;
+}
+
+static bool IsBlockedFileName(std::string_view name)
+{
+    return g_blockZoneIdentifier && name.ends_with(c_zoneIdentifierSuffix);
+}
 
 Expected<std::tuple<std::shared_ptr<Fid>, Qid>> CreateFile(std::shared_ptr<const IRoot> root, LX_UID_T uid)
 {
@@ -501,6 +514,11 @@ Expected<Qid> File::Open(OpenFlags flags)
 // Creates a file in a directory, updating this object to point to the new file.
 Expected<Qid> File::Create(std::string_view name, OpenFlags flags, UINT32 mode, UINT32 /* gid */)
 {
+    if (IsBlockedFileName(name))
+    {
+        return LxError{LX_EACCES};
+    }
+
     // Acquire the lock exclusive because the file name will be modified,
     // and to protect against concurrent opens and creates.
     std::lock_guard<std::shared_mutex> lock{m_Lock};
@@ -542,6 +560,11 @@ Expected<Qid> File::Create(std::string_view name, OpenFlags flags, UINT32 mode, 
 // Creates a subdirectory.
 Expected<Qid> File::MkDir(std::string_view name, UINT32 mode, UINT32 /* gid */)
 {
+    if (IsBlockedFileName(name))
+    {
+        return LxError{LX_EACCES};
+    }
+
     const auto newFileName = ChildPath(name);
 
     // The specified gid is currently ignored. Supporting it would be possible, but it would be
@@ -762,6 +785,11 @@ std::string File::ChildPathWithLockHeld(std::string_view name)
 // Renames a directory entry.
 LX_INT File::RenameAt(std::string_view oldName, Fid& newParent, std::string_view newName)
 {
+    if (IsBlockedFileName(newName))
+    {
+        return LX_EACCES;
+    }
+
     if (!newParent.IsFile() || !newParent.IsOnRoot(m_Root))
     {
         return LX_EINVAL;
@@ -788,6 +816,11 @@ LX_INT File::RenameAt(std::string_view oldName, Fid& newParent, std::string_view
 // Renames the current directory entry.
 LX_INT File::Rename(Fid& newParent, std::string_view newName)
 {
+    if (IsBlockedFileName(newName))
+    {
+        return LX_EACCES;
+    }
+
     if (!newParent.IsFile() || !newParent.IsOnRoot(m_Root))
     {
         return LX_EINVAL;
@@ -823,6 +856,11 @@ LX_INT File::Rename(Fid& newParent, std::string_view newName)
 // Creates a symbolic link in a directory.
 Expected<Qid> File::SymLink(std::string_view name, std::string_view target, UINT32 /* gid */)
 {
+    if (IsBlockedFileName(name))
+    {
+        return LxError{LX_EACCES};
+    }
+
     if (m_Root->ReadOnly())
     {
         return LxError{LX_EROFS};
@@ -862,6 +900,11 @@ Expected<UINT32> File::ReadLink(gsl::span<char> name)
 // Creates a hard link in a directory to another file.
 LX_INT File::Link(std::string_view newName, Fid& target)
 {
+    if (IsBlockedFileName(newName))
+    {
+        return LX_EACCES;
+    }
+
     if (!target.IsFile() || !target.IsOnRoot(m_Root))
     {
         return LX_EINVAL;
@@ -890,6 +933,11 @@ LX_INT File::Link(std::string_view newName, Fid& target)
 // Creates a device object in a directory.
 Expected<Qid> File::MkNod(std::string_view name, UINT32 mode, UINT32 major, UINT32 minor, UINT32 gid)
 {
+    if (IsBlockedFileName(name))
+    {
+        return LxError{LX_EACCES};
+    }
+
     if (m_Root->ReadOnly())
     {
         return LxError{LX_EROFS};

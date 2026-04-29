@@ -232,6 +232,7 @@ Abstract:
 #define LX_INIT_PLAN9_LOG_LEVEL_ARG "--log-level"
 #define LX_INIT_PLAN9_PIPE_FD_ARG "--pipe-fd"
 #define LX_INIT_PLAN9_TRUNCATE_LOG_ARG "--log-truncate"
+#define LX_INIT_PLAN9_BLOCK_ZONE_IDENTIFIER_ARG "--block-zone-identifier"
 
 //
 // wsl-capture-crash

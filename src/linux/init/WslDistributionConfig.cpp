@@ -45,6 +45,7 @@ WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
         ConfigKey("fileServer.logFile", Plan9LogFile),
         ConfigKey("fileServer.logLevel", Plan9LogLevel),
         ConfigKey("fileServer.logTruncate", Plan9LogTruncate),
+        ConfigKey("fileServer.blockZoneIdentifier", Plan9BlockZoneIdentifier),
 
         ConfigKey(c_ConfigGpuEnabledOption, GpuEnabled),
         ConfigKey(c_ConfigAppendGpuLibPathOption, AppendGpuLibPath),
