@@ -929,7 +929,7 @@ class UnitTests
     {
         const auto tarFileName = LXSST_IMPORT_DISTRO_TEST_DIR L"test.tar";
         const auto rootfsDirectoryName = LXSST_IMPORT_DISTRO_TEST_DIR L"rootfs";
-        const auto vhdFileName = LXSST_IMPORT_DISTRO_TEST_DIR L"ext4.vhdx";
+        const auto vhdFileName = LXSST_IMPORT_DISTRO_TEST_DIR L"distro.vhdx";
         auto cleanup = wil::scope_exit([&] {
             try
             {
@@ -1032,6 +1032,146 @@ class UnitTests
         VERIFY_ARE_EQUAL(err, L"bsdtar: Error opening archive: Unrecognized archive format\n");
     }
 
+    TEST_METHOD(ImportDistroWithFsType)
+    {
+        WSL2_TEST_ONLY();
+
+        //
+        // Test importing a distribution with custom filesystem type.
+        // Validates ext4, btrfs, and xfs filesystem types.
+        //
+
+        auto validateOutput = [](LPCWSTR commandLine, LPCWSTR expectedOutput, DWORD expectedExitCode = 0) {
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(commandLine, expectedExitCode);
+            VERIFY_ARE_EQUAL(expectedOutput, out);
+        };
+
+        auto testFsType = [&](LPCWSTR fsType, LPCWSTR expectedFsType) {
+            const auto distroName = std::format(L"fstype-test-{}", fsType);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+            });
+
+            // Import with custom fs type
+            validateOutput(
+                std::format(L"--import {} {} \"{}\" --version 2 --fs-type {}", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath, fsType).c_str(),
+                L"The operation completed successfully. \r\n",
+                0);
+
+            // Verify the filesystem type is correct by checking /etc/fstab or mount output
+            auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+            VERIFY_IS_TRUE(mountOut.find(expectedFsType) != std::wstring::npos);
+
+            // Cleanup
+            WslShutdown();
+        };
+
+        // Test ext4 (default)
+        testFsType(L"ext4", L"ext4");
+
+        // Test btrfs
+        testFsType(L"btrfs", L"btrfs");
+
+        // Test xfs
+        testFsType(L"xfs", L"xfs");
+    }
+
+    TEST_METHOD(ImportDistroWithFsMountOptions)
+    {
+        WSL2_TEST_ONLY();
+
+        //
+        // Test importing a distribution with custom filesystem mount options.
+        // Covers ext4, btrfs (with subvol), and xfs filesystem types.
+        //
+
+        auto importAndValidate = [&](LPCWSTR testName, const std::wstring& extraArgs, const std::vector<std::wstring>& expectedStrings) {
+            const auto distroName = std::format(L"fsmount-test-{}", testName);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+            });
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"--import {} {} \"{}\" --version 2 {}", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath, extraArgs),
+                0);
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+
+            auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+            for (const auto& expected : expectedStrings)
+            {
+                VERIFY_IS_TRUE(mountOut.find(expected) != std::wstring::npos);
+            }
+
+            WslShutdown();
+        };
+
+        // Test ext4 with kernel mount options
+        importAndValidate(L"ext4", L"--fs-mount-options discard,data=writeback", {L"ext4", L"data=writeback"});
+
+        // Test btrfs with compress, subvol, and ssd options
+        importAndValidate(L"btrfs", L"--fs-type btrfs --fs-mount-options compress=zstd,subvol=@,ssd",
+            {L"btrfs", L"compress=zstd", L"subvol=/@", L"ssd"});
+
+        // Test xfs with quota options (uquota/gquota are displayed as usrquota/grpquota by mount)
+        importAndValidate(L"xfs", L"--fs-type xfs --fs-mount-options uquota,gquota",
+            {L"xfs", L"usrquota", L"grpquota"});
+    }
+
+    TEST_METHOD(ManageSetFsMountOptions)
+    {
+        WSL2_TEST_ONLY();
+
+        //
+        // Test the --manage --set-fs-mount-options command across different filesystem types.
+        //
+
+        auto testManageMountOptions = [&](LPCWSTR testName, const std::wstring& importExtraArgs,
+            const std::wstring& mountOptions, const std::vector<std::wstring>& expectedStrings) {
+            const auto distroName = std::format(L"manage-fsmount-{}", testName);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+            });
+
+            // Import a distribution
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"--import {} {} \"{}\" --version 2 {}", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath, importExtraArgs),
+                0);
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+
+            // Set the mount options using --manage
+            WslShutdown();
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"--manage {} --set-fs-mount-options {}", distroName, mountOptions),
+                0);
+            VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+
+            // Verify the mount options are applied after restart
+            auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+            for (const auto& expected : expectedStrings)
+            {
+                VERIFY_IS_TRUE(mountOut.find(expected) != std::wstring::npos);
+            }
+
+            WslShutdown();
+        };
+
+        // Test changing data options on ext4
+        testManageMountOptions(L"ext4", L"--fs-type ext4", L"data=journal", {L"ext4", L"data=journal"});
+
+        // Test changing compress option on btrfs
+        testManageMountOptions(L"btrfs", L"--fs-type btrfs", L"compress=lzo", {L"btrfs", L"compress=lzo"});
+
+        // Test enabling quotas on xfs
+        testManageMountOptions(L"xfs", L"--fs-type xfs", L"uquota,gquota", {L"xfs", L"usrquota", L"grpquota"});
+    }
+
+
     TEST_METHOD(AppxDistroDeletion)
     {
         // Create a dummy distro registration
@@ -1050,7 +1190,7 @@ class UnitTests
         wsl::windows::common::registry::WriteDword(key.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
 
         // Create a dummy vhd
-        const auto vhdPath = vhdDir.string() + "\\ext4.vhdx";
+        const auto vhdPath = vhdDir.string() + "\\distro.vhdx";
 
         wil::unique_handle vhdHandle(CreateFileA(vhdPath.c_str(), GENERIC_READ, 0, nullptr, CREATE_ALWAYS, 0, nullptr));
         VERIFY_IS_TRUE(vhdHandle.is_valid());
@@ -1232,7 +1372,7 @@ class UnitTests
 
                 ValidateErrorMessage(
                     L"-d DummyBrokenDistro",
-                    L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
+                    L"Failed to attach disk 'C:\\DoesNotExit\\distro.vhdx' to WSL2: The system cannot find the path "
                     L"specified. ",
                     L"Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND");
 
@@ -1300,6 +1440,11 @@ class UnitTests
             L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
         ValidateErrorMessage(L"--manage test_distro --resize foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
+
+        ValidateErrorMessage(
+            L"--manage DoesNotExist --set-fs-mount-options discard",
+            L"There is no distribution with the supplied name.",
+            L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
         ValidateErrorMessage(
             L"--install --distribution debian --no-distribution",
@@ -1488,6 +1633,13 @@ Arguments for managing Windows Subsystem for Linux:
             --from-file <Path>
                 Install a distribution from a local file.
 
+            --fs-type <FsType>
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options <Options>
+                Specify additional mount options for the filesystem.
+
             --legacy
                 Use the legacy distribution manifest.
 
@@ -1527,6 +1679,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --set-fs-mount-options <Options>
+                Set the filesystem mount options for the distribution root.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -1602,6 +1757,13 @@ Arguments for managing distributions in Windows Subsystem for Linux:
             --vhd
                 Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
                 This operation makes a copy of the VHD file at the specified install location.
+
+            --fs-type <FsType>
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options <Options>
+                Specify additional mount options for the filesystem.
 
     --import-in-place <Distro> <FileName>
         Imports the specified VHD file as a new distribution.
@@ -2354,14 +2516,14 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             // Validate that starting the distribution fails with the correct error code.
             validateOutput(
                 L"-d BrokenDistro echo ok",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED\r\n");
+                L"The distribution failed to start because its virtual disk is corrupted, has an unexpected filesystem type, or has invalid mount options.\r\n"
+                L"Error code: Wsl/Service/CreateInstance/WSL_E_MOUNT_FAILED\r\n");
 
             // Validate that trying to export the distribution fails with the correct error code.
             validateOutput(
                 L"--export BrokenDistro dummy.tar",
-                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-                L"Error code: Wsl/Service/WSL_E_DISK_CORRUPTED\r\n");
+                L"The distribution failed to start because its virtual disk is corrupted, has an unexpected filesystem type, or has invalid mount options.\r\n"
+                L"Error code: Wsl/Service/WSL_E_MOUNT_FAILED\r\n");
 
             // Shutdown WSL to force the disk to detach.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0L);
@@ -2370,8 +2532,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Import a corrupted vhd.
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
-            L"The distribution failed to start because its virtual disk is corrupted.\r\n"
-            L"Error code: Wsl/Service/RegisterDistro/WSL_E_DISK_CORRUPTED\r\n");
+            L"The distribution failed to start because its virtual disk is corrupted, has an unexpected filesystem type, or has invalid mount options.\r\n"
+            L"Error code: Wsl/Service/RegisterDistro/WSL_E_MOUNT_FAILED\r\n");
 
         // Ensure the VHD can be deleted to make sure it was properly ejected from the VM.
         VERIFY_ARE_EQUAL(DeleteFileW(vhdPath.c_str()), TRUE);
@@ -2752,7 +2914,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // Validate that the distribution still starts
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", testFolder)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", testFolder)));
         }
 
         auto absolutePath = std::filesystem::weakly_canonical(".").wstring();
@@ -2764,7 +2926,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // Validate that the distribution still starts
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", absolutePath)));
         }
 
         // Try to move the distribution to a folder that's already in use
@@ -2782,7 +2944,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"Wsl/Service/MoveDistro/ERROR_FILE_EXISTS\r\n");
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", absolutePath)));
         }
 
         // Try to move the distribution to an invalid path
@@ -2797,7 +2959,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"Wsl/Service/MoveDistro/ERROR_INVALID_NAME\r\n");
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
-            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
+            VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\distro.vhdx", absolutePath)));
         }
     }
 
@@ -3021,8 +3183,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // std::pair[0] = Written value, std::pair[1] = Actual/Expected value
             static const std::vector<std::pair<PCWSTR, PCWSTR>> filePathsToTest{
-                {L"C:\\DoesNotExit\\ext4.vhdx", L"C:\\DoesNotExit\\ext4.vhdx"},
-                {L"\\DoesNotExit\\ext4.vhdx", L"\\DoesNotExit\\ext4.vhdx"},
+                {L"C:\\DoesNotExit\\distro.vhdx", L"C:\\DoesNotExit\\distro.vhdx"},
+                {L"\\DoesNotExit\\distro.vhdx", L"\\DoesNotExit\\distro.vhdx"},
                 {L"", L""},
             };
 
@@ -3043,7 +3205,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                         {L"", L""},
                         {L"notaport", L""},
                         {L"-5555", L""},
-                        {L"C:\\DoesNotExit\\ext4.vhdx", L""},
+                        {L"C:\\DoesNotExit\\distro.vhdx", L""},
                     },
                 },
                 {

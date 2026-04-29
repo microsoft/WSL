@@ -99,6 +99,12 @@ cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=\" DISTRO_HOSTTYPE
 
 cpp_quote("#define LXSS_DISTRO_DEFAULT_KERNEL_COMMAND_LINE \"BOOT_IMAGE=/kernel init=/init\"")
 
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_TYPE L\"ext4\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_EXT4 L\"discard,errors=remount-ro,data=ordered\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_BTRFS L\"discard\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_XFS L\"discard\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_EXT4")
+
 cpp_quote("#define LXSS_DISTRO_FLAGS_ENABLE_INTEROP 0x1")
 cpp_quote("#define LXSS_DISTRO_FLAGS_APPEND_NT_PATH 0x2")
 cpp_quote("#define LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING 0x4")
@@ -138,7 +144,7 @@ cpp_quote("#define LXSS_PLAN9_UNIX_SOCKET L\"fsserver\"")
 
 cpp_quote("#define LXSS_VM_MODE_INITRD_NAME L\"initrd.img\"")
 cpp_quote("#define LXSS_VM_MODE_KERNEL_NAME L\"kernel\"")
-cpp_quote("#define LXSS_VM_MODE_VHD_NAME L\"ext4.vhdx\"")
+cpp_quote("#define LXSS_VM_MODE_VHD_NAME L\"distro.vhdx\"")
 
 cpp_quote("#define LXSS_TOOLS_DIRECTORY L\"tools\"")
 
@@ -187,6 +193,8 @@ interface ILxssUserSession : IUnknown
         [in, unique] LPCWSTR TargetDirectory,
         [in] ULONG Flags,
         [in] ULONG64 VhdSize,
+        [in, unique] LPCWSTR FsType,
+        [in, unique] LPCWSTR FsMountOptions,
         [in, unique] LPCWSTR PackageFamilyName,
         [out] LPWSTR* InstalledDistributionName,
         [in, out] LXSS_ERROR_INFO* Error,
@@ -201,6 +209,8 @@ interface ILxssUserSession : IUnknown
         [in, unique] LPCWSTR TargetDirectory,
         [in] ULONG Flags,
         [in] ULONG64 VhdSize,
+        [in, unique] LPCWSTR FsType,
+        [in, unique] LPCWSTR FsMountOptions,
         [in, unique] LPCWSTR PackageFamilyName,
         [out] LPWSTR* InstalledDistributionName,
         [in, out] LXSS_ERROR_INFO* Error,
@@ -343,6 +353,11 @@ interface ILxssUserSession : IUnknown
         [in] LPCGUID DistroGuid,
         [in] LPCWSTR DistributionName, 
         [ in, out ] LXSS_ERROR_INFO * Error);
+
+    HRESULT SetFsMountOptions(
+        [in] LPCGUID DistroGuid,
+        [in] LPCWSTR FsMountOptions,
+        [in, out] LXSS_ERROR_INFO* Error);
 };
 
 
@@ -390,7 +405,7 @@ cpp_quote("#define WSL_E_DISK_MOUNT_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILI
 cpp_quote("#define WSL_E_WSL1_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2C) /* 0x8004032C */")
 cpp_quote("#define WSL_E_VIRTUAL_MACHINE_PLATFORM_REQUIRED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2D) /* 0x8004032D */")
 cpp_quote("#define WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2E) /* 0x8004032E */")
-cpp_quote("#define WSL_E_DISK_CORRUPTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2F) /* 0x8004032F */")
+cpp_quote("#define WSL_E_MOUNT_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2F) /* 0x8004032F */")
 cpp_quote("#define WSL_E_DISTRIBUTION_NAME_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x30) /* 0x80040330 */")
 cpp_quote("#define WSL_E_INVALID_JSON MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x31) /* 0x80040331 */")
 cpp_quote("#define WSL_E_VM_CRASHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x32) /* 0x80040332 */")

@@ -383,6 +383,8 @@ HRESULT STDMETHODCALLTYPE LxssUserSession::RegisterDistribution(
     _In_ LPCWSTR TargetDirectory,
     _In_ ULONG Flags,
     _In_ ULONG64 VhdSize,
+    _In_opt_ LPCWSTR FsType,
+    _In_opt_ LPCWSTR FsMountOptions,
     _In_opt_ LPCWSTR PackageFamilyName,
     _Out_ LPWSTR* InstalledDistributionName,
     _Out_ LXSS_ERROR_INFO* Error,
@@ -395,7 +397,7 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->RegisterDistribution(
-        DistributionName, Version, FileHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, PackageFamilyName, InstalledDistributionName, pDistroGuid);
+        DistributionName, Version, FileHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, FsType, FsMountOptions, PackageFamilyName, InstalledDistributionName, pDistroGuid);
 }
 CATCH_RETURN()
 
@@ -415,6 +417,8 @@ try
         TargetDirectory,
         0,
         0,
+        nullptr,
+        nullptr,
         packageFamilyName.empty() ? nullptr : packageFamilyName.c_str(),
         nullptr,
         nullptr,
@@ -430,6 +434,8 @@ HRESULT STDMETHODCALLTYPE LxssUserSession::RegisterDistributionPipe(
     _In_ LPCWSTR TargetDirectory,
     _In_ ULONG Flags,
     _In_ ULONG64 VhdSize,
+    _In_opt_ LPCWSTR FsType,
+    _In_opt_ LPCWSTR FsMountOptions,
     _In_opt_ LPCWSTR PackageFamilyName,
     _Out_ LPWSTR* InstalledDistributionName,
     _Out_ LXSS_ERROR_INFO* Error,
@@ -442,7 +448,7 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->RegisterDistribution(
-        DistributionName, Version, PipeHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, PackageFamilyName, InstalledDistributionName, pDistroGuid);
+        DistributionName, Version, PipeHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, FsType, FsMountOptions, PackageFamilyName, InstalledDistributionName, pDistroGuid);
 }
 CATCH_RETURN()
 
@@ -477,6 +483,18 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->SetSparse(DistroGuid, Sparse, AllowUnsafe);
+}
+CATCH_RETURN()
+
+HRESULT STDMETHODCALLTYPE LxssUserSession::SetFsMountOptions(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->SetFsMountOptions(DistroGuid, FsMountOptions);
 }
 CATCH_RETURN()
 
@@ -1323,6 +1341,8 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
         LX_UID_ROOT,
         nullptr,
         path.filename().c_str(),
+        nullptr,
+        nullptr,
         false);
 
     auto configuration = s_GetDistributionConfiguration(registration);
@@ -1376,6 +1396,8 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
     _In_ LPCWSTR TargetDirectory,
     _In_ ULONG Flags,
     _In_ ULONG64 VhdSize,
+    _In_opt_ LPCWSTR FsType,
+    _In_opt_ LPCWSTR FsMountOptions,
     _In_opt_ LPCWSTR PackageFamilyName,
     _Out_opt_ LPWSTR* InstalledDistributionName,
     _Out_ GUID* pDistroGuid)
@@ -1514,6 +1536,8 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 LX_UID_ROOT,
                 PackageFamilyName,
                 vhdName.c_str(),
+                FsType,
+                FsMountOptions,
                 WI_IsFlagClear(Flags, LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE));
 
             configuration = s_GetDistributionConfiguration(registration, DistributionName == nullptr);
@@ -1777,6 +1801,29 @@ try
         .SetSparse = Sparse,
     };
     THROW_IF_WIN32_BOOL_FALSE(::DeviceIoControl(vhd.get(), FSCTL_SET_SPARSE, &buffer, sizeof(buffer), nullptr, 0, nullptr, nullptr));
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::SetFsMountOptions(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions)
+try
+{
+    ExecutionContext context(Context::ConfigureDistro);
+
+    WSL_LOG("SetFsMountOptions", TraceLoggingValue(FsMountOptions, "FsMountOptions"));
+
+    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+    std::lock_guard lock(m_instanceLock);
+
+    // Ensure the distribution exists.
+    auto distribution = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+
+    // Write the new mount options.
+    distribution.Write(Property::FsMountOptions, FsMountOptions);
+
+    // Terminate the distribution so the new settings will take effect.
+    _TerminateInstanceInternal(&distribution.Id(), false);
 
     return S_OK;
 }
@@ -2459,7 +2506,7 @@ void LxssUserSessionImpl::_CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ HAND
     const auto basePath = wsl::windows::common::filesystem::GetLegacyBasePath(UserToken);
 
     DistributionRegistration::Create(
-        LxssKey, LXSS_LEGACY_DISTRO_GUID, LXSS_LEGACY_INSTALL_NAME, LXSS_DISTRO_VERSION_LEGACY, basePath.c_str(), configFlags, defaultUid, nullptr, LXSS_VM_MODE_VHD_NAME, false);
+        LxssKey, LXSS_LEGACY_DISTRO_GUID, LXSS_LEGACY_INSTALL_NAME, LXSS_DISTRO_VERSION_LEGACY, basePath.c_str(), configFlags, defaultUid, nullptr, LXSS_VM_MODE_VHD_NAME, nullptr, nullptr, false);
 
     _SetDistributionInstalled(LxssKey, LXSS_LEGACY_DISTRO_GUID);
 }
@@ -4018,6 +4065,8 @@ LxssUserSessionImpl::s_GetDistributionConfiguration(const DistributionRegistrati
 
     // Read the vhd file name and append to the base path.
     configuration.VhdFilePath = configuration.BasePath / Distro.Read(Property::VhdFileName);
+    configuration.FsType = Distro.Read(Property::FsType);
+    configuration.FsMountOptions = Distro.Read(Property::FsMountOptions);
     configuration.Flags = Distro.Read(Property::Flags);
 
     configuration.OsVersion = Distro.Read(Property::OsVersion).value_or(L"");

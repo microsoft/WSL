@@ -81,7 +81,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_WSL1_DISABLED),
     X(WSL_E_VIRTUAL_MACHINE_PLATFORM_REQUIRED),
     X(WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED),
-    X(WSL_E_DISK_CORRUPTED),
+    X(WSL_E_MOUNT_FAILED),
     X(WSL_E_DISTRIBUTION_NAME_NEEDED),
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
@@ -693,8 +693,8 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED:
         return Localization::MessageLocalSystemNotSupported();
 
-    case WSL_E_DISK_CORRUPTED:
-        return Localization::MessageDiskCorrupted();
+    case WSL_E_MOUNT_FAILED:
+        return Localization::MessageMountFailed();
 
     case WSL_E_NOT_A_LINUX_DISTRO:
         return Localization::MessageInvalidDistributionTar();

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -436,6 +436,13 @@ Arguments for managing Windows Subsystem for Linux:
             --from-file &lt;Path&gt;
                 Install a distribution from a local file.
 
+            --fs-type &lt;FsType&gt;
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options &lt;Options&gt;
+                Specify additional mount options for the filesystem.
+
             --legacy
                 Use the legacy distribution manifest.
 
@@ -475,6 +482,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize &lt;MemoryString&gt;
                 Resize the disk of the distribution to the specified size.
+
+            --set-fs-mount-options &lt;Options&gt;
+                Set the filesystem mount options for the distribution root.
 
     --mount &lt;Disk&gt;
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -551,6 +561,13 @@ Arguments for managing distributions in Windows Subsystem for Linux:
                 Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
                 This operation makes a copy of the VHD file at the specified install location.
 
+            --fs-type &lt;FsType&gt;
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options &lt;Options&gt;
+                Specify additional mount options for the filesystem.
+
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Imports the specified VHD file as a new distribution.
         This virtual hard disk must be formatted with the ext4 filesystem type.
@@ -591,10 +608,10 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--fs-type "}{Locked="--fs-mount-options "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1052,8 +1069,8 @@ Falling back to NAT networking.</value>
     <value>The distribution failed to start. Error code: {}, failure step: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDiskCorrupted" xml:space="preserve">
-    <value>The distribution failed to start because its virtual disk is corrupted.</value>
+  <data name="MessageMountFailed" xml:space="preserve">
+    <value>The distribution failed to start because its virtual disk is corrupted, has an unexpected filesystem type, or has invalid mount options.</value>
   </data>
   <data name="MessageConfigKeyDuplicated" xml:space="preserve">
     <value>Duplicated config key '{}' in {}:{} (Conflicting key: '{}' in {}:{})</value>

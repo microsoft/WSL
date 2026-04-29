@@ -164,6 +164,8 @@ public:
         _In_ LPCWSTR TargetDirectory,
         _In_ ULONG Flags,
         _In_ ULONG64 VhdSize,
+        _In_opt_ LPCWSTR FsType,
+        _In_opt_ LPCWSTR FsMountOptions,
         _In_opt_ LPCWSTR PackageFamilyName,
         _Out_ LPWSTR* InstalledDistributionName,
         _Out_ LXSS_ERROR_INFO* Error,
@@ -180,6 +182,8 @@ public:
         _In_ LPCWSTR TargetDirectory,
         _In_ ULONG Flags,
         _In_ ULONG64 VhdSize,
+        _In_opt_ LPCWSTR FsType,
+        _In_opt_ LPCWSTR FsMountOptions,
         _In_opt_ LPCWSTR PackageFamilyName,
         _Out_ LPWSTR* InstalledDistributionName,
         _Out_ LXSS_ERROR_INFO* Error,
@@ -199,6 +203,11 @@ public:
     /// Sets or unsets the sparse flag for a distribution.
     /// </summary>
     IFACEMETHOD(SetSparse)(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Sets the filesystem mount options for a distribution.
+    /// </summary>
+    IFACEMETHOD(SetFsMountOptions)(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
     /// Sets the version for a distribution.
@@ -457,6 +466,8 @@ public:
         _In_ LPCWSTR TargetDirectory,
         _In_ ULONG Flags,
         _In_ ULONG64 VhdSize,
+        _In_opt_ LPCWSTR FsType,
+        _In_opt_ LPCWSTR FsMountOptions,
         _In_opt_ LPCWSTR PackageFamilyName,
         _Out_opt_ LPWSTR* InstalledDistributionName,
         _Out_ GUID* pDistroGuid);
@@ -478,6 +489,12 @@ public:
     /// </summary>
     HRESULT
     SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe);
+
+    /// <summary>
+    /// Sets the filesystem mount options for a distribution.
+    /// </summary>
+    HRESULT
+    SetFsMountOptions(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions);
 
     /// <summary>
     /// Sets the version for a distribution.
