@@ -48,8 +48,9 @@ namespace Microsoft.WSL.Containers
     runtimeclass Session
     {
         static Session Create(SessionSettings settings);
-
         void Terminate();
+
+        Container CreateContainer(ContainerSettings containerSettings);
 
         Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);
         // TODO: Explore additional overloads for other types of input streams
@@ -171,8 +172,6 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass Container
     {
-        static Container Create(Session session, ContainerSettings containerSettings);
-
         void Start(ContainerStartFlags flags);
         void Stop(Signal signal, UInt32 timeoutSeconds);
         void Delete(DeleteContainerFlags flags);
