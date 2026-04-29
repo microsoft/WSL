@@ -5385,11 +5385,6 @@ class WSLCTests
         auto container2 = launcher2.Launch(*m_defaultSession);
         VERIFY_ARE_EQUAL(container2.State(), WslcContainerStateRunning);
         VERIFY_ARE_EQUAL(container2.Inspect().HostConfig.NetworkMode, networkName);
-
-        VERIFY_SUCCEEDED(container1.Get().Stop(WSLCSignalSIGTERM, 0));
-        VERIFY_SUCCEEDED(container1.Get().Delete(WSLCDeleteFlagsNone));
-        VERIFY_SUCCEEDED(container2.Get().Stop(WSLCSignalSIGTERM, 0));
-        VERIFY_SUCCEEDED(container2.Get().Delete(WSLCDeleteFlagsNone));
     }
 
     WSLC_TEST_METHOD(ContainerCustomNetworkDeleteWhileInUseTest)
@@ -5418,9 +5413,6 @@ class WSLCTests
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
 
         VERIFY_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
-
-        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGTERM, 0));
-        VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
     }
 
     WSLC_TEST_METHOD(ContainerCustomNetworkPortMappingTest)
@@ -5451,9 +5443,6 @@ class WSLCTests
         WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
 
         ExpectHttpResponse(L"http://127.0.0.1:1251", 200);
-
-        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
-        VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
     }
 
     WSLC_TEST_METHOD(ContainerCustomNetworkRecoveryTest)
@@ -5478,6 +5467,8 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(session->CreateNetwork(&networkOptions));
 
+            auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(session->DeleteNetwork(networkName.c_str())); });
+
             WSLCContainerLauncher launcher(
                 "debian:latest", containerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
             launcher.SetContainerNetworkName(std::string(networkName));
@@ -5486,10 +5477,14 @@ class WSLCTests
             container.SetDeleteOnClose(false);
 
             VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+
+            networkCleanup.release();
         }
 
         {
             auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-custom-net", true, WSLCNetworkingModeNAT));
+            auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(session->DeleteNetwork(networkName.c_str())); });
+
             auto container = OpenContainer(session.get(), containerName);
             container.SetDeleteOnClose(false);
 
@@ -5501,8 +5496,6 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
-
-            LOG_IF_FAILED(session->DeleteNetwork(networkName.c_str()));
         }
     }
 
