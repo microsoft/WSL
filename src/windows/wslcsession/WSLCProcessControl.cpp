@@ -78,9 +78,10 @@ void DockerContainerProcessControl::SetExitCode(int ExitCode)
 void DockerContainerProcessControl::SignalExit()
 {
     std::lock_guard lock{m_lock};
-    if (!m_exitEvent.is_signaled() && m_exitedCode.has_value())
+    if (!m_exitEvent.is_signaled())
     {
         WSL_LOG("ContainerProcessStop");
+        WI_ASSERT(m_exitedCode.has_value());
         m_exitEvent.SetEvent();
     }
 }
