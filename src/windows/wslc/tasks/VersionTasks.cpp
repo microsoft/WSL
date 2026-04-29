@@ -55,28 +55,29 @@ void ListVersionInfo(CLIExecutionContext& context)
     }
     case FormatType::Table:
     {
+        constexpr auto c_indent = L"  ";
         auto table = wsl::windows::wslc::TableOutput<2>({L"", L""});
         table.SetShowHeader(false);
 
         // Client section
         table.OutputLine({Localization::WSLCCLI_VersionTableClientHeader(), L""});
-        table.OutputLine({Localization::WSLCCLI_VersionTableVersion(), MultiByteToWide(versionInfo.Client.Version)});
-        table.OutputLine({Localization::WSLCCLI_VersionTableGitCommit(), MultiByteToWide(versionInfo.Client.GitCommit)});
-        table.OutputLine({Localization::WSLCCLI_VersionTableBuilt(), MultiByteToWide(versionInfo.Client.Built)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableVersion(), MultiByteToWide(versionInfo.Client.Version)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableGitCommit(), MultiByteToWide(versionInfo.Client.GitCommit)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableBuilt(), MultiByteToWide(versionInfo.Client.Built)});
         table.OutputLine(
-            {Localization::WSLCCLI_VersionTableOsArch(), MultiByteToWide(versionInfo.Client.Os + "/" + versionInfo.Client.Arch)});
+            {c_indent + Localization::WSLCCLI_VersionTableOsArch(), MultiByteToWide(versionInfo.Client.Os + "/" + versionInfo.Client.Arch)});
 
         // Blank separator
         table.OutputLine({L"", L""});
 
         // Server section
         table.OutputLine({Localization::WSLCCLI_VersionTableServerHeader(), L""});
-        table.OutputLine({Localization::WSLCCLI_VersionTableLinuxKernel(), MultiByteToWide(versionInfo.Server.Kernel)});
-        table.OutputLine({Localization::WSLCCLI_VersionTableWSLg(), MultiByteToWide(versionInfo.Server.WSLg)});
-        table.OutputLine({Localization::WSLCCLI_VersionTableMSRDC(), MultiByteToWide(versionInfo.Server.MSRDC)});
-        table.OutputLine({Localization::WSLCCLI_VersionTableDirect3D(), MultiByteToWide(versionInfo.Server.Direct3D)});
-        table.OutputLine({Localization::WSLCCLI_VersionTableDXCore(), MultiByteToWide(versionInfo.Server.DXCore)});
-        table.OutputLine({Localization::WSLCCLI_VersionTableWindows(), MultiByteToWide(versionInfo.Server.Windows)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableLinuxKernel(), MultiByteToWide(versionInfo.Server.Kernel)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableWSLg(), MultiByteToWide(versionInfo.Server.WSLg)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableMSRDC(), MultiByteToWide(versionInfo.Server.MSRDC)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableDirect3D(), MultiByteToWide(versionInfo.Server.Direct3D)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableDXCore(), MultiByteToWide(versionInfo.Server.DXCore)});
+        table.OutputLine({c_indent + Localization::WSLCCLI_VersionTableWindows(), MultiByteToWide(versionInfo.Server.Windows)});
 
         table.Complete();
         break;

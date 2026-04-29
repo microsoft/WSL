@@ -2531,39 +2531,39 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Server:</value>
   </data>
   <data name="WSLCCLI_VersionTableVersion" xml:space="preserve">
-    <value>  Version</value>
+    <value>Version</value>
   </data>
   <data name="WSLCCLI_VersionTableGitCommit" xml:space="preserve">
-    <value>  Git commit</value>
+    <value>Git commit</value>
   </data>
   <data name="WSLCCLI_VersionTableBuilt" xml:space="preserve">
-    <value>  Built</value>
+    <value>Built</value>
   </data>
   <data name="WSLCCLI_VersionTableOsArch" xml:space="preserve">
-    <value>  OS/Arch</value>
+    <value>OS/Arch</value>
     <comment>{Locked="OS/Arch"}OS/Arch is a technical term and should not be translated</comment>
   </data>
   <data name="WSLCCLI_VersionTableLinuxKernel" xml:space="preserve">
-    <value>  Linux kernel</value>
+    <value>Linux kernel</value>
   </data>
   <data name="WSLCCLI_VersionTableWSLg" xml:space="preserve">
-    <value>  WSLg</value>
+    <value>WSLg</value>
     <comment>{Locked="WSLg"}WSLg is a product name and should not be translated</comment>
   </data>
   <data name="WSLCCLI_VersionTableMSRDC" xml:space="preserve">
-    <value>  MSRDC</value>
+    <value>MSRDC</value>
     <comment>{Locked="MSRDC"}MSRDC is a product name and should not be translated</comment>
   </data>
   <data name="WSLCCLI_VersionTableDirect3D" xml:space="preserve">
-    <value>  Direct3D</value>
+    <value>Direct3D</value>
     <comment>{Locked="Direct3D"}Direct3D is a product name and should not be translated</comment>
   </data>
   <data name="WSLCCLI_VersionTableDXCore" xml:space="preserve">
-    <value>  DXCore</value>
+    <value>DXCore</value>
     <comment>{Locked="DXCore"}DXCore is a product name and should not be translated</comment>
   </data>
   <data name="WSLCCLI_VersionTableWindows" xml:space="preserve">
-    <value>  Windows</value>
+    <value>Windows</value>
     <comment>{Locked="Windows"}Windows is a product name and should not be translated</comment>
   </data>
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
