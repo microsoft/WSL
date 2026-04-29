@@ -15,7 +15,14 @@ internal static class WinRTActivation
     private static DllGetActivationFactoryFn s_getDllFactory;
 
     // Overrides the WinRT activation to route activation of our types through our native DLL.
+    #pragma warning disable CA2255
+    // CA2255 warns against using ModuleInitializer to discourage using it without thinking through some possible issues.
+    // For example, unintuitive timing (it runs the first time a type is used, not when the module is loaded or inspected),
+    // and limiting possible optimizations (if the module is loaded, but nothing that depended on the initializer is ever used).
+    // In this case, we only need it to run before using any of our types, and everything in the assembly needs this
+    // initialization, so it's fine.
     [ModuleInitializer]
+    #pragma warning restore CA2255
     internal static void Initialize()
     {
         // Get a pointer to the function in the DLL that creates activation factories.
