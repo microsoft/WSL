@@ -189,11 +189,26 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         Settings = &defaultSettings->Settings;
     }
 
+    std::wstring callerFileName;
+
     HRESULT creationResult = wil::ResultFromException([&]() {
         // Get caller info.
         const auto callerProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
         const ULONG sessionId = m_nextSessionId++;
         const DWORD creatorPid = GetProcessId(callerProcess.get());
+
+        // Query the full image path of the calling process and extract just the file name.
+        // Failure is non-fatal: callerFileName remains empty if the process has already exited.
+        if (callerProcess)
+        {
+            WCHAR imagePath[MAX_PATH];
+            DWORD imagePathLen = ARRAYSIZE(imagePath);
+            if (QueryFullProcessImageNameW(callerProcess.get(), 0, imagePath, &imagePathLen))
+            {
+                callerFileName = std::filesystem::path(imagePath).filename().wstring();
+            }
+        }
+
         const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
         // Create the VM in the SYSTEM service (privileged).
@@ -232,6 +247,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         TraceLoggingValue(creationResult, "Result"),
         TraceLoggingValue(tokenInfo.Elevated, "Elevated"),
         TraceLoggingValue(static_cast<uint32_t>(Flags), "Flags"),
+        TraceLoggingValue(callerFileName.c_str(), "CallerFileName"),
         TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
     THROW_IF_FAILED_MSG(creationResult, "Failed to create session: %ls", resolvedDisplayName.c_str());
