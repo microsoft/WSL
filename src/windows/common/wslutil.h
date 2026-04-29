@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 #include <functional>
+#include <optional>
 #include <span>
 #include <type_traits>
 #include "SubProcess.h"
@@ -146,6 +147,8 @@ bool IsInteractiveConsole();
 bool IsRunningInMsix();
 
 bool IsVhdFile(_In_ const std::filesystem::path& path);
+
+std::optional<std::filesystem::path> GetResultantSwapPath(_In_ const std::filesystem::path& swapFilePath);
 
 bool IsVirtualMachinePlatformInstalled();
 

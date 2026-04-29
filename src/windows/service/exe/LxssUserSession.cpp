@@ -2856,6 +2856,57 @@ void LxssUserSessionImpl::_CreateVm()
         const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
         auto config = _GetResultantConfig(userToken.get());
 
+        // Validate that the swap file path does not point to any distribution's data VHD.
+        // Using a distribution's VHD as swap would destroy its filesystem with mkswap.
+        const auto resolvedSwapPath = wsl::windows::common::wslutil::GetResultantSwapPath(config.SwapFilePath);
+        if (resolvedSwapPath.has_value())
+        {
+            auto swapFilePath = resolvedSwapPath.value();
+
+            std::error_code error;
+            auto canonicalSwapPath = std::filesystem::weakly_canonical(swapFilePath, error);
+            if (error)
+            {
+                LOG_WIN32(error.value());
+                canonicalSwapPath = std::move(swapFilePath);
+            }
+
+            canonicalSwapPath = canonicalSwapPath.lexically_normal();
+
+            const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+            for (const auto& distro : _EnumerateDistributions(lxssKey.get()))
+            {
+                std::filesystem::path distroVhdPath;
+                try
+                {
+                    distroVhdPath = distro.ReadVhdFilePath();
+                }
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION();
+                    // skip distro whose registration is broken
+                    continue;
+                }
+
+                auto canonicalDistroPath = std::filesystem::weakly_canonical(distroVhdPath, error);
+                if (error)
+                {
+                    LOG_WIN32(error.value());
+                    canonicalDistroPath = std::move(distroVhdPath);
+                }
+
+                canonicalDistroPath = canonicalDistroPath.lexically_normal();
+
+                if (_wcsicmp(canonicalSwapPath.c_str(), canonicalDistroPath.c_str()) == 0)
+                {
+                    auto distroName = distro.Read(Property::Name);
+                    THROW_HR_WITH_USER_ERROR(
+                        WSL_E_SWAP_FILE_CONFLICTS_WITH_DISTRO,
+                        wsl::shared::Localization::MessageSwapFileConflictsWithDistroVhd(canonicalSwapPath.c_str(), distroName.c_str()));
+                }
+            }
+        }
+
         // Initialize policies for the plugin interface.
         WSLVmCreationSettings userSettings{};
         WI_SetFlagIf(userSettings.CustomConfigurationFlags, WSLUserConfigurationCustomKernel, !config.KernelPath.empty());

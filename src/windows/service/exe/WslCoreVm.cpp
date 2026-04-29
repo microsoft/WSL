@@ -472,11 +472,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 }
 
                 // Ensure the swap vhd ends with the vhdx file extension.
-                if (!wsl::windows::common::string::IsPathComponentEqual(
-                        m_vmConfig.SwapFilePath.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension))
-                {
-                    m_vmConfig.SwapFilePath += wsl::windows::common::wslutil::c_vhdxFileExtension;
-                }
+                m_vmConfig.SwapFilePath = wsl::windows::common::wslutil::GetResultantSwapPath(m_vmConfig.SwapFilePath).value();
 
                 // Create the VHD with an additional page for swap overhead.
                 m_vmConfig.SwapSizeBytes += PAGE_SIZE;

@@ -1744,6 +1744,29 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         validateSwapSize(L"200M");
     }
 
+    WSL2_TEST_METHOD(SwapFileConflictsWithDistroVhd)
+    {
+        // Read the test distro's VHD path from the registry.
+        auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+        auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+        auto vhdFileName = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"VhdFileName", L"ext4.vhdx");
+        auto vhdPath = std::filesystem::path(basePath) / vhdFileName;
+
+        // Set swapFile to point to the distro's data VHD.
+        // Escape backslashes for .wslconfig ini parsing.
+        auto swapFileConfig = std::regex_replace(vhdPath.wstring(), std::wregex(L"\\\\"), L"\\\\");
+        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + swapFileConfig);
+
+        // Launching the distro should fail because swapFile conflicts with the distro's VHD.
+        auto canonicalVhdPath = std::filesystem::weakly_canonical(vhdPath).lexically_normal();
+        ValidateOutput(
+            L"echo ok",
+            std::format(
+                L"{}\r\nError code: Wsl/Service/CreateInstance/CreateVm/WSL_E_SWAP_FILE_CONFLICTS_WITH_DISTRO\r\n",
+                wsl::shared::Localization::MessageSwapFileConflictsWithDistroVhd(canonicalVhdPath.c_str(), LXSS_DISTRO_NAME_TEST_L)),
+            L"");
+    }
+
     TEST_METHOD(InitDoesntBlockSignals)
     {
         auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"grep -iF SigBlk < /proc/1/status");
