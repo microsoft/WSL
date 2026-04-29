@@ -139,6 +139,15 @@ class WSLCCLIArgumentUnitTests
         VERIFY_THROWS(validation::GetFormatTypeFromString(L"xml"), ArgumentException);
         VERIFY_NO_THROW(validation::ValidateFormatTypeFromString({L"json", L"table"}, L"formatArg"));
         VERIFY_THROWS(validation::ValidateFormatTypeFromString({L"JSON", L"TABLE", L"csv"}, L"formatArg"), ArgumentException);
+
+        // Verify GPU device argument
+        VERIFY_NO_THROW(validation::ValidateGpus({L"all"}, L"gpusArg"));
+        VERIFY_NO_THROW(validation::ValidateGpus({L"ALL"}, L"gpusArg"));
+        VERIFY_NO_THROW(validation::ValidateGpus({L"All"}, L"gpusArg"));
+        VERIFY_THROWS(validation::ValidateGpus({L"none"}, L"gpusArg"), ArgumentException);
+        VERIFY_THROWS(validation::ValidateGpus({L"0"}, L"gpusArg"), ArgumentException);
+        VERIFY_THROWS(validation::ValidateGpus({L"gpu0"}, L"gpusArg"), ArgumentException);
+        VERIFY_THROWS(validation::ValidateGpus({L""}, L"gpusArg"), ArgumentException);
     }
 
     // Test: Verify EnumVariantMap behavior with ArgTypes.

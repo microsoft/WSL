@@ -260,7 +260,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.PublishAll = true;
     }
 
-    if (context.Args.Contains(ArgType::Gpu))
+    if (context.Args.Contains(ArgType::Gpus))
     {
         options.Gpu = true;
     }

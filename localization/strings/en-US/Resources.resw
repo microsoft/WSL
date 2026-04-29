@@ -2571,8 +2571,13 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Arguments to pass to container's init process</value>
   </data>
-  <data name="WSLCCLI_GpuArgDescription" xml:space="preserve">
-    <value>Enable GPU access inside the container</value>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="--gpus"}{Locked="all"}</comment>
+  </data>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--gpus"}{Locked="all"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Delete images even if they are being used</value>
