@@ -109,6 +109,9 @@ private:
 class WSLCVirtualMachine
 {
 public:
+    static inline const char* c_gpuLibrariesPath = "/usr/lib/wsl/lib";
+    static inline const char* c_gpuDriversPath = "/usr/lib/wsl/drivers";
+
     struct ConnectedSocket
     {
         int Fd{};
@@ -162,10 +165,7 @@ public:
         return m_vmId;
     }
 
-    bool GpuEnabled() const
-    {
-        return FeatureEnabled(WslcFeatureFlagsGPU);
-    }
+    bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
@@ -182,8 +182,6 @@ private:
         _In_ const std::vector<WSLCProcessFd>& Fds = {},
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
-
-    bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(
         wsl::shared::SocketChannel& Channel, enum WSLC_FORK::ForkType Type, ULONG TtyRows = 0, ULONG TtyColumns = 0);
