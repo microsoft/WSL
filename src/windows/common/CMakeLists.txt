@@ -42,6 +42,7 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    SlowOperationWatcher.cpp
     WslTelemetry.cpp
     VirtioNetworking.cpp
     wslutil.cpp
@@ -119,6 +120,7 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    SlowOperationWatcher.h
     WslTelemetry.h
     VirtioNetworking.h
     wslutil.h
