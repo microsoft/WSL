@@ -2302,8 +2302,10 @@ CATCH_RETURN();
 HRESULT WSLCSession::Terminate()
 try
 {
-    // Ensure only one Terminate() runs to completion. OnVmExited() can race
-    // with an external Terminate() call; the second caller is a no-op.
+    // Ensure only one Terminate() runs. This must be checked before taking m_lock
+    // because OnVmExited() is called from the IORelay thread — if an external Terminate()
+    // holds m_lock and calls m_ioRelay.Stop(), the relay thread must not re-enter
+    // Terminate() and deadlock on m_lock.
     if (m_terminating.exchange(true))
     {
         return S_OK;

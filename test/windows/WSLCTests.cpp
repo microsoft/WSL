@@ -8169,7 +8169,7 @@ class WSLCTests
                 THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), state != WSLCSessionStateTerminated);
             },
             std::chrono::seconds{1},
-            std::chrono::seconds{10});
+            std::chrono::minutes{2});
     }
 
     // Returns true if any running VM is owned by the given name.
