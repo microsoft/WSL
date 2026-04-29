@@ -114,4 +114,33 @@ struct InspectVolume
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectVolume, Name, Driver, CreatedAt, DriverOpts, Labels, Status);
 };
 
+struct InspectIPAMConfig
+{
+    std::string Subnet;
+    std::string Gateway;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectIPAMConfig, Subnet, Gateway);
+};
+
+struct InspectIPAM
+{
+    std::string Driver;
+    std::optional<std::vector<InspectIPAMConfig>> Config;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectIPAM, Driver, Config);
+};
+
+struct InspectNetwork
+{
+    std::string Id;
+    std::string Name;
+    std::string Driver;
+    std::string Scope;
+    bool Internal{};
+    InspectIPAM IPAM;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectNetwork, Id, Name, Driver, Scope, Internal, IPAM, Labels);
+};
+
 } // namespace wsl::windows::common::wslc_schema

@@ -35,6 +35,7 @@ cpp_quote("#define WSLC_MAX_VOLUME_DRIVER_LENGTH 255")
 cpp_quote("#define WSLC_MAX_NETWORK_NAME_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
+cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
 
 typedef
 struct _WSLCVersion {
@@ -245,9 +246,10 @@ typedef enum _WSLCContainerFlags
     WSLCContainerFlagsRm = 1, // Delete the container when it exits. TODO: Implement.
     WSLCContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
     WSLCContainerFlagsInit = 4, // Run the container under an init process.
+    WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
 } WSLCContainerFlags;
 
-cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit)")
+cpp_quote("#define WSLCContainerFlagsValid (WSLCContainerFlagsRm | WSLCContainerFlagsGpu | WSLCContainerFlagsInit | WSLCContainerFlagsPublishAll)")
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCContainerFlags);")
 
@@ -746,6 +748,7 @@ interface IWSLCSession : IUnknown
     HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options);
     HRESULT DeleteNetwork([in] LPCSTR Name);
     HRESULT ListNetworks([out, size_is(, *Count)] WSLCNetworkInformation** Networks, [out] ULONG* Count);
+    HRESULT InspectNetwork([in] LPCSTR Name, [out] LPSTR* Output);
 }
 
 //
@@ -835,3 +838,4 @@ cpp_quote("#define WSLC_E_CONTAINER_IS_RUNNING MAKE_HRESULT(SEVERITY_ERROR, FACI
 cpp_quote("#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 7) /* 0x80040607 */")
 cpp_quote("#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8) /* 0x80040608 */")
 cpp_quote("#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9) /* 0x80040609 */")
+cpp_quote("#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10) /* 0x8004060A */")

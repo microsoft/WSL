@@ -423,24 +423,40 @@ class WSLCE2EContainerRunTests
     }
 
     // https://github.com/microsoft/WSL/issues/14433
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral_NotSupported)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortEphemeral)
     {
-        auto result = RunWslc(std::format(L"container run -p 80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        // Start a container with an ephemeral host port mapping (-p 8080 means host picks a random port)
+        auto result = RunWslc(std::format(
+            L"container run -d --name {} -p {} {} {}", WslcContainerName, ContainerTestPort, PythonImage.NameAndTag(), GetPythonHttpServerScript(ContainerTestPort)));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Inspect the container to find the allocated host port
+        auto inspectContainer = InspectContainer(WslcContainerName);
+        auto portKey = std::to_string(ContainerTestPort) + "/tcp";
+        VERIFY_IS_TRUE(inspectContainer.Ports.contains(portKey));
+
+        auto portBindings = inspectContainer.Ports[portKey];
+        VERIFY_ARE_EQUAL(1u, portBindings.size());
+
+        auto hostPort = std::stoi(portBindings[0].HostPort);
+        VERIFY_IS_TRUE(hostPort > 0);
+
+        // Verify we can connect to the server on the ephemeral port
+        ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", hostPort).c_str(), HTTP_STATUS_OK, true);
     }
 
     // https://github.com/microsoft/WSL/issues/14433
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortUdp_NotSupported)
     {
         auto result = RunWslc(std::format(L"container run -p 80:80/udp {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
     // https://github.com/microsoft/WSL/issues/14433
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_PortHostIP_NotSupported)
     {
         auto result = RunWslc(std::format(L"container run -p 127.0.0.1:80:80 {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Port mappings with specific host IPs or UDP protocol are not currently supported\r\nError code: ERROR_NOT_SUPPORTED\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Port_TCP)
@@ -561,10 +577,47 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Hostname)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --hostname my-test-host {} hostname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-test-host\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Domainname)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --domainname my-test-domain {} dnsdomainname", DebianImage.NameAndTag()));
+        result.Verify({.Stdout = L"my-test-domain\n", .Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNS)
+    {
+        auto result =
+            RunWslc(std::format(L"container run --rm --dns 1.1.1.1 --dns 8.8.8.8 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 1.1.1.1") != std::wstring::npos);
+        VERIFY_IS_TRUE(result.Stdout->find(L"nameserver 8.8.8.8") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSSearch)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --dns-search example.com --dns-search test.local {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"search example.com test.local") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_DNSOption)
+    {
+        auto result = RunWslc(std::format(
+            L"container run --rm --dns-option ndots:5 --dns-option timeout:3 {} cat /etc/resolv.conf", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"options ndots:5 timeout:3") != std::wstring::npos);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_Success)
     {
         // Create a named volume
-        auto result = RunWslc(std::format(L"volume create --opt SizeBytes={} {}", DefaultVolumeSizeBytes, WslcVolumeName));
+        auto result = RunWslc(std::format(L"volume create {}", WslcVolumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Create a container with --rm that uses the named volume and writes a file to it
@@ -625,7 +678,6 @@ private:
 
     // Test named volume
     const std::wstring WslcVolumeName = L"wslc-test-volume";
-    const int DefaultVolumeSizeBytes = 3 * 1024 * 1024;
 
     std::wstring GetHelpMessage() const
     {
@@ -665,13 +717,19 @@ private:
         std::wstringstream options;
         options << L"The following options are available:\r\n"
                 << L"  -d,--detach       Run container in detached mode\r\n"
+                << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
+                << L"  --dns-option      Set DNS options\r\n"
+                << L"  --dns-search      Set DNS search domains\r\n"
+                << L"  --domainname      Container domain name\r\n"
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
+                << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  -l,--label        Set metadata on an object\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
+                << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"

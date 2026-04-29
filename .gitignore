@@ -71,3 +71,4 @@ test-storage/
 *.vhdx
 *.tar
 *.etl
+*.lscache

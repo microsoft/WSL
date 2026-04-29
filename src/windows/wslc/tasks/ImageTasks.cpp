@@ -26,12 +26,34 @@ Abstract:
 #include <wslutil.h>
 
 using namespace wsl::shared;
+using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+static bool TryInspectImage(Session& session, const std::string& imageId, std::optional<wslc_schema::InspectImage>& inspectData)
+{
+    try
+    {
+        inspectData = ImageService::Inspect(session, imageId);
+        return true;
+    }
+    catch (const wil::ResultException& ex)
+    {
+        if (ex.GetErrorCode() == WSLC_E_IMAGE_NOT_FOUND)
+        {
+            PrintMessage(Localization::MessageWslcImageNotFound(imageId.c_str()), stderr);
+            return false;
+        }
+
+        throw;
+    }
+}
+
 void BuildImage(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -197,8 +219,15 @@ void InspectImages(CLIExecutionContext& context)
     std::vector<wsl::windows::common::wslc_schema::InspectImage> result;
     for (const auto& id : imageIds)
     {
-        auto inspectData = ImageService::Inspect(session, WideToMultiByte(id));
-        result.push_back(inspectData);
+        std::optional<wslc_schema::InspectImage> inspectData;
+        if (TryInspectImage(session, WideToMultiByte(id), inspectData))
+        {
+            result.push_back(*inspectData);
+        }
+        else
+        {
+            context.ExitCode = 1;
+        }
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);

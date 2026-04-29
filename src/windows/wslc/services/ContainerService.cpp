@@ -45,6 +45,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
 
     auto containerFlags = WSLCContainerFlagsNone;
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsRm, options.Remove);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);
@@ -57,15 +58,13 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         {
             // https://github.com/microsoft/WSL/issues/14433
             // The following scenarios are currently not implemented:
-            // - Ephemeral host port mappings
             // - Host port mappings with a specific host IP
             // - Host port mappings with UDP protocol
-            if (portMapping.HostPort().IsEphemeral() || portMapping.HostIP().has_value() ||
-                portMapping.PortProtocol() == PublishPort::Protocol::UDP)
+            if (portMapping.HostIP().has_value() || portMapping.PortProtocol() == PublishPort::Protocol::UDP)
             {
                 THROW_HR_WITH_USER_ERROR(
                     HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
-                    "Port mappings with ephemeral host ports, specific host IPs, or UDP protocol are not currently supported");
+                    "Port mappings with specific host IPs or UDP protocol are not currently supported");
             }
         }
 
@@ -111,6 +110,31 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     if (!options.WorkingDirectory.empty())
     {
         containerLauncher.SetWorkingDirectory(std::string(options.WorkingDirectory));
+    }
+
+    if (options.Hostname.has_value())
+    {
+        containerLauncher.SetHostname(std::string(options.Hostname.value()));
+    }
+
+    if (options.Domainname.has_value())
+    {
+        containerLauncher.SetDomainname(std::string(options.Domainname.value()));
+    }
+
+    if (!options.DnsServers.empty())
+    {
+        containerLauncher.SetDnsServers(std::vector<std::string>(options.DnsServers));
+    }
+
+    if (!options.DnsSearchDomains.empty())
+    {
+        containerLauncher.SetDnsSearchDomains(std::vector<std::string>(options.DnsSearchDomains));
+    }
+
+    if (!options.DnsOptions.empty())
+    {
+        containerLauncher.SetDnsOptions(std::vector<std::string>(options.DnsOptions));
     }
 
     for (const auto& tmpfsSpec : options.Tmpfs)

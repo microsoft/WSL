@@ -113,6 +113,7 @@ find_package(NUGET REQUIRED)
 find_package(VERSION REQUIRED)
 find_package(MC REQUIRED)
 find_package(Appx REQUIRED)
+find_package(CSharp REQUIRED)
 
 # Download nuget packages
 restore_nuget_packages()
@@ -169,6 +170,10 @@ endif()
 
 if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
+endif ()
+
+if (NOT DEFINED WSL_BUILD_SDKCS)
+    set(WSL_BUILD_SDKCS false)
 endif ()
 
 find_commit_hash(COMMIT_HASH)
@@ -282,6 +287,7 @@ add_compile_definitions(UNICODE
                         WSL_PACKAGE_VERSION_REVISION=${PACKAGE_VERSION_REVISION}
                         DISTRO_HOSTTYPE="${DISTRO_HOSTTYPE}"
                         WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS}
+                        DCAT_PRODUCT_NAME=R"\(${DCAT_PRODUCT_NAME}\)"
                         DCAT_REGISTRATION_KEY=R"\(${DCAT_REGISTRATION_KEY}\)")
 
 if (${OFFICIAL_BUILD})
@@ -307,6 +313,12 @@ endif()
 if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /CETCOMPAT")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
+endif()
+
+if (WSL_BUILD_SDKCS OR WSL_BUILD_WSL_SETTINGS)
+    set(CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS} /langversion:latest /debug:full")
+    set(CMAKE_DOTNET_SDK "Microsoft.NET.Sdk")
+    set(CMAKE_DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
 endif()
 
 # Common link libraries
@@ -535,6 +547,10 @@ add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
+
+if (WSL_BUILD_SDKCS)
+    add_subdirectory(src/windows/WslcSDK/csharp)
+endif()
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

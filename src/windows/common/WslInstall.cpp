@@ -59,6 +59,7 @@ std::vector<std::wstring> GetInstalledOptionalComponents()
 
     return installedComponents;
 }
+
 }; // namespace
 
 HRESULT WslInstall::InstallDistribution(

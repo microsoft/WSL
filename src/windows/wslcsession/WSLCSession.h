@@ -17,7 +17,9 @@ Abstract:
 #include "wslc.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCContainer.h"
+#include "IWSLCVolume.h"
 #include "WSLCVhdVolume.h"
+#include "WSLCGuestVolume.h"
 #include "WSLCVolumeMetadata.h"
 #include "WSLCNetworkMetadata.h"
 #include "ContainerEventTracker.h"
@@ -133,6 +135,7 @@ public:
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;
     IFACEMETHOD(DeleteNetwork)(_In_ LPCSTR Name) override;
     IFACEMETHOD(ListNetworks)(_Out_ WSLCNetworkInformation** Networks, _Out_ ULONG* Count) override;
+    IFACEMETHOD(InspectNetwork)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
 
     IFACEMETHOD(Terminate()) override;
 
@@ -152,6 +155,16 @@ public:
 
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
+
+    HANDLE SessionTerminatingEvent() const noexcept
+    {
+        return m_sessionTerminatingEvent.get();
+    }
+
+    ULONG Id() const noexcept
+    {
+        return m_id;
+    }
 
 private:
     ULONG m_id = 0;
@@ -190,7 +203,7 @@ private:
     std::mutex m_containersLock;
     std::mutex m_volumesLock;
     std::vector<std::unique_ptr<WSLCContainerImpl>> m_containers;
-    std::unordered_map<std::string, std::unique_ptr<WSLCVhdVolumeImpl>> m_volumes;
+    std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;
     std::unordered_set<std::string> m_anonymousVolumes; // TODO: Implement proper anonymous volume support.
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;

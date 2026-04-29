@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "IWSLCVolume.h"
 #include "WSLCVolumeMetadata.h"
 #include "wslc.h"
 #include <filesystem>
@@ -29,7 +30,7 @@ namespace wsl::windows::service::wslc {
 class WSLCVirtualMachine;
 class DockerHTTPClient;
 
-class WSLCVhdVolumeImpl
+class WSLCVhdVolumeImpl : public IWSLCVolume
 {
 public:
     NON_COPYABLE(WSLCVhdVolumeImpl);
@@ -59,14 +60,19 @@ public:
     static std::unique_ptr<WSLCVhdVolumeImpl> Open(
         _In_ const wsl::windows::common::docker_schema::Volume& Volume, _In_ WSLCVirtualMachine& VirtualMachine, _In_ DockerHTTPClient& DockerClient);
 
-    void Delete();
-    std::string Inspect() const;
-    WSLCVolumeInformation GetVolumeInformation() const;
-
-    const std::string& Name() const noexcept
+    // IWSLCVolume
+    const std::string& Name() const noexcept override
     {
         return m_name;
     }
+    const char* Driver() const noexcept override
+    {
+        return WSLCVhdVolumeDriver;
+    }
+    void Delete() override;
+    std::string Inspect() const override;
+    WSLCVolumeInformation GetVolumeInformation() const override;
+
     const std::string& VirtualMachinePath() const noexcept
     {
         return m_virtualMachinePath;
