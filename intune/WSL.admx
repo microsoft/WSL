@@ -171,5 +171,13 @@
       </elements>
     </policy>
 
+    <policy name="CustomDistributionManifest" class="Machine" displayName="$(string.CustomDistributionManifest)" explainText="$(string.CustomDistributionManifestExplain)" presentation="$(presentation.CustomDistributionManifest)" key="Software\Policies\WSL">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <elements>
+        <text id="CustomDistributionManifest_Value" valueName="CustomDistributionManifest" required="true" />
+      </elements>
+    </policy>
+
   </policies>
 </policyDefinitions>

@@ -864,6 +864,11 @@ int ListDistributionsHelper(_In_ ListOptions options)
         };
 
         const auto manifest = wsl::windows::common::distribution::GetAvailable();
+        if (manifest.PolicyOverridden)
+        {
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageDistributionListOverriddenByPolicy());
+        }
+
         if (manifest.OverrideManifest.has_value())
         {
             readNames(*manifest.OverrideManifest);

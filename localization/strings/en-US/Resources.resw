@@ -948,6 +948,9 @@ Falling back to NAT networking.</value>
     <value>The .wslconfig setting '{}' is disabled by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageDistributionListOverriddenByPolicy" xml:space="preserve">
+    <value>The distribution list has been overridden by the computer policy.</value>
+  </data>
   <data name="MessageDebugShellDisabled" xml:space="preserve">
     <value>The debug shell is disabled by the computer policy.</value>
   </data>
