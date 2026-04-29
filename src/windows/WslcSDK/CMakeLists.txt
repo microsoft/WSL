@@ -22,7 +22,10 @@ set_target_properties(wslcsdk
 )
 
 add_subdirectory(winrt)
-add_subdirectory(csharp)
+
+if (WSL_BUILD_SDKCS)
+    add_subdirectory(csharp)
+endif()
 
 add_dependencies(wslcsdk wslserviceidl wslcsdkwinrt)
 target_link_libraries(wslcsdk ${COMMON_LINK_LIBRARIES} legacy_stdio_definitions common wslcsdkwinrt)
