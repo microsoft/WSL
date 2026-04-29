@@ -106,6 +106,36 @@ class WSLCE2EContainerCreateTests
         VerifyContainerIsListed(containerId, L"created");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_CIDFile_Valid)
+    {
+        // Prepare a CID file path that does not exist
+        const auto cidFilePath = wsl::windows::common::filesystem::GetTempFilename();
+        VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str()));
+        auto deleteCidFile = wil::scope_exit([&]() { VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str())); });
+
+        auto result = RunWslc(std::format(
+            L"container create --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_TRUE(std::filesystem::exists(cidFilePath));
+        VERIFY_ARE_EQUAL(containerId, ReadFileContent(cidFilePath.wstring()));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_CIDFile_AlreadyExists)
+    {
+        const auto cidFilePath = wsl::windows::common::filesystem::GetTempFilename();
+        auto deleteCidFile = wil::scope_exit([&]() { VERIFY_IS_TRUE(DeleteFileW(cidFilePath.c_str())); });
+
+        auto result = RunWslc(std::format(
+            L"container create --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify(
+            {.Stderr = std::format(L"CID file '{}' already exists\r\nError code: ERROR_FILE_EXISTS\r\n", EscapePath(cidFilePath.wstring())),
+             .ExitCode = 1});
+
+        VerifyContainerIsNotListed(WslcContainerName);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_DuplicateContainerName)
     {
         VerifyContainerIsNotListed(WslcContainerName);
@@ -710,6 +740,7 @@ private:
     {
         std::wstringstream options;
         options << L"The following options are available:\r\n" //
+                << L"  --cidfile         Write the container ID to the provided path\r\n"
                 << L"  --dns             IP address of the DNS nameserver in resolv.conf\r\n"
                 << L"  --dns-option      Set DNS options\r\n"
                 << L"  --dns-search      Set DNS search domains\r\n"

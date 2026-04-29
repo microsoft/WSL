@@ -48,6 +48,7 @@ struct ContainerOptions
     std::vector<std::string> DnsSearchDomains;
     std::vector<std::string> DnsOptions;
     std::vector<std::string> Tmpfs;
+    std::optional<std::wstring> CidFile{};
 };
 
 struct CreateContainerResult
@@ -285,5 +286,22 @@ struct TmpfsMount
 private:
     std::string m_containerPath;
     std::string m_options;
+};
+
+class CidFile
+{
+public:
+    explicit CidFile(const std::optional<std::wstring>& path);
+    ~CidFile();
+
+    NON_COPYABLE(CidFile);
+    NON_MOVABLE(CidFile);
+
+    void Commit(const std::string& containerId);
+
+private:
+    std::optional<std::wstring> m_path{};
+    wil::unique_hfile m_file;
+    bool m_committed = false;
 };
 } // namespace wsl::windows::wslc::models

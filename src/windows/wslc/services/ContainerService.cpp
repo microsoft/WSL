@@ -20,6 +20,8 @@ Abstract:
 #include <wslutil.h>
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
+#include <filesystem>
+#include <fstream>
 #include <unordered_map>
 #include <wslc.h>
 
@@ -325,9 +327,17 @@ std::wstring ContainerService::FormatPorts(WSLCContainerState state, const std::
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions)
 {
+    // Reserve the CID file (fails if it already exists) before creating the container so a
+    // container isn't created when the caller-requested path can't be written. The file is
+    // removed automatically if we don't reach Commit() below.
+    CidFile cidFile(runOptions.CidFile);
+
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions);
     auto& container = runningContainer.Get();
+
+    WSLCContainerId containerId{};
+    THROW_IF_FAILED(container.GetId(containerId));
 
     // Start the created container
     WSLCContainerStartFlags startFlags{};
@@ -336,6 +346,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
 
     // Disable auto-delete only after successful start
     runningContainer.SetDeleteOnClose(false);
+    cidFile.Commit(containerId);
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLCContainerStartFlagsAttach))
@@ -344,19 +355,19 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerO
         return consoleService.AttachToCurrentConsole(runningContainer.GetInitProcess());
     }
 
-    WSLCContainerId containerId{};
-    THROW_IF_FAILED(container.GetId(containerId));
     PrintMessage(L"%hs", stdout, containerId);
     return 0;
 }
 
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions)
 {
+    CidFile cidFile(runOptions.CidFile);
     auto runningContainer = CreateInternal(session, image, runOptions);
     runningContainer.SetDeleteOnClose(false);
     auto& container = runningContainer.Get();
     WSLCContainerId id{};
     THROW_IF_FAILED(container.GetId(id));
+    cidFile.Commit(id);
     return {.Id = id};
 }
 
