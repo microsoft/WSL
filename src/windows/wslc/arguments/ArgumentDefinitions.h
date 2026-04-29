@@ -56,7 +56,7 @@ _(File,           "file",                L"f",              Kind::Value,       L
 _(Follow,         "follow",              L"f",              Kind::Flag,        Localization::WSLCCLI_FollowArgDescription()) \
 _(Format,         "format",              NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_FormatArgDescription()) \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     Localization::WSLCCLI_ForwardArgsDescription()) \
-_(Gpu,            "gpu",                 NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_GpuArgDescription()) \
+_(Gpus,           "gpus",                NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GpusArgDescription()) \
 /*_(GroupId,        "groupid",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_GroupIdArgDescription())*/ \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(Hostname,       "hostname",            L"h",              Kind::Value,       Localization::WSLCCLI_HostnameArgDescription()) \
