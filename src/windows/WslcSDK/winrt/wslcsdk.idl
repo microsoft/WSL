@@ -63,6 +63,8 @@ namespace Microsoft.WSL.Containers
         void CreateVhdVolume(VhdRequirements options);
         void DeleteVhdVolume(String name);
 
+        String Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
+
         IVectorView<ImageInfo> Images { get; };
     };
 
@@ -236,26 +238,24 @@ namespace Microsoft.WSL.Containers
         WslPackage = 2,
     };
 
-    runtimeclass Version
+    runtimeclass ServiceVersion
     {
-        Version(UInt32 major, UInt32 minor, UInt32 revision);
-
-        UInt32 Major { get; };
-        UInt32 Minor { get; };
-        UInt32 Revision { get; };
+        UInt32 Major { get; }
+        UInt32 Minor { get; }
+        UInt32 Revision { get; }
     };
 
     runtimeclass InstallProgress
     {
-        ComponentFlags Component;
-        UInt32 Progress;
-        UInt32 Total;
+        ComponentFlags Component { get; };
+        UInt32 Progress { get; };
+        UInt32 Total { get; };
     };
 
     runtimeclass WslcService
     {
         static ComponentFlags GetMissingComponents();
-        static Version GetVersion();
+        static ServiceVersion GetVersion();
         static Windows.Foundation.IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync();
     };
 
@@ -287,17 +287,17 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass ImageProgress
     {
-        String Id;
-        ImageProgressStatus Status;
-        UInt64 CurrentBytes;
-        UInt64 TotalBytes;
+        String Id { get; };
+        ImageProgressStatus Status { get; };
+        UInt64 CurrentBytes { get; };
+        UInt64 TotalBytes { get; };
     };
 
     runtimeclass PullImageOptions
     {
-        PullImageOptions(Windows.Foundation.Uri uri);
+        PullImageOptions(String uri);
 
-        Windows.Foundation.Uri Uri;
+        String Uri;
         String RegistryAuth;
     };
 
