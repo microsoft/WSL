@@ -593,6 +593,17 @@ class WSLCE2EContainerCreateTests
         result.Verify({.Stdout = L"/tmp\n", .Stderr = L"", .ExitCode = 0});
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Create_WithLabel_Success)
+    {
+        auto result =
+            RunWslc(std::format(L"container create --name {} --label A=1 --label B=2 {}", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_ARE_EQUAL("1", inspect.Labels["A"]);
+        VERIFY_ARE_EQUAL("2", inspect.Labels["B"]);
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Create_Hostname)
     {
         auto result = RunWslc(std::format(
@@ -719,6 +730,7 @@ private:
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
                 << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
+                << L"  -l,--label        Set metadata on an object\r\n"
                 << L"  --name            Name of the container\r\n"
                 << L"  -p,--publish      Publish a port from a container to host\r\n"
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
