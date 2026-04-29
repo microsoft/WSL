@@ -14,18 +14,16 @@ Abstract:
 #pragma once
 #include "CLIExecutionContext.h"
 
-using wsl::windows::wslc::execution::CLIExecutionContext;
-
 namespace wsl::windows::wslc::task {
-void BuildImage(CLIExecutionContext& context);
-void GetImages(CLIExecutionContext& context);
-void ListImages(CLIExecutionContext& context);
-void LoadImage(CLIExecutionContext& context);
-void PullImage(CLIExecutionContext& context);
-void PushImage(CLIExecutionContext& context);
-void DeleteImage(CLIExecutionContext& context);
-void InspectImages(CLIExecutionContext& context);
-void TagImage(CLIExecutionContext& context);
-void SaveImage(CLIExecutionContext& context);
-void PruneImages(CLIExecutionContext& context);
+void BuildImage(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void GetImages(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void ListImages(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void LoadImage(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void PullImage(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void PushImage(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void DeleteImage(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void InspectImages(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void TagImage(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void SaveImage(wsl::windows::wslc::execution::CLIExecutionContext& context);
+void PruneImages(wsl::windows::wslc::execution::CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task
