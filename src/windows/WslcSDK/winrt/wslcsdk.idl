@@ -1,0 +1,328 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    wslcsdk.idl
+
+Abstract:
+
+    This file contains the definition of a WinRT projection of the WSL Container SDK API.
+
+--*/
+
+namespace Microsoft.WSL.Containers
+{
+    [flags]
+    enum SessionFeatureFlags
+    {
+        None = 0x00000000,
+        EnableGpu = 0x00000004
+    };
+
+    enum SessionTerminationReason
+    {
+        Unknown = 0,
+        Shutdown = 1,
+        Crashed = 2,
+    };
+
+    delegate void SessionTerminationHandler(Session session, SessionTerminationReason reason);
+
+    runtimeclass SessionSettings
+    {
+        SessionSettings(String name, String storagePath);
+
+        String Name;
+        String StoragePath;
+
+        Windows.Foundation.IReference<UInt32> CpuCount;
+        Windows.Foundation.IReference<UInt32> MemoryMB;
+        Windows.Foundation.IReference<UInt32> TimeoutMS;
+        VhdRequirements VhdRequirements;
+        SessionFeatureFlags FeatureFlags;
+        SessionTerminationHandler TerminationHandler;
+    };
+
+    runtimeclass Session
+    {
+        static Session Create(SessionSettings settings);
+
+        void Terminate();
+
+        Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PullImageAsync(PullImageOptions options);
+        // TODO: Explore additional overloads for other types of input streams
+        Windows.Foundation.IAsyncActionWithProgress<ImageProgress> ImportImageAsync(String path, String imageName);
+        Windows.Foundation.IAsyncActionWithProgress<ImageProgress> LoadImageAsync(String path);
+        Windows.Foundation.IAsyncActionWithProgress<ImageProgress> PushImageAsync(PushImageOptions options);
+
+        void DeleteImage(String nameOrId);
+        void TagImage(TagImageOptions options);
+
+        void CreateVhdVolume(VhdRequirements options);
+        void DeleteVhdVolume(String name);
+
+        String Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
+
+        IVectorView<ImageInfo> Images { get; };
+    };
+
+
+    enum ContainerNetworkingMode
+    {
+        None = 0,
+        Bridged = 1,
+    };
+
+    [flags]
+    enum ContainerFlags
+    {
+        None = 0x00000000,
+        AutoRemove = 0x00000001,
+        EnableGpu = 0x00000002,
+        Privileged = 0x00000004,
+    };
+
+    enum PortProtocol
+    {
+        TCP = 0,
+        UDP = 1,
+    };
+
+    runtimeclass ContainerPortMapping
+    {
+        ContainerPortMapping(UInt16 windowsPort, UInt16 containerPort, PortProtocol protocol);
+
+        UInt16 WindowsPort;
+        UInt16 ContainerPort;
+        PortProtocol Protocol;
+
+        Windows.Networking.HostName WindowsAddress;
+    };
+
+    runtimeclass ContainerVolume
+    {
+        ContainerVolume(String windowsPath, String containerPath, Boolean readOnly);
+
+        String WindowsPath;
+        String ContainerPath;
+        Boolean ReadOnly;
+    };
+
+    runtimeclass ContainerNamedVolume
+    {
+        ContainerNamedVolume(String name, String containerPath, Boolean readOnly);
+
+        String Name;
+        String ContainerPath;
+        Boolean ReadOnly;
+    };
+
+    [flags]
+    enum ContainerStartFlags
+    {
+        None = 0x00000000,
+        Attach = 0x00000001,
+    };
+
+    enum ContainerState
+    {
+        Invalid = 0,
+        Created = 1,
+        Running = 2,
+        Exited = 3,
+        Deleted = 4,
+    };
+
+    [flags]
+    enum DeleteContainerFlags
+    {
+        None = 0,
+        Force = 0x00000001
+    };
+
+    runtimeclass ContainerSettings
+    {
+        ContainerSettings(String imageName);
+
+        String ImageName;
+
+        String Name;
+        ProcessSettings InitProcess;
+        Windows.Foundation.IReference<ContainerNetworkingMode> NetworkingMode;
+        String HostName;
+        String DomainName;
+        ContainerFlags Flags;
+        IVector<ContainerPortMapping> PortMappings;
+        IVector<ContainerVolume> Volumes;
+        IVector<ContainerNamedVolume> NamedVolumes;
+    };
+
+    enum Signal
+    {
+        None = 0,     // No signal; reserved for future use
+        SIGHUP = 1,   // SIGHUP: reload / hangup
+        SIGINT = 2,   // SIGINT: interrupt (Ctrl-C)
+        SIGQUIT = 3,  // SIGQUIT: quit with core dump
+        SIGKILL = 9,  // SIGKILL: immediate termination
+        SIGTERM = 15, // SIGTERM: graceful shutdown
+    };
+
+    runtimeclass Container
+    {
+        static Container Create(Session session, ContainerSettings containerSettings);
+
+        void Start(ContainerStartFlags flags);
+        void Stop(Signal signal, UInt32 timeoutSeconds);
+        void Delete(DeleteContainerFlags flags);
+
+        Process CreateProcess(ProcessSettings newProcessSettings);
+
+        String Inspect();
+
+        String Id { get; };
+        Process InitProcess { get; };
+        ContainerState State { get; };
+    };
+
+    enum ProcessOutputHandle
+    {
+        StandardOutput = 1,
+        StandardError = 2,
+    };
+
+    delegate void ProcessOutputHandler(Process process, UInt8[] data);
+
+    delegate void ProcessExitHandler(Process process, Int32 exitCode);
+
+    runtimeclass ProcessSettings
+    {
+        ProcessSettings();
+
+        String WorkingDirectory;
+        IVector<String> CmdLine;
+        IMap<String, String> EnvironmentVariables;
+
+        ProcessOutputHandler OnStdOut;
+        ProcessOutputHandler OnStdErr;
+        ProcessExitHandler OnExit;
+    };
+
+    enum ProcessState
+    {
+        Unknown = 0,
+        Running = 1,
+        Exited = 2,
+        Signalled = 3,
+    };
+
+    runtimeclass Process
+    {
+        UInt32 Pid { get; };
+        ProcessState State { get; };
+        Int32 ExitCode { get; };
+
+        void Signal(Signal signal);
+        Windows.Storage.Streams.IInputStream GetOutputStream(ProcessOutputHandle outputHandle);
+        Windows.Storage.Streams.IOutputStream GetInputStream();
+
+        event ProcessExitHandler Exited;
+    };
+
+    [flags]
+    enum ComponentFlags
+    {
+        None = 0,
+        VirtualMachinePlatform = 1,
+        WslPackage = 2,
+    };
+
+    runtimeclass ServiceVersion
+    {
+        UInt32 Major { get; };
+        UInt32 Minor { get; };
+        UInt32 Revision { get; };
+    };
+
+    runtimeclass InstallProgress
+    {
+        ComponentFlags Component { get; };
+        UInt32 Progress { get; };
+        UInt32 Total { get; };
+    };
+
+    runtimeclass WslcService
+    {
+        static ComponentFlags GetMissingComponents();
+        static ServiceVersion GetVersion();
+        static Windows.Foundation.IAsyncActionWithProgress<InstallProgress> InstallWithDependenciesAsync();
+    };
+
+    enum VhdType
+    {
+        Dynamic = 0,
+        Fixed = 1,
+    };
+
+    runtimeclass VhdRequirements
+    {
+        VhdRequirements(String name, UInt64 sizeInBytes, VhdType type);
+
+        String Name;
+        UInt64 SizeInBytes;
+        VhdType Type;
+    };
+
+    enum ImageProgressStatus
+    {
+        Unknown = 0,
+        Pulling = 1,
+        Waiting = 2,
+        Downloading = 3,
+        Verifying = 4,
+        Extracting = 5,
+        Complete = 6,
+    };
+
+    runtimeclass ImageProgress
+    {
+        String Id { get; };
+        ImageProgressStatus Status { get; };
+        UInt64 CurrentBytes { get; };
+        UInt64 TotalBytes { get; };
+    };
+
+    runtimeclass PullImageOptions
+    {
+        PullImageOptions(String uri);
+
+        String Uri;
+        String RegistryAuth;
+    };
+
+    runtimeclass PushImageOptions
+    {
+        PushImageOptions(String image, String registryAuth);
+
+        String Image;
+        String RegistryAuth;
+    };
+
+    runtimeclass TagImageOptions
+    {
+        TagImageOptions(String image, String repository, String tag);
+
+        String Image;
+        String Repository;
+        String Tag;
+    };
+
+    runtimeclass ImageInfo
+    {
+        String Name { get; };
+        Windows.Storage.Streams.IBuffer Sha256 { get; };
+        UInt64 SizeBytes { get; };
+        Windows.Foundation.DateTime CreatedTimestamp { get; };
+    };
+}

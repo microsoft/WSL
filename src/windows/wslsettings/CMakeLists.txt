@@ -233,6 +233,7 @@ set_target_properties(
   VS_GLOBAL_PlatformTarget "${TARGET_PLATFORM}"
   VS_GLOBAL_ImplicitUsings enable
   VS_GLOBAL_Nullable enable
+  VS_GLOBAL_GenerateAssemblyInfo false
 )
 
 configure_file(
