@@ -2287,8 +2287,15 @@ try
 
     // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
     // This is required because calling CancelIoEx() between two ReadFile() calls does nothing, and therefore could still allow another thread to get stuck doing synchronous IO.
+    bool retrying = false;
     while (!sessionLock)
     {
+        // If this isn't the first iteration, sleep to prevent this loop from burning too much CPU.
+        if (retrying)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
         {
             std::lock_guard lock(m_userHandlesLock);
 
@@ -2298,11 +2305,6 @@ try
             if (!m_sessionTerminatingEvent.is_signaled())
             {
                 m_sessionTerminatingEvent.SetEvent();
-            }
-            else
-            {
-                // If this isn't the first iteration, sleep to present this loop for burning too much CPU.
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
 
             // Cancel any pending IO on user-provided handles to unblock operations
@@ -2319,6 +2321,7 @@ try
         }
 
         sessionLock = m_lock.try_lock_exclusive();
+        retrying = true;
     }
 
     // Acquire an exclusive lock to ensure that no operation is running.
