@@ -21,10 +21,6 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 ContainerPortMapping::ContainerPortMapping(uint16_t windowsPort, uint16_t containerPort, winrt::Microsoft::WSL::Containers::PortProtocol const& protocol) :
     m_windowsPort(windowsPort), m_containerPort(containerPort), m_protocol(protocol)
 {
-    if (protocol != PortProtocol::TCP)
-    {
-        throw hresult_not_implemented();
-    }
 }
 
 uint16_t ContainerPortMapping::WindowsPort()
@@ -67,11 +63,6 @@ void ContainerPortMapping::Protocol(winrt::Microsoft::WSL::Containers::PortProto
     if (m_containerPortMapping)
     {
         throw hresult_illegal_state_change();
-    }
-
-    if (value != PortProtocol::TCP)
-    {
-        throw hresult_not_implemented();
     }
 
     m_protocol = value;
