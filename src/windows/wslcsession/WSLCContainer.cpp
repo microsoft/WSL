@@ -1100,14 +1100,8 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         wslcInspect.Mounts.push_back(std::move(mountInfo));
     }
 
-    // Map labels, filtering out internal metadata.
-    for (const auto& [key, value] : m_labels)
-    {
-        if (key != WSLCContainerMetadataLabel)
-        {
-            wslcInspect.Labels[key] = value;
-        }
-    }
+    // Map labels. m_labels should already exclude internal metadata labels.
+    wslcInspect.Labels = m_labels;
 
     return wslcInspect;
 }
