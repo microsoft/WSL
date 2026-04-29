@@ -285,7 +285,7 @@ Return Value:
             snprintf(
                 Plan9Options,
                 sizeof(Plan9Options),
-                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=5,access=client,msize=262144,trans=virtio",
+                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=0x5,access=client,msize=262144,trans=virtio",
                 Plan9Source,
                 Temp);
         }
@@ -294,7 +294,7 @@ Return Value:
             snprintf(
                 Plan9Options,
                 sizeof(Plan9Options),
-                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*",
+                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=0x5,access=client,msize=65536,trans=fd,rfd=*,wfd=*",
                 Plan9Source,
                 Temp);
         }
@@ -3652,8 +3652,6 @@ Return Value:
     // Test an invalid buffer after a valid buffer. The writev call should return the
     // number of bytes written until the invalid buffer.
     //
-    // N.B. The plan 9 client does not follow this behavior, and will write nothing.
-    //
 
     LxtCheckErrno(FileDescriptor = open(TestFile, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU));
     memset(Iov, 0, sizeof(Iov));
@@ -3664,23 +3662,16 @@ Return Value:
     Iov[2].iov_base = ContentB;
     Iov[2].iov_len = sizeof(ContentB);
     LxtLogInfo("%d", g_LxtFsInfo.FsType);
-    if (g_LxtFsInfo.FsType == LxtFsTypePlan9)
-    {
-        LxtCheckErrnoFailure(Bytes = writev(FileDescriptor, Iov, 3), EFAULT);
-    }
-    else
-    {
-        LxtCheckErrno(Bytes = writev(FileDescriptor, Iov, 3));
-        LxtCheckEqual(Bytes, sizeof(ContentA), "%d");
-        LxtCheckErrno(close(FileDescriptor));
+    LxtCheckErrno(Bytes = writev(FileDescriptor, Iov, 3));
+    LxtCheckEqual(Bytes, sizeof(ContentA), "%d");
+    LxtCheckErrno(close(FileDescriptor));
 
-        LxtCheckErrno(FileDescriptor = open(TestFile, O_RDWR, S_IRWXU));
-        memset(Buffer, 0, sizeof(Buffer));
-        LxtCheckErrno(Bytes = read(FileDescriptor, Buffer, sizeof(ContentA)));
-        LxtCheckEqual(Bytes, sizeof(ContentA), "%d");
-        LxtCheckErrno(Bytes = read(FileDescriptor, Buffer, sizeof(ContentB)));
-        LxtCheckEqual(Bytes, 0, "%d");
-    }
+    LxtCheckErrno(FileDescriptor = open(TestFile, O_RDWR, S_IRWXU));
+    memset(Buffer, 0, sizeof(Buffer));
+    LxtCheckErrno(Bytes = read(FileDescriptor, Buffer, sizeof(ContentA)));
+    LxtCheckEqual(Bytes, sizeof(ContentA), "%d");
+    LxtCheckErrno(Bytes = read(FileDescriptor, Buffer, sizeof(ContentB)));
+    LxtCheckEqual(Bytes, 0, "%d");
 
     Result = LXT_RESULT_SUCCESS;
 
