@@ -16,7 +16,7 @@ Abstract:
 
 #include "ServiceProcessLauncher.h"
 #include "WSLCSession.h"
-#include "ContainerEventTracker.h"
+#include "DockerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLCProcessControl.h"
 #include "IORelay.h"
@@ -30,6 +30,7 @@ namespace wsl::windows::service::wslc {
 
 class WSLCContainer;
 class WSLCSession;
+class WSLCVolumes;
 
 struct ContainerPortMapping
 {
@@ -64,7 +65,7 @@ public:
         std::vector<ContainerPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        ContainerEventTracker& EventTracker,
+        DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay,
         WSLCContainerState InitialState,
@@ -112,9 +113,8 @@ public:
         const WSLCContainerOptions& Options,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
-        const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& SessionVolumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        ContainerEventTracker& EventTracker,
+        DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay);
 
@@ -122,10 +122,9 @@ public:
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
         WSLCVirtualMachine& virtualMachine,
-        const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
-        const std::unordered_set<std::string>& anonymousVolumes,
+        WSLCVolumes& Volumes,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
-        ContainerEventTracker& EventTracker,
+        DockerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay);
 
@@ -141,6 +140,11 @@ private:
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
     __requires_exclusive_lock_held(m_lock) void DisconnectComWrapper();
+
+    __requires_exclusive_lock_held(m_lock) void OnStopped(std::optional<std::uint64_t> stopTimestamp);
+
+    void SetExitCode(int ExitCode) noexcept;
+    void SignalInitProcessExit() noexcept;
 
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLCProcessFlags flags);
 
@@ -166,6 +170,8 @@ private:
         wil::unique_event Event{wil::EventOptions::None};
     } m_stopNotification;
 
+    wil::unique_event m_destroyEvent{wil::EventOptions::ManualReset};
+
     // Serializes Stop() callers and signals OnEvent that a Stop is in flight.
     // Must be acquired before m_lock when both are needed.
     std::mutex m_stopLock;
@@ -180,8 +186,8 @@ private:
     std::vector<WSLCVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;
     Microsoft::WRL::ComPtr<WSLCContainer> m_comWrapper;
-    ContainerEventTracker& m_eventTracker;
-    ContainerEventTracker::ContainerTrackingReference m_containerEvents;
+    DockerEventTracker& m_eventTracker;
+    DockerEventTracker::EventTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
     WSLCContainerNetworkType m_networkingMode{};
 };

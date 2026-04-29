@@ -632,13 +632,17 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"WSLC Named Volume Test", .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_NotFound_Fail)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_AutoCreate)
     {
         auto result = RunWslc(std::format(
             L"container run --rm --volume {}:/data {} sh -c \"echo -n 'WSLC Named Volume Test' > /data/test.txt\"",
             WslcVolumeName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", WslcVolumeName), .ExitCode = 1});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Verify the volume was auto-created by removing it (fails if it doesn't exist).
+        result = RunWslc(std::format(L"volume rm {}", WslcVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
 private:

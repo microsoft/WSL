@@ -20,16 +20,17 @@ set(SOURCES
     # Volume management
     WSLCVhdVolume.cpp
     WSLCGuestVolume.cpp
+    WSLCVolumes.cpp
 
     # Supporting classes
-    ContainerEventTracker.cpp
+    DockerEventTracker.cpp
     DockerHTTPClient.cpp
     IORelay.cpp
     ServiceProcessLauncher.cpp
     )
 
 set(HEADERS
-    ContainerEventTracker.h
+    DockerEventTracker.h
     DockerHTTPClient.h
     IORelay.h
     ServiceProcessLauncher.h
@@ -44,6 +45,7 @@ set(HEADERS
     WSLCVirtualMachine.h
     WSLCVhdVolume.h
     WSLCGuestVolume.h
+    WSLCVolumes.h
     IWSLCVolume.h
     WSLCVolumeMetadata.h)
 

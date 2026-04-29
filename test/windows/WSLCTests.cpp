@@ -1977,21 +1977,21 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
 
-        // Lists anonymous docker volume names via the VM's docker CLI.
-        // TODO: Add proper support so we can list via session's API instead.
         auto listAnonymousVolumes = [&]() {
-            auto result = ExpectCommandResult(
-                m_defaultSession.get(), {"/usr/bin/docker", "volume", "ls", "-q", "-f", "label=com.docker.volume.anonymous"}, 0);
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
+            VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+
             std::vector<std::string> names;
-            std::stringstream ss(result.Output[1]);
-            std::string line;
-            while (std::getline(ss, line))
+
+            // TODO: Replace with filter for anonymous volumes in ListVolumes API.
+            for (const auto& vol : volumes)
             {
-                if (!line.empty())
+                if (std::string(vol.Driver) == "guest")
                 {
-                    names.push_back(line);
+                    names.push_back(vol.Name);
                 }
             }
+
             return names;
         };
 
@@ -1999,15 +1999,14 @@ class WSLCTests
         {
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
             auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess();
+            container.SetDeleteOnClose(false);
 
             auto containerId = container.Id();
 
+            auto result = container.GetInitProcess();
             ValidateProcessOutput(result, {});
 
             ResetTestSession();
-
-            container.SetDeleteOnClose(false);
 
             // Manually cleanup the container and delete anonymous volumes since the session has been reset.
             auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -2035,16 +2034,21 @@ class WSLCTests
             container.GetInitProcess().Wait();
             container.SetDeleteOnClose(false);
 
+            // Clean up any leaked anonymous volumes when this block exits.
+            auto volumeCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                auto volumes = listAnonymousVolumes();
+                for (const auto& name : volumes)
+                {
+                    LOG_IF_FAILED(m_defaultSession->DeleteVolume(name.c_str()));
+                }
+            });
+
             VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
 
             // Anonymous volume was NOT deleted by Docker.
-            auto leaked = listAnonymousVolumes();
-            VERIFY_ARE_EQUAL(leaked.size(), 1u);
-
-            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "volume", "prune", "-f"});
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
         }
 
         // Delete container with WSLCDeleteFlagsDeleteVolumes -> anonymous volume is cleaned up.
