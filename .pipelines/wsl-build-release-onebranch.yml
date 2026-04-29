@@ -35,6 +35,10 @@ extends:
     globalSdl:
       credscan:
         enabled: true
+      codesign:
+        enabled: true
+        break: true
+        targetGlob: '**\*.dll;**\*.exe;**\*.sys;**\*.msi;**\*.msix;**\*.msixbundle;**\*.appx;**\*.nupkg'
       perStage:
         credscan:
           enabled: true
