@@ -17,18 +17,15 @@ Abstract:
 #define THROW_MSG_IF_FAILED(hr, msg) \
     do \
     { \
-        auto _hr = (hr); \
-        if (FAILED(_hr)) \
+        const auto _hr = (hr); \
+        auto _msg = (msg).get(); \
+        if (_msg) \
         { \
-            auto _msg = (msg).get(); \
-            if (!_msg) \
-            { \
-                throw winrt::hresult_error(_hr); \
-            } \
-            else \
-            { \
-                throw winrt::hresult_error(_hr, winrt::to_hstring(_msg)); \
-            } \
+            THROW_HR_IF_MSG(_hr, FAILED(_hr), "%ls", _msg); \
+        } \
+        else \
+        { \
+            THROW_IF_FAILED(_hr); \
         } \
     } while (0)
 
