@@ -816,7 +816,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
         DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
-        LOG_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
+        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
     }
 }
 
@@ -832,7 +832,7 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     // taking m_lock. Callers on the docker event-loop thread (OnEvent) must not wait.
     if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
     {
-        LOG_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s));
+        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
     }
 }
 
