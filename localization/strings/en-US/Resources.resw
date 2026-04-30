@@ -2577,7 +2577,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
     <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}{Locked="--gpus"}{Locked="all"}Command line arguments should not be translated</comment>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Delete images even if they are being used</value>

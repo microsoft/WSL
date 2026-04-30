@@ -389,12 +389,12 @@ void ConfigureLdPathForGpu(std::vector<std::string>& Env)
             it->append(":");
         }
 
-        it->append(wsl::windows::service::wslc::WSLCVirtualMachine::c_gpuLibrariesPath);
+        it->append(WSLCVirtualMachine::c_gpuLibrariesPath);
     }
     else
     {
         // Otherwise create a new entry.
-        Env.emplace_back(std::format("LD_LIBRARY_PATH={}", wsl::windows::service::wslc::WSLCVirtualMachine::c_gpuLibrariesPath));
+        Env.emplace_back(std::format("LD_LIBRARY_PATH={}", WSLCVirtualMachine::c_gpuLibrariesPath));
     }
 }
 
