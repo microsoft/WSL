@@ -14,4 +14,5 @@ target_link_libraries(wslinstall
                       common
                       legacy_stdio_definitions
                       Crypt32.lib
-                      sfc.lib)
+                      sfc.lib
+                      propsys.lib)

@@ -30,7 +30,8 @@ target_link_libraries(wsltests
                       VirtDisk.lib
                       Wer.lib
                       Dbghelp.lib
-                      sfc.lib)
+                      sfc.lib
+                      propsys.lib)
 
 add_dependencies(wsltests wslserviceidl)
 add_subdirectory(testplugin)

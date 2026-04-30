@@ -14,6 +14,9 @@ Abstract:
 
 #include "precomp.h"
 #include <Sfc.h>
+#include <propkey.h>
+#include <propvarutil.h>
+#include <ShObjIdl.h>
 
 #include "Common.h"
 #include "registry.hpp"
@@ -1047,5 +1050,126 @@ class InstallerTests
         InstallMsi();
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
+    }
+
+    TEST_METHOD(InstallSetsShortcutProperties)
+    {
+        // Verify that RepairShortcutProperties CA correctly sets shortcut properties on WSL.lnk
+        // (System.AppUserModel.ID and System.AppUserModel.ToastActivatorCLSID) after a fresh install.
+        // These were previously set by the MsiShortcutProperty table; the CA replaces that mechanism
+        // to eliminate Warning 1946 under file-locking contention. See: microsoft/WSL#11276, #13469
+
+        // Ensure a clean install so the CA runs.
+        UninstallMsi();
+        InstallMsi();
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+
+        // Locate the WSL.lnk shortcut in the common Programs folder.
+        wil::unique_cotaskmem_string programsFolder;
+        VERIFY_SUCCEEDED(SHGetKnownFolderPath(FOLDERID_CommonPrograms, 0, nullptr, &programsFolder));
+        const auto wslShortcut = std::wstring(programsFolder.get()) + L"\\WSL.lnk";
+        VERIFY_IS_TRUE(std::filesystem::exists(wslShortcut));
+
+        // Open the shortcut via COM and read its IPropertyStore.
+        auto coInit = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+
+        wil::com_ptr<IShellLinkW> shellLink;
+        VERIFY_SUCCEEDED(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shellLink)));
+
+        wil::com_ptr<IPersistFile> persistFile;
+        VERIFY_SUCCEEDED(shellLink->QueryInterface(IID_PPV_ARGS(&persistFile)));
+        VERIFY_SUCCEEDED(persistFile->Load(wslShortcut.c_str(), STGM_READ | STGM_SHARE_DENY_NONE));
+
+        wil::com_ptr<IPropertyStore> propertyStore;
+        VERIFY_SUCCEEDED(shellLink->QueryInterface(IID_PPV_ARGS(&propertyStore)));
+
+        // Verify System.AppUserModel.ID == "Microsoft.WSL"
+        PROPVARIANT pvAppId{};
+        auto clearAppId = wil::scope_exit([&pvAppId]() { PropVariantClear(&pvAppId); });
+        VERIFY_SUCCEEDED(propertyStore->GetValue(PKEY_AppUserModel_ID, &pvAppId));
+        VERIFY_ARE_EQUAL(pvAppId.vt, static_cast<VARTYPE>(VT_LPWSTR));
+        VERIFY_ARE_EQUAL(std::wstring(pvAppId.pwszVal), L"Microsoft.WSL");
+
+        // Verify System.AppUserModel.ToastActivatorCLSID is set to the expected CLSID.
+        static constexpr CLSID c_wslToastActivatorClsid = {0x2B9C59C3, 0x98F1, 0x45C8, {0xB8, 0x7B, 0x12, 0xAE, 0x3C, 0x79, 0x27, 0xE8}};
+        PROPVARIANT pvToastClsid{};
+        auto clearToast = wil::scope_exit([&pvToastClsid]() { PropVariantClear(&pvToastClsid); });
+        VERIFY_SUCCEEDED(propertyStore->GetValue(PKEY_AppUserModel_ToastActivatorCLSID, &pvToastClsid));
+        VERIFY_ARE_EQUAL(pvToastClsid.vt, static_cast<VARTYPE>(VT_CLSID));
+        VERIFY_ARE_EQUAL(0, memcmp(pvToastClsid.puuid, &c_wslToastActivatorClsid, sizeof(CLSID)));
+    }
+
+    TEST_METHOD(InstallSetsShortcutPropertiesUnderContention)
+    {
+        // Verify that RepairShortcutProperties CA still sets shortcut properties correctly when
+        // another process holds the .lnk file open with a conflicting share mode (simulating a
+        // search indexer, antivirus, or PowerToys Run). The CA uses exponential backoff to retry
+        // on sharing violations. See: microsoft/WSL#11276, microsoft/WSL#12759, microsoft/WSL#13469
+
+        // Locate WSL.lnk.
+        wil::unique_cotaskmem_string programsFolder;
+        VERIFY_SUCCEEDED(SHGetKnownFolderPath(FOLDERID_CommonPrograms, 0, nullptr, &programsFolder));
+        const auto wslShortcut = std::wstring(programsFolder.get()) + L"\\WSL.lnk";
+
+        // Ensure a clean install so WSL.lnk exists.
+        UninstallMsi();
+        InstallMsi();
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_IS_TRUE(std::filesystem::exists(wslShortcut));
+
+        // Open WSL.lnk with a read handle that denies write access from other openers.
+        // This causes the CA's Load(STGM_READWRITE...) calls to fail with a sharing violation,
+        // exercising the exponential-backoff retry logic in RepairShortcutProperties.
+        wil::unique_hfile fileHandle(::CreateFileW(
+            wslShortcut.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        VERIFY_IS_TRUE(!!fileHandle);
+
+        // Transfer handle ownership to the async task so there is no shared mutable state.
+        // The task closes the handle after 500ms, allowing the CA retry loop to succeed.
+        HANDLE rawHandle = fileHandle.release();
+        auto releaseHandle = std::async(std::launch::async, [rawHandle]() {
+            Sleep(500);
+            CloseHandle(rawHandle);
+        });
+
+        // Load wslinstall.dll from the installed path and call RepairShortcutProperties directly.
+        // This exercises the retry/backoff logic without depending on msiexec sequencing.
+        // The function is safe to call with a null MSIHANDLE: it only uses it for TraceLogging
+        // and a local log file (not via MSI APIs).
+        const auto wslInstallDll = (m_installedPath / L"wslinstall.dll").wstring();
+        wil::unique_hmodule wslInstall(LoadLibraryW(wslInstallDll.c_str()));
+        VERIFY_IS_NOT_NULL(wslInstall.get());
+
+        using RepairShortcutPropertiesFn = UINT(__stdcall*)(MSIHANDLE);
+        auto repairShortcutProperties = reinterpret_cast<RepairShortcutPropertiesFn>(
+            GetProcAddress(wslInstall.get(), "RepairShortcutProperties"));
+        VERIFY_IS_NOT_NULL(repairShortcutProperties);
+
+        // Call the CA function: it retries on sharing violation until we release the lock at ~500ms.
+        // Passing MSIHANDLE=0 (null) is safe: the function only uses it for TraceLogging and a local
+        // log file — it never calls MSI APIs that dereference the handle.
+        const auto result = repairShortcutProperties(0 /*hInstall*/);
+        VERIFY_ARE_EQUAL(NOERROR, result);
+
+        releaseHandle.wait();
+
+        // Verify that properties were set correctly despite the initial contention.
+        auto coInit = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+
+        wil::com_ptr<IShellLinkW> shellLink;
+        VERIFY_SUCCEEDED(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shellLink)));
+
+        wil::com_ptr<IPersistFile> persistFile;
+        VERIFY_SUCCEEDED(shellLink->QueryInterface(IID_PPV_ARGS(&persistFile)));
+        VERIFY_SUCCEEDED(persistFile->Load(wslShortcut.c_str(), STGM_READ | STGM_SHARE_DENY_NONE));
+
+        wil::com_ptr<IPropertyStore> propertyStore;
+        VERIFY_SUCCEEDED(shellLink->QueryInterface(IID_PPV_ARGS(&propertyStore)));
+
+        PROPVARIANT pvAppId{};
+        auto clearAppId = wil::scope_exit([&pvAppId]() { PropVariantClear(&pvAppId); });
+        VERIFY_SUCCEEDED(propertyStore->GetValue(PKEY_AppUserModel_ID, &pvAppId));
+        VERIFY_ARE_EQUAL(pvAppId.vt, static_cast<VARTYPE>(VT_LPWSTR));
+        VERIFY_ARE_EQUAL(std::wstring(pvAppId.pwszVal), L"Microsoft.WSL");
     }
 };

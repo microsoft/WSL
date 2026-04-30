@@ -6,6 +6,7 @@ EXPORTS
     DeprovisionMsix
     WslValidateInstallation
     WslFinalizeInstallation
+    RepairShortcutProperties
     InstallMsix
     InstallMsixAsUser
     RegisterLspCategories

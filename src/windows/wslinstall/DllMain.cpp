@@ -19,7 +19,17 @@ Abstract:
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/windows.management.deployment.h>
 #include <Sfc.h>
+#include <propkey.h>
+#include <propvarutil.h>
+#include <ShlObj.h>
+#include <ShObjIdl.h>
 #include "defs.h"
+
+// Not defined in older Windows SDK propkey headers.
+// {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}, 36
+static constexpr PROPERTYKEY c_pkeyAppUserModelIsSystemComponent = {
+    {0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3}},
+    36};
 
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
@@ -797,6 +807,162 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
     }
     CATCH_LOG();
 
+    return NOERROR;
+}
+
+// Ensures shortcut properties are set on the WSL.lnk and WSL Settings.lnk shortcuts, retrying on
+// sharing violations. This is a repair action that runs after CreateShortcuts to handle the case
+// where the built-in MsiShortcutProperty table fails due to another process (e.g., search indexer,
+// antivirus, or PowerToys Run) holding a .lnk file open. See: microsoft/WSL#11276,
+// microsoft/WSL#13469
+//
+// Uses exponential backoff: 50ms, 100ms, 200ms, 400ms, 800ms... capped at 1s per retry.
+// Total timeout is approximately 5 seconds (enough for any transient lock to release).
+static constexpr int c_maxRetries = 10;
+static constexpr int c_initialRetryDelayMs = 50;
+static constexpr int c_maxRetryDelayMs = 1000;
+static constexpr int c_totalTimeoutMs = 5000;
+
+struct ShortcutPropertyEntry
+{
+    const PROPERTYKEY& key;
+    const PROPVARIANT& value;
+};
+
+// Sets multiple properties on a shortcut in a single load/commit/save cycle with retry.
+static HRESULT SetShortcutPropertiesWithRetry(
+    _In_ LPCWSTR shortcutPath, _In_ std::initializer_list<ShortcutPropertyEntry> properties)
+{
+    auto coInit = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+
+    int delayMs = c_initialRetryDelayMs;
+    auto startTime = GetTickCount64();
+
+    for (int attempt = 0; attempt < c_maxRetries; ++attempt)
+    {
+        if (attempt > 0 && (GetTickCount64() - startTime) >= c_totalTimeoutMs)
+        {
+            break;
+        }
+
+        wil::com_ptr<IShellLinkW> shellLink;
+        RETURN_IF_FAILED(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shellLink)));
+
+        wil::com_ptr<IPersistFile> persistFile;
+        RETURN_IF_FAILED(shellLink->QueryInterface(IID_PPV_ARGS(&persistFile)));
+
+        auto hr = persistFile->Load(shortcutPath, STGM_READWRITE | STGM_SHARE_DENY_NONE);
+        if (FAILED(hr))
+        {
+            if (hr == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) ||
+                hr == HRESULT_FROM_WIN32(ERROR_LOCK_VIOLATION) ||
+                hr == STG_E_SHAREVIOLATION)
+            {
+                Sleep(delayMs);
+                delayMs = (std::min)(delayMs * 2, c_maxRetryDelayMs);
+                continue;
+            }
+            RETURN_HR(hr);
+        }
+
+        wil::com_ptr<IPropertyStore> propertyStore;
+        RETURN_IF_FAILED(shellLink->QueryInterface(IID_PPV_ARGS(&propertyStore)));
+
+        for (const auto& prop : properties)
+        {
+            hr = propertyStore->SetValue(prop.key, prop.value);
+            if (FAILED(hr)) break;
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            hr = propertyStore->Commit();
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = persistFile->Save(shortcutPath, TRUE);
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            return S_OK;
+        }
+
+        if (hr == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) ||
+            hr == HRESULT_FROM_WIN32(ERROR_LOCK_VIOLATION) ||
+            hr == STG_E_SHAREVIOLATION)
+        {
+            Sleep(delayMs);
+            delayMs = (std::min)(delayMs * 2, c_maxRetryDelayMs);
+            continue;
+        }
+
+        RETURN_HR(hr);
+    }
+
+    return HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION);
+}
+
+// Ensures shortcut properties are set on WSL.lnk and WSL Settings.lnk, retrying on
+// sharing violations. Runs after CreateShortcuts to handle the case where the built-in
+// MsiShortcutProperty table fails due to another process (e.g., search indexer, antivirus,
+// or PowerToys Run) holding a .lnk file open. See: microsoft/WSL#11276, microsoft/WSL#13469
+extern "C" UINT __stdcall RepairShortcutProperties(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("RepairShortcutProperties");
+
+        wil::unique_cotaskmem_string programsFolder;
+        THROW_IF_FAILED(SHGetKnownFolderPath(FOLDERID_CommonPrograms, 0, nullptr, &programsFolder));
+        auto programsFolderStr = std::wstring(programsFolder.get());
+
+        // Repair WSL.lnk — batch both properties in one load/commit/save cycle
+        auto wslShortcut = programsFolderStr + L"\\WSL.lnk";
+        if (GetFileAttributesW(wslShortcut.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            PROPVARIANT pvAppId{};
+            THROW_IF_FAILED(InitPropVariantFromString(L"Microsoft.WSL", &pvAppId));
+            auto clearAppId = wil::scope_exit([&pvAppId]() { PropVariantClear(&pvAppId); });
+
+            static constexpr CLSID c_wslToastActivatorClsid = {0x2B9C59C3, 0x98F1, 0x45C8, {0xB8, 0x7B, 0x12, 0xAE, 0x3C, 0x79, 0x27, 0xE8}};
+            PROPVARIANT pvToastClsid{};
+            THROW_IF_FAILED(InitPropVariantFromCLSID(c_wslToastActivatorClsid, &pvToastClsid));
+            auto clearToast = wil::scope_exit([&pvToastClsid]() { PropVariantClear(&pvToastClsid); });
+
+            auto hr = SetShortcutPropertiesWithRetry(wslShortcut.c_str(), {
+                {PKEY_AppUserModel_ID, pvAppId},
+                {PKEY_AppUserModel_ToastActivatorCLSID, pvToastClsid}});
+
+            WSL_LOG("RepairShortcutProperty",
+                TraceLoggingValue(wslShortcut.c_str(), "shortcut"),
+                TraceLoggingValue(hr, "result"));
+        }
+
+        // Repair WSL Settings.lnk — only on workstation (MsiNTProductType = 1).
+        // The server shortcut does not use IsSystemComponent (matches original WiX authoring).
+        if (!IsWindowsServer())
+        {
+            auto wslSettingsShortcut = programsFolderStr + L"\\WSL Settings.lnk";
+            if (GetFileAttributesW(wslSettingsShortcut.c_str()) != INVALID_FILE_ATTRIBUTES)
+            {
+                PROPVARIANT pvSystemComponent{};
+                pvSystemComponent.vt = VT_BOOL;
+                pvSystemComponent.boolVal = VARIANT_TRUE;
+
+                auto hr = SetShortcutPropertiesWithRetry(wslSettingsShortcut.c_str(), {
+                    {c_pkeyAppUserModelIsSystemComponent, pvSystemComponent}});
+
+                WSL_LOG("RepairShortcutProperty",
+                    TraceLoggingValue(wslSettingsShortcut.c_str(), "shortcut"),
+                    TraceLoggingValue(hr, "result"));
+            }
+        }
+    }
+    CATCH_LOG();
+
+    // Always return success — this is a best-effort repair action.
+    // The shortcut works without these properties; they only affect toast notifications.
     return NOERROR;
 }
 
