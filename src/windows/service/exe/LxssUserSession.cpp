@@ -891,7 +891,7 @@ HRESULT LxssUserSessionImpl::MountDisk(
     _Out_ int* Step,
     _Out_ LPWSTR* MountName)
 {
-    ExecutionContext context(Context::DetachDisk);
+    ExecutionContext context(Context::MountDisk);
 
     std::lock_guard lock(m_instanceLock);
     return wil::ResultFromException([&]() {
@@ -1788,47 +1788,48 @@ try
     std::lock_guard lock(m_instanceLock);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
     const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
-    LXSS_DISTRO_CONFIGURATION configuration = s_GetDistributionConfiguration(registration);
+    const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
-    const auto vhdFilePath = configuration.VhdFilePath;
-    if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdFilePath.c_str()))
+    const auto& vhdPath = configuration.VhdFilePath;
+    if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str()))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_DISTRO_NOT_STOPPED, wsl::shared::Localization::MessageVhdInUse());
     }
 
-    auto diskHandle = wsl::core::filesystem::OpenVhd(vhdFilePath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
-    const auto diskSize = wsl::core::filesystem::GetDiskSize(diskHandle.get());
-
-    const auto resizingLarger = NewSize > diskSize;
-    if (resizingLarger)
+    // If growing the VHD, resize the underlying VHD file before resizing the filesystem.
+    bool resizingLarger;
     {
-        wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_NONE);
-    }
+        auto runAsUser = wil::CoImpersonateClient();
+        auto diskHandle = wsl::core::filesystem::OpenVhd(vhdPath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
+        resizingLarger = NewSize > wsl::core::filesystem::GetDiskSize(diskHandle.get());
 
-    diskHandle.reset();
+        if (resizingLarger)
+        {
+            wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_NONE);
+        }
+    }
 
     // Ensure VM exists and attach the VHD.
     _CreateVm();
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    const auto lun = m_utilityVm->AttachDisk(vhdFilePath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+    const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
 
     // Resize the underlying filesystem.
     //
     // N.B. Passing zero as the size causes the resize to consume all available space on the block device.
     {
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdFilePath.c_str()); });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
         m_utilityVm->ResizeDistribution(lun, OutputHandle, resizingLarger ? 0 : NewSize);
     }
 
     // If shrinking the VHD, resize the underlying VHD file. This is only supported for .vhdx files.
     //
     // N.B. RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE is required because vhdmp can't validate that the minimum safe ext4 size.
-    if (!resizingLarger &&
-        wsl::shared::string::IsEqual(vhdFilePath.extension().c_str(), wsl::windows::common::wslutil::c_vhdxFileExtension, true))
+    if (!resizingLarger && wsl::shared::string::IsEqual(vhdPath.extension().c_str(), wsl::windows::common::wslutil::c_vhdxFileExtension, true))
     {
-        const auto diskHandle =
-            wsl::core::filesystem::OpenVhd(vhdFilePath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
+        auto runAsUser = wil::CoImpersonateClient();
+        const auto diskHandle = wsl::core::filesystem::OpenVhd(vhdPath.c_str(), VIRTUAL_DISK_ACCESS_GET_INFO | VIRTUAL_DISK_ACCESS_METAOPS);
         wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE);
     }
 

@@ -162,7 +162,7 @@ gid_t GetUserGroupId(uid_t uid)
     for (;;)
     {
         buffer.resize(size);
-        if (getpwuid_r(uid, &pwd, buffer.data(), size, &result) < 0)
+        if (getpwuid_r(uid, &pwd, buffer.data(), size, &result) != 0)
         {
             if (errno != ERANGE)
             {
@@ -198,7 +198,7 @@ gid_t GetGroupIdByName(const char* name)
     for (;;)
     {
         buffer.resize(size);
-        if (getgrnam_r(name, &grp, buffer.data(), size, &result) < 0)
+        if (getgrnam_r(name, &grp, buffer.data(), size, &result) != 0)
         {
             if (errno != ERANGE)
             {

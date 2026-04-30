@@ -13,6 +13,8 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <unordered_map>
+#include <unordered_set>
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
@@ -168,6 +170,91 @@ class WSLCCLICommandUnitTests
         }
 
         VERIFY_IS_TRUE(found, L"RootCommand should contain VersionCommand");
+    }
+
+    // Walk every command in the root tree and verify no argument collisions.
+    TEST_METHOD(AllCommands_NoAmbiguousArgumentNamesOrAliases)
+    {
+        // Build a lookup table from ArgType -> enum name string using the same X-macro.
+        static constexpr const wchar_t* c_argTypeNames[] = {
+#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, Desc) L## #EnumName,
+            WSLC_ARGUMENTS(WSLC_ARG_ENUM)
+#undef WSLC_ARG_ENUM
+        };
+
+        const auto ArgTypeName = [](argument::ArgType type) -> std::wstring_view {
+            const auto index = static_cast<size_t>(type);
+            const auto max = static_cast<size_t>(argument::ArgType::Max);
+            if (index < max)
+            {
+                return c_argTypeNames[index];
+            }
+
+            return L"<unknown>";
+        };
+
+        // Starting with the Root command, verify no argument collisions.
+        std::vector<std::unique_ptr<Command>> commands;
+        commands.push_back(std::make_unique<RootCommand>());
+
+        while (!commands.empty())
+        {
+            auto current = std::move(commands.back());
+            commands.pop_back();
+            VERIFY_IS_NOT_NULL(current.get());
+
+            const std::wstring commandFullName(current->FullName());
+            std::unordered_set<size_t> seenTypes;
+            std::unordered_map<std::wstring, argument::ArgType> seenNames;
+            std::unordered_map<std::wstring, argument::ArgType> seenAliases;
+
+            for (const auto& arg : current->GetAllArguments())
+            {
+                // Check for duplicate ArgType registration.
+                if (!seenTypes.emplace(static_cast<size_t>(arg.Type())).second)
+                {
+                    VERIFY_FAIL(std::format(L"Command '{}' registers ArgType '{}' more than once", commandFullName, ArgTypeName(arg.Type()))
+                                    .c_str());
+                }
+
+                // Check name collision between distinct ArgTypes.
+                const auto& name = arg.Name();
+                auto [nameIt, nameInserted] = seenNames.emplace(name, arg.Type());
+                if (!nameInserted)
+                {
+                    VERIFY_FAIL(std::format(
+                                    L"Command '{}' has duplicate name '--{}' (ArgType '{}' conflicts with ArgType '{}')",
+                                    commandFullName,
+                                    name,
+                                    ArgTypeName(arg.Type()),
+                                    ArgTypeName(nameIt->second))
+                                    .c_str());
+                }
+
+                // Check alias collision between distinct ArgTypes; skip empty aliases (NO_ALIAS).
+                const auto& alias = arg.Alias();
+                if (!alias.empty())
+                {
+                    auto [aliasIt, aliasInserted] = seenAliases.emplace(alias, arg.Type());
+                    if (!aliasInserted)
+                    {
+                        VERIFY_FAIL(std::format(
+                                        L"Command '{}' has duplicate alias '-{}' (ArgType '{}' conflicts with ArgType '{}')",
+                                        commandFullName,
+                                        alias,
+                                        ArgTypeName(arg.Type()),
+                                        ArgTypeName(aliasIt->second))
+                                        .c_str());
+                    }
+                }
+            }
+
+            // Add any subcommands of this command for validation.
+            for (auto& sub : current->GetCommands())
+            {
+                commands.push_back(std::move(sub));
+            }
+        }
     }
 };
 

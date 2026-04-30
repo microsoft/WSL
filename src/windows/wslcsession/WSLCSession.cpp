@@ -240,6 +240,9 @@ try
 
     m_virtualMachine->Initialize();
 
+    // Get an event from the service that is signaled when the VM exits.
+    THROW_IF_FAILED(Vm->GetTerminationEvent(&m_vmExitedEvent));
+
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
@@ -259,6 +262,10 @@ try
 
     //  Start the event tracker.
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
+
+    // Monitor for unexpected VM exit.
+    m_ioRelay.AddHandle(
+        std::make_unique<windows::common::relay::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
 
     // Recover any existing containers from storage.
     RecoverExistingNetworks();
@@ -374,6 +381,18 @@ void WSLCSession::OnContainerdExited()
     {
         WSL_LOG("UnexpectedContainerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
     }
+}
+
+void WSLCSession::OnVmExited()
+{
+    WSL_LOG(
+        "VmExited",
+        TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+        TraceLoggingValue(m_id, "SessionId"),
+        TraceLoggingValue(m_displayName.c_str(), "Name"),
+        TraceLoggingValue(!m_sessionTerminatingEvent.is_signaled(), "Unexpected"));
+
+    LOG_IF_FAILED(Terminate());
 }
 
 void WSLCSession::OnProcessLog(const gsl::span<char>& Buffer, PCSTR Source)
@@ -2283,30 +2302,59 @@ CATCH_RETURN();
 HRESULT WSLCSession::Terminate()
 try
 {
-
+    // Ensure only one Terminate() runs. This must be checked before taking m_lock
+    // because OnVmExited() is called from the IORelay thread — if an external Terminate()
+    // holds m_lock and calls m_ioRelay.Stop(), the relay thread must not re-enter
+    // Terminate() and deadlock on m_lock.
+    if (m_terminating.exchange(true))
     {
-        std::lock_guard lock(m_userHandlesLock);
-
-        // m_sessionTerminatingEvent is always valid, so it can be signalled without holding m_lock.
-        // This allows a session to be unblocked if a stuck operation is holding m_lock.
-        // N.B. This must happen under m_userHandlesLock to synchronize with potentially running operations.
-        m_sessionTerminatingEvent.SetEvent();
-
-        // Cancel any pending IO on user-provided handles to unblock operations
-        // in case the handles don't support overlapped IO.
-        CancelUserHandleIO();
+        return S_OK;
     }
 
-    {
-        std::lock_guard comLock(m_userCOMCallbacksLock);
+    wil::rwlock_release_exclusive_scope_exit sessionLock;
 
-        // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
-        // to unblock operations waiting for cross-process COM responses.
-        CancelUserCOMCallbacks();
+    // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
+    // This is required because calling CancelIoEx() between two ReadFile() calls does nothing, and therefore could still allow another thread to get stuck doing synchronous IO.
+    bool retrying = false;
+    while (!sessionLock)
+    {
+        // If this isn't the first iteration, sleep to prevent this loop from burning too much CPU.
+        if (retrying)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        {
+            std::lock_guard lock(m_userHandlesLock);
+
+            // m_sessionTerminatingEvent is always valid, so it can be signalled without holding m_lock.
+            // This allows a session to be unblocked if a stuck operation is holding m_lock.
+            // N.B. This must happen under m_userHandlesLock to synchronize with potentially running operations.
+            if (!m_sessionTerminatingEvent.is_signaled())
+            {
+                m_sessionTerminatingEvent.SetEvent();
+            }
+
+            // Cancel any pending IO on user-provided handles to unblock operations
+            // in case the handles don't support overlapped IO.
+            CancelUserHandleIO();
+        }
+
+        {
+            std::lock_guard comLock(m_userCOMCallbacksLock);
+
+            // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
+            // to unblock operations waiting for cross-process COM responses.
+            CancelUserCOMCallbacks();
+        }
+
+        sessionLock = m_lock.try_lock_exclusive();
+        retrying = true;
     }
 
     // Acquire an exclusive lock to ensure that no operation is running.
-    auto lock = m_lock.lock_exclusive();
+    WI_VERIFY(sessionLock);
+
     std::lock_guard containersLock(m_containersLock);
     std::lock_guard volumesLock(m_volumesLock);
     std::lock_guard networksLock(m_networksLock);
@@ -2331,33 +2379,44 @@ try
     m_eventTracker.reset();
     m_dockerClient.reset();
 
-    // Stop dockerd first, then containerd (dockerd is a client of containerd).
-    // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
-    if (m_dockerdProcess.has_value())
+    // Check if the VM has already exited (e.g., killed externally).
+    // If so, skip operations that require a live VM to avoid unnecessary waits.
+    // N.B. m_vmExitedEvent may be uninitialized if Terminate() is called from the
+    // Initialize() error path before GetTerminationEvent() succeeds.
+    if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
-        auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-        WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
-        m_dockerdProcess.reset();
+        WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
     }
-
-    if (m_containerdProcess.has_value())
+    else
     {
-        auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
-        WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
-        m_containerdProcess.reset();
-    }
-
-    if (m_virtualMachine)
-    {
-        // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
-        try
+        // Stop dockerd first, then containerd (dockerd is a client of containerd).
+        // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
+        if (m_dockerdProcess.has_value())
         {
-            m_virtualMachine->Unmount(c_containerdStorage);
+            auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
         }
-        CATCH_LOG();
 
-        m_virtualMachine.reset();
+        if (m_containerdProcess.has_value())
+        {
+            auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
+        }
+
+        if (m_virtualMachine)
+        {
+            // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
+            try
+            {
+                m_virtualMachine->Unmount(c_containerdStorage);
+            }
+            CATCH_LOG();
+        }
     }
+
+    m_dockerdProcess.reset();
+    m_containerdProcess.reset();
+    m_virtualMachine.reset();
 
     m_terminated = true;
     return S_OK;

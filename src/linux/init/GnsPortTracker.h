@@ -1,9 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
-#include <deque>
 #include <map>
-#include <mutex>
 #include <set>
 #include <utility>
 #include <optional>
@@ -146,9 +144,7 @@ private:
 
     static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
 
-    void ResolvePortZeroBind(DeferredPortLookup lookup);
-
-    void RunDeferredResolve();
+    std::optional<PortAllocation> ResolvePortZeroBind(DeferredPortLookup lookup);
 
     void TrackPort(PortAllocation allocation);
 
@@ -163,15 +159,6 @@ private:
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
 
     std::string m_networkNamespace;
-
-    std::mutex m_deferredMutex;
-    std::condition_variable m_deferredCv;
-    std::deque<DeferredPortLookup> m_deferredQueue;
-
-    // Resolved port-0 allocations posted by the background RunDeferredResolve thread
-    // for the main Run() loop to process (keeps SocketChannel access single-threaded).
-    std::mutex m_resolvedMutex;
-    std::deque<PortAllocation> m_resolvedQueue;
 };
 
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& portAllocation);

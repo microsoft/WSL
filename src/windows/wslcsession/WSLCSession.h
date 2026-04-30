@@ -156,6 +156,16 @@ public:
     UserCOMCallback RegisterUserCOMCallback();
     void UnregisterUserCOMCallback(DWORD ThreadId);
 
+    HANDLE SessionTerminatingEvent() const noexcept
+    {
+        return m_sessionTerminatingEvent.get();
+    }
+
+    ULONG Id() const noexcept
+    {
+        return m_id;
+    }
+
 private:
     ULONG m_id = 0;
 
@@ -167,6 +177,7 @@ private:
     void OnProcessLog(const gsl::span<char>& Data, PCSTR Source);
     void OnContainerdExited();
     void OnDockerdExited();
+    void OnVmExited();
     ServiceRunningProcess StartProcess(
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
     void StartContainerd();
@@ -198,12 +209,14 @@ private:
     std::mutex m_networksLock;
     std::unordered_map<std::string, NetworkEntry> m_networks;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_vmExitedEvent;
     wil::srwlock m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_containerdProcess;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLCFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
+    std::atomic<bool> m_terminating{false};
     std::atomic<bool> m_terminated{false};
 
     // User-provided handles that the session is currently doing IO on.

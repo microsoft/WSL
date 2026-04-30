@@ -2135,6 +2135,11 @@ Return Value:
 {
     LogInfo("Exiting UnitTests module");
 
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        WslTraceLoggingUninitialize();
+        g_mtaCookie.reset();
+    });
+
     //
     // Release the watchdog timer.
     //
@@ -2189,9 +2194,6 @@ Return Value:
 
         wsl::windows::common::registry::WriteString(userKey.get(), nullptr, L"DefaultDistribution", g_originalDefaultDistro.c_str());
     }
-
-    WslTraceLoggingUninitialize();
-    g_mtaCookie.reset();
 
     return true;
 }

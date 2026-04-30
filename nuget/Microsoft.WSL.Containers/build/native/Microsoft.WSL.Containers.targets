@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-    <PropertyGroup Condition="'$(WSLCSDK_Platform)' == ''">
-        <WSLCSDK_Platform>$(Platform)</WSLCSDK_Platform>
+    <PropertyGroup>
+        <WslcPlatform Condition="'$(WslcPlatform)' == ''">$(Platform)</WslcPlatform>
+        <_wslcIsInvalidPlatform Condition="'$(WslcPlatform)' != 'x64' and '$(WslcPlatform)' != 'arm64'">true</_wslcIsInvalidPlatform>
     </PropertyGroup>
+
     <ItemDefinitionGroup>
         <ClCompile>
             <AdditionalIncludeDirectories>
@@ -16,11 +18,17 @@
                 %(AdditionalDependencies)
             </AdditionalDependencies>
             <AdditionalLibraryDirectories>
-                $(MSBuildThisFileDirectory)..\..\runtimes\win-$(Platform);
+                $(MSBuildThisFileDirectory)..\..\runtimes\win-$(WslcPlatform);
                 %(AdditionalLibraryDirectories)
             </AdditionalLibraryDirectories>
         </Link>
     </ItemDefinitionGroup>
 
-    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
+    <ItemGroup>
+        <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(WslcPlatform)\native\wslcsdk.dll" />
+    </ItemGroup>
+
+    <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcIsInvalidPlatform)' == 'true'">
+        <Error Text="wslcsdk.dll could not be copied because platform '$(WslcPlatform)' is not supported. Only x64 and arm64 platforms are supported. You can override the detected platform by setting the property WslcPlatform." />
+    </Target>
 </Project>

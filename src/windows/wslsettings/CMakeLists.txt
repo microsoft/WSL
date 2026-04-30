@@ -1,6 +1,6 @@
 set(TargetApp wslsettings)
 
-project(${TargetApp} LANGUAGES CSharp)
+enable_language(CSharp)
 
 # needed for csharp_set_xaml_cs_properties
 include(CSharpUtilities)
@@ -127,6 +127,7 @@ add_executable(
   Views/Settings/NetworkingPage.xaml.cs
   Views/Settings/OptionalFeaturesPage.xaml
   Views/Settings/OptionalFeaturesPage.xaml.cs
+  Views/Settings/SettingsApplyHelper.cs
   Views/Settings/ShellPage.xaml
   Views/Settings/ShellPage.xaml.cs
   Windows/OOBEWindow.xaml
@@ -183,21 +184,16 @@ csharp_set_xaml_cs_properties(
   Views/Settings/ShellPage.xaml.cs
 )
 
+configure_csharp_target(${TargetApp})
+
 set_property(
   SOURCE App.xaml
   PROPERTY VS_XAML_TYPE
   "ApplicationDefinition"
 )
 
-# Set the C# language version (defaults to 3.0).
-set(
-  CMAKE_CSharp_FLAGS
-  "/langversion:latest"
-)
-
 target_compile_options(
   ${TargetApp}
-  PRIVATE "/debug:full"
   PRIVATE "/unsafe"
 )
 
@@ -218,23 +214,6 @@ Microsoft.Xaml.Behaviors.WinUI.Managed_${XAML_BEHAVIORS_VERSION};\
 WinUIEx_${WINUIEX_VERSION}"
 )
 
-set(
-  TARGET_PLATFORM_VERSION
-  "10.0.26100.0"
-)
-set(
-  WINDOWS_TARGET_PLATFORM_VERSION
-  "windows${TARGET_PLATFORM_VERSION}"
-)
-set(
-  TARGET_PLATFORM_MIN_VERSION
-  "10.0.19041.0"
-)
-set(
-  WINDOWS_TARGET_PLATFORM_MIN_VERSION
-  "windows${TARGET_PLATFORM_MIN_VERSION}"
-)
-
 set_target_properties(
   ${TargetApp} PROPERTIES
   # ----- Dotnet, Windows App SDK and WinUI stuff starts here -----
@@ -252,16 +231,8 @@ set_target_properties(
   VS_GLOBAL_Platform "${TARGET_PLATFORM}"
   VS_GLOBAL_Platforms "${TARGET_PLATFORM}"
   VS_GLOBAL_PlatformTarget "${TARGET_PLATFORM}"
-  VS_GLOBAL_TargetPlatformVersion "${TARGET_PLATFORM_VERSION}"
-  VS_GLOBAL_TargetPlatformMinVersion "${TARGET_PLATFORM_MIN_VERSION}"
-  VS_GLOBAL_WindowsSdkPackageVersion "${WINDOWS_SDK_DOTNET_VERSION}"
   VS_GLOBAL_ImplicitUsings enable
   VS_GLOBAL_Nullable enable
-  VS_GLOBAL_AppendRuntimeIdentifierToOutputPath false
-  VS_GLOBAL_GenerateAssemblyInfo false
-  VS_GLOBAL_TargetLatestRuntimePatch false
-  DOTNET_SDK "Microsoft.NET.Sdk"
-  DOTNET_TARGET_FRAMEWORK "net8.0-${WINDOWS_TARGET_PLATFORM_VERSION}"
 )
 
 configure_file(

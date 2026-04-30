@@ -15,6 +15,7 @@ Abstract:
 
 #pragma once
 
+#include <atomic>
 #include "wslc.h"
 #include "hcs.hpp"
 #include "GuestDeviceManager.h"
@@ -43,6 +44,7 @@ public:
     IFACEMETHOD(DetachDisk)(_In_ ULONG Lun) override;
     IFACEMETHOD(AddShare)(_In_ LPCWSTR WindowsPath, _In_ BOOL ReadOnly, _Out_ GUID* ShareId) override;
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
+    IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
 
 private:
     struct DiskInfo
@@ -93,8 +95,8 @@ private:
 
     std::filesystem::path m_vmSavedStateFile;
     std::filesystem::path m_crashDumpFolder;
-    bool m_vmSavedStateCaptured = false;
-    bool m_crashLogCaptured = false;
+    std::atomic<bool> m_vmSavedStateCaptured = false;
+    std::atomic<bool> m_crashLogCaptured = false;
 
     wil::com_ptr<ITerminationCallback> m_terminationCallback;
 };

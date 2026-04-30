@@ -60,12 +60,12 @@
                 "FriendlyName": "openSUSE Tumbleweed",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103.x86_64-1.224-Build1.224.wsl",
-                    "Sha256": "0x394be699da2821b331355f3541e237aa3aa00bc4068f33283d68303d8336d484"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422.x86_64-2.97-Build2.97.wsl",
+                    "Sha256": "0xc0dcf707276626e7a6227404c6a1e351dfdb9d39f2538d2b8a78a2c2e41f5912"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103.aarch64-2.195-Build2.195.wsl",
-                    "Sha256": "0xbcbb88e957091c425ecb42f3076b8882b5976fd94885e453afaee40de3b79470"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422.aarch64-3.82-Build3.82.wsl",
+                    "Sha256": "0x70d02e702b7788c494ad785bc3987ac1361f263af99d2c8180aac269cf0a9747"
                 }
             },
             {
@@ -325,8 +325,8 @@
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103-WSL.x86_64-26003.9.1368.0-Build9.1368.appx",
-            "Arm64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260106.0/openSUSE-Tumbleweed-20260103-WSL.aarch64-26003.9.741.0-Build9.741.appx",
+            "Amd64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422-WSL.x86_64-26112.10.203.0-Build10.203.appx",
+            "Arm64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20260423.0/openSUSE-Tumbleweed-20260422-WSL.aarch64-26112.10.154.0-Build10.154.appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]

@@ -75,10 +75,6 @@ void DeviceHostProxy::RemoveDevice(const GUID& Type, const GUID& InstanceId)
         m_devices.erase(InstanceId);
     }
 
-    // TODO: Add this back after the the hotplug issue with the most recent wsldevicehost.dll is resolved.
-    //       See https://github.com/microsoft/openvmm/issues/3077 for more details.
-    return;
-
     // N.B. Removing the FlexIov device is best effort since not all versions of Windows support it.
     try
     {

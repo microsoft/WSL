@@ -33,7 +33,8 @@ void GnsPortTrackerChannel::Run()
     {
         for (;;)
         {
-            auto [header, range] = m_channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+            auto transaction = m_channel.ReceiveTransaction();
+            auto [header, range] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
             if (header == nullptr)
             {
                 return;
@@ -46,7 +47,8 @@ void GnsPortTrackerChannel::Run()
                 const auto* message = gslhelpers::try_get_struct<LX_GNS_PORT_ALLOCATION_REQUEST>(range);
                 THROW_HR_IF_MSG(E_UNEXPECTED, !message, "Unexpected message size: %i", header->MessageSize);
 
-                m_channel.SendResultMessage<int32_t>(m_callback(ConvertPortRequestToSockAddr(message), message->Protocol, message->Allocate));
+                transaction.SendResultMessage<int32_t>(
+                    m_callback(ConvertPortRequestToSockAddr(message), message->Protocol, message->Allocate));
             }
             break;
             case LxGnsMessageIfStateChangeRequest:
@@ -55,7 +57,7 @@ void GnsPortTrackerChannel::Run()
                 THROW_HR_IF_MSG(E_UNEXPECTED, !message, "Unexpected message size: %i", header->MessageSize);
 
                 m_interfaceStateCallback(message->InterfaceName, message->InterfaceUp);
-                m_channel.SendResultMessage<int32_t>(0);
+                transaction.SendResultMessage<int32_t>(0);
             }
             break;
             default:

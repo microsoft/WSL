@@ -20,10 +20,12 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
+#include "VolumeModel.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
 using namespace wsl::shared;
+using namespace wsl::windows::common;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
@@ -31,6 +33,26 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
+
+static bool TryInspectContainer(Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
+{
+    try
+    {
+        inspectData = ContainerService::Inspect(session, containerId);
+        return true;
+    }
+    catch (const wil::ResultException& ex)
+    {
+        if (ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
+        {
+            PrintMessage(Localization::MessageWslcContainerNotFound(containerId.c_str()), stderr);
+            return false;
+        }
+
+        throw;
+    }
+}
+
 void AttachContainer::operator()(CLIExecutionContext& context) const
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -71,8 +93,15 @@ void InspectContainers(CLIExecutionContext& context)
     std::vector<wsl::windows::common::wslc_schema::InspectContainer> result;
     for (const auto& id : containerIds)
     {
-        auto inspectData = ContainerService::Inspect(session, WideToMultiByte(id));
-        result.push_back(inspectData);
+        std::optional<wslc_schema::InspectContainer> inspectData;
+        if (TryInspectContainer(session, WideToMultiByte(id), inspectData))
+        {
+            result.push_back(*inspectData);
+        }
+        else
+        {
+            context.ExitCode = 1;
+        }
     }
 
     auto json = ToJson(result, c_jsonPrettyPrintIndent);
@@ -345,6 +374,15 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         for (const auto& value : tmpfs)
         {
             options.Tmpfs.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Label))
+    {
+        for (const auto& label : context.Args.GetAll<ArgType::Label>())
+        {
+            auto parsed = Label::Parse(label);
+            options.Labels.emplace_back(parsed.first, parsed.second);
         }
     }
 

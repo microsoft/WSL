@@ -113,6 +113,7 @@ find_package(NUGET REQUIRED)
 find_package(VERSION REQUIRED)
 find_package(MC REQUIRED)
 find_package(Appx REQUIRED)
+find_package(CSharp REQUIRED)
 
 # Download nuget packages
 restore_nuget_packages()
@@ -169,6 +170,10 @@ endif()
 
 if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
+endif ()
+
+if (NOT DEFINED WSL_BUILD_SDKCS)
+    set(WSL_BUILD_SDKCS false)
 endif ()
 
 find_commit_hash(COMMIT_HASH)
@@ -310,6 +315,12 @@ if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
 endif()
 
+if (WSL_BUILD_SDKCS OR WSL_BUILD_WSL_SETTINGS)
+    set(CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS} /langversion:latest /debug:full")
+    set(CMAKE_DOTNET_SDK "Microsoft.NET.Sdk")
+    set(CMAKE_DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
+endif()
+
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
 set(COMMON_LINK_LIBRARIES
@@ -398,12 +409,6 @@ set(WSL_PRE_COMMIT_MODE "warn" CACHE STRING "Pre-commit hook behavior: warn, err
 # Generate the pre-commit hook into the build tree
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tools/hooks)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit.in ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit @ONLY)
-
-cmake_path(COMPARE "${wsl_SOURCE_DIR}" EQUAL "${wsl_BINARY_DIR}" BUILD_IN_SOURCE)
-if (NOT ${BUILD_IN_SOURCE}) # Testing on 3.26 project_type_DIR paths appear canonicalized
-    file(CREATE_LINK ${LLVM_INSTALL_DIR}/clang-format.exe ${wsl_SOURCE_DIR}/tools/clang-format.exe COPY_ON_ERROR)
-    file(COPY_FILE ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit ${wsl_SOURCE_DIR}/tools/hooks/pre-commit ONLY_IF_DIFFERENT)
-endif()
 
 set(LINUXSDK_PATH ${LINUXSDK_SOURCE_DIR}/${LLVM_ARCH})
 set(LLVM_TARGET "${LLVM_ARCH}-unknown-linux-musl")
@@ -536,6 +541,10 @@ add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
+
+if (WSL_BUILD_SDKCS)
+    add_subdirectory(src/windows/WslcSDK/csharp)
+endif()
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

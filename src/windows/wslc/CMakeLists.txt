@@ -23,7 +23,9 @@ target_precompile_headers(wslclib REUSE_FROM common)
 set_target_properties(wslclib PROPERTIES FOLDER windows)
 
 # Create wslc.exe
-add_executable(wslc $<TARGET_OBJECTS:wslclib>)
+# N.B. Linking wslclib (OBJECT library) brings both object files and
+# transitive dependencies. Do not also use $<TARGET_OBJECTS:wslclib>.
+add_executable(wslc)
 
 target_link_libraries(wslc wslclib)
 

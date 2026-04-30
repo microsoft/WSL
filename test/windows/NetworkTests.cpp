@@ -2136,6 +2136,24 @@ class NetworkTests
             std::chrono::minutes(2)));
     }
 
+    static void VerifyPortZeroRebindSucceeds()
+    {
+        // Verify that bind(0) -> close -> immediate rebind on the same port succeeds.
+        // Uses a perl one-liner to perform the entire sequence in a single process,
+        // matching the semantics of a native C test (no SO_REUSEADDR, same-process rebind).
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"perl -MSocket -e '"
+                            L"socket(S1,AF_INET,SOCK_STREAM,0) or die;"
+                            L"bind(S1,sockaddr_in(0,INADDR_ANY)) or die;"
+                            L"my $port=(sockaddr_in(getsockname(S1)))[0];"
+                            L"close(S1);"
+                            L"socket(S2,AF_INET,SOCK_STREAM,0) or die;"
+                            L"bind(S2,sockaddr_in($port,INADDR_ANY)) or die;"
+                            L"close(S2)"
+                            L"'"),
+            0L);
+    }
+
     template <typename T>
     static void VerifyNotBound(T& Address, int AddressFamily, int Protocol)
     {
@@ -4038,6 +4056,16 @@ class MirroredTests
         NetworkTests::VerifyPortZeroBindIsTracked(false);
     }
 
+    WSL2_TEST_METHOD(PortZeroRebindSucceeds)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyPortZeroRebindSucceeds();
+    }
+
     WSL2_TEST_METHOD(ExplicitEphemeralBind)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4552,6 +4580,22 @@ class MirroredTests
 
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
+
+    WSL2_TEST_METHOD(MirroredFallbackToNatWhenIpv6Disabled)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        // Set the registry key to disable IPv6 globally on the host.
+        RegistryKeyChange<DWORD> disableIpv6(
+            HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters", L"DisabledComponents", 0xFF);
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        // Force a restart so we re-evaluate the networking mode with the regkey set.
+        WslShutdown();
+
+        // Verify WSL is actually running in NAT mode.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
+    }
 };
 
 class BridgedTests
@@ -4840,6 +4884,15 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         NetworkTests::VerifyPortZeroBindIsTracked();
+    }
+
+    WSL2_TEST_METHOD(PortZeroRebindSucceeds)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyPortZeroRebindSucceeds();
     }
 
     WSL2_TEST_METHOD(HttpProxySimple)

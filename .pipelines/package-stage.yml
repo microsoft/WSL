@@ -83,6 +83,7 @@ stages:
                   Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\installer\installer.$($arch.platform).msix" "$dest\installer.msix"
                   Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.lib" "$dest\wslcsdk.lib"
                   Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdk.dll" "$dest\wslcsdk.dll"
+                  Copy-Item "$(Pipeline.Workspace)\drop_$($arch.platform)\sdk\$($arch.platform)\wslcsdkcs.dll" "$dest\wslcsdkcs.dll"
               }
 
               # Copy MSIs to the output bundle directory

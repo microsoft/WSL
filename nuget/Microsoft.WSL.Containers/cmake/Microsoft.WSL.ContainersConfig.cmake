@@ -47,7 +47,7 @@ add_library(Microsoft.WSL.Containers::SDK SHARED IMPORTED GLOBAL)
 set_target_properties(Microsoft.WSL.Containers::SDK PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${_wslcsdk_include_dir}"
     IMPORTED_IMPLIB "${_wslcsdk_lib_dir}/wslcsdk.lib"
-    IMPORTED_LOCATION "${_wslcsdk_lib_dir}/wslcsdk.dll"
+    IMPORTED_LOCATION "${_wslcsdk_lib_dir}/native/wslcsdk.dll"
 )
 
 # Clean up temporary variables

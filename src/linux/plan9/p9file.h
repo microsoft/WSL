@@ -33,7 +33,7 @@ struct Root final : public IRoot
         std::vector<char> buffer(bufsize);
         passwd pwd{};
         passwd* result = nullptr;
-        if (getpwuid_r(uid, &pwd, buffer.data(), buffer.size(), &result) < 0 || result == nullptr)
+        if (getpwuid_r(uid, &pwd, buffer.data(), buffer.size(), &result) != 0 || result == nullptr)
         {
             Plan9TraceLoggingProvider::LogMessage(std::format("getpwuid_r failed for uid: {}, errno={}", uid, errno));
             return;

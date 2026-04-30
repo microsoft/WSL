@@ -1,4 +1,5 @@
 set(NUGET_PACKAGES Microsoft.WSL.PluginApi.nuspec Microsoft.WSL.Containers.nuspec)
+set(WSL_NUGET_TARGET_FRAMEWORK "net8.0-windows10.0.19041.0")
 
 # generate vars with native paths since nuget won't accept unix path separators
 cmake_path(NATIVE_PATH CMAKE_SOURCE_DIR CMAKE_SOURCE_DIR_NATIVE)

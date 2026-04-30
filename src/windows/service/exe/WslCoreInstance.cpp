@@ -344,7 +344,8 @@ void WslCoreInstance::UpdateTimezone()
         wsl::windows::common::helpers::GenerateTimezoneUpdateMessage(wsl::windows::common::helpers::GetLinuxTimezone(m_userToken.get()));
 
     auto lock = m_initChannel->Lock();
-    m_initChannel->GetChannel().SendMessage<LX_INIT_TIMEZONE_INFORMATION>(gsl::make_span(message));
+    auto transaction = m_initChannel->GetChannel().StartTransaction();
+    transaction.Send<LX_INIT_TIMEZONE_INFORMATION>(gsl::make_span(message));
 }
 
 ULONG64 WslCoreInstance::GetLifetimeManagerId() const
@@ -389,11 +390,12 @@ void WslCoreInstance::Initialize()
     auto config = wsl::windows::common::helpers::GenerateConfigurationMessage(
         m_configuration.Name, fixedDrives, m_defaultUid, timezone, {}, m_featureFlags, drvfsMount);
 
-    m_initChannel->GetChannel().SendMessage<LX_INIT_CONFIGURATION_INFORMATION>(gsl::span(config));
+    auto transaction = m_initChannel->GetChannel().StartTransaction();
+    transaction.Send<LX_INIT_CONFIGURATION_INFORMATION>(gsl::span(config));
 
     // Init replies with information about the distribution.
     gsl::span<gsl::byte> span;
-    const auto& response = m_initChannel->GetChannel().ReceiveMessage<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
+    const auto& response = transaction.Receive<LX_INIT_CONFIGURATION_INFORMATION_RESPONSE>(&span);
     m_defaultUid = response.DefaultUid;
     m_plan9Port = response.Plan9Port;
     m_distributionInfo.PidNamespace = response.PidNamespace;
@@ -473,8 +475,9 @@ bool WslCoreInstance::RequestStop(_In_ bool Force)
             terminateMessage.Header.MessageSize = sizeof(terminateMessage);
             terminateMessage.Force = Force;
 
-            m_initChannel->GetChannel().SendMessage(terminateMessage);
-            auto [message, span] = m_initChannel->GetChannel().ReceiveMessageOrClosed<RESULT_MESSAGE<bool>>(m_socketTimeout);
+            auto transaction = m_initChannel->GetChannel().StartTransaction();
+            transaction.Send(terminateMessage);
+            auto [message, span] = transaction.ReceiveOrClosed<RESULT_MESSAGE<bool>>(m_socketTimeout);
             if (message)
             {
                 shutdown = message->Result;

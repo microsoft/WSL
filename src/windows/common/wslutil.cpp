@@ -616,10 +616,36 @@ wsl::windows::common::wslutil::GetDefaultVersion(void)
     return version;
 }
 
+namespace {
+
+// Returns true if Windows Admin Protection (shadow admin) is enabled on
+// this system. The message is shown for both elevated and non-elevated
+// callers because either side may be missing the other's distributions.
+// Caches the DLL lookup on first call.
+bool IsAdminProtectionEnabled()
+{
+    using ShadowAdminEnabledFn = BOOL(WINAPI)();
+    static std::optional<LxssDynamicFunction<ShadowAdminEnabledFn>> s_fn;
+    static std::once_flag s_initFlag;
+
+    std::call_once(s_initFlag, []() {
+        LxssDynamicFunction<ShadowAdminEnabledFn> fn{DynamicFunctionErrorLogs::None};
+        if (SUCCEEDED(fn.load(L"SecurityHealthUdk.dll", "Shield_LUAIsShadowAdminEnabled")))
+        {
+            s_fn.emplace(std::move(fn));
+        }
+    });
+
+    return s_fn.has_value() && (*s_fn)();
+}
+
+} // anonymous namespace
+
 std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
 {
     ULONG buildNumber = 0;
     std::wstring kbUrl;
+    std::wstring errorString;
 
     switch (result)
     {
@@ -639,10 +665,12 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
         return Localization::MessageHigherIntegrity();
 
     case WSL_E_DEFAULT_DISTRO_NOT_FOUND:
-        return Localization::MessageNoDefaultDistro();
+        errorString = Localization::MessageNoDefaultDistro();
+        break;
 
     case WSL_E_DISTRO_NOT_FOUND:
-        return Localization::MessageDistroNotFound();
+        errorString = Localization::MessageDistroNotFound();
+        break;
 
     case WSL_E_DISTRIBUTION_NAME_NEEDED:
         return Localization::MessageDistributionNameNeeded();
@@ -779,7 +807,26 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     }
     }
 
-    return GetSystemErrorString(result);
+    if (errorString.empty())
+    {
+        return GetSystemErrorString(result);
+    }
+
+    // If Admin Protection is enabled, prepend an informational message for
+    // errors that may be caused by the shadow admin's separate registry hive.
+    try
+    {
+        if (IsAdminProtectionEnabled())
+        {
+            auto message = Localization::MessageAdminProtectionEnabled();
+            message += L"\n\n";
+            message += errorString;
+            return message;
+        }
+    }
+    CATCH_LOG()
+
+    return errorString;
 }
 
 std::optional<std::pair<std::wstring, GitHubReleaseAsset>> wsl::windows::common::wslutil::GetGitHubAssetFromRelease(const GitHubRelease& Release)
@@ -1316,8 +1363,15 @@ void wsl::windows::common::wslutil::SetCrtEncoding(int Mode)
     setMode(stdout, Mode);
     setMode(stderr, Mode);
 
-    // Set the locale to the current environment's default locale.
+    // Set the locale to the current environment's default locale for regional
+    // formatting (numeric, time, collation), then override LC_CTYPE to UTF-8
+    // so that narrow-to-wide conversions (e.g. %hs in wprintf) correctly decode
+    // UTF-8 multi-byte sequences from Linux/container processes.
     WI_VERIFY(_wsetlocale(LC_ALL, L"") != NULL);
+    if (Mode == _O_U8TEXT)
+    {
+        WI_VERIFY(_wsetlocale(LC_CTYPE, L".UTF-8") != NULL);
+    }
 }
 
 void wsl::windows::common::wslutil::SetThreadDescription(LPCWSTR Name)

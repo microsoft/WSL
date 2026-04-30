@@ -278,9 +278,10 @@ void WSLCVirtualMachine::Initialize()
     auto [__, ___, childChannel] = Fork(WSLC_FORK::Thread);
 
     WSLC_WATCH_PROCESSES watchMessage{};
-    childChannel.SendMessage(watchMessage);
+    auto watchTransaction = childChannel.StartTransaction();
+    watchTransaction.Send(watchMessage);
 
-    THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
+    THROW_HR_IF(E_FAIL, watchTransaction.Receive<RESULT_MESSAGE<uint32_t>>().Result != 0);
 
     m_processExitThread = std::thread(std::bind(&WSLCVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
 
@@ -567,7 +568,10 @@ WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::share
 {
     WSLC_ACCEPT message{};
     message.Fd = Fd;
-    const auto& response = Channel.Transaction(message);
+
+    auto transaction = Channel.StartTransaction();
+    transaction.Send(message);
+    const auto& response = transaction.Receive<WSLC_ACCEPT::TResponse>();
 
     ConnectedSocket socket;
     socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
@@ -575,7 +579,7 @@ WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::share
     // If the FD was unspecified, read the Linux file descriptor from the guest.
     if (Fd == -1)
     {
-        socket.Fd = Channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
+        socket.Fd = transaction.Receive<RESULT_MESSAGE<int32_t>>().Result;
     }
     else
     {
@@ -641,24 +645,29 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
 
     // Check if this is a tty or not
     const WSLCProcessFd* tty = nullptr;
-    const WSLCProcessFd* ttyControl = nullptr;
     auto [pid, _, childChannel] = Fork(WSLC_FORK::Process);
 
     std::vector<WSLCVirtualMachine::ConnectedSocket> sockets;
+    ConnectedSocket ttyControlhandle;
     for (const auto& e : Fds)
     {
-        if (e.Type == WSLCFdTypeTty)
-        {
-            THROW_HR_IF_MSG(E_INVALIDARG, tty != nullptr, "Multiple terminal fds specified");
-            tty = &e;
-        }
-        else if (e.Type == WSLCFdTypeTtyControl)
-        {
-            THROW_HR_IF_MSG(E_INVALIDARG, ttyControl != nullptr, "Multiple terminal control fds specified");
-            ttyControl = &e;
-        }
 
-        sockets.emplace_back(ConnectSocket(childChannel, static_cast<int32_t>(e.Fd)));
+        if (e.Type == WSLCFdTypeTtyControl)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, ttyControlhandle.Fd != -1, "Multiple terminal control fds specified");
+
+            ttyControlhandle = ConnectSocket(childChannel, e.Fd);
+        }
+        else
+        {
+            if (e.Type == WSLCFdTypeTty)
+            {
+                THROW_HR_IF_MSG(E_INVALIDARG, tty != nullptr, "Multiple terminal fds specified");
+                tty = &e;
+            }
+
+            sockets.emplace_back(ConnectSocket(childChannel, e.Fd));
+        }
     }
 
     PrepareCommandLine(sockets);
@@ -670,6 +679,16 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     Message.WriteStringArray(Message->CommandLineIndex, Options.CommandLine.Values, Options.CommandLine.Count);
     Message.WriteStringArray(Message->EnvironmentIndex, Options.Environment.Values, Options.Environment.Count);
 
+    // N.B. The process control needs to be registered before the actual exec message is sent. Otherwise, if the process exits quickly, we might receive the exit notification before registering it.
+    std::shared_ptr<VMProcessControl> control;
+    auto registerProcess = [&](int processPid) {
+        control = std::make_shared<VMProcessControl>(*this, processPid, std::move(ttyControlhandle.Socket));
+        {
+            std::lock_guard lock{m_trackedProcessesLock};
+            m_trackedProcesses.emplace_back(control);
+        }
+    };
+
     // If this is an interactive tty, we need a relay process
     if (tty != nullptr)
     {
@@ -677,8 +696,11 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
         WSLC_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.Socket = tty->Fd;
-        relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
-        childChannel.SendMessage(relayMessage);
+        relayMessage.TtyControl = ttyControlhandle.Fd; // N.B. Fd is set to -1 if unset.
+        {
+            auto relayTransaction = childChannel.StartTransaction();
+            relayTransaction.Send(relayMessage);
+        }
 
         auto result = ExpectClosedChannelOrError(childChannel);
         if (result != 0)
@@ -687,8 +709,14 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
             THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
 
-        grandChildChannel.SendMessage<WSLC_EXEC>(Message.Span());
-        result = ExpectClosedChannelOrError(grandChildChannel);
+        registerProcess(grandChildPid);
+
+        {
+            auto execTransaction = grandChildChannel.StartTransaction();
+            execTransaction.Send<WSLC_EXEC>(Message.Span());
+            auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
+            result = execResponse != nullptr ? execResponse->Result : 0;
+        }
         if (result != 0)
         {
             setErrno(result);
@@ -699,8 +727,12 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
     }
     else
     {
-        childChannel.SendMessage<WSLC_EXEC>(Message.Span());
-        auto result = ExpectClosedChannelOrError(childChannel);
+        registerProcess(pid);
+
+        auto execTransaction = childChannel.StartTransaction();
+        execTransaction.Send<WSLC_EXEC>(Message.Span());
+        auto [execResponse, execSpan] = execTransaction.ReceiveOrClosed<RESULT_MESSAGE<int32_t>>();
+        auto result = execResponse != nullptr ? execResponse->Result : 0;
         if (result != 0)
         {
             setErrno(result);
@@ -708,27 +740,13 @@ Microsoft::WRL::ComPtr<WSLCProcess> WSLCVirtualMachine::CreateLinuxProcessImpl(
         }
     }
 
-    wil::unique_socket ttyControlHandle;
-
     std::map<ULONG, TypedHandle> stdHandles;
     for (auto& [fd, handle] : sockets)
     {
-        if (ttyControl != nullptr && fd == ttyControl->Fd)
-        {
-            ttyControlHandle = std::move(handle);
-            continue;
-        }
-
         stdHandles.emplace(fd, TypedHandle{wil::unique_handle{reinterpret_cast<HANDLE>(handle.release())}, WSLCHandleTypeSocket});
     }
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
-    auto control = std::make_shared<VMProcessControl>(*this, pid, std::move(ttyControlHandle));
-
-    {
-        std::lock_guard lock{m_trackedProcessesLock};
-        m_trackedProcesses.emplace_back(control);
-    }
 
     auto process = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), Options.Flags);
 
@@ -1197,15 +1215,23 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
 
             auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmTerminatingEvent.get()};
 
-            const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
-            const char* process = reinterpret_cast<const char*>(&message.Buffer);
+            auto transaction = channel.ReceiveTransaction();
+            gsl::span<gsl::byte> responseSpan;
+            const auto& message = transaction.Receive<LX_PROCESS_CRASH>(&responseSpan);
+
+            const auto bufferSize = responseSpan.size_bytes() - offsetof(LX_PROCESS_CRASH, Buffer);
+            const std::string process(message.Buffer, strnlen(message.Buffer, bufferSize));
 
             constexpr auto dumpExtension = ".dmp";
             constexpr auto dumpPrefix = "wsl-crash";
 
             auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
 
-            std::replace_if(filename.begin(), filename.end(), [](auto e) { return !std::isalnum(e) && e != '.' && e != '-'; }, '_');
+            std::replace_if(
+                filename.begin(),
+                filename.end(),
+                [](char e) { return !std::isalnum(static_cast<unsigned char>(e)) && e != '.' && e != '-'; },
+                '_');
 
             auto fullPath = crashDumpFolder / filename;
 
@@ -1214,7 +1240,7 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
                 TraceLoggingValue(fullPath.c_str(), "FullPath"),
                 TraceLoggingValue(message.Pid, "Pid"),
                 TraceLoggingValue(message.Signal, "Signal"),
-                TraceLoggingValue(process, "process"));
+                TraceLoggingValue(process.c_str(), "process"));
 
             filesystem::EnsureDirectory(crashDumpFolder.c_str());
 
@@ -1235,7 +1261,7 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
             wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
             THROW_LAST_ERROR_IF(!file);
 
-            channel.SendResultMessage<std::int32_t>(0);
+            transaction.SendResultMessage<std::int32_t>(0);
             relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
         }
         CATCH_LOG()

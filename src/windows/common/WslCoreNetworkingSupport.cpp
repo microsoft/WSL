@@ -117,11 +117,11 @@ bool wsl::core::networking::IsFlowSteeringSupportedByHns() noexcept
                 allocatePortRange.load(c_computeNetworkModuleName, "HcnReserveGuestNetworkServicePortRange"));
 
             static LxssDynamicFunction<decltype(HcnReserveGuestNetworkServicePort)> allocatePort{DynamicFunctionErrorLogs::None};
-            RETURN_IF_FAILED_EXPECTED(allocatePortRange.load(c_computeNetworkModuleName, "HcnReserveGuestNetworkServicePort"));
+            RETURN_IF_FAILED_EXPECTED(allocatePort.load(c_computeNetworkModuleName, "HcnReserveGuestNetworkServicePort"));
 
             static LxssDynamicFunction<decltype(HcnReleaseGuestNetworkServicePortReservationHandle)> releasePort{DynamicFunctionErrorLogs::None};
             RETURN_IF_FAILED_EXPECTED(
-                allocatePortRange.load(c_computeNetworkModuleName, "HcnReleaseGuestNetworkServicePortReservationHandle"));
+                releasePort.load(c_computeNetworkModuleName, "HcnReleaseGuestNetworkServicePortReservationHandle"));
 
             supported = true;
         }

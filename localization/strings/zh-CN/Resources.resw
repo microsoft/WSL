@@ -750,6 +750,11 @@ Windows: {}</value>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
     <value>运行调试 shell 需要以管理员身份运行 wsl.exe。</value>
   </data>
+  <data name="MessageAdminProtectionEnabled" xml:space="preserve">
+    <value>Windows Admin Protection 已启用，并且你的分发可能会在其他帐户下注册。
+有关 Admin Protection 的详细信息，请访问 https://aka.ms/apdevguide</value>
+    <comment>{Locked="Windows Admin Protection"}{Locked="Admin Protection"}{Locked="https://aka.ms/apdevguide"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
     <value>分发“{}”的安装过程失败，退出代码: {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -884,6 +889,10 @@ Windows: {}</value>
   <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
     <value>Windows 版本 {}。{} 没有所需的功能</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedIpv6Disabled" xml:space="preserve">
+    <value>主机上以不受支持的方式禁用了 IPv6 (HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters DisabledComponents=0xff)</value>
+    <comment>{Locked="HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"}{Locked="DisabledComponents"}{Locked="0xff"}</comment>
   </data>
   <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
     <value>Hyper-V 防火墙不受支持</value>
@@ -1882,6 +1891,41 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
+  </data>
+  <data name="Settings_ApplyChangesButton.Content" xml:space="preserve">
+    <value>应用更改</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogTitle" xml:space="preserve">
+    <value>需要关闭 WSL</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogDescription" xml:space="preserve">
+    <value>更改的 WSL 设置需要关闭 WSL 并重启才能完成。关闭将导致任何活动的 WSL 会话终止。</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownButton" xml:space="preserve">
+    <value>立即关闭 WSL</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogLaterButton" xml:space="preserve">
+    <value>以后再说</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogFailedTitle" xml:space="preserve">
+    <value>无法应用更改</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCloseButton" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="Settings_ApplyChangesDialogCommitFailed" xml:space="preserve">
+    <value>未能保存挂起的设置更改。错误代码： {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for Win32 error code</comment>
+  </data>
+  <data name="Settings_ApplyChangesDialogShutdownFailed" xml:space="preserve">
+    <value>已保存设置，但关闭 WSL 失败： {0}</value>
+    <comment>{Locked="{0}"}Format placeholder for exception message</comment>
+  </data>
+  <data name="Settings_BooleanTrueText" xml:space="preserve">
+    <value>开</value>
+  </data>
+  <data name="Settings_BooleanFalseText" xml:space="preserve">
+    <value>关</value>
   </data>
   <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
     <value>通过 Visual Studio 构建、运行、调试和分析运行于 WSL 上的应用</value>

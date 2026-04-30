@@ -1,14 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-    <PropertyGroup Condition="'$(WSLCSDK_Platform)' == ''">
-        <WSLCSDK_Platform Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x64</WSLCSDK_Platform>
-        <WSLCSDK_Platform Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</WSLCSDK_Platform>
-    </PropertyGroup>
+    <!-- If we have a RuntimeIdentifier, the DLL is referenced automatically.
+         If it is missing, we fall back to PlatformTarget to reference it manually. -->
+    <Choose>
+        <When Condition="'$(RuntimeIdentifier)' != ''">
+            <PropertyGroup>
+                <_wslcPlatform Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x64</_wslcPlatform>
+                <_wslcPlatform Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</_wslcPlatform>
+                <_wslcInvalidPlatformProperty Condition="'$(_wslcPlatform)' == ''">RuntimeIdentifier</_wslcInvalidPlatformProperty>
+                <_wslcInvalidPlatform Condition="'$(_wslcPlatform)' == ''">$(RuntimeIdentifier)</_wslcInvalidPlatform>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <_wslcPlatform Condition="'$(PlatformTarget)' == 'x64'">x64</_wslcPlatform>
+                <_wslcPlatform Condition="'$(PlatformTarget)' == 'arm64'">arm64</_wslcPlatform>
+                <_wslcInvalidPlatformProperty Condition="'$(_wslcPlatform)' == ''">PlatformTarget</_wslcInvalidPlatformProperty>
+                <_wslcInvalidPlatform Condition="'$(_wslcPlatform)' == ''">$(PlatformTarget)</_wslcInvalidPlatform>
+            </PropertyGroup>
 
-    <PropertyGroup Condition="'$(WSLCSDK_Platform)' == ''">
-        <WSLCSDK_Platform Condition="'$(Platform)' != 'AnyCPU'">$(Platform)</WSLCSDK_Platform>
-    </PropertyGroup>
+            <ItemGroup Condition="'$(_wslcPlatform)' != ''">
+                <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(_wslcPlatform)\native\wslcsdk.dll" />
+            </ItemGroup>
+        </Otherwise>
+    </Choose>
 
-    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
-
+    <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcInvalidPlatform)' != ''">
+        <Error Text="wslcsdk.dll could not be copied because the $(_wslcInvalidPlatformProperty) '$(_wslcInvalidPlatform)' is not supported. Only x64 and arm64 platforms are supported." />
+    </Target>
 </Project>

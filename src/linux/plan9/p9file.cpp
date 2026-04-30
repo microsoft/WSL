@@ -1060,7 +1060,7 @@ LX_INT File::Access(AccessFlags flags)
     }
 
     std::string parentPath;
-    const int index = name.find_last_of('/');
+    const auto index = name.find_last_of('/');
     if (index != std::string::npos)
     {
         parentPath = name.substr(0, index);
