@@ -39,7 +39,7 @@ public:
 
     unique_com_disconnect() = default;
     unique_com_disconnect(Microsoft::WRL::ComPtr<WSLCContainer>&& wrapper) noexcept;
-    ~unique_com_disconnect noexcept();
+    ~unique_com_disconnect() noexcept;
 
 private:
     Microsoft::WRL::ComPtr<WSLCContainer> m_wrapper;
