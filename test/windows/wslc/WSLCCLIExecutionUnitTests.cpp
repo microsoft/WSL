@@ -284,7 +284,6 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
     }
 
-    // Test: Full parse of 'run --gpus all image' sets Gpu option
     TEST_METHOD(RunCommand_ParseGpusAll_SetsGpuOption)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus all ubuntu sh");
@@ -300,7 +299,6 @@ class WSLCCLIExecutionUnitTests
         VERIFY_IS_TRUE(options.Gpu);
     }
 
-    // Test: Full parse of 'run --gpus invalid image' rejects invalid GPU value
     TEST_METHOD(RunCommand_ParseGpusInvalid_ThrowsArgumentException)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus invalid ubuntu sh");
@@ -313,7 +311,6 @@ class WSLCCLIExecutionUnitTests
             command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
     }
 
-    // Test: Full parse of 'create --gpus all image' sets Gpu option
     TEST_METHOD(CreateCommand_ParseGpusAll_SetsGpuOption)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus all ubuntu sh");
@@ -329,7 +326,6 @@ class WSLCCLIExecutionUnitTests
         VERIFY_IS_TRUE(options.Gpu);
     }
 
-    // Test: Full parse of 'create --gpus none image' rejects invalid GPU value
     TEST_METHOD(CreateCommand_ParseGpusInvalid_ThrowsArgumentException)
     {
         auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus none ubuntu sh");

@@ -3397,6 +3397,7 @@ class WSLCTests
 
             // Validate that exec with a trailing colon in LD_LIBRARY_PATH doesn't produce a double colon.
             expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path:"});
+            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH="});
         }
 
         // Validate that containers without the GPU flag do not have GPU resources.
