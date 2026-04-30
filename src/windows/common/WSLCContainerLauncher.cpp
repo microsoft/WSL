@@ -326,7 +326,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
-    // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
+    // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
     auto result = Session.CreateContainer(&options, &container);
     if (FAILED(result))
