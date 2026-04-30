@@ -644,7 +644,11 @@ class WSLCE2EContainerRunTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopSignal)
     {
         constexpr int ExpectedExitCode = 42;
-        auto result = RunWslc(std::format(LR"(container run -d --stop-signal SIGUSR1 --name {} {} bash -c "trap 'exit {}' SIGUSR1; while true; do sleep 1; done")", WslcContainerName, DebianImage.NameAndTag(), ExpectedExitCode));
+        auto result = RunWslc(std::format(
+            LR"(container run -d --stop-signal SIGUSR1 --name {} {} bash -c "trap 'exit {}' SIGUSR1; while true; do sleep 1; done")",
+            WslcContainerName,
+            DebianImage.NameAndTag(),
+            ExpectedExitCode));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         result = RunWslc(std::format(L"container stop {}", WslcContainerName));
