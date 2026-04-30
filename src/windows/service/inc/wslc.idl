@@ -231,7 +231,7 @@ typedef enum _WSLCContainerNetworkType
     WSLCContainerNetworkTypeNone = 0,
     WSLCContainerNetworkTypeHost = 1,
     WSLCContainerNetworkTypeBridged = 2,
-    // WSLCContainerNetworkTypeCustom = 3 // TODO: Implement when implementing custom networks
+    WSLCContainerNetworkTypeCustom = 3
 } WSLCContainerNetworkType;
 
 typedef struct _WSLCContainerNetwork
