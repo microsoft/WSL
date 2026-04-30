@@ -125,7 +125,7 @@ jobs:
         displayName: "CMake ${{ parameters.platform }}"
         inputs:
           workingDirectory: "."
-          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true $(packageInputDirArg)\${{ parameters.platform }}
+          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true -DWSL_BUILD_SDKCS=true $(packageInputDirArg)\${{ parameters.platform }}
 
       # Workaround for WSL Settings NuGet restore authentication issue
       - script: _deps\nuget.exe restore -NonInteractive
@@ -213,6 +213,7 @@ jobs:
               New-Item -ItemType Directory -Path "$(ob_outputDirectory)\sdk\${{ parameters.platform }}" -Force
               Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.lib" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.lib"
               Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
+              Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdkcs.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdkcs.dll"
 
       - task: PowerShell@2
         displayName: "Create CAB from ${{ parameters.platform }} installer msi"
