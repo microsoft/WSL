@@ -365,10 +365,22 @@ class UnitTests
                 VERIFY_ARE_EQUAL(cmdOutput, L"ok\r\n");
             };
 
+            auto validateGeneratedBinfmtFiles = []() {
+                auto [binfmtConfig, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /run/binfmt.d/WSLInterop.conf");
+                VERIFY_ARE_EQUAL(binfmtConfig, L":WSLInterop:M::MZ::/init:FP\n");
+
+                auto [serviceOverride, __] =
+                    LxsstuLaunchWslAndCaptureOutput(L"cat /run/systemd/generator/systemd-binfmt.service.d/override.conf");
+                VERIFY_IS_TRUE(serviceOverride.find(L"ExecStop=") != std::wstring::npos);
+                VERIFY_IS_TRUE(serviceOverride.find(L"ExecStartPost=") != std::wstring::npos);
+            };
+
+            validateGeneratedBinfmtFiles();
             validateBinfmt();
 
             // Validate that this still works after restarting the distribution.
             TerminateDistribution();
+            validateGeneratedBinfmtFiles();
             validateBinfmt();
 
             // Validate that stopping or restarting systemd-binfmt doesn't break interop.
@@ -376,16 +388,21 @@ class UnitTests
             validateBinfmt();
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), 0u);
+            validateGeneratedBinfmtFiles();
             validateBinfmt();
 
             // Validate that the unit is regenerated after a daemon-reload.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl daemon-reload && systemctl restart systemd-binfmt.service"), 0u);
+            validateGeneratedBinfmtFiles();
             validateBinfmt();
         }
 
         {
             // Enable systemd (restarts distro).
             auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /run/binfmt.d/WSLInterop.conf"), 1u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/systemd-binfmt.service.d/override.conf"), 1u);
 
             // Validate that WSL's binfmt interpreter is overridden
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
