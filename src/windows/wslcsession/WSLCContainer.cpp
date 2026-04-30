@@ -377,7 +377,7 @@ void ValidateNamedVolumes(
 
 void ConfigureLdPathForGpu(std::vector<std::string>& Env)
 {
-    constexpr std::string_view ldLibraryPathPrefix = "LD_LIBRARY_PATH=";
+    static constexpr std::string_view ldLibraryPathPrefix = "LD_LIBRARY_PATH=";
     auto it = std::ranges::find_if(Env, [](const std::string& e) { return e.starts_with(ldLibraryPathPrefix); });
 
     if (it != Env.end())
