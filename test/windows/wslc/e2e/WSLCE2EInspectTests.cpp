@@ -35,6 +35,7 @@ class WSLCE2EInspectTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(DebianImage.Name);
+        EnsureNetworkDoesNotExist(WslcNetworkName);
         EnsureImageIsDeleted(DebianImage);
         return true;
     }
@@ -43,6 +44,7 @@ class WSLCE2EInspectTests
     {
         EnsureContainerDoesNotExist(WslcContainerName);
         EnsureContainerDoesNotExist(DebianImage.Name);
+        EnsureNetworkDoesNotExist(WslcNetworkName);
         return true;
     }
 
@@ -165,14 +167,14 @@ class WSLCE2EInspectTests
         }
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_PriorityOverVolume)
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Image_PriorityOverNetwork)
     {
-        // When an image and volume share the same name and no --type is specified,
-        // the image should be returned (image is checked before volume in InspectTasks).
-        EnsureVolumeDoesNotExist(DebianImage.Name);
-        auto createResult = RunWslc(std::format(L"volume create {}", DebianImage.Name));
+        // When an image and network share the same name and no --type is specified,
+        // the image should be returned (image is checked before network in InspectTasks).
+        EnsureNetworkDoesNotExist(DebianImage.Name);
+        auto createResult = RunWslc(std::format(L"network create --driver bridge {}", DebianImage.Name));
         createResult.Verify({.Stderr = L"", .ExitCode = 0});
-        auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(DebianImage.Name); });
+        auto deleteNetwork = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(DebianImage.Name); });
 
         // No type specified
         {
@@ -199,14 +201,61 @@ class WSLCE2EInspectTests
             VERIFY_ARE_EQUAL(DebianImage.NameAndTag(), wsl::shared::string::MultiByteToWide(inspectData[0].RepoTags.value()[0]));
         }
 
+        // With --type network
+        {
+            auto result = RunWslc(std::format(L"inspect --type network {}", DebianImage.Name));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Inspect_Network_PriorityOverVolume)
+    {
+        // When a network and volume share the same name and no --type is specified,
+        // the network should be returned (network is checked before volume in InspectTasks).
+        EnsureNetworkDoesNotExist(WslcNetworkName);
+        EnsureVolumeDoesNotExist(WslcNetworkName);
+
+        auto createNetworkResult = RunWslc(std::format(L"network create --driver bridge {}", WslcNetworkName));
+        createNetworkResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto deleteNetwork = wil::scope_exit([&]() { EnsureNetworkDoesNotExist(WslcNetworkName); });
+
+        auto createVolumeResult = RunWslc(std::format(L"volume create {}", WslcNetworkName));
+        createVolumeResult.Verify({.Stderr = L"", .ExitCode = 0});
+        auto deleteVolume = wil::scope_exit([&]() { EnsureVolumeDoesNotExist(WslcNetworkName); });
+
+        // No type specified — network takes priority over volume
+        {
+            auto result = RunWslc(std::format(L"inspect {}", WslcNetworkName));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+
+        // With --type network
+        {
+            auto result = RunWslc(std::format(L"inspect --type network {}", WslcNetworkName));
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            auto inspectData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, inspectData.size());
+            VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+        }
+
         // With --type volume
         {
-            auto result = RunWslc(std::format(L"inspect --type volume {}", DebianImage.Name));
+            auto result = RunWslc(std::format(L"inspect --type volume {}", WslcNetworkName));
             result.Verify({.Stderr = L"", .ExitCode = 0});
             auto inspectData =
                 wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectVolume>>(result.Stdout.value().c_str());
             VERIFY_ARE_EQUAL(1u, inspectData.size());
-            VERIFY_ARE_EQUAL(DebianImage.Name, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
+            VERIFY_ARE_EQUAL(WslcNetworkName, wsl::shared::string::MultiByteToWide(inspectData[0].Name));
         }
     }
 
@@ -239,7 +288,7 @@ class WSLCE2EInspectTests
     WSLC_TEST_METHOD(WSLCE2E_Inspect_InvalidTypeValue)
     {
         auto result = RunWslc(std::format(L"inspect --type invalid {}", DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container, volume.\r\n", .ExitCode = 1});
+        result.Verify({.Stderr = L"Invalid type value: invalid is not a recognized inspect type. Supported inspect types are: image, container, network, volume.\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Inspect_SkipsInvalidFormatError)
@@ -261,6 +310,7 @@ private:
     const TestImage& DebianImage = DebianTestImage();
     const TestImage& InvalidImage = InvalidTestImage();
     const std::wstring WslcVolumeName = L"wslc-inspect-test-volume";
+    const std::wstring WslcNetworkName = L"wslc-inspect-test-network";
     std::wstring GetHelpMessage() const
     {
         std::wstringstream output;

@@ -244,6 +244,36 @@ void VerifyVolumeIsNotListed(const std::wstring& volumeName)
     }
 }
 
+void VerifyNetworkIsListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            return;
+        }
+    }
+
+    VERIFY_FAIL(std::format(L"Network '{}' not found in network list output", networkName).c_str());
+}
+
+void VerifyNetworkIsNotListed(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            VERIFY_FAIL(std::format(L"Network '{}' found in network list output", networkName).c_str());
+        }
+    }
+}
+
 std::string GetHashId(const std::string& id, bool fullId)
 {
     return wsl::windows::common::string::TruncateId(id, !fullId);
@@ -424,6 +454,31 @@ void EnsureVolumeDoesNotExist(const std::wstring& volumeName)
             break;
         }
     }
+}
+
+void EnsureNetworkDoesNotExist(const std::wstring& networkName)
+{
+    auto result = RunWslc(L"network list --format json");
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto networks = wsl::shared::FromJson<std::vector<WSLCNetworkInformation>>(result.Stdout.value().c_str());
+    for (const auto& net : networks)
+    {
+        if (net.Name == wsl::shared::string::WideToMultiByte(networkName))
+        {
+            auto deleteResult = RunWslc(std::format(L"network rm {}", networkName));
+            deleteResult.Verify({.Stderr = L"", .ExitCode = 0});
+            break;
+        }
+    }
+}
+
+wslc_schema::InspectNetwork InspectNetwork(const std::wstring& networkName)
+{
+    auto result = RunWslc(std::format(L"network inspect {}", networkName));
+    result.Verify({.Stderr = L"", .ExitCode = 0});
+    auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectNetwork>>(result.Stdout.value().c_str());
+    VERIFY_ARE_EQUAL(1u, inspectData.size());
+    return inspectData[0];
 }
 
 wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
