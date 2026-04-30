@@ -1368,7 +1368,10 @@ void wsl::windows::common::wslutil::SetCrtEncoding(int Mode)
     // so that narrow-to-wide conversions (e.g. %hs in wprintf) correctly decode
     // UTF-8 multi-byte sequences from Linux/container processes.
     WI_VERIFY(_wsetlocale(LC_ALL, L"") != NULL);
-    WI_VERIFY(_wsetlocale(LC_CTYPE, L".UTF-8") != NULL);
+    if (Mode == _O_U8TEXT)
+    {
+        WI_VERIFY(_wsetlocale(LC_CTYPE, L".UTF-8") != NULL);
+    }
 }
 
 void wsl::windows::common::wslutil::SetThreadDescription(LPCWSTR Name)
