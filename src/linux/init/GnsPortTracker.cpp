@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <optional>
 #include <iostream>
-#include <algorithm>
 #include <linux/audit.h> /* Definition of AUDIT_* constants */
 #include <linux/sock_diag.h>
 #include <linux/inet_diag.h>
