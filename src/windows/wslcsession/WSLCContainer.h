@@ -39,7 +39,7 @@ public:
 
     unique_com_disconnect() = default;
     unique_com_disconnect(Microsoft::WRL::ComPtr<WSLCContainer>&& wrapper) noexcept;
-    ~unique_com_disconnect();
+    ~unique_com_disconnect noexcept();
 
 private:
     Microsoft::WRL::ComPtr<WSLCContainer> m_wrapper;
@@ -144,17 +144,17 @@ public:
         IORelay& Relay);
 
 private:
-    __requires_exclusive_lock_held(m_lock) unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
+    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect DeleteExclusiveLockHeld(WSLCDeleteFlags Flags);
 
     void AllocateBridgedModePorts();
     void OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime);
 
     bool WaitForEvent(const wil::unique_event& Event, std::chrono::milliseconds Timeout) const;
 
-    __requires_exclusive_lock_held(m_lock) unique_com_disconnect ReleaseResources();
+    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect ReleaseResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseRuntimeResources();
     __requires_exclusive_lock_held(m_lock) void ReleaseProcesses();
-    __requires_exclusive_lock_held(m_lock) unique_com_disconnect PrepareDisconnectComWrapper();
+    __requires_exclusive_lock_held(m_lock) [[nodiscard]] unique_com_disconnect PrepareDisconnectComWrapper();
 
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLCProcessFlags flags);
 

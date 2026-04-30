@@ -415,7 +415,7 @@ unique_com_disconnect::unique_com_disconnect(Microsoft::WRL::ComPtr<WSLCContaine
 {
 }
 
-unique_com_disconnect::~unique_com_disconnect()
+unique_com_disconnect::~unique_com_disconnect() noexcept
 {
     if (m_wrapper)
     {
