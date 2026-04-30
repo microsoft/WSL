@@ -70,7 +70,7 @@ std::vector<BYTE> ParseHex(const std::wstring& input)
     for (auto i = 0; i < input.size(); i += 2)
     {
         // Skip '0x', if any
-        if (i == 0 && input[0] == '0' && tolower(input[1]) == 'x')
+        if (i == 0 && input.size() >= 2 && input[0] == '0' && tolower(input[1]) == 'x')
         {
             continue;
         }

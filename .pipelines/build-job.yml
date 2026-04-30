@@ -1,0 +1,268 @@
+# Shared build job template for x64 and arm64 platforms.
+# Parameterized by platform, with optional test artifact and CodeQL support.
+
+parameters:
+  - name: platform
+    type: string
+
+  - name: isRelease
+    type: boolean
+
+  - name: isNightly
+    type: boolean
+
+  - name: packageVersion
+    type: string
+
+  - name: traceLoggingConfig
+    type: string
+    default: ''
+
+  - name: targets
+    type: object
+
+  - name: pool
+    type: string
+    default: ''
+
+  - name: vsoOrg
+    type: string
+
+  - name: vsoProject
+    type: string
+
+  - name: artifactSuffix
+    type: string
+
+  - name: esrp
+    type: object
+
+  # x64-only features
+  - name: includeTestArtifacts
+    type: boolean
+    default: false
+
+  - name: includeCodeQL
+    type: boolean
+    default: false
+
+  - name: dependsOn
+    type: string
+    default: ''
+
+jobs:
+  - job: build_${{ parameters.platform }}
+    displayName: "Build WSL package (${{ parameters.platform }})"
+    timeoutInMinutes: 120
+    ${{ if ne(parameters.dependsOn, '') }}:
+      dependsOn: ${{ parameters.dependsOn }}
+
+    ${{ if eq(parameters.pool, '') }}:
+      pool: {'type': 'windows'}
+
+    ${{ else }}:
+      pool: ${{ parameters.pool }}
+
+    variables:
+      NUGET_PLUGIN_HANDSHAKE_TIMEOUT_IN_SECONDS: 60
+      NUGET_PLUGIN_REQUEST_TIMEOUT_IN_SECONDS: 60
+      ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+      ob_artifactBaseName: 'drop_wsl'
+      ob_artifactSuffix: '${{ parameters.artifactSuffix }}'
+      packageStagingDir: '$(Build.SourcesDirectory)\packageStagingDir'
+      ${{ if parameters.includeTestArtifacts }}:
+        ob_sdl_codeSignValidation_excludes: -|**testbin\**
+      ${{ if parameters.includeCodeQL }}:
+        Codeql.PublishDatabaseLog: true
+        Codeql.SourceRoot: src
+      ${{ if eq(parameters.isRelease, true) }}:
+        packageInputDirArg: '-DPACKAGE_INPUT_DIR=$(packageStagingDir)'
+      ${{ else }}:
+        packageInputDirArg: ''
+
+    steps:
+
+      - ${{ if parameters.includeCodeQL }}:
+        - task: CodeQL3000Init@0
+          inputs:
+            Enabled: ${{ and(parameters.isNightly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))}}
+
+      - ${{ if eq(parameters.isRelease, true) }}:
+        - task: UseDotNet@2
+          displayName: Install .NET Core SDK (required by EsrpCodeSigning)
+          inputs:
+            packageType: "sdk"
+
+      - task: PowerShell@2
+        displayName: Set trace logging configuration
+        condition: ne('${{ parameters.traceLoggingConfig }}', '')
+        inputs:
+            targetType: 'inline'
+            script: 'Set-Content -Path src/windows/inc/traceloggingconfig.h -Value $env:config.replace("\n", "`n")'
+        env:
+            config: '${{ parameters.traceLoggingConfig }}'
+
+      - task: PowerShell@2
+        displayName: "Compute package version"
+        name: version
+        inputs:
+          targetType: inline
+          ${{ if eq(parameters.packageVersion, '') }}:
+            script: |
+              $gitversion_version = (Select-Xml -Path packages.config  -XPath '/packages/package[@id=''GitVersion.CommandLine'']/@version').Node.Value
+              $env:path = "packages/GitVersion.CommandLine.$gitversion_version/tools;$env:path"
+              . .\tools\devops\version_functions.ps1
+              $version = Get-VersionInfo -Nightly $${{ parameters.isNightly }}
+              Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$($version.MsixVersion)"
+              Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$($version.NugetVersion)"
+
+          ${{ else }}:
+            script: |
+              Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}' + '.0'))"
+              Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}'))"
+
+      - task: CMake@1
+        displayName: "CMake ${{ parameters.platform }}"
+        inputs:
+          workingDirectory: "."
+          cmakeArgs: . --fresh -A ${{ parameters.platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DINCLUDE_PACKAGE_STAGE=${{ or(parameters.isRelease, parameters.isNightly) }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true $(packageInputDirArg)\${{ parameters.platform }}
+
+      # Workaround for WSL Settings NuGet restore authentication issue
+      - script: _deps\nuget.exe restore -NonInteractive
+
+      - ${{ each target in parameters.targets }}:
+          - script: cmake --build . --config Release --target ${{ target.target }} -- -m
+            displayName: "Build ${{ target.target }} (${{ parameters.platform }})"
+
+          - ${{ if eq(parameters.isRelease, true) }}:
+              - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+                displayName: "Sign ${{ target.target }} (${{ parameters.platform }})"
+                inputs:
+                  ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
+                  signConfigType: ${{ parameters.esrp.signConfigType }}
+                  SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
+                  MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
+                  MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
+                  ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
+                  AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
+                  AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
+                  AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
+                  AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
+                  FolderPath: "bin\\${{ parameters.platform }}\\Release"
+                  Pattern: "${{ target.pattern }}"
+                  UseMSIAuthentication: true
+                  EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
+                  inlineOperation: |
+                    [
+                          {
+                              "KeyCode": "CP-230012",
+                              "OperationCode": "SigntoolSign",
+                              "Parameters" : {
+                                    "OpusName" : "Microsoft",
+                                    "OpusInfo" : "http://www.microsoft.com",
+                                    "FileDigest" : "/fd \"SHA256\"",
+                                    "PageHash" : "/NPH",
+                                    "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                                },
+                                "ToolName" : "sign",
+                                "ToolVersion" : "1.0"
+                            },
+                            {
+                                "KeyCode" : "CP-230012",
+                                "OperationCode" : "SigntoolVerify",
+                                "Parameters" : {},
+                                "ToolName" : "sign",
+                                "ToolVersion" : "1.0"
+                            }
+                      ]
+
+              - task: PowerShell@2
+                displayName: "Copy signed ${{ target.target }} to staging (${{ parameters.platform }})"
+                inputs:
+                  targetType: inline
+                  script: |
+                      $arch = '${{ parameters.platform }}'
+                      $pattern = '${{ target.pattern }}'
+                      $inputDir = "bin\$arch\Release"
+                      $outputDir = "$(packageStagingDir)\$arch"
+                      New-Item -ItemType Directory -Path "$outputDir\wslsettings" -Force
+                      foreach ($file in $pattern.Split(',')) {
+                          $sourcePath = Join-Path $inputDir $file
+                          if (Test-Path $sourcePath) {
+                              $destPath = Join-Path $outputDir $file
+                              Write-Host "Copying signed file: $sourcePath -> $destPath"
+                              Copy-Item -Path $sourcePath -Destination $destPath -Force
+                          } else {
+                              Write-Warning "File not found: $sourcePath"
+                          }
+                      }
+
+      - script: cmake --build . --config Release -- -m
+        displayName: "Build remaining targets (${{ parameters.platform }})"
+
+      - task: PowerShell@2
+        displayName: "Stage MSI and installer msix (${{ parameters.platform }})"
+        inputs:
+          targetType: inline
+          script: |
+              New-Item -ItemType Directory -Path "$(ob_outputDirectory)\bundle" -Force
+              New-Item -ItemType Directory -Path "$(ob_outputDirectory)\installer" -Force
+              Copy-Item -Path "bin\${{ parameters.platform }}\release\wsl.msi" -Destination "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).${{ parameters.platform }}.msi"
+              Copy-Item -Path "bin\${{ parameters.platform }}\release\installer.msix" -Destination "$(ob_outputDirectory)\installer\installer.${{ parameters.platform }}.msix"
+              if (Test-Path "generated\dev-cert.pfx") { Copy-Item "generated\dev-cert.pfx" "$(ob_outputDirectory)\installer\dev-cert.pfx" }
+
+      - powershell: |
+          $binFolder = ".\bin\${{ parameters.platform }}\Release"
+          $pdbFolder = Join-Path $(ob_outputDirectory) "pdb\${{ parameters.platform }}\Release"
+          mkdir $pdbFolder
+          foreach ($filter in @("*.pdb", "*.debug"))
+          {
+              foreach ($e in (Get-ChildItem -Recurse -Path $binFolder -Filter $filter)) {Move-Item -Path $e.fullname -Destination (Join-Path $pdbFolder $e.name)}
+          }
+        displayName: Collect symbols (${{ parameters.platform }})
+
+      # Test artifacts (x64 only)
+      - ${{ if parameters.includeTestArtifacts }}:
+        - powershell: |
+            $taefVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.Taef'']/@version').Node.Value
+            New-Item -ItemType Directory -Path "$(ob_outputDirectory)\bundle" -Force
+            mkdir $(ob_outputDirectory)\testbin\x64\release
+
+            Copy-Item -Path "bin\x64\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wsltests.dll"
+            Copy-Item -Path "bin\x64\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\testplugin.dll"
+            Copy-Item -Path "bin\x64\release\installer.msix" -Destination "$(ob_outputDirectory)\testbin\x64\release\installer.msix"
+            Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\x64" -Destination "$(ob_outputDirectory)\testbin\x64\release\taef"
+
+            Move-Item -Path "bin\x64\cloudtest" -Destination "$(ob_outputDirectory)\testbin\x64\cloudtest"
+
+            Move-Item -Path "tools\test\test-setup.ps1" -Destination "$(ob_outputDirectory)\testbin\test-setup.ps1"
+            Move-Item -Path "tools\test\CloudTest-Setup.bat" -Destination "$(ob_outputDirectory)\testbin\CloudTest-Setup.bat"
+            Move-Item -Path "diagnostics\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
+            Move-Item -Path "test\linux\unit_tests" -Destination "$(ob_outputDirectory)\testbin\unit_tests"
+
+            $TestDistroVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
+            Copy-Item "packages\Microsoft.WSL.TestDistro.$TestDistroVersion\x64\test_distro.tar.xz" "$(ob_outputDirectory)\testbin\x64"
+
+          displayName: Stage test artifacts
+
+      - task: PublishSymbols@2
+        displayName: Publish symbols (${{ parameters.platform }})
+        inputs:
+          SymbolServerType: "TeamServices"
+          TreatNotIndexedAsWarning: true
+          SymbolsProduct: WSL
+          SymbolsVersion: $(version.WSL_PACKAGE_VERSION)
+          SearchPattern: |
+            $(ob_outputDirectory)/pdb/**/*.pdb
+            bin/**/*.exe
+            bin/**/*.dll
+
+      - ${{ if ne(parameters.pool, '') }}:
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: $(ob_outputDirectory)
+            artifactName: $(ob_artifactBaseName)$(ob_artifactSuffix)
+
+      - ${{ if parameters.includeCodeQL }}:
+        - task: CodeQL3000Finalize@0
+          condition: ${{ and(parameters.isNightly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))}}

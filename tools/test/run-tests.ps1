@@ -45,9 +45,55 @@ if ($Fast)
     $SetupScript = $null
 }
 
-te.exe $TestDllPath /p:SetupScript=$SetupScript  /p:Version=$Version /p:DistroPath=$DistroPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
-
-if (!$?)
+# Handle /attachdebugger: verify WinDbgX is available, then add /waitfordebugger so we can find and attach to the test host.
+$AttachDebugger = $false
+if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
 {
-    exit 1
+    $TeArgs = @($TeArgs | Where-Object { $_ -ine '/attachdebugger' })
+    if (Get-Command "WinDbgX.exe" -ErrorAction SilentlyContinue)
+    {
+        $AttachDebugger = $true
+        $TeArgs += '/waitfordebugger'
+        # Run in-process so WinDbgX can attach directly to TE.exe without
+        # polling for a TE.ProcessHost.exe child process.
+        if (-not ($TeArgs -icontains '/inproc'))
+        {
+            $TeArgs += '/inproc'
+        }
+    }
+    else
+    {
+        Write-Warning "/attachdebugger was requested, but WinDbgX.exe was not found. Continuing without debugger."
+    }
 }
+
+# If the user provided a /name: or /select: filter, don't add automatic version filtering.
+$HasUserSelection = $false
+foreach ($arg in $TeArgs)
+{
+    if ($arg -like '/name:*' -or $arg -like '/select:*' -or $arg -like '-name:*' -or $arg -like '-select:*')
+    {
+        $HasUserSelection = $true
+        break
+    }
+}
+
+$teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath",
+    "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
+
+if (-not $HasUserSelection)
+{
+    $teArgList += "/select:`"@WSLVersion='$Version' or not(@WSLVersion='*')`""
+}
+
+$teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
+
+if ($AttachDebugger)
+{
+    # /inproc is always added above, so attach directly to TE.exe.
+    Write-Host "Launching WinDbgX attached to TE.exe (PID: $($teProcess.Id))..."
+    Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
+}
+
+$teProcess | Wait-Process
+exit $teProcess.ExitCode

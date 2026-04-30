@@ -193,7 +193,7 @@ int MountInit(const char* Target);
 
 int MountPlan9(const char* Name, const char* Target, bool ReadOnly, std::optional<int> BufferSize = {});
 
-int ProcessMessage(wsl::shared::SocketChannel& channel, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
 
 wil::unique_fd RegisterSeccompHook();
 
@@ -324,7 +324,7 @@ try
 
             sched_param Parameter{};
             Parameter.sched_priority = 0;
-            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) < 0);
+            THROW_LAST_ERROR_IF(pthread_setschedparam(pthread_self(), SCHED_IDLE, &Parameter) != 0);
 
             //
             // Periodically check if the machine is idle by querying procfs for CPU usage.
@@ -342,7 +342,7 @@ try
             long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
             long long int ReclaimWindow[20] = {}; // 10 minutes
             long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
-            bool ReclaimIdling;
+            bool ReclaimIdling = false;
 
             //
             // Fall back to drop cache if the required cgroup path is not present.
@@ -429,7 +429,7 @@ try
                 if (PageReportingOrder != 0 && (Start - Stop) > IdleThreshold)
                 {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
-                    const long long int Stop = GetUserCpuTime();
+                    Stop = GetUserCpuTime();
                     THROW_LAST_ERROR_IF(Stop == -1);
                     if ((Stop - Start) < IdleThreshold)
                     {
@@ -471,7 +471,7 @@ Return Value:
         return {};
     }
 
-    struct sockaddr_nl Address;
+    struct sockaddr_nl Address{};
     Address.nl_family = AF_NETLINK;
     if (bind(Fd.get(), (struct sockaddr*)&Address, sizeof(Address)) < 0)
     {
@@ -587,7 +587,7 @@ Return Value:
     std::string content = wsl::shared::string::ReadFile<char, char>(std::format("/sys/block/{}/dev", BlockDeviceName).c_str());
     auto separator = content.find(':');
 
-    if (separator == 0 || separator - 1 >= content.size() || separator == std::string::npos)
+    if (separator == std::string::npos || separator == 0 || separator + 1 == content.size())
     {
         LOG_ERROR("Failed to parse device number '{}' for device '{}'", content.c_str(), BlockDeviceName.c_str());
         THROW_ERRNO(EINVAL);
@@ -2808,7 +2808,7 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
     }
 }
 
-int ProcessMountFolderMessage(wsl::shared::SocketChannel& Channel, gsl::span<gsl::byte> Buffer)
+int ProcessMountFolderMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer)
 
 /*++
 
@@ -2844,7 +2844,7 @@ Return Value:
     }
 
     int Result = MountPlan9(Name, Target, Message->ReadOnly);
-    Channel.SendResultMessage<int32_t>(Result);
+    Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }
 
@@ -3163,7 +3163,7 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-int ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
 
 /*++
 
@@ -3173,9 +3173,7 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a file descriptor to the socket on which the message was
-        received. This is used for operations that require responses, for example a
-        VHD eject request.
+    Transaction - Supplies the transaction for replying to the message.
 
     Buffer - Supplies the message.
 
@@ -3259,7 +3257,7 @@ try
             return -1;
         }
 
-        Channel.SendResultMessage(EjectScsi(EjectMessage->Lun));
+        Transaction.SendResultMessage(EjectScsi(EjectMessage->Lun));
         return 0;
     }
 
@@ -3495,10 +3493,10 @@ try
         return 0;
 
     case LxMiniInitMountFolder:
-        return ProcessMountFolderMessage(Channel, Buffer);
+        return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        return ProcessCreateProcessMessage(Channel, Buffer);
+        return ProcessCreateProcessMessage(Transaction, Buffer);
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -4175,13 +4173,14 @@ int main(int Argc, char* Argv[])
         }
         else if (PollDescriptors[0].revents & POLLIN)
         {
-            auto [Message, Range] = channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+            auto transaction = channel.ReceiveTransaction();
+            auto [Message, Range] = transaction.ReceiveOrClosed<MESSAGE_HEADER>();
             if (Message == nullptr)
             {
                 break; // Socket was closed, exit
             }
 
-            Result = ProcessMessage(channel, Message->MessageType, Range, Config);
+            Result = ProcessMessage(transaction, Message->MessageType, Range, Config);
             if (Result < 0)
             {
                 goto ErrorExit;
