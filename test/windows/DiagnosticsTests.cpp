@@ -135,9 +135,9 @@ class DiagnosticsTests
         VERIFY_IS_TRUE(msg.find(stepDesc) != std::wstring::npos, L"Message should contain the human-readable step description");
     }
 
-    TEST_METHOD(MountDiskErrorMessageContainsWslConfigGuidance)
+    TEST_METHOD(MountDiskErrorMessageContainsRecoveryUrl)
     {
-        // Verify the mount-disk-specific message includes .wslconfig guidance.
+        // Verify the mount-disk-specific message includes the recovery URL.
         constexpr int step = static_cast<int>(LxInitCreateInstanceStepMountDisk);
         auto stepDesc = CreateInstanceStepDescription(LxInitCreateInstanceStepMountDisk);
         auto stepInfo = std::to_wstring(step) + L" (" + stepDesc + L")";
@@ -148,10 +148,9 @@ class DiagnosticsTests
         WEX::Logging::Log::Comment(WEX::Common::String().Format(L"MountDisk error message: \"%s\"", msg.c_str()));
         VERIFY_IS_FALSE(msg.empty(), L"MountDisk error message should not be empty");
 
-        // Must contain .wslconfig and swapFile references for actionable guidance
+        // Must contain recovery URL for actionable guidance
         VERIFY_IS_TRUE(
-            msg.find(L".wslconfig") != std::wstring::npos, L"MountDisk message should mention .wslconfig for actionable guidance");
-        VERIFY_IS_TRUE(msg.find(L"swapFile") != std::wstring::npos, L"MountDisk message should mention swapFile setting");
+            msg.find(L"https://aka.ms/wsldiskmountrecovery") != std::wstring::npos, L"MountDisk message should contain recovery URL");
 
         // Must still contain the error code and step info
         VERIFY_IS_TRUE(
