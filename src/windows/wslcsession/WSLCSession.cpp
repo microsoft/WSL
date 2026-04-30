@@ -2310,7 +2310,7 @@ try
     {
         return S_OK;
     }
-  
+
     wil::rwlock_release_exclusive_scope_exit sessionLock;
 
     // Because it's not possible to synchronize CancelIoEx() with ReadFile() calls, keep attempting to acquire the session lock while cancelling IO & callbacks.
