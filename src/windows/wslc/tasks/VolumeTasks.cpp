@@ -30,17 +30,6 @@ using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc::task {
 
-static std::pair<std::string, std::string> OptionsToKeyValue(const std::wstring& option)
-{
-    auto pos = option.find('=');
-    if (pos == std::wstring::npos)
-    {
-        return {WideToMultiByte(option), std::string()};
-    }
-
-    return {WideToMultiByte(option.substr(0, pos)), WideToMultiByte(option.substr(pos + 1))};
-}
-
 static bool TryInspectVolume(Session& session, const std::string& volumeName, std::optional<wslc_schema::InspectVolume>& inspectData)
 {
     try
@@ -91,12 +80,14 @@ void CreateVolume(CLIExecutionContext& context)
 
     for (const auto& option : context.Args.GetAll<ArgType::Options>())
     {
-        options.DriverOpts.push_back(OptionsToKeyValue(option));
+        auto parsed = DriverOption::Parse(option);
+        options.DriverOpts.emplace_back(parsed.first, parsed.second);
     }
 
     for (const auto& label : context.Args.GetAll<ArgType::Label>())
     {
-        options.Labels.push_back(OptionsToKeyValue(label));
+        auto parsed = Label::Parse(label);
+        options.Labels.emplace_back(parsed.first, parsed.second);
     }
 
     if (context.Args.Contains(ArgType::Driver))

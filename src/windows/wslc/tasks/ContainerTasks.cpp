@@ -20,6 +20,7 @@ Abstract:
 #include "SessionModel.h"
 #include "SessionService.h"
 #include "TableOutput.h"
+#include "VolumeModel.h"
 #include <wil/result_macros.h>
 #include <wslc_schema.h>
 
@@ -363,6 +364,15 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         for (const auto& value : tmpfs)
         {
             options.Tmpfs.emplace_back(WideToMultiByte(value));
+        }
+    }
+
+    if (context.Args.Contains(ArgType::Label))
+    {
+        for (const auto& label : context.Args.GetAll<ArgType::Label>())
+        {
+            auto parsed = Label::Parse(label);
+            options.Labels.emplace_back(parsed.first, parsed.second);
         }
     }
 

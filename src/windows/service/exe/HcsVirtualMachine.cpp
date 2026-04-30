@@ -581,6 +581,15 @@ try
 }
 CATCH_RETURN()
 
+HRESULT HcsVirtualMachine::GetTerminationEvent(_Out_ HANDLE* Event)
+try
+{
+    *Event = wslutil::DuplicateHandle(m_vmExitEvent.get());
+
+    return S_OK;
+}
+CATCH_RETURN()
+
 void CALLBACK HcsVirtualMachine::OnVmExitCallback(HCS_EVENT* Event, void* Context)
 try
 {

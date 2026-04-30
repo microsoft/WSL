@@ -34,6 +34,7 @@ using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::IWSLCVolume;
 using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
+using wsl::windows::service::wslc::unique_com_disconnect;
 using wsl::windows::service::wslc::VMPortMapping;
 using wsl::windows::service::wslc::WSLCContainer;
 using wsl::windows::service::wslc::WSLCContainerImpl;
@@ -409,6 +410,19 @@ const char* ContainerPortMapping::ProtocolString() const
     }
 }
 
+unique_com_disconnect::unique_com_disconnect(Microsoft::WRL::ComPtr<WSLCContainer>&& wrapper) noexcept :
+    m_wrapper(std::move(wrapper))
+{
+}
+
+unique_com_disconnect::~unique_com_disconnect() noexcept
+{
+    if (m_wrapper)
+    {
+        m_wrapper->Disconnect();
+    }
+}
+
 WSLCPortMapping ContainerPortMapping::Serialize() const
 {
     return WSLCPortMapping{
@@ -492,8 +506,14 @@ WSLCContainerImpl::~WSLCContainerImpl()
 
     m_containerEvents.Reset();
 
-    auto lock = m_lock.lock_exclusive();
-    ReleaseResources();
+    // Release resources under m_lock, but extract the COM wrapper so Disconnect()
+    // can be called without holding m_lock. Calling Disconnect() under m_lock can
+    // deadlock if an in-flight COM caller is waiting for m_lock.
+    unique_com_disconnect wrapper;
+    {
+        auto lock = m_lock.lock_exclusive();
+        wrapper = ReleaseResources();
+    }
 }
 
 void WSLCContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noexcept
@@ -680,6 +700,8 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
 
 void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode, std::uint64_t eventTime)
 {
+    unique_com_disconnect comWrapper;
+
     if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
@@ -709,9 +731,14 @@ void WSLCContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
             if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
             {
-                DeleteExclusiveLockHeld(WSLCDeleteFlagsDeleteVolumes);
+                comWrapper = DeleteExclusiveLockHeld(WSLCDeleteFlagsDeleteVolumes);
             }
         }
+
+        // Release m_lock and m_stopLock before the wrapper's destructor calls
+        // Disconnect(), so in-flight COM callers can drain from COMImplClass::m_callers.
+        lock.reset();
+        stopGuard.unlock();
     }
     else if (event == ContainerEvent::Destroy)
     {
@@ -749,6 +776,9 @@ bool WSLCContainerImpl::WaitForEvent(const wil::unique_event& Event, std::chrono
 
 void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 {
+    // N.B. comWrapper must be destructed after m_lock is released.
+    unique_com_disconnect comWrapper;
+
     std::lock_guard stopGuard{m_stopLock};
     auto lock = m_lock.lock_exclusive();
 
@@ -822,19 +852,20 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
     if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsRm))
     {
-        DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
+        comWrapper = DeleteExclusiveLockHeld(WSLCDeleteFlagsForce | WSLCDeleteFlagsDeleteVolumes);
     }
 }
 
 void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
 {
-    // Acquire an exclusive lock since this method modifies m_state.
     auto lock = m_lock.lock_exclusive();
+    auto wrapper = DeleteExclusiveLockHeld(Flags);
+    lock.reset();
 
-    DeleteExclusiveLockHeld(Flags);
+    // N.B. wrapper must be destroyed after m_lock is released, since its destructor calls Disconnect().
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
+__requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::DeleteExclusiveLockHeld(WSLCDeleteFlags Flags)
 {
     // Validate that the container is not running or already deleted.
     THROW_HR_WITH_USER_ERROR_IF(
@@ -854,7 +885,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DeleteExclusiveLo
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
     Transition(WslcContainerStateDeleted);
-    ReleaseResources();
+    return ReleaseResources();
 }
 
 void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
@@ -1099,6 +1130,9 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         mountInfo.ReadWrite = true;
         wslcInspect.Mounts.push_back(std::move(mountInfo));
     }
+
+    // Map labels. m_labels should already exclude internal metadata labels.
+    wslcInspect.Labels = m_labels;
 
     return wslcInspect;
 }
@@ -1681,7 +1715,7 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseRuntimeRes
     UnmountVolumes(m_mountedVolumes, m_virtualMachine);
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseResources()
+__requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::ReleaseResources()
 {
     WSL_LOG("ReleaseResources", TraceLoggingValue(m_id.c_str(), "ID"));
 
@@ -1693,11 +1727,10 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::ReleaseResources(
         e.VmMapping.VmPort.reset();
     }
 
-    // Disconnect the COM wrapper so no new RPC calls can reach this container.
-    DisconnectComWrapper();
+    return PrepareDisconnectComWrapper();
 }
 
-__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DisconnectComWrapper()
+__requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::PrepareDisconnectComWrapper()
 {
     if (m_comWrapper)
     {
@@ -1707,10 +1740,9 @@ __requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::DisconnectComWrap
             std::lock_guard processesLock{m_processesLock};
             m_comWrapper->CacheState(m_id, m_name, m_state, m_initProcess);
         }
-
-        m_comWrapper->Disconnect();
-        m_comWrapper.Reset();
     }
+
+    return unique_com_disconnect{std::exchange(m_comWrapper, nullptr)};
 }
 
 __requires_lock_held(m_lock) void WSLCContainerImpl::Transition(WSLCContainerState State, std::optional<std::uint64_t> stateChangedAt) noexcept
@@ -1756,7 +1788,7 @@ HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
         return S_OK;
     }
 
-    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
     // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
     if (hr == RPC_E_DISCONNECTED)
     {
@@ -1783,7 +1815,7 @@ HRESULT WSLCContainer::GetInitProcess(IWSLCProcess** Process)
         return S_OK;
     }
 
-    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
     // so if CallImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
     if (hr == RPC_E_DISCONNECTED)
     {
@@ -1861,7 +1893,7 @@ try
 {
     auto cacheLock = m_cacheLock.lock_exclusive();
 
-    // CacheState must only be called once, during DisconnectComWrapper().
+    // CacheState must only be called once, during PrepareDisconnectComWrapper().
     WI_ASSERT(!m_cachedState.has_value());
 
     m_cachedId = id;
@@ -1905,7 +1937,7 @@ try
 
     RETURN_HR_IF(hr, hr != RPC_E_DISCONNECTED);
 
-    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
     // so if LockImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
     auto cacheLock = m_cacheLock.lock_shared();
     if (WI_VERIFY(m_cachedId.has_value()))
@@ -1933,7 +1965,7 @@ try
 
     RETURN_HR_IF(hr, hr != RPC_E_DISCONNECTED);
 
-    // DisconnectComWrapper() populates the cache before setting m_impl to null,
+    // PrepareDisconnectComWrapper() populates the cache before setting m_impl to null,
     // so if LockImpl failed with RPC_E_DISCONNECTED, the cache must be populated.
     auto cacheLock = m_cacheLock.lock_shared();
     if (WI_VERIFY(m_cachedName.has_value()))
