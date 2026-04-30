@@ -199,7 +199,7 @@ void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& a
 {
     for (const auto& value : values)
     {
-        if (!IsEqual(value, L"all", true))
+        if (!IsEqual(value, L"all"))
         {
             throw ArgumentException(Localization::WSLCCLI_GpusInvalidValue(argName, value));
         }

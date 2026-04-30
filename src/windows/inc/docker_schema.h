@@ -215,9 +215,8 @@ struct HostConfig
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
     std::vector<DeviceMapping> Devices;
-    bool Privileged{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, Privileged);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices);
 };
 
 struct CreateContainer
