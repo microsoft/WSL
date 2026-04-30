@@ -80,6 +80,31 @@ FetchContent_Declare(nlohmannjson
 FetchContent_MakeAvailable(nlohmannjson)
 FetchContent_GetProperties(nlohmannjson SOURCE_DIR NLOHMAN_JSON_SOURCE_DIR)
 
+FetchContent_Declare(yaml-cpp
+                     URL https://github.com/jbeder/yaml-cpp/releases/download/yaml-cpp-0.9.0/yaml-cpp-yaml-cpp-0.9.0.tar.gz
+                     URL_HASH SHA256=298593d9c440fd9034b8b193d96318b76d49bc97c6ceadb7b0836edf0b6d7539)
+
+set(YAML_CPP_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS   OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_MSVC_SHARED_RT    OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING          OFF CACHE BOOL "" FORCE) # Prevents yaml-cpp from generating CTest* targets
+
+FetchContent_MakeAvailable(yaml-cpp)
+
+set(BOOST_VERSION "1.90.0")
+set(BOOST_TARBALL "boost_${BOOST_VERSION}")
+string(REPLACE "." "_" BOOST_TARBALL "${BOOST_TARBALL}")
+
+FetchContent_Declare(
+  boost_headers
+  URL https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_TARBALL}.tar.gz
+  URL_HASH SHA256=5e93d582aff26868d581a52ae78c7d8edf3f3064742c6e77901a1f18a437eea9
+)
+
+FetchContent_MakeAvailable(boost_headers)
+
+
 # Import modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(IDL REQUIRED)
@@ -88,6 +113,7 @@ find_package(NUGET REQUIRED)
 find_package(VERSION REQUIRED)
 find_package(MC REQUIRED)
 find_package(Appx REQUIRED)
+find_package(CSharp REQUIRED)
 
 # Download nuget packages
 restore_nuget_packages()
@@ -105,6 +131,7 @@ find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
+find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
@@ -145,6 +172,10 @@ if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
     set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
+if (NOT DEFINED WSL_BUILD_SDKCS)
+    set(WSL_BUILD_SDKCS false)
+endif ()
+
 find_commit_hash(COMMIT_HASH)
 
 if (NOT PACKAGE_VERSION)
@@ -164,9 +195,21 @@ if (OFFICIAL_BUILD AND NOT PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9
     message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'. Needs to match '([0-9]+).([0-9]+).([0-9]+).0' for official builds")
 endif()
 
-# Configure per-config output directories
+if (${TARGET_PLATFORM} STREQUAL "x64")
+    set(DCAT_PRODUCT_NAME WSL.amd64)
+endif()
+
+if (${TARGET_PLATFORM} STREQUAL "arm64")
+    set(DCAT_PRODUCT_NAME WSL.arm64)
+endif()
+
+set(DCAT_REGISTRATION_KEY "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\DynamicInstalled\\${DCAT_PRODUCT_NAME}")
+
+# Configure output directories
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -243,7 +286,9 @@ add_compile_definitions(UNICODE
                         WSL_PACKAGE_VERSION_MINOR=${PACKAGE_VERSION_MINOR}
                         WSL_PACKAGE_VERSION_REVISION=${PACKAGE_VERSION_REVISION}
                         DISTRO_HOSTTYPE="${DISTRO_HOSTTYPE}"
-                        WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS})
+                        WSL_BUILD_WSL_SETTINGS=${WSL_BUILD_WSL_SETTINGS}
+                        DCAT_PRODUCT_NAME=R"\(${DCAT_PRODUCT_NAME}\)"
+                        DCAT_REGISTRATION_KEY=R"\(${DCAT_REGISTRATION_KEY}\)")
 
 if (${OFFICIAL_BUILD})
     add_compile_definitions(WSL_OFFICIAL_BUILD)
@@ -270,6 +315,12 @@ if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
 endif()
 
+if (WSL_BUILD_SDKCS OR WSL_BUILD_WSL_SETTINGS)
+    set(CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS} /langversion:latest /debug:full")
+    set(CMAKE_DOTNET_SDK "Microsoft.NET.Sdk")
+    set(CMAKE_DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
+endif()
+
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
 set(COMMON_LINK_LIBRARIES
@@ -283,6 +334,7 @@ set(COMMON_LINK_LIBRARIES
     Shlwapi.lib
     synchronization.lib
     Bcrypt.lib
+    Crypt32.lib
     icu.lib)
 
 set(MSI_LINK_LIBRARIES
@@ -334,6 +386,10 @@ if (NOT VS_INSTALL_DIR)
     message(FATAL_ERROR "Could not determine Visual Studio installation directory.")
 endif()
 
+# Pick the first line returned from vswhere, in case multiple versions are returned.
+# TODO: Remove this and require VS 2026 once the CI supports it.
+string(REGEX MATCH "([^\n\r]+)" VS_INSTALL_DIR "${VS_INSTALL_DIR}")
+
 if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
     set(LLVM_INSTALL_DIR "${VS_INSTALL_DIR}/VC/Tools/Llvm/x64/bin")
 else()
@@ -353,12 +409,6 @@ set(WSL_PRE_COMMIT_MODE "warn" CACHE STRING "Pre-commit hook behavior: warn, err
 # Generate the pre-commit hook into the build tree
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tools/hooks)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit.in ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit @ONLY)
-
-cmake_path(COMPARE "${wsl_SOURCE_DIR}" EQUAL "${wsl_BINARY_DIR}" BUILD_IN_SOURCE)
-if (NOT ${BUILD_IN_SOURCE}) # Testing on 3.26 project_type_DIR paths appear canonicalized
-    file(CREATE_LINK ${LLVM_INSTALL_DIR}/clang-format.exe ${wsl_SOURCE_DIR}/tools/clang-format.exe COPY_ON_ERROR)
-    file(COPY_FILE ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit ${wsl_SOURCE_DIR}/tools/hooks/pre-commit ONLY_IF_DIFFERENT)
-endif()
 
 set(LINUXSDK_PATH ${LINUXSDK_SOURCE_DIR}/${LLVM_ARCH})
 set(LLVM_TARGET "${LLVM_ARCH}-unknown-linux-musl")
@@ -446,6 +496,7 @@ endif()
 
 # Common include paths
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wil/include)
+include_directories(${boost_headers_SOURCE_DIR})
 include_directories(${WSLDEPS_SOURCE_DIR}/include)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/Windows)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/schemas)
@@ -478,6 +529,7 @@ add_subdirectory(msipackage)
 add_subdirectory(msixinstaller)
 add_subdirectory(src/windows/common)
 add_subdirectory(src/windows/service)
+add_subdirectory(src/windows/wslcsession)
 add_subdirectory(src/windows/wslinstaller/inc)
 add_subdirectory(src/windows/wslinstaller/stub)
 add_subdirectory(src/windows/wslinstaller/exe)
@@ -487,6 +539,12 @@ add_subdirectory(src/windows/wslg)
 add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
+add_subdirectory(src/windows/wslc)
+add_subdirectory(src/windows/WslcSDK)
+
+if (WSL_BUILD_SDKCS)
+    add_subdirectory(src/windows/WslcSDK/csharp)
+endif()
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

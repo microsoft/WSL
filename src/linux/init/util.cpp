@@ -199,7 +199,7 @@ InteropServer::~InteropServer()
     Reset();
 }
 
-int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout)
+int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout, int SocketFlags)
 
 /*++
 
@@ -216,6 +216,8 @@ Arguments:
         address of the peer socket.
 
     Timeout - Supplies a timeout.
+
+    SocketFlags - Supplies the socket flags.
 
 Return Value:
 
@@ -265,7 +267,7 @@ Return Value:
     if (Result != -1)
     {
         socklen_t SocketAddressSize = sizeof(SocketAddress);
-        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SOCK_CLOEXEC);
+        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SocketFlags);
     }
 
     if (Result < 0)
@@ -1706,6 +1708,25 @@ Return Value:
     return 0;
 }
 
+int UtilMountFile(const char* Source, const char* Destination)
+try
+{
+    // Is the file is a symlink, delete it since that would break the mount.
+    if (std::filesystem::is_symlink(Destination))
+    {
+        std::filesystem::remove(Destination);
+    }
+
+    wil::unique_fd Fd{open(Destination, (O_CREAT | O_WRONLY), 0755)};
+    THROW_LAST_ERROR_IF(!Fd);
+
+    THROW_LAST_ERROR_IF(mount(Source, Destination, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);
+    THROW_LAST_ERROR_IF(mount(nullptr, Destination, nullptr, (MS_RDONLY | MS_REMOUNT | MS_BIND), nullptr) < 0);
+
+    return 0;
+}
+CATCH_RETURN_ERRNO();
+
 int UtilMount(const char* Source, const char* Target, const char* Type, unsigned long MountFlags, const char* Options, std::optional<std::chrono::seconds> TimeoutSeconds)
 
 /*++
@@ -1752,13 +1773,18 @@ Return Value:
     //      - For Plan9 (9p): device is busy or not found
     //      - For VirtioFS: invalid tag (device not ready)
     //
+    // N.B. MS_SHARED must be applied in a separate mount() call, so it is
+    //      stripped from the initial mount flags and applied after the mount.
+    //
+
+    const unsigned long initialFlags = MountFlags & ~MS_SHARED;
 
     try
     {
         if (TimeoutSeconds.has_value())
         {
             wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() { THROW_LAST_ERROR_IF(mount(Source, Target, Type, MountFlags, Options) < 0); },
+                [&]() { THROW_LAST_ERROR_IF(mount(Source, Target, Type, initialFlags, Options) < 0); },
                 c_defaultRetryPeriod,
                 TimeoutSeconds.value(),
                 [&]() {
@@ -1784,7 +1810,7 @@ Return Value:
         }
         else
         {
-            THROW_LAST_ERROR_IF(mount(Source, Target, Type, MountFlags, Options) < 0);
+            THROW_LAST_ERROR_IF(mount(Source, Target, Type, initialFlags, Options) < 0);
         }
     }
     catch (...)
@@ -1792,6 +1818,16 @@ Return Value:
         errno = wil::ResultFromCaughtException();
         LOG_ERROR("mount({}, {}, {}, {:#x}, {}) failed {}", Source, Target, Type, MountFlags, Options, errno);
         return -errno;
+    }
+
+    // N.B. The shared flag must be applied in a separate mount() call.
+    if (WI_IsFlagSet(MountFlags, MS_SHARED))
+    {
+        if (mount(nullptr, Target, nullptr, MS_SHARED, nullptr) < 0)
+        {
+            LOG_ERROR("Failed to make shared mount {} {}", Target, errno);
+            return -errno;
+        }
     }
 
     return 0;

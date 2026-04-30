@@ -419,26 +419,14 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     {
         try
         {
-            // Open a handle to the service control manager and check if the inbox service is registered.
-            const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_ENUMERATE_SERVICE)};
-            THROW_LAST_ERROR_IF(!manager);
-
-            // Check if the service is running.
-            const wil::unique_schandle service{OpenServiceW(manager.get(), L"GlobalSecureAccessTunnelingService", SERVICE_QUERY_STATUS)};
-            if (service)
+            if (wsl::windows::common::helpers::IsServiceRunning(L"GlobalSecureAccessTunnelingService"))
             {
-                SERVICE_STATUS status;
-                THROW_IF_WIN32_BOOL_FALSE(QueryServiceStatus(service.get(), &status));
-
-                if (status.dwCurrentState != SERVICE_STOPPED)
+                if (DnsTunnelingConfigPresence == ConfigKeyPresence::Present)
                 {
-                    if (DnsTunnelingConfigPresence == ConfigKeyPresence::Present)
-                    {
-                        EMIT_USER_WARNING(wsl::shared::Localization::MessageDnsTunnelingDisabled());
-                    }
-
-                    EnableDnsTunneling = false;
+                    EMIT_USER_WARNING(wsl::shared::Localization::MessageDnsTunnelingDisabled());
                 }
+
+                EnableDnsTunneling = false;
             }
         }
         CATCH_LOG()
@@ -474,9 +462,12 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         EnableVirtio9p = false;
     }
 
-    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored)
+    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy)
     {
-        VALIDATE_CONFIG_OPTION((NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored), EnableDnsTunneling, false);
+        VALIDATE_CONFIG_OPTION(
+            (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy),
+            EnableDnsTunneling,
+            false);
     }
 
     if (!EnableDnsTunneling)

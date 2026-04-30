@@ -152,7 +152,12 @@ std::wstring wsl::core::networking::NetworkSettings::GetBestGatewayMacAddress(AD
     const auto result = ResolveIpNetEntry2(&ipNetRow, nullptr);
     if (result != NO_ERROR)
     {
-        LOG_HR_MSG(HRESULT_FROM_WIN32(result), "Failed to resolve gateway MAC address");
+        LOG_HR_MSG(
+            HRESULT_FROM_WIN32(result),
+            "Failed to resolve gateway MAC address for: %ls, interface: %lu",
+            windows::common::string::SockAddrInetToWstring(gatewayAddress).c_str(),
+            InterfaceIndex);
+
         return {};
     }
 

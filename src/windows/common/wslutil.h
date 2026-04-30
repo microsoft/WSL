@@ -19,6 +19,7 @@ Abstract:
 #include "SubProcess.h"
 #include <winrt/windows.management.deployment.h>
 #include "JsonUtils.h"
+#include "wslc.h"
 
 namespace wsl::windows::common {
 struct Error;
@@ -27,6 +28,7 @@ struct ErrorStrings
 {
     std::wstring Message;
     std::wstring Code;
+    std::optional<std::wstring> Source;
 };
 } // namespace wsl::windows::common
 
@@ -44,7 +46,14 @@ inline auto c_msixPackageFamilyName = L"MicrosoftCorporationII.WindowsSubsystemF
 inline auto c_githubUrlOverrideRegistryValue = L"GitHubUrlOverride";
 inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
-inline constexpr auto c_vmOwner = L"WSL";
+inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLC: Does this apply to WSLC ?
+
+enum class EnumReferenceFormat
+{
+    None,
+    Tag,
+    Digest
+};
 
 struct GitHubReleaseAsset
 {
@@ -62,6 +71,109 @@ struct GitHubRelease
     std::wstring created_at;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GitHubRelease, name, assets, created_at);
+};
+
+struct COMErrorInfo
+{
+    wil::unique_bstr Message;
+    wil::unique_bstr Source;
+};
+
+static_assert(sizeof(WSLCHandle::Handle) == sizeof(HANDLE));
+static_assert(sizeof(FILE_HANDLE) == sizeof(HANDLE));
+static_assert(sizeof(PIPE_HANDLE) == sizeof(HANDLE));
+static_assert(sizeof(SOCKET_HANDLE) == sizeof(HANDLE));
+
+struct COMOutputHandle : public WSLCHandle
+{
+    NON_COPYABLE(COMOutputHandle);
+    NON_MOVABLE(COMOutputHandle);
+    COMOutputHandle()
+    {
+        ZeroMemory(&Handle, sizeof(Handle));
+        Type = WSLCHandleTypeUnknown;
+    }
+
+    ~COMOutputHandle()
+    {
+        Reset();
+    }
+
+    void Reset() noexcept
+    {
+        if (!Empty())
+        {
+            LOG_IF_WIN32_BOOL_FALSE(CloseHandle(Handle.File));
+            Handle.File = nullptr;
+        }
+    }
+
+    [[nodiscard]] wil::unique_handle Release() noexcept
+    {
+        wil::unique_handle handle(Handle.File);
+        Handle.File = nullptr;
+
+        return handle;
+    }
+
+    HANDLE Get() const noexcept
+    {
+        return Handle.File;
+    }
+
+    bool Empty() const noexcept
+    {
+        return Handle.File == nullptr || Handle.File == INVALID_HANDLE_VALUE;
+    }
+};
+
+struct PruneResult
+{
+    NON_COPYABLE(PruneResult);
+    WSLCPruneContainersResults result{};
+
+    PruneResult() = default;
+
+    PruneResult(PruneResult&& other)
+    {
+        *this = std::move(other);
+    }
+
+    PruneResult& operator=(PruneResult&& other)
+    {
+        CoTaskMemFree(result.Containers);
+        result.Containers = other.result.Containers;
+        result.ContainersCount = other.result.ContainersCount;
+        result.SpaceReclaimed = other.result.SpaceReclaimed;
+
+        other.result.Containers = nullptr;
+        other.result.ContainersCount = 0;
+        other.result.SpaceReclaimed = 0;
+
+        return *this;
+    }
+
+    ~PruneResult()
+    {
+        CoTaskMemFree(result.Containers);
+    }
+};
+
+class StopWatch
+{
+    NON_COPYABLE(StopWatch);
+    NON_MOVABLE(StopWatch);
+
+public:
+    StopWatch() = default;
+
+    uint64_t ElapsedMilliseconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_startTime).count();
+    }
+
+private:
+    std::chrono::steady_clock::time_point m_startTime = std::chrono::steady_clock::now();
 };
 
 template <typename T>
@@ -99,11 +211,13 @@ GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> na
 
 std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
 
+std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
+
 [[nodiscard]] HANDLE DuplicateHandle(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = std::nullopt, _In_ BOOL InheritHandle = FALSE);
 
-[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE Handle);
+[[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = {});
 
-[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> Permissions = {});
+[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> DesiredAccess = {});
 
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
 
@@ -111,7 +225,11 @@ std::wstring ErrorCodeToString(HRESULT Error);
 
 ErrorStrings ErrorToString(const Error& error);
 
+[[nodiscard]] HANDLE FromCOMInputHandle(WSLCHandle Handle);
+
 std::filesystem::path GetBasePath();
+
+std::optional<COMErrorInfo> GetCOMErrorInfo();
 
 DWORD GetDefaultVersion(void);
 
@@ -135,6 +253,8 @@ std::wstring GetSystemErrorString(_In_ HRESULT result);
 
 std::wstring GetDebugShellPipeName(_In_ PSID Sid);
 
+std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> GetInstalledPackageVersion();
+
 std::vector<BYTE> HashFile(HANDLE File, DWORD Algorithm);
 
 void InitializeWil();
@@ -151,11 +271,19 @@ bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();
 
+std::pair<std::string, std::string> NormalizeRepo(const std::string& Input);
+
 std::pair<wil::unique_hfile, wil::unique_hfile> OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped);
 
 wil::unique_handle OpenCallingProcess(_In_ DWORD access);
 
+void ParseIpv4Address(const char* Address, in_addr& Result);
+
+void ParseIpv6Address(const char* Address, in_addr6& Result);
+
 std::tuple<uint32_t, uint32_t, uint32_t> ParseWslPackageVersion(_In_ const std::wstring& Version);
+
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input, EnumReferenceFormat* Format = nullptr);
 
 void PrintSystemError(_In_ HRESULT result, _Inout_ FILE* stream = stdout);
 
@@ -196,6 +324,23 @@ void SetThreadDescription(LPCWSTR Name);
 
 wil::unique_hlocal_string SidToString(_In_ PSID Sid);
 
+WSLCHandle ToCOMInputHandle(HANDLE Handle);
+[[nodiscard]] WSLCHandle ToCOMOutputHandle(HANDLE Handle, DWORD Access);
+[[nodiscard]] WSLCHandle ToCOMOutputHandle(HANDLE Handle, DWORD Access, WSLCHandleType Type);
+
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
+
+std::string Base64Encode(const std::string& input);
+std::string Base64Decode(const std::string& encoded);
+
+// Builds the base64-encoded X-Registry-Auth header value used by Docker APIs
+// (PullImage, PushImage, etc.) from the given credentials.
+std::string BuildRegistryAuthHeader(const std::string& username, const std::string& password);
+
+// Builds the base64-encoded X-Registry-Auth header value from an identity token
+// returned by Authenticate().
+std::string BuildRegistryAuthHeader(const std::string& identityToken);
+
+std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
 
 } // namespace wsl::windows::common::wslutil

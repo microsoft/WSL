@@ -33,6 +33,8 @@ Abstract:
 
 #define STRING_FIELD(Name) #Name, (Name <= 0 ? "<empty>" : ((char*)(this)) + Name)
 
+#define STRING_ARRAY_FIELD(Name) #Name, (StringArray((char*)(this), Name, Header.MessageSize))
+
 // Safe pretty-print for flexible array members (char Buffer[]). Bounds the read
 // using the struct's Header.MessageSize so it never reads past the received data.
 #define BUFFER_FIELD(Name) #Name, PrettyPrintSafeBufferView(this, Header.MessageSize, Name)
@@ -61,6 +63,13 @@ inline std::string_view PrettyPrintSafeBufferView(const void* structBase, unsign
         PrettyPrintImpl(Out); \
         return Out.str(); \
     }
+
+struct StringArray
+{
+    const char* MessageHead = nullptr;
+    unsigned int Index = 0;
+    unsigned int MessageSize = 0;
+};
 
 template <typename T>
 inline void PrettyPrint(std::stringstream& Out, const T& Value)
@@ -92,6 +101,17 @@ inline void PrettyPrint(std::stringstream& Out, const T& Value)
     {
         // N.B. Enum can be specialized by creating an overload for this method.
         Out << std::to_string(Value);
+    }
+    else if constexpr (std::is_same_v<T, StringArray>)
+    {
+        if (Value.Index <= 0)
+        {
+            Out << "<empty>";
+            return;
+        }
+
+        gsl::span<const char> span(Value.MessageHead + Value.Index, Value.MessageHead + Value.MessageSize);
+        Out << wsl::shared::string::Join(wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span)), ',');
     }
     else
     {

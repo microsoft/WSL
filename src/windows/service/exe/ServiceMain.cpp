@@ -18,6 +18,7 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "LxssIpTables.h"
 #include "LxssUserSessionFactory.h"
+#include "WSLCSessionManagerFactory.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -30,6 +31,9 @@ wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
+
+// Declare the WSLCSessionManager COM class.
+CoCreatableClassWrlCreatorMapInclude(WSLCSessionManager);
 
 struct WslServiceSecurityPolicy
 {
@@ -170,9 +174,6 @@ try
 
     wsl::windows::common::security::ApplyProcessMitigationPolicies();
 
-    // Ensure that the OS has support for running lifted WSL.
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_SERVICE_DISABLED), !wsl::windows::common::helpers::IsWslSupportInterfacePresent());
-
     // Initialize Winsock.
     WSADATA Data;
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
@@ -189,6 +190,9 @@ try
     });
 
     EvaluateWslPolicy();
+
+    wsl::windows::common::helpers::RegisterWithDcat();
+
     return S_OK;
 }
 CATCH_RETURN()
@@ -239,6 +243,9 @@ void WslService::ServiceStopped()
 
     // Terminate all user sessions.
     ClearSessionsAndBlockNewInstances();
+
+    // Also tear down WSLC sessions.
+    wsl::windows::service::wslc::ClearWslcSessionsAndBlockNewInstances();
 
     // Disconnect from the LxCore driver.
     if (g_lxcoreInitialized)

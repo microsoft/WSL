@@ -47,6 +47,8 @@ typedef struct _LX_PORT_LISTENER_CONTEXT
 namespace wsl::windows::wslrelay::localhost {
 void RelayWorker(_In_ wsl::shared::SocketChannel& SocketChannel, _In_ const GUID& VmId);
 
+void RunWSLCPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent);
+
 class Relay
 {
 public:

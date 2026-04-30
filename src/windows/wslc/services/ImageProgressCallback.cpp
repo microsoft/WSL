@@ -1,0 +1,128 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ImageProgressCallback.cpp
+
+Abstract:
+
+    This file contains the ImageProgressCallback Implementation.
+
+--*/
+
+#include "precomp.h"
+#include "ImageProgressCallback.h"
+#include "ImageService.h"
+#include <format>
+
+namespace wsl::windows::wslc::services {
+using namespace wsl::shared;
+
+ChangeTerminalMode::ChangeTerminalMode(HANDLE console, bool cursorVisible) : m_console(console)
+{
+    if (!wsl::windows::common::wslutil::IsConsoleHandle(console))
+    {
+        m_console = nullptr;
+        return;
+    }
+
+    THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(console, &m_originalCursorInfo));
+    CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
+    newCursorInfo.bVisible = cursorVisible;
+    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(console, &newCursorInfo));
+}
+
+ChangeTerminalMode::~ChangeTerminalMode()
+{
+    if (m_console)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    }
+}
+
+auto ImageProgressCallback::MoveToLine(SHORT line)
+{
+    if (line > 0)
+    {
+        wprintf(L"\033[%iA", line);
+    }
+
+    return wil::scope_exit([line = line]() {
+        if (line > 1)
+        {
+            wprintf(L"\033[%iB", line - 1);
+        }
+    });
+}
+
+HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total)
+{
+    try
+    {
+        if (!m_terminalMode.IsConsole())
+        {
+            return S_OK;
+        }
+
+        if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
+        {
+            wprintf(L"%hs\n", status);
+            m_currentLine++;
+            return S_OK;
+        }
+
+        auto info = Info();
+
+        auto it = m_statuses.find(id);
+        if (it == m_statuses.end())
+        {
+            // If this is the first time we see this ID, create a new line for it.
+            m_statuses.emplace(id, m_currentLine);
+            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            m_currentLine++;
+        }
+        else
+        {
+            auto revert = MoveToLine(m_currentLine - it->second);
+            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+        }
+
+        return S_OK;
+    }
+    CATCH_RETURN();
+}
+
+CONSOLE_SCREEN_BUFFER_INFO ImageProgressCallback::Info()
+{
+    CONSOLE_SCREEN_BUFFER_INFO info{};
+    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
+    return info;
+}
+
+std::wstring ImageProgressCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
+{
+    std::wstring line;
+    if (total != 0)
+    {
+        line = std::format(L"{} '{}': {}%", status, id, current * 100 / total);
+    }
+    else if (current != 0)
+    {
+        line = std::format(L"{} '{}': {}s", status, id, current);
+    }
+    else
+    {
+        line = std::format(L"{} '{}'", status, id);
+    }
+
+    // Erase any previously written char on that line.
+    while (line.size() < info.dwSize.X)
+    {
+        line += L' ';
+    }
+
+    return line;
+}
+} // namespace wsl::windows::wslc::services

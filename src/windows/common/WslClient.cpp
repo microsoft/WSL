@@ -19,6 +19,7 @@ Abstract:
 #include "Distribution.h"
 #include "CommandLine.h"
 #include <conio.h>
+#include "WslCoreFilesystem.h"
 
 #define BASH_PATH L"/bin/bash"
 
@@ -107,17 +108,9 @@ struct ShellExecOptions
     }
 };
 
-bool IsInteractiveConsole()
-{
-    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode{};
-
-    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
-}
-
 void PromptForKeyPress()
 {
-    if (IsInteractiveConsole())
+    if (wsl::windows::common::wslutil::IsInteractiveConsole())
     {
         wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessagePressAnyKeyToExit());
         LOG_IF_WIN32_BOOL_FALSE(FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE)));
@@ -259,7 +252,7 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
 
     parser.AddPositionalArgument(name, 0);
     parser.AddPositionalArgument(filePath, 1);
-    parser.AddArgument(SetFlag<ULONG, LXSS_EXPORT_DISTRO_FLAGS_VHD>(flags), WSL_EXPORT_ARG_VHD_OPTION);
+    parser.AddArgument(SetFlag<LXSS_EXPORT_DISTRO_FLAGS_VHD, ULONG>(flags), WSL_EXPORT_ARG_VHD_OPTION);
     parser.AddArgument(parseFormat, WSL_EXPORT_ARG_FORMAT_OPTION);
     parser.Parse();
 
@@ -325,7 +318,7 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     parser.AddPositionalArgument(AbsolutePath(installPath), 1);
     parser.AddPositionalArgument(filePath, 2);
     parser.AddArgument(WslVersion(version), WSL_IMPORT_ARG_VERSION);
-    parser.AddArgument(SetFlag<ULONG, LXSS_IMPORT_DISTRO_FLAGS_VHD>{flags}, WSL_IMPORT_ARG_VHD);
+    parser.AddArgument(SetFlag<LXSS_IMPORT_DISTRO_FLAGS_VHD, ULONG>{flags}, WSL_IMPORT_ARG_VHD);
 
     parser.Parse();
 
@@ -1505,10 +1498,11 @@ int RunDebugShell()
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(pipe.get(), "\n", 1, nullptr, nullptr));
 
     // Create a thread to relay stdin to the pipe.
-    wsl::windows::common::ConsoleState Io;
+    wsl::windows::common::ConsoleState console;
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
-    std::thread inputThread(
-        [&]() { wsl::windows::common::RelayStandardInput(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), {}, exitEvent.get(), &Io); });
+    std::thread inputThread([&]() {
+        wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), []() {}, exitEvent.get());
+    });
 
     auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         exitEvent.SetEvent();

@@ -45,7 +45,18 @@ function(add_test_group image version)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup.xml.in ${DIR}/TestGroup.xml)
 endfunction()
 
+function(add_wslc_test_group image)
+    set(version "c")
+    set(DIR ${OUT}/${image}-wslc)
+
+    file(MAKE_DIRECTORY ${DIR})
+
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestMap.xml.in ${DIR}/TestMap.xml)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup-wslc.xml.in ${DIR}/TestGroup.xml)
+endfunction()
+
 foreach(image ${CLOUDTEST_IMAGES})
     add_test_group("${image}" "1")
     add_test_group("${image}" "2")
+    add_wslc_test_group("${image}")
 endforeach()

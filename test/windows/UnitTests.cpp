@@ -965,7 +965,7 @@ class UnitTests
             VERIFY_IS_FALSE(!vhdFile);
         }
 
-        auto validateOutput = [](LPCWSTR commandLine, LPCWSTR expectedOutput, DWORD expectedExitCode = -1) {
+        auto validateOutput = [](LPCWSTR commandLine, const std::wstring& expectedOutput, DWORD expectedExitCode = -1) {
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(commandLine, expectedExitCode);
             VERIFY_ARE_EQUAL(expectedOutput, out);
             VERIFY_ARE_EQUAL(L"", err);
@@ -973,10 +973,22 @@ class UnitTests
 
         auto version = LxsstuVmMode() ? 2 : 1;
         auto commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, tarFileName, version);
-        validateOutput(
-            commandLine.c_str(),
-            L"The supplied install location is already in use.\r\n"
-            L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+        if (LxsstuVmMode())
+        {
+            validateOutput(
+                commandLine.c_str(),
+                std::format(
+                    L"Failed to create disk '{}ext4.vhdx': The file exists. \r\n"
+                    L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n",
+                    LXSST_IMPORT_DISTRO_TEST_DIR));
+        }
+        else
+        {
+            validateOutput(
+                commandLine.c_str(),
+                L"The file exists. \r\n"
+                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
+        }
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
         validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
@@ -988,6 +1000,25 @@ class UnitTests
                 commandLine.c_str(),
                 L"This operation is only supported by WSL2.\r\n"
                 L"Error code: Wsl/Service/RegisterDistro/WSL_E_WSL2_NEEDED\r\n");
+        }
+
+        //
+        // Verify that importing a distribution with a different name into the same path as an
+        // already registered distribution (test_distro) returns the path-already-exists error.
+        //
+
+        {
+            const auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+            VERIFY_IS_TRUE(!!distroKey);
+
+            auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+            VERIFY_IS_FALSE(basePath.empty());
+
+            commandLine = std::format(L"--import path-conflict-distro \"{}\" \"{}\" --version {}", basePath, tarFileName, version);
+            validateOutput(
+                commandLine.c_str(),
+                L"The supplied install location is already in use.\r\n"
+                L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
         }
 
         //
@@ -5440,7 +5471,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Cannot create a file when that file already exists. \r\n"
                     L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
 
                 VERIFY_ARE_EQUAL(err, L"");
@@ -5451,7 +5482,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
 
                 VERIFY_ARE_EQUAL(
                     out,
-                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Cannot create a file when that file already exists. \r\n"
                     L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
 
                 VERIFY_ARE_EQUAL(err, L"");
@@ -6038,6 +6069,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken();
+
         VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"echo dummy", nullptr, nullptr, nullptr, nonElevatedToken.get()));
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"mountpoint /mnt/c", 0u);
         VERIFY_ARE_EQUAL(out, L"/mnt/c is a mountpoint\n");
@@ -6529,6 +6561,64 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(BytesToHex({0xDE, 0xAD, 0xBE, 0xEF}), L"0xdeadbeef");
         VERIFY_ARE_EQUAL(BytesToHex({0x00, 0x00}), L"0x0000");
         VERIFY_ARE_EQUAL(BytesToHex({0xFF, 0xFF}), L"0xffff");
+    }
+
+    TEST_METHOD(HexToBytes)
+    {
+        using wsl::windows::common::string::BytesToHex;
+        using wsl::windows::common::string::HexToBytes;
+        using ByteVec = std::vector<BYTE>;
+
+        // Wide string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string with 0x prefix
+        VERIFY_ARE_EQUAL(HexToBytes("0xdeadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Wide string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes(L"deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Narrow string without prefix
+        VERIFY_ARE_EQUAL(HexToBytes("deadbeef"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Empty string
+        VERIFY_ARE_EQUAL(HexToBytes(L""), (ByteVec{}));
+
+        // Single byte
+        VERIFY_ARE_EQUAL(HexToBytes(L"0x0f"), (ByteVec{0x0F}));
+
+        // Uppercase hex digits
+        VERIFY_ARE_EQUAL(HexToBytes(L"0xDEADBEEF"), (ByteVec{0xDE, 0xAD, 0xBE, 0xEF}));
+
+        // Round-trip: BytesToHex -> HexToBytes
+        const ByteVec original = {0x01, 0x23, 0xAB};
+        VERIFY_ARE_EQUAL(HexToBytes(BytesToHex(original)), original);
+
+        // Odd-length string (after stripping "0x") throws E_INVALIDARG
+        bool threw = false;
+        try
+        {
+            HexToBytes(L"0xabc");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
+
+        // Invalid hex character throws E_INVALIDARG
+        threw = false;
+        try
+        {
+            HexToBytes(L"0xZZ");
+        }
+        catch (const wil::ResultException& e)
+        {
+            VERIFY_ARE_EQUAL(e.GetErrorCode(), E_INVALIDARG);
+            threw = true;
+        }
+        VERIFY_IS_TRUE(threw);
     }
 
     WSL2_TEST_METHOD(InteractiveMount)

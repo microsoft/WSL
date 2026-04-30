@@ -140,6 +140,64 @@ inline const char* FromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
     return String.data();
 }
 
+template <typename T>
+inline const char* FromMessageBuffer(const gsl::span<gsl::byte>& Span)
+{
+    return FromSpan(Span, offsetof(T, Buffer));
+}
+
+inline std::vector<const char*> StringPointersFromArray(const std::vector<std::string>& Strings, bool insertNull)
+{
+    std::vector<const char*> result(Strings.size());
+    std::transform(Strings.begin(), Strings.end(), result.begin(), [](const std::string& str) { return str.c_str(); });
+
+    if (insertNull)
+    {
+        result.push_back(nullptr);
+    }
+
+    return result;
+}
+
+inline std::vector<std::string> ArrayFromSpan(gsl::span<const gsl::byte> Span, size_t Offset = 0)
+{
+    THROW_INVALID_ARG_IF(Span.size() < Offset);
+
+    Span = Span.subspan(Offset);
+
+    std::vector<std::string> Result;
+
+    auto it = Span.begin();
+
+    auto readSize = [&]() {
+        THROW_INVALID_ARG_IF(Span.end() - it < sizeof(int32_t));
+
+        auto size = *reinterpret_cast<const int32_t*>(&*it);
+        it += sizeof(int32_t);
+
+        return size;
+    };
+
+    while (true)
+    {
+        auto size = readSize();
+        if (size == -1)
+        {
+            break;
+        }
+
+        THROW_INVALID_ARG_IF(size < 0);
+        THROW_INVALID_ARG_IF(size > Span.end() - it);
+
+        const char* begin = reinterpret_cast<const char*>(&*it);
+        Result.emplace_back(begin, size);
+
+        it += size;
+    }
+
+    return Result;
+}
+
 constexpr auto c_defaultHostName = "localhost";
 
 inline std::string CleanHostname(const std::string_view Hostname)
@@ -829,6 +887,22 @@ struct std::formatter<std::source_location, char>
     auto format(const std::source_location& location, TCtx& ctx) const
     {
         return std::format_to(ctx.out(), "{}[{}:{}]", location.function_name(), location.file_name(), location.line());
+    }
+};
+
+template <>
+struct std::formatter<std::source_location, wchar_t>
+{
+    template <typename TCtx>
+    static constexpr auto parse(TCtx& ctx)
+    {
+        return ctx.begin();
+    }
+
+    template <typename TCtx>
+    auto format(const std::source_location& location, TCtx& ctx) const
+    {
+        return std::format_to(ctx.out(), L"{}[{}:{}]", location.function_name(), location.file_name(), location.line());
     }
 };
 

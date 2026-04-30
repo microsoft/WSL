@@ -20,6 +20,7 @@ Abstract:
 #ifdef WIN32
 #include "wslservice.h"
 #include "ExecutionContext.h"
+#include "wslc.h"
 #endif
 
 #define NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT_FROM_ONLY(Type, ...) \
@@ -31,19 +32,21 @@ Abstract:
 
 namespace wsl::shared {
 
+constexpr int c_jsonPrettyPrintIndent = 2;
+
 template <typename T>
-std::string ToJson(const T& Value)
+std::string ToJson(const T& Value, int indent = -1)
 {
     nlohmann::json json;
     to_json(json, Value);
 
-    return json.dump();
+    return json.dump(indent);
 }
 
 template <typename T>
-std::wstring ToJsonW(const T& Value)
+std::wstring ToJsonW(const T& Value, int indent = -1)
 {
-    return wsl::shared::string::MultiByteToWide(ToJson(Value));
+    return wsl::shared::string::MultiByteToWide(ToJson(Value, indent));
 }
 
 template <typename T, typename TJson = nlohmann::json>
@@ -62,7 +65,8 @@ T FromJson(const char* Value)
 
 #ifdef WIN32
 
-        THROW_HR_WITH_USER_ERROR(WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()));
+        THROW_HR_WITH_USER_ERROR_MSG(
+            WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()), "Invalid JSON: %hs", Value);
 
 #else
         LOG_ERROR("Failed to deserialize json: '{}'. Error: {}", Value, e.what());
@@ -167,5 +171,25 @@ struct adl_serializer<wsl::shared::string::MacAddress>
         }
     }
 };
+
+#ifdef WIN32
+template <>
+struct adl_serializer<WSLCVolumeInformation>
+{
+    static void to_json(json& j, const WSLCVolumeInformation& volume)
+    {
+        j = json{{"Name", std::string(volume.Name)}, {"Driver", std::string(volume.Driver)}};
+    }
+
+    static void from_json(const json& j, WSLCVolumeInformation& volume)
+    {
+        std::string name = j.at("Name").get<std::string>();
+        std::string driver = j.at("Driver").get<std::string>();
+
+        strncpy_s(volume.Name, sizeof(volume.Name), name.c_str(), _TRUNCATE);
+        strncpy_s(volume.Driver, sizeof(volume.Driver), driver.c_str(), _TRUNCATE);
+    }
+};
+#endif
 
 } // namespace nlohmann

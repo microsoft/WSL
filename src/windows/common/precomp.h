@@ -52,6 +52,7 @@ Abstract:
 #include <msi.h>
 #include <AccCtrl.h>
 #include <AclAPI.h>
+#include <wuapi.h>
 #include "windowsdefs.h"
 
 // Annotations
@@ -140,6 +141,7 @@ Abstract:
 #include <lxbusapi.h>
 
 // Utility/helper functions
+#include "COMImplClass.h"
 #include "conncheckshared.h"
 #include "helpers.hpp"
 #include "string.hpp"

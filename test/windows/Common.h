@@ -27,6 +27,8 @@ Abstract:
 #include "wslutil.h"
 #include "WslCoreConfig.h"
 
+using namespace std::chrono_literals;
+
 //
 // N.B. This is also defined in 'lxtcommon.h' & 'lxsetup.ps1'. Update those
 //      files too, if the distro name changes here.
@@ -103,20 +105,30 @@ Abstract:
         return; \
     }
 
+#define WSL_TEST_CLASS_PROPERTIES \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManager.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManagerProxyStub.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslclient.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslservice.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslcsession.exe")
+
 #define WSL_TEST_CLASS(_name) \
     BEGIN_TEST_CLASS(_name) \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManager.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"LxssManagerProxyStub.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslclient.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslservice.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
-        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
+        WSL_TEST_CLASS_PROPERTIES \
+    END_TEST_CLASS()
+
+#define WSLC_TEST_CLASS(_name) \
+    BEGIN_TEST_CLASS(_name) \
+        WSL_TEST_CLASS_PROPERTIES \
+        TEST_CLASS_PROPERTY(L"TestCategory", L"WSLC") \
     END_TEST_CLASS()
 
 //
@@ -173,10 +185,8 @@ template <typename T>
 class RegistryKeyChange
 {
 public:
-    RegistryKeyChange(HKEY Hive, LPCWSTR Key, LPCWSTR Name, const T& Value) : m_value(Name)
+    RegistryKeyChange(HKEY Hive, LPCWSTR Key, LPCWSTR Name, const T& Value) : m_hive(Hive), m_key(Key), m_value(Name)
     {
-        m_key = wsl::windows::common::registry::CreateKey(Hive, Key, KEY_ALL_ACCESS);
-
         m_originalValue = Get();
 
         Set(Value);
@@ -184,38 +194,63 @@ public:
 
     ~RegistryKeyChange()
     {
-        if (m_key)
+        if (m_key != nullptr)
         {
+            auto key = wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
+
             if (m_originalValue.has_value())
             {
                 Set(m_originalValue.value());
             }
             else
             {
-                wsl::windows::common::registry::DeleteKeyValue(m_key.get(), m_value.c_str());
+                wsl::windows::common::registry::DeleteKeyValue(key.get(), m_value.c_str());
             }
         }
     }
 
-    RegistryKeyChange(const RegistryKeyChange&) = delete;
-    RegistryKeyChange(RegistryKeyChange&& other) = default;
-    const RegistryKeyChange& operator=(RegistryKeyChange&& other)
+    wil::unique_hkey OpenKey()
     {
-        m_key = std::move(other.m_key);
-        m_value = std::move(other.m_value);
+        return wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
+    }
+
+    RegistryKeyChange(const RegistryKeyChange&) = delete;
+    RegistryKeyChange(RegistryKeyChange&& other) noexcept :
+        m_hive(other.m_hive), m_key(other.m_key), m_value(std::move(other.m_value)), m_originalValue(std::move(other.m_originalValue))
+    {
+        other.m_hive = nullptr;
+        other.m_key = nullptr;
+    }
+
+    RegistryKeyChange& operator=(RegistryKeyChange&& other)
+    {
+        if (this != &other)
+        {
+            m_hive = std::move(other.m_hive);
+            m_key = std::move(other.m_key);
+            m_value = std::move(other.m_value);
+            m_originalValue = std::move(other.m_originalValue);
+
+            other.m_hive = nullptr;
+            other.m_key = nullptr;
+        }
+
+        return *this;
     }
 
     const RegistryKeyChange& operator=(RegistryKeyChange&) = delete;
 
     void Set(const T& Value)
     {
+        auto key = wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
+
         if constexpr (std::is_same_v<std::remove_reference_t<T>, DWORD>)
         {
-            wsl::windows::common::registry::WriteDword(m_key.get(), nullptr, m_value.c_str(), Value);
+            wsl::windows::common::registry::WriteDword(key.get(), nullptr, m_value.c_str(), Value);
         }
         else if constexpr (std::is_same_v<std::remove_reference_t<T>, std::wstring>)
         {
-            wsl::windows::common::registry::WriteString(m_key.get(), nullptr, m_value.c_str(), Value.c_str());
+            wsl::windows::common::registry::WriteString(key.get(), nullptr, m_value.c_str(), Value.c_str());
         }
         else
         {
@@ -225,11 +260,14 @@ public:
 
     auto Get() const
     {
+
+        auto key = wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
+
         if constexpr (std::is_same_v<T, DWORD>)
         {
             DWORD Value = 0;
             DWORD Size = sizeof(Value);
-            const auto Result = RegGetValueW(m_key.get(), nullptr, m_value.c_str(), RRF_RT_REG_DWORD, nullptr, &Value, &Size);
+            const auto Result = RegGetValueW(key.get(), nullptr, m_value.c_str(), RRF_RT_REG_DWORD, nullptr, &Value, &Size);
             if (Result == ERROR_SUCCESS)
             {
                 WI_ASSERT(Size == sizeof(Value));
@@ -246,7 +284,7 @@ public:
         }
         else if constexpr (std::is_same_v<std::remove_reference_t<T>, std::wstring>)
         {
-            return wsl::windows::common::registry::ReadOptionalString(m_key.get(), nullptr, m_value.c_str());
+            return wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, m_value.c_str());
         }
         else
         {
@@ -255,7 +293,8 @@ public:
     }
 
 private:
-    wil::unique_hkey m_key;
+    HKEY m_hive = nullptr;
+    LPCWSTR m_key = nullptr;
     std::wstring m_value;
     std::optional<T> m_originalValue;
 };
@@ -307,6 +346,34 @@ public:
 private:
     std::optional<std::wstring> m_originalContent;
     LPCWSTR m_path{};
+};
+
+class PartialHandleRead
+{
+public:
+    NON_COPYABLE(PartialHandleRead);
+    NON_MOVABLE(PartialHandleRead);
+
+    PartialHandleRead(HANDLE Handle);
+    ~PartialHandleRead();
+
+    void Expect(const std::string& Expected);
+    void ExpectConsume(const std::string& Expected);
+    void ExpectClosed(DWORD Timeout = 60 * 1000);
+
+    std::string ReadBytes(size_t Length);
+    std::string ConsumeBytes(size_t Length);
+
+    std::string GetData() const;
+
+private:
+    void Run();
+
+    HANDLE m_handle{};
+    mutable std::mutex m_mutex;
+    wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    std::thread m_thread;
+    std::string m_data;
 };
 
 //
@@ -427,7 +494,7 @@ std::vector<std::wstring> LxssSplitString(_In_ const std::wstring& string, _In_ 
 
 void RestartWslService();
 
-wil::unique_handle GetNonElevatedToken();
+wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type = TokenPrimary);
 
 std::wstring LxssWriteWslConfig(const std::wstring& Content);
 
@@ -523,3 +590,77 @@ std::optional<GUID> GetDistributionId(LPCWSTR Name);
 wil::unique_hkey OpenDistributionKey(LPCWSTR Name);
 
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings = L"", int ExitCode = -1);
+
+std::string ReadToString(SOCKET Handle);
+std::string ReadToString(HANDLE Handle);
+
+std::wstring ReadFileContent(const std::string& Path);
+std::wstring ReadFileContent(const std::wstring& Path);
+
+void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout = 60s);
+
+std::string EscapeString(const std::string& Input);
+
+void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);
+
+std::filesystem::path GetTestImagePath(std::string_view imageName);
+
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry = false);
+
+template <typename T>
+void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T>& actual, const std::source_location& source = std::source_location::current())
+{
+    std::map<T, size_t> expectedCounts;
+    std::map<T, size_t> actualCounts;
+
+    for (const auto& e : expected)
+    {
+        expectedCounts[e]++;
+    }
+
+    for (const auto& e : actual)
+    {
+        actualCounts[e]++;
+    }
+
+    std::wstring error;
+
+    for (const auto& [value, count] : expectedCounts)
+    {
+        if (actualCounts[value] != count)
+        {
+            error += std::format(L"Value '{}' expected {} times but was found {} times.\n", value, count, actualCounts[value]);
+        }
+    }
+
+    for (const auto& [value, count] : actualCounts)
+    {
+        if (expectedCounts.find(value) == expectedCounts.end())
+        {
+            error += std::format(L"Unexpected value found: '{}'", value);
+        }
+    }
+
+    if (!error.empty())
+    {
+        error += std::format(L"Expected ({} elements):\n", expected.size());
+        for (const auto& e : expected)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Actual ({} elements):\n", actual.size());
+
+        for (const auto& e : actual)
+        {
+            error += std::format(L"- {}\n", e);
+        }
+
+        error += std::format(L"Called from: {}", source);
+
+        LogError("VerifyAreEqualUnordered failed: %ls", error.c_str());
+        VERIFY_FAIL();
+    }
+}
+
+void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);

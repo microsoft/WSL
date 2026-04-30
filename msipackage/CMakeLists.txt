@@ -8,11 +8,16 @@ else()
     set(PACKAGE_INPUT_DIR ${BIN})
 endif()
 
+# DCOM Access/Launch permission binary security descriptor.
+# SDDL: O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY)
+# Grants local launch/activate to Authenticated Users, Principal Self, and SYSTEM.
+set(DCOM_PERMISSION "01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000")
+
 set(OUTPUT_PACKAGE ${BIN}/wsl.msi)
 set(PACKAGE_WIX_IN ${CMAKE_CURRENT_LIST_DIR}/package.wix.in)
 set(PACKAGE_WIX ${BIN}/package.wix)
 set(CAB_CACHE ${BIN}/cab)
-set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wslinstall.dll)
+set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wslinstall.dll;wslc.exe;wslcsession.exe)
 if (WSL_BUILD_WSL_SETTINGS)
     list(APPEND WINDOWS_BINARIES "wslsettings/wslsettings.dll;wslsettings/wslsettings.exe;libwsl.dll")
 endif()
@@ -52,7 +57,7 @@ add_custom_command(
 
 add_custom_target(msipackage DEPENDS ${OUTPUT_PACKAGE})
 set_target_properties(msipackage PROPERTIES EXCLUDE_FROM_ALL FALSE SOURCES ${PACKAGE_WIX_IN})
-add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init initramfs wslinstall msixgluepackage)
+add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init initramfs wslinstall msixgluepackage wslc wslcsession)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_dependencies(msipackage wslsettings libwsl)

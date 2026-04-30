@@ -719,7 +719,7 @@ class InstallerTests
         ValidatePackageInstalledProperly();
     }
 
-    TEST_METHOD(InstallremovesStaleServiceRegistration)
+    TEST_METHOD(InstallRemovesStaleServiceRegistration)
     {
         // Remove the MSI package.
         UninstallMsi();
@@ -898,6 +898,47 @@ class InstallerTests
         VERIFY_IS_FALSE(SfcIsKeyProtected(HKEY_LOCAL_MACHINE, keyPath, KEY_WOW64_64KEY));
     }
 
+    void ValidateDcatRegistration()
+    {
+        const auto versionValue =
+            wsl::windows::common::registry::ReadString(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY), L"Version");
+        VERIFY_ARE_EQUAL(versionValue, WIDEN(WSL_PACKAGE_VERSION));
+    }
+
+    TEST_METHOD(InstallerRegistersWithDcat)
+    {
+        // Uninstalling should remove the registration
+        UninstallMsi();
+        VERIFY_IS_FALSE(IsMsiPackageInstalled());
+        VERIFY_IS_FALSE(IsMsixInstalled());
+
+        VERIFY_ARE_EQUAL(
+            wsl::windows::common::registry::OpenKeyNoThrow(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY), KEY_READ).second,
+            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+
+        // Installing should add the registration
+        InstallMsi();
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_IS_TRUE(IsMsixInstalled());
+
+        ValidateDcatRegistration();
+    }
+
+    TEST_METHOD(ServiceRemediatesDcatRegistration)
+    {
+        // Starting the service should create the registration if it is missing
+        StopWslService();
+        VERIFY_ARE_EQUAL(wsl::windows::common::registry::DeleteKey(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY)), true);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list"), 0);
+        ValidateDcatRegistration();
+
+        // Starting the service should fix the registration if needed
+        StopWslService();
+        wsl::windows::common::registry::WriteString(HKEY_LOCAL_MACHINE, WIDEN(DCAT_REGISTRATION_KEY), L"Version", L"1.0.0");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list"), 0);
+        ValidateDcatRegistration();
+    }
+
     void CallWslUpdateViaMsi()
     {
 
@@ -1048,4 +1089,95 @@ class InstallerTests
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
     }
+
+    /*
+     TODO: Uncomment when the functionality is implemented in the SDK.
+    TEST_METHOD(WSLCInstall)
+    {
+        auto expectComponents = [](WslInstallComponent expected) {
+            WslInstallComponent components{};
+            VERIFY_SUCCEEDED(WslQueryMissingComponents(&components));
+
+            VERIFY_ARE_EQUAL(components, expected);
+        };
+
+        VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslPackage, nullptr, nullptr), E_INVALIDARG);
+
+        // TODO: remove once 2.7.0 is released.
+        RegistryKeyChange<std::wstring> version(HKEY_LOCAL_MACHINE, LXSS_REGISTRY_PATH "\\MSI", L"Version", L"2.7.0");
+
+        expectComponents(WslInstallComponentNone);
+
+        // Validate that a package < 2.7 is handled correctly.
+        {
+            version.Set(L"2.6.0");
+            expectComponents(WslInstallComponentWslPackage);
+        }
+
+        version.Set(L"2.7.0");
+
+        // Validate that a missing package is detected.
+        expectComponents(WslInstallComponentNone);
+        UninstallMsi();
+
+        expectComponents(WslInstallComponentWslPackage);
+
+        {
+            UniqueWebServer fileServer(L"http://127.0.0.1:12346/", std::filesystem::path(m_msiPath));
+            VERIFY_SUCCEEDED(WslSetPackageUrl(L"http://127.0.0.1:12346/"));
+
+            WslInstallComponent progressedComponents{};
+            auto callback = [](WslInstallComponent Component, uint64_t progress, uint64_t total, void* Context) {
+                *reinterpret_cast<WslInstallComponent*>(Context) |= Component;
+            };
+
+            VERIFY_SUCCEEDED(WslInstallComponents(WslInstallComponentWslPackage, callback, &progressedComponents));
+            VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslPackage);
+
+            ValidateInstalledVersion(WIDEN(WSL_PACKAGE_VERSION));
+            version.Set(L"2.7.0");
+
+            expectComponents(WslInstallComponentNone);
+
+            progressedComponents = WslInstallComponentNone;
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentVMPOC, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentVMPOC);
+
+            progressedComponents = WslInstallComponentNone;
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslOC, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslOC);
+        }
+
+        {
+            VERIFY_SUCCEEDED(WslSetPackageUrl(L"http://127.0.0.1:12346/"));
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslPackage, nullptr, nullptr), WININET_E_CANNOT_CONNECT);
+        }
+    }
+
+    // This test case requires a machine without the OC's enabled.
+    TEST_METHOD(WSLCInstallManual)
+    {
+        WslInstallComponent components{};
+        VERIFY_SUCCEEDED(WslQueryMissingComponents(&components));
+
+        if (!WI_IsAnyFlagSet(components, WslInstallComponentWslOC | WslInstallComponentVMPOC))
+        {
+            LogSkipped("OC are installed, skipping test. Flags: %i", components);
+            return;
+        }
+
+        auto expectedComponents = WslInstallComponentVMPOC;
+        WI_SetFlagIf(expectedComponents, WslInstallComponentWslOC, !wsl::windows::common::helpers::IsWindows11OrAbove());
+
+        VERIFY_ARE_EQUAL(components, expectedComponents);
+
+        WslInstallComponent progressedComponents{};
+        auto callback = [](WslInstallComponent Component, uint64_t progress, uint64_t total, void* Context) {
+            *reinterpret_cast<WslInstallComponent*>(Context) |= Component;
+        };
+
+        VERIFY_ARE_EQUAL(WslInstallComponents(components, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, expectedComponents);
+    }
+    */
 };

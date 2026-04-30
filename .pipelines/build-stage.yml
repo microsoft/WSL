@@ -7,6 +7,10 @@ parameters:
     type: string
     default: ""
 
+  - name: nugetSuffix
+    type: string
+    default: ""
+
   - name: isNightly
     type: boolean
     default: false
@@ -19,6 +23,7 @@ parameters:
     type: object
     default:
       - Microsoft.WSL.PluginApi.nuspec
+      - Microsoft.WSL.Containers.nuspec
 
   - name: includePackageStage
     type: boolean
@@ -27,8 +32,8 @@ parameters:
   - name: targets
     type: object
     default:
-      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll"
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslcsession;wslc;wsltests;wslcsdk;wslcsdkcs"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslcsession.exe,wslc.exe,wslcsdk.dll,wslcsdkcs.dll"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage"
