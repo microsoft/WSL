@@ -9,6 +9,7 @@ WslcInitContainerSettings
 WslcInitProcessSettings
 
 WslcCreateSession
+WslcGetCliSession
 WslcCreateContainer
 
 WslcReleaseSession
