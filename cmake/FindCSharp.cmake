@@ -3,8 +3,9 @@ function(configure_csharp_target TARGET)
 
     target_compile_options(
         ${TARGET}
-        PRIVATE "/langversion:latest"
-        PRIVATE "/debug:full")
+        PRIVATE
+            "/langversion:latest"
+            "/debug:full")
 
     set_target_properties(
         ${TARGET} PROPERTIES
