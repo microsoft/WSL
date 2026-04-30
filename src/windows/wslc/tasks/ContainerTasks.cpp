@@ -430,6 +430,26 @@ void ViewContainerLogs(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerId = context.Args.Get<ArgType::ContainerId>();
     bool follow = context.Args.Contains(ArgType::Follow);
-    ContainerService::Logs(session, WideToMultiByte(containerId), follow);
+    bool timestamps = context.Args.Contains(ArgType::Timestamps);
+
+    ULONGLONG tail = 0;
+    if (context.Args.Contains(ArgType::Tail))
+    {
+        tail = std::stoull(WideToMultiByte(context.Args.Get<ArgType::Tail>()));
+    }
+
+    ULONGLONG since = 0;
+    if (context.Args.Contains(ArgType::Since))
+    {
+        since = std::stoull(WideToMultiByte(context.Args.Get<ArgType::Since>()));
+    }
+
+    ULONGLONG until = 0;
+    if (context.Args.Contains(ArgType::Until))
+    {
+        until = std::stoull(WideToMultiByte(context.Args.Get<ArgType::Until>()));
+    }
+
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow, timestamps, since, until, tail);
 }
 } // namespace wsl::windows::wslc::task

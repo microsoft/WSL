@@ -32,6 +32,6 @@ struct ContainerService
     static std::vector<models::ContainerInformation> List(models::Session& session);
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
-    static void Logs(models::Session& session, const std::string& id, bool follow);
+    static void Logs(models::Session& session, const std::string& id, bool follow, bool timestamps = false, ULONGLONG since = 0, ULONGLONG until = 0, ULONGLONG tail = 0);
 };
 } // namespace wsl::windows::wslc::services

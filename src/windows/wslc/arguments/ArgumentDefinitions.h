@@ -87,13 +87,17 @@ _(Session,        "session",             NO_ALIAS,          Kind::Value,       L
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SessionIdPositionalArgDescription()) \
 _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
 _(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription(L"SIGKILL")) \
+_(Since,          "since",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SinceArgDescription()) \
 _(Source,         "source",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SourceArgDescription()) \
 _(Tag,            "tag",                 L"t",              Kind::Value,       Localization::WSLCCLI_TagArgDescription()) \
+_(Tail,           "tail",                L"n",              Kind::Value,       Localization::WSLCCLI_TailArgDescription()) \
 _(Target,         "target",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,           "time",                L"t",              Kind::Value,       Localization::WSLCCLI_TimeArgDescription()) \
+_(Timestamps,     "timestamps",          NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_TimestampsArgDescription()) \
 _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_TMPFSArgDescription()) \
 _(TTY,            "tty",                 L"t",              Kind::Flag,        Localization::WSLCCLI_TTYArgDescription()) \
 _(Type,           "type",                L"t",              Kind::Value,       Localization::WSLCCLI_TypeArgDescription()) \
+_(Until,          "until",               NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_UntilArgDescription()) \
 _(User,           "user",                L"u",              Kind::Value,       Localization::WSLCCLI_UserArgDescription()) \
 _(Username,       "username",            L"u",              Kind::Value,       Localization::WSLCCLI_LoginUsernameArgDescription()) \
 _(Verbose,        "verbose",             NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_VerboseArgDescription()) \
