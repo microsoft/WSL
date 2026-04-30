@@ -30,7 +30,7 @@ constexpr uint32_t s_DefaultCPUCount = 2;
 constexpr uint32_t s_DefaultMemoryMB = 2000;
 // Maximum value per use with HVSOCKET_CONNECT_TIMEOUT_MAX
 constexpr ULONG s_DefaultBootTimeout = 300000;
-// Default to 1 GB
+// Default to 1 TB (decimal, 1,000,000,000,000 bytes)
 constexpr UINT64 s_DefaultStorageSize = 1000ULL * 1000 * 1000 * 1000;
 
 #define WSLC_FLAG_VALUE_ASSERT(_wlsc_name_, _wslc_name_) \
