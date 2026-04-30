@@ -652,7 +652,7 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize)
     {
-        auto result = RunWslc(std::format(L"container run --rm --shm-size 128m {} df -h /dev/shm", DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(L"container run --rm --shm-size 128M {} df -h /dev/shm", DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout->find(L"128M") != std::wstring::npos);
     }
