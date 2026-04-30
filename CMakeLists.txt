@@ -410,9 +410,6 @@ set(WSL_PRE_COMMIT_MODE "warn" CACHE STRING "Pre-commit hook behavior: warn, err
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tools/hooks)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit.in ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit @ONLY)
 
-file(CREATE_LINK ${LLVM_INSTALL_DIR}/clang-format.exe ${CMAKE_CURRENT_LIST_DIR}/tools/clang-format.exe COPY_ON_ERROR)
-file(COPY_FILE ${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit ${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit ONLY_IF_DIFFERENT)
-
 set(LINUXSDK_PATH ${LINUXSDK_SOURCE_DIR}/${LLVM_ARCH})
 set(LLVM_TARGET "${LLVM_ARCH}-unknown-linux-musl")
 set(LINUX_CC ${LLVM_INSTALL_DIR}/clang.exe)
