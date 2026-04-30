@@ -8,7 +8,8 @@ set(SOURCES
     Common.cpp
     PluginTests.cpp
     PolicyTests.cpp
-    InstallerTests.cpp)
+    InstallerTests.cpp
+    DiagnosticsTests.cpp)
 
 set(HEADERS
     Common.h
@@ -19,6 +20,7 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
+target_include_directories(wsltests PRIVATE ${PROJECT_SOURCE_DIR}/src/windows/service/exe)
 target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests
                       common

@@ -14,6 +14,9 @@ Abstract:
 
 #include "precomp.h"
 #include "WslCoreInstance.h"
+#include "DiagnosticsHelpers.h"
+
+using wsl::windows::service::diagnostics::CreateInstanceStepDescription;
 
 WslCoreInstance::WslCoreInstance(
     _In_ HANDLE UserToken,
@@ -57,17 +60,45 @@ WslCoreInstance::WslCoreInstance(
         }
     }
 
+    WSL_LOG(
+        "CreateInstanceGuestResult",
+        TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(m_instanceId, "instanceId"),
+        TraceLoggingValue(m_runtimeId, "vmId"),
+        TraceLoggingValue(result.Result, "linuxError"),
+        TraceLoggingValue(static_cast<int>(result.FailureStep), "failureStep"),
+        TraceLoggingValue(result.Pid, "pid"),
+        TraceLoggingValue(result.ConnectPort, "connectPort"));
+
     if (result.Result != 0)
     {
+        const auto stepDescription = CreateInstanceStepDescription(result.FailureStep);
+        const auto stepInfo = std::to_wstring(static_cast<int>(result.FailureStep)) + L" (" + stepDescription + L")";
+        WSL_LOG(
+            "CreateInstanceGuestFailure",
+            TraceLoggingLevel(WINEVENT_LEVEL_WARNING),
+            TraceLoggingValue(m_configuration.Name.c_str(), "distroName"),
+            TraceLoggingValue(m_instanceId, "instanceId"),
+            TraceLoggingValue(m_runtimeId, "vmId"),
+            TraceLoggingValue(result.Result, "linuxError"),
+            TraceLoggingValue(static_cast<int>(result.FailureStep), "failureStep"),
+            TraceLoggingValue(stepDescription.c_str(), "failureStepDescription"));
+
         // N.B. EUCLEAN (117) can be returned if the disk's journal is corrupted.
         if ((result.Result == EINVAL || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk)
         {
             THROW_HR(WSL_E_DISK_CORRUPTED);
         }
+        else if (result.FailureStep == LxInitCreateInstanceStepMountDisk)
+        {
+            wsl::windows::common::ExecutionContext stepContext(wsl::windows::common::Context::MountDisk);
+            THROW_HR_WITH_USER_ERROR(
+                WSL_E_DISTRO_START_FAILED, wsl::shared::Localization::MessageDistributionFailedToStartMountDisk(result.Result, stepInfo));
+        }
         else
         {
             THROW_HR_WITH_USER_ERROR(
-                E_FAIL, wsl::shared::Localization::MessageDistributionFailedToStart(result.Result, static_cast<int>(result.FailureStep)));
+                WSL_E_DISTRO_START_FAILED, wsl::shared::Localization::MessageDistributionFailedToStart(result.Result, stepInfo));
         }
     }
 

@@ -1175,9 +1175,22 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     _In_ ULONG ExportFlags,
     _Out_opt_ ULONG* ConnectPort)
 {
+    WSL_LOG(
+        "CreateInstanceAttachDiskBegin",
+        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(InstanceId, "instanceId"),
+        TraceLoggingValue(m_runtimeId, "vmId"));
+
     // Add the VHD to the machine.
     auto lock = m_lock.lock_exclusive();
     const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+
+    WSL_LOG(
+        "CreateInstanceAttachDiskEnd",
+        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(InstanceId, "instanceId"),
+        TraceLoggingValue(m_runtimeId, "vmId"),
+        TraceLoggingValue(lun, "lun"));
 
     // Launch the init daemon and create the instance.
     int flags = LxMiniInitMessageFlagNone;
@@ -1219,6 +1232,21 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message.WriteString(message->UserProfileOffset, userProfile);
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send<LX_MINI_INIT_MESSAGE>(message.Span());
+
+    WSL_LOG(
+        "CreateInstanceLaunchMessageSent",
+        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(InstanceId, "instanceId"),
+        TraceLoggingValue(m_runtimeId, "vmId"),
+        TraceLoggingValue(static_cast<int>(MessageType), "messageType"),
+        TraceLoggingValue(flags, "flags"),
+        TraceLoggingValue(WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), "launchSystemDistro"));
+
+    WSL_LOG(
+        "CreateInstanceAwaitGuestResult",
+        TraceLoggingValue(Configuration.Name.c_str(), "distroName"),
+        TraceLoggingValue(InstanceId, "instanceId"),
+        TraceLoggingValue(m_runtimeId, "vmId"));
 
     return CreateInstanceInternal(
         InstanceId, Configuration, ReceiveTimeout, DefaultUid, ClientLifetimeId, WI_IsFlagSet(flags, LxMiniInitMessageFlagLaunchSystemDistro), ConnectPort);
