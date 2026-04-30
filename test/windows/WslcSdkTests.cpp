@@ -2399,14 +2399,8 @@ class WslcSdkTests
     {
         // Validate that creating a GPU container on a session without GPU support fails.
         {
-            WslcProcessSettings procSettings;
-            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            const char* argv[] = {"/bin/sh", "-c", "echo hello"};
-            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
-
             WslcContainerSettings containerSettings;
             VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
-            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
             VERIFY_SUCCEEDED(WslcSetContainerSettingsFlags(&containerSettings, WSLC_CONTAINER_FLAG_ENABLE_GPU));
 
             UniqueContainer container;

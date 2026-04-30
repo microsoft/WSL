@@ -3334,7 +3334,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerGpu)
     {
 
-        // Validate that setting GPU flag on a non-GPU session fails.
+        // Validate that setting the GPU flag on a non-GPU session fails.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-gpu-fail");
             launcher.SetContainerFlags(WSLCContainerFlagsGpu);
@@ -3399,7 +3399,7 @@ class WSLCTests
             expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path:"});
         }
 
-        // Validate that containers without GPU flag do not have GPU resources.
+        // Validate that containers without the GPU flag do not have GPU resources.
         {
             WSLCContainerLauncher launcher("debian:latest", "test-container-no-gpu", {"/bin/sh", "-c", "test -c /dev/dxg"});
             auto container = launcher.Launch(*session);
