@@ -67,8 +67,10 @@ std::shared_ptr<DmesgCollector> DmesgCollector::Create(
 std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSource Source)
 {
     std::wstring pipeName = wsl::windows::common::helpers::GetUniquePipeName();
+    auto sd = wsl::windows::common::helpers::CreatePipeSecurityDescriptor();
+    SECURITY_ATTRIBUTES sa = {sizeof(sa), sd.get(), FALSE};
     wil::unique_hfile pipe(CreateNamedPipeW(
-        pipeName.c_str(), (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr));
+        pipeName.c_str(), (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, &sa));
 
     THROW_LAST_ERROR_IF(!pipe);
 

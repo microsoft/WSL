@@ -112,6 +112,8 @@ using unique_mta_cookie = wil::unique_any<CO_MTA_USAGE_COOKIE, decltype(::CoDecr
 
 void ConnectPipe(_In_ HANDLE Pipe, _In_ DWORD Timeout = INFINITE, _In_ const std::vector<HANDLE>& ExitEvents = {});
 
+wil::unique_hlocal_security_descriptor CreatePipeSecurityDescriptor();
+
 std::wstring_view ConsumeArgument(_In_ std::wstring_view CommandLine, _In_ std::wstring_view Argument);
 
 void CreateConsole(_In_ LPCWSTR ConsoleTitle = nullptr);

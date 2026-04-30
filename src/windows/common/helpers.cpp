@@ -242,6 +242,18 @@ void wsl::windows::common::helpers::ConnectPipe(_In_ HANDLE Pipe, _In_ DWORD Tim
     }
 }
 
+wil::unique_hlocal_security_descriptor wsl::windows::common::helpers::CreatePipeSecurityDescriptor()
+{
+    // Create a security descriptor that grants full access to SYSTEM and Authenticated Users.
+    // This is required for named pipes created in Session 0 — the default DACL of service accounts
+    // (e.g. NETWORK SERVICE) may not allow SYSTEM processes (e.g. vmwp.exe) to connect.
+    wil::unique_hlocal_security_descriptor sd;
+    THROW_IF_WIN32_BOOL_FALSE(
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;;GA;;;SY)(A;;GA;;;AU)", SDDL_REVISION_1, &sd, nullptr));
+
+    return sd;
+}
+
 std::wstring_view wsl::windows::common::helpers::ConsumeArgument(_In_ std::wstring_view CommandLine, _In_ std::wstring_view Argument)
 {
     WI_ASSERT((CommandLine.size() >= Argument.size()) && (wcsncmp(CommandLine.data(), Argument.data(), Argument.size()) == 0));
@@ -569,8 +581,10 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
         //     Raw: PIPE_TYPE_BYTE | PIPE_READMODE_BYTE
         //     Blocking: PIPE_WAIT
         WI_SetFlag(flags, LaunchWslRelayFlags::ConnectPipe);
+        auto sd = CreatePipeSecurityDescriptor();
+        SECURITY_ATTRIBUTES sa = {sizeof(sa), sd.get(), FALSE};
         pipe.reset(CreateNamedPipeW(
-            PipeName, (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr));
+            PipeName, (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, &sa));
     }
 
     THROW_LAST_ERROR_IF(!pipe);
@@ -592,8 +606,10 @@ void wsl::windows::common::helpers::LaunchKdRelay(_In_ LPCWSTR PipeName, _In_ HA
     //     Asynchronous: FILE_FLAG_OVERLAPPED
     //     Raw: PIPE_TYPE_BYTE | PIPE_READMODE_BYTE
     //     Blocking: PIPE_WAIT
+    auto sd = CreatePipeSecurityDescriptor();
+    SECURITY_ATTRIBUTES sa = {sizeof(sa), sd.get(), FALSE};
     const wil::unique_hfile pipe{CreateNamedPipeW(
-        PipeName, (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr)};
+        PipeName, (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, &sa)};
 
     THROW_LAST_ERROR_IF(!pipe);
 

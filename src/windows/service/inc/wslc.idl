@@ -418,10 +418,13 @@ interface IWSLCVirtualMachine : IUnknown
 
     // Configures networking engine with sockets from the user process.
     // GnsSocket is required; DnsSocket is optional (NULL if DNS tunneling is disabled).
-    // The service duplicates the socket handles.
+    // Socket handles are passed as opaque ULONG_PTR values (not system_handle) so the
+    // server (SYSTEM) can duplicate them from the client via DuplicateHandleFromCallingProcess.
+    // This avoids requiring the client to OpenProcess(PROCESS_DUP_HANDLE) on the server,
+    // which fails when the client is a non-SYSTEM service account (e.g. NETWORK SERVICE).
     HRESULT ConfigureNetworking(
-        [in, system_handle(sh_socket)] HANDLE GnsSocket,
-        [in, system_handle(sh_socket), unique] HANDLE* DnsSocket);
+        [in] ULONG_PTR GnsSocket,
+        [in, unique] ULONG_PTR* DnsSocket);
 
     // Attaches a VHD or VHDX disk to the VM.
     // GrantVmAccess is called by the service before attaching.

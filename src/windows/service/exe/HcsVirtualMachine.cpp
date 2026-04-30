@@ -351,7 +351,7 @@ try
 }
 CATCH_RETURN()
 
-HRESULT HcsVirtualMachine::ConfigureNetworking(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket)
+HRESULT HcsVirtualMachine::ConfigureNetworking(_In_ ULONG_PTR GnsSocket, _In_opt_ ULONG_PTR* DnsSocket)
 try
 {
     std::lock_guard lock(m_lock);
@@ -362,9 +362,11 @@ try
         return S_OK;
     }
 
-    // Duplicate the socket handles - COM manages the lifetime of the marshalled handles,
-    // so we need our own copies to take ownership.
-    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
+    // Duplicate the socket handles from the calling process. The handles are passed as
+    // opaque ULONG_PTR values; the server (SYSTEM) pulls them via DuplicateHandleFromCallingProcess
+    // so the client doesn't need PROCESS_DUP_HANDLE access to the server.
+    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(
+        wslutil::DuplicateHandleFromCallingProcess(reinterpret_cast<HANDLE>(GnsSocket)))};
     wil::unique_socket dnsSocketHandle;
     if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
@@ -378,7 +380,8 @@ try
         }
         else
         {
-            dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
+            dnsSocketHandle.reset(reinterpret_cast<SOCKET>(
+                wslutil::DuplicateHandleFromCallingProcess(reinterpret_cast<HANDLE>(*DnsSocket))));
         }
     }
     else

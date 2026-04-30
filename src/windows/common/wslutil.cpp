@@ -299,8 +299,96 @@ wil::com_ptr<TInterface> wsl::windows::common::wslutil::CoGetCallContext()
 
 void wsl::windows::common::wslutil::CoInitializeSecurity()
 {
-    THROW_IF_FAILED(CoInitializeSecurity(
-        nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_STATIC_CLOAKING, 0));
+    // Use an explicit security descriptor so that COM callbacks (e.g. from vmwp.exe running as
+    // SYSTEM) succeed even when the process is running in Session 0 (e.g. NETWORK SERVICE).
+    // The default nullptr SD is too restrictive in that environment, causing E_ACCESSDENIED
+    // on incoming COM calls.
+    // The SD grants COM_RIGHTS_EXECUTE (0x1) + COM_RIGHTS_EXECUTE_LOCAL (0x2) +
+    // COM_RIGHTS_ACTIVATE_LOCAL (0x8) = 0xB to SYSTEM and Authenticated Users.
+    //
+    // ConvertStringSecurityDescriptorToSecurityDescriptorW returns a self-relative SD, but
+    // CoInitializeSecurity requires absolute format. Convert via MakeAbsoluteSD.
+    // This follows the same pattern as comservicehelper.h's InitializeSecurity.
+    //
+    // N.B. This function is called before WslTraceLoggingInitialize in some binaries
+    // (e.g. wslrelay.exe), so WSL_LOG must NOT be used here — it would dereference the
+    // uninitialized g_hTraceLoggingProvider (nullptr) and cause an access violation.
+    // Use LOG_IF_FAILED_MSG (WIL-based) instead.
+
+    PSECURITY_DESCRIPTOR pSDRelative = nullptr;
+    auto cleanupRelative = wil::scope_exit([&] {
+        if (pSDRelative)
+            LocalFree(pSDRelative);
+    });
+
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            L"O:BAG:BAD:(A;;0xB;;;SY)(A;;0xB;;;AU)", SDDL_REVISION_1, &pSDRelative, nullptr))
+    {
+        LOG_HR_MSG(HRESULT_FROM_WIN32(GetLastError()), "CoInitializeSecurity: ConvertStringSecurityDescriptorToSecurityDescriptorW failed");
+        goto fallback;
+    }
+
+    {
+        // Query required buffer sizes for MakeAbsoluteSD.
+        DWORD cbSDAbsolute = 0, cbDacl = 0, cbSacl = 0, cbOwner = 0, cbPrimaryGroup = 0;
+        PSECURITY_DESCRIPTOR pSDAbsolute = nullptr;
+        PACL pDacl = nullptr;
+        PACL pSacl = nullptr;
+        PSID pOwner = nullptr;
+        PSID pPrimaryGroup = nullptr;
+
+        auto cleanupAbsolute = wil::scope_exit([&] {
+            if (pSDAbsolute) HeapFree(GetProcessHeap(), 0, pSDAbsolute);
+            if (pDacl) HeapFree(GetProcessHeap(), 0, pDacl);
+            if (pSacl) HeapFree(GetProcessHeap(), 0, pSacl);
+            if (pOwner) HeapFree(GetProcessHeap(), 0, pOwner);
+            if (pPrimaryGroup) HeapFree(GetProcessHeap(), 0, pPrimaryGroup);
+        });
+
+        if (MakeAbsoluteSD(pSDRelative, nullptr, &cbSDAbsolute, nullptr, &cbDacl, nullptr, &cbSacl, nullptr, &cbOwner, nullptr, &cbPrimaryGroup) ||
+            GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        {
+            LOG_HR_MSG(HRESULT_FROM_WIN32(GetLastError()), "CoInitializeSecurity: MakeAbsoluteSD size query failed");
+            goto fallback;
+        }
+
+        pSDAbsolute = reinterpret_cast<PSECURITY_DESCRIPTOR>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbSDAbsolute));
+        pDacl = reinterpret_cast<PACL>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbDacl));
+        pSacl = reinterpret_cast<PACL>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbSacl));
+        pOwner = reinterpret_cast<PSID>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbOwner));
+        pPrimaryGroup = reinterpret_cast<PSID>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, cbPrimaryGroup));
+
+        if (!pSDAbsolute || !pDacl || !pSacl || !pOwner || !pPrimaryGroup)
+        {
+            LOG_HR_MSG(E_OUTOFMEMORY, "CoInitializeSecurity: HeapAlloc failed");
+            goto fallback;
+        }
+
+        if (!MakeAbsoluteSD(pSDRelative, pSDAbsolute, &cbSDAbsolute, pDacl, &cbDacl, pSacl, &cbSacl, pOwner, &cbOwner, pPrimaryGroup, &cbPrimaryGroup))
+        {
+            LOG_HR_MSG(HRESULT_FROM_WIN32(GetLastError()), "CoInitializeSecurity: MakeAbsoluteSD failed");
+            goto fallback;
+        }
+
+        const HRESULT hr = ::CoInitializeSecurity(
+            pSDAbsolute, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_STATIC_CLOAKING, 0);
+
+        LOG_IF_FAILED_MSG(hr, "CoInitializeSecurity with explicit SD");
+
+        if (SUCCEEDED(hr) || hr == RPC_E_TOO_LATE)
+        {
+            return;
+        }
+    }
+
+fallback:
+    // Fallback: initialize without an explicit SD.
+    const HRESULT hrFallback = ::CoInitializeSecurity(
+        nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_STATIC_CLOAKING, 0);
+
+    LOG_IF_FAILED_MSG(hrFallback, "CoInitializeSecurity fallback");
+
+    THROW_IF_FAILED(hrFallback);
 }
 
 void wsl::windows::common::wslutil::ConfigureCrt()

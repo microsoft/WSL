@@ -22,6 +22,24 @@ using GetVmWorkerProcessType = decltype(GetVmWorkerProcess(std::declval<Args>().
 
 using namespace wsl::windows::common::hcs;
 
+// Set COM proxy blanket for Session 0 compatibility.
+// In Session 0, cross-process COM callbacks (e.g. from vmwp.exe) fail unless
+// the proxy uses dynamic cloaking with impersonation. Without this, the default
+// COM security context captures the process token at CoInitializeSecurity time,
+// which is insufficient for callbacks from the VM worker process.
+static HRESULT SetProxyBlanketForSession0(IUnknown* proxy)
+{
+    return CoSetProxyBlanket(
+        proxy,
+        RPC_C_AUTHN_DEFAULT,
+        RPC_C_AUTHZ_DEFAULT,
+        COLE_DEFAULT_PRINCIPAL,
+        RPC_C_AUTHN_LEVEL_DEFAULT,
+        RPC_C_IMP_LEVEL_IMPERSONATE,
+        nullptr,
+        EOAC_DYNAMIC_CLOAKING);
+}
+
 DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId) :
     m_systemId{VmId}, m_runtimeId{RuntimeId}, m_system{wsl::windows::common::hcs::OpenComputeSystem(VmId.c_str(), GENERIC_ALL)}, m_shutdown{false}
 {
@@ -151,6 +169,8 @@ try
     static LxssDynamicFunction<decltype(HdvProxyDeviceHost)> proxyDeviceHost{c_hdvModuleName, "HdvProxyDeviceHost"};
     const wil::com_ptr<IVmDeviceHost> remoteHost = DeviceHost;
     const wil::com_ptr<IUnknown> unknown = remoteHost.query<IUnknown>();
+    THROW_IF_FAILED(SetProxyBlanketForSession0(remoteHost.get()));
+    THROW_IF_FAILED(SetProxyBlanketForSession0(unknown.get()));
     THROW_IF_FAILED(proxyDeviceHost(m_system.get(), unknown.get(), ProcessId, IpcSectionHandle));
     return S_OK;
 }
@@ -195,6 +215,7 @@ try
                 c_vmwpctrlModuleName, "GetVmWorkerProcess"};
 
             RETURN_IF_FAILED(getVmWorker(m_runtimeId, __uuidof(*m_deviceAccess), reinterpret_cast<IUnknown**>(&m_deviceAccess)));
+            RETURN_IF_FAILED(SetProxyBlanketForSession0(m_deviceAccess.get()));
         }
 
         RETURN_HR_IF(E_NOINTERFACE, !m_deviceAccess);
@@ -204,6 +225,7 @@ try
         wil::com_ptr<IUnknown> device;
         RETURN_IF_FAILED(m_deviceAccess->GetDevice(FLEXIO_DEVICE_ID, InstanceId, &device));
         knownDevice->second.MemoryNotification = device.query<IVmFiovGuestMemoryFastNotification>();
+        RETURN_IF_FAILED(SetProxyBlanketForSession0(knownDevice->second.MemoryNotification.get()));
     }
 
     const auto result = knownDevice->second.MemoryNotification->RegisterDoorbell(
@@ -261,6 +283,7 @@ try
             static LxssDynamicFunction<GetVmWorkerProcessType<REFGUID, REFIID, IUnknown**>> getVmWorker{
                 c_vmwpctrlModuleName, "GetVmWorkerProcess"};
             THROW_IF_FAILED(getVmWorker(m_runtimeId, __uuidof(*m_deviceAccess), reinterpret_cast<IUnknown**>(&m_deviceAccess)));
+            THROW_IF_FAILED(SetProxyBlanketForSession0(m_deviceAccess.get()));
         }
 
         THROW_HR_IF(E_NOINTERFACE, !m_deviceAccess);
@@ -269,6 +292,7 @@ try
         wil::com_ptr<IUnknown> device;
         THROW_IF_FAILED(m_deviceAccess->GetDevice(FLEXIO_DEVICE_ID, InstanceId, &device));
         knownDevice->second.MemoryMapping = device.query<IVmFiovGuestMmioMappings>();
+        THROW_IF_FAILED(SetProxyBlanketForSession0(knownDevice->second.MemoryMapping.get()));
     }
 
     THROW_IF_FAILED(knownDevice->second.MemoryMapping->CreateSectionBackedMmioRange(

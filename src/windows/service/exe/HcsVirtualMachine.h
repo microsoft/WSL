@@ -39,7 +39,7 @@ public:
     // IWSLCVirtualMachine implementation
     IFACEMETHOD(GetId)(_Out_ GUID* VmId) override;
     IFACEMETHOD(AcceptConnection)(_Out_ HANDLE* Socket) override;
-    IFACEMETHOD(ConfigureNetworking)(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket) override;
+    IFACEMETHOD(ConfigureNetworking)(_In_ ULONG_PTR GnsSocket, _In_opt_ ULONG_PTR* DnsSocket) override;
     IFACEMETHOD(AttachDisk)(_In_ LPCWSTR Path, _In_ BOOL ReadOnly, _Out_ ULONG* Lun) override;
     IFACEMETHOD(DetachDisk)(_In_ ULONG Lun) override;
     IFACEMETHOD(AddShare)(_In_ LPCWSTR WindowsPath, _In_ BOOL ReadOnly, _Out_ GUID* ShareId) override;

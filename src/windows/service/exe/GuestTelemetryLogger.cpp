@@ -46,8 +46,10 @@ void GuestTelemetryLogger::Start(const wil::unique_event& ExitEvent)
     THROW_HR_IF(E_UNEXPECTED, !m_pipeName.empty());
 
     m_pipeName = wsl::windows::common::helpers::GetUniquePipeName();
+    auto sd = wsl::windows::common::helpers::CreatePipeSecurityDescriptor();
+    SECURITY_ATTRIBUTES sa = {sizeof(sa), sd.get(), FALSE};
     wil::unique_hfile pipe(CreateNamedPipeW(
-        m_pipeName.c_str(), (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, nullptr));
+        m_pipeName.c_str(), (PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED), (PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT), 1, LX_RELAY_BUFFER_SIZE, LX_RELAY_BUFFER_SIZE, 0, &sa));
 
     THROW_LAST_ERROR_IF(!pipe);
 

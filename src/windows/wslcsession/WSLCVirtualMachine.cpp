@@ -390,17 +390,18 @@ void WSLCVirtualMachine::ConfigureNetworking()
     auto process = CreateLinuxProcessImpl("/init", options, fds, nullptr, prepareCommandLine);
 
     // Call back to the service to configure the networking engine.
+    // Pass raw handle values as ULONG_PTR — the service duplicates them server-side.
     auto gnsHandle = process->GetStdHandle(gnsChannelFd);
 
     wil::unique_handle dnsHandle;
-    HANDLE dnsSocketHandle = nullptr;
+    ULONG_PTR dnsSocketValue = 0;
     if (enableDnsTunneling)
     {
         dnsHandle = process->GetStdHandle(dnsChannelFd);
-        dnsSocketHandle = dnsHandle.get();
+        dnsSocketValue = reinterpret_cast<ULONG_PTR>(dnsHandle.get());
     }
 
-    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsHandle.get(), enableDnsTunneling ? &dnsSocketHandle : nullptr));
+    THROW_IF_FAILED(m_vm->ConfigureNetworking(reinterpret_cast<ULONG_PTR>(gnsHandle.get()), enableDnsTunneling ? &dnsSocketValue : nullptr));
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
