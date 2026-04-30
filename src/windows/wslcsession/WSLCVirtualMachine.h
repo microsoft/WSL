@@ -111,7 +111,7 @@ class WSLCVirtualMachine
 public:
     struct ConnectedSocket
     {
-        int Fd{};
+        int Fd = -1;
         wil::unique_socket Socket;
     };
 
