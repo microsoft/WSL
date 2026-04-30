@@ -61,7 +61,7 @@ struct StopContainerOptions
 {
     static constexpr LONG DefaultTimeout = -1;
 
-    WSLCSignal Signal = WSLCSignalSIGTERM;
+    WSLCSignal Signal = WSLCSignalNone;
     LONG Timeout = DefaultTimeout;
 };
 

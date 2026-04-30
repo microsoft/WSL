@@ -643,11 +643,16 @@ class WSLCE2EContainerRunTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopSignal)
     {
-        auto result = RunWslc(std::format(
-            L"container run -d --stop-signal SIGUSR1 --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        constexpr int ExpectedExitCode = 42;
+        auto result = RunWslc(std::format(LR"(container run -d --stop-signal SIGUSR1 --name {} {} bash -c "trap 'exit {}' SIGUSR1; while true; do sleep 1; done")", WslcContainerName, DebianImage.NameAndTag(), ExpectedExitCode));
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        auto containerId = result.GetStdoutOneLine();
-        VerifyContainerIsListed(containerId, L"running");
+
+        result = RunWslc(std::format(L"container stop {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_IS_FALSE(inspect.State.Running);
+        VERIFY_ARE_EQUAL(ExpectedExitCode, inspect.State.ExitCode);
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize)
@@ -736,7 +741,7 @@ private:
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
-                << L"  --shm-size        Size of /dev/shm (e.g. 64m, 1g)\r\n"
+                << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
                 << L"  --stop-signal     Signal to stop the container (default: SIGTERM)\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
