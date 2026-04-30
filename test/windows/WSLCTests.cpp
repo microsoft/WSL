@@ -438,44 +438,51 @@ class WSLCTests
         }
     }
 
-    // Returns the set of VM owner names currently reported by hcsdiag.
-    static std::vector<std::wstring> ListVmOwners()
+    struct VmInfo
     {
-        std::wstring commandLine = L"hcsdiag list -raw";
-        wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+        std::wstring Id;
+        std::wstring Owner;
+    };
+
+    // Returns VM info (Id + Owner) for all running VMs via hcsdiag.
+    static std::vector<VmInfo> ListVms()
+    {
+        wsl::windows::common::SubProcess process(nullptr, L"hcsdiag list -raw");
         auto output = process.RunAndCaptureOutput(10000);
 
-        std::vector<std::wstring> owners;
+        std::vector<VmInfo> vms;
         auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(output.Stdout), nullptr, false);
         if (!json.is_array())
         {
-            return owners;
+            return vms;
         }
 
         for (const auto& entry : json)
         {
-            if (entry.contains("Owner") && entry["Owner"].is_string())
+            if (entry.contains("Owner") && entry["Owner"].is_string() && entry.contains("Id") && entry["Id"].is_string())
             {
-                owners.push_back(wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>()));
+                vms.push_back(
+                    {wsl::shared::string::MultiByteToWide(entry["Id"].get<std::string>()),
+                     wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>())});
             }
         }
 
-        return owners;
+        return vms;
     }
 
     WSLC_TEST_METHOD(VmOwnerMatchesSessionDisplayName)
     {
         // The default session (c_testSessionName) is already running from class setup.
         // Verify its display name appears as a VM owner in hcsdiag output.
-        auto owners = ListVmOwners();
+        auto vms = ListVms();
 
-        auto found = std::ranges::find(owners, c_testSessionName);
-        if (found == owners.end())
+        auto found = std::ranges::find_if(vms, [](const auto& vm) { return vm.Owner == c_testSessionName; });
+        if (found == vms.end())
         {
             LogError("Expected VM owner '%ws' not found. Owners:", c_testSessionName);
-            for (const auto& owner : owners)
+            for (const auto& vm : vms)
             {
-                LogError("  '%ws'", owner.c_str());
+                LogError("  '%ws'", vm.Owner.c_str());
             }
 
             VERIFY_FAIL();
@@ -8141,5 +8148,70 @@ class WSLCTests
         auto initProcess = container.GetInitProcess();
 
         ValidateProcessOutput(initProcess, {{1, "OK\n"}});
+    }
+
+    // Kills all VMs matching the given owner name via hcsdiag.
+    static void KillVmByOwner(const std::wstring& owner)
+    {
+        bool found = false;
+        for (const auto& vm : ListVms())
+        {
+            if (vm.Owner == owner)
+            {
+                found = true;
+                VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess(nullptr, std::format(L"hcsdiag.exe kill {}", vm.Id).c_str()).Run(10000), 0u);
+            }
+        }
+
+        VERIFY_IS_TRUE(found, std::format(L"VM with owner '{}' not found", owner).c_str());
+    }
+
+    // Waits for a session to report the terminated state.
+    static void WaitForSessionTermination(IWSLCSession* session)
+    {
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                WSLCSessionState state{};
+                THROW_IF_FAILED(session->GetState(&state));
+                THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), state != WSLCSessionStateTerminated);
+            },
+            std::chrono::seconds{1},
+            std::chrono::minutes{2});
+    }
+
+    // Returns true if any running VM is owned by the given name.
+    static bool IsVmRunning(const std::wstring& owner)
+    {
+        return std::ranges::any_of(ListVms(), [&](const auto& vm) { return vm.Owner == owner; });
+    }
+
+    WSLC_TEST_METHOD(VmKillTerminatesSession)
+    {
+        constexpr auto c_sessionName = L"wslc-vm-kill-test";
+        auto settings = GetDefaultSessionSettings(c_sessionName);
+        auto session = CreateSession(settings);
+
+        KillVmByOwner(c_sessionName);
+
+        WaitForSessionTermination(session.get());
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
+    }
+
+    WSLC_TEST_METHOD(VmKillFailsInFlightOperations)
+    {
+        constexpr auto c_sessionName = L"wslc-vm-kill-inflight-test";
+        auto settings = GetDefaultSessionSettings(c_sessionName);
+        auto session = CreateSession(settings);
+
+        WSLCProcessLauncher launcher("/bin/sleep", {"/bin/sleep", "60"});
+        auto process = launcher.Launch(*session);
+
+        KillVmByOwner(c_sessionName);
+
+        // The process and session should both terminate (not hang).
+        WaitForSessionTermination(session.get());
+        VERIFY_IS_TRUE(process.GetExitEvent().wait(10000));
+
+        VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
     }
 };

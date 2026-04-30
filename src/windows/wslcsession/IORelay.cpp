@@ -61,7 +61,8 @@ void IORelay::Stop()
     m_exit = true;
     m_refreshEvent.SetEvent();
 
-    if (m_thread.joinable())
+    // Skip join if called from the IORelay thread itself (e.g., from a handle callback).
+    if (m_thread.joinable() && m_thread.get_id() != std::this_thread::get_id())
     {
         m_thread.join();
     }
