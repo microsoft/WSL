@@ -29,6 +29,7 @@
                 <File Id="wslg.exe" Name="wslg.exe" Source="${PACKAGE_INPUT_DIR}/wslg.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
+                <File Id="wslpluginhost.exe" Name="wslpluginhost.exe" Source="${PACKAGE_INPUT_DIR}/wslpluginhost.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
                 <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />
 
@@ -157,6 +158,35 @@
                 <!-- Notification server -->
                 <RegistryKey Root="HKCR" Key="CLSID\{2B9C59C3-98F1-45C8-B87B-12AE3C7927E8}\LocalServer32">
                     <RegistryValue Value='"[INSTALLDIR]wslhost.exe"' Type="string" />
+                </RegistryKey>
+
+                <!-- WslPluginHost - out-of-process plugin isolation (process spawned by service) -->
+                <!-- WslPluginHost AppID — SYSTEM-only activation -->
+                <!-- O:SYG:SYD:(A;;CCDCSW;;;SY) -->
+                <RegistryKey Root="HKCR" Key="AppID\{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}">
+                    <RegistryValue Name="AccessPermission" Value="010004801400000020000000000000002C00000001010000000000051200000001010000000000051200000002001C0001000000000014000B000000010100000000000512000000" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="010004801400000020000000000000002C00000001010000000000051200000001010000000000051200000002001C0001000000000014000B000000010100000000000512000000" Type="binary" />
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="CLSID\{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}">
+                    <RegistryValue Name="AppId" Value="{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}" Type="string" />
+                    <RegistryValue Value="WslPluginHost" Type="string" />
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="CLSID\{7a1d2c3e-4b5f-6a7d-8e9f-0a1b2c3d4e5f}\LocalServer32">
+                    <RegistryValue Value='"[INSTALLDIR]wslpluginhost.exe"' Type="string" />
+                </RegistryKey>
+
+                <!-- WslPluginHost interfaces — use the shared wslserviceproxystub.dll -->
+                <RegistryKey Root="HKCR" Key="Interface\{A2B3C4D5-E6F7-4890-AB12-CD34EF56A789}">
+                    <RegistryValue Value="IWslPluginHostCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{B3C4D5E6-F7A8-4901-BC23-DE45FA67B890}">
+                    <RegistryValue Value="IWslPluginHost" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
                 </RegistryKey>
 
                 <!-- wsldevicehost.dll -->

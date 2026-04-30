@@ -83,6 +83,7 @@ Abstract:
 #include <optional>
 #include <filesystem>
 #include <mutex>
+#include <shared_mutex>
 #include <chrono>
 #include <codecvt>
 #include <random>
