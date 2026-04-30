@@ -674,6 +674,7 @@ typedef struct _WSLCSessionInitSettings
     LPCWSTR StoragePath;
     WSLCSessionStorageFlags StorageFlags;
     ULONGLONG MaximumStorageSizeMb;
+    ULONG SwapSizeMb;
     ULONG BootTimeoutMs;
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;

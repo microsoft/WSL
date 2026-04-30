@@ -7417,6 +7417,15 @@ class WSLCTests
         VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
     }
 
+    WSLC_TEST_METHOD(SwapConfigured)
+    {
+        // Verify that swap space is configured in the VM (on a block device from the swap VHD).
+        auto result = ExpectCommandResult(m_defaultSession.get(), {"/usr/sbin/swapon", "--show=NAME,SIZE", "--noheadings"}, 0);
+
+        VERIFY_ARE_EQUAL(result.Code, 0);
+        VERIFY_IS_TRUE(result.Output[1].find("/dev/") != std::string::npos);
+    }
+
     WSLC_TEST_METHOD(ContainerAutoRemove)
     {
         // Test that a container with the Rm flag is automatically deleted on Stop().
