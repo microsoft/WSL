@@ -3350,7 +3350,8 @@ class WSLCTests
 
             auto container = launcher.Launch(*session);
 
-            auto expect = [&](const std::vector<const char*> command, int exitCode,
+            auto expect = [&](const std::vector<std::string> command,
+                              int exitCode,
                               const std::map<int, std::string>& expectedOutput = {},
                               const std::vector<std::string>& env = {}) {
                 auto process = WSLCProcessLauncher({}, command, env).Launch(container.Get());
