@@ -2360,7 +2360,9 @@ try
 
     // Check if the VM has already exited (e.g., killed externally).
     // If so, skip operations that require a live VM to avoid unnecessary waits.
-    if (m_vmExitedEvent.is_signaled())
+    // N.B. m_vmExitedEvent may be uninitialized if Terminate() is called from the
+    // Initialize() error path before GetTerminationEvent() succeeds.
+    if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
         WSL_LOG("SkippingGracefulShutdown_VmDead", TraceLoggingValue(m_id, "SessionId"));
     }
