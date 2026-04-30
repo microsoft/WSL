@@ -44,6 +44,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
 
+    case ArgType::Gpus:
+        validation::ValidateGpus(execArgs.GetAll<ArgType::Gpus>(), m_name);
+        break;
+
     case ArgType::Volume:
         validation::ValidateVolumeMount(execArgs.GetAll<ArgType::Volume>());
         break;
@@ -188,6 +192,17 @@ InspectType GetInspectTypeFromString(const std::wstring& input, const std::wstri
     {
         constexpr std::wstring_view supportedValues = L"image, container, volume";
         throw ArgumentException(Localization::WSLCCLI_InvalidInspectError(argName, input, supportedValues));
+    }
+}
+
+void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        if (!IsEqual(value, L"all"))
+        {
+            throw ArgumentException(Localization::WSLCCLI_GpusInvalidValue(argName, value));
+        }
     }
 }
 

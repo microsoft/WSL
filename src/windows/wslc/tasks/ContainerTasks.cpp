@@ -261,6 +261,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.PublishAll = true;
     }
 
+    if (context.Args.Contains(ArgType::Gpus))
+    {
+        options.Gpu = true;
+    }
+
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAll<ArgType::Volume>();

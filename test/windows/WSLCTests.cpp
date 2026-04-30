@@ -3331,6 +3331,75 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerGpu)
+    {
+
+        // Validate that setting GPU flag on a non-GPU session fails.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-gpu-fail");
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto [hr, _] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+        }
+
+        auto restore = ResetTestSession();
+
+        auto settings = GetDefaultSessionSettings(L"container-gpu-test", true);
+        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsGPU);
+
+        auto session = CreateSession(settings);
+
+        // Validate that GPU resources are available inside a container when WSLCContainerFlagsGpu is set.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-gpu", {"sleep", "99999"});
+            launcher.SetContainerFlags(WSLCContainerFlagsGpu);
+
+            auto container = launcher.Launch(*session);
+
+            auto expect = [&](const std::vector<std::string> command,
+                              int exitCode,
+                              const std::map<int, std::string>& expectedOutput = {},
+                              const std::vector<std::string>& env = {}) {
+                auto process = WSLCProcessLauncher({}, command, env).Launch(container.Get());
+                ValidateProcessOutput(process, expectedOutput, exitCode);
+            };
+
+            // Validate that /dev/dxg is available as a character device.
+            expect({"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
+
+            // Validate that the GPU library directory is mounted and contains libraries.
+            expect({"/bin/sh", "-c", "test -d /usr/lib/wsl/lib && ls /usr/lib/wsl/lib | grep -q ."}, 0);
+
+            // Validate that the GPU drivers directory is mounted and accessible.
+            expect({"/bin/sh", "-c", "test -d /usr/lib/wsl/drivers"}, 0);
+
+            // Validate that the GPU mount points are read-only.
+            expect({"/usr/bin/touch", "/usr/lib/wsl/lib/test"}, 1);
+            expect({"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}, 1);
+
+            // Validate that LD_LIBRARY_PATH is set to include the GPU library path.
+            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
+
+            // Validate that LD_LIBRARY_PATH is correctly set when calling exec.
+            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/usr/lib/wsl/lib\n"}});
+
+            // Validate that exec with a pre-existing LD_LIBRARY_PATH appends the GPU path.
+            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path"});
+
+            // Validate that exec with a trailing colon in LD_LIBRARY_PATH doesn't produce a double colon.
+            expect({"/bin/sh", "-c", "echo $LD_LIBRARY_PATH"}, 0, {{1, "/custom/path:/usr/lib/wsl/lib\n"}}, {"LD_LIBRARY_PATH=/custom/path:"});
+        }
+
+        // Validate that containers without GPU flag do not have GPU resources.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-no-gpu", {"/bin/sh", "-c", "test -c /dev/dxg"});
+            auto container = launcher.Launch(*session);
+
+            ValidateContainerOutput(container, {{1, ""}}, 1);
+        }
+    }
+
     WSLC_TEST_METHOD(Modules)
     {
         // Sanity check.

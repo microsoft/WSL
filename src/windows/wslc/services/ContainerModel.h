@@ -37,6 +37,7 @@ struct ContainerOptions
     bool Remove = false;
     bool TTY = false;
     bool PublishAll = false;
+    bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
     std::string WorkingDirectory;

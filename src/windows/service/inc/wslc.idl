@@ -243,8 +243,8 @@ typedef struct _WSLCContainerNetwork
 typedef enum _WSLCContainerFlags
 {
     WSLCContainerFlagsNone = 0,
-    WSLCContainerFlagsRm = 1, // Delete the container when it exits. TODO: Implement.
-    WSLCContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
+    WSLCContainerFlagsRm = 1, // Delete the container when it exits.
+    WSLCContainerFlagsGpu = 2, // Enable GPU access.
     WSLCContainerFlagsInit = 4, // Run the container under an init process.
     WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
 } WSLCContainerFlags;
