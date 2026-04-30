@@ -241,7 +241,7 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const ActivePortSet& Ports, time_t 
         // Port allocations are done based on protocol+port so we don't need the socket to explicitly match the address or family
         // of the bind request that is tracked in m_allocatedPorts, it just needs to match the port number and protocol.
 
-        if (Ports.find({it->first.Port, it->first.Protocol}) == Ports.end())
+        if (!Ports.contains({it->first.Port, it->first.Protocol}))
         {
             if (!it->second.has_value() || it->second.value() < Timestamp)
             {
@@ -266,7 +266,7 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const ActivePortSet& Ports, time_t 
             it->second.reset(); // The port is known to be allocated, remove the timeout
         }
 
-        it++;
+        ++it;
     }
 }
 
