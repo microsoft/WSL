@@ -28,7 +28,7 @@ struct ContainerService
     static int Start(models::Session& session, const std::string& id, bool attach = false);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, WSLCSignal signal = WSLCSignalSIGKILL);
-    static void Delete(models::Session& session, const std::string& id, bool force);
+    static void Delete(models::Session& session, const std::string& id, bool force, bool removeVolumes = false);
     static std::vector<models::ContainerInformation> List(models::Session& session);
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);

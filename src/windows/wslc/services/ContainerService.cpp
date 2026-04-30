@@ -402,11 +402,23 @@ void ContainerService::Kill(Session& session, const std::string& id, WSLCSignal 
     THROW_IF_FAILED(container->Kill(signal));
 }
 
-void ContainerService::Delete(Session& session, const std::string& id, bool force)
+void ContainerService::Delete(Session& session, const std::string& id, bool force, bool removeVolumes)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    THROW_IF_FAILED(container->Delete(force ? WSLCDeleteFlagsForce : WSLCDeleteFlagsNone));
+
+    WSLCDeleteFlags flags = WSLCDeleteFlagsNone;
+    if (force)
+    {
+        WI_SetFlag(flags, WSLCDeleteFlagsForce);
+    }
+
+    if (removeVolumes)
+    {
+        WI_SetFlag(flags, WSLCDeleteFlagsDeleteVolumes);
+    }
+
+    THROW_IF_FAILED(container->Delete(flags));
 }
 
 std::vector<ContainerInformation> ContainerService::List(Session& session)
