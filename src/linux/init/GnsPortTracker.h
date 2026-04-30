@@ -116,19 +116,21 @@ public:
         std::uint64_t CallId;
     };
 
+    using ActivePortSet = std::set<std::pair<std::uint16_t, int>>;
+
     struct PortRefreshResult
     {
-        std::set<PortAllocation> Ports;
+        ActivePortSet Ports;
         time_t Timestamp;
         std::function<void()> Resume;
     };
 
 private:
-    void OnRefreshAllocatedPorts(const std::set<PortAllocation>& Ports, time_t Timestamp);
+    void OnRefreshAllocatedPorts(const ActivePortSet& Ports, time_t Timestamp);
 
     void RunPortRefresh();
 
-    std::set<PortAllocation> ListAllocatedPorts();
+    ActivePortSet ListAllocatedPorts();
 
     std::optional<BindCall> ReadNextRequest();
 

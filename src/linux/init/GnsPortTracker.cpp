@@ -176,9 +176,9 @@ void GnsPortTracker::Run()
     }
 }
 
-std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
+GnsPortTracker::ActivePortSet GnsPortTracker::ListAllocatedPorts()
 {
-    std::set<PortAllocation> ports;
+    ActivePortSet ports;
 
     inet_diag_req_v2 message{};
     message.sdiag_family = AF_INET;
@@ -189,20 +189,7 @@ std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
         for (const auto& e : response.Messages<inet_diag_msg>(SOCK_DIAG_BY_FAMILY))
         {
             const auto* payload = e.Payload();
-            in6_addr address = {};
-
-            if (payload->idiag_family == AF_INET6)
-            {
-                static_assert(sizeof(address.s6_addr32) == 16);
-                static_assert(sizeof(address.s6_addr32) == sizeof(payload->id.idiag_src));
-                memcpy(address.s6_addr32, payload->id.idiag_src, sizeof(address.s6_addr32));
-            }
-            else
-            {
-                address.s6_addr32[0] = payload->id.idiag_src[0];
-            }
-
-            ports.emplace(ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
+            ports.emplace(ntohs(payload->id.idiag_sport), static_cast<int>(message.sdiag_protocol));
         }
     };
 
@@ -233,7 +220,7 @@ std::set<GnsPortTracker::PortAllocation> GnsPortTracker::ListAllocatedPorts()
     return ports;
 }
 
-void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Ports, time_t Timestamp)
+void GnsPortTracker::OnRefreshAllocatedPorts(const ActivePortSet& Ports, time_t Timestamp)
 {
     // Because there's no way to get notified when the bind() call actually completes, it' possible
     // that this method is called before the bind() completion and so the port allocation may not be visible yet.
@@ -243,15 +230,9 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
     // - The port has been seen to be allocated (if so, then the timeout is empty)
     // - The timeout has expired
 
-    std::set<std::pair<std::uint16_t, int>> activePortProtocols;
-    for (const auto& p : Ports)
-    {
-        activePortProtocols.emplace(p.Port, p.Protocol);
-    }
-
     for (auto it = m_allocatedPorts.begin(); it != m_allocatedPorts.end();)
     {
-        // Ports contains the list of all Linux sockets currently active and stores the source port used by each socket
+        // Ports is generated from the list of all Linux sockets currently active and stores the source port used by each socket
         // Sockets can use a source port even though an explicit bind() was not made for that port. As long as there
         // is a socket using the source port, we should not deallocate it yet.
         //
@@ -261,7 +242,7 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
         // Port allocations are done based on protocol+port so we don't need the socket to explicitly match the address or family
         // of the bind request that is tracked in m_allocatedPorts, it just needs to match the port number and protocol.
 
-        if (activePortProtocols.find({it->first.Port, it->first.Protocol}) == activePortProtocols.end())
+        if (Ports.find({it->first.Port, it->first.Protocol}) == Ports.end())
         {
             if (!it->second.has_value() || it->second.value() < Timestamp)
             {
