@@ -119,8 +119,8 @@ COMMAND_LINE_TEST_CASE(L"run --dns-option", L"run", false) // Missing value for 
 // GPU tests for container run
 COMMAND_LINE_TEST_CASE(L"run --gpus all ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run --gpus all ubuntu sh", L"run", true)
-COMMAND_LINE_TEST_CASE(L"run --gpus invalid ubuntu", L"run", false)   // Only 'all' is supported
-COMMAND_LINE_TEST_CASE(L"run --gpus", L"run", false)                  // Missing value for --gpus
+COMMAND_LINE_TEST_CASE(L"run --gpus invalid ubuntu", L"run", false) // Only 'all' is supported
+COMMAND_LINE_TEST_CASE(L"run --gpus", L"run", false)                // Missing value for --gpus
 // GPU tests for container create
 COMMAND_LINE_TEST_CASE(L"create --gpus all ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --gpus all ubuntu sh", L"create", true)

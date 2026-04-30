@@ -1201,8 +1201,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
 
-    request.Env.push_back("LD_LIBRARY_PATH=/usr/lib/wsl/lib");
-
     if (containerOptions.StopSignal != WSLCSignalNone)
     {
         request.StopSignal = std::to_string(containerOptions.StopSignal);
