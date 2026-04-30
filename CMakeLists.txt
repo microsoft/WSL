@@ -410,12 +410,6 @@ set(WSL_PRE_COMMIT_MODE "warn" CACHE STRING "Pre-commit hook behavior: warn, err
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tools/hooks)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/hooks/pre-commit.in ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit @ONLY)
 
-cmake_path(COMPARE "${wsl_SOURCE_DIR}" EQUAL "${wsl_BINARY_DIR}" BUILD_IN_SOURCE)
-if (NOT ${BUILD_IN_SOURCE}) # Testing on 3.26 project_type_DIR paths appear canonicalized
-    file(CREATE_LINK ${LLVM_INSTALL_DIR}/clang-format.exe ${wsl_SOURCE_DIR}/tools/clang-format.exe COPY_ON_ERROR)
-    file(COPY_FILE ${CMAKE_BINARY_DIR}/tools/hooks/pre-commit ${wsl_SOURCE_DIR}/tools/hooks/pre-commit ONLY_IF_DIFFERENT)
-endif()
-
 set(LINUXSDK_PATH ${LINUXSDK_SOURCE_DIR}/${LLVM_ARCH})
 set(LLVM_TARGET "${LLVM_ARCH}-unknown-linux-musl")
 set(LINUX_CC ${LLVM_INSTALL_DIR}/clang.exe)
