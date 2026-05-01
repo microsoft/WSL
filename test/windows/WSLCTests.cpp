@@ -5530,10 +5530,12 @@ class WSLCTests
         WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
         launcher.SetContainerNetworkName(std::string(networkName));
 
-        auto container = launcher.Create(*m_defaultSession);
-        container.SetDeleteOnClose(false);
+        {
+            auto container = launcher.Create(*m_defaultSession);
+            container.SetDeleteOnClose(false);
 
-        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+        }
 
         // Restart the session and verify the container is recovered with its custom network.
         ResetTestSession();
