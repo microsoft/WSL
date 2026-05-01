@@ -2573,7 +2573,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
     <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
-    <comment>{Locked="--gpus"}{Locked="all"}</comment>
+    <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
     <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
