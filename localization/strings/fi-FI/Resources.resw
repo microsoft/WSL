@@ -2625,9 +2625,6 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Istunnon tallennuspolku</value>
   </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Lähetettävä signaali</value>
-  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Nykyinen tai olemassa oleva kuvaviittaus muodossa image-name[:tag]</value>
   </data>

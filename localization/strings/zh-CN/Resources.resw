@@ -2631,9 +2631,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>会话存储路径</value>
   </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>要发送的信号</value>
-  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>当前或现有图像引用采用 image-name[:tag] 格式</value>
   </data>

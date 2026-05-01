@@ -2625,9 +2625,6 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Session storage path</value>
   </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send</value>
-  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Current or existing image reference in the image-name[:tag] format</value>
   </data>

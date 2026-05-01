@@ -824,6 +824,10 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
     {
         SignalArg = Signal;
     }
+    else if (m_stopSignal != WSLCSignalNone)
+    {
+        SignalArg = m_stopSignal;
+    }
 
     // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
     // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
@@ -1442,6 +1446,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
+    metadata.StopSignal = containerOptions.StopSignal;
 
     for (const auto& e : mappedPorts)
     {
@@ -1482,6 +1487,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         ParseDockerTimestamp(inspectData.Created),
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
+
+    container->m_stopSignal = containerOptions.StopSignal;
 
     deleteOnFailure.release();
     return container;
@@ -1557,6 +1564,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         static_cast<std::uint64_t>(dockerContainer.Created),
         metadata.InitProcessFlags,
         metadata.Flags);
+
+    container->m_stopSignal = static_cast<WSLCSignal>(metadata.StopSignal);
 
     // Restore the state change timestamp from Docker inspect data.
     try
