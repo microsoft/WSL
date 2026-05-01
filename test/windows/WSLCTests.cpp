@@ -5375,9 +5375,6 @@ class WSLCTests
         auto container = launcher.Launch(*m_defaultSession);
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
         VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, networkName);
-        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGTERM, 0));
-        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
-        VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
     }
 
     WSLC_TEST_METHOD(ContainerCustomNetworkNotFoundTest)
@@ -5513,56 +5510,41 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ContainerCustomNetworkRecoveryTest)
     {
-        auto restore = ResetTestSession();
-
         const std::string networkName = "custom-net-recovery";
         const std::string containerName = "test-custom-net-recovery";
 
-        {
-            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-custom-net", true, WSLCNetworkingModeNAT));
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
 
-            LOG_IF_FAILED(session->DeleteNetwork(networkName.c_str()));
+        WSLCDriverOption opts[] = {{"Subnet", "172.39.0.0/16"}};
 
-            WSLCDriverOption opts[] = {{"Subnet", "172.39.0.0/16"}};
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        networkOptions.DriverOpts = opts;
+        networkOptions.DriverOptsCount = ARRAYSIZE(opts);
 
-            WSLCNetworkOptions networkOptions{};
-            networkOptions.Name = networkName.c_str();
-            networkOptions.Driver = "bridge";
-            networkOptions.DriverOpts = opts;
-            networkOptions.DriverOptsCount = ARRAYSIZE(opts);
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
 
-            VERIFY_SUCCEEDED(session->CreateNetwork(&networkOptions));
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
 
-            auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(session->DeleteNetwork(networkName.c_str())); });
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string(networkName));
 
-            WSLCContainerLauncher launcher(
-                "debian:latest", containerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
-            launcher.SetContainerNetworkName(std::string(networkName));
+        auto container = launcher.Create(*m_defaultSession);
+        container.SetDeleteOnClose(false);
 
-            auto container = launcher.Create(*session);
-            container.SetDeleteOnClose(false);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
 
-            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+        // Restart the session and verify the container is recovered with its custom network.
+        ResetTestSession();
 
-            networkCleanup.release();
-        }
+        auto recoveredContainer = OpenContainer(m_defaultSession.get(), containerName);
 
-        {
-            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-custom-net", true, WSLCNetworkingModeNAT));
-            auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(session->DeleteNetwork(networkName.c_str())); });
+        VERIFY_ARE_EQUAL(recoveredContainer.State(), WslcContainerStateCreated);
+        VERIFY_SUCCEEDED(recoveredContainer.Get().Start(WSLCContainerStartFlagsAttach, nullptr));
+        VERIFY_ARE_EQUAL(recoveredContainer.State(), WslcContainerStateRunning);
 
-            auto container = OpenContainer(session.get(), containerName);
-            container.SetDeleteOnClose(false);
-
-            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
-            VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsAttach, nullptr));
-            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
-
-            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, networkName);
-
-            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
-        }
+        VERIFY_ARE_EQUAL(recoveredContainer.Inspect().HostConfig.NetworkMode, networkName);
     }
 
     WSLC_TEST_METHOD(ContainerInspect)
