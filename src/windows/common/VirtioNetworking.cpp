@@ -246,6 +246,7 @@ void VirtioNetworking::RefreshGuestConnection()
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
     appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress(AF_INET));
+    appendOption(L"gateway_ip", L"169.254.73.152");
 
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {

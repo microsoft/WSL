@@ -213,7 +213,7 @@ bool CopyProcessSettingsToRuntime(WSLCProcessOptions& runtimeOptions, const Wslc
 {
     if (initProcessOptions)
     {
-        runtimeOptions.CurrentDirectory = initProcessOptions->currentDirectory;
+        runtimeOptions.CurrentDirectory = initProcessOptions->workingDirectory;
         runtimeOptions.CommandLine.Values = initProcessOptions->commandLine;
         runtimeOptions.CommandLine.Count = initProcessOptions->commandLineCount;
         runtimeOptions.Environment.Values = initProcessOptions->environment;
@@ -1072,7 +1072,7 @@ try
 {
     auto internalType = CheckAndGetInternalType(processSettings);
 
-    internalType->currentDirectory = currentDirectory;
+    internalType->workingDirectory = currentDirectory;
 
     return S_OK;
 }

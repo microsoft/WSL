@@ -426,8 +426,7 @@ try
     }
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
-        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6 | wsl::core::VirtioNetworkingFlags::LocalhostRelay |
-                                                 wsl::core::VirtioNetworkingFlags::DisableLoopbackMirroring;
+        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6 | wsl::core::VirtioNetworkingFlags::LocalhostRelay;
         if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
             WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunnelingSocket);

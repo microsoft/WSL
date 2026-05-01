@@ -23,7 +23,7 @@ using namespace wsl::shared;
 using namespace wsl::windows::wslc::models;
 namespace wslutil = wsl::windows::common::wslutil;
 
-int SessionService::Attach(const std::wstring& sessionName)
+int SessionService::Attach(const std::wstring& sessionName, bool raw)
 {
     wil::com_ptr<IWSLCSessionManager> manager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));

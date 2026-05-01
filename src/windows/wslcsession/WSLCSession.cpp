@@ -248,15 +248,18 @@ try
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
-    // Launch containerd first
-    StartContainerd();
+    if (!raw)
+    {
 
-    // Launch dockerd with external containerd socket
-    StartDockerd();
+        // Launch containerd first
+        StartContainerd();
 
-    // Wait for dockerd to be ready before starting the event tracker.
-    THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+        // Launch dockerd with external containerd socket
+        StartDockerd();
+
+        // Wait for dockerd to be ready before starting the event tracker.
+        THROW_WIN32_IF_MSG(
+            ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
         auto [_, __, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
@@ -265,14 +268,15 @@ try
         //  Start the event tracker.
         m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
-    // Monitor for unexpected VM exit.
-    m_ioRelay.AddHandle(
-        std::make_unique<windows::common::relay::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
+        // Monitor for unexpected VM exit.
+        m_ioRelay.AddHandle(
+            std::make_unique<windows::common::relay::EventHandle>(m_vmExitedEvent.get(), std::bind(&WSLCSession::OnVmExited, this)));
 
-    // Recover any existing containers from storage.
-    RecoverExistingNetworks();
-    RecoverExistingVolumes();
-    RecoverExistingContainers();
+        // Recover any existing containers from storage.
+        RecoverExistingNetworks();
+        RecoverExistingVolumes();
+        RecoverExistingContainers();
+    }
 
     errorCleanup.release();
     return S_OK;
@@ -2422,7 +2426,6 @@ try
             }
             CATCH_LOG();
         }
-
     }
 
     m_dockerdProcess.reset();
