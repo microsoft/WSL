@@ -224,8 +224,7 @@ void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstr
 
 ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
 {
-    auto narrowInput = wsl::windows::common::string::WideToMultiByte(input);
-    auto parsed = wsl::shared::string::ParseMemorySize(narrowInput.c_str());
+    auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
     if (!parsed.has_value())
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
