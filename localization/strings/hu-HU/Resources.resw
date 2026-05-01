@@ -2625,6 +2625,9 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Munkamenet-tároló útvonala</value>
   </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Küldendő jel</value>
+  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Jelenlegi vagy meglévő lemezkép-hivatkozás image-name[:tag] formátumban</value>
   </data>

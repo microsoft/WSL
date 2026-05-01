@@ -2625,6 +2625,9 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Cesta k úložišti relace</value>
   </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signál k odeslání</value>
+  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuální nebo existující odkaz na obrázek ve formátu image-name[:tag]</value>
   </data>

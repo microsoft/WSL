@@ -188,7 +188,6 @@ private:
     std::uint64_t m_stateChangedAt{static_cast<std::uint64_t>(std::time(nullptr))};
     std::uint64_t m_createdAt{};
     WSLCContainerState m_state = WslcContainerStateInvalid;
-    WSLCSignal m_stopSignal = WSLCSignalNone;
     WSLCSession& m_wslcSession;
     WSLCVirtualMachine& m_virtualMachine;
     std::vector<ContainerPortMapping> m_mappedPorts;

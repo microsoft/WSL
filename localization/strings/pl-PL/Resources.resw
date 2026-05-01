@@ -2625,6 +2625,9 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Ścieżka magazynu sesji</value>
   </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Sygnał do wysłania</value>
+  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Bieżące lub istniejące odwołanie do obrazu w formacie nazwa_obrazu[:tag]</value>
   </data>
