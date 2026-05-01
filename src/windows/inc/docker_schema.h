@@ -217,7 +217,8 @@ struct HostConfig
     std::vector<DeviceMapping> Devices;
     std::optional<ULONGLONG> ShmSize;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, ShmSize);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, ShmSize);
 };
 
 struct CreateContainer
