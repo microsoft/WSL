@@ -7419,11 +7419,15 @@ class WSLCTests
 
     WSLC_TEST_METHOD(SwapConfigured)
     {
-        // Verify that swap space is configured in the VM (on a block device from the swap VHD).
-        auto result = ExpectCommandResult(m_defaultSession.get(), {"/usr/sbin/swapon", "--show=NAME,SIZE", "--noheadings"}, 0);
+        // Swap is configured asynchronously (mkswap + swapon runs fire-and-forget), so retry until it's active.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto result = ExpectCommandResult(m_defaultSession.get(), {"/usr/sbin/swapon", "--show=NAME,SIZE", "--noheadings"}, 0);
 
-        VERIFY_ARE_EQUAL(result.Code, 0);
-        VERIFY_IS_TRUE(result.Output[1].find("/dev/") != std::string::npos);
+                THROW_WIN32_IF(ERROR_RETRY, result.Code != 0 || result.Output.size() < 2 || result.Output[1].find("/dev/") == std::string::npos);
+            },
+            std::chrono::milliseconds{500},
+            std::chrono::seconds{30});
     }
 
     WSLC_TEST_METHOD(ContainerAutoRemove)

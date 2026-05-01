@@ -364,7 +364,7 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
         {
             m_swapVhdPath = storagePath / "swap.vhdx";
             DeleteFileW(m_swapVhdPath.c_str()); // Remove stale swap from prior run
-            wsl::core::filesystem::CreateVhd(m_swapVhdPath.c_str(), static_cast<ULONGLONG>(Settings.SwapSizeMb) * _1MB, UserSid, false, true);
+            wsl::core::filesystem::CreateVhd(m_swapVhdPath.c_str(), static_cast<ULONGLONG>(Settings.SwapSizeMb) * _1MB, UserSid, false, false);
 
             auto [_, swapDevice] = m_virtualMachine->AttachDisk(m_swapVhdPath.c_str(), false);
 
