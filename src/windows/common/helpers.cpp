@@ -730,3 +730,15 @@ try
     wsl::windows::common::registry::WriteString(dcatKey.get(), nullptr, L"Version", registeredVersion.c_str());
 }
 CATCH_LOG()
+
+void wsl::windows::common::helpers::AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder)
+{
+    // Enable timesync workaround to sync on resume from sleep in modern standby.
+    kernelCmdLine += L" hv_utils.timesync_implicit=1";
+
+    // Disable rate limiting of user writes to dmesg.
+    kernelCmdLine += L" printk.devkmsg=on";
+
+    // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
+    kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", pageReportingOrder);
+}

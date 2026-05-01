@@ -948,15 +948,6 @@ int WSLCEntryPoint(int Argc, char* Argv[])
     }
 
     //
-    // Disable rate limiting of user writes to dmesg.
-    //
-
-    if (WriteToFile("/proc/sys/kernel/printk_devkmsg", "on\n") < 0)
-    {
-        return -1;
-    }
-
-    //
     // Set the ephemeral port range
     //
 
