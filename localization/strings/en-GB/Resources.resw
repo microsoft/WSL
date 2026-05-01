@@ -2027,7 +2027,7 @@ Usage:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
-    <value>Unrecognized command: '{}'</value>
+    <value>Unrecognised command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
@@ -2078,7 +2078,7 @@ Usage:
     <value>For more details on a specific command, pass it the help argument.</value>
   </data>
   <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
-    <value>Argument name was not recognized for the current command: '{}'</value>
+    <value>Argument name was not recognised for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
@@ -2104,7 +2104,7 @@ Usage:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
-    <value>Argument alias was not recognized for the current command: '{}'</value>
+    <value>Argument alias was not recognised for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
@@ -2706,7 +2706,7 @@ On first run, creates the file with all settings commented out at their defaults
     <comment>{Locked="name|uid|uid:gid"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
-    <value>Expose virtualization capabilities to the container</value>
+    <value>Expose virtualisation capabilities to the container</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
     <value>Arguments to pass to the command being executed inside the container</value>
@@ -2719,11 +2719,11 @@ On first run, creates the file with all settings commented out at their defaults
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized inspect type. Supported inspect types are: {}.</value>
+    <value>Invalid {} value: {} is not a recognised inspect type. Supported inspect types are: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).</value>
+    <value>Invalid {} value: {} is not a recognised signal name or number (Example: SIGKILL, kill, or 9).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
