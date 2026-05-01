@@ -196,7 +196,7 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
         wslConfigSetting.StringValue = wslConfig->Config.KernelModulesPath.c_str();
         break;
     default:
-        FAIL_FAST();
+        return {.ConfigEntry = WslConfigEntry::NoEntry};
     }
 
     return wslConfigSetting;
@@ -561,6 +561,6 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
             wslConfig->Config.KernelModulesPath);
     }
     default:
-        FAIL_FAST();
+        return ERROR_INVALID_PARAMETER;
     }
 }
