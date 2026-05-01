@@ -335,11 +335,11 @@ std::string Base64Decode(const std::string& encoded);
 
 // Builds the base64-encoded X-Registry-Auth header value used by Docker APIs
 // (PullImage, PushImage, etc.) from the given credentials.
-std::string BuildRegistryAuthHeader(const std::string& username, const std::string& password, const std::string& serverAddress);
+std::string BuildRegistryAuthHeader(const std::string& username, const std::string& password);
 
 // Builds the base64-encoded X-Registry-Auth header value from an identity token
 // returned by Authenticate().
-std::string BuildRegistryAuthHeader(const std::string& identityToken, const std::string& serverAddress);
+std::string BuildRegistryAuthHeader(const std::string& identityToken);
 
 std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
 

@@ -67,10 +67,10 @@ std::string RegistryService::Get(const std::string& serverAddress)
 
     if (username == TokenUsername)
     {
-        return BuildRegistryAuthHeader(secret, serverAddress);
+        return BuildRegistryAuthHeader(secret);
     }
 
-    return BuildRegistryAuthHeader(username, secret, serverAddress);
+    return BuildRegistryAuthHeader(username, secret);
 }
 
 void RegistryService::Erase(const std::string& serverAddress)

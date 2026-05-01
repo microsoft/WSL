@@ -56,7 +56,7 @@ WslcGetContainerID
 WslcGetContainerInitProcess
 
 WslcSetProcessSettingsCallbacks
-WslcSetProcessSettingsCurrentDirectory
+WslcSetProcessSettingsWorkingDirectory
 WslcSetProcessSettingsCmdLine
 WslcSetProcessSettingsEnvVariables
 WslcGetProcessPid
@@ -66,7 +66,7 @@ WslcGetProcessExitCode
 WslcSignalProcess
 WslcGetProcessIOHandle
 
-WslcCanRun
+WslcGetMissingComponents
 WslcGetVersion
 WslcInstallWithDependencies
 

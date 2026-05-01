@@ -71,9 +71,9 @@ typedef enum WslcVhdType
 
 typedef struct WslcVhdRequirements
 {
-    // Ignored by WslcSetSessionSettingsVHD
+    // Ignored by WslcSetSessionSettingsVhd
     _In_z_ PCSTR name;
-    _In_ uint64_t sizeInBytes; // Desired size (for create/expand)
+    _In_ uint64_t sizeBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
 } WslcVhdRequirements;
 
@@ -100,7 +100,7 @@ STDAPI WslcCreateSession(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSe
 
 // OPTIONAL SESSION SETTINGS
 STDAPI WslcSetSessionSettingsCpuCount(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t cpuCount);
-STDAPI WslcSetSessionSettingsMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb);
+STDAPI WslcSetSessionSettingsMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMB);
 STDAPI WslcSetSessionSettingsTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS);
 
 STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_opt_ const WslcVhdRequirements* vhdRequirements);
@@ -209,7 +209,7 @@ STDAPI WslcReleaseContainer(_In_ WslcContainer container);
 
 #define WSLC_CONTAINER_ID_BUFFER_SIZE 65 // 64 hex chars + null terminator
 
-STDAPI WslcGetContainerID(_In_ WslcContainer container, _Out_writes_(WSLC_CONTAINER_ID_BUFFER_SIZE) CHAR containerId[WSLC_CONTAINER_ID_BUFFER_SIZE]);
+STDAPI WslcGetContainerID(_In_ WslcContainer container, _Out_writes_(WSLC_CONTAINER_ID_BUFFER_SIZE) CHAR containerID[WSLC_CONTAINER_ID_BUFFER_SIZE]);
 
 STDAPI WslcGetContainerInitProcess(_In_ WslcContainer container, _Out_ WslcProcess* initProcess);
 
@@ -270,7 +270,7 @@ STDAPI WslcInitProcessSettings(_Out_ WslcProcessSettings* processSettings);
 
 // OPTIONAL PROCESS SETTINGS
 
-STDAPI WslcSetProcessSettingsCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory);
+STDAPI WslcSetProcessSettingsWorkingDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR workingDirectory);
 
 STDAPI WslcSetProcessSettingsCmdLine(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc);
 
@@ -299,7 +299,7 @@ typedef enum WslcProcessIOHandle
 //       caller needs to keep the data, it must copy the contents before
 //       returning from the callback.
 //
-//   dataSize
+//   dataBytes
 //       Number of bytes available in the data buffer.
 //
 //   context
@@ -313,7 +313,7 @@ typedef enum WslcProcessIOHandle
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
 typedef __callback void(CALLBACK* WslcStdIOCallback)(
-    WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
+    WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context);
 
 // Callback invoked when a WSLC process has exited AND any remaining IO has been flushed.
 //
@@ -370,8 +370,8 @@ STDAPI WslcReleaseProcess(_In_ WslcProcess process);
 // Container image
 typedef struct WslcImageProgressDetail
 {
-    _Out_ uint64_t current; // bytes downloaded so far
-    _Out_ uint64_t total;   // total bytes expected
+    _Out_ uint64_t currentBytes; // bytes downloaded so far
+    _Out_ uint64_t totalBytes;   // total bytes expected
 } WslcImageProgressDetail;
 
 typedef enum WslcImageProgressStatus
@@ -416,7 +416,7 @@ STDAPI WslcImportSessionImage(
     _In_ WslcSession session,
     _In_z_ PCSTR imageName,
     _In_ HANDLE imageContent,
-    _In_ uint64_t imageContentLength,
+    _In_ uint64_t imageContentBytes,
     _In_opt_ const WslcImportImageOptions* options,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
@@ -432,7 +432,7 @@ typedef struct WslcLoadImageOptions
 STDAPI WslcLoadSessionImage(
     _In_ WslcSession session,
     _In_ HANDLE imageContent,
-    _In_ uint64_t imageContentLength,
+    _In_ uint64_t imageContentBytes,
     _In_opt_ const WslcLoadImageOptions* options,
     _Outptr_opt_result_z_ PWSTR* errorMessage);
 
@@ -447,10 +447,10 @@ typedef struct WslcImageInfo
     CHAR name[WSLC_IMAGE_NAME_LENGTH];
     uint8_t sha256[32];
     uint64_t sizeBytes;
-    uint64_t createdTimestamp;
+    uint64_t createdUnixTime;
 } WslcImageInfo;
 
-STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcDeleteSessionImage(_In_ WslcSession session, _In_z_ PCSTR nameOrID, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 typedef struct WslcTagImageOptions
 {
@@ -550,7 +550,7 @@ typedef enum WslcComponentFlags
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcComponentFlags);
 
-STDAPI WslcCanRun(_Out_ BOOL* canRun, _Out_ WslcComponentFlags* missingComponents);
+STDAPI WslcGetMissingComponents(_Out_ WslcComponentFlags* missingComponents);
 
 typedef struct WslcVersion
 {
@@ -560,8 +560,11 @@ typedef struct WslcVersion
 } WslcVersion;
 STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version);
 
-typedef __callback void(CALLBACK* WslcInstallCallback)(_In_ WslcComponentFlags component, _In_ uint32_t progress, _In_ uint32_t total, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcInstallCallback)(
+    _In_ WslcComponentFlags component, _In_ uint32_t progressSteps, _In_ uint32_t totalSteps, _In_opt_ PVOID context);
 
+// Callbacks will only be made for components that are actively installed by this call.
+// That list can be acquired prior to this call with `WslcCanRun`.
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
 
 EXTERN_C_END

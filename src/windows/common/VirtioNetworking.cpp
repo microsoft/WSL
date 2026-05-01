@@ -96,7 +96,7 @@ try
 }
 CATCH_LOG()
 
-HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const noexcept
+HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
 {
     if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6))
     {
@@ -134,26 +134,12 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
             }
         }
 
-        try
-        {
-            hostPort = ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, allocate);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION_MSG("Failure adding localhost relay port %d", guestPort);
-        }
+        hostPort = ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, allocate);
     }
 
     if (!loopback)
     {
-        try
-        {
-            hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION_MSG("Failure adding relay port %d", guestPort);
-        }
+        hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
     }
 
     return S_OK;
@@ -246,7 +232,6 @@ void VirtioNetworking::RefreshGuestConnection()
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
     appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress(AF_INET));
-    appendOption(L"gateway_ip", L"169.254.73.152");
 
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {
@@ -316,7 +301,7 @@ void VirtioNetworking::SetupLoopbackDevice()
         VIRTIO_NET_CLASS_ID,
         c_loopbackDeviceName,
         nullptr,
-        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
+        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55;gateway_ip=169.254.73.152",
         0,
         m_userToken.get());
 

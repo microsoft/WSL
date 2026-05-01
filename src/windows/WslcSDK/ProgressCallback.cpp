@@ -52,8 +52,8 @@ HRESULT STDMETHODCALLTYPE ProgressCallback::OnProgress(LPCSTR Status, LPCSTR Id,
 
         message.id = Id;
         message.status = ConvertStatus(Status);
-        message.detail.current = Current;
-        message.detail.total = Total;
+        message.detail.currentBytes = Current;
+        message.detail.totalBytes = Total;
 
         return m_callback(&message, m_context);
     }
