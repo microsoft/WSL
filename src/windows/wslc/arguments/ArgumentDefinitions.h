@@ -86,9 +86,11 @@ _(Remove,         "rm",                  NO_ALIAS,          Kind::Flag,        L
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_LoginServerArgDescription()) \
 _(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SessionIdPositionalArgDescription()) \
+_(ShmSize,        "shm-size",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ShmSizeArgDescription()) \
 _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
 _(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription(L"SIGKILL")) \
 _(Source,         "source",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SourceArgDescription()) \
+_(StopSignal,     "stop-signal",         NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_StopSignalArgDescription(L"SIGTERM")) \
 _(Tag,            "tag",                 L"t",              Kind::Value,       Localization::WSLCCLI_TagArgDescription()) \
 _(Target,         "target",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_TargetArgDescription()) \
 _(Time,           "time",                L"t",              Kind::Value,       Localization::WSLCCLI_TimeArgDescription()) \

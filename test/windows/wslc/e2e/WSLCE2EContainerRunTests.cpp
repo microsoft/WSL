@@ -652,6 +652,31 @@ class WSLCE2EContainerRunTests
         VERIFY_ARE_EQUAL("2", inspect.Labels["B"]);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopSignal)
+    {
+        constexpr int ExpectedExitCode = 42;
+        auto result = RunWslc(std::format(
+            LR"(container run -d --stop-signal SIGUSR1 --name {} {} bash -c "trap 'exit {}' SIGUSR1; while true; do sleep 1; done")",
+            WslcContainerName,
+            DebianImage.NameAndTag(),
+            ExpectedExitCode));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container stop {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_IS_FALSE(inspect.State.Running);
+        VERIFY_ARE_EQUAL(ExpectedExitCode, inspect.State.ExitCode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --shm-size 128M {} df -h /dev/shm", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"128M") != std::wstring::npos);
+    }
+
 private:
     // Test container name
     const std::wstring WslcContainerName = L"wslc-test-container";
@@ -733,6 +758,8 @@ private:
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
+                << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
+                << L"  --stop-signal     Signal to stop the container (default: SIGTERM)\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"
