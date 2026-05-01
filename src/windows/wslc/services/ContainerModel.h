@@ -38,7 +38,7 @@ struct ContainerOptions
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;
-    ULONGLONG ShmSize = 0;
+    std::optional<ULONGLONG> ShmSize{};
     bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;

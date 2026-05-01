@@ -101,9 +101,9 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
         containerLauncher.SetDefaultStopSignal(options.StopSignal);
     }
 
-    if (options.ShmSize > 0)
+    if (options.ShmSize.has_value())
     {
-        containerLauncher.SetShmSize(options.ShmSize);
+        containerLauncher.SetShmSize(options.ShmSize.value());
     }
 
     if (!options.Entrypoint.empty())
