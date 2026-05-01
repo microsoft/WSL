@@ -1055,7 +1055,7 @@ int WSLCEntryPoint(int Argc, char* Argv[])
     // Start memory reduction thread (compaction + drop_caches when idle).
     //
 
-    UtilStartMemoryReductionThread(MemoryReductionModeDropCache);
+    StartMemoryReductionThread(LxMiniInitMemoryReclaimModeDropCache);
 
     //
     // Establish the message channel with the service via hvsocket.

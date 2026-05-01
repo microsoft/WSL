@@ -122,8 +122,6 @@ std::optional<bool> g_EnableSocketLogging;
 
 int Chroot(const char* Target);
 
-void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
-
 void CreateSwap(unsigned int Lun);
 
 int CreateTempDirectory(const char* ParentPath, std::string& Path);
@@ -260,30 +258,6 @@ Return Value:
 
     return 0;
 }
-
-void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
-
-/*++
-
-Routine Description:
-
-    This routine configures memory reduction behavior including memory reclaim and compaction.
-
-Arguments:
-
-    Mode - Supplies the memory reclaim mode.
-
-Return Value:
-
-    None.
-
---*/
-
-try
-{
-    UtilStartMemoryReductionThread(static_cast<MemoryReductionMode>(Mode));
-}
-CATCH_LOG()
 
 wil::unique_fd CreateNetlinkSocket(void)
 
@@ -3057,7 +3031,7 @@ try
         // Configure memory reclamation.
         //
 
-        ConfigureMemoryReduction(EarlyConfig->MemoryReclaimMode);
+        StartMemoryReductionThread(EarlyConfig->MemoryReclaimMode);
 
         //
         // Initialize system distro if supported.

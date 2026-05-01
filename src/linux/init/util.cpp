@@ -3544,7 +3544,7 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-void UtilStartMemoryReductionThread(MemoryReductionMode Mode)
+void StartMemoryReductionThread(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
 
 /*++
 
@@ -3599,13 +3599,13 @@ try
             // Fall back to drop cache if the required cgroup path is not present.
             //
 
-            if (Mode == MemoryReductionModeGradual && access(RECLAIM_PATH, W_OK) < 0)
+            if (Mode == LxMiniInitMemoryReclaimModeGradual && access(RECLAIM_PATH, W_OK) < 0)
             {
                 LOG_WARNING("access({}, W_OK) failed {}, falling back to drop_caches", RECLAIM_PATH, errno);
-                Mode = MemoryReductionModeDropCache;
+                Mode = LxMiniInitMemoryReclaimModeDropCache;
             }
 
-            if (Mode == MemoryReductionModeGradual)
+            if (Mode == LxMiniInitMemoryReclaimModeGradual)
             {
                 static_assert(COUNT_OF(ReclaimWindow) >= 6);
                 ReclaimWindowLength = 6; // Set to 3 minutes.
@@ -3623,7 +3623,7 @@ try
                 Start = GetUserCpuTime();
                 THROW_LAST_ERROR_IF(Start == -1);
 
-                if (Mode != MemoryReductionModeDisabled)
+                if (Mode != LxMiniInitMemoryReclaimModeDisabled)
                 {
                     //
                     // Ensure that utilization is below 0.5% from the last 30 seconds, and last n minutes, of usage.
@@ -3633,7 +3633,7 @@ try
                     if ((ReclaimWindow[LastIndex] > Start - ReclaimThreshold * (ReclaimWindowLength + 1)) &&
                         (ReclaimWindow[ReclaimIndex] > Start - ReclaimThreshold))
                     {
-                        if (Mode == MemoryReductionModeGradual)
+                        if (Mode == LxMiniInitMemoryReclaimModeGradual)
                         {
                             double MemorySize = GetMemoryInUse();
                             THROW_LAST_ERROR_IF(MemorySize < 0);
@@ -3676,7 +3676,7 @@ try
                 // This coalesces free pages into larger blocks for more efficient page reporting.
                 //
 
-                if (Mode != MemoryReductionModeDisabled && (Start - Stop) > IdleThreshold)
+                if ((Start - Stop) > IdleThreshold)
                 {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                     Stop = GetUserCpuTime();
