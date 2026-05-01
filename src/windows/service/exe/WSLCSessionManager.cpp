@@ -198,15 +198,10 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         const DWORD creatorPid = GetProcessId(callerProcess.get());
 
         // Query the full image path of the calling process and extract just the file name.
-        // Failure is non-fatal: callerFileName remains empty if the process has already exited.
-        if (callerProcess)
+        std::wstring callerFilePath;
+        if (SUCCEEDED_LOG(wil::QueryFullProcessImageNameW<std::wstring>(callerProcess.get(), 0, callerFilePath)))
         {
-            WCHAR imagePath[MAX_PATH];
-            DWORD imagePathLen = ARRAYSIZE(imagePath);
-            if (QueryFullProcessImageNameW(callerProcess.get(), 0, imagePath, &imagePathLen))
-            {
-                callerFileName = std::filesystem::path(imagePath).filename().wstring();
-            }
+            callerFileName = std::filesystem::path(callerFilePath).filename().wstring();
         }
 
         const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
