@@ -634,7 +634,7 @@ bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
         const auto exitCode = LaunchElevated(elevatedCommand.c_str());
         if (exitCode != 0)
         {
-            return exitCode;
+            THROW_HR(HRESULT_FROM_WIN32(exitCode));
         }
     }
     else
