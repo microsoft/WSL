@@ -2377,14 +2377,6 @@ try
         retrying = true;
     }
 
-    {
-        std::lock_guard comLock(m_userCOMCallbacksLock);
-
-        // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
-        // to unblock operations waiting for cross-process COM responses.
-        CancelUserCOMCallbacks();
-    }
-
     // Acquire an exclusive lock to ensure that no operation is running.
     WI_VERIFY(sessionLock);
 
