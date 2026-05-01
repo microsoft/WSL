@@ -2029,7 +2029,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
-    <value>Container '{}' not found.</value>
+    <value>找不到容器 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
@@ -2175,7 +2175,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImageNotFound" xml:space="preserve">
-    <value>Image '{}' not found.</value>
+    <value>未找到映像 '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2187,7 +2187,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
-    <value>unsupported volume driver options: {}</value>
+    <value>不支持的卷驱动程序选项: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
@@ -2195,19 +2195,19 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkNotFound" xml:space="preserve">
-    <value>Network not found: '{}'</value>
+    <value>找不到网络: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
-    <value>Unsupported network driver: '{}'</value>
+    <value>不支持的网络驱动程序: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
-    <value>Network '{}' has active endpoints.</value>
+    <value>网络 '{}' 具有活动终结点。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
-    <value>Network '{}' already exists.</value>
+    <value>网络 '{}' 已存在。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2360,32 +2360,32 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>拉取映像。</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllArgDescription" xml:space="preserve">
-    <value>Remove all unused images, not just dangling ones.</value>
+    <value>移除所有未使用的映像，而不仅仅是悬空映像。</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>已删除: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
-    <value>Remove unused images.</value>
+    <value>移除未使用的映像。</value>
   </data>
   <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
     <value>删除所有悬空映像。如果指定 --all ，则删除任何容器未使用的所有映像。</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {:.2f} MB</value>
+    <value>总回收空间: {:.2f} MB</value>
     <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
-    <value>Untagged: {}</value>
+    <value>已取消标记: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>将映像上传到注册表。</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>将映像上传到注册表。</value>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>移除图像。</value>
@@ -2400,26 +2400,26 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>保存映像。</value>
   </data>
   <data name="WSLCCLI_LoginDesc" xml:space="preserve">
-    <value>Log in to a registry.</value>
+    <value>登录到注册表。</value>
   </data>
   <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
     <value>登录到注册表。如果未指定服务器，则默认值由会话定义。</value>
   </data>
   <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
-    <value>Log out from a registry.</value>
+    <value>从注册表注销。</value>
   </data>
   <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
     <value>从注册表注销。如果未指定服务器，则默认值由会话定义。</value>
   </data>
   <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
-    <value>Login Succeeded</value>
+    <value>登录成功</value>
   </data>
   <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
-    <value>Removing login credentials for {}</value>
+    <value>正在移除 {} 的登录凭据</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
-    <value>Not logged in to {}</value>
+    <value>未登录到 {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
@@ -2427,39 +2427,39 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
-    <value>Failed to write '{}': {}</value>
+    <value>未能写入 '{}': {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
-    <value>Server</value>
+    <value>服务器</value>
   </data>
   <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
-    <value>Username</value>
+    <value>用户名</value>
   </data>
   <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
-    <value>Password or Personal Access Token (PAT)</value>
+    <value>密码或个人访问令牌(PAT)</value>
     <comment>{Locked="PAT"}Acronym should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
-    <value>Take the Password or Personal Access Token (PAT) from stdin</value>
+    <value>从 stdin 获取密码或个人访问令牌(PAT)</value>
     <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
-    <value>--password and --password-stdin are mutually exclusive</value>
+    <value>--password 和 --password-stdin 互斥</value>
     <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
-    <value>Must provide --username with --password-stdin</value>
+    <value>必须为 --username 提供 --password-stdin</value>
     <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
-    <value>Username: </value>
+    <value>用户名:</value>
   </data>
   <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
-    <value>Password: </value>
+    <value>密码:</value>
   </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
-    <value>Manage registry credentials.</value>
+    <value>管理注册表凭据。</value>
   </data>
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>管理注册表凭据，包括登录和注销容器注册表。</value>
@@ -2541,7 +2541,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>始终尝试拉取较新版本的映像</value>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
-    <value>Set the target build stage to build</value>
+    <value>设置要生成的目标生成阶段</value>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>要运行的命令</value>
@@ -2577,6 +2577,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>要传递到容器初始化进程的参数</value>
   </data>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="all"}</comment>
+  </data>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>删除映像(即使正在使用它们)</value>
   </data>
@@ -2587,13 +2595,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>提供包含图像的 tar 存档文件的路径</value>
   </data>
   <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
-    <value>Set metadata on an object</value>
+    <value>在对象上设置元数据</value>
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
-    <value>Label key cannot be empty</value>
+    <value>标签键不能为空</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
-    <value>Container host name</value>
+    <value>容器主机名</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>容器的名称</value>
@@ -2617,7 +2625,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>将端口从容器发布到主机</value>
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
-    <value>Publish all exposed ports to random host ports</value>
+    <value>将所有已公开的端口发布到随机主机端口</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>仅输出容器 ID</value>
@@ -2683,7 +2691,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
-    <value>Container domain name</value>
+    <value>容器域名</value>
   </data>
   <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
     <value>进程的组 ID</value>
@@ -2725,7 +2733,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized inspect type. Supported inspect types are: {}.</value>
+    <value>无效的 {} 值: {} 不是可识别的检查类型。支持的检查类型为: {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
@@ -2751,20 +2759,20 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>请求了加载但未提供输入。</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
-    <value>Manage volumes.</value>
+    <value>管理卷。</value>
   </data>
   <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
     <value>管理 WSL 卷的生命周期，包括创建、检查、列出和删除卷。</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
-    <value>Create a volume.</value>
+    <value>创建卷。</value>
   </data>
   <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
     <value>创建可附加到容器的命名卷。</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
-    <value>Remove one or more volumes.</value>
+    <value>移除一个或多个卷。</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
     <value>移除一个或多个卷。如果卷正在被容器使用，则无法移除。</value>
@@ -2776,37 +2784,37 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>显示一个或多个卷的详细信息。</value>
   </data>
   <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
-    <value>List volumes.</value>
+    <value>列出卷。</value>
   </data>
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
-    <value>Lists all volumes in the session.</value>
+    <value>列出会话中的所有卷。</value>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
-    <value>Volume name</value>
+    <value>卷名称</value>
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Specify volume driver name (default {})</value>
+    <value>指定卷驱动程序名称(默认值 {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
-    <value>Set driver specific options</value>
+    <value>设置特定于驱动程序的选项</value>
   </data>
   <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the volume names only</value>
+    <value>仅输出卷名称</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
     <value>无法将图像写入终端。请使用 -o 标志或重定向标准输出。</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>预期格式: &lt;主机路径|命名卷&gt;:&lt;容器路径&gt;[:模式]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. {}</value>
+    <value>卷规范无效: '{}'。{}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Host path cannot be empty. {}</value>
+    <value>卷规范无效: '{}'。主机路径不能为空。{}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
@@ -2822,39 +2830,39 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
-    <value>Name or Id of any object type</value>
+    <value>任何对象类型的名称或 ID</value>
   </data>
   <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
-    <value>Type of the object to inspect</value>
+    <value>要检查的对象的类型</value>
   </data>
   <data name="WSLCCLI_InspectDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>检查对象。</value>
   </data>
   <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>检查对象。</value>
   </data>
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
-    <value>Object not found: {}</value>
+    <value>找不到对象: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
-    <value>Warning: Invalid value for setting '{}' in {}:{}.</value>
+    <value>警告: {}:{} 中设置 '{}' 的值无效。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
-    <value>Warning: Invalid type for setting '{}' in {}:{}.</value>
+    <value>警告: {}:{} 中设置 '{}' 的类型无效。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_NonStringKey" xml:space="preserve">
-    <value>Warning: Non-string key in section '{}' in {}:{}.</value>
+    <value>警告: {}:{} 中节 '{}' 中的非字符串键。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownSection" xml:space="preserve">
-    <value>Warning: Unknown setting section '{}' in {}:{}.</value>
+    <value>警告: {}:{} 中的设置节 '{}' 未知。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
-    <value>Warning: Unknown setting '{}' in {}:{}.</value>
+    <value>警告: {}:{} 中的设置 '{}' 未知。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
@@ -2862,7 +2870,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_ParseError" xml:space="preserve">
-    <value>Warning: Settings file at {} could not be parsed. Error: {}.</value>
+    <value>警告: 无法分析 {} 处的设置文件。错误: '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">

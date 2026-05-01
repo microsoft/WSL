@@ -2578,6 +2578,14 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumentos a serem passados para o processo de inicialização do contêiner</value>
   </data>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="all"}</comment>
+  </data>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Excluir imagens mesmo que elas estejam sendo usadas</value>
   </data>

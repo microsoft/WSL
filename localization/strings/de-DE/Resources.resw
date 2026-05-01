@@ -2029,7 +2029,7 @@ Verwendung:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
-    <value>Container '{}' not found.</value>
+    <value>Der Container „{}“ wurde nicht gefunden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
@@ -2175,7 +2175,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImageNotFound" xml:space="preserve">
-    <value>Image '{}' not found.</value>
+    <value>Image„{}“ wurde nicht gefunden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2187,7 +2187,7 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
-    <value>unsupported volume driver options: {}</value>
+    <value>Nicht unterstützte Volumetreiberoptionen: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
@@ -2195,19 +2195,19 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkNotFound" xml:space="preserve">
-    <value>Network not found: '{}'</value>
+    <value>Netzwerk nicht gefunden: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
-    <value>Unsupported network driver: '{}'</value>
+    <value>Nicht unterstützter Netzwerktreiber: „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
-    <value>Network '{}' has active endpoints.</value>
+    <value>Das Netzwerk „{}“ hat aktive Endpunkte.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
-    <value>Network '{}' already exists.</value>
+    <value>Das Netzwerk „{}“ ist bereits vorhanden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2363,29 +2363,29 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Entfernen Sie alle nicht verwendeten Bilder, nicht nur baumelnde.</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Gelöscht: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
-    <value>Remove unused images.</value>
+    <value>Nicht verwendete Images entfernen.</value>
   </data>
   <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
     <value>Entfernt alle nicht zugeordneten Bilder. Wenn --all angegeben wird, werden alle Images entfernt, die von keinem Container verwendet werden.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {:.2f} MB</value>
+    <value>Insgesamt zurückgewonnener Speicherplatz: {:.2f} MB</value>
     <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
-    <value>Untagged: {}</value>
+    <value>Ohne Tag: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>Ein Image in eine Registrierung hochladen.</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>Ein Image in eine Registrierung hochladen.</value>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Bilder entfernen.</value>
@@ -2400,26 +2400,26 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <value>Speichert Images.</value>
   </data>
   <data name="WSLCCLI_LoginDesc" xml:space="preserve">
-    <value>Log in to a registry.</value>
+    <value>Bei einer Registrierungsstelle anmelden.</value>
   </data>
   <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
     <value>Melden Sie sich bei einer Registrierung an. Wenn kein Server angegeben ist, wird der Standardwert durch die Sitzung definiert.</value>
   </data>
   <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
-    <value>Log out from a registry.</value>
+    <value>Aus einem Register abmelden.</value>
   </data>
   <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
     <value>Melden Sie sich von einer Registrierung ab. Wenn kein Server angegeben ist, wird der Standardwert durch die Sitzung definiert.</value>
   </data>
   <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
-    <value>Login Succeeded</value>
+    <value>Anmeldung erfolgreich</value>
   </data>
   <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
-    <value>Removing login credentials for {}</value>
+    <value>Anmeldedaten für {} entfernen</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
-    <value>Not logged in to {}</value>
+    <value>Nicht angemeldet bei {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
@@ -2427,42 +2427,42 @@ Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/priva
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
-    <value>Failed to write '{}': {}</value>
+    <value>Das Schreiben von „{}“ ist fehlgeschlagen: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
     <value>Server</value>
   </data>
   <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
-    <value>Username</value>
+    <value>Benutzername</value>
   </data>
   <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
-    <value>Password or Personal Access Token (PAT)</value>
+    <value>Kennwort oder persönlicher Zugriffstoken (PAT)</value>
     <comment>{Locked="PAT"}Acronym should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
-    <value>Take the Password or Personal Access Token (PAT) from stdin</value>
+    <value>Kennwort oder persönlichen Zugriffstoken (PAT) von der Standard-Eingabe (stdin) übernehmen</value>
     <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
-    <value>--password and --password-stdin are mutually exclusive</value>
+    <value>--password und --password-stdin schließen sich gegenseitig aus</value>
     <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
-    <value>Must provide --username with --password-stdin</value>
+    <value>Es muss --username zusammen mit --password-stdin angegeben werden</value>
     <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
-    <value>Username: </value>
+    <value>Benutzername: </value>
   </data>
   <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
-    <value>Password: </value>
+    <value>Kennwort: </value>
   </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
-    <value>Manage registry credentials.</value>
+    <value>Registrierungsanmeldeinformationen verwalten.</value>
   </data>
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
-    <value>Manage registry credentials, including logging in and out of container registries.</value>
+    <value>Registrierungsanmeldedaten verwalten, einschließlich der Anmeldung bei und Abmeldung von Containerregistrierungen.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Ein Bild taggen.</value>
@@ -2538,10 +2538,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
-    <value>Always attempt to pull a newer version of the image</value>
+    <value>Immer versuchen, eine neuere Version des Images zu laden</value>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
-    <value>Set the target build stage to build</value>
+    <value>Setzen Sie die angestrebte Build-Stufe auf „Build“</value>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Der auszuführende Befehl</value>
@@ -2577,6 +2577,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Argumente, die an den Init-Prozess des Containers übergeben werden</value>
   </data>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="all"}</comment>
+  </data>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Bilder löschen, auch wenn sie verwendet werden</value>
   </data>
@@ -2587,13 +2595,13 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Bietet den Pfad zur Tar-Archivdatei, die das Bild enthält</value>
   </data>
   <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
-    <value>Set metadata on an object</value>
+    <value>Metadaten für ein Objekt festlegen</value>
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
-    <value>Label key cannot be empty</value>
+    <value>Bezeichnungsschlüssel darf nicht leer sein</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
-    <value>Container host name</value>
+    <value>Hostname des Containers</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Name des Containers</value>
@@ -2617,7 +2625,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Einen Port von einem Container zum Host freigeben</value>
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
-    <value>Publish all exposed ports to random host ports</value>
+    <value>Alle exponierten Ports auf zufällige Host-Ports veröffentlichen</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Gibt nur die Container-IDs aus.</value>
@@ -2683,7 +2691,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
-    <value>Container domain name</value>
+    <value>Container-Domänenname</value>
   </data>
   <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
     <value>Gruppen-ID für den Prozess</value>
@@ -2751,20 +2759,20 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Laden angefordert, aber keine Eingabe bereitgestellt.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
-    <value>Manage volumes.</value>
+    <value>Volumes verwalten.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
     <value>Verwalten Sie den Lebenszyklus WSL Volumes, einschließlich Erstellen, Überprüfen, Auflisten und Löschen.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
-    <value>Create a volume.</value>
+    <value>Erstellt ein Volume.</value>
   </data>
   <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
     <value>Erstellt ein benanntes Volume, das an Container angefügt werden kann.</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
-    <value>Remove one or more volumes.</value>
+    <value>Ein oder mehrere Volumes entfernen.</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
     <value>Entfernt mindestens ein Volume. Ein Volume kann nicht entfernt werden, wenn es von einem Container verwendet wird.</value>
@@ -2776,33 +2784,33 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Zeigt detaillierte Informationen zu mindestens einem Volume an.</value>
   </data>
   <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
-    <value>List volumes.</value>
+    <value>Volumes auflisten.</value>
   </data>
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
-    <value>Lists all volumes in the session.</value>
+    <value>Listet alle Volumes in der Sitzung auf.</value>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
-    <value>Volume name</value>
+    <value>Volumename</value>
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Specify volume driver name (default {})</value>
+    <value>Geben Sie den Namen des Volumetreiber an (Standard: {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
-    <value>Set driver specific options</value>
+    <value>Treiberspezifische Optionen festlegen</value>
   </data>
   <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the volume names only</value>
+    <value>Gibt nur die Volumenamen aus</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write image to terminal. Use the -o flag or redirect stdout.</value>
+    <value>Das Image kann nicht auf das Terminal geschrieben werden. Kennzeichen -o verwenden oder StdOut umleiten.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Erwartetes Format: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. {}</value>
+    <value>Ungültige Angaben zum Volume: „{}“. {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
@@ -2822,19 +2830,19 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
-    <value>Name or Id of any object type</value>
+    <value>Name oder ID eines beliebigen Objekttyps</value>
   </data>
   <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
-    <value>Type of the object to inspect</value>
+    <value>Typ des zu überprüfenden Objekts</value>
   </data>
   <data name="WSLCCLI_InspectDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>Objekte überprüfen.</value>
   </data>
   <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>Objekte überprüfen.</value>
   </data>
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
-    <value>Object not found: {}</value>
+    <value>Objekt nicht gefunden: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
@@ -2850,11 +2858,11 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownSection" xml:space="preserve">
-    <value>Warning: Unknown setting section '{}' in {}:{}.</value>
+    <value>Warnung: Unbekannter Einstellungsabschnitt „{}“ in {}:{}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
-    <value>Warning: Unknown setting '{}' in {}:{}.</value>
+    <value>Warnung: Unbekannte Einstellung „{}“ in {}:{}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
@@ -2866,7 +2874,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
-    <value>Warning: Settings file at {} is empty or has invalid structure. Expected a YAML mapping.</value>
+    <value>Warnung: Die Einstellungsdatei bei {} ist leer oder hat eine ungültige Struktur. YAML-Zuordnung erwartet.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
