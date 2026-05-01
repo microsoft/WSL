@@ -7417,6 +7417,19 @@ class WSLCTests
         VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
     }
 
+    WSLC_TEST_METHOD(SwapConfigured)
+    {
+        // Swap is configured asynchronously (mkswap + swapon runs fire-and-forget), so retry until it's active.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                auto result = ExpectCommandResult(m_defaultSession.get(), {"/usr/sbin/swapon", "--show=NAME,SIZE", "--noheadings"}, 0);
+
+                THROW_WIN32_IF(ERROR_RETRY, result.Code != 0 || result.Output.size() < 2 || result.Output[1].find("/dev/") == std::string::npos);
+            },
+            std::chrono::milliseconds{500},
+            std::chrono::seconds{30});
+    }
+
     WSLC_TEST_METHOD(ContainerAutoRemove)
     {
         // Test that a container with the Rm flag is automatically deleted on Stop().

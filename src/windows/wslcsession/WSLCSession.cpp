@@ -363,6 +363,25 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     // Mount the device to /root.
     m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
 
+    // Configure swap on a separate ephemeral VHD.
+    if (Settings.SwapSizeMb > 0)
+    {
+        try
+        {
+            m_swapVhdPath = storagePath / "swap.vhdx";
+            DeleteFileW(m_swapVhdPath.c_str()); // Remove stale swap from prior run
+            wsl::core::filesystem::CreateVhd(m_swapVhdPath.c_str(), static_cast<ULONGLONG>(Settings.SwapSizeMb) * _1MB, UserSid, false, false);
+
+            auto [_, swapDevice] = m_virtualMachine->AttachDisk(m_swapVhdPath.c_str(), false);
+
+            // Fire-and-forget: mkswap + swapon runs asynchronously since swap is best-effort.
+            auto cmd = std::format("/usr/sbin/mkswap {0} && /usr/sbin/swapon {0}", swapDevice);
+            ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "-c", cmd});
+            launcher.Launch(*m_virtualMachine);
+        }
+        CATCH_LOG()
+    }
+
     deleteVhdOnFailure.release();
 }
 
@@ -2431,6 +2450,13 @@ try
     m_dockerdProcess.reset();
     m_containerdProcess.reset();
     m_virtualMachine.reset();
+
+    // Delete the ephemeral swap VHD now that the VM is gone.
+    if (!m_swapVhdPath.empty())
+    {
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_swapVhdPath.c_str()));
+        m_swapVhdPath.clear();
+    }
 
     m_terminated = true;
     return S_OK;
