@@ -509,7 +509,6 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->SwapLun = swapLun;
     message->SystemDistroDeviceType = m_systemDistroDeviceType;
     message->SystemDistroDeviceId = m_systemDistroDeviceId;
-    message->PageReportingOrder = m_coldDiscardShiftSize;
     message->MemoryReclaimMode = static_cast<LX_MINI_INIT_MEMORY_RECLAIM_MODE>(m_vmConfig.MemoryReclaim);
     message->EnableDebugShell = m_vmConfig.EnableDebugShell;
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
@@ -1526,6 +1525,9 @@ std::wstring WslCoreVm::GenerateConfigJson()
 
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
+
+    // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
+    kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", m_coldDiscardShiftSize);
 
     // If using virtio features, enable SWIOTLB as a perf optimization (will cause VM to consume 64MB more memory).
     if (m_vmConfig.EnableVirtio9p || m_vmConfig.EnableVirtioFs || m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)

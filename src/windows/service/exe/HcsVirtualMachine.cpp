@@ -108,6 +108,10 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
+    // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
+    int pageReportingOrder = (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ? 5 : 9;
+    kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", pageReportingOrder);
+
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
     // N.B. 'DmesgOutput' needs to be duplicated since COM will close it when this call completes.
