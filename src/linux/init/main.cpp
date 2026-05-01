@@ -290,7 +290,7 @@ try
     // and memory reclaim. This ensures that the maximum number of pages can be discarded to the host.
     //
 
-    std::thread([Mode = Mode]() mutable {
+    std::thread([Mode]() mutable {
         try
         {
             //

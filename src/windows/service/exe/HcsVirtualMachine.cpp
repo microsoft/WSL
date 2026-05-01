@@ -76,15 +76,21 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
     vmSettings.ComputeTopology.Processor.Count = Settings->CpuCount;
 
-    // Configure backing page size, fault cluster shift size, and cold discard hint size to favor density (lower vmmem usage).
+    // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
     //
-    // N.B. Cold discard hint size should be a multiple of the fault cluster shift size.
+    // N.B. Page reporting order must be >= fault cluster size shift.
     const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+    int pageReportingOrder;
     if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
     {
         vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
         vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;
         vmSettings.ComputeTopology.Memory.DirectMapFaultClusterSizeShift = 4;
+        pageReportingOrder = 5; // 128k
+    }
+    else
+    {
+        pageReportingOrder = 9; // 2MB
     }
 
     if (helpers::IsVmemmSuffixSupported() && Settings->DisplayName)
@@ -109,7 +115,6 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
     // Configure page reporting order - minimum order of pages reported as free to the hypervisor.
-    int pageReportingOrder = (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ? 5 : 9;
     kernelCmdLine += std::format(L" page_reporting.page_reporting_order={}", pageReportingOrder);
 
     // Setup dmesg collector with optional DmesgOutput handle.
