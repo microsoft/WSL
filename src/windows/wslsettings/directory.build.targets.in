@@ -5,4 +5,12 @@
     <WindowsSdkSupportedTargetPlatformVersion Include="10.0.26100.0" Exclude="@(WindowsSdkSupportedTargetPlatformVersion)" WindowsSdkPackageVersion="10.0.26100.0" MinimumNETVersion="6.0" />
     <SdkSupportedTargetPlatformVersion Include="10.0.26100.0" Exclude="@(SdkSupportedTargetPlatformVersion)"/>
   </ItemGroup>
+  <!-- CodeQL forces all compiler-generated files to be written to disk (instead of compiled in memory)
+       for static analysis. Some files are generated in the XamlPreCompile target, which does not have a
+       dependency on CreateCompilerGeneratedFilesOutputPath. This can cause failures if the output folder
+       does not exist yet when XamlPreCompile runs. This target ensures that the output path exists. -->
+  <Target Name="CreateCompilerGeneratedFilesOutputPathBeforeXamlPreCompile"
+          BeforeTargets="XamlPreCompile">
+    <MakeDir Directories="$(CompilerGeneratedFilesOutputPath)" />
+  </Target>
 </Project>
