@@ -1565,7 +1565,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         metadata.InitProcessFlags,
         metadata.Flags);
 
-    container->m_stopSignal = static_cast<WSLCSignal>(metadata.StopSignal);
+    container->m_stopSignal = metadata.StopSignal;
 
     // Restore the state change timestamp from Docker inspect data.
     try

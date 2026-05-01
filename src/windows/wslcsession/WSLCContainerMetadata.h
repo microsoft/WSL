@@ -57,7 +57,7 @@ struct WSLCContainerMetadataV1
     WSLCProcessFlags InitProcessFlags{WSLCProcessFlagsNone};
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
-    int StopSignal{WSLCSignalNone};
+    WSLCSignal StopSignal{WSLCSignalNone};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Ports, Volumes, StopSignal);
 };
