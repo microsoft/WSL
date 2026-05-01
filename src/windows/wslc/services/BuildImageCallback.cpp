@@ -21,6 +21,13 @@ using wsl::windows::common::string::MultiByteToWide;
 
 BuildImageCallback::~BuildImageCallback()
 {
+    // Capture any partial line so it's included in the error replay below; otherwise
+    // CollapseWindow() would discard it.
+    if (!m_pendingLine.empty())
+    {
+        m_allLines.push_back(std::move(m_pendingLine));
+    }
+
     CollapseWindow();
 
     // On build error (not cancellation), replay the full log output so the user can see what went wrong.
@@ -140,7 +147,9 @@ void BuildImageCallback::Redraw()
 {
     CONSOLE_SCREEN_BUFFER_INFO info{};
     THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
-    const SHORT consoleWidth = info.dwSize.X;
+    // Use the visible window width (not buffer width), minus one column to avoid the
+    // deferred-wrap edge case when a line is exactly the window width.
+    const SHORT consoleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left);
 
     // Determine how many completed lines to show, leaving room for the pending line.
     const bool showPending = !m_pendingLine.empty();

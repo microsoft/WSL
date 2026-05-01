@@ -30,6 +30,7 @@ private:
     std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
     std::map<std::string, SHORT> m_statuses;
     SHORT m_currentLine = 0;
+    EnableVirtualTerminal m_vtMode{GetStdHandle(STD_OUTPUT_HANDLE)};
     ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
 };
 } // namespace wsl::windows::wslc::services
