@@ -315,4 +315,18 @@ uint16_t UtilWinAfToLinuxAf(uint16_t AddressFamily);
 
 int WriteToFile(const char* Path, const char* Content, int permissions = 0644);
 
+enum MemoryReductionMode
+{
+    MemoryReductionModeDisabled = 0,
+    MemoryReductionModeGradual = 1,
+    MemoryReductionModeDropCache = 2,
+};
+
+static_assert(MemoryReductionModeDisabled == 0);
+static_assert(MemoryReductionModeGradual == 1);
+static_assert(MemoryReductionModeDropCache == 2);
+
+// Starts a background thread that performs memory compaction and optional cache reclaim when the VM is idle.
+void UtilStartMemoryReductionThread(MemoryReductionMode Mode);
+
 int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span<gsl::byte> Buffer);
