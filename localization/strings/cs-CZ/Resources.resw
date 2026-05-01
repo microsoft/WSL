@@ -2626,8 +2626,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Cesta k úložišti relace</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signál k odeslání (výchozí: {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Signál k odeslání</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuální nebo existující odkaz na obrázek ve formátu image-name[:tag]</value>

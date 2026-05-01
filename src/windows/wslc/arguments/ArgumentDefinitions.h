@@ -88,7 +88,7 @@ _(Session,        "session",             NO_ALIAS,          Kind::Value,       L
 _(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SessionIdPositionalArgDescription()) \
 _(ShmSize,        "shm-size",            NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_ShmSizeArgDescription()) \
 _(StoragePath,    "storage-path",        NO_ALIAS,          Kind::Positional,  L"Path to the session storage directory") \
-_(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription(L"SIGKILL")) \
+_(Signal,         "signal",              L"s",              Kind::Value,       Localization::WSLCCLI_SignalArgDescription()) \
 _(Source,         "source",              NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_SourceArgDescription()) \
 _(StopSignal,     "stop-signal",         NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_StopSignalArgDescription()) \
 _(Tag,            "tag",                 L"t",              Kind::Value,       Localization::WSLCCLI_TagArgDescription()) \

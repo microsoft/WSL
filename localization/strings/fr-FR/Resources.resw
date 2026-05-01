@@ -2633,8 +2633,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Chemin d’accès de stockage de session</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal à envoyer (par défaut : {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>Signal à envoyer</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Référence d’image actuelle ou existante au format nom_image[ :tag]</value>
