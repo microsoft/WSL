@@ -17,7 +17,7 @@
             {
                 "Name": "Ubuntu-26.04",
                 "FriendlyName": "Ubuntu 26.04 LTS",
-                "Default": true,
+                "Default": false,
                 "Amd64Url": {
                     "Url": "https://releases.ubuntu.com/26.04/ubuntu-26.04-wsl-amd64.wsl",
                     "Sha256": "96c7f5fb28a7fe28245331f9bfbe4375f18dd29a4850116ad3c4f60f6700c55c"
