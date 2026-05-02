@@ -50,9 +50,8 @@ private:
     bool m_isConsole = wsl::windows::common::wslutil::IsConsoleHandle(m_console);
     EnableVirtualTerminal m_vtMode{m_console};
     std::deque<std::string> m_lines;
-    // TODO: Track per step so the destructor can replay only the failing step's logs on
-    // error (like docker build). Per-stage tracking could also support separate scrolling
-    // windows for parallel stages.
+    // TODO: Track logs per step so the destructor can replay only the failing step's
+    // logs on error, rather than every line captured during the build.
     std::vector<std::string> m_allLines;
     std::string m_pendingLine;
     SHORT m_displayedLines = 0;

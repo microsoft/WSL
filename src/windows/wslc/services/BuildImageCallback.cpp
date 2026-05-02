@@ -84,7 +84,9 @@ try
         return S_OK;
     }
 
-    const bool isLog = (id != nullptr && *id != '\0');
+    // Match the specific "log" sentinel sent by WSLCSession::BuildImage rather than
+    // accepting any non-empty id, so future or unrelated id usage defaults to permanent.
+    const bool isLog = (id != nullptr && std::string_view{id} == "log");
 
     if (!isLog)
     {
@@ -148,7 +150,9 @@ void BuildImageCallback::Redraw()
     CONSOLE_SCREEN_BUFFER_INFO info{};
     THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(m_console, &info));
     // Use the visible window width (not buffer width), minus one column to avoid the
-    // deferred-wrap edge case when a line is exactly the window width.
+    // deferred-wrap edge case when a line is exactly the window width. Clamp to at
+    // least zero so the value never goes negative (which would underflow when passed
+    // to std::wstring::resize).
     const SHORT consoleWidth = std::max<SHORT>(0, info.srWindow.Right - info.srWindow.Left);
 
     // Determine how many completed lines to show, leaving room for the pending line.

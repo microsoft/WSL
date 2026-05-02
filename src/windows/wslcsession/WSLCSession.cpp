@@ -839,7 +839,7 @@ try
                 it != digestToStageName.end() && !entry.id.empty() && reportedSteps.insert(entry.id).second)
             {
                 flushLine();
-                reportProgress(logPrefix(it->second) + entry.id + "\n", c_logId);
+                reportProgress(logPrefix(it->second) + entry.id + "\n");
             }
         }
     };
