@@ -2023,7 +2023,7 @@ Käyttö:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
-    <value>Container '{}' not found.</value>
+    <value>Säilöä {} ei löydy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
@@ -2169,7 +2169,7 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImageNotFound" xml:space="preserve">
-    <value>Image '{}' not found.</value>
+    <value>Kuvaa {} ei löydy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2181,7 +2181,7 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
-    <value>unsupported volume driver options: {}</value>
+    <value>Tuetut äänenvoimakkuusohjaimen asetukset puuttuvat: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
@@ -2189,19 +2189,19 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkNotFound" xml:space="preserve">
-    <value>Network not found: '{}'</value>
+    <value>Verkkoa ei löydy: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
-    <value>Unsupported network driver: '{}'</value>
+    <value>Ei-tuettu verkkokortin ohjain: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
-    <value>Network '{}' has active endpoints.</value>
+    <value>Verkolla {} on aktiivisia päätepisteitä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
-    <value>Network '{}' already exists.</value>
+    <value>Verkko {} on jo olemassa.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2357,29 +2357,29 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Poista kaikki käyttämättömät kuvat, ei vain roikkuvat.</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Poistettu: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
-    <value>Remove unused images.</value>
+    <value>Poista käyttämättömät kuvat.</value>
   </data>
   <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
-    <value>Removes all dangling images. If --all is specified, removes all images not used by any container.</value>
+    <value>Poistaa kaikki roikkuvat kuvat. Jos --all on määritetty, se poistaa kaikki kuvat, joita mikään säilö ei käytä.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {:.2f} MB</value>
+    <value>Palautettu tila yhteensä: {:.2f} Mt</value>
     <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
-    <value>Untagged: {}</value>
+    <value>Merkitsemätön: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>Lataa kuva rekisteriin.</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>Lataa kuva rekisteriin.</value>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Poista kuvat.</value>
@@ -2394,26 +2394,26 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <value>Tallentaa kuvia.</value>
   </data>
   <data name="WSLCCLI_LoginDesc" xml:space="preserve">
-    <value>Log in to a registry.</value>
+    <value>Kirjaudu rekisteriin.</value>
   </data>
   <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
-    <value>Log in to a registry. If no server is specified, the default is defined by the session.</value>
+    <value>Kirjaudu rekisteriin. Jos palvelinta ei ole määritetty, istunnon oletusasetusta käytetään.</value>
   </data>
   <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
-    <value>Log out from a registry.</value>
+    <value>Kirjaudu ulos rekisteristä.</value>
   </data>
   <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
-    <value>Log out from a registry. If no server is specified, the default is defined by the session.</value>
+    <value>Kirjaudu ulos rekisteristä. Jos palvelinta ei ole määritetty, istunnon oletusasetusta käytetään.</value>
   </data>
   <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
-    <value>Login Succeeded</value>
+    <value>Kirjautuminen onnistui</value>
   </data>
   <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
-    <value>Removing login credentials for {}</value>
+    <value>Kirjautumistietojen poistaminen kohteesta {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
-    <value>Not logged in to {}</value>
+    <value>Ei kirjautuneena kohteeseen {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
@@ -2421,42 +2421,42 @@ Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
-    <value>Failed to write '{}': {}</value>
+    <value>Kirjoitus {} epäonnistui: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
-    <value>Server</value>
+    <value>Palvelin</value>
   </data>
   <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
-    <value>Username</value>
+    <value>Käyttäjänimi</value>
   </data>
   <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
-    <value>Password or Personal Access Token (PAT)</value>
+    <value>Salasana tai henkilökohtainen käyttöoikeustunnus (PAT)</value>
     <comment>{Locked="PAT"}Acronym should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
-    <value>Take the Password or Personal Access Token (PAT) from stdin</value>
+    <value>Ota salasana tai henkilökohtainen käyttöoikeustunnus (PAT) stdin:stä</value>
     <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
-    <value>--password and --password-stdin are mutually exclusive</value>
+    <value>--password ja --password-stdin ovat toisensa poissulkevia</value>
     <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
-    <value>Must provide --username with --password-stdin</value>
+    <value>--username on annettava yhdessä --password-stdin kanssa</value>
     <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
-    <value>Username: </value>
+    <value>Käyttäjänimi: </value>
   </data>
   <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
-    <value>Password: </value>
+    <value>Salasana: </value>
   </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
-    <value>Manage registry credentials.</value>
+    <value>Hallitse rekisterin tunnistetietoja.</value>
   </data>
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
-    <value>Manage registry credentials, including logging in and out of container registries.</value>
+    <value>Hallitse rekisterin tunnistetietoja, mukaan lukien sisään ja ulos kirjautuminen säilörekistereistä.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Merkitse kuva tunnisteella.</value>
@@ -2532,10 +2532,10 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
-    <value>Always attempt to pull a newer version of the image</value>
+    <value>Yritä aina hakea kuvan uudempi versio</value>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
-    <value>Set the target build stage to build</value>
+    <value>Aseta kohdekoontivaihe koontiversioksi</value>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Suoritettava komento</value>
@@ -2576,7 +2576,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Virheellinen {}-arvo: {}. Vain määritettä kaikki tuetaan.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
@@ -2589,13 +2589,13 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Antaa polun tar-arkistotiedostoon, joka sisältää kuvan</value>
   </data>
   <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
-    <value>Set metadata on an object</value>
+    <value>Aseta metatiedot objektille</value>
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
-    <value>Label key cannot be empty</value>
+    <value>Tunnisteen avain ei voi olla tyhjä</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
-    <value>Container host name</value>
+    <value>Säilön isäntänimi</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Säilön nimi</value>
@@ -2619,7 +2619,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Julkaise portti säilöstä isäntäkoneeseen</value>
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
-    <value>Publish all exposed ports to random host ports</value>
+    <value>Julkaise kaikki paljastetut portit satunnaisiin isäntäportteihin</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Tulostaa vain säilöjen tunnukset</value>
@@ -2685,7 +2685,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
-    <value>Container domain name</value>
+    <value>Säilön toimialuenimi</value>
   </data>
   <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
     <value>Prosessin ryhmätunnus</value>
@@ -2727,7 +2727,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized inspect type. Supported inspect types are: {}.</value>
+    <value>Virheellinen {} -arvo: {} ei ole tunnistettu inspect-tyyppi. Tuetut inspect-tyypit ovat: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
@@ -2753,20 +2753,20 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Pyydettiin latausta, mutta syötettä ei annettu.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
-    <value>Manage volumes.</value>
+    <value>Hallitse asemia.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
-    <value>Manage the lifecycle of WSL volumes, including creating, inspecting, listing, and deleting them.</value>
+    <value>Hallitse WSL-tilavuuksien elinkaarta, mukaan lukien niiden luominen, tarkastaminen, luetteloiminen ja poistaminen.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
-    <value>Create a volume.</value>
+    <value>Luo asema.</value>
   </data>
   <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
-    <value>Creates a named volume that can be attached to containers.</value>
+    <value>Luo nimetty asema, joka voidaan liittää säiliöihin.</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
-    <value>Remove one or more volumes.</value>
+    <value>Poista yksi tai useampi asema.</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
     <value>Poistaa vähintään yhden aseman. Asemaa ei voi poistaa, jos se on säilön käytössä.</value>
@@ -2778,65 +2778,65 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <value>Näytä vähintään yhden aseman yksityiskohtaiset tiedot.</value>
   </data>
   <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
-    <value>List volumes.</value>
+    <value>Luettele asemat.</value>
   </data>
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
-    <value>Lists all volumes in the session.</value>
+    <value>Luettelee kaikki istunnon asemat.</value>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
-    <value>Volume name</value>
+    <value>Aseman nimi</value>
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Specify volume driver name (default {})</value>
+    <value>Määritä äänenvoimakkuusohjaimen nimi (oletus {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
-    <value>Set driver specific options</value>
+    <value>Määritä ohjaimen erityisasetukset</value>
   </data>
   <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the volume names only</value>
+    <value>Tulostaa vain asemien nimet</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write image to terminal. Use the -o flag or redirect stdout.</value>
+    <value>Kuvaa ei voi kirjoittaa päätteeseen. Käytä -o-merkintää tai ohjaa stdout uudelleen.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Odotettu muoto: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. {}</value>
+    <value>Virheelliset asemamääritykset: {}. {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Host path cannot be empty. {}</value>
+    <value>Virheelliset asemamääritykset: {}. Isäntäpolku ei voi olla tyhjä. {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Container path cannot be empty. {}</value>
+    <value>Virheelliset asemamääritykset: {}. Säiliön polku ei voi olla tyhjä. {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Container path must be an absolute path (starting with '/'). {}</value>
+    <value>Virheelliset asemamääritykset: {}. Säiliön polun on oltava absoluuttinen polku (joka alkaa /). {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Host path '{}' is not a valid Windows path.</value>
+    <value>Virheelliset asemamääritykset: {}. Isäntäpolku {} ei ole kelvollinen Windows-polku.</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
-    <value>Name or Id of any object type</value>
+    <value>Minkä tahansa objektityypin nimi tai tunnus</value>
   </data>
   <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
-    <value>Type of the object to inspect</value>
+    <value>Tarkastettavan objektin tyyppi</value>
   </data>
   <data name="WSLCCLI_InspectDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>Tarkasta objektit.</value>
   </data>
   <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>Tarkasta objektit.</value>
   </data>
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
-    <value>Object not found: {}</value>
+    <value>Objektia ei löydy: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
@@ -2844,11 +2844,11 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
-    <value>Warning: Invalid type for setting '{}' in {}:{}.</value>
+    <value>Varoitus: Virheellinen tyyppi asetukselle {} kohteessa {}: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_NonStringKey" xml:space="preserve">
-    <value>Warning: Non-string key in section '{}' in {}:{}.</value>
+    <value>Varoitus: muu kuin merkkijonoavain osiossa {} kohteessa {}: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownSection" xml:space="preserve">
@@ -2856,7 +2856,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
-    <value>Warning: Unknown setting '{}' in {}:{}.</value>
+    <value>Varoitus: Tuntematon asetus {} kohteessa {}: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
@@ -2868,7 +2868,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
-    <value>Warning: Settings file at {} is empty or has invalid structure. Expected a YAML mapping.</value>
+    <value>Varoitus: Asetustiedosto kohdassa {} on tyhjä tai siinä on virheellinen rakenne. Odotettiin YAML-yhdistämismääritystä.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

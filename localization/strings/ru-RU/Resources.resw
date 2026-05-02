@@ -2030,7 +2030,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNotFound" xml:space="preserve">
-    <value>Container '{}' not found.</value>
+    <value>Контейнер "{}" не найден.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
@@ -2176,7 +2176,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcImageNotFound" xml:space="preserve">
-    <value>Image '{}' not found.</value>
+    <value>Изображение "{}" не найдено.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
@@ -2188,7 +2188,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
-    <value>unsupported volume driver options: {}</value>
+    <value>неподдерживаемые параметры драйвера тома: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
@@ -2196,19 +2196,19 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkNotFound" xml:space="preserve">
-    <value>Network not found: '{}'</value>
+    <value>Сеть не найдена: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
-    <value>Unsupported network driver: '{}'</value>
+    <value>Неподдерживаемый сетевой драйвер: "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkInUse" xml:space="preserve">
-    <value>Network '{}' has active endpoints.</value>
+    <value>Сеть "{}" содержит активные конечные точки.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
-    <value>Network '{}' already exists.</value>
+    <value>Сеть "{}" уже существует.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
@@ -2361,32 +2361,32 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Извлекает образы.</value>
   </data>
   <data name="WSLCCLI_ImagePruneAllArgDescription" xml:space="preserve">
-    <value>Remove all unused images, not just dangling ones.</value>
+    <value>Удалить все неиспользуемые образы, а не только непривязанные.</value>
   </data>
   <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
-    <value>Deleted: {}</value>
+    <value>Удалено: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
-    <value>Remove unused images.</value>
+    <value>Удаление неиспользуемых изображений.</value>
   </data>
   <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
-    <value>Removes all dangling images. If --all is specified, removes all images not used by any container.</value>
+    <value>Удаляет все непривязанные образы. Если аргумент --all указан, все образы, не используемые ни одним контейнером, будут удалены.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Total reclaimed space: {:.2f} MB</value>
+    <value>Объем освобожденной памяти: {:.2f} МБ</value>
     <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
-    <value>Untagged: {}</value>
+    <value>Без тега: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>Загрузить образ в реестр.</value>
   </data>
   <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
-    <value>Upload an image to a registry.</value>
+    <value>Загрузить образ в реестр.</value>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
     <value>Удалить образы.</value>
@@ -2401,26 +2401,26 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Сохраняет образы.</value>
   </data>
   <data name="WSLCCLI_LoginDesc" xml:space="preserve">
-    <value>Log in to a registry.</value>
+    <value>Войти в реестр.</value>
   </data>
   <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
     <value>Войдите в реестр. Если сервер не указан, значение по умолчанию определяется сеансом.</value>
   </data>
   <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
-    <value>Log out from a registry.</value>
+    <value>Выйти из реестра.</value>
   </data>
   <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
     <value>Выход из реестра. Если сервер не указан, значение по умолчанию определяется сеансом.</value>
   </data>
   <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
-    <value>Login Succeeded</value>
+    <value>Вход выполнен</value>
   </data>
   <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
-    <value>Removing login credentials for {}</value>
+    <value>Удаление учетных данных для входа в {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
-    <value>Not logged in to {}</value>
+    <value>Вход в {} не выполнен</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
@@ -2428,42 +2428,42 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
-    <value>Failed to write '{}': {}</value>
+    <value>Не удалось записать "{}": {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
-    <value>Server</value>
+    <value>Сервер</value>
   </data>
   <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
-    <value>Username</value>
+    <value>Имя пользователя</value>
   </data>
   <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
-    <value>Password or Personal Access Token (PAT)</value>
+    <value>Пароль или личный маркер доступа (PAT)</value>
     <comment>{Locked="PAT"}Acronym should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
-    <value>Take the Password or Personal Access Token (PAT) from stdin</value>
+    <value>Получите пароль или личный маркер доступа (PAT) из stdin</value>
     <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
-    <value>--password and --password-stdin are mutually exclusive</value>
+    <value>--password и --password-stdin являются взаимоисключающими</value>
     <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
-    <value>Must provide --username with --password-stdin</value>
+    <value>Необходимо указать --username вместе с --password-stdin</value>
     <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
-    <value>Username: </value>
+    <value>Имя пользователя: </value>
   </data>
   <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
-    <value>Password: </value>
+    <value>Пароль: </value>
   </data>
   <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
-    <value>Manage registry credentials.</value>
+    <value>Управление учетными данными реестра.</value>
   </data>
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
-    <value>Manage registry credentials, including logging in and out of container registries.</value>
+    <value>Управляйте учетными данными реестра, включая вход и выход из реестров контейнеров.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Добавьте тег к изображению.</value>
@@ -2539,10 +2539,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
-    <value>Always attempt to pull a newer version of the image</value>
+    <value>Всегда пытайтесь загрузить более новую версию образа</value>
   </data>
   <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
-    <value>Set the target build stage to build</value>
+    <value>Настройка целевой стадии сборки для сборки</value>
   </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
     <value>Команда для выполнения</value>
@@ -2583,7 +2583,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Недопустимое значение {}: "{}". Поддерживается только "all".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
@@ -2596,13 +2596,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Указывает путь к tar-архиву с образом</value>
   </data>
   <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
-    <value>Set metadata on an object</value>
+    <value>Настройка метаданных для объекта</value>
   </data>
   <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
-    <value>Label key cannot be empty</value>
+    <value>Ключ метки не может быть пустым</value>
   </data>
   <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
-    <value>Container host name</value>
+    <value>Имя узла контейнера</value>
   </data>
   <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
     <value>Имя контейнера</value>
@@ -2626,7 +2626,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Опубликовать порт из контейнера на узел</value>
   </data>
   <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
-    <value>Publish all exposed ports to random host ports</value>
+    <value>Опубликовать все раскрытые порты на случайных портах узла</value>
   </data>
   <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
     <value>Выводит только идентификаторы контейнеров</value>
@@ -2692,7 +2692,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
-    <value>Container domain name</value>
+    <value>Доменное имя контейнера</value>
   </data>
   <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
     <value>Идентификатор группы процесса</value>
@@ -2760,70 +2760,70 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Запрошена загрузка, но входные данные не предоставлены.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
-    <value>Manage volumes.</value>
+    <value>Управление томами.</value>
   </data>
   <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
-    <value>Manage the lifecycle of WSL volumes, including creating, inspecting, listing, and deleting them.</value>
+    <value>Управляйте жизненным циклом томов WSL: создавайте, проверяйте, перечисляйте и удаляйте их.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
-    <value>Create a volume.</value>
+    <value>Создать том.</value>
   </data>
   <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
-    <value>Creates a named volume that can be attached to containers.</value>
+    <value>Создает именованный том, который можно подключить к контейнерам.</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
-    <value>Remove one or more volumes.</value>
+    <value>Удалить один или несколько томов.</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
-    <value>Removes one or more volumes. A volume cannot be removed if it is in use by a container.</value>
+    <value>Удаляет один или несколько томов. Том нельзя удалить, если он используется контейнером.</value>
   </data>
   <data name="WSLCCLI_VolumeInspectDesc" xml:space="preserve">
-    <value>Display detailed information on one or more volumes.</value>
+    <value>Отобразить подробную информацию об одном или нескольких томах.</value>
   </data>
   <data name="WSLCCLI_VolumeInspectLongDesc" xml:space="preserve">
-    <value>Display detailed information on one or more volumes.</value>
+    <value>Отобразить подробную информацию об одном или нескольких томах.</value>
   </data>
   <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
-    <value>List volumes.</value>
+    <value>Список томов.</value>
   </data>
   <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
-    <value>Lists all volumes in the session.</value>
+    <value>Перечислить все тома в сеансе.</value>
   </data>
   <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
-    <value>Volume name</value>
+    <value>Имя тома</value>
   </data>
   <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
-    <value>Specify volume driver name (default {})</value>
+    <value>Укажите имя драйвера тома (по умолчанию {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
-    <value>Set driver specific options</value>
+    <value>Настройка параметров драйвера</value>
   </data>
   <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
-    <value>Outputs the volume names only</value>
+    <value>Вывести только имена томов</value>
   </data>
   <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
-    <value>Cannot write image to terminal. Use the -o flag or redirect stdout.</value>
+    <value>Невозможно записать образ в терминал. Используйте флаг -o или перенаправьте StdOut.</value>
   </data>
   <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
-    <value>Expected format: &lt;host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
+    <value>Ожидаемый формат: host path | named volume&gt;:&lt;container path&gt;[:mode]</value>
     <comment>Usage string for volume mount specification.</comment>
   </data>
   <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. {}</value>
+    <value>Недопустимые спецификации тома: "{}". {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Host path cannot be empty. {}</value>
+    <value>Недопустимые спецификации тома: "{}". Путь к узлу не может быть пустым. {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Container path cannot be empty. {}</value>
+    <value>Недопустимые спецификации тома: "{}". Путь контейнера не может быть пустым. {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
-    <value>Invalid volume specifications: '{}'. Container path must be an absolute path (starting with '/'). {}</value>
+    <value>Недопустимые спецификации тома: "{}". Путь к контейнеру должен быть абсолютным (начинаться с "/"). {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
@@ -2831,19 +2831,19 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
-    <value>Name or Id of any object type</value>
+    <value>Имя или идентификатор объекта любого типа.</value>
   </data>
   <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
-    <value>Type of the object to inspect</value>
+    <value>Тип объекта для проверки</value>
   </data>
   <data name="WSLCCLI_InspectDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>Проверка объектов.</value>
   </data>
   <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
-    <value>Inspect objects.</value>
+    <value>Проверка объектов.</value>
   </data>
   <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
-    <value>Object not found: {}</value>
+    <value>Объект не найден: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
@@ -2863,7 +2863,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
-    <value>Warning: Unknown setting '{}' in {}:{}.</value>
+    <value>Предупреждение: неизвестный параметр "{}" в {}:{}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
@@ -2875,7 +2875,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
-    <value>Warning: Settings file at {} is empty or has invalid structure. Expected a YAML mapping.</value>
+    <value>Предупреждение: файл параметров в {} пуст или имеет недопустимую структуру. Ожидается сопоставление YAML.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
