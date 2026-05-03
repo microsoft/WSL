@@ -2576,7 +2576,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Neplatná hodnota {}: '{}'. Podporuje se pouze 'all'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">

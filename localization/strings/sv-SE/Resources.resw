@@ -2368,7 +2368,7 @@ För sekretessinformation om den här produkten, besök https://aka.ms/privacy.<
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
-    <value>Totalt återkallat utrymme: {:.2f} MB</value>
+    <value>Totalt frigjort utrymme: {:.2f} MB</value>
     <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
@@ -2572,11 +2572,11 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Argument som skickas till containerns init-process</value>
   </data>
   <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
-    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <value>Lägg till GPU-enheter i containern ("alla" för att skicka alla GPU:er)</value>
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Ogiltigt {} värde ''{}''. Endast ''all'' stöds.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">

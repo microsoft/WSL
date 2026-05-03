@@ -2572,11 +2572,11 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Argumenter som sendes til beholderens init-prosess</value>
   </data>
   <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
-    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <value>Legg til GPU-enheter i beholderen («all» for å gi tilgang til alle GPU-er)</value>
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Ugyldig {} verdi: «{}». Bare «all» støttes.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">

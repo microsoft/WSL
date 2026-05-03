@@ -2394,16 +2394,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Görüntüleri kaydeder.</value>
   </data>
   <data name="WSLCCLI_LoginDesc" xml:space="preserve">
-    <value>Bir kayıt defterinde oturum açın.</value>
+    <value>Registry’ye giriş yapın.</value>
   </data>
   <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
-    <value>Kayıt defterinde oturum açın. Sunucu belirtilmezse, varsayılan oturum tarafından tanımlanır.</value>
+    <value>Bir kayıt defterinde oturum açın. Sunucu belirtilmezse, varsayılan değer oturum tarafından tanımlanır.</value>
   </data>
   <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
-    <value>Kayıt defterinin oturumunu kapatın.</value>
+    <value>Registry’den çıkış yapın.</value>
   </data>
   <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
-    <value>Kayıt defteri oturumunu kapatın. Sunucu belirtilmezse, varsayılan oturum tarafından tanımlanır.</value>
+    <value>Kayıt defterinin oturumunu kapatın. Sunucu belirtilmezse, varsayılan değer oturum tarafından tanımlanır.</value>
   </data>
   <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
     <value>Oturum Açma Başarılı Oldu</value>
@@ -2576,7 +2576,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Geçersiz {} değeri: '{}'. Yalnızca 'tümü' desteklenir.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
@@ -2727,7 +2727,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
-    <value>Geçersiz {} değeri: {} tanınan bir inceleme türü değil. Desteklenen inceleme türleri şunlardır: {}.</value>
+    <value>Geçersiz {} değeri: {} tanınan bir denetleme türü değil. Desteklenen denetleme türleri şunlardır: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
@@ -2769,7 +2769,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Bir veya birden fazla birimi kaldırın.</value>
   </data>
   <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
-    <value>Bir veya daha fazla birimi kaldırır. Birim, kapsayıcı tarafından kullanılıyorsa kaldırılamaz.</value>
+    <value>Bir veya birden çok birimi kaldırır. Birim, bir kapsayıcı tarafından kullanılıyorsa kaldırılamaz.</value>
   </data>
   <data name="WSLCCLI_VolumeInspectDesc" xml:space="preserve">
     <value>Bir veya birden çok birim hakkında ayrıntılı bilgi görüntüler.</value>
@@ -2856,7 +2856,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
-    <value>Warning: Bilinmeyen '{}' ayarı ({}:{} içinde).</value>
+    <value>Uyarı: {}:{} içinde bilinmeyen '{}' ayarı.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
