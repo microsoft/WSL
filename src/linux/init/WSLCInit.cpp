@@ -670,8 +670,7 @@ void HandleMessageImpl(
     Transaction.SendResultMessage(result < 0 ? errno : 0);
 }
 
-void HandleMessageImpl(
-    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_UNMOUNT&, const gsl::span<gsl::byte>& Buffer)
 {
     auto* path = wsl::shared::string::FromMessageBuffer<WSLC_UNMOUNT>(Buffer);
     auto result = umount(path) < 0 ? errno : 0;
