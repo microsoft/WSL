@@ -56,6 +56,17 @@ struct InspectHostConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode);
 };
 
+struct InspectContainerConfig
+{
+    std::optional<std::vector<std::string>> Env;
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
+    std::string User;
+    std::string WorkingDir;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir);
+};
+
 struct InspectContainer
 {
     std::string Id;
@@ -64,11 +75,12 @@ struct InspectContainer
     std::string Image;
     InspectState State;
     InspectHostConfig HostConfig;
+    InspectContainerConfig Config;
     std::map<std::string, std::vector<InspectPortBinding>> Ports;
     std::vector<InspectMount> Mounts;
     std::map<std::string, std::string> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Ports, Mounts, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels);
 };
 
 struct ImageConfig
