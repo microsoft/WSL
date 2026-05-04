@@ -1394,7 +1394,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuLibrariesPath));
         request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuDriversPath));
 
-        request.HostConfig.Devices.push_back({"/dev/dxg", "/dev/dxg", "rwm"});
+        request.HostConfig.Devices = {{"/dev/dxg", "/dev/dxg", "rwm"}};
 
         ConfigureLdPathForGpu(request.Env);
     }
