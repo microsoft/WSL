@@ -461,6 +461,8 @@ class WSLCTests
 
         LogInfo("hcsdiag list exit=%lu stdout='%ws' stderr='%ws'", output.ExitCode, output.Stdout.c_str(), output.Stderr.c_str());
 
+        VERIFY_ARE_EQUAL(output.ExitCode, 0u);
+
         const auto trim = [](std::wstring_view text) {
             constexpr auto whitespace = L" \t\r\n";
             const auto first = text.find_first_not_of(whitespace);
