@@ -18,6 +18,8 @@ Abstract:
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
+#include "hcs.hpp"
+#include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
@@ -443,61 +445,37 @@ class WSLCTests
         std::wstring Owner;
     };
 
-    // Returns VM info (Id + Owner) for all running VMs via hcsdiag.
+    // Returns VM info (Id + Owner) for all running compute systems via the HCS API.
     //
-    // Parses the default `hcsdiag list` text output rather than `-raw` because
-    // the JSON option is not available on older Windows builds (e.g. Win10 22H2).
-    // The text format is consistently:
-    //
-    //   <id>
-    //       <Type>, <State>, <Id>, <Owner>
-    //
-    // where the indented line is a comma-separated list (with arbitrary
-    // whitespace padding) common to every supported Windows version.
+    // We call HcsEnumerateComputeSystems directly rather than shelling out to
+    // hcsdiag.exe because hcsdiag's `-raw` (JSON) flag is not supported on
+    // older in-box hcsdiag (e.g. Win10 22H2), and parsing its plain-text output
+    // is brittle (the comma-separated layout breaks if Owner contains commas).
     static std::vector<VmInfo> ListVms()
     {
-        wsl::windows::common::SubProcess process(nullptr, L"hcsdiag list");
-        const auto output = process.RunAndCaptureOutput(10000);
+        auto operation = wsl::windows::common::hcs::CreateOperation();
+        THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
 
-        LogInfo("hcsdiag list exit=%lu stdout='%ws' stderr='%ws'", output.ExitCode, output.Stdout.c_str(), output.Stderr.c_str());
+        wil::unique_cotaskmem_string resultDocument;
+        const auto result = ::HcsWaitForOperationResult(operation.get(), 10000, &resultDocument);
+        THROW_IF_FAILED_MSG(result, "HcsEnumerateComputeSystems failed (error: %ls)", resultDocument.get());
 
-        VERIFY_ARE_EQUAL(output.ExitCode, 0u);
-
-        const auto trim = [](std::wstring_view text) {
-            constexpr auto whitespace = L" \t\r\n";
-            const auto first = text.find_first_not_of(whitespace);
-            if (first == std::wstring_view::npos)
-            {
-                return std::wstring{};
-            }
-
-            const auto last = text.find_last_not_of(whitespace);
-            return std::wstring{text.substr(first, last - first + 1)};
-        };
+        LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
 
         std::vector<VmInfo> vms;
-        std::wistringstream stream(output.Stdout);
-        std::wstring line;
-        while (std::getline(stream, line))
+        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()), nullptr, false);
+        if (!json.is_array())
         {
-            // Only the indented detail line carries the comma-separated fields.
-            if (line.empty() || !std::iswspace(static_cast<wint_t>(line.front())))
-            {
-                continue;
-            }
+            return vms;
+        }
 
-            std::vector<std::wstring> fields;
-            std::wistringstream lineStream(line);
-            std::wstring field;
-            while (std::getline(lineStream, field, L','))
+        for (const auto& entry : json)
+        {
+            if (entry.contains("Owner") && entry["Owner"].is_string() && entry.contains("Id") && entry["Id"].is_string())
             {
-                fields.push_back(trim(field));
-            }
-
-            // Expected layout: {Type, State, Id, Owner}.
-            if (fields.size() >= 4 && !fields[2].empty())
-            {
-                vms.push_back({std::move(fields[2]), std::move(fields[3])});
+                vms.push_back(
+                    {wsl::shared::string::MultiByteToWide(entry["Id"].get<std::string>()),
+                     wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>())});
             }
         }
 
