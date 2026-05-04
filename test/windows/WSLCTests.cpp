@@ -472,6 +472,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(VmOwnerMatchesSessionDisplayName)
     {
+        WINDOWS_11_TEST_ONLY();
+
         // The default session (c_testSessionName) is already running from class setup.
         // Verify its display name appears as a VM owner in hcsdiag output.
         auto vms = ListVms();
@@ -8477,6 +8479,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(VmKillTerminatesSession)
     {
+        WINDOWS_11_TEST_ONLY();
+
         constexpr auto c_sessionName = L"wslc-vm-kill-test";
         auto settings = GetDefaultSessionSettings(c_sessionName);
         auto session = CreateSession(settings);
@@ -8489,6 +8493,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(VmKillFailsInFlightOperations)
     {
+        WINDOWS_11_TEST_ONLY();
+
         constexpr auto c_sessionName = L"wslc-vm-kill-inflight-test";
         auto settings = GetDefaultSessionSettings(c_sessionName);
         auto session = CreateSession(settings);
