@@ -2578,11 +2578,11 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Argumente, die an den Init-Prozess des Containers übergeben werden</value>
   </data>
   <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
-    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <value>GPU-Geräte zum Container hinzufügen („alle“, um alle GPUs zu übergeben)</value>
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Ungültiger {}-Wert: „{}“. Es wird nur „alle“ unterstützt.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
