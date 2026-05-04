@@ -2026,6 +2026,9 @@ Użycie:
     <value>Nie znaleziono kontenera „{}”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
+    <value>Container network name is required for custom network type.</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Nierozpoznane polecenie: „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2576,7 +2579,7 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <comment>{Locked="all"}</comment>
   </data>
   <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
-    <value>Invalid {} value: '{}'. Only 'all' is supported.</value>
+    <value>Nieprawidłowa wartość {}: „{}”. Obsługiwana jest tylko wartość „all”.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">

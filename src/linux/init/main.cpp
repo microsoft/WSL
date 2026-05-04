@@ -1481,15 +1481,6 @@ Return Value:
     }
 
     //
-    // Disable rate limiting of user writes to dmesg.
-    //
-
-    if (WriteToFile("/proc/sys/kernel/printk_devkmsg", "on\n") < 0)
-    {
-        return -1;
-    }
-
-    //
     // Set the hostname.
     //
 
@@ -2934,7 +2925,7 @@ Return Value:
                     return;
                 }
 
-                Target = GetMountTarget(Message->Buffer);
+                Target = GetMountTarget(wsl::shared::string::FromMessageBuffer<LX_MINI_INIT_UNMOUNT_MESSAGE>(Buffer));
 
                 Step = LxMiniInitMountStepUnmount;
                 Result = umount(Target.c_str());
