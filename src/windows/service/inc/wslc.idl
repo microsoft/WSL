@@ -228,7 +228,7 @@ typedef struct _WSLCTmpfsMount
 
 typedef struct _WSLCUlimit
 {
-    LPCSTR Name;
+    [string] LPCSTR Name;
     LONGLONG Soft;
     LONGLONG Hard;
 } WSLCUlimit;

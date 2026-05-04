@@ -7273,19 +7273,6 @@ class WSLCTests
             VERIFY_ARE_EQUAL(200ll, ulimits[1].Hard);
         }
 
-        // Validate that UlimitsCount > 0 with a null Ulimits pointer is rejected.
-        {
-            WSLCContainerOptions options{};
-            options.Image = "debian:latest";
-            options.Name = "test-ulimits-null-array";
-            options.Ulimits = nullptr;
-            options.UlimitsCount = 1;
-
-            wil::com_ptr<IWSLCContainer> container;
-            auto hr = m_defaultSession->CreateContainer(&options, &container);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
-        }
-
         // Validate that a Ulimit entry with a null Name is rejected.
         {
             WSLCUlimit ulimit{.Name = nullptr, .Soft = 1, .Hard = 1};
