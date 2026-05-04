@@ -20,6 +20,7 @@ namespace wsl::windows::wslc::services {
 using wsl::windows::common::string::MultiByteToWide;
 
 BuildImageCallback::~BuildImageCallback()
+try
 {
     // Capture any partial line so it's included in the error replay below; otherwise
     // CollapseWindow() would discard it.
@@ -36,9 +37,16 @@ BuildImageCallback::~BuildImageCallback()
     {
         for (const auto& line : m_allLines)
         {
-            wprintf(L"%hs", line.c_str());
+            WriteTerminal(MultiByteToWide(line));
         }
     }
+}
+CATCH_LOG()
+
+void BuildImageCallback::WriteTerminal(std::wstring_view content) const
+{
+    DWORD written;
+    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
 }
 
 bool BuildImageCallback::IsCancelled() const
@@ -50,7 +58,7 @@ void BuildImageCallback::CollapseWindow()
 {
     if (m_displayedLines > 0)
     {
-        wprintf(L"\033[%dA\033[J", m_displayedLines);
+        WriteTerminal(std::format(L"\033[{}A\033[J", m_displayedLines));
         m_displayedLines = 0;
     }
 
@@ -87,7 +95,7 @@ try
     {
         // Permanent line: collapse the scrolling window then print directly.
         CollapseWindow();
-        wprintf(L"%hs", status);
+        WriteTerminal(MultiByteToWide(status));
         return S_OK;
     }
 
@@ -211,7 +219,7 @@ void BuildImageCallback::Redraw()
 
     buffer += L"\033[22m\033[?25h";
 
-    wprintf(L"%ls", buffer.c_str());
+    WriteTerminal(buffer);
     m_displayedLines = displayCount;
 }
 
