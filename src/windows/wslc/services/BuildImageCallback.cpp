@@ -25,6 +25,7 @@ BuildImageCallback::~BuildImageCallback()
     // CollapseWindow() would discard it.
     if (!m_pendingLine.empty())
     {
+        m_pendingLine += '\n';
         m_allLines.push_back(std::move(m_pendingLine));
     }
 
@@ -35,27 +36,21 @@ BuildImageCallback::~BuildImageCallback()
     {
         for (const auto& line : m_allLines)
         {
-            WriteTerminal(MultiByteToWide(line) + L'\n');
+            wprintf(L"%hs", line.c_str());
         }
     }
 }
 
-void BuildImageCallback::WriteTerminal(std::wstring_view content) const
-{
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
-}
-
 bool BuildImageCallback::IsCancelled() const
 {
-    return m_cancelEvent != nullptr && WaitForSingleObject(m_cancelEvent, 0) == WAIT_OBJECT_0;
+    return WaitForSingleObject(m_cancelEvent, 0) == WAIT_OBJECT_0;
 }
 
 void BuildImageCallback::CollapseWindow()
 {
     if (m_displayedLines > 0)
     {
-        WriteTerminal(std::format(L"\033[{}A\033[J", m_displayedLines));
+        wprintf(L"\033[%dA\033[J", m_displayedLines);
         m_displayedLines = 0;
     }
 
@@ -92,7 +87,7 @@ try
     {
         // Permanent line: collapse the scrolling window then print directly.
         CollapseWindow();
-        WriteTerminal(MultiByteToWide(status));
+        wprintf(L"%hs", status);
         return S_OK;
     }
 
@@ -101,7 +96,16 @@ try
     {
         if (*p == '\n')
         {
-            m_allLines.push_back(m_pendingLine);
+            // Store with the trailing newline so the byte count matches what is replayed.
+            // Cap retained log output to avoid unbounded growth on very long builds.
+            m_allLines.push_back(m_pendingLine + '\n');
+            m_allLinesBytes += m_allLines.back().size();
+            while (m_allLinesBytes > c_maxAllLinesBytes && !m_allLines.empty())
+            {
+                m_allLinesBytes -= m_allLines.front().size();
+                m_allLines.pop_front();
+            }
+
             m_lines.push_back(std::move(m_pendingLine));
             m_pendingLine.clear();
             if (m_lines.size() > c_maxDisplayLines)
@@ -207,7 +211,7 @@ void BuildImageCallback::Redraw()
 
     buffer += L"\033[22m\033[?25h";
 
-    WriteTerminal(buffer);
+    wprintf(L"%ls", buffer.c_str());
     m_displayedLines = displayCount;
 }
 
