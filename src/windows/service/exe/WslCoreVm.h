@@ -277,7 +277,7 @@ private:
     wsl::core::Config m_vmConfig;
     std::wstring m_comPipe0;
     std::wstring m_comPipe1;
-    int m_coldDiscardShiftSize;
+    int m_pageReportingOrder;
     WslTraceLoggingClient m_traceClient;
     std::filesystem::path m_rootFsPath;
     std::filesystem::path m_tempPath;

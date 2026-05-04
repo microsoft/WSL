@@ -32,6 +32,7 @@ using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wslc::ContainerPortMapping;
 using wsl::windows::service::wslc::IWSLCVolume;
+using wsl::windows::service::wslc::NetworkEntry;
 using wsl::windows::service::wslc::RelayedProcessIO;
 using wsl::windows::service::wslc::TypedHandle;
 using wsl::windows::service::wslc::unique_com_disconnect;
@@ -147,8 +148,17 @@ uint16_t AllocateEphemeralPort(int family, const char* address)
 
 // Builds port mapping list from container options and returns the network mode string.
 std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
-    std::vector<_WSLCPortMapping>& requestedPorts, WSLCContainerNetworkType networkType, WSLCVirtualMachine& virtualMachine)
+    std::vector<_WSLCPortMapping>& requestedPorts,
+    WSLCContainerNetworkType networkType,
+    WSLCVirtualMachine& virtualMachine,
+    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    LPCSTR containerNetworkName)
 {
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        containerNetworkName != nullptr && networkType != WSLCContainerNetworkTypeCustom,
+        "ContainerNetworkName must be null when network type is not Custom");
+
     // Determine network mode string.
     std::string networkMode;
     if (networkType == WSLCContainerNetworkTypeBridged)
@@ -162,6 +172,16 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
     else if (networkType == WSLCContainerNetworkTypeNone)
     {
         networkMode = "none";
+    }
+    else if (networkType == WSLCContainerNetworkTypeCustom)
+    {
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcContainerNetworkNameRequired(), !containerNetworkName || strlen(containerNetworkName) == 0);
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(containerNetworkName), !sessionNetworks.contains(containerNetworkName));
+
+        networkMode = containerNetworkName;
     }
     else
     {
@@ -186,8 +206,8 @@ std::pair<std::vector<ContainerPortMapping>, std::string> ProcessPortMappings(
 
         auto& entry = ports.emplace_back(VMPortMapping::FromWSLCPortMapping(e), e.ContainerPort);
 
-        // Only allocate port for bridged network. Host mode ports are allocated when the container starts.
-        if (networkType == WSLCContainerNetworkTypeBridged)
+        // Allocate VM ports for bridged and custom networks. Host mode ports are allocated when the container starts.
+        if (networkType == WSLCContainerNetworkTypeBridged || networkType == WSLCContainerNetworkTypeCustom)
         {
             entry.VmMapping.AssignVmPort(virtualMachine.AllocatePort(e.Family, e.Protocol));
         }
@@ -269,7 +289,17 @@ WSLCContainerNetworkType DockerNetworkModeToWSLCNetworkType(const std::string& m
         return WSLCContainerNetworkTypeNone;
     }
 
-    THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %hs", mode.c_str());
+    // Docker treats empty NetworkMode as the default (bridged).
+    if (mode.empty())
+    {
+        return WSLCContainerNetworkTypeBridged;
+    }
+
+    // Reject Docker special syntaxes (container:<id>, service:<name>, etc.);
+    // any plain name is treated as a user-defined custom network.
+    THROW_HR_IF_MSG(E_INVALIDARG, mode.find(':') != std::string::npos, "Unsupported Docker network mode: %hs", mode.c_str());
+
+    return WSLCContainerNetworkTypeCustom;
 }
 
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
@@ -372,6 +402,29 @@ void ValidateNamedVolumes(
                 Localization::MessageWslcVolumeNotFound(mount.Name),
                 !sessionVolumes.contains(mount.Name) && !anonymousVolumes.contains(mount.Name));
         }
+    }
+}
+
+void ConfigureLdPathForGpu(std::vector<std::string>& Env)
+{
+    static constexpr std::string_view ldLibraryPathPrefix = "LD_LIBRARY_PATH=";
+    auto it = std::ranges::find_if(Env, [](const std::string& e) { return e.starts_with(ldLibraryPathPrefix); });
+
+    if (it != Env.end())
+    {
+        // If the user already has an LD_LIBRARY_PATH, append the GPU library paths to it.
+        auto ldPath = it->substr(ldLibraryPathPrefix.size());
+        if (!ldPath.empty() && !ldPath.ends_with(":"))
+        {
+            it->append(":");
+        }
+
+        it->append(WSLCVirtualMachine::c_gpuLibrariesPath);
+    }
+    else
+    {
+        // Otherwise create a new entry.
+        Env.emplace_back(std::format("LD_LIBRARY_PATH={}", WSLCVirtualMachine::c_gpuLibrariesPath));
     }
 }
 
@@ -996,6 +1049,11 @@ void WSLCContainerImpl::Exec(const WSLCProcessOptions* Options, LPCSTR DetachKey
         request.DetachKeys = DetachKeys;
     }
 
+    if (WI_IsFlagSet(m_containerFlags, WSLCContainerFlagsGpu))
+    {
+        ConfigureLdPathForGpu(request.Env);
+    }
+
     try
     {
         auto result = m_dockerClient.CreateExec(m_id, request);
@@ -1142,6 +1200,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
+    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1319,6 +1378,27 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     ProcessNamedVolumes(containerOptions, sessionVolumes, request);
 
+    // Configure GPU support if requested.
+    if (WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsGpu))
+    {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            !virtualMachine.FeatureEnabled(WslcFeatureFlagsGPU),
+            "WSLCContainerFlagsGpu requires GPU support enabled on the session");
+
+        if (!request.HostConfig.Binds.has_value())
+        {
+            request.HostConfig.Binds = std::vector<std::string>{};
+        }
+
+        request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuLibrariesPath));
+        request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuDriversPath));
+
+        request.HostConfig.Devices.push_back({"/dev/dxg", "/dev/dxg", "rwm"});
+
+        ConfigureLdPathForGpu(request.Env);
+    }
+
     // Prepare port mappings from container options.
     std::vector<_WSLCPortMapping> ports;
     for (ULONG i = 0; i < containerOptions.PortsCount; i++)
@@ -1362,7 +1442,12 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     // Process port mappings from container options.
-    auto [mappedPorts, networkMode] = ProcessPortMappings(ports, containerOptions.ContainerNetwork.ContainerNetworkType, virtualMachine);
+    auto [mappedPorts, networkMode] = ProcessPortMappings(
+        ports,
+        containerOptions.ContainerNetwork.ContainerNetworkType,
+        virtualMachine,
+        sessionNetworks,
+        containerOptions.ContainerNetwork.ContainerNetworkName);
 
     request.HostConfig.NetworkMode = networkMode;
 
@@ -1470,7 +1555,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     {
         auto& inserted = ports.emplace_back(ContainerPortMapping{VMPortMapping::FromContainerMetaData(e), e.ContainerPort});
 
-        if (networkingMode == WSLCContainerNetworkTypeBridged)
+        if (networkingMode == WSLCContainerNetworkTypeBridged || networkingMode == WSLCContainerNetworkTypeCustom)
         {
             auto allocation = virtualMachine.TryAllocatePort(e.VmPort, e.Family, e.Protocol);
 

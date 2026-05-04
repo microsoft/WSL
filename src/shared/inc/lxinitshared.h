@@ -1251,7 +1251,6 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
     unsigned int SwapLun;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE SystemDistroDeviceType;
     unsigned int SystemDistroDeviceId;
-    int PageReportingOrder;
     LX_MINI_INIT_MEMORY_RECLAIM_MODE MemoryReclaimMode;
     // IPv4 address stored in network byte order
     uint32_t DnsTunnelingIpAddress = 0;
@@ -1269,7 +1268,6 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
         FIELD(SwapLun),
         FIELD(SystemDistroDeviceType),
         FIELD(SystemDistroDeviceId),
-        FIELD(PageReportingOrder),
         FIELD(MemoryReclaimMode),
         FIELD(DnsTunnelingIpAddress),
         FIELD(EnableDebugShell),

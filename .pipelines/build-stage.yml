@@ -32,12 +32,12 @@ parameters:
   - name: targets
     type: object
     default:
-      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslcsession;wslc;wsltests;wslcsdk;wslcsdkcs"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslcsession.exe,wslc.exe,wslcsdk.dll,wslcsdkcs.dll"
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslcsession;wslc;wsltests;wslcsdk"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslcsession.exe,wslc.exe,wslcsdk.dll"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
-      - target: "msipackage"
-        pattern: "wsl.msi"
+      - target: "msipackage;wslcsdkcs"
+        pattern: "wsl.msi,wslcsdkcs.dll"
 
   - name: pool
     type: string

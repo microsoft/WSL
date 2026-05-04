@@ -41,6 +41,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Entrypoint),
         Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile, false, NO_LIMIT),
+        Argument::Create(ArgType::Gpus),
         Argument::Create(ArgType::Hostname),
         Argument::Create(ArgType::Interactive),
         Argument::Create(ArgType::Label, false, NO_LIMIT),

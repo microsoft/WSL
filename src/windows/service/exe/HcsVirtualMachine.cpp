@@ -76,15 +76,21 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
     vmSettings.ComputeTopology.Processor.Count = Settings->CpuCount;
 
-    // Configure backing page size, fault cluster shift size, and cold discard hint size to favor density (lower vmmem usage).
+    // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
     //
-    // N.B. Cold discard hint size should be a multiple of the fault cluster shift size.
+    // N.B. Page reporting order must be >= fault cluster size shift.
     const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+    int pageReportingOrder;
     if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
     {
         vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
         vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;
         vmSettings.ComputeTopology.Memory.DirectMapFaultClusterSizeShift = 4;
+        pageReportingOrder = 5; // 128k
+    }
+    else
+    {
+        pageReportingOrder = 9; // 2MB
     }
 
     if (helpers::IsVmemmSuffixSupported() && Settings->DisplayName)
@@ -105,8 +111,8 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
 
-    // Enable timesync workaround to sync on resume from sleep in modern standby.
-    kernelCmdLine += L" hv_utils.timesync_implicit=1";
+    // Append common kernel parameters shared between WSL2 and WSLC.
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder);
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.

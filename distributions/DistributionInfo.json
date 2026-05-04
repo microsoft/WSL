@@ -6,12 +6,25 @@
                 "FriendlyName": "Ubuntu",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-wsl-amd64.wsl",
-                    "Sha256": "9b2f7730dc68227dd04a9f3e5eab86ad85caf556b8606ad94f1f29ff5c4fd3f5"
+                    "Url": "https://releases.ubuntu.com/26.04/ubuntu-26.04-wsl-amd64.wsl",
+                    "Sha256": "96c7f5fb28a7fe28245331f9bfbe4375f18dd29a4850116ad3c4f60f6700c55c"
                 },
                 "Arm64Url": {
-                    "Url": "https://cdimages.ubuntu.com/releases/24.04.4/release/ubuntu-24.04.4-wsl-arm64.wsl",
-                    "Sha256": "6b244d89f412a68f51e58f396fab65bed3b5896a25c045a99bef9c78a07df507"
+                    "Url": "https://cdimages.ubuntu.com/releases/26.04/release/ubuntu-26.04-wsl-arm64.wsl",
+                    "Sha256": "9fae7b65ac7be0ebb019987c922f1f1f1aaffb061834eb22e76a5e2a958dd3f6"
+                }
+            },
+            {
+                "Name": "Ubuntu-26.04",
+                "FriendlyName": "Ubuntu 26.04 LTS",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://releases.ubuntu.com/26.04/ubuntu-26.04-wsl-amd64.wsl",
+                    "Sha256": "96c7f5fb28a7fe28245331f9bfbe4375f18dd29a4850116ad3c4f60f6700c55c"
+                },
+                "Arm64Url": {
+                    "Url": "https://cdimages.ubuntu.com/releases/26.04/release/ubuntu-26.04-wsl-arm64.wsl",
+                    "Sha256": "9fae7b65ac7be0ebb019987c922f1f1f1aaffb061834eb22e76a5e2a958dd3f6"
                 }
             },
             {
@@ -192,8 +205,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2026.04.01.162669/archlinux-2026.04.01.162669.wsl",
-                    "Sha256": "c1c4387b89bbaf84a79084bc1c51caa54998cd8b0b241a3b4e1c0a89f239c9c5"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2026.05.01.165442/archlinux-2026.05.01.165442.wsl",
+                    "Sha256": "3cd6fbfd59b9ea1a3541366666223b429c7cbd2d0b38c22193021d40a93bf7e7"
                 }
             }
         ],

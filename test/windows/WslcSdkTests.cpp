@@ -2394,4 +2394,47 @@ class WslcSdkTests
         pullOptions.uri = "///invalid-registry-url///";
         VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &pullOptions, nullptr), E_INVALIDARG);
     }
+
+    WSLC_TEST_METHOD(ContainerGpu)
+    {
+        // Validate that creating a GPU container on a session without GPU support fails.
+        {
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsFlags(&containerSettings, WSLC_CONTAINER_FLAG_ENABLE_GPU));
+
+            UniqueContainer container;
+            VERIFY_ARE_EQUAL(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+        }
+
+        // Create a GPU-enabled session.
+        std::filesystem::path gpuStorage = m_storagePath / "wslc-gpu-session-storage";
+        auto cleanupStorage = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            std::error_code error;
+            std::filesystem::remove_all(gpuStorage, error);
+        });
+
+        WslcSessionSettings sessionSettings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"wslc-gpu-test", gpuStorage.c_str(), &sessionSettings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsFeatureFlags(&sessionSettings, WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU));
+
+        WslcVhdRequirements vhdReqs{};
+        vhdReqs.sizeBytes = 4096ull * 1024 * 1024;
+        vhdReqs.type = WSLC_VHD_TYPE_DYNAMIC;
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsVhd(&sessionSettings, &vhdReqs));
+
+        UniqueSession gpuSession;
+        VERIFY_SUCCEEDED(WslcCreateSession(&sessionSettings, &gpuSession, nullptr));
+        THROW_IF_FAILED(WslcLoadSessionImageFromFile(gpuSession.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
+
+        // Validate /dev/dxg is available and LD_LIBRARY_PATH is set via the container init command.
+        {
+            const char* initArgv[] = {"/bin/sh", "-c", "test -c /dev/dxg && echo $LD_LIBRARY_PATH"};
+
+            auto output = RunContainerAndCapture(
+                gpuSession.get(), "debian:latest", {initArgv[0], initArgv[1], initArgv[2]}, WSLC_CONTAINER_FLAG_ENABLE_GPU);
+
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "/usr/lib/wsl/lib\n");
+        }
+    }
 };
