@@ -44,8 +44,8 @@ class WSLCE2EContainerLogsTests
     WSLC_TEST_METHOD(WSLCE2E_Container_Logs_Tail)
     {
         // Run a container that outputs two lines
-        auto result = RunWslc(
-            std::format(L"container run --name {} {} sh -c \"echo line1 && echo line2\"", WslcContainerName, DebianImage.NameAndTag()));
+        auto result = RunWslc(std::format(
+            L"container run --name {} {} sh -c \"echo line1 && echo line2\"", WslcContainerName, DebianImage.NameAndTag()));
         result.Verify({.Stdout = L"line1\nline2\n", .Stderr = L"", .ExitCode = 0});
 
         // Verify --tail 1 only shows the last line
