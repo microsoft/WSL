@@ -265,9 +265,8 @@ struct ContainerConfig
     std::optional<std::vector<std::string>> Env;
     std::optional<std::vector<std::string>> Cmd;
     std::optional<std::vector<std::string>> Entrypoint;
-    std::optional<std::map<std::string, std::string>> Labels;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint);
 };
 
 struct InspectMount

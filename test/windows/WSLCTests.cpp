@@ -5573,15 +5573,18 @@ class WSLCTests
             const std::string envVar = "WSLC_TEST_VAR=hello";
             const std::string workDir = "/tmp";
 
-            WSLCContainerLauncher launcher("debian:latest", "test-container-inspect-config", {"sleep", "99999"}, {envVar});
+            WSLCContainerLauncher launcher("debian:latest", "test-container-inspect-config", {"99999"}, {envVar});
+            launcher.SetEntrypoint({"sleep"});
             launcher.SetWorkingDirectory(std::string{workDir});
 
             auto container = launcher.Launch(*m_defaultSession);
             auto details = container.Inspect();
 
-            VERIFY_IS_TRUE(details.Config.Env.has_value());
+            const auto& config = details.Config;
+
+            VERIFY_IS_TRUE(config.Env.has_value());
             bool envVarFound = false;
-            for (const auto& env : details.Config.Env.value())
+            for (const auto& env : *config.Env)
             {
                 if (env == envVar)
                 {
@@ -5590,7 +5593,18 @@ class WSLCTests
                 }
             }
             VERIFY_IS_TRUE(envVarFound);
-            VERIFY_ARE_EQUAL(details.Config.WorkingDir, workDir);
+
+            VERIFY_ARE_EQUAL(config.WorkingDir, workDir);
+
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_ARE_EQUAL(1u, config.Cmd->size());
+            VERIFY_ARE_EQUAL(config.Cmd->at(0), std::string{"99999"});
+
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(1u, config.Entrypoint->size());
+            VERIFY_ARE_EQUAL(config.Entrypoint->at(0), std::string{"sleep"});
+
+            VERIFY_ARE_EQUAL(config.User, std::string{});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
