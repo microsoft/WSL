@@ -18,7 +18,6 @@ Abstract:
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
-#include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
 using namespace wsl::windows::common::registry;
@@ -445,25 +444,58 @@ class WSLCTests
     };
 
     // Returns VM info (Id + Owner) for all running VMs via hcsdiag.
+    //
+    // Parses the default `hcsdiag list` text output rather than `-raw` because
+    // the JSON option is not available on older Windows builds (e.g. Win10 22H2).
+    // The text format is consistently:
+    //
+    //   <id>
+    //       <Type>, <State>, <Id>, <Owner>
+    //
+    // where the indented line is a comma-separated list (with arbitrary
+    // whitespace padding) common to every supported Windows version.
     static std::vector<VmInfo> ListVms()
     {
-        wsl::windows::common::SubProcess process(nullptr, L"hcsdiag list -raw");
-        auto output = process.RunAndCaptureOutput(10000);
+        wsl::windows::common::SubProcess process(nullptr, L"hcsdiag list");
+        const auto output = process.RunAndCaptureOutput(10000);
+
+        LogInfo("hcsdiag list exit=%lu stdout='%ws' stderr='%ws'", output.ExitCode, output.Stdout.c_str(), output.Stderr.c_str());
+
+        const auto trim = [](std::wstring_view text) {
+            constexpr auto whitespace = L" \t\r\n";
+            const auto first = text.find_first_not_of(whitespace);
+            if (first == std::wstring_view::npos)
+            {
+                return std::wstring{};
+            }
+
+            const auto last = text.find_last_not_of(whitespace);
+            return std::wstring{text.substr(first, last - first + 1)};
+        };
 
         std::vector<VmInfo> vms;
-        auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(output.Stdout), nullptr, false);
-        if (!json.is_array())
+        std::wistringstream stream(output.Stdout);
+        std::wstring line;
+        while (std::getline(stream, line))
         {
-            return vms;
-        }
-
-        for (const auto& entry : json)
-        {
-            if (entry.contains("Owner") && entry["Owner"].is_string() && entry.contains("Id") && entry["Id"].is_string())
+            // Only the indented detail line carries the comma-separated fields.
+            if (line.empty() || !std::iswspace(static_cast<wint_t>(line.front())))
             {
-                vms.push_back(
-                    {wsl::shared::string::MultiByteToWide(entry["Id"].get<std::string>()),
-                     wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>())});
+                continue;
+            }
+
+            std::vector<std::wstring> fields;
+            std::wistringstream lineStream(line);
+            std::wstring field;
+            while (std::getline(lineStream, field, L','))
+            {
+                fields.push_back(trim(field));
+            }
+
+            // Expected layout: {Type, State, Id, Owner}.
+            if (fields.size() >= 4 && !fields[2].empty())
+            {
+                vms.push_back({std::move(fields[2]), std::move(fields[3])});
             }
         }
 
