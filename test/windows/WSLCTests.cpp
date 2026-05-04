@@ -5584,16 +5584,7 @@ class WSLCTests
             const auto& config = details.Config;
 
             VERIFY_IS_TRUE(config.Env.has_value());
-            bool envVarFound = false;
-            for (const auto& env : *config.Env)
-            {
-                if (env == envVar)
-                {
-                    envVarFound = true;
-                    break;
-                }
-            }
-            VERIFY_IS_TRUE(envVarFound);
+            VERIFY_IS_TRUE(std::ranges::find(*config.Env, envVar) != config.Env->end());
 
             VERIFY_ARE_EQUAL(config.WorkingDir, workDir);
 
@@ -5606,9 +5597,6 @@ class WSLCTests
             VERIFY_ARE_EQUAL(config.Entrypoint->at(0), std::string{"sleep"});
 
             VERIFY_ARE_EQUAL(config.User, std::string{"nobody"});
-
-            VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
-            VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
         }
     }
 
