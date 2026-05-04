@@ -2646,6 +2646,9 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
   </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Number of lines to show from the end of the logs</value>
+  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>New image reference in the image-name[:tag] format</value>
   </data>

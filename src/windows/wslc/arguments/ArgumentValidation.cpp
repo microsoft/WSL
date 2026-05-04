@@ -40,6 +40,10 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
 
+    case ArgType::Tail:
+        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Tail>(), m_name);
+        break;
+
     case ArgType::Time:
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
