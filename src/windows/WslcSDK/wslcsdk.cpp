@@ -316,20 +316,15 @@ std::pair<wil::com_ptr<IWSLCSessionManager>, HRESULT> CreateSessionManagerRaw()
     HRESULT hr = CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&result));
     if (SUCCEEDED(hr))
     {
-        WSLCVersion minimumClientVersion{};
-        THROW_IF_FAILED(result->GetMinimumSupportedClientVersion(&minimumClientVersion));
+        const WSLCVersion clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        BOOL isSupported = FALSE;
+        THROW_IF_FAILED(result->IsClientVersionSupported(&clientVersion, &isSupported));
 
-        decltype(wsl::shared::PackageVersion) requiredClientVersion{
-            minimumClientVersion.Major, minimumClientVersion.Minor, minimumClientVersion.Revision};
-
-        if (requiredClientVersion > wsl::shared::PackageVersion)
+        if (!isSupported)
         {
             LOG_HR_MSG(
                 WSLC_E_SDK_UPDATE_NEEDED,
-                "WSLC SDK update required. Minimum supported version: %lu.%lu.%lu, current SDK version: %lu.%lu.%lu",
-                minimumClientVersion.Major,
-                minimumClientVersion.Minor,
-                minimumClientVersion.Revision,
+                "WSLC SDK update required. Current SDK version: %lu.%lu.%lu",
                 WSL_PACKAGE_VERSION_MAJOR,
                 WSL_PACKAGE_VERSION_MINOR,
                 WSL_PACKAGE_VERSION_REVISION);
