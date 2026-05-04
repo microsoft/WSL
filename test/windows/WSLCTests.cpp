@@ -446,13 +446,10 @@ class WSLCTests
     };
 
     // Returns VM info (Id + Owner) for all running compute systems via the HCS API.
-    //
-    // We call HcsEnumerateComputeSystems directly rather than shelling out to
-    // hcsdiag.exe because hcsdiag's `-raw` (JSON) flag is not supported on
-    // older in-box hcsdiag (e.g. Win10 22H2), and parsing its plain-text output
-    // is brittle (the comma-separated layout breaks if Owner contains commas).
     static std::vector<VmInfo> ListVms()
     {
+        const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
+
         auto operation = wsl::windows::common::hcs::CreateOperation();
         THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
 
@@ -463,7 +460,7 @@ class WSLCTests
         LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
 
         std::vector<VmInfo> vms;
-        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()), nullptr, false);
+        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()));
         if (!json.is_array())
         {
             return vms;
