@@ -394,7 +394,7 @@ try
             return;
         }
 
-        auto Value = UtilGetEnvironmentVariable(Query->Buffer);
+        auto Value = UtilGetEnvironmentVariable(wsl::shared::string::FromMessageBuffer<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Message));
         wsl::shared::MessageWriter<LX_INIT_QUERY_ENVIRONMENT_VARIABLE> Response(LxInitMessageQueryEnvironmentVariable);
         Response.WriteString(Value);
         Transaction.Send<LX_INIT_QUERY_ENVIRONMENT_VARIABLE>(Response.Span());
@@ -427,7 +427,8 @@ try
         }
         else
         {
-            success = CreateLoginSession(Config, CreateSession->Buffer, CreateSession->Uid);
+            success = CreateLoginSession(
+                Config, wsl::shared::string::FromMessageBuffer<LX_INIT_CREATE_LOGIN_SESSION>(Message), CreateSession->Uid);
         }
 
         break;
