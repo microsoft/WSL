@@ -5576,6 +5576,7 @@ class WSLCTests
             WSLCContainerLauncher launcher("debian:latest", "test-container-inspect-config", {"99999"}, {envVar});
             launcher.SetEntrypoint({"sleep"});
             launcher.SetWorkingDirectory(std::string{workDir});
+            launcher.SetUser("nobody");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto details = container.Inspect();
@@ -5604,7 +5605,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(1u, config.Entrypoint->size());
             VERIFY_ARE_EQUAL(config.Entrypoint->at(0), std::string{"sleep"});
 
-            VERIFY_ARE_EQUAL(config.User, std::string{});
+            VERIFY_ARE_EQUAL(config.User, std::string{"nobody"});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
