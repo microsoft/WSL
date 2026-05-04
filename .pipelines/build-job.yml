@@ -131,7 +131,7 @@ jobs:
       - script: _deps\nuget.exe restore -NonInteractive
 
       - ${{ each target in parameters.targets }}:
-          - script: cmake --build . --config Release --target ${{ target.target }} --verbose -- -m /bl:$(ob_outputDirectory)\binlogs\${{ parameters.platform }}-1.binlog
+          - script: cmake --build . --config Release --target ${{ target.target }} --verbose -- -m /bl:$(ob_outputDirectory)\binlogs\${{ parameters.platform }}-${{ target.target }}.binlog
             displayName: "Build ${{ target.target }} (${{ parameters.platform }})"
 
           - ${{ if eq(parameters.isRelease, true) }}:
@@ -197,7 +197,7 @@ jobs:
                           }
                       }
 
-      - script: cmake --build . --config Release --verbose -- -m /bl:$(ob_outputDirectory)\binlogs\${{ parameters.platform }}-2.binlog
+      - script: cmake --build . --config Release --verbose -- -m /bl:$(ob_outputDirectory)\binlogs\${{ parameters.platform }}-remaining-targets.binlog
         displayName: "Build remaining targets (${{ parameters.platform }})"
 
       - task: PowerShell@2
