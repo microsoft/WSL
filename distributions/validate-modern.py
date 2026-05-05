@@ -422,9 +422,9 @@ def read_tar(node, file, elf_magic: str):
 
             unexpected_keys = [e for e in keys if e.casefold() not in valid_keys]
             if unexpected_keys:
-                error(node, f'Found unexpected_keys in "{real_path}": {unexpected_keys}')
+                error(node, f'Found unexpected_keys in "{path}": {unexpected_keys}')
             else:
-                click.secho(f'Found valid keys in "{real_path}": {list(keys.keys())}')
+                click.secho(f'Found valid keys in "{path}": {list(keys.keys())}')
 
             return keys
 
