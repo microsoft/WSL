@@ -295,19 +295,6 @@ void WSLCVirtualMachine::Initialize()
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
 
-    // Configure cold discard hint size for page reporting.
-    // This sets the minimum order of pages that will be reported as free to the hypervisor.
-    {
-        const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
-        int pageReportingOrder = (windowsVersion.BuildNumber >= wsl::windows::common::helpers::WindowsBuildNumbers::Germanium) ? 5 : 9; // 128k or 2MB
-        auto cmdStr = std::format("echo {} > /sys/module/page_reporting/parameters/page_reporting_order", pageReportingOrder);
-        std::vector<const char*> args{"/bin/sh", "-c", cmdStr.c_str()};
-
-        WSLCProcessOptions options{};
-        options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
-        CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
-    }
-
     // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
     ConfigureNetworking();
 }

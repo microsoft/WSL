@@ -197,6 +197,7 @@ private:
     wil::unique_event m_dockerdReadyEvent{wil::EventOptions::ManualReset};
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
+    std::filesystem::path m_swapVhdPath;
 
     // N.B. m_lock must be acquired before acquiring m_volumesLock, m_containersLock, or m_networksLock.
     // These locks protect m_volumes / m_containers without requiring an exclusive m_lock.

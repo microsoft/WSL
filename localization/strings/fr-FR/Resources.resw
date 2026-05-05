@@ -2033,6 +2033,9 @@ Utilisation :
     <value>Le conteneur '{}' est introuvable.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
+    <value>Le nom du réseau de conteneurs est obligatoire pour le type de réseau personnalisé.</value>
+  </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Commande non reconnue : '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2577,6 +2580,14 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
     <value>Arguments à passer au processus d'initialisation du conteneur</value>
+  </data>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="all"}</comment>
+  </data>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Valeur {} non valide : « {} ». Seul « all » est pris en charge.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
     <value>Supprimez les images même si elles sont utilisées</value>

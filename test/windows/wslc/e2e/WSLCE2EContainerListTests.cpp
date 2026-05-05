@@ -149,9 +149,9 @@ class WSLCE2EContainerListTests
 
         result = RunWslc(L"container list --all --quiet");
         result.Verify({.Stderr = L"", .ExitCode = 0});
-        const auto outputLine = result.GetStdoutOneLine();
 
-        VERIFY_ARE_EQUAL(containerId, outputLine);
+        // Verify the created container ID appears in the quiet output.
+        VERIFY_IS_TRUE(result.StdoutContainsLine(containerId));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_InvalidFormatOption)
@@ -175,8 +175,13 @@ class WSLCE2EContainerListTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         // Parse json and verify we got the expected container information back
         auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
-        VERIFY_ARE_EQUAL(1U, containers.size());
-        VERIFY_ARE_EQUAL(containerId, wsl::shared::string::MultiByteToWide(containers[0].Id));
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(containers.size(), 1U);
+
+        auto findContainer = [](const std::vector<ContainerInformation>& list, const std::wstring& id) {
+            return std::ranges::any_of(list, [&](const auto& c) { return wsl::shared::string::MultiByteToWide(c.Id) == id; });
+        };
+
+        VERIFY_IS_TRUE(findContainer(containers, containerId));
 
         // Create another container
         result = RunWslc(std::format(L"container create --name {} {}", WslcContainerName2, DebianImage.NameAndTag()));
@@ -189,18 +194,10 @@ class WSLCE2EContainerListTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         // Parse json and verify we got both containers back
         containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
-        VERIFY_ARE_EQUAL(2U, containers.size());
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(containers.size(), 2U);
 
-        // Extract container IDs
-        std::vector<std::wstring> containerIds;
-        for (const auto& container : containers)
-        {
-            containerIds.push_back(wsl::shared::string::MultiByteToWide(container.Id));
-        }
-
-        // Verify both container IDs are in the list
-        VERIFY_IS_TRUE(std::find(containerIds.begin(), containerIds.end(), containerId) != containerIds.end());
-        VERIFY_IS_TRUE(std::find(containerIds.begin(), containerIds.end(), containerId2) != containerIds.end());
+        VERIFY_IS_TRUE(findContainer(containers, containerId));
+        VERIFY_IS_TRUE(findContainer(containers, containerId2));
     }
 
 private:

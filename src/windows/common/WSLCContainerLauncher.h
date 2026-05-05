@@ -74,6 +74,7 @@ public:
     void SetDefaultStopSignal(WSLCSignal Signal);
     void SetShmSize(ULONGLONG ShmSize);
     void SetContainerFlags(WSLCContainerFlags Flags);
+    void SetContainerNetworkName(std::string&& Name);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
     void SetDnsServers(std::vector<std::string>&& DnsServers);
@@ -94,6 +95,7 @@ private:
     std::deque<std::string> m_volumeNames;
     std::deque<std::string> m_containerPaths;
     WSLCContainerNetworkType m_containerNetworkType;
+    std::string m_containerNetworkName;
     std::vector<std::string> m_entrypoint;
     WSLCSignal m_stopSignal = WSLCSignalNone;
     ULONGLONG m_shmSize = 0;

@@ -48,6 +48,11 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
         break;
 
+    case ArgType::Tail:
+        validation::ValidateIntegerFromString<ULONGLONG>(
+            execArgs.GetAll<ArgType::Tail>(), m_name, [](auto value) { return value != 0; });
+        break;
+
     case ArgType::Time:
         validation::ValidateIntegerFromString<LONGLONG>(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
