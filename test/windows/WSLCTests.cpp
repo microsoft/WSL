@@ -2884,7 +2884,22 @@ class WSLCTests
         {
             auto result = ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"}, 0);
 
-            VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+            if (mode == WSLCNetworkingModeVirtioProxy)
+            {
+                // Virtio proxy points resolv.conf at the eth0 gateway.
+                ExpectCommandResult(
+                    session.get(),
+                    {"/bin/sh",
+                     "-c",
+                     "ns=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf); "
+                     "gw=$(ip route show default | awk '{print $3; exit}'); "
+                     "[ -n \"$ns\" ] && [ -n \"$gw\" ] && [ \"$ns\" = \"$gw\" ]"},
+                    0);
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+            }
         }
 
         // Verify DNS resolution.
