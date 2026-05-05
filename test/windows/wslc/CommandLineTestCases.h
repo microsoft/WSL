@@ -158,6 +158,8 @@ COMMAND_LINE_TEST_CASE(L"container logs --tail=10 cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs -n=10 cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --follow --tail 5 cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --tail abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs -n abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs -n=abc cont1", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs --tail", L"logs", false)
 COMMAND_LINE_TEST_CASE(L"container logs -n", L"logs", false)
 
