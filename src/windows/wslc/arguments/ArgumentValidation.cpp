@@ -41,7 +41,8 @@ void Argument::Validate(const ArgMap& execArgs) const
         break;
 
     case ArgType::Tail:
-        validation::ValidateIntegerFromString<ULONGLONG>(execArgs.GetAll<ArgType::Tail>(), m_name);
+        validation::ValidateIntegerFromString<ULONGLONG>(
+            execArgs.GetAll<ArgType::Tail>(), m_name, [](auto value) { return value != 0; });
         break;
 
     case ArgType::Time:
