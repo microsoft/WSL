@@ -201,4 +201,6 @@ bool TryAttachConsole();
 
 void RegisterWithDcat(_In_ bool IncludeVersionNumber = true);
 
+void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder);
+
 } // namespace wsl::windows::common::helpers

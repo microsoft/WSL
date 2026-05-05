@@ -223,7 +223,7 @@ struct HostConfig
     std::optional<std::vector<std::string>> DnsOptions;
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
-    std::vector<DeviceMapping> Devices;
+    std::optional<std::vector<DeviceMapping>> Devices;
 
     // Per-container resource limits. 0 means "no limit" (Docker default).
     std::int64_t Memory{};
