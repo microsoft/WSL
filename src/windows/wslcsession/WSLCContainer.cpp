@@ -1490,17 +1490,49 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
+    // When the user provides a name, use it directly. Otherwise, generate a random name
+    // and retry with increasing entropy on conflict (Docker returns 409 for duplicate names).
     std::optional<std::string> containerName;
     if (containerOptions.Name != nullptr)
     {
         containerName = containerOptions.Name;
     }
-    else
-    {
-        containerName = GenerateContainerName(0);
-    }
 
-    auto result = DockerClient.CreateContainer(request, containerName);
+    constexpr int c_maxNameRetries = 6;
+    CreatedContainer result;
+
+    for (int attempt = 0;; attempt++)
+    {
+        if (!containerName.has_value())
+        {
+            if (attempt < c_maxNameRetries)
+            {
+                containerName = GenerateContainerName(attempt);
+            }
+            else
+            {
+                // Fallback to a random hex name, mirroring Docker's fallback to truncated container ID.
+                containerName = GenerateRandomHexName();
+            }
+        }
+
+        try
+        {
+            result = DockerClient.CreateContainer(request, containerName);
+            break;
+        }
+        catch (const DockerHTTPException& e)
+        {
+            // Only retry on name conflict (409) for auto-generated names.
+            if (e.StatusCode() == 409 && containerOptions.Name == nullptr && attempt < c_maxNameRetries)
+            {
+                containerName.reset();
+                continue;
+            }
+
+            throw;
+        }
+    }
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.

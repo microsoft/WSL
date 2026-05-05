@@ -64,4 +64,24 @@ inline std::string GenerateContainerName(int retry)
     return name;
 }
 
+// Generate a random 12-character hex string as a fallback name.
+// Mirrors Docker's fallback to truncated container ID when all human-readable retries are exhausted.
+inline std::string GenerateRandomHexName()
+{
+    std::random_device rd;
+    std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned short> random(rd());
+
+    std::array<unsigned short, 6> randomBytes;
+    std::generate(randomBytes.begin(), randomBytes.end(), random);
+
+    std::string name;
+    name.reserve(randomBytes.size() * 2);
+    for (auto b : randomBytes)
+    {
+        std::format_to(std::back_inserter(name), "{:02x}", static_cast<BYTE>(b));
+    }
+
+    return name;
+}
+
 } // namespace wsl::windows::service::wslc
