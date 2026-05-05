@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
 #include "WSLCNetworkMetadata.h"
+#include "ContainerNameGenerator.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -1636,20 +1637,45 @@ try
     {
         std::scoped_lock lock(m_containersLock, m_volumesLock, m_networksLock);
 
-        // Collect existing container names for local conflict checking.
-        std::unordered_set<std::string> existingNames;
-        for (const auto& c : m_containers)
+        // Generate a unique container name if the user didn't provide one.
+        // The lock is held, so m_containers is our authoritative view of existing names.
+        std::string generatedName;
+        auto options = *containerOptions;
+        if (options.Name == nullptr)
         {
-            existingNames.insert(c->Name());
+            std::unordered_set<std::string> existingNames;
+            for (const auto& c : m_containers)
+            {
+                existingNames.insert(c->Name());
+            }
+
+            constexpr int c_maxNameRetries = 6;
+            for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
+            {
+                generatedName = GenerateContainerName(attempt);
+                if (!existingNames.contains(generatedName))
+                {
+                    break;
+                }
+
+                generatedName.clear();
+            }
+
+            // Fallback to a random hex name, mirroring Docker's fallback to truncated container ID.
+            if (generatedName.empty())
+            {
+                generatedName = GenerateRandomHexName();
+            }
+
+            options.Name = generatedName.c_str();
         }
 
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
-            *containerOptions,
+            options,
             *this,
             m_virtualMachine.value(),
             m_volumes,
             m_networks,
-            existingNames,
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),

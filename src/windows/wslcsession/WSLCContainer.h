@@ -129,7 +129,6 @@ public:
         WSLCVirtualMachine& virtualMachine,
         const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& SessionVolumes,
         const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
-        const std::unordered_set<std::string>& ExistingContainerNames,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,

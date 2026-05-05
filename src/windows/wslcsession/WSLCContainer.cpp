@@ -21,7 +21,6 @@ Abstract:
 #include "WSLCContainer.h"
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
-#include "ContainerNameGenerator.h"
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
@@ -1208,7 +1207,6 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
-    const std::unordered_set<std::string>& existingContainerNames,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1491,61 +1489,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
-    // When the user provides a name, use it directly. Otherwise, generate a random name
-    // and retry with increasing entropy on conflict (Docker returns 409 for duplicate names).
-    std::optional<std::string> containerName;
-    if (containerOptions.Name != nullptr)
-    {
-        containerName = containerOptions.Name;
-    }
-
-    constexpr int c_maxNameRetries = 6;
-    CreatedContainer result;
-
-    if (containerOptions.Name != nullptr)
-    {
-        // User-provided name: no retry, let Docker return 409 on conflict.
-        result = DockerClient.CreateContainer(request, containerName);
-    }
-    else
-    {
-        // Generate a unique name. Check against known container names locally first to avoid
-        // unnecessary HTTP round-trips, then fall back to Docker's 409 response for conflicts
-        // not tracked locally (e.g., containers from external tools or other sessions).
-        for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
-        {
-            containerName = GenerateContainerName(attempt);
-
-            // Skip names that are known to conflict locally.
-            if (existingContainerNames.contains(containerName.value()))
-            {
-                containerName.reset();
-                continue;
-            }
-
-            try
-            {
-                result = DockerClient.CreateContainer(request, containerName);
-                break;
-            }
-            catch (const DockerHTTPException& e)
-            {
-                if (e.StatusCode() != 409)
-                {
-                    throw;
-                }
-            }
-
-            containerName.reset();
-        }
-
-        // Fallback to a random hex name, mirroring Docker's fallback to truncated container ID.
-        if (!containerName.has_value())
-        {
-            containerName = GenerateRandomHexName();
-            result = DockerClient.CreateContainer(request, containerName);
-        }
-    }
+    auto result =
+        DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
