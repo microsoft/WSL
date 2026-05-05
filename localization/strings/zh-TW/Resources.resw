@@ -2652,6 +2652,9 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>建置映像的標記</value>
   </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Number of lines to show from the end of the logs</value>
+  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>影像名稱[:tag] 格式中的新影像參考</value>
   </data>
@@ -2741,6 +2744,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>無效的 {} 值: {} 不是可辨識的訊號名稱或數字 (例如: SIGKILL、kill 或 9)。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Invalid {} argument value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
