@@ -2652,6 +2652,9 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Etiqueta para la imagen compilada</value>
   </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Número de líneas que se mostrarán desde el final de los registros</value>
+  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nueva referencia de imagen en formato image-name[:tag]</value>
   </data>
@@ -2741,6 +2744,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Valor {} no válido: {} no es un nombre o número de señal reconocido (ejemplo: SIGKILL, kill o 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Invalid {} argument value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">

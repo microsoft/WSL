@@ -2027,7 +2027,7 @@ Gebruik:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Container network name is required for custom network type.</value>
+    <value>De netwerknaam van de container is verplicht voor een aangepast netwerktype.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Niet-herkende opdracht: '{}'</value>
@@ -2646,6 +2646,9 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag voor de gebouwde installatiekopie</value>
   </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Aantal regels dat moet worden weergegeven vanaf het einde van de logboeken</value>
+  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nieuwe afbeeldingsverwijzing in de indeling image-name[:tag]</value>
   </data>
@@ -2735,6 +2738,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Ongeldige {}-waarde: {} is geen herkende signaalnaam of -getal (voorbeeld: SIGKILL, kill of 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Ongeldige {} parameterwaarde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">

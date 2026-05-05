@@ -2652,6 +2652,9 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag für das erstellte Image</value>
   </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Anzahl der Zeilen, die vom Ende der Protokolle angezeigt werden sollen</value>
+  </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Neue Bildreferenz im Format image-name[:tag]</value>
   </data>
@@ -2741,6 +2744,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Ungültiger {}-Wert: {} ist kein bekannter Signalname oder keine bekannte Zahl (Beispiel: SIGKILL, kill oder 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Ungültiger {}-Argumentwert: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
