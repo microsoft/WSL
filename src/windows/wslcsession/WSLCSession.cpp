@@ -110,6 +110,50 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
     return wslcInspect;
 }
 
+using wsl::windows::service::wslc::c_descriptors;
+using wsl::windows::service::wslc::c_mountains;
+
+// Generate a random container name in the format "descriptor_mountain".
+// When retry > 0, appends a random digit (0-9) to reduce collisions.
+std::string GenerateContainerName(int retry)
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::uniform_int_distribution<size_t> leftDist(0, c_descriptors.size() - 1);
+    std::uniform_int_distribution<size_t> rightDist(0, c_mountains.size() - 1);
+
+    auto name = std::string(c_descriptors[leftDist(gen)]) + "_" + c_mountains[rightDist(gen)];
+
+    if (retry > 0)
+    {
+        std::uniform_int_distribution<int> digitDist(0, 9);
+        name += std::to_string(digitDist(gen));
+    }
+
+    return name;
+}
+
+// Generate a random 12-character hex string as a fallback name.
+// Mirrors Docker's fallback to truncated container ID when all human-readable retries are exhausted.
+std::string GenerateRandomHexName()
+{
+    std::random_device rd;
+    std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned short> random(rd());
+
+    std::array<unsigned short, 6> randomBytes;
+    std::generate(randomBytes.begin(), randomBytes.end(), random);
+
+    std::string name;
+    name.reserve(randomBytes.size() * 2);
+    for (auto b : randomBytes)
+    {
+        std::format_to(std::back_inserter(name), "{:02x}", static_cast<BYTE>(b));
+    }
+
+    return name;
+}
+
 } // namespace
 
 namespace wsl::windows::service::wslc {
