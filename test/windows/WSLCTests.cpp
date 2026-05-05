@@ -445,7 +445,7 @@ class WSLCTests
         std::wstring Owner;
     };
 
-    // Returns VM info (Id + Owner) for all running compute systems via the HCS API.
+    // Returns VM info (Id + Owner) for all compute systems via the HCS API.
     static std::vector<VmInfo> ListVms()
     {
         const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
