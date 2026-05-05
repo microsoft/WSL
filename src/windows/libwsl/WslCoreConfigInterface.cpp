@@ -94,7 +94,7 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
     case SwapSizeBytes:
         static_assert(std::is_same<decltype(wslConfigSetting.UInt64Value), decltype(wslConfig->Config.SwapSizeBytes)>::value);
         wslConfigSetting.UInt64Value = wslConfig->Config.SwapSizeBytes;
-        return wslConfigSetting;
+        break;
     case SwapFilePath:
         static_assert(std::is_same<decltype(wslConfigSetting.StringValue), decltype(wslConfig->Config.SwapFilePath.c_str())>::value);
         wslConfigSetting.StringValue = wslConfig->Config.SwapFilePath.c_str();

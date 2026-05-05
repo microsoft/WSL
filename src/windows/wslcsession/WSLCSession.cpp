@@ -757,17 +757,19 @@ try
         return "  [" + name + "] ";
     };
 
-    auto reportProgress = [&](const std::string& message) {
+    auto reportProgress = [&](const std::string& message, const char* id = "") {
         if (ProgressCallback != nullptr)
         {
-            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), "", 0, 0));
+            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), id, 0, 0));
         }
     };
+
+    static constexpr char c_logId[] = "log";
 
     auto flushLine = [&]() {
         if (needsNewline)
         {
-            reportProgress("\n");
+            reportProgress("\n", c_logId);
             needsNewline = false;
         }
     };
@@ -835,13 +837,13 @@ try
                     // so it terminates/overwrites cleanly without a spurious prefix.
                     if (needsNewline && (decoded[0] == '\n' || decoded[0] == '\r'))
                     {
-                        reportProgress(decoded.substr(0, 1));
+                        reportProgress(decoded.substr(0, 1), c_logId);
                         decoded.erase(0, 1);
                     }
 
                     if (!decoded.empty())
                     {
-                        reportProgress(IndentLines(decoded, logPrefix(it->second)));
+                        reportProgress(IndentLines(decoded, logPrefix(it->second)), c_logId);
                     }
 
                     needsNewline = !decoded.empty() && decoded.back() != '\n';
@@ -931,6 +933,14 @@ try
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
+    // Strip \r from the error output. The captured docker output sometimes contains
+    // \r\n line endings (e.g., in the Dockerfile context BuildKit prints on failure).
+    // When the CRT writes stderr in text mode it translates each \n to \r\n, turning
+    // \r\n into \r\r\n. cmd.exe's 2> writes that as-is (one line break), but
+    // PowerShell's 2> treats it as two line breaks and double-spaces the output.
+    // Stripping \r normalizes to plain \n which becomes \r\n once via text-mode
+    // translation.
+    std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 
     return S_OK;

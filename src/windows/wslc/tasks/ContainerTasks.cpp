@@ -435,6 +435,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerId = context.Args.Get<ArgType::ContainerId>();
     bool follow = context.Args.Contains(ArgType::Follow);
-    ContainerService::Logs(session, WideToMultiByte(containerId), follow);
+
+    ULONGLONG tail = 0;
+    if (context.Args.Contains(ArgType::Tail))
+    {
+        tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
+    }
+
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow, tail);
 }
 } // namespace wsl::windows::wslc::task

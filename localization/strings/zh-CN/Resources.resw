@@ -2033,7 +2033,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Container network name is required for custom network type.</value>
+    <value>自定义网络类型需要容器网络名称。</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>无法识别的命令:“{}”</value>

@@ -2033,7 +2033,7 @@ Verwendung:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Container network name is required for custom network type.</value>
+    <value>Für den benutzerdefinierten Netzwerktyp ist ein Containernetzwerkname erforderlich.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Nicht erkannter Befehl: „{}“</value>
