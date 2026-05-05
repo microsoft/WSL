@@ -460,11 +460,18 @@ try
 {
     RETURN_HR_IF(E_POINTER, ClientVersion == nullptr || IsSupported == nullptr);
 
+    WSL_LOG(
+        "ClientVersionCheck",
+        TraceLoggingValue(ClientVersion->Major, "Major"),
+        TraceLoggingValue(ClientVersion->Minor, "Minor"),
+        TraceLoggingValue(ClientVersion->Revision, "Revision"));
+
     constexpr std::tuple<uint32_t, uint32_t, uint32_t> c_minClientVersion{2, 9, 0};
 
     const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{ClientVersion->Major, ClientVersion->Minor, ClientVersion->Revision};
 
-    *IsSupported = (clientVersion >= c_minClientVersion) ? TRUE : FALSE;
+    // For now set 2.9.0 as the floor version. Also support if the client version exactly matches ours to cover builds before 2.9.0.
+    *IsSupported = (clientVersion >= c_minClientVersion || wsl::shared::PackageVersion == clientVersion);
 
     return S_OK;
 }
