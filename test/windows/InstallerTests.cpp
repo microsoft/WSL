@@ -1125,6 +1125,4 @@ class InstallerTests
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
     }
-
-   
 };
