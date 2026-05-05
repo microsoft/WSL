@@ -124,7 +124,9 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::InitialAutoProxyTimeout, InitialAutoProxyTimeout),
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
-        ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug)};
+        ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
+        ConfigKey(ConfigSetting::Experimental::Swiotlb, SwiotlbCfg),
+};
 
     wil::unique_file ConfigFile;
     if (ConfigFilePath != nullptr)

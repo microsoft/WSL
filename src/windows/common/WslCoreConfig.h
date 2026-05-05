@@ -289,6 +289,7 @@ namespace ConfigSetting {
         static constexpr auto IgnoredPorts = "experimental.ignoredPorts";
         static constexpr auto HostAddressLoopback = "experimental.hostAddressLoopback";
         static constexpr auto SetVersionDebug = "experimental.setVersionDebug";
+        static constexpr auto Swiotlb = "experimental.swiotlb";
 
     } // namespace Experimental
 } // namespace ConfigSetting
@@ -381,5 +382,6 @@ struct Config
 
     GUID NatNetworkId() const noexcept;
     LPCWSTR NatNetworkName() const noexcept;
+    std::wstring SwiotlbCfg;
 };
 } // namespace wsl::core

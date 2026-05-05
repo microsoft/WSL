@@ -857,6 +857,15 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
     const auto virtiofsInitialized = Admin ? m_adminDrvfsToken.is_valid() : m_drvfsToken.is_valid();
     if (m_vmConfig.EnableVirtioFs && !virtiofsInitialized)
     {
+        std::wstring mountOptions = TEXT(LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS);
+        // If provided, pass the swiotlb configuration from the user to virtiofs
+        // similar to mount options, using control configuration tokens, that
+        // are stripped from the mount options string prior to mount options parsing.
+        if (!m_vmConfig.SwiotlbCfg.empty())
+        {
+            mountOptions += TEXT(LX_INIT_MOUNT_CONFIG_OPTION_SWIOTLB) + m_vmConfig.SwiotlbCfg;
+        }
+
         // Add virtiofs devices associating indices with paths from the fixed drive bitmap. These devices support
         // multiple mounts in the guest, so this only needs to be done once.
         auto fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives(UserToken).first;
@@ -865,7 +874,7 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
             ULONG index;
             WI_VERIFY(_BitScanForward(&index, fixedDrives) != FALSE);
             const wchar_t fixedDrivePath[] = {gsl::narrow_cast<wchar_t>(L'A' + index), L':', L'\\', L'\0'};
-            AddVirtioFsShare(Admin, fixedDrivePath, TEXT(LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS), UserToken);
+            AddVirtioFsShare(Admin, fixedDrivePath, mountOptions.c_str(), UserToken);
             fixedDrives ^= (1 << index);
         }
     }
@@ -1571,6 +1580,12 @@ std::wstring WslCoreVm::GenerateConfigJson()
     if (m_vmConfig.EnableVirtio9p || m_vmConfig.EnableVirtioFs || m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
     {
         kernelCmdLine += L" swiotlb=force";
+
+        // Add the swiotlb configuration kernel command line parameter.
+        if (!m_vmConfig.SwiotlbCfg.empty())
+        {
+            kernelCmdLine += L" hv_pci_swiotlb=" + m_vmConfig.SwiotlbCfg;
+        }
     }
 
     if (IsVirtioSerialConsoleSupported())

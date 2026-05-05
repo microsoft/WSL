@@ -162,6 +162,7 @@ Abstract:
 //
 
 #define LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS ";uid=1000;gid=1000;symlinkroot=/mnt/"
+#define LX_INIT_MOUNT_CONFIG_OPTION_SWIOTLB ";swiotlb="
 
 #define LX_INIT_UTILITY_VM_CREATE_PROCESS_SOCKET_COUNT (5)
 
