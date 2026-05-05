@@ -28,7 +28,10 @@ using namespace wsl::windows::wslc::models;
 namespace wsl::windows::wslc::validation {
 
 template <typename T>
-void ValidateIntegerFromString(const std::vector<std::wstring>& values, const std::wstring& argName, const std::function<bool(T)>& validate = [](T) { return true; })
+void ValidateIntegerFromString(
+    const std::vector<std::wstring>& values, const std::wstring& argName, const std::function<bool(T)>& validate = [](T) {
+        return true;
+    })
 {
     for (const auto& value : values)
     {
