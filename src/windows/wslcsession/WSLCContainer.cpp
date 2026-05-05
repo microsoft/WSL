@@ -1208,6 +1208,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    const std::unordered_set<std::string>& existingContainerNames,
     std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -1501,38 +1502,29 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     constexpr int c_maxNameRetries = 6;
     CreatedContainer result;
 
-    for (int attempt = 0;; attempt++)
+    if (containerOptions.Name == nullptr)
     {
+        // Generate a unique name, checking against known container names locally before
+        // calling Docker to avoid unnecessary HTTP round-trips on conflicts.
+        for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
+        {
+            containerName = GenerateContainerName(attempt);
+            if (!existingContainerNames.contains(containerName.value()))
+            {
+                break;
+            }
+
+            containerName.reset();
+        }
+
+        // Fallback to a random hex name, mirroring Docker's fallback to truncated container ID.
         if (!containerName.has_value())
         {
-            if (attempt < c_maxNameRetries)
-            {
-                containerName = GenerateContainerName(attempt);
-            }
-            else
-            {
-                // Fallback to a random hex name, mirroring Docker's fallback to truncated container ID.
-                containerName = GenerateRandomHexName();
-            }
-        }
-
-        try
-        {
-            result = DockerClient.CreateContainer(request, containerName);
-            break;
-        }
-        catch (const DockerHTTPException& e)
-        {
-            // Only retry on name conflict (409) for auto-generated names.
-            if (e.StatusCode() == 409 && containerOptions.Name == nullptr && attempt < c_maxNameRetries)
-            {
-                containerName.reset();
-                continue;
-            }
-
-            throw;
+            containerName = GenerateRandomHexName();
         }
     }
+
+    result = DockerClient.CreateContainer(request, containerName);
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.

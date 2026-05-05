@@ -1636,12 +1636,20 @@ try
     {
         std::scoped_lock lock(m_containersLock, m_volumesLock, m_networksLock);
 
+        // Collect existing container names for local conflict checking.
+        std::unordered_set<std::string> existingNames;
+        for (const auto& c : m_containers)
+        {
+            existingNames.insert(c->Name());
+        }
+
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
             *containerOptions,
             *this,
             m_virtualMachine.value(),
             m_volumes,
             m_networks,
+            existingNames,
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
