@@ -21,6 +21,7 @@ Abstract:
 #include "WSLCContainer.h"
 #include "WSLCProcess.h"
 #include "WSLCProcessIO.h"
+#include "ContainerNameGenerator.h"
 
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::docker_schema::ErrorResponse;
@@ -1489,8 +1490,17 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
-    auto result =
-        DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
+    std::optional<std::string> containerName;
+    if (containerOptions.Name != nullptr)
+    {
+        containerName = containerOptions.Name;
+    }
+    else
+    {
+        containerName = GenerateContainerName(0);
+    }
+
+    auto result = DockerClient.CreateContainer(request, containerName);
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
