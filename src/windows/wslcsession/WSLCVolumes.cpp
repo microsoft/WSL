@@ -65,13 +65,24 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
 
 void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t)
 {
+    auto lock = m_lock.lock_exclusive();
+
+    // If this event matches the next self-initiated operation we are waiting to observe, the
+    // map mutation has already been applied by CreateVolume / DeleteVolume. Just pop the event and
+    // skip updating m_volumes.
+    if (!m_expectedEvents.empty() && m_expectedEvents.front().first == volumeName && m_expectedEvents.front().second == event)
+    {
+        m_expectedEvents.pop_front();
+        return;
+    }
+
     if (event == VolumeEvent::Create)
     {
-        OpenVolume(volumeName);
+        OpenVolumeExclusiveLockHeld(volumeName);
     }
     else if (event == VolumeEvent::Destroy)
     {
-        OnVolumeDeleted(volumeName);
+        OnVolumeDeletedExclusiveLockHeld(volumeName);
     }
 }
 
@@ -107,6 +118,9 @@ WSLCVolumeInformation WSLCVolumes::CreateVolume(
     auto [it, inserted] = m_volumes.insert({name, std::move(volume)});
     WI_VERIFY(inserted);
 
+    // Record that we initiated this create so OnVolumeEvent ignores the matching docker event.
+    m_expectedEvents.emplace_back(name, VolumeEvent::Create);
+
     return info;
 }
 
@@ -121,6 +135,9 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
 
     it->second->Delete();
     m_volumes.erase(it);
+
+    // Record that we initiated this destroy so OnVolumeEvent ignores the matching docker event.
+    m_expectedEvents.emplace_back(Name, VolumeEvent::Destroy);
 }
 
 std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes() const
@@ -154,28 +171,23 @@ bool WSLCVolumes::ContainsVolume(const std::string& Name) const
     return m_volumes.contains(Name);
 }
 
-void WSLCVolumes::OpenVolume(const std::string& VolumeName)
+__requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const std::string& volumeName)
 {
-    auto lock = m_lock.lock_exclusive();
-
-    if (VolumeName.empty() || m_volumes.contains(VolumeName))
+    if (volumeName.empty() || m_volumes.contains(volumeName))
     {
         return;
     }
 
     try
     {
-        auto vol = m_dockerClient.InspectVolume(VolumeName);
-        OpenVolumeExclusiveLockHeld(vol);
+        OpenVolumeExclusiveLockHeld(m_dockerClient.InspectVolume(volumeName));
     }
-    CATCH_LOG_MSG("Failed to open volume: %hs", VolumeName.c_str());
+    CATCH_LOG_MSG("Failed to open volume: %hs", volumeName.c_str());
 }
 
-void WSLCVolumes::OnVolumeDeleted(const std::string& VolumeName)
+__requires_lock_held(m_lock) void WSLCVolumes::OnVolumeDeletedExclusiveLockHeld(const std::string& volumeName)
 {
-    auto lock = m_lock.lock_exclusive();
-
-    auto it = m_volumes.find(VolumeName);
+    auto it = m_volumes.find(volumeName);
     if (it != m_volumes.end())
     {
         it->second->OnDeleted();

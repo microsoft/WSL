@@ -18,7 +18,6 @@ Abstract:
 #include "WSLCVolumeMetadata.h"
 #include "DockerHTTPClient.h"
 #include "DockerEventTracker.h"
-#include <unordered_map>
 
 namespace wsl::windows::service::wslc {
 
@@ -47,14 +46,15 @@ public:
     bool ContainsVolume(_In_ const std::string& Name) const;
 
 private:
-    void OpenVolume(_In_ const std::string& VolumeName);
     __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const wsl::windows::common::docker_schema::Volume& vol);
+    __requires_lock_held(m_lock) void OpenVolumeExclusiveLockHeld(const std::string& volumeName);
+    __requires_lock_held(m_lock) void OnVolumeDeletedExclusiveLockHeld(const std::string& volumeName);
 
     void OnVolumeEvent(const std::string& volumeName, VolumeEvent event, std::uint64_t eventTime);
-    void OnVolumeDeleted(_In_ const std::string& VolumeName);
 
     mutable wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>> m_volumes;
+    _Guarded_by_(m_lock) std::deque<std::pair<std::string, VolumeEvent>> m_expectedEvents;
 
     DockerHTTPClient& m_dockerClient;
     WSLCVirtualMachine& m_virtualMachine;
