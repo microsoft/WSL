@@ -24,6 +24,27 @@ constexpr auto c_ipStrings = {"ip", "ip6"};
 
 const char* c_loopbackInterfaceName = "lo";
 
+namespace {
+
+// Validates that an interface name is safe to interpolate into a shell command line
+// (i.e. as an argument to UtilExecCommandLine, which uses popen()). The Linux kernel
+// only rejects interface names that are empty, ".", "..", contain '/' or whitespace,
+// or are >= IFNAMSIZ; characters like ';', '$', '&', '|', '`', '(', ')', '<', '>',
+// '*', '?', backslash, and quotes are all permitted at the kernel level but are
+// shell metacharacters. This helper enforces a stricter allowlist that covers all
+// real-world interface names (eth0, eth0.100, eth0:1, br-abc, veth-abc123, etc.)
+// while rejecting any character that could alter shell parsing.
+void ValidateInterfaceNameForShell(std::string_view name)
+{
+    constexpr std::string_view c_allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:@-";
+    if (name.empty() || name.find_first_not_of(c_allowed) != std::string_view::npos)
+    {
+        throw RuntimeErrorWithSourceLocation(std::format("Interface name contains characters not safe for shell interpolation: '{}'", name));
+    }
+}
+
+} // namespace
+
 GnsEngine::GnsEngine(
     wsl::shared::SocketChannel& channel,
     const NotificationRoutine& notificationRoutine,
@@ -640,6 +661,10 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
     {
         auto interfaceNetFilterRequest = wsl::shared::FromJson<wsl::shared::hns::InterfaceNetFilterRequest>(payload->Json.c_str());
         auto interface = OpenInterfaceOrAdapter(interfaceNetFilterRequest.targetDeviceName);
+
+        // The interface name is interpolated into nft command lines run via popen() below.
+        // Reject names containing shell metacharacters before any UtilExecCommandLine call.
+        ValidateInterfaceNameForShell(interface.Name());
 
         GNS_LOG_INFO(
             "LxGnsMessageInterfaceNetFilter for interface {} {{operation={}, startPort={}, endPort={}}}",
