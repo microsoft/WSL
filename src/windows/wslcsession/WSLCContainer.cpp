@@ -1502,16 +1502,38 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     constexpr int c_maxNameRetries = 6;
     CreatedContainer result;
 
-    if (containerOptions.Name == nullptr)
+    if (containerOptions.Name != nullptr)
     {
-        // Generate a unique name, checking against known container names locally before
-        // calling Docker to avoid unnecessary HTTP round-trips on conflicts.
+        // User-provided name: no retry, let Docker return 409 on conflict.
+        result = DockerClient.CreateContainer(request, containerName);
+    }
+    else
+    {
+        // Generate a unique name. Check against known container names locally first to avoid
+        // unnecessary HTTP round-trips, then fall back to Docker's 409 response for conflicts
+        // not tracked locally (e.g., containers from external tools or other sessions).
         for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
         {
             containerName = GenerateContainerName(attempt);
-            if (!existingContainerNames.contains(containerName.value()))
+
+            // Skip names that are known to conflict locally.
+            if (existingContainerNames.contains(containerName.value()))
             {
+                containerName.reset();
+                continue;
+            }
+
+            try
+            {
+                result = DockerClient.CreateContainer(request, containerName);
                 break;
+            }
+            catch (const DockerHTTPException& e)
+            {
+                if (e.StatusCode() != 409)
+                {
+                    throw;
+                }
             }
 
             containerName.reset();
@@ -1521,10 +1543,9 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         if (!containerName.has_value())
         {
             containerName = GenerateRandomHexName();
+            result = DockerClient.CreateContainer(request, containerName);
         }
     }
-
-    result = DockerClient.CreateContainer(request, containerName);
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.
