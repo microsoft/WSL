@@ -158,10 +158,6 @@ function Collect-FilesToFormat {
         [string[]]$ModifiedFiles = $null
     )
     process {
-        if (-not (Test-Path -Path $Path)) {
-            Write-Host -ForegroundColor Red "Item not found: $Path"
-            return @()
-        }
         $Path = Resolve-Path $Path
         $files = [System.Collections.Generic.List[string]]::new()
         if ((Get-Item -Path $Path) -is [System.IO.DirectoryInfo]) {
