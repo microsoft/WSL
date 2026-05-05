@@ -7,6 +7,15 @@
   <resources minRequiredRevision="0.1" fallbackCulture="en-US"/>
   <categories>
     <category name="WSL" displayName="$(string.WindowsSubsystemForLinux)"/>
+    <category name="WSLContainers" displayName="$(string.WSLContainers)">
+      <parentCategory ref="WSL" />
+    </category>
+    <category name="WSLContainerCLI" displayName="$(string.WSLContainerCLI)">
+      <parentCategory ref="WSLContainers" />
+    </category>
+    <category name="WSLContainerAPI" displayName="$(string.WSLContainerAPI)">
+      <parentCategory ref="WSLContainers" />
+    </category>
   </categories>
   <policies>
     <policy name="AllowWSL" class="Machine" displayName="$(string.AllowWSL)" explainText="$(string.AllowWSLExplain)" key="Software\Policies\WSL" valueName="AllowWSL">
@@ -169,6 +178,61 @@
           </item>
         </enum>
       </elements>
+    </policy>
+
+    <!-- WSL Container CLI Policies -->
+
+    <policy name="AllowWSLContainerCLI" class="Machine" displayName="$(string.AllowWSLContainerCLI)" explainText="$(string.AllowWSLContainerCLIExplain)" key="Software\Policies\WSL" valueName="AllowWSLContainerCLI">
+      <parentCategory ref="WSLContainerCLI" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="WSLContainerCLIRegistryAllowlist" class="Machine" displayName="$(string.WSLContainerCLIRegistryAllowlist)" explainText="$(string.WSLContainerCLIRegistryAllowlistExplain)" presentation="$(presentation.WSLContainerCLIRegistryAllowlist)" key="Software\Policies\WSL">
+      <parentCategory ref="WSLContainerCLI" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <elements>
+        <text id="WSLContainerCLIRegistryAllowlist_Input" valueName="WSLContainerCLIRegistryAllowlist" />
+      </elements>
+    </policy>
+
+    <policy name="WSLContainerCLIRegistryBlocklist" class="Machine" displayName="$(string.WSLContainerCLIRegistryBlocklist)" explainText="$(string.WSLContainerCLIRegistryBlocklistExplain)" presentation="$(presentation.WSLContainerCLIRegistryBlocklist)" key="Software\Policies\WSL">
+      <parentCategory ref="WSLContainerCLI" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <elements>
+        <text id="WSLContainerCLIRegistryBlocklist_Input" valueName="WSLContainerCLIRegistryBlocklist" />
+      </elements>
+    </policy>
+
+    <!-- WSL Container API Policies -->
+
+    <policy name="AllowWindowsAppsRunLinuxContainers" class="Machine" displayName="$(string.AllowWindowsAppsRunLinuxContainers)" explainText="$(string.AllowWindowsAppsRunLinuxContainersExplain)" key="Software\Policies\WSL" valueName="AllowWindowsAppsRunLinuxContainers">
+      <parentCategory ref="WSLContainerAPI" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <!-- WSL Distribution Access Policy -->
+
+    <policy name="AllowWSLDistributionAccess" class="Machine" displayName="$(string.AllowWSLDistributionAccess)" explainText="$(string.AllowWSLDistributionAccessExplain)" key="Software\Policies\WSL" valueName="AllowWSLDistributionAccess">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
     </policy>
 
   </policies>

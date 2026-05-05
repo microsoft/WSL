@@ -49,10 +49,45 @@
         <string id="NetworkingModeNAT">NAT</string>
         <string id="NetworkingModeMirrored">Mirrored</string>
         <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <string id="WSLContainers">WSL Containers</string>
+        <string id="WSLContainerCLI">WSL Container CLI</string>
+        <string id="WSLContainerAPI">WSL Container API</string>
+
+        <string id="AllowWSLContainerCLI">Allow WSL Container CLI</string>
+        <string id="AllowWSLContainerCLIExplain">This policy controls whether the WSL Container CLI (wslc.exe) can be used on this machine. When enabled or not configured, users can use the WSL Container CLI. When set to disabled, the WSL Container CLI is blocked for all users.</string>
+
+        <string id="WSLContainerCLIRegistryAllowlist">Allowlist for WSL container CLI registries</string>
+        <string id="WSLContainerCLIRegistryAllowlistExplain">When enabled, the WSL Container CLI will only be allowed to pull images from the registries listed here. Specify registries as a semicolon-separated list of hostnames (e.g. "registry1.example.com;registry2.example.com").
+
+If the allowlist is non-empty, only images from listed registries can be pulled. If an image's registry appears in both the allowlist and the blocklist, it will be blocked.</string>
+
+        <string id="WSLContainerCLIRegistryBlocklist">Blocklist for WSL container CLI registries</string>
+        <string id="WSLContainerCLIRegistryBlocklistExplain">When enabled, the WSL Container CLI will be unable to pull images from the registries listed here. Specify registries as a semicolon-separated list of hostnames (e.g. "registry1.example.com;registry2.example.com").
+
+If an image's registry appears in both the allowlist and the blocklist, it will be blocked.</string>
+
+        <string id="AllowWindowsAppsRunLinuxContainers">Allow Windows apps to run Linux containers</string>
+        <string id="AllowWindowsAppsRunLinuxContainersExplain">This policy controls whether Windows applications can run Linux containers as part of their runtime. When enabled or not configured, Windows apps can run Linux containers. When set to disabled, Windows apps cannot run Linux containers.
+
+Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+
+        <string id="AllowWSLDistributionAccess">Allow WSL distribution access</string>
+        <string id="AllowWSLDistributionAccessExplain">This policy controls whether users can install and interact with distributions in WSL (e.g. install and use Ubuntu, etc.). When enabled or not configured, users can access WSL distributions. When set to disabled, distribution access is blocked. Users will still be able to use containers.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">
         <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Default Networking Mode</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerCLIRegistryAllowlist">
+        <textBox refId="WSLContainerCLIRegistryAllowlist_Input">
+          <label>Allowed registries (semicolon-separated)</label>
+        </textBox>
+      </presentation>
+      <presentation id="WSLContainerCLIRegistryBlocklist">
+        <textBox refId="WSLContainerCLIRegistryBlocklist_Input">
+          <label>Blocked registries (semicolon-separated)</label>
+        </textBox>
       </presentation>
     </presentationTable>
   </resources>
