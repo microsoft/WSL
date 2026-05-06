@@ -805,7 +805,7 @@ Mer information om Admin Protection finns på https://aka.ms/apdevguide</value>
     <value>Öppna EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Den här distributionen innehåller inget standardnamn. Använd --name för att välja distributionsnamnet.</value>
+    <value>Den här distributionen innehåller inget standardnamn. Använd --name för att välja distributionsnamn.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">

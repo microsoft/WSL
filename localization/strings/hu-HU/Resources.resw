@@ -805,7 +805,7 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
     <value>Eseménynapló megnyitása</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Ez a terjesztés nem tartalmaz alapértelmezett nevet. A terjesztési név kiválasztásához használja a --name .</value>
+    <value>Ez a disztribúció nem tartalmaz alapértelmezett nevet. A --name segítségével válassza ki a disztribúció nevét.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">

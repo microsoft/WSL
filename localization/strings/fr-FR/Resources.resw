@@ -812,7 +812,7 @@ Pour plus d’informations sur Admin Protection, veuillez consulter https://aka.
     <value>Ouvrir EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Cette distribution ne contient pas de nom par défaut. Utilisez --name pour choisir le nom de distribution.</value>
+    <value>Cette distribution ne contient pas de nom par défaut. Utilisez --name pour choisir le nom de la distribution.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">

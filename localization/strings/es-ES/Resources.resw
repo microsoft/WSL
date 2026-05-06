@@ -811,7 +811,7 @@ Para obtener más información sobre Admin Protection, visite https://aka.ms/apd
     <value>Abrir EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Esta distribución no contiene un nombre predeterminado. Use --name para elegir el nombre de distribución.</value>
+    <value>Esta distribución no contiene un nombre predeterminado. Use --name para elegir el nombre de la distribución.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">

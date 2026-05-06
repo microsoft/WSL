@@ -169,7 +169,7 @@
     <value>提供的安裝位置已在使用中。</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>具有所提供名稱的發佈已經存在。使用 --name 選擇不同的名稱。</value>
+    <value>具有所提供名稱的發佈已經存在。使用 --name 選擇其他名稱。</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -811,7 +811,7 @@ Windows 版本： {}</value>
     <value>開啟 EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>此發佈不包含預設名稱。使用 --name 來選擇發佈名稱。</value>
+    <value>此發佈不包含預設名稱。使用 --name 選擇散發名稱。</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">

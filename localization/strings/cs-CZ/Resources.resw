@@ -169,7 +169,7 @@ Nainstalovat pomocí souboru wsl.exe {} &lt;Distro&gt;.
     <value>Zadané umístění instalace je již používáno.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Distribuce se zadaným názvem již existuje. Pomocí --name zvolte jiný název.</value>
+    <value>Distribuce se zadaným názvem už existuje. Pomocí --name zvolte jiný název.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
