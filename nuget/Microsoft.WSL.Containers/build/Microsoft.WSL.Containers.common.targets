@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-    <Target Name="WSLCSDK_ErrorNoPlatform" BeforeTargets="PrepareForBuild" Condition="'$(WSLCSDK_Platform)' == ''">
+    <Target Name="WSLCSDK_ErrorNoPlatform" BeforeTargets="PrepareForBuild" Condition="'$(WSLCSDK_Platform)' == '' AND '$(DesignTimeBuild)' != 'true'">
         <Error Text="wslcsdk.dll could not be copied because the AnyCPU platform is being used. Please specify a platform to copy this file, using either RuntimeIdentifier, an architecture specific Platform, or explicitly with WSLCSDK_Platform." />
     </Target>
 
+    <Target Name="WSLCSDK_ErrorInvalidPlatform" BeforeTargets="PrepareForBuild" Condition="'$(WSLCSDK_Platform)' != '' AND '$(WSLCSDK_Platform)' != 'x64' AND '$(WSLCSDK_Platform)' != 'arm64' AND '$(DesignTimeBuild)' != 'true'">
+        <Error Text="WSLCSDK_Platform '$(WSLCSDK_Platform)' is not supported. Supported values: x64, arm64." />
+    </Target>
+
     <ItemGroup>
-        <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\runtimes\win-$(WSLCSDK_Platform)\wslcsdk.dll" />
+        <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\runtimes\win-$(WSLCSDK_Platform)\native\wslcsdk.dll" />
     </ItemGroup>
 
     <!-- ================================================================== -->
@@ -61,7 +65,7 @@
              XML entities: &quot; = "  &lt; = <  &gt; = >  -->
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
-               Text="WslcImage The item value '%(WslcImage.Identity)' must be a valid file name." />
+               Text="WslcImage item '%(WslcImage.Identity)' must be a valid file name." />
     </Target>
 
     <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:

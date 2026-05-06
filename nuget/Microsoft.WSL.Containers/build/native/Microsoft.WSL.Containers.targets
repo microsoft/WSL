@@ -16,7 +16,7 @@
                 %(AdditionalDependencies)
             </AdditionalDependencies>
             <AdditionalLibraryDirectories>
-                $(MSBuildThisFileDirectory)..\..\runtimes\win-$(Platform);
+                $(MSBuildThisFileDirectory)..\..\runtimes\win-$(WSLCSDK_Platform);
                 %(AdditionalLibraryDirectories)
             </AdditionalLibraryDirectories>
         </Link>
