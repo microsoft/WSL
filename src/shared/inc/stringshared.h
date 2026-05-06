@@ -47,6 +47,7 @@ using MacAddress = std::array<std::uint8_t, 6>;
 inline unsigned int CopyToSpan(const std::string_view String, const gsl::span<gsl::byte> Span, size_t& Offset)
 {
     gsl::copy(as_bytes(gsl::make_span(String.data(), String.size())), Span.subspan(Offset));
+    Span[Offset + String.size()] = gsl::byte{0};
     const auto PreviousOffset = gsl::narrow_cast<unsigned int>(Offset);
     Offset += String.size() + 1;
     return PreviousOffset;

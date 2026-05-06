@@ -358,6 +358,25 @@ void WSLCSession::ConfigureStorage(const WSLCSessionInitSettings& Settings, PSID
     // Mount the device to /root.
     m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
 
+    // Configure swap on a separate ephemeral VHD.
+    if (Settings.SwapSizeMb > 0)
+    {
+        try
+        {
+            m_swapVhdPath = storagePath / "swap.vhdx";
+            DeleteFileW(m_swapVhdPath.c_str()); // Remove stale swap from prior run
+            wsl::core::filesystem::CreateVhd(m_swapVhdPath.c_str(), static_cast<ULONGLONG>(Settings.SwapSizeMb) * _1MB, UserSid, false, false);
+
+            auto [_, swapDevice] = m_virtualMachine->AttachDisk(m_swapVhdPath.c_str(), false);
+
+            // Fire-and-forget: mkswap + swapon runs asynchronously since swap is best-effort.
+            auto cmd = std::format("/usr/sbin/mkswap {0} && /usr/sbin/swapon {0}", swapDevice);
+            ServiceProcessLauncher launcher("/bin/sh", {"/bin/sh", "-c", cmd});
+            launcher.Launch(*m_virtualMachine);
+        }
+        CATCH_LOG()
+    }
+
     deleteVhdOnFailure.release();
 }
 
@@ -739,17 +758,19 @@ try
         return "  [" + name + "] ";
     };
 
-    auto reportProgress = [&](const std::string& message) {
+    auto reportProgress = [&](const std::string& message, const char* id = "") {
         if (ProgressCallback != nullptr)
         {
-            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), "", 0, 0));
+            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), id, 0, 0));
         }
     };
+
+    static constexpr char c_logId[] = "log";
 
     auto flushLine = [&]() {
         if (needsNewline)
         {
-            reportProgress("\n");
+            reportProgress("\n", c_logId);
             needsNewline = false;
         }
     };
@@ -817,13 +838,13 @@ try
                     // so it terminates/overwrites cleanly without a spurious prefix.
                     if (needsNewline && (decoded[0] == '\n' || decoded[0] == '\r'))
                     {
-                        reportProgress(decoded.substr(0, 1));
+                        reportProgress(decoded.substr(0, 1), c_logId);
                         decoded.erase(0, 1);
                     }
 
                     if (!decoded.empty())
                     {
-                        reportProgress(IndentLines(decoded, logPrefix(it->second)));
+                        reportProgress(IndentLines(decoded, logPrefix(it->second)), c_logId);
                     }
 
                     needsNewline = !decoded.empty() && decoded.back() != '\n';
@@ -913,6 +934,14 @@ try
 
     int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
+    // Strip \r from the error output. The captured docker output sometimes contains
+    // \r\n line endings (e.g., in the Dockerfile context BuildKit prints on failure).
+    // When the CRT writes stderr in text mode it translates each \n to \r\n, turning
+    // \r\n into \r\r\n. cmd.exe's 2> writes that as-is (one line break), but
+    // PowerShell's 2> treats it as two line breaks and double-spaces the output.
+    // Stripping \r normalizes to plain \n which becomes \r\n once via text-mode
+    // translation.
+    std::erase(allOutput, '\r');
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 
     return S_OK;
@@ -1606,12 +1635,13 @@ try
 
     try
     {
-        std::lock_guard lock(m_containersLock);
+        std::scoped_lock lock(m_containersLock, m_networksLock);
 
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
             *containerOptions,
             *this,
             m_virtualMachine.value(),
+            m_networks,
             std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -2146,8 +2176,9 @@ try
     }
     catch (const DockerHTTPException& e)
     {
+        // Docker returns 403 when the network has active endpoints.
         THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), e.StatusCode() == 409);
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), Localization::MessageWslcNetworkInUse(name), e.StatusCode() == 403);
         THROW_HR_WITH_USER_ERROR_IF(WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(name), e.StatusCode() == 404);
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to delete network '%hs'", name.c_str());
     }
@@ -2381,6 +2412,13 @@ try
     m_dockerdProcess.reset();
     m_containerdProcess.reset();
     m_virtualMachine.reset();
+
+    // Delete the ephemeral swap VHD now that the VM is gone.
+    if (!m_swapVhdPath.empty())
+    {
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_swapVhdPath.c_str()));
+        m_swapVhdPath.clear();
+    }
 
     m_terminated = true;
     return S_OK;
