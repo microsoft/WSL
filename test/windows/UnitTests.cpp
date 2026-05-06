@@ -6654,5 +6654,20 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             -1);
     }
 
+    WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
+    {
+        auto revert = EnableSystemd();
+        VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+
+        // Kill the WSL init process
+        LxsstuLaunchWsl(L"kill -9 2");
+
+        Sleep(3000);
+
+        // Verify that a new WSL command succeeds (the distro restarts cleanly).
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
+        VERIFY_ARE_EQUAL(out, L"hello\n");
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests

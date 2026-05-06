@@ -160,6 +160,8 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config);
 
 wil::unique_fd UnmarshalConsoleFromServer(int MessageFd, LXBUS_IPC_CONSOLE_ID ConsoleId);
 
+int WslInitWatcher(int Argc, char** Argv);
+
 int WslEntryPoint(int Argc, char* Argv[])
 {
     //
@@ -221,6 +223,10 @@ int WslEntryPoint(int Argc, char* Argv[])
         else if (strcmp(BaseName, LX_INIT_WSL_USER_GENERATOR) == 0)
         {
             ExitCode = GenerateUserSystemdUnits(Argc, Argv);
+        }
+        else if (strcmp(BaseName, LX_INIT_WSL_INIT_WATCHER) == 0)
+        {
+            ExitCode = WslInitWatcher(Argc, Argv);
         }
         else
         {
@@ -2397,6 +2403,24 @@ Return Value:
         }
 
         //
+        // Fork a watcher process that monitors WSL init and tears down
+        // the PID namespace if it exits unexpectedly.
+        //
+
+        const auto wslInitPid = std::to_string(getpid());
+        const int WatcherPid = fork();
+        if (WatcherPid < 0)
+        {
+            FATAL_ERROR("fork failed {}", errno);
+        }
+        else if (WatcherPid == 0)
+        {
+            execl(LX_INIT_PATH, LX_INIT_WSL_INIT_WATCHER, wslInitPid.c_str(), nullptr);
+            LOG_ERROR("execl({}) failed {}", LX_INIT_WSL_INIT_WATCHER, errno);
+            _exit(1);
+        }
+
+        //
         // Keep track of the new pid for WSL init.
         //
 
@@ -3488,4 +3512,33 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
             LOG_ERROR("{} failed to start within {}ms", INIT_PATH, Config.BootInitTimeout);
         }
     }
+}
+
+int WslInitWatcher(int Argc, char** Argv)
+{
+    // Keep this as simple as possible. Log is not used.
+
+    prctl(PR_SET_NAME, LX_INIT_WSL_INIT_WATCHER, 0, 0, 0);
+
+    if (Argc < 2)
+    {
+        _exit(1);
+    }
+
+    const pid_t WslInitPid = std::stoi(Argv[1]);
+
+    const int pidfd = syscall(__NR_pidfd_open, WslInitPid, 0);
+    if (pidfd < 0)
+    {
+        _exit(1);
+    }
+
+    pollfd pfd{pidfd, POLLIN, 0};
+    while (poll(&pfd, 1, -1) < 0 && errno == EINTR)
+    {
+    }
+
+    // Teardown the current PID namespace. Not shutting down the VM.
+    reboot(RB_POWER_OFF);
+    _exit(1);
 }
