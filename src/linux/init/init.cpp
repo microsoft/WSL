@@ -2415,7 +2415,7 @@ Return Value:
         }
         else if (WatcherPid == 0)
         {
-            execl(LX_INIT_PATH, LX_INIT_WSL_INIT_WATCHER, wslInitPid.c_str(), nullptr);
+            execl(LX_INIT_PATH, LX_INIT_WSL_INIT_WATCHER, wslInitPid.c_str(), static_cast<char*>(nullptr));
             LOG_ERROR("execl({}) failed {}", LX_INIT_WSL_INIT_WATCHER, errno);
             _exit(1);
         }
@@ -3525,17 +3525,28 @@ int WslInitWatcher(int Argc, char** Argv)
         _exit(1);
     }
 
-    const pid_t WslInitPid = std::stoi(Argv[1]);
+    char* end = nullptr;
+    const long parsed = strtol(Argv[1], &end, 10);
+    if (end == Argv[1] || *end != '\0' || parsed <= 0 || parsed != static_cast<pid_t>(parsed))
+    {
+        _exit(1);
+    }
+    const pid_t wslInitPid = static_cast<pid_t>(parsed);
 
-    const int pidfd = syscall(__NR_pidfd_open, WslInitPid, 0);
+    const int pidfd = syscall(__NR_pidfd_open, wslInitPid, 0);
     if (pidfd < 0)
     {
         _exit(1);
     }
 
     pollfd pfd{pidfd, POLLIN, 0};
-    while (poll(&pfd, 1, -1) < 0 && errno == EINTR)
+    int rc;
+    while ((rc = poll(&pfd, 1, -1)) < 0 && errno == EINTR)
     {
+    }
+    if (rc <= 0 || (pfd.revents & POLLIN) == 0)
+    {
+        _exit(1);
     }
 
     // Teardown the current PID namespace. Not shutting down the VM.
