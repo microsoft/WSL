@@ -1150,6 +1150,12 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
         }
     }
 
+    wslcInspect.Config.Env = dockerInspect.Config.Env;
+    wslcInspect.Config.Cmd = dockerInspect.Config.Cmd;
+    wslcInspect.Config.Entrypoint = dockerInspect.Config.Entrypoint;
+    wslcInspect.Config.User = dockerInspect.Config.User;
+    wslcInspect.Config.WorkingDir = dockerInspect.Config.WorkingDir;
+
     // Map WSLC port mappings (Windows host ports only). HostIp is not set here and will use
     // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
     for (const auto& e : m_mappedPorts)
@@ -1324,6 +1330,11 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         }
 
         request.HostConfig.Ulimits = std::move(ulimits);
+    }
+
+    if (containerOptions.ShmSize > 0)
+    {
+        request.HostConfig.ShmSize = containerOptions.ShmSize;
     }
 
     if (containerOptions.VolumesCount > 0)

@@ -32,7 +32,7 @@ stages:
     dependsOn: [build_x64, build_arm64]
     jobs:
       - job: package
-        displayName: "Create msixbundle & appxupload"
+        displayName: "Package WSL release artifacts"
         timeoutInMinutes: 60
 
         ${{ if eq(parameters.pool, '') }}:

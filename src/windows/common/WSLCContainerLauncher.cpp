@@ -129,6 +129,11 @@ void WSLCContainerLauncher::SetDefaultStopSignal(WSLCSignal Signal)
     m_stopSignal = Signal;
 }
 
+void WSLCContainerLauncher::SetShmSize(ULONGLONG ShmSize)
+{
+    m_shmSize = ShmSize;
+}
+
 void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
 {
     m_entrypoint = std::move(entrypoint);
@@ -283,6 +288,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
     options.Flags = m_containerFlags;
+    options.ShmSize = m_shmSize;
 
     if (!entrypointStorage.empty())
     {
@@ -354,7 +360,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.UlimitsCount = static_cast<ULONG>(m_ulimits.size());
     options.Ulimits = m_ulimits.size() > 0 ? m_ulimits.data() : nullptr;
 
-    // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
+    // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
     auto result = Session.CreateContainer(&options, &container);
     if (FAILED(result))
