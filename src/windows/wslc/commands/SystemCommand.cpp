@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    SystemCommand.h
+    SystemCommand.cpp
 
 Abstract:
 
-    Declaration of System command tree.
+    Definition of System command tree.
 
 --*/
 #include "CLIExecutionContext.h"
