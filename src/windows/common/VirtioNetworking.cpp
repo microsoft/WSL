@@ -228,6 +228,12 @@ void VirtioNetworking::RefreshGuestConnection()
 
     appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
     appendOption(L"client_mac", networkSettings->MacAddress);
+    // uint32_t net_mask = UINT32_MAX << (32 - networkSettings->PreferredIpAddress.PrefixLength);
+    ULONG net_mask;
+    if (ConvertLengthToIpv4Mask(networkSettings->PreferredIpAddress.PrefixLength, &net_mask) == 0) {
+        auto net_mask_string = std::format(L"{}.{}.{}.{}", net_mask & 0xFF, (net_mask >> 8) & 0xFF, (net_mask >> 16) & 0xFF, (net_mask >> 24) & 0xFF);
+        appendOption(L"netmask", net_mask_string);
+    }
 
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);

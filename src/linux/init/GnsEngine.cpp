@@ -490,6 +490,7 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
                 gelnic.Name().c_str());
             manager.InitializeLoopbackConfiguration(gelnic);
 
+/*
             if (createDeviceRequest.disableLoopbackMirroring)
             {
                 // Masquerade loopback-sourced traffic that gets forwarded to non-loopback interfaces.
@@ -514,6 +515,7 @@ std::tuple<bool, int> GnsEngine::ProcessNextMessage(wsl::shared::Transaction& tr
             WriteToFile("/proc/sys/net/ipv4/conf/default/route_localnet", "1");
             WriteToFile("/proc/sys/net/ipv4/conf/eth0/route_localnet", "1");
 
+*/
             break;
         }
         default:
