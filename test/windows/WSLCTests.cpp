@@ -1030,12 +1030,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(LoadImage)
     {
-        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
-        // TODO: Remove once the fix is available.
-        if (IsWindowsServer())
-        {
-            SKIP_TEST_UNSTABLE();
-        }
+        SKIP_TEST_SERVER();
 
         std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
         wil::unique_handle imageTarFileHandle{
@@ -1126,12 +1121,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ImportImage)
     {
-        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
-        // TODO: Remove once the fix is available.
-        if (IsWindowsServer())
-        {
-            SKIP_TEST_UNSTABLE();
-        }
+        SKIP_TEST_SERVER();
 
         auto cleanup =
             wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
@@ -2756,6 +2746,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(BuildImageStuckCallbackCancellation)
     {
+        SKIP_TEST_SERVER();
+
         class StuckBuildProgressCallback
             : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
         {
