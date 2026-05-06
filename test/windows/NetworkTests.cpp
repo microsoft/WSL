@@ -4815,6 +4815,16 @@ class VirtioProxyTests
         }
     }
 
+    WSL2_TEST_METHOD(ValidateMacAddress)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        // eth0 should have wsldevicehost's default client MAC. Update if that default changes.
+        VERIFY_ARE_EQUAL(GetMacAddress(L"eth0"), std::wstring(L"00:00:00:00:01:00"));
+    }
+
     WSL2_TEST_METHOD(GuestPortIsReleased)
     {
         VIRTIOPROXY_TEST_ONLY();
