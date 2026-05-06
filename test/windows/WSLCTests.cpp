@@ -6502,7 +6502,8 @@ class WSLCTests
                     launcher.AddPort(1265, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
 
                     // TODO: Update error code once changed in virtionet.
-                    VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, E_FAIL);
+                    auto container = launcher.Create(*session);
+                    VERIFY_ARE_EQUAL(container.Get().Start(WSLCContainerStartFlagsNone, nullptr), E_FAIL);
                     ValidateCOMErrorMessage(L"Failed to map port '1.1.1.1:1265/tcp', Unspecified error ");
                 }
             }

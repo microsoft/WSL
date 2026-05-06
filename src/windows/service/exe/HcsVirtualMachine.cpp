@@ -604,8 +604,7 @@ try
 
     *AllocatedHostPort = 0;
 
-    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(
-        wsl::shared::string::MultiByteToWide(ListenAddress));
+    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
 
     listenAddr.Ipv4.sin_port = HostPort;
 
@@ -623,11 +622,9 @@ try
 {
     RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
 
-    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(
-        wsl::shared::string::MultiByteToWide(ListenAddress));
+    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(ListenAddress));
 
     listenAddr.Ipv4.sin_port = HostPort;
-
 
     std::lock_guard lock(m_lock);
 
