@@ -373,6 +373,11 @@ public:
         return fd;
     }
 
+    int* addressof() noexcept
+    {
+        return &m_Fd;
+    }
+
     friend void swap(unique_fd& fd1, unique_fd& fd2)
     {
         std::swap(fd1.m_Fd, fd2.m_Fd);

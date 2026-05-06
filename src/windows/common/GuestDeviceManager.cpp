@@ -9,6 +9,15 @@ GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ 
 {
 }
 
+GuestDeviceManager::~GuestDeviceManager()
+{
+    try
+    {
+        m_deviceHostSupport->Shutdown();
+    }
+    CATCH_LOG()
+}
+
 _Requires_lock_not_held_(m_lock)
 GUID GuestDeviceManager::AddGuestDevice(
     _In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Options, _In_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken)
@@ -40,18 +49,20 @@ GUID GuestDeviceManager::AddHdvShareWithOptions(
         if (!server)
         {
             server = wil::CoCreateInstance<IPlan9FileSystem>(ImplementationClsid, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
-            AddRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag.c_str(), server);
+            m_deviceHostSupport->AddRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag.c_str(), server);
         }
 
         THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), Path, Flags));
     }
 
     // This requires more privileges than the user may have, so impersonation is disabled.
-    return AddNewDevice(DeviceId, server, AccessName);
+    return m_deviceHostSupport->AddNewDevice(DeviceId, server, AccessName);
 }
 
+_Requires_lock_not_held_(m_lock)
 GUID GuestDeviceManager::AddNewDevice(_In_ const GUID& deviceId, _In_ const wil::com_ptr<IPlan9FileSystem>& server, _In_ PCWSTR tag)
 {
+    auto guestDeviceLock = m_lock.lock_exclusive();
     return m_deviceHostSupport->AddNewDevice(deviceId, server, tag);
 }
 
@@ -135,9 +146,9 @@ wil::com_ptr<IPlan9FileSystem> GuestDeviceManager::GetRemoteFileSystem(_In_ REFC
     return m_deviceHostSupport->GetRemoteFileSystem(clsid, tag);
 }
 
-void GuestDeviceManager::Shutdown()
-try
+_Requires_lock_not_held_(m_lock)
+void GuestDeviceManager::RemoveGuestDevice(_In_ const GUID& DeviceId, _In_ const GUID& InstanceId)
 {
-    m_deviceHostSupport->Shutdown();
+    auto guestDeviceLock = m_lock.lock_exclusive();
+    m_deviceHostSupport->RemoveDevice(DeviceId, InstanceId);
 }
-CATCH_LOG()

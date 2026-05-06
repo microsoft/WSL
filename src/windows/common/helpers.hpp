@@ -153,6 +153,12 @@ bool IsPackageInstalled(_In_ LPCWSTR PackageFamilyName);
 
 bool IsServicePresent(_In_ LPCWSTR ServiceName);
 
+bool IsServiceRunning(_In_ LPCWSTR ServiceName);
+
+bool IsVirtioSerialConsoleSupported();
+
+bool IsVmemmSuffixSupported();
+
 bool IsWindows11OrAbove();
 
 bool IsWslOptionalComponentPresent();
@@ -192,5 +198,9 @@ DWORD RunProcess(_Inout_ std::wstring& CommandLine);
 void SetHandleInheritable(_In_ HANDLE Handle, _In_ bool Inheritable = true);
 
 bool TryAttachConsole();
+
+void RegisterWithDcat(_In_ bool IncludeVersionNumber = true);
+
+void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int pageReportingOrder);
 
 } // namespace wsl::windows::common::helpers

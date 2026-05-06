@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <WslcPlatform Condition="'$(WslcPlatform)' == ''">$(Platform)</WslcPlatform>
+        <_wslcIsInvalidPlatform Condition="'$(WslcPlatform)' != 'x64' and '$(WslcPlatform)' != 'arm64'">true</_wslcIsInvalidPlatform>
+    </PropertyGroup>
+
+    <ItemDefinitionGroup>
+        <ClCompile>
+            <AdditionalIncludeDirectories>
+                $(MSBuildThisFileDirectory)..\..\include;
+                %(AdditionalIncludeDirectories)
+            </AdditionalIncludeDirectories>
+        </ClCompile>
+        <Link>
+            <AdditionalDependencies>
+                wslcsdk.lib;
+                %(AdditionalDependencies)
+            </AdditionalDependencies>
+            <AdditionalLibraryDirectories>
+                $(MSBuildThisFileDirectory)..\..\runtimes\win-$(WslcPlatform);
+                %(AdditionalLibraryDirectories)
+            </AdditionalLibraryDirectories>
+        </Link>
+    </ItemDefinitionGroup>
+
+    <ItemGroup>
+        <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-$(WslcPlatform)\native\wslcsdk.dll" />
+    </ItemGroup>
+
+    <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcIsInvalidPlatform)' == 'true'">
+        <Error Text="wslcsdk.dll could not be copied because platform '$(WslcPlatform)' is not supported. Only x64 and arm64 platforms are supported. You can override the detected platform by setting the property WslcPlatform." />
+    </Target>
+</Project>

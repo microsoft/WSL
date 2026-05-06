@@ -16,6 +16,7 @@ parameters:
     default:
       - wsl1
       - wsl2
+      - wslc
 
   - name: test_images
     type: object

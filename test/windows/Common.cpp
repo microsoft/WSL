@@ -20,6 +20,7 @@ Abstract:
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
+#include <winsafer.h>
 
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -65,6 +66,9 @@ std::optional<std::wstring> g_dumpToolPath;
 static bool g_enableWerReport = false;
 static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
+std::wstring g_testDataPath;
+bool g_fastTestRun = false; // True when test.bat was invoked with -f
+static wil::unique_mta_usage_cookie g_mtaCookie;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -823,7 +827,15 @@ void CreateProcessCrashReport(DWORD Pid, LPCWSTR ImageName, LPCWSTR EventName)
 void CreateWerReports()
 {
     static const std::set<std::wstring, wsl::shared::string::CaseInsensitiveCompare> WslProcesses{
-        L"wsl.exe", L"wslhost.exe", L"wslrelay.exe", L"wslservice.exe", L"wslg.exe", L"vmcompute.exe", L"vmwp.exe"};
+        L"wsl.exe",
+        L"wslhost.exe",
+        L"wslrelay.exe",
+        L"wslservice.exe",
+        L"wslg.exe",
+        L"vmcompute.exe",
+        L"vmwp.exe",
+        L"wslcsession.exe",
+        L"wslc.exe"};
 
     auto PrivilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
     const std::wstring EventName = L"WslTestHang-" + g_pipelineBuildId;
@@ -1316,12 +1328,26 @@ void StopWslService()
     StopService(service.get());
 }
 
-wil::unique_handle GetNonElevatedToken()
+wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)
 {
-    const auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
+    auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
+
+    if (Type != TokenPrimary)
+    {
+        // N.B. Using the Safer API to create a non-elevated primary token break drvfs, so skipping this for primary tokens.
+        SAFER_LEVEL_HANDLE saferLevel = nullptr;
+        auto closeSaferLevel = wil::scope_exit([&]() { SaferCloseLevel(saferLevel); });
+
+        THROW_IF_WIN32_BOOL_FALSE(SaferCreateLevel(SAFER_SCOPEID_MACHINE, SAFER_LEVELID_NORMALUSER, SAFER_LEVEL_OPEN, &saferLevel, nullptr));
+
+        wil::unique_handle restrictedToken;
+        THROW_IF_WIN32_BOOL_FALSE(SaferComputeTokenFromLevel(saferLevel, token.get(), &restrictedToken, 0, nullptr));
+
+        token = std::move(restrictedToken);
+    }
 
     wil::unique_handle nonElevatedToken;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, TokenPrimary, &nonElevatedToken));
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
 
     wil::unique_sid mediumIntegritySid;
     THROW_LAST_ERROR_IF(!ConvertStringSidToSidA("S-1-16-8192", &mediumIntegritySid));
@@ -1363,14 +1389,24 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+std::wstring ReadFileContent(const std::string& Path)
+{
+    std::ifstream configRead(Path);
+    return std::wstring{std::istreambuf_iterator<char>(configRead), {}};
+}
+
+std::wstring ReadFileContent(const std::wstring& Path)
+{
+    std::wifstream configRead(Path);
+    return std::wstring{std::istreambuf_iterator<wchar_t>(configRead), {}};
+}
+
 // writes global WSL 2 config settings at %userprofile%/.wslconfig
 std::wstring LxssWriteWslConfig(const std::wstring& Content)
 {
     auto path = getenv("userprofile") + std::string("\\.wslconfig");
 
-    std::wifstream configRead(path);
-    auto previousContent = std::wstring{std::istreambuf_iterator<wchar_t>(configRead), {}};
-    configRead.close();
+    auto previousContent = ReadFileContent(path);
 
     std::wofstream config(path);
     VERIFY_IS_TRUE(config.good());
@@ -1937,6 +1973,10 @@ Return Value:
 --*/
 
 {
+    wsl::windows::common::wslutil::InitializeWil();
+
+    THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
+
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG
     wil::g_fResultFailFastUnknownExceptions = false;
@@ -2035,11 +2075,14 @@ Return Value:
 
     g_testDistroPath = getTestParam(L"DistroPath");
 
+    g_testDataPath = getTestParam(L"TestDataPath");
+
     const auto setupScript = getOptionalTestParam(L"SetupScript");
     if (!setupScript.has_value())
     {
         // If no setup script is present, mark test_distro as the default distro here for convenience.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--set-default " LXSS_DISTRO_NAME_TEST_L), 0L);
+        g_fastTestRun = true;
 
         return true;
     }
@@ -2091,6 +2134,11 @@ Return Value:
 
 {
     LogInfo("Exiting UnitTests module");
+
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        WslTraceLoggingUninitialize();
+        g_mtaCookie.reset();
+    });
 
     //
     // Release the watchdog timer.
@@ -2146,8 +2194,6 @@ Return Value:
 
         wsl::windows::common::registry::WriteString(userKey.get(), nullptr, L"DefaultDistribution", g_originalDefaultDistro.c_str());
     }
-
-    WslTraceLoggingUninitialize();
 
     return true;
 }
@@ -2525,4 +2571,368 @@ void DistroFileChange::SetContent(LPCWSTR Content)
 void DistroFileChange::Delete()
 {
     VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root rm -f '{}'", m_path).c_str()), 0L);
+}
+
+std::string ReadToString(SOCKET Handle)
+{
+    std::string output;
+    DWORD offset = 0;
+    while (true) // TODO: timeout
+    {
+        constexpr auto bufferSize = 512;
+
+        output.resize(output.size() + bufferSize);
+        int bytesRead = 0;
+
+        if ((bytesRead = recv(Handle, &output[offset], bufferSize, 0)) < 0)
+        {
+            LogError("recv failed with %lu", GetLastError());
+            VERIFY_FAIL();
+        }
+
+        if (bytesRead == 0)
+        {
+            output.resize(offset);
+            break;
+        }
+
+        output.resize(offset + bytesRead);
+        offset += bytesRead;
+    }
+
+    return output;
+}
+
+std::string ReadToString(HANDLE Handle)
+{
+    std::string output;
+    DWORD offset = 0;
+    constexpr DWORD bufferSize = 4096;
+
+    while (true)
+    {
+        output.resize(offset + bufferSize);
+        DWORD bytesRead = 0;
+        if (!ReadFile(Handle, output.data() + offset, bufferSize, &bytesRead, nullptr))
+        {
+            VERIFY_ARE_EQUAL(GetLastError(), ERROR_BROKEN_PIPE);
+        }
+
+        offset += bytesRead;
+        output.resize(offset);
+        if (bytesRead == 0)
+        {
+            break;
+        }
+    }
+
+    return output;
+}
+
+void VerifyPatternMatch(const std::string& Content, const std::string& Pattern)
+{
+    if (!PathMatchSpecA(Content.c_str(), Pattern.c_str()))
+    {
+        std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", Content, Pattern);
+        VERIFY_FAIL(message.c_str());
+    }
+}
+
+std::string EscapeString(const std::string& Input)
+{
+    std::string Output;
+
+    for (const auto& e : Input)
+    {
+        if (e == '\n')
+        {
+            Output += "\\n";
+        }
+        else if (e == '\r')
+        {
+            Output += "\\r";
+        }
+        else if (e == '\0')
+        {
+            Output += "\\0";
+        }
+        else if (e == '\t')
+        {
+            Output += "\\t";
+        }
+        else if (e == '\x1b') // ESC character - start of VT sequence
+        {
+            Output += "\\x1b";
+        }
+        else
+        {
+            Output += e;
+        }
+    }
+
+    return Output;
+}
+
+PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
+{
+    m_thread = std::thread(std::bind(&PartialHandleRead::Run, this));
+}
+
+PartialHandleRead::~PartialHandleRead()
+{
+    m_exitEvent.SetEvent();
+    if (m_thread.joinable())
+    {
+        m_thread.join();
+    }
+}
+
+std::string PartialHandleRead::ReadBytes(size_t Length)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&]() {
+            std::lock_guard lock{m_mutex};
+
+            THROW_HR_IF(E_ABORT, m_data.size() < Length);
+        },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(60));
+
+    std::lock_guard lock{m_mutex};
+
+    return m_data.substr(0, Length);
+}
+
+std::string PartialHandleRead::ConsumeBytes(size_t Length)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&]() {
+            std::lock_guard lock{m_mutex};
+
+            THROW_HR_IF(E_ABORT, m_data.size() < Length);
+        },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(60));
+
+    std::lock_guard lock{m_mutex};
+    std::string result = m_data.substr(0, Length);
+    m_data.erase(0, Length);
+    return result;
+}
+
+std::string PartialHandleRead::GetData() const
+{
+    std::lock_guard lock{m_mutex};
+    return m_data;
+}
+
+void PartialHandleRead::Expect(const std::string& Expected)
+{
+    auto content = ReadBytes(Expected.size());
+
+    VERIFY_ARE_EQUAL(content, Expected);
+}
+
+void PartialHandleRead::ExpectConsume(const std::string& Expected)
+{
+    auto content = ConsumeBytes(Expected.size());
+
+    if (content != Expected)
+    {
+        VERIFY_FAIL(std::format(
+                        L"Expected: '{}' but got: '{}'",
+                        wsl::shared::string::MultiByteToWide(EscapeString(Expected)),
+                        wsl::shared::string::MultiByteToWide(EscapeString(content)))
+                        .c_str());
+    }
+}
+
+void PartialHandleRead::ExpectClosed(DWORD Timeout)
+{
+    VERIFY_ARE_EQUAL(WaitForSingleObject(m_thread.native_handle(), Timeout), WAIT_OBJECT_0);
+}
+
+void PartialHandleRead::Run()
+try
+{
+    std::vector<gsl::byte> buffer(4096);
+
+    while (!m_exitEvent.is_signaled())
+    {
+        auto bytesRead = wsl::windows::common::relay::InterruptableRead(m_handle, gsl::make_span(buffer), {m_exitEvent.get()});
+        if (bytesRead == 0)
+        {
+            break;
+        }
+
+        std::lock_guard lock{m_mutex};
+        m_data.append(reinterpret_cast<char*>(buffer.data()), bytesRead);
+    }
+}
+CATCH_LOG();
+
+class ReadHandleWithTargetValue : public wsl::windows::common::relay::ReadHandle
+{
+public:
+    NON_COPYABLE(ReadHandleWithTargetValue);
+    NON_MOVABLE(ReadHandleWithTargetValue);
+
+    ReadHandleWithTargetValue(wsl::windows::common::relay::HandleWrapper&& MovedHandle, std::string_view targetValue) :
+        ReadHandle(std::move(MovedHandle), [this](const auto& buffer) { m_readBuffer.append(buffer.data(), buffer.size()); }),
+        m_targetValue(targetValue)
+    {
+    }
+
+    void Schedule() override
+    {
+        ReadHandle::Schedule();
+        CheckIfTargetFound();
+    }
+
+    void Collect() override
+    {
+        ReadHandle::Collect();
+        CheckIfTargetFound();
+    }
+
+private:
+    void CheckIfTargetFound()
+    {
+        using namespace wsl::windows::common::relay;
+
+        if (State == IOHandleStatus::Standby || State == IOHandleStatus::Completed)
+        {
+            bool targetFound = (m_readBuffer.find(m_targetValue) != std::string::npos);
+
+            if (State == IOHandleStatus::Standby)
+            {
+                if (targetFound)
+                {
+                    State = IOHandleStatus::Completed;
+                }
+            }
+            else
+            {
+                THROW_WIN32_IF(ERROR_NOT_FOUND, !targetFound);
+            }
+        }
+    }
+
+    std::string m_readBuffer;
+    std::string m_targetValue;
+};
+
+void WaitForOutput(wil::unique_handle handle, std::string_view targetValue, std::chrono::milliseconds timeout)
+{
+    wsl::windows::common::relay::MultiHandleWait io;
+    io.AddHandle(std::make_unique<ReadHandleWithTargetValue>(std::move(handle), targetValue));
+    io.Run(timeout);
+}
+
+std::filesystem::path GetTestImagePath(std::string_view imageName)
+{
+    std::filesystem::path result = std::filesystem::path{g_testDataPath};
+
+    if (imageName == "debian:latest")
+    {
+        result /= L"debian-latest.tar";
+    }
+    else if (imageName == "python:3.12-alpine")
+    {
+        result /= L"python-3_12-alpine.tar";
+    }
+    else if (imageName == "alpine:latest")
+    {
+        result /= L"alpine-latest.tar";
+    }
+    else if (imageName == "hello-world:latest")
+    {
+        result /= L"HelloWorldSaved.tar";
+    }
+    else if (imageName == "wslc-registry:latest")
+    {
+        result /= L"wslc-registry.tar";
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unknown test image: %hs", imageName.data());
+    }
+
+    return result;
+}
+
+void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode, bool retry)
+{
+    const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
+    filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
+
+    const winrt::Windows::Web::Http::HttpClient client(filter);
+
+    const auto sendRequest = [&]() {
+        try
+        {
+            LogInfo("Sending request to: %ls", Url);
+            auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
+            auto content = response.Content().ReadAsStringAsync().get();
+
+            if (expectedCode.has_value())
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
+            }
+            else
+            {
+                LogError("Unexpected reply for: %ls", Url);
+                VERIFY_FAIL();
+            }
+        }
+        catch (...)
+        {
+            auto result = wil::ResultFromCaughtException();
+
+            if (!expectedCode.has_value())
+            {
+                // We currently reset the connection if connect() fails inside
+                // the VM. Consider failing the Windows connect() instead.
+                VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
+                return;
+            }
+
+            // Throw so RetryWithTimeout can decide whether to retry.
+            THROW_HR(result);
+        }
+    };
+
+    if (retry)
+    {
+        wsl::shared::retry::RetryWithTimeout<void>(sendRequest, std::chrono::milliseconds(500), std::chrono::seconds(30), [&]() {
+            return wil::ResultFromCaughtException() == HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE);
+        });
+    }
+    else
+    {
+        sendRequest();
+    }
+}
+
+void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode)
+{
+    auto [everyoneSid, everyoneSidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_WORLD_SID_AUTHORITY, SECURITY_WORLD_RID);
+
+    EXPLICIT_ACCESSW ea{};
+    ea.grfAccessPermissions = Permissions;
+    ea.grfAccessMode = Mode;
+    ea.grfInheritance = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea.Trustee.ptstrName = static_cast<LPWSTR>(everyoneSid);
+
+    PACL acl = nullptr;
+    wil::unique_hlocal descriptor;
+    THROW_IF_WIN32_ERROR(
+        GetNamedSecurityInfoW(path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &acl, nullptr, &descriptor));
+
+    wsl::windows::common::security::unique_acl newAcl;
+    THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &ea, acl, &newAcl));
+
+    THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+        const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
 }
