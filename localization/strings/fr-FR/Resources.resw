@@ -812,7 +812,7 @@ Pour plus d’informations sur Admin Protection, veuillez consulter https://aka.
     <value>Ouvrir EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Cette distribution ne contient pas de nom par défaut. Utilisez --name pour choisir le nom de distribution.</value>
+    <value>Cette distribution ne contient pas de nom par défaut. Utilisez --name pour choisir le nom de la distribution.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -2034,7 +2034,7 @@ Utilisation :
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Container network name is required for custom network type.</value>
+    <value>Le nom du réseau de conteneurs est obligatoire pour le type de réseau personnalisé.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Commande non reconnue : '{}'</value>
@@ -2643,15 +2643,14 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Chemin d’accès de stockage de session</value>
   </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal à envoyer (par défaut : {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Référence d’image actuelle ou existante au format nom_image[ :tag]</value>
   </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Étiquette de l'image construite</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Nombre de lignes à afficher à partir de la fin des journaux</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nouvelle référence d’image au format image-name[:tag]</value>
@@ -2742,6 +2741,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Valeur {} non valide : {} n’est pas un nom ou un numéro de signal reconnu (exemple : SIGKILL, kill ou 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Invalid {} argument value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">

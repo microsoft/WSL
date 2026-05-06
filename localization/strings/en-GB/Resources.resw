@@ -169,7 +169,7 @@ Install using 'wsl.exe {} &lt;Distro&gt;'.
     <value>The supplied install location is already in use.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>A distribution with the supplied name already exists. Use --name to chose a different name.</value>
+    <value>A distribution with the supplied name already exists. Use --name to choose a different name.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -805,7 +805,7 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
     <value>Open EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>This distribution doesn't contain a default name. Use --name to chose the distribution name.</value>
+    <value>This distribution doesn't contain a default name. Use --name to choose the distribution name.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -2636,15 +2636,14 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Session storage path</value>
   </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send (default: {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Current or existing image reference in the image-name[:tag] format</value>
   </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Tag for the built image</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Number of lines to show from the end of the logs</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>New image reference in the image-name[:tag] format</value>
@@ -2735,6 +2734,10 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Invalid {} value: {} is not a recognised signal name or number (Example: SIGKILL, kill, or 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Invalid {} argument value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">

@@ -4401,7 +4401,7 @@ VERSION_ID="Invalid|Format"
             // Import should fail without --name
             constexpr auto expectedOutput =
                 L"Installing: distro-no-default-name.tar\r\n\
-This distribution doesn't contain a default name. Use --name to chose the distribution name.\r\n\
+This distribution doesn't contain a default name. Use --name to choose the distribution name.\r\n\
 Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
             InstallFromTar(L"distro-no-default-name.tar", L"", -1, expectedOutput);
@@ -4660,7 +4660,7 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
             constexpr auto expectedOutput =
                 L"Installing: conflict.tar\r\n\
-A distribution with the supplied name already exists. Use --name to chose a different name.\r\n\
+A distribution with the supplied name already exists. Use --name to choose a different name.\r\n\
 Error code: Wsl/Service/RegisterDistro/ERROR_ALREADY_EXISTS\r\n";
 
             InstallFromTar(L"conflict.tar", L"", -1, expectedOutput);

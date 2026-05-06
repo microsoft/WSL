@@ -1139,6 +1139,12 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
 
     wslcInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
 
+    wslcInspect.Config.Env = dockerInspect.Config.Env;
+    wslcInspect.Config.Cmd = dockerInspect.Config.Cmd;
+    wslcInspect.Config.Entrypoint = dockerInspect.Config.Entrypoint;
+    wslcInspect.Config.User = dockerInspect.Config.User;
+    wslcInspect.Config.WorkingDir = dockerInspect.Config.WorkingDir;
+
     // Map WSLC port mappings (Windows host ports only). HostIp is not set here and will use
     // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
     for (const auto& e : m_mappedPorts)
@@ -1294,6 +1300,11 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsInit);
 
+    if (containerOptions.ShmSize > 0)
+    {
+        request.HostConfig.ShmSize = containerOptions.ShmSize;
+    }
+
     if (containerOptions.VolumesCount > 0)
     {
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
@@ -1394,7 +1405,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuLibrariesPath));
         request.HostConfig.Binds->push_back(std::format("{0}:{0}:ro", WSLCVirtualMachine::c_gpuDriversPath));
 
-        request.HostConfig.Devices.push_back({"/dev/dxg", "/dev/dxg", "rwm"});
+        request.HostConfig.Devices = {{"/dev/dxg", "/dev/dxg", "rwm"}};
 
         ConfigureLdPathForGpu(request.Env);
     }

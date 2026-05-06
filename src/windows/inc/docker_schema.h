@@ -214,9 +214,11 @@ struct HostConfig
     std::optional<std::vector<std::string>> DnsOptions;
     std::optional<std::vector<std::string>> Binds;
     std::map<std::string, std::string> Tmpfs;
-    std::vector<DeviceMapping> Devices;
+    std::optional<ULONGLONG> ShmSize;
+    std::optional<std::vector<DeviceMapping>> Devices;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions, Binds, Tmpfs, Devices, ShmSize);
 };
 
 struct CreateContainer
@@ -260,8 +262,13 @@ struct ContainerInspectState
 struct ContainerConfig
 {
     std::string Image;
+    std::string User;
+    std::string WorkingDir;
+    std::optional<std::vector<std::string>> Env;
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image, User, WorkingDir, Env, Cmd, Entrypoint);
 };
 
 struct InspectMount

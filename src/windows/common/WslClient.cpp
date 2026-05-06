@@ -634,7 +634,9 @@ bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
         const auto exitCode = LaunchElevated(elevatedCommand.c_str());
         if (exitCode != 0)
         {
-            return exitCode;
+            THROW_HR_WITH_USER_ERROR(
+                WSL_E_INSTALL_COMPONENT_FAILED,
+                Localization::MessageOptionalComponentInstallFailed(wsl::shared::string::Join(missingComponents, L','), exitCode));
         }
     }
     else

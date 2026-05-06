@@ -169,7 +169,7 @@ Instale usando 'wsl.exe {} &lt;Distro&gt;'.
     <value>O local de instalação fornecido já está em uso.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Já existe uma distribuição com o nome fornecido. Use --name escolher um nome diferente.</value>
+    <value>Já existe uma distribuição com o nome fornecido. Use --name para escolher um nome diferente.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -2034,7 +2034,7 @@ Uso:
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Container network name is required for custom network type.</value>
+    <value>O nome da rede do contêiner é necessário para o tipo de rede personalizado.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Comando não reconhecido: '{}'</value>
@@ -2643,15 +2643,14 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Caminho de armazenamento da sessão</value>
   </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Sinal a enviar (padrão: {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Referência de imagem atual ou existente no formato image-name[:tag]</value>
   </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>Rótulo para a imagem criada</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Número de linhas a serem mostradas a partir do final dos logs</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nova referência de imagem no formato image-name[:tag]</value>
@@ -2742,6 +2741,10 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>Valor {} inválido: {} não é um nome de sinal ou número reconhecido (Exemplo: SIGKILL, kill ou 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Valor do argumento {} inválido: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">

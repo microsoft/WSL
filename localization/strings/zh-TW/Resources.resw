@@ -169,7 +169,7 @@
     <value>提供的安裝位置已在使用中。</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>具有所提供名稱的發佈已經存在。使用 --name 選擇不同的名稱。</value>
+    <value>具有所提供名稱的發佈已經存在。使用 --name 選擇其他名稱。</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -811,7 +811,7 @@ Windows 版本： {}</value>
     <value>開啟 EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>此發佈不包含預設名稱。使用 --name 來選擇發佈名稱。</value>
+    <value>此發佈不包含預設名稱。使用 --name 選擇散發名稱。</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -2033,7 +2033,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
-    <value>Container network name is required for custom network type.</value>
+    <value>自訂網路類型需要容器網路名稱。</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>無法辨識的命令: '{}'</value>
@@ -2642,15 +2642,14 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>工作階段儲存路徑</value>
   </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>要傳送的訊號 (預設: {})</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>目前或現有的影像參考採用影像名稱[:tag]格式</value>
   </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
     <value>建置映像的標記</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Number of lines to show from the end of the logs</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>影像名稱[:tag] 格式中的新影像參考</value>
@@ -2741,6 +2740,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
     <value>無效的 {} 值: {} 不是可辨識的訊號名稱或數字 (例如: SIGKILL、kill 或 9)。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Invalid {} argument value: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
