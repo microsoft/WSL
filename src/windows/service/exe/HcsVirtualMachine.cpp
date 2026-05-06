@@ -373,7 +373,9 @@ try
     wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
     wil::unique_socket dnsSocketHandle;
 
-    // Run the DnsResolver support check first so it can clear the feature flag before the validation below.
+    // The DNS hvsocket is only allocated for NAT mode.
+    THROW_HR_IF(E_INVALIDARG, (FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode == WSLCNetworkingModeNAT) != (DnsSocket != nullptr));
+
     // The check still applies to virtio proxy because the host virtio proxy uses the same Windows DNS APIs.
     if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
@@ -385,11 +387,7 @@ try
         }
     }
 
-    // The DNS hvsocket is only allocated for NAT mode.
-    const bool expectDnsSocket = FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode == WSLCNetworkingModeNAT;
-    THROW_HR_IF(E_INVALIDARG, expectDnsSocket != (DnsSocket != nullptr));
-
-    if (DnsSocket != nullptr)
+    if (DnsSocket != nullptr && FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
         dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
     }
