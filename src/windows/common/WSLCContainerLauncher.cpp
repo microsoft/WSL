@@ -129,6 +129,11 @@ void WSLCContainerLauncher::SetDefaultStopSignal(WSLCSignal Signal)
     m_stopSignal = Signal;
 }
 
+void WSLCContainerLauncher::SetShmSize(ULONGLONG ShmSize)
+{
+    m_shmSize = ShmSize;
+}
+
 void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
 {
     m_entrypoint = std::move(entrypoint);
@@ -137,6 +142,11 @@ void WSLCContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
 void WSLCContainerLauncher::SetContainerFlags(WSLCContainerFlags Flags)
 {
     m_containerFlags = Flags;
+}
+
+void WSLCContainerLauncher::SetContainerNetworkName(std::string&& Name)
+{
+    m_containerNetworkName = std::move(Name);
 }
 
 void WSLCContainerLauncher::SetHostname(std::string&& Hostname)
@@ -250,10 +260,12 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
+    options.ContainerNetwork.ContainerNetworkName = m_containerNetworkName.empty() ? nullptr : m_containerNetworkName.c_str();
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
     options.StopSignal = m_stopSignal;
     options.Flags = m_containerFlags;
+    options.ShmSize = m_shmSize;
 
     if (!entrypointStorage.empty())
     {
@@ -320,7 +332,7 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
     options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
 
-    // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
+    // TODO: Support volumes, ports, flags, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
     auto result = Session.CreateContainer(&options, &container);
     if (FAILED(result))

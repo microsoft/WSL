@@ -1115,7 +1115,7 @@ typedef struct _LX_INIT_START_SOCKET_RELAY
     MESSAGE_HEADER Header;
     unsigned short Family;
     unsigned short Port;
-    size_t BufferSize;
+    uint64_t BufferSize;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Family), FIELD(Port), FIELD(BufferSize));
 } LX_INIT_START_SOCKET_RELAY, *PLX_INIT_START_SOCKET_RELAY;
