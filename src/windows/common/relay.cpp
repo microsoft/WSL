@@ -25,10 +25,12 @@ using wsl::windows::common::relay::LineBasedReadHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
+using wsl::windows::common::relay::ReadSocketMessageHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
 using wsl::windows::common::relay::SingleAcceptHandle;
+using wsl::windows::common::relay::SocketWriteHandle;
 using wsl::windows::common::relay::WriteHandle;
 
 namespace {
@@ -42,6 +44,24 @@ LARGE_INTEGER InitializeFileOffset(HANDLE File)
     }
 
     return Offset;
+}
+
+void CancelPendingIo(HANDLE Handle, OVERLAPPED& Overlapped)
+{
+    DWORD bytesTransferred{};
+    if (CancelIoEx(Handle, &Overlapped))
+    {
+        if (!GetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true))
+        {
+            auto error = GetLastError();
+            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+        }
+    }
+    else
+    {
+        // ERROR_NOT_FOUND is returned if there was no IO to cancel.
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+    }
 }
 
 } // namespace
@@ -1128,20 +1148,7 @@ ReadHandle::~ReadHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        DWORD bytesRead{};
-        if (CancelIoEx(Handle.Get(), &Overlapped))
-        {
-            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
-            {
-                auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-            }
-        }
-        else
-        {
-            // ERROR_NOT_FOUND is returned if there was no IO to cancel.
-            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
-        }
+        CancelPendingIo(Handle.Get(), Overlapped);
     }
 }
 
@@ -1442,6 +1449,203 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
     }
 }
 
+ReadSocketMessageHandle::ReadSocketMessageHandle(
+    HandleWrapper&& MovedSocket, std::vector<gsl::byte>& Buffer, std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage) :
+    Socket(std::move(MovedSocket)), Buffer(Buffer), OnMessage(std::move(OnMessage))
+{
+    Overlapped.hEvent = Event.get();
+
+    if (Buffer.size() < sizeof(MESSAGE_HEADER))
+    {
+        Buffer.resize(sizeof(MESSAGE_HEADER));
+    }
+}
+
+ReadSocketMessageHandle::~ReadSocketMessageHandle()
+{
+    if (State == IOHandleStatus::Pending)
+    {
+        CancelPendingIo(Socket.Get(), Overlapped);
+    }
+}
+
+void ReadSocketMessageHandle::ScheduleRecv()
+{
+    Event.ResetEvent();
+
+    auto target = gsl::make_span(Buffer).subspan(CurrentOffset, BytesRemaining);
+    WSABUF wsaBuf = {gsl::narrow_cast<ULONG>(target.size()), reinterpret_cast<CHAR*>(target.data())};
+    DWORD bytesRead{};
+    DWORD flags = 0;
+    if (WSARecv(reinterpret_cast<SOCKET>(Socket.Get()), &wsaBuf, 1, &bytesRead, &flags, &Overlapped, nullptr) == 0)
+    {
+        ProcessRecvResult(bytesRead);
+    }
+    else
+    {
+        auto error = WSAGetLastError();
+        if (error == WSAECONNABORTED || error == WSAECONNRESET)
+        {
+            OnMessage({});
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != WSA_IO_PENDING, "Socket: 0x%p", (void*)Socket.Get());
+
+        State = IOHandleStatus::Pending;
+    }
+}
+
+void ReadSocketMessageHandle::ProcessRecvResult(DWORD BytesRead)
+{
+    if (BytesRead == 0)
+    {
+        OnMessage({});
+        State = IOHandleStatus::Completed;
+        return;
+    }
+
+    CurrentOffset += BytesRead;
+    BytesRemaining -= BytesRead;
+
+    if (BytesRemaining > 0)
+    {
+        return;
+    }
+
+    if (ReadingHeader)
+    {
+        auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
+
+        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize < sizeof(MESSAGE_HEADER), "Unexpected message size: %u", messageSize);
+        THROW_HR_IF_MSG(E_UNEXPECTED, messageSize > 4 * 1024 * 1024, "Message size too large: %u", messageSize);
+
+        if (messageSize == sizeof(MESSAGE_HEADER))
+        {
+            OnMessage(gsl::make_span(Buffer.data(), messageSize));
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
+        if (Buffer.size() < messageSize)
+        {
+            Buffer.resize(messageSize);
+        }
+
+        ReadingHeader = false;
+        CurrentOffset = sizeof(MESSAGE_HEADER);
+        BytesRemaining = messageSize - sizeof(MESSAGE_HEADER);
+    }
+    else
+    {
+        auto messageSize = gslhelpers::get_struct<MESSAGE_HEADER>(gsl::make_span(Buffer.data(), sizeof(MESSAGE_HEADER)))->MessageSize;
+        OnMessage(gsl::make_span(Buffer.data(), messageSize));
+        State = IOHandleStatus::Completed;
+    }
+}
+
+void ReadSocketMessageHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+    ScheduleRecv();
+}
+
+void ReadSocketMessageHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    State = IOHandleStatus::Standby;
+
+    DWORD bytesRead{};
+    DWORD flags{};
+    if (!WSAGetOverlappedResult(reinterpret_cast<SOCKET>(Socket.Get()), &Overlapped, &bytesRead, FALSE, &flags))
+    {
+        long error = WSAGetLastError();
+        THROW_WIN32_IF(error, error != WSAECONNABORTED && error != WSAECONNRESET);
+
+        WI_ASSERT(bytesRead == 0);
+    }
+
+    ProcessRecvResult(bytesRead);
+}
+
+HANDLE ReadSocketMessageHandle::GetHandle() const
+{
+    return Event.get();
+}
+
+SocketWriteHandle::SocketWriteHandle(HandleWrapper&& MovedSocket, gsl::span<const gsl::byte> Buffer) :
+    Socket(std::move(MovedSocket)), Buffer(Buffer.begin(), Buffer.end())
+{
+    Overlapped.hEvent = Event.get();
+}
+
+SocketWriteHandle::~SocketWriteHandle()
+{
+    if (State == IOHandleStatus::Pending)
+    {
+        CancelPendingIo(Socket.Get(), Overlapped);
+    }
+}
+
+void SocketWriteHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    Event.ResetEvent();
+
+    WSABUF wsaBuf = {gsl::narrow_cast<ULONG>(Buffer.size()), reinterpret_cast<CHAR*>(Buffer.data())};
+    DWORD bytesWritten{};
+    if (WSASend(reinterpret_cast<SOCKET>(Socket.Get()), &wsaBuf, 1, &bytesWritten, 0, &Overlapped, nullptr) == 0)
+    {
+        Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
+        if (Buffer.empty())
+        {
+            State = IOHandleStatus::Completed;
+        }
+    }
+    else
+    {
+        auto error = WSAGetLastError();
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != WSA_IO_PENDING, "Socket: 0x%p", (void*)Socket.Get());
+
+        State = IOHandleStatus::Pending;
+    }
+}
+
+void SocketWriteHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    State = IOHandleStatus::Standby;
+
+    DWORD bytesWritten{};
+    DWORD flags{};
+    THROW_IF_WIN32_BOOL_FALSE(WSAGetOverlappedResult(reinterpret_cast<SOCKET>(Socket.Get()), &Overlapped, &bytesWritten, FALSE, &flags));
+
+    Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
+    if (Buffer.empty())
+    {
+        State = IOHandleStatus::Completed;
+    }
+}
+
+void SocketWriteHandle::Push(gsl::span<const gsl::byte> Content)
+{
+    WI_ASSERT(State == IOHandleStatus::Standby || State == IOHandleStatus::Completed);
+    WI_ASSERT(!Content.empty());
+
+    Buffer.insert(Buffer.end(), Content.begin(), Content.end());
+
+    State = IOHandleStatus::Standby;
+}
+
+HANDLE SocketWriteHandle::GetHandle() const
+{
+    return Event.get();
+}
+
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Buffer) :
     Handle(std::move(MovedHandle)), Buffer(Buffer), Offset(InitializeFileOffset(Handle.Get()))
 {
@@ -1452,20 +1656,7 @@ WriteHandle::~WriteHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        DWORD bytesRead{};
-        if (CancelIoEx(Handle.Get(), &Overlapped))
-        {
-            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
-            {
-                auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-            }
-        }
-        else
-        {
-            // ERROR_NOT_FOUND is returned if there was no IO to cancel.
-            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
-        }
+        CancelPendingIo(Handle.Get(), Overlapped);
     }
 }
 

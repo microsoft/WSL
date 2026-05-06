@@ -429,7 +429,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
 
     // Accept a connection from mini_init with a receive timeout so the service does not get stuck waiting for a response from the VM.
-    m_miniInitChannel = wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", m_terminatingEvent.get()};
+    m_miniInitChannel =
+        wsl::shared::SocketChannel{AcceptConnection(m_vmConfig.KernelBootTimeout), "mini_init", {m_terminatingEvent.get()}};
 
     // Accept the connection from the Linux guest for notifications.
     m_notifyChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
@@ -1056,7 +1057,7 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
             DWORD receiveTimeout = m_vmConfig.KernelBootTimeout;
             THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_terminatingEvent.get()};
+            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", {m_terminatingEvent.get()}};
 
             auto transaction = channel.ReceiveTransaction();
             gsl::span<gsl::byte> responseSpan;
@@ -1955,7 +1956,7 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
     transaction.Send<LX_MINI_INIT_MOUNT_MESSAGE>(message.Span());
 
     // Accept a connection from mini_init
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", {m_terminatingEvent.get()}};
 
     // Get the mount result from mini_init
     auto [mountResult, step] = GetMountResult(channel);
@@ -2085,7 +2086,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
         channel = {
             AcceptConnection(m_vmConfig.KernelBootTimeout),
             "WaitForPmem",
-            m_terminatingEvent.get(),
+            {m_terminatingEvent.get()},
         };
     }
 
@@ -2394,7 +2395,7 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send(message);
 
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "ResizeDistribution", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "ResizeDistribution", {m_terminatingEvent.get()}};
     auto outputChannel = AcceptConnection(m_vmConfig.KernelBootTimeout);
 
     wsl::windows::common::relay::ScopedRelay outputRelay(std::move(outputChannel), OutputHandle);
@@ -2473,7 +2474,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const AttachedDis
     transaction.Send(message);
 
     // Accept a connection from mini_init.
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", {m_terminatingEvent.get()}};
 
     // Get the unmount result from mini_init
     return GetMountResult(channel);
@@ -2489,7 +2490,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ const AttachedD
     transaction.Send<LX_MINI_INIT_UNMOUNT_MESSAGE>(message.Span());
 
     // Accept a connection from mini_init.
-    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", m_terminatingEvent.get()};
+    wsl::shared::SocketChannel channel{AcceptConnection(m_vmConfig.KernelBootTimeout), "MountResult", {m_terminatingEvent.get()}};
 
     // Get the unmount result from mini_init.
     return GetMountResult(channel);
@@ -2546,7 +2547,7 @@ try
             break;
         }
 
-        wsl::shared::SocketChannel channel{std::move(socket.value()), "VirtioFs", m_terminatingEvent.get()};
+        wsl::shared::SocketChannel channel{std::move(socket.value()), "VirtioFs", {m_terminatingEvent.get()}};
         std::thread([this, channel = std::move(channel)]() mutable {
             try
             {

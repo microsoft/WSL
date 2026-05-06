@@ -343,6 +343,53 @@ private:
     bool ExpectHeader = true;
 };
 
+class ReadSocketMessageHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(ReadSocketMessageHandle);
+    NON_MOVABLE(ReadSocketMessageHandle);
+
+    ReadSocketMessageHandle(HandleWrapper&& Socket, std::vector<gsl::byte>& Buffer, std::function<void(const gsl::span<gsl::byte>& Message)>&& OnMessage);
+    ~ReadSocketMessageHandle();
+
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    void ScheduleRecv();
+    void ProcessRecvResult(DWORD BytesRead);
+
+    HandleWrapper Socket;
+    std::vector<gsl::byte>& Buffer;
+    std::function<void(const gsl::span<gsl::byte>& Message)> OnMessage;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    bool ReadingHeader = true;
+    size_t BytesRemaining = sizeof(MESSAGE_HEADER);
+    size_t CurrentOffset = 0;
+};
+
+class SocketWriteHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(SocketWriteHandle);
+    NON_MOVABLE(SocketWriteHandle);
+
+    SocketWriteHandle(HandleWrapper&& Socket, gsl::span<const gsl::byte> Buffer = {});
+    ~SocketWriteHandle();
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+    void Push(gsl::span<const gsl::byte> Buffer);
+
+private:
+    HandleWrapper Socket;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    std::vector<gsl::byte> Buffer;
+};
+
 class WriteHandle : public OverlappedIOHandle
 {
 public:

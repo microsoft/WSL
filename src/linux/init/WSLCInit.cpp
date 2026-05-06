@@ -666,6 +666,8 @@ void HandleMessageImpl(
 void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)
 {
+    std::this_thread::sleep_for(std::chrono::milliseconds(
+        100000000)); // Small delay to increase the chance that the target process is waiting in a syscall and can be interrupted by the signal.
     auto result = kill(Message.Pid, Message.Signal);
     Transaction.SendResultMessage(result < 0 ? errno : 0);
 }
