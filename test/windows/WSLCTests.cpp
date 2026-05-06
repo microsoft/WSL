@@ -3748,6 +3748,65 @@ class WSLCTests
         ValidateNamedVolumeContract("guest", nullptr, 0);
     }
 
+    WSLC_TEST_METHOD(NamedVolumesStress)
+    {
+        constexpr unsigned int c_threadCount = 8;
+        constexpr unsigned int c_iterationsPerThread = 50;
+        const std::string volumeName = "wslc-stress-vol";
+
+        // Best-effort cleanup of any leftover volume from prior runs / on test exit.
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        std::atomic<unsigned int> failures = 0;
+        std::vector<std::thread> threads;
+        threads.reserve(c_threadCount);
+
+        for (unsigned int t = 0; t < c_threadCount; ++t)
+        {
+            threads.emplace_back([&]() {
+                for (unsigned int i = 0; i < c_iterationsPerThread; ++i)
+                {
+                    WSLCVolumeOptions volumeOptions{};
+                    volumeOptions.Name = volumeName.c_str();
+                    volumeOptions.Driver = "guest";
+
+                    WSLCVolumeInformation volInfo{};
+                    HRESULT hrCreate = m_defaultSession->CreateVolume(&volumeOptions, &volInfo);
+                    if (FAILED(hrCreate) && hrCreate != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+                    {
+                        LogError("CreateVolume(%hs) unexpected HR: 0x%08x", volumeName.c_str(), hrCreate);
+                        ++failures;
+                    }
+
+                    HRESULT hrDelete = m_defaultSession->DeleteVolume(volumeName.c_str());
+                    if (FAILED(hrDelete) && hrDelete != WSLC_E_VOLUME_NOT_FOUND)
+                    {
+                        LogError("DeleteVolume(%hs) unexpected HR: 0x%08x", volumeName.c_str(), hrDelete);
+                        ++failures;
+                    }
+                }
+            });
+        }
+
+        for (auto& thread : threads)
+        {
+            thread.join();
+        }
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
+
+        // Every thread's iteration ends with a Delete, so the globally-last operation across
+        // all threads is guaranteed to be a Delete. The volume must therefore not exist in
+        // either our cache or docker -- if either disagrees, our state is desynced from docker.
+
+        // Our cache view: InspectVolume must report not-found.
+        wil::unique_cotaskmem_ansistring inspectOutput;
+        VERIFY_ARE_EQUAL(m_defaultSession->InspectVolume(volumeName.c_str(), &inspectOutput), WSLC_E_VOLUME_NOT_FOUND);
+
+        // Docker's view: `docker volume inspect` must also report not-found (non-zero exit).
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "volume", "inspect", volumeName}, 1);
+    }
+
     // Verifies that a container using a named volume survives a session restart and the volume's data is preserved.
     void ValidateNamedVolumeRecoveryContract(std::string_view driver, const WSLCDriverOption* driverOpts, ULONG driverOptsCount)
     {
