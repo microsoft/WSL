@@ -5771,8 +5771,11 @@ class WSLCTests
         ValidateCOMErrorMessage(L"Duplicate network: 'bridge'");
     }
 
-    WSLC_TEST_METHOD(ContainerAdditionalNetworkInvalidNameTest)
+    WSLC_TEST_METHOD(ContainerAdditionalNetworkMalformedNameReportsNotFoundTest)
     {
+        // Malformed names are not validated separately — they fail the network lookup,
+        // matching the primary network's attach-by-name semantics.
+
         // Invalid character.
         {
             WSLCContainerLauncher launcher(
@@ -5780,8 +5783,8 @@ class WSLCTests
             launcher.AddAdditionalNetwork("bad/name");
 
             auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-            ValidateCOMErrorMessage(L"Invalid name: 'bad/name'");
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, retVal.first);
+            ValidateCOMErrorMessage(L"Network not found: 'bad/name'");
         }
 
         // Empty name.
@@ -5791,8 +5794,8 @@ class WSLCTests
             launcher.AddAdditionalNetwork("");
 
             auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-            ValidateCOMErrorMessage(L"Invalid name: ''");
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, retVal.first);
+            ValidateCOMErrorMessage(L"Network not found: ''");
         }
 
         // Name exceeds WSLC_MAX_NETWORK_NAME_LENGTH (255).
@@ -5804,8 +5807,8 @@ class WSLCTests
             launcher.AddAdditionalNetwork(tooLongName);
 
             auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
-            ValidateCOMErrorMessage(std::format(L"Invalid name: '{}'", std::wstring(tooLongName.begin(), tooLongName.end())).c_str());
+            VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, retVal.first);
+            ValidateCOMErrorMessage(std::format(L"Network not found: '{}'", std::wstring(tooLongName.begin(), tooLongName.end())).c_str());
         }
     }
 

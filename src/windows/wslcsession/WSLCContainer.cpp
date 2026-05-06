@@ -405,24 +405,17 @@ void ValidateNamedVolumes(
     }
 }
 
-void ValidateName(LPCSTR Name, size_t maxLength)
-{
-    const std::string_view name{Name};
-    static constexpr std::string_view validChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.";
-
-    THROW_HR_WITH_USER_ERROR_IF(
-        E_INVALIDARG,
-        Localization::MessageWslcInvalidName(Name),
-        name.empty() || name.size() > maxLength || name.find_first_not_of(validChars) != std::string_view::npos);
-}
-
 void ProcessAdditionalNetworks(
     const WSLCContainerOptions& containerOptions,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
     const std::string& primaryNetworkMode,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
-    THROW_HR_IF(E_INVALIDARG, containerOptions.AdditionalNetworksCount > 0 && containerOptions.AdditionalNetworks == nullptr);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        containerOptions.AdditionalNetworksCount > 0 && containerOptions.AdditionalNetworks == nullptr,
+        "AdditionalNetworks pointer is null but AdditionalNetworksCount=%lu",
+        containerOptions.AdditionalNetworksCount);
 
     if (containerOptions.AdditionalNetworksCount == 0)
     {
@@ -448,8 +441,6 @@ void ProcessAdditionalNetworks(
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.AdditionalNetworks[i], "AdditionalNetworks at index %lu is null", i);
 
         const std::string networkName = containerOptions.AdditionalNetworks[i];
-
-        ValidateName(networkName.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
 
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(networkName), !seenNetworks.insert(networkName).second);
