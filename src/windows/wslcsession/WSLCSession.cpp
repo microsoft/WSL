@@ -1682,7 +1682,6 @@ try
         std::scoped_lock lock(m_containersLock, m_volumesLock, m_networksLock);
 
         // Generate a unique container name if the user didn't provide one.
-        // The lock is held, so m_containers is our authoritative view of existing names.
         std::string generatedName;
         auto options = *containerOptions;
         if (options.Name == nullptr)
@@ -1696,13 +1695,12 @@ try
             constexpr int c_maxNameRetries = 6;
             for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
             {
-                generatedName = GenerateContainerName(attempt);
-                if (!existingNames.contains(generatedName))
+                auto randomName = GenerateContainerName(attempt);
+                if (!existingNames.contains(randomName))
                 {
+                    generatedName = randomName;
                     break;
                 }
-
-                generatedName.clear();
             }
 
             // Fallback to a random hex name, mirroring Docker's fallback to truncated container ID.
