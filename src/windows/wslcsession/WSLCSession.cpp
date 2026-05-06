@@ -117,38 +117,17 @@ using wsl::windows::service::wslc::c_mountains;
 // When retry > 0, appends a random digit (0-9) to reduce collisions.
 std::string GenerateContainerName(int retry)
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    static std::mt19937 s_gen(std::random_device{}());
 
     std::uniform_int_distribution<size_t> leftDist(0, c_descriptors.size() - 1);
     std::uniform_int_distribution<size_t> rightDist(0, c_mountains.size() - 1);
 
-    auto name = std::string(c_descriptors[leftDist(gen)]) + "_" + c_mountains[rightDist(gen)];
+    auto name = std::string(c_descriptors[leftDist(s_gen)]) + "_" + c_mountains[rightDist(s_gen)];
 
     if (retry > 0)
     {
         std::uniform_int_distribution<int> digitDist(0, 9);
-        name += std::to_string(digitDist(gen));
-    }
-
-    return name;
-}
-
-// Generate a random 12-character hex string as a fallback name.
-// Mirrors Docker's fallback to truncated container ID when all human-readable retries are exhausted.
-std::string GenerateRandomHexName()
-{
-    std::random_device rd;
-    std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned short> random(rd());
-
-    std::array<unsigned short, 6> randomBytes;
-    std::generate(randomBytes.begin(), randomBytes.end(), random);
-
-    std::string name;
-    name.reserve(randomBytes.size() * 2);
-    for (auto b : randomBytes)
-    {
-        std::format_to(std::back_inserter(name), "{:02x}", static_cast<BYTE>(b));
+        name += std::to_string(digitDist(s_gen));
     }
 
     return name;
@@ -1668,7 +1647,7 @@ try
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     // Validate that name & images are valid.
-    if (containerOptions->Name != nullptr)
+    if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
     {
         ValidateName(containerOptions->Name, WSLC_MAX_CONTAINER_NAME_LENGTH);
     }
@@ -1684,7 +1663,7 @@ try
         // Generate a unique container name if the user didn't provide one.
         std::string generatedName;
         auto options = *containerOptions;
-        if (options.Name == nullptr)
+        if (options.Name == nullptr || options.Name[0] == '\0')
         {
             std::unordered_set<std::string> existingNames;
             for (const auto& c : m_containers)
@@ -1703,10 +1682,12 @@ try
                 }
             }
 
-            // Fallback to a random hex name, mirroring Docker's fallback to truncated container ID.
+            // Fallback to a GUID name
             if (generatedName.empty())
             {
-                generatedName = GenerateRandomHexName();
+                GUID guid{};
+                THROW_IF_FAILED(CoCreateGuid(&guid));
+                generatedName = wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
             }
 
             options.Name = generatedName.c_str();
