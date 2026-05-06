@@ -115,6 +115,11 @@ class WSLCCLIArgumentUnitTests
         VERIFY_NO_THROW(validation::ValidateIntegerFromString<LONGLONG>({L"1234", L"-1234567890123"}, L"testArg"));
         VERIFY_THROWS(validation::ValidateIntegerFromString<LONGLONG>({L"1234", L"-92233720369999854775808"}, L"testArg"), ArgumentException);
 
+        // Verify --tail validation rejects 0 (mirrors ArgType::Tail validation)
+        VERIFY_THROWS(validation::ValidateIntegerFromString<ULONGLONG>({L"0"}, L"tail", [](auto value) { return value != 0; }), ArgumentException);
+        VERIFY_NO_THROW(validation::ValidateIntegerFromString<ULONGLONG>({L"10"}, L"tail", [](auto value) { return value != 0; }));
+        VERIFY_NO_THROW(validation::ValidateIntegerFromString<ULONGLONG>({L"1"}, L"tail", [](auto value) { return value != 0; }));
+
         // Verify WSLCSignal conversion
         auto validSignal = validation::GetWSLCSignalFromString(L"SIGTERM");
         VERIFY_ARE_EQUAL(validSignal, WSLCSignalSIGTERM);

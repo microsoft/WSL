@@ -2925,7 +2925,7 @@ Return Value:
                     return;
                 }
 
-                Target = GetMountTarget(Message->Buffer);
+                Target = GetMountTarget(wsl::shared::string::FromMessageBuffer<LX_MINI_INIT_UNMOUNT_MESSAGE>(Buffer));
 
                 Step = LxMiniInitMountStepUnmount;
                 Result = umount(Target.c_str());

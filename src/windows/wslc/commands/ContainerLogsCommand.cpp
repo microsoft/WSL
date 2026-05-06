@@ -30,6 +30,7 @@ std::vector<Argument> ContainerLogsCommand::GetArguments() const
         Argument::Create(ArgType::ContainerId, true),
         Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Follow),
+        Argument::Create(ArgType::Tail),
     };
 }
 

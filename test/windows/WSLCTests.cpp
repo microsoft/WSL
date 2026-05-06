@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
+#include "hcs.hpp"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -444,14 +445,22 @@ class WSLCTests
         std::wstring Owner;
     };
 
-    // Returns VM info (Id + Owner) for all running VMs via hcsdiag.
+    // Returns VM info (Id + Owner) for all compute systems via the HCS API.
     static std::vector<VmInfo> ListVms()
     {
-        wsl::windows::common::SubProcess process(nullptr, L"hcsdiag list -raw");
-        auto output = process.RunAndCaptureOutput(10000);
+        const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
+
+        auto operation = wsl::windows::common::hcs::CreateOperation();
+        THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
+
+        wil::unique_cotaskmem_string resultDocument;
+        const auto result = ::HcsWaitForOperationResult(operation.get(), 10000, &resultDocument);
+        THROW_IF_FAILED_MSG(result, "HcsEnumerateComputeSystems failed (error: %ls)", resultDocument.get());
+
+        LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
 
         std::vector<VmInfo> vms;
-        auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(output.Stdout), nullptr, false);
+        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()));
         if (!json.is_array())
         {
             return vms;
@@ -1117,6 +1126,13 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ImportImage)
     {
+        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
+        // TODO: Remove once the fix is available.
+        if (IsWindowsServer())
+        {
+            SKIP_TEST_UNSTABLE();
+        }
+
         auto cleanup =
             wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
 
@@ -5428,6 +5444,205 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerCustomNetworkTest)
+    {
+        const std::string networkName = "custom-net-test";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.35.0.0/16"}};
+
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        networkOptions.DriverOpts = opts;
+        networkOptions.DriverOptsCount = ARRAYSIZE(opts);
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-network", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string(networkName));
+
+        auto container = launcher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, networkName);
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkNotFoundTest)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-network-notfound", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string("nonexistent-net"));
+
+        auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
+        VERIFY_ARE_EQUAL(WSLC_E_NETWORK_NOT_FOUND, retVal.first);
+        ValidateCOMErrorMessageContains(L"nonexistent-net");
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkMissingNameTest)
+    {
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-network-noname", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+
+        auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+        ValidateCOMErrorMessageContains(L"Container network name is required");
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkEmptyNameTest)
+    {
+        LPCSTR args[] = {"sleep", "99999"};
+
+        WSLCContainerOptions options{};
+        options.Image = "debian:latest";
+        options.Name = "test-custom-network-empty";
+        options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+        options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
+        options.ContainerNetwork.ContainerNetworkName = "";
+
+        wil::com_ptr<IWSLCContainer> container;
+        auto hr = m_defaultSession->CreateContainer(&options, &container);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, hr);
+        ValidateCOMErrorMessageContains(L"Container network name is required");
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkMultipleContainersTest)
+    {
+        const std::string networkName = "custom-net-multi";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.36.0.0/16"}};
+
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        networkOptions.DriverOpts = opts;
+        networkOptions.DriverOptsCount = ARRAYSIZE(opts);
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCContainerLauncher launcher1(
+            "debian:latest", "test-custom-multi-1", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher1.SetContainerNetworkName(std::string(networkName));
+
+        WSLCContainerLauncher launcher2(
+            "debian:latest", "test-custom-multi-2", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher2.SetContainerNetworkName(std::string(networkName));
+
+        auto container1 = launcher1.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(container1.State(), WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(container1.Inspect().HostConfig.NetworkMode, networkName);
+
+        auto container2 = launcher2.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(container2.State(), WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(container2.Inspect().HostConfig.NetworkMode, networkName);
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkDeleteWhileInUseTest)
+    {
+        const std::string networkName = "custom-net-inuse";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.37.0.0/16"}};
+
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        networkOptions.DriverOpts = opts;
+        networkOptions.DriverOptsCount = ARRAYSIZE(opts);
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-net-inuse", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string(networkName));
+
+        auto container = launcher.Launch(*m_defaultSession);
+        VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
+
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), m_defaultSession->DeleteNetwork(networkName.c_str()));
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkPortMappingTest)
+    {
+        const std::string networkName = "custom-net-ports";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.38.0.0/16"}};
+
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        networkOptions.DriverOpts = opts;
+        networkOptions.DriverOptsCount = ARRAYSIZE(opts);
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCContainerLauncher launcher(
+            "python:3.12-alpine", "test-custom-net-ports", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string(networkName));
+        launcher.AddPort(1251, 8000, AF_INET);
+
+        auto container = launcher.Launch(*m_defaultSession);
+        auto initProcess = container.GetInitProcess();
+        WaitForOutput(initProcess.GetStdHandle(1), "Serving HTTP on");
+
+        ExpectHttpResponse(L"http://127.0.0.1:1251", 200);
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkRecoveryTest)
+    {
+        const std::string networkName = "custom-net-recovery";
+        const std::string containerName = "test-custom-net-recovery";
+
+        LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str()));
+
+        WSLCDriverOption opts[] = {{"Subnet", "172.39.0.0/16"}};
+
+        WSLCNetworkOptions networkOptions{};
+        networkOptions.Name = networkName.c_str();
+        networkOptions.Driver = "bridge";
+        networkOptions.DriverOpts = opts;
+        networkOptions.DriverOptsCount = ARRAYSIZE(opts);
+
+        VERIFY_SUCCEEDED(m_defaultSession->CreateNetwork(&networkOptions));
+
+        auto networkCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteNetwork(networkName.c_str())); });
+
+        WSLCContainerLauncher launcher("debian:latest", containerName, {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.SetContainerNetworkName(std::string(networkName));
+
+        {
+            auto container = launcher.Create(*m_defaultSession);
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(container.State(), WslcContainerStateCreated);
+        }
+
+        // Restart the session and verify the container is recovered with its custom network.
+        ResetTestSession();
+
+        auto recoveredContainer = OpenContainer(m_defaultSession.get(), containerName);
+
+        VERIFY_ARE_EQUAL(recoveredContainer.State(), WslcContainerStateCreated);
+        VERIFY_SUCCEEDED(recoveredContainer.Get().Start(WSLCContainerStartFlagsAttach, nullptr));
+        VERIFY_ARE_EQUAL(recoveredContainer.State(), WslcContainerStateRunning);
+
+        VERIFY_ARE_EQUAL(recoveredContainer.Inspect().HostConfig.NetworkMode, networkName);
+    }
+
     WSLC_TEST_METHOD(ContainerInspect)
     {
         // Helper to verify port mappings.
@@ -5566,6 +5781,37 @@ class WSLCTests
             expectMounts(details.Mounts, {});
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        }
+
+        // Test that Config fields are populated in inspect output.
+        {
+            const std::string envVar = "WSLC_TEST_VAR=hello";
+            const std::string workDir = "/tmp";
+
+            WSLCContainerLauncher launcher("debian:latest", "test-container-inspect-config", {"99999"}, {envVar});
+            launcher.SetEntrypoint({"sleep"});
+            launcher.SetWorkingDirectory(std::string{workDir});
+            launcher.SetUser("nobody");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto details = container.Inspect();
+
+            const auto& config = details.Config;
+
+            VERIFY_IS_TRUE(config.Env.has_value());
+            VERIFY_IS_TRUE(std::ranges::find(*config.Env, envVar) != config.Env->end());
+
+            VERIFY_ARE_EQUAL(config.WorkingDir, workDir);
+
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_ARE_EQUAL(1u, config.Cmd->size());
+            VERIFY_ARE_EQUAL(config.Cmd->at(0), std::string{"99999"});
+
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(1u, config.Entrypoint->size());
+            VERIFY_ARE_EQUAL(config.Entrypoint->at(0), std::string{"sleep"});
+
+            VERIFY_ARE_EQUAL(config.User, std::string{"nobody"});
         }
     }
 
