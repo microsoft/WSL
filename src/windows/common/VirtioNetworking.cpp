@@ -96,11 +96,11 @@ try
 }
 CATCH_LOG()
 
-HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
+uint16_t VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
 {
     if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, VirtioNetworkingFlags::Ipv6))
     {
-        return S_OK;
+        return 0;
     }
 
     const auto ipAddress = (addr.si_family == AF_INET) ? reinterpret_cast<const void*>(&addr.Ipv4.sin_addr)
@@ -112,7 +112,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         // Only intercepting 127.0.0.1; any other loopback address will remain on 'lo'.
         if (addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
         {
-            return S_OK;
+            return 0;
         }
     }
 
@@ -142,7 +142,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
     }
 
-    return S_OK;
+    return hostPort;
 }
 
 uint16_t VirtioNetworking::ModifyOpenPorts(
@@ -199,7 +199,9 @@ try
 
     *AllocatedHostPort = 0;
 
-    return HandlePortNotification(ListenAddress, Protocol, GuestPort, true);
+    *AllocatedHostPort = HandlePortNotification(ListenAddress, Protocol, GuestPort, true);
+
+    return S_OK;
 }
 CATCH_RETURN()
 
@@ -209,7 +211,9 @@ try
     RETURN_HR_IF(E_INVALIDARG, Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP);
 
     const auto hostPort = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&ListenAddress));
-    return HandlePortNotification(ListenAddress, Protocol, GuestPort, false);
+    HandlePortNotification(ListenAddress, Protocol, GuestPort, false);
+
+    return S_OK;
 }
 CATCH_RETURN()
 
@@ -320,7 +324,6 @@ void VirtioNetworking::SetupLoopbackDevice()
     createLoopbackDevice.deviceName = c_loopbackDeviceName;
     createLoopbackDevice.type = hns::DeviceType::Loopback;
     createLoopbackDevice.lowerEdgeAdapterId = m_localhostAdapterId.value();
-    createLoopbackDevice.disableLoopbackMirroring = WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DisableLoopbackMirroring);
     constexpr auto loopbackType = GnsMessageType(createLoopbackDevice);
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }

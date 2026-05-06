@@ -168,6 +168,8 @@ public:
 
     bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
+    WSLCNetworkingMode NetworkingMode() const;
+
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
 

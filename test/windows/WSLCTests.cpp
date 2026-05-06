@@ -6260,6 +6260,258 @@ class WSLCTests
         RunPortMappingsTest(*session, WSLCContainerNetworkTypeHost);
     }
 
+    WSLC_TEST_METHOD(PortMappingsAdvanced)
+    {
+        auto [restore, session] = SetupPortMappingsTest(WSLCNetworkingModeVirtioProxy);
+
+        // Helper to resolve the first non-loopback IPv4 address on an active host adapter.
+        auto getHostAdapterIpv4 = []() -> std::optional<std::string> {
+            ULONG bufferSize = 0;
+            constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+            auto result = GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &bufferSize);
+            if (result != ERROR_BUFFER_OVERFLOW)
+            {
+                return std::nullopt;
+            }
+
+            std::vector<BYTE> buffer(bufferSize);
+            auto* adapters = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
+            result = GetAdaptersAddresses(AF_INET, flags, nullptr, adapters, &bufferSize);
+            if (result != ERROR_SUCCESS)
+            {
+                return std::nullopt;
+            }
+
+            for (auto* adapter = adapters; adapter != nullptr; adapter = adapter->Next)
+            {
+                if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK || adapter->IfType == IF_TYPE_TUNNEL)
+                {
+                    continue;
+                }
+
+                for (auto* addr = adapter->FirstUnicastAddress; addr != nullptr; addr = addr->Next)
+                {
+                    if (addr->Address.lpSockaddr->sa_family != AF_INET)
+                    {
+                        continue;
+                    }
+
+                    auto& ipv4 = reinterpret_cast<sockaddr_in*>(addr->Address.lpSockaddr)->sin_addr;
+
+                    // Skip APIPA (169.254.x.x) addresses.
+                    if ((ntohl(ipv4.s_addr) & 0xFFFF0000) == 0xA9FE0000)
+                    {
+                        continue;
+                    }
+
+                    char buf[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &ipv4, buf, sizeof(buf));
+                    return std::string(buf);
+                }
+            }
+
+            return std::nullopt;
+        };
+
+        auto hostIp = getHostAdapterIpv4();
+
+        // Sends a UDP datagram and waits for a reply. Returns the reply payload.
+        auto sendUdpAndReceive = [](uint16_t port, int family, const std::string& payload) -> std::string {
+            SOCKADDR_INET addr{};
+            addr.si_family = static_cast<ADDRESS_FAMILY>(family);
+            INETADDR_SETLOOPBACK((PSOCKADDR)&addr);
+            SS_PORT(&addr) = htons(port);
+
+            wil::unique_socket sock{socket(family, SOCK_DGRAM, IPPROTO_UDP)};
+            THROW_LAST_ERROR_IF(!sock);
+
+            // Set a receive timeout so the test doesn't hang if the reply never arrives.
+            DWORD timeout = 5000;
+            THROW_LAST_ERROR_IF(
+                setsockopt(sock.get(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR);
+
+            THROW_LAST_ERROR_IF(
+                sendto(sock.get(), payload.data(), static_cast<int>(payload.size()), 0, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) ==
+                SOCKET_ERROR);
+
+            char buf[1024];
+            int received = recvfrom(sock.get(), buf, sizeof(buf), 0, nullptr, nullptr);
+            THROW_LAST_ERROR_IF(received == SOCKET_ERROR);
+
+            return std::string(buf, received);
+        };
+
+        struct PortMapping
+        {
+            uint16_t HostPort;
+            uint16_t ContainerPort;
+            int Family;
+            int Protocol = IPPROTO_TCP;
+            std::optional<std::string> BindingAddress;
+        };
+
+        auto runCustomBindingTests = [&](WSLCContainerNetworkType containerNetworkType) {
+            LogInfo("Container network type: %d", static_cast<int>(containerNetworkType));
+
+            // Creates a TCP container with the given port mappings, waits for it to be ready,
+            // and returns it. The returned container is automatically stopped and deleted when
+            // it goes out of scope.
+            auto createTcpContainer = [&](const std::vector<PortMapping>& ports) {
+                static int containerIndex = 0;
+                WSLCContainerLauncher launcher(
+                    "python:3.12-alpine",
+                    std::format("test-ports-custom-{}", containerIndex++),
+                    {"python3", "-m", "http.server", "--bind", "::"},
+                    {"PYTHONUNBUFFERED=1"},
+                    containerNetworkType);
+
+                for (const auto& port : ports)
+                {
+                    launcher.AddPort(port.HostPort, port.ContainerPort, port.Family, port.Protocol, port.BindingAddress);
+                }
+
+                auto container = launcher.Launch(*session);
+                WaitForOutput(container.GetInitProcess().GetStdHandle(1), "Serving HTTP on");
+                return container;
+            };
+
+            // Explicit localhost (127.0.0.1) binding.
+            {
+                auto container = createTcpContainer({{1260, 8000, AF_INET, IPPROTO_TCP, "127.0.0.1"}});
+                ExpectHttpResponse(L"http://127.0.0.1:1260", 200);
+            }
+
+            // 0.0.0.0 (all interfaces) binding.
+            {
+                auto container = createTcpContainer({{1261, 8000, AF_INET, IPPROTO_TCP, "0.0.0.0"}});
+
+                // Verify reachable via loopback.
+                ExpectHttpResponse(L"http://127.0.0.1:1261", 200);
+
+                // Verify reachable via host adapter IP to confirm wildcard semantics.
+                if (hostIp.has_value())
+                {
+                    auto url = std::format(L"http://{}:1261", wsl::shared::string::MultiByteToWide(hostIp.value()));
+                    ExpectHttpResponse(url.c_str(), 200);
+                }
+                else
+                {
+                    LogInfo("Skipping host adapter IP verification: no suitable IPv4 adapter found");
+                }
+            }
+
+            // Main host adapter's IPv4 address binding.
+            {
+                if (hostIp.has_value())
+                {
+                    auto container = createTcpContainer({{1262, 8000, AF_INET, IPPROTO_TCP, hostIp.value()}});
+
+                    auto url = std::format(L"http://{}:1262", wsl::shared::string::MultiByteToWide(hostIp.value()));
+                    ExpectHttpResponse(url.c_str(), 200);
+                }
+                else
+                {
+                    LogInfo("Skipping host adapter IP binding test: no suitable IPv4 adapter found");
+                }
+            }
+
+            // Anonymous bind on localhost (ephemeral host port).
+            {
+                auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, "127.0.0.1"}});
+
+                auto inspectData = container.Inspect();
+                VERIFY_IS_TRUE(inspectData.Ports.contains("8000/tcp"));
+
+                auto& bindings = inspectData.Ports["8000/tcp"];
+                VERIFY_ARE_EQUAL(1u, bindings.size());
+
+                ExpectHttpResponse(std::format(L"http://127.0.0.1:{}", bindings[0].HostPort).c_str(), 200);
+            }
+
+            // Anonymous bind on host ip (ephemeral host port).
+            {
+
+                if (hostIp.has_value())
+                {
+                    auto container = createTcpContainer({{WSLC_EPHEMERAL_PORT, 8000, AF_INET, IPPROTO_TCP, hostIp.value()}});
+
+                    auto inspectData = container.Inspect();
+                    VERIFY_IS_TRUE(inspectData.Ports.contains("8000/tcp"));
+
+                    auto& bindings = inspectData.Ports["8000/tcp"];
+                    VERIFY_ARE_EQUAL(1u, bindings.size());
+
+                    ExpectHttpResponse(std::format(L"http://{}:{}", hostIp.value(), bindings[0].HostPort).c_str(), 200);
+                }
+                else
+                {
+                    LogInfo("Skipping host adapter IP binding test: no suitable IPv4 adapter found");
+                }
+            }
+
+            // TODO: uncomment once stable.
+            /*
+            // IPv6 loopback (::1) binding.
+            {
+                auto container = createTcpContainer({{1263, 8000, AF_INET6, IPPROTO_TCP, "::1"}});
+                ExpectHttpResponse(L"http://[::1]:1263", 200);
+            }
+
+            // IPv6 wildcard (::) binding.
+            {
+                auto container = createTcpContainer({{1264, 8000, AF_INET6, IPPROTO_TCP, "::"}});
+                ExpectHttpResponse(L"http://[::1]:1264", 200);
+            }
+
+            // UDP port mapping with a Python echo server.
+            {
+                // Inline Python UDP echo server: receives a datagram and sends it back uppercased.
+                static constexpr auto c_udpEchoScript =
+                    "import socket,sys;"
+                    "s=socket.socket(socket.AF_INET6,socket.SOCK_DGRAM);"
+                    "s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_V6ONLY,0);"
+                    "s.bind(('::',9000));"
+                    "print('UDP listening',flush=True);"
+                    "data,addr=s.recvfrom(1024);"
+                    "s.sendto(data.upper(),addr)";
+
+                static int udpContainerIndex = 0;
+                WSLCContainerLauncher launcher(
+                    "python:3.12-alpine",
+                    std::format("test-ports-custom-udp-{}", udpContainerIndex++),
+                    {"python3", "-c", c_udpEchoScript},
+                    {"PYTHONUNBUFFERED=1"},
+                    containerNetworkType);
+
+                launcher.AddPort(1265, 9000, AF_INET, IPPROTO_UDP, "127.0.0.1");
+
+                auto container = launcher.Launch(*session);
+                WaitForOutput(container.GetInitProcess().GetStdHandle(1), "UDP listening");
+
+                auto reply = sendUdpAndReceive(1265, AF_INET, "hello");
+                VERIFY_ARE_EQUAL(reply, "HELLO");
+            }
+
+            */
+
+            // Validate that trying to bind an address that the host doesn't have fails:
+            {
+                // Malformed address string.
+                {
+                    WSLCContainerLauncher launcher("python:3.12-alpine", {}, {}, {}, containerNetworkType);
+                    launcher.AddPort(1265, 8000, AF_INET, IPPROTO_TCP, "1.1.1.1");
+
+                    // TODO: Update error code once changed in virtionet.
+                    VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, E_FAIL);
+                    ValidateCOMErrorMessage(L"Failed to map port '1.1.1.1:1265/tcp', Unspecified error ");
+                }
+            }
+        };
+
+        runCustomBindingTests(WSLCContainerNetworkTypeBridged);
+        runCustomBindingTests(WSLCContainerNetworkTypeHost);
+    }
+
     TEST_METHOD(PortMappingsNone)
     {
         // Validate that trying to map ports without network fails.

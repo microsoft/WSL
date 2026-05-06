@@ -18,7 +18,6 @@ enum class VirtioNetworkingFlags
     DnsTunneling = 0x2,
     Ipv6 = 0x4,
     DnsTunnelingSocket = 0x8,
-    DisableLoopbackMirroring = 0x10,
 };
 DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
 
@@ -54,7 +53,7 @@ public:
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
 
-    HRESULT HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const;
+    uint16_t HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const;
     uint16_t ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();
     void SetupLoopbackDevice();

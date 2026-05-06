@@ -411,6 +411,11 @@ bool WSLCVirtualMachine::FeatureEnabled(WSLCFeatureFlags Value) const
     return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
 }
 
+WSLCNetworkingMode WSLCVirtualMachine::NetworkingMode() const
+{
+    return m_networkingMode;
+}
+
 void WSLCVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
 try
 {
@@ -914,12 +919,24 @@ void WSLCVirtualMachine::MapPort(VMPortMapping& Mapping)
     else if (m_networkingMode == WSLCNetworkingModeVirtioProxy)
     {
         USHORT allocatedHostPort = 0;
-        THROW_IF_FAILED(m_vm->MapVirtioNetPort(
-            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str(), &allocatedHostPort));
+        auto result = m_vm->MapVirtioNetPort(
+            Mapping.HostPort(), Mapping.VmPort->Port(), Mapping.Protocol, Mapping.BindingAddressString().c_str(), &allocatedHostPort);
+
+        if (FAILED(result))
+        {
+            auto portString =
+                std::format("{}:{}/{}", Mapping.BindingAddressString(), Mapping.HostPort(), Mapping.Protocol == IPPROTO_TCP ? "tcp" : "udp");
+
+            THROW_HR_WITH_USER_ERROR(result, shared::Localization::MessageFailedToMapPort(portString, common::wslutil::GetErrorString(result)));
+        }
 
         // For anonymous binds, write back the allocated host port.
-        if (Mapping.HostPort() == WSLC_EPHEMERAL_PORT && allocatedHostPort != 0)
+        if (Mapping.HostPort() == WSLC_EPHEMERAL_PORT)
         {
+            WSL_LOG(
+                "AllocatedHostPort",
+                TraceLoggingValue(allocatedHostPort, "HostPort"),
+                TraceLoggingValue(Mapping.VmPort->Port(), "GuestPort"));
             Mapping.SetHostPort(allocatedHostPort);
         }
     }
