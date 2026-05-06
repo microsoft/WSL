@@ -1,13 +1,22 @@
-// Copyright (C) Microsoft Corporation. All rights reserved.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCNetworkMetadata.h
+
+Abstract:
+
+    Constants for auto generated container names.
+
+--*/
 
 #pragma once
 
 #include <array>
 
 namespace wsl::windows::service::wslc {
-
-// 55 descriptors x 56 mountains = 3,080 unique combinations.
-// With retry digit suffix (0-9), up to 30,800 unique names.
 
 constexpr std::array c_descriptors = {
     "swift",       "bold",      "misty",       "golden",     "rugged",     "serene",    "mighty",
