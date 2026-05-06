@@ -58,18 +58,14 @@
 Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
 
         <string id="WSLContainerCLIRegistryAllowlist">Allowlist for WSL container CLI registries</string>
-        <string id="WSLContainerCLIRegistryAllowlistExplain">When set, the WSL Container CLI will only be allowed to pull images from the registries listed here. Specify registries as a semicolon-separated list of hostnames (e.g. "registry1.example.com;registry2.example.com").
-
-If the allowlist is populated, only images from listed registries can be pulled.</string>
+        <string id="WSLContainerCLIRegistryAllowlistExplain">When enabled, the WSL Container CLI will only be allowed to pull images from the registries listed here.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">
         <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Default Networking Mode</dropdownList>
       </presentation>
       <presentation id="WSLContainerCLIRegistryAllowlist">
-        <textBox refId="WSLContainerCLIRegistryAllowlist_Input">
-          <label>Allowed registries (semicolon-separated)</label>
-        </textBox>
+        <listBox refId="WSLContainerCLIRegistryAllowlist_Input">Allowed registries</listBox>
       </presentation>
     </presentationTable>
   </resources>
