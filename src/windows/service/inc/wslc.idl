@@ -293,6 +293,9 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(NamedVolumesCount)] WSLCNamedVolume* NamedVolumes;
     ULONG NamedVolumesCount;
+
+    [unique, size_is(AdditionalNetworksCount)] LPCSTR* AdditionalNetworks;
+    ULONG AdditionalNetworksCount;
 } WSLCContainerOptions;
 
 typedef enum _WSLCContainerState

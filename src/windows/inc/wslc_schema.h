@@ -67,6 +67,23 @@ struct InspectContainerConfig
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainerConfig, Env, Cmd, Entrypoint, User, WorkingDir);
 };
 
+struct InspectEndpointSettings
+{
+    std::string IPAddress;
+    std::string Gateway;
+    std::string MacAddress;
+    int IPPrefixLen{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointSettings, IPAddress, Gateway, MacAddress, IPPrefixLen);
+};
+
+struct InspectNetworkSettings
+{
+    std::map<std::string, InspectEndpointSettings> Networks;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectNetworkSettings, Networks);
+};
+
 struct InspectContainer
 {
     std::string Id;
@@ -79,8 +96,9 @@ struct InspectContainer
     std::map<std::string, std::vector<InspectPortBinding>> Ports;
     std::vector<InspectMount> Mounts;
     std::map<std::string, std::string> Labels;
+    InspectNetworkSettings NetworkSettings;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings);
 };
 
 struct ImageConfig

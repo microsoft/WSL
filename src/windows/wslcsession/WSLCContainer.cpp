@@ -405,6 +405,62 @@ void ValidateNamedVolumes(
     }
 }
 
+void ValidateName(LPCSTR Name, size_t maxLength)
+{
+    const std::string_view name{Name};
+    static constexpr std::string_view validChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.";
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcInvalidName(Name),
+        name.empty() || name.size() > maxLength || name.find_first_not_of(validChars) != std::string_view::npos);
+}
+
+void ProcessAdditionalNetworks(
+    const WSLCContainerOptions& containerOptions,
+    const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
+    const std::string& primaryNetworkMode,
+    wsl::windows::common::docker_schema::CreateContainer& request)
+{
+    THROW_HR_IF(E_INVALIDARG, containerOptions.AdditionalNetworksCount > 0 && containerOptions.AdditionalNetworks == nullptr);
+
+    if (containerOptions.AdditionalNetworksCount == 0)
+    {
+        return;
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(
+        E_INVALIDARG,
+        Localization::MessageWslcAdditionalNetworksRequirePrimary(),
+        primaryNetworkMode == "host" || primaryNetworkMode == "none");
+
+    std::unordered_set<std::string> seenNetworks;
+
+    // Track the primary network name to detect duplicates in the additional networks list.
+    seenNetworks.insert(primaryNetworkMode);
+
+    // Add the primary and all additional networks to EndpointsConfig so Docker attaches them all at create time.
+    auto& endpointsConfig = request.NetworkingConfig.EndpointsConfig;
+    endpointsConfig[primaryNetworkMode] = {};
+
+    for (ULONG i = 0; i < containerOptions.AdditionalNetworksCount; i++)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.AdditionalNetworks[i], "AdditionalNetworks at index %lu is null", i);
+
+        const std::string networkName = containerOptions.AdditionalNetworks[i];
+
+        ValidateName(networkName.c_str(), WSLC_MAX_NETWORK_NAME_LENGTH);
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(networkName), !seenNetworks.insert(networkName).second);
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(networkName), !sessionNetworks.contains(networkName));
+
+        endpointsConfig[networkName] = {};
+    }
+}
+
 void ConfigureLdPathForGpu(std::vector<std::string>& Env)
 {
     static constexpr std::string_view ldLibraryPathPrefix = "LD_LIBRARY_PATH=";
@@ -1198,6 +1254,17 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
     // Map labels. m_labels should already exclude internal metadata labels.
     wslcInspect.Labels = m_labels;
 
+    // Map per-endpoint network settings from Docker inspect data.
+    for (const auto& [name, endpoint] : dockerInspect.NetworkSettings.Networks)
+    {
+        wslc_schema::InspectEndpointSettings wslcEndpoint{};
+        wslcEndpoint.IPAddress = endpoint.IPAddress;
+        wslcEndpoint.Gateway = endpoint.Gateway;
+        wslcEndpoint.MacAddress = endpoint.MacAddress;
+        wslcEndpoint.IPPrefixLen = endpoint.IPPrefixLen;
+        wslcInspect.NetworkSettings.Networks[name] = std::move(wslcEndpoint);
+    }
+
     return wslcInspect;
 }
 
@@ -1457,6 +1524,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     request.HostConfig.NetworkMode = networkMode;
 
+    ProcessAdditionalNetworks(containerOptions, sessionNetworks, networkMode, request);
+
     for (const auto& e : mappedPorts)
     {
         auto portKey = std::format("{}/{}", e.ContainerPort, e.ProtocolString());
@@ -1500,6 +1569,27 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Inspect the container to fetch its generated name (if needed) and Docker's authoritative Created timestamp.
     auto inspectData = DockerClient.InspectContainer(result.Id);
+
+    // Post-create verification: confirm every requested network is actually attached.
+    // If Docker rejected any endpoint, throw here so deleteOnFailure cleans up the orphan container.
+    if (containerOptions.AdditionalNetworksCount > 0)
+    {
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            !inspectData.NetworkSettings.Networks.contains(networkMode),
+            "Container was created but primary network '%hs' was not attached",
+            networkMode.c_str());
+    }
+
+    for (ULONG i = 0; i < containerOptions.AdditionalNetworksCount; i++)
+    {
+        const std::string networkName = containerOptions.AdditionalNetworks[i];
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            !inspectData.NetworkSettings.Networks.contains(networkName),
+            "Container was created but network '%hs' was not attached",
+            networkName.c_str());
+    }
 
     auto container = std::make_unique<WSLCContainerImpl>(
         wslcSession,

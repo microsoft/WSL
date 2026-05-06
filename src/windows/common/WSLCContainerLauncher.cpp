@@ -222,6 +222,11 @@ void wsl::windows::common::WSLCContainerLauncher::AddTmpfs(const std::string& Co
     m_tmpfsMounts.push_back(tmpfs);
 }
 
+void wsl::windows::common::WSLCContainerLauncher::AddAdditionalNetwork(const std::string& Name)
+{
+    m_additionalNetworks.push_back(Name);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::LaunchNoThrow(IWSLCSession& Session, WSLCContainerStartFlags Flags)
 {
     auto [result, container] = CreateNoThrow(Session);
@@ -325,6 +330,18 @@ std::pair<HRESULT, std::optional<RunningWSLCContainer>> WSLCContainerLauncher::C
 
     options.TmpfsCount = static_cast<ULONG>(m_tmpfsMounts.size());
     options.Tmpfs = m_tmpfsMounts.size() > 0 ? m_tmpfsMounts.data() : nullptr;
+
+    std::vector<const char*> additionalNetworksStorage;
+    for (const auto& e : m_additionalNetworks)
+    {
+        additionalNetworksStorage.push_back(e.c_str());
+    }
+
+    if (!additionalNetworksStorage.empty())
+    {
+        options.AdditionalNetworks = additionalNetworksStorage.data();
+        options.AdditionalNetworksCount = static_cast<ULONG>(additionalNetworksStorage.size());
+    }
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLCContainer> container;
