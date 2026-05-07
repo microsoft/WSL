@@ -4,7 +4,6 @@
 
 #include "INetworkingEngine.h"
 #include "GnsChannel.h"
-#include "DnsResolver.h"
 #include "WslCoreHostDnsInfo.h"
 #include "GnsPortTrackerChannel.h"
 #include "GuestDeviceManager.h"
@@ -17,20 +16,13 @@ enum class VirtioNetworkingFlags
     LocalhostRelay = 0x1,
     DnsTunneling = 0x2,
     Ipv6 = 0x4,
-    DnsTunnelingSocket = 0x8,
 };
 DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
 
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(
-        GnsChannel&& gnsChannel,
-        VirtioNetworkingFlags flags,
-        LPCWSTR dnsOptions,
-        std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-        wil::shared_handle userToken,
-        wil::unique_socket&& dnsHvsocket = {});
+    VirtioNetworking(GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
 
     ~VirtioNetworking();
 
@@ -70,7 +62,6 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
-    std::optional<networking::DnsResolver> m_dnsTunnelingResolver;
     std::optional<GUID> m_localhostAdapterId;
     std::optional<GUID> m_adapterId;
 

@@ -80,6 +80,9 @@ public:
     void SetDnsServers(std::vector<std::string>&& DnsServers);
     void SetDnsSearchDomains(std::vector<std::string>&& DnsSearchDomains);
     void SetDnsOptions(std::vector<std::string>&& DnsOptions);
+    void SetMemoryLimit(std::int64_t Bytes);
+    void SetNanoCpus(std::int64_t NanoCpus);
+    void AddUlimit(const std::string& Name, std::int64_t Soft, std::int64_t Hard);
 
     using WSLCProcessLauncher::FormatResult;
     using WSLCProcessLauncher::SetUser;
@@ -111,5 +114,9 @@ private:
     std::vector<WSLCTmpfsMount> m_tmpfsMounts;
     std::deque<std::string> m_tmpfsContainerPaths;
     std::deque<std::string> m_tmpfsOptions;
+    std::int64_t m_memoryBytes = 0;
+    std::int64_t m_nanoCpus = 0;
+    std::vector<WSLCUlimit> m_ulimits;
+    std::deque<std::string> m_ulimitNames;
 };
 } // namespace wsl::windows::common
