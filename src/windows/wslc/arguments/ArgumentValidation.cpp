@@ -40,6 +40,14 @@ void Argument::Validate(const ArgMap& execArgs) const
         validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
 
+    case ArgType::StopSignal:
+        validation::ValidateWSLCSignalFromString(execArgs.GetAll<ArgType::StopSignal>(), m_name);
+        break;
+
+    case ArgType::ShmSize:
+        validation::ValidateMemorySize(execArgs.GetAll<ArgType::ShmSize>(), m_name);
+        break;
+
     case ArgType::Tail:
         validation::ValidateIntegerFromString<ULONGLONG>(
             execArgs.GetAll<ArgType::Tail>(), m_name, [](auto value) { return value != 0; });
@@ -209,6 +217,25 @@ void ValidateGpus(const std::vector<std::wstring>& values, const std::wstring& a
             throw ArgumentException(Localization::WSLCCLI_GpusInvalidValue(argName, value));
         }
     }
+}
+
+void ValidateMemorySize(const std::vector<std::wstring>& values, const std::wstring& argName)
+{
+    for (const auto& value : values)
+    {
+        std::ignore = GetMemorySizeFromString(value, argName);
+    }
+}
+
+ULONGLONG GetMemorySizeFromString(const std::wstring& input, const std::wstring& argName)
+{
+    auto parsed = wsl::shared::string::ParseMemorySize(input.c_str());
+    if (!parsed.has_value())
+    {
+        throw ArgumentException(Localization::WSLCCLI_InvalidMemorySizeError(argName, input));
+    }
+
+    return parsed.value();
 }
 
 } // namespace wsl::windows::wslc::validation

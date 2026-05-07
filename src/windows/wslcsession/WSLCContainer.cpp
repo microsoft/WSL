@@ -1300,6 +1300,11 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLCContainerFlagsInit);
 
+    if (containerOptions.ShmSize > 0)
+    {
+        request.HostConfig.ShmSize = containerOptions.ShmSize;
+    }
+
     if (containerOptions.VolumesCount > 0)
     {
         THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
