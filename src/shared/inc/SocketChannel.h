@@ -132,6 +132,11 @@ public:
         return oldEvents;
     }
 
+    const std::vector<HANDLE>& GetExitEvents() const
+    {
+        return m_exitEvents;
+    }
+
 #endif
 
     template <typename TMessage>
@@ -174,7 +179,7 @@ public:
 #ifdef WIN32
 
         auto io = CreateIO();
-        io.AddHandle(std::make_unique<windows::common::relay::SocketWriteHandle>(m_socket.get(), span));
+        io.AddHandle(std::make_unique<windows::common::relay::WriteHandle>(m_socket.get(), span));
 
         io.Run(TimeoutToMilliseconds(timeout));
 

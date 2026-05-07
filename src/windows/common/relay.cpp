@@ -1162,12 +1162,13 @@ void ReadHandle::Schedule()
     DWORD bytesRead{};
     Overlapped.Offset = Offset.LowPart;
     Overlapped.OffsetHigh = Offset.HighPart;
-    if (ReadFile(Handle.Get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesRead, &Overlapped))
+    auto* bufferData = reinterpret_cast<char*>(Buffer.Span().data());
+    if (ReadFile(Handle.Get(), bufferData, static_cast<DWORD>(Buffer.Size()), &bytesRead, &Overlapped))
     {
         Offset.QuadPart += bytesRead;
 
         // Signal the read.
-        OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
+        OnRead(gsl::make_span<char>(bufferData, static_cast<size_t>(bytesRead)));
 
         // ReadFile completed immediately, process the result right away.
         if (bytesRead == 0)
@@ -1218,7 +1219,7 @@ void ReadHandle::Collect()
     Offset.QuadPart += bytesRead;
 
     // Signal the read.
-    OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
+    OnRead(gsl::make_span<char>(reinterpret_cast<char*>(Buffer.Span().data()), static_cast<size_t>(bytesRead)));
 
     // Transition to Complete if this was a zero byte read.
     if (bytesRead == 0)
@@ -1486,8 +1487,7 @@ void ReadSocketMessageHandle::ScheduleRecv()
         auto error = WSAGetLastError();
         if (error == WSAECONNABORTED || error == WSAECONNRESET)
         {
-            OnMessage({});
-            State = IOHandleStatus::Completed;
+            ProcessRecvResult(0);
             return;
         }
 
@@ -1501,6 +1501,16 @@ void ReadSocketMessageHandle::ProcessRecvResult(DWORD BytesRead)
 {
     if (BytesRead == 0)
     {
+        // If the socket was closed before any bytes of the next message were read, signal a clean end-of-stream.
+        // If some bytes were already buffered, the peer closed mid-message which is a protocol error.
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            CurrentOffset > 0,
+            "Socket closed before a complete message could be read. ReadingHeader: %d, CurrentOffset: %zu, BytesRemaining: %zu",
+            ReadingHeader,
+            CurrentOffset,
+            BytesRemaining);
+
         OnMessage({});
         State = IOHandleStatus::Completed;
         return;
@@ -1646,8 +1656,16 @@ HANDLE SocketWriteHandle::GetHandle() const
     return Event.get();
 }
 
-WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Buffer) :
-    Handle(std::move(MovedHandle)), Buffer(Buffer), Offset(InitializeFileOffset(Handle.Get()))
+WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source) :
+    Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get()))
+{
+    std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
+    Remaining = Buffer.Span();
+    Overlapped.hEvent = Event.get();
+}
+
+WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, gsl::span<gsl::byte> Source) :
+    Handle(std::move(MovedHandle)), Buffer(Source), Remaining(Buffer.Span()), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
 }
@@ -1671,12 +1689,12 @@ void WriteHandle::Schedule()
 
     // Schedule the write.
     DWORD bytesWritten{};
-    if (WriteFile(Handle.Get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesWritten, &Overlapped))
+    if (WriteFile(Handle.Get(), Remaining.data(), static_cast<DWORD>(Remaining.size()), &bytesWritten, &Overlapped))
     {
         Offset.QuadPart += bytesWritten;
 
-        Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
-        if (Buffer.empty())
+        Remaining = Remaining.subspan(bytesWritten);
+        if (Remaining.empty())
         {
             State = IOHandleStatus::Completed;
         }
@@ -1703,8 +1721,8 @@ void WriteHandle::Collect()
     THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.Get(), &Overlapped, &bytesWritten, false));
     Offset.QuadPart += bytesWritten;
 
-    Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
-    if (Buffer.empty())
+    Remaining = Remaining.subspan(bytesWritten);
+    if (Remaining.empty())
     {
         State = IOHandleStatus::Completed;
     }
@@ -1716,7 +1734,11 @@ void WriteHandle::Push(const gsl::span<char>& Content)
     WI_ASSERT(State == IOHandleStatus::Standby || State == IOHandleStatus::Completed);
     WI_ASSERT(!Content.empty());
 
-    Buffer.insert(Buffer.end(), Content.begin(), Content.end());
+    // Resize() throws E_UNEXPECTED if Buffer does not own its storage.
+    const auto oldSize = Buffer.Size();
+    Buffer.Resize(oldSize + Content.size());
+    std::memcpy(Buffer.Span().data() + oldSize, Content.data(), Content.size());
+    Remaining = Buffer.Span();
 
     State = IOHandleStatus::Standby;
 }

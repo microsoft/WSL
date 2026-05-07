@@ -594,6 +594,10 @@ void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, con
 std::string ReadToString(SOCKET Handle);
 std::string ReadToString(HANDLE Handle);
 
+// Connects a pair of overlapped TCP sockets via an anonymous bind on the loopback interface.
+// Returns {client, server}.
+std::pair<wil::unique_socket, wil::unique_socket> MakeSocketPair();
+
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 

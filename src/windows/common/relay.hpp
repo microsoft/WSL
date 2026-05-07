@@ -231,6 +231,48 @@ private:
     std::function<void()> OnClose;
 };
 
+// A buffer that may either own its underlying storage (constructed from a size, allocating an
+// internal std::vector<char>) or borrow it from a caller-provided gsl::span<gsl::byte>.
+class BufferWrapper
+{
+public:
+    DEFAULT_MOVABLE(BufferWrapper);
+    NON_COPYABLE(BufferWrapper);
+
+    explicit BufferWrapper(size_t size) : m_owned(std::in_place, size)
+    {
+    }
+
+    explicit BufferWrapper(gsl::span<gsl::byte> span) : m_unowned(span)
+    {
+    }
+
+    bool Owned() const noexcept
+    {
+        return m_owned.has_value();
+    }
+
+    void Resize(size_t size)
+    {
+        THROW_HR_IF_MSG(E_UNEXPECTED, !Owned(), "BufferWrapper::Resize called on a non-owned buffer");
+        m_owned->resize(size);
+    }
+
+    gsl::span<gsl::byte> Span() noexcept
+    {
+        return Owned() ? gsl::make_span(reinterpret_cast<gsl::byte*>(m_owned->data()), m_owned->size()) : m_unowned;
+    }
+
+    size_t Size() const noexcept
+    {
+        return Owned() ? m_owned->size() : m_unowned.size();
+    }
+
+private:
+    std::optional<std::vector<char>> m_owned;
+    gsl::span<gsl::byte> m_unowned;
+};
+
 class OverlappedIOHandle
 {
 public:
@@ -282,7 +324,7 @@ private:
     std::function<void(const gsl::span<char>& Buffer)> OnRead;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
-    std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
+    BufferWrapper Buffer{LX_RELAY_BUFFER_SIZE};
     LARGE_INTEGER Offset{};
 };
 
@@ -397,6 +439,7 @@ public:
     NON_MOVABLE(WriteHandle);
 
     WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Buffer = {});
+    WriteHandle(HandleWrapper&& Handle, gsl::span<gsl::byte> Span);
     ~WriteHandle();
     void Schedule() override;
     void Collect() override;
@@ -407,7 +450,8 @@ private:
     HandleWrapper Handle;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
-    std::vector<char> Buffer;
+    BufferWrapper Buffer;
+    gsl::span<gsl::byte> Remaining;
     LARGE_INTEGER Offset{};
 };
 

@@ -552,7 +552,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLCVirtualMachine::For
     auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmTerminatingEvent.get(), m_initChannelTimeout);
 
     return std::make_tuple(
-        pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent}});
+        pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), std::vector<HANDLE>{Channel.GetExitEvents()}});
 }
 
 WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
