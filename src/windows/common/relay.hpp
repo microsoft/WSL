@@ -258,6 +258,19 @@ public:
         m_owned->resize(size);
     }
 
+    void Consume(size_t bytes) noexcept
+    {
+        WI_ASSERT(bytes <= Size());
+        if (Owned())
+        {
+            m_owned->erase(m_owned->begin(), m_owned->begin() + bytes);
+        }
+        else
+        {
+            m_unowned = m_unowned.subspan(bytes);
+        }
+    }
+
     gsl::span<gsl::byte> Span() noexcept
     {
         return Owned() ? gsl::make_span(reinterpret_cast<gsl::byte*>(m_owned->data()), m_owned->size()) : m_unowned;
@@ -451,7 +464,6 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     BufferWrapper Buffer;
-    gsl::span<gsl::byte> Remaining;
     LARGE_INTEGER Offset{};
 };
 

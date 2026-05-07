@@ -1660,12 +1660,11 @@ WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& S
     Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get()))
 {
     std::memcpy(Buffer.Span().data(), Source.data(), Source.size());
-    Remaining = Buffer.Span();
     Overlapped.hEvent = Event.get();
 }
 
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, gsl::span<gsl::byte> Source) :
-    Handle(std::move(MovedHandle)), Buffer(Source), Remaining(Buffer.Span()), Offset(InitializeFileOffset(Handle.Get()))
+    Handle(std::move(MovedHandle)), Buffer(Source), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
 }
@@ -1688,13 +1687,14 @@ void WriteHandle::Schedule()
     Overlapped.OffsetHigh = Offset.HighPart;
 
     // Schedule the write.
+    const auto buffer = Buffer.Span();
     DWORD bytesWritten{};
-    if (WriteFile(Handle.Get(), Remaining.data(), static_cast<DWORD>(Remaining.size()), &bytesWritten, &Overlapped))
+    if (WriteFile(Handle.Get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesWritten, &Overlapped))
     {
         Offset.QuadPart += bytesWritten;
 
-        Remaining = Remaining.subspan(bytesWritten);
-        if (Remaining.empty())
+        Buffer.Consume(bytesWritten);
+        if (Buffer.Size() == 0)
         {
             State = IOHandleStatus::Completed;
         }
@@ -1721,8 +1721,8 @@ void WriteHandle::Collect()
     THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.Get(), &Overlapped, &bytesWritten, false));
     Offset.QuadPart += bytesWritten;
 
-    Remaining = Remaining.subspan(bytesWritten);
-    if (Remaining.empty())
+    Buffer.Consume(bytesWritten);
+    if (Buffer.Size() == 0)
     {
         State = IOHandleStatus::Completed;
     }
@@ -1738,7 +1738,6 @@ void WriteHandle::Push(const gsl::span<char>& Content)
     const auto oldSize = Buffer.Size();
     Buffer.Resize(oldSize + Content.size());
     std::memcpy(Buffer.Span().data() + oldSize, Content.data(), Content.size());
-    Remaining = Buffer.Span();
 
     State = IOHandleStatus::Standby;
 }
