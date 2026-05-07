@@ -81,8 +81,8 @@ unset(_wslcsdk_lib_dir)
 # IMAGE is the container image reference (required).
 # TAR_LOCATION is the output path for the saved image tarball
 # (optional; defaults to ${CMAKE_CURRENT_BINARY_DIR}/<target>.tar).
-# The image is exported via 'wslc image save' on every build, even
-# when sources have not changed.
+# The build, save, and prune steps run together when SOURCES change;
+# `cmake --build . --target clean` (and VS Clean) remove the tar.
 
 function(wslc_add_image _target_name)
     cmake_parse_arguments(
@@ -120,8 +120,14 @@ function(wslc_add_image _target_name)
     endif()
     # Normalize TAR_LOCATION to an absolute path. A bare filename or relative
     # path would leave _tar_dir empty below and break `make_directory ""`.
-    get_filename_component(ARG_TAR_LOCATION "${ARG_TAR_LOCATION}" ABSOLUTE
-                           BASE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+    # Skip the normalization when the path contains a generator expression
+    # (e.g. $<TARGET_FILE_DIR:...>) — those resolve to absolute paths at
+    # build time and would otherwise get BASE_DIR prepended at configure
+    # time, producing a doubled path like build/$<...>/foo.tar.
+    if(NOT ARG_TAR_LOCATION MATCHES "\\$<")
+        get_filename_component(ARG_TAR_LOCATION "${ARG_TAR_LOCATION}" ABSOLUTE
+                               BASE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+    endif()
 
     # Find wslc CLI
     if(NOT WSLC_CLI_PATH)
@@ -153,20 +159,25 @@ function(wslc_add_image _target_name)
 
     get_filename_component(_tar_dir "${ARG_TAR_LOCATION}" DIRECTORY)
 
+    # build + save + prune live in one add_custom_command so the tar shows
+    # up as a known OUTPUT — this is what makes Visual Studio's Clean (and
+    # `cmake --build . --target clean`) actually delete the tar on rebuild.
+    # The chain is incremental: when ${_resolved_sources} hasn't changed,
+    # nothing reruns. (MSBuild side is unconditional save-every-build by
+    # design; CMake gets to be smarter because OUTPUT semantics demand it.)
     add_custom_command(
-        OUTPUT "${_stamp}"
+        OUTPUT "${_stamp}" "${ARG_TAR_LOCATION}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${_tar_dir}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
+        COMMAND "${WSLC_CLI_PATH}" image save -o "${ARG_TAR_LOCATION}" "${_image_ref}"
+        # Prune dangling images left behind by previous builds. The image we
+        # just tagged stays; only untagged predecessors get removed.
+        COMMAND "${WSLC_CLI_PATH}" image prune
         COMMAND ${CMAKE_COMMAND} -E touch "${_stamp}"
         DEPENDS ${_resolved_sources} "${_dockerfile_path}"
-        COMMENT "WSLC: Building image '${_image_ref}'..."
+        COMMENT "WSLC: Building image '${_image_ref}', saving to '${ARG_TAR_LOCATION}', and pruning dangling images..."
         VERBATIM
     )
 
-    add_custom_target(${_target_name} ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${_tar_dir}"
-        COMMAND "${WSLC_CLI_PATH}" image save -o "${ARG_TAR_LOCATION}" "${_image_ref}"
-        DEPENDS "${_stamp}"
-        COMMENT "WSLC: Saving image '${_image_ref}' to '${ARG_TAR_LOCATION}'..."
-        VERBATIM
-    )
+    add_custom_target(${_target_name} ALL DEPENDS "${_stamp}" "${ARG_TAR_LOCATION}")
 endfunction()
