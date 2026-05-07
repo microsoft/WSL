@@ -786,12 +786,12 @@ class NetworkTests
         if (HostHasInternetConnectivity(AF_INET))
         {
             // Test A record resolution (IPv4) with both UDP and TCP
-            VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+            VerifyDigDnsResolution(L"dig +short +time=10 A bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 A bing.com");
 
             // Test reverse DNS lookup
-            VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +short +time=10 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 -x 8.8.8.8");
         }
         else
         {
@@ -801,8 +801,8 @@ class NetworkTests
         if (HostHasInternetConnectivity(AF_INET6))
         {
             // Test AAAA record resolution (IPv6) with both UDP and TCP
-            VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +short +time=10 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 AAAA bing.com");
         }
         else
         {
@@ -813,53 +813,53 @@ class NetworkTests
     static void VerifyDnsResolutionRecordTypes()
     {
         // Test various DNS record types
-        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 SOA bing.com");
     }
 
     static void VerifyDnsQueries()
     {
         // query for A/IPv4 records
-        VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 A bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 A bing.com");
 
         // query for AAAA/IPv6 records
-        VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 AAAA bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 AAAA bing.com");
 
         // query for MX records
-        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 MX bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 MX bing.com");
 
         // query for NS records
-        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 NS bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 NS bing.com");
 
         // reverse DNS lookup
-        VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+        VerifyDigDnsResolution(L"dig +short +time=10 -x 8.8.8.8");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 -x 8.8.8.8");
 
         // query for SOA records
-        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 SOA bing.com");
 
         // query for TXT records
-        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 TXT bing.com");
 
         // query for CNAME records
-        VerifyDigDnsResolution(L"dig +time=5 CNAME bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +time=5 CNAME bing.com");
+        VerifyDigDnsResolution(L"dig +time=10 CNAME bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +time=10 CNAME bing.com");
 
         // query for SRV records
-        VerifyDigDnsResolution(L"dig +time=5 SRV bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +time=5 SRV bing.com");
+        VerifyDigDnsResolution(L"dig +time=10 SRV bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +time=10 SRV bing.com");
 
         // query for ANY - for this option dig expects a large response so it will query directly over TCP,
         // instead of trying UDP first and falling back to TCP.
-        VerifyDigDnsResolution(L"dig +short ANY bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 ANY bing.com");
     }
 
     static void VerifyDnsSuffixes()

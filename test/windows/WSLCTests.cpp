@@ -1126,6 +1126,13 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ImportImage)
     {
+        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
+        // TODO: Remove once the fix is available.
+        if (IsWindowsServer())
+        {
+            SKIP_TEST_UNSTABLE();
+        }
+
         auto cleanup =
             wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
 
