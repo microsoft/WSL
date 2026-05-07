@@ -30,7 +30,6 @@ using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
 using wsl::windows::common::relay::SingleAcceptHandle;
-using wsl::windows::common::relay::SocketWriteHandle;
 using wsl::windows::common::relay::WriteHandle;
 
 namespace {
