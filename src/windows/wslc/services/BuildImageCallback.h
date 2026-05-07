@@ -35,9 +35,6 @@ private:
 
     void CollapseWindow();
     void Redraw();
-    // Use WriteConsoleW directly rather than wprintf: wprintf is noticeably slower for
-    // the per-redraw scrolling display and produces visible flicker.
-    void WriteTerminal(std::wstring_view content) const;
     bool IsCancelled() const;
 
     const bool m_verbose;

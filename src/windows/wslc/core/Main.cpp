@@ -112,7 +112,7 @@ try
         // If the user pressed Ctrl-C, acknowledge the cancellation and exit.
         if (context.CancelEvent && context.CancelEvent.is_signaled())
         {
-            fwprintf(stderr, L"\nCancelled.\n");
+            wslutil::PrintMessage(L"\nCancelled.", stderr);
             return 1;
         }
 

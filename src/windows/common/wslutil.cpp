@@ -1329,10 +1329,49 @@ void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout
     fwprintf(stream, L"%ls\n", GetSystemErrorString(result).c_str());
 }
 
+void wsl::windows::common::wslutil::Print(_In_ std::wstring_view content, _Inout_ FILE* const stream)
+{
+    // For console handles, write the buffer in one WriteConsoleW call. wide stdio
+    // (wprintf/fwprintf) goes through a per-character UCRT path in _O_U8TEXT mode that
+    // is slow and produces visible flicker for multi-line redraws.
+    const int fd = _fileno(stream);
+    if (fd >= 0)
+    {
+        const auto handle = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+        DWORD consoleMode;
+        if (handle != INVALID_HANDLE_VALUE && GetConsoleMode(handle, &consoleMode))
+        {
+            DWORD written;
+            if (WriteConsoleW(handle, content.data(), static_cast<DWORD>(content.size()), &written, nullptr))
+            {
+                return;
+            }
+        }
+    }
+
+    fwprintf(stream, L"%.*ls", static_cast<int>(content.size()), content.data());
+}
+
 void wsl::windows::common::wslutil::PrintMessageImpl(_In_ const std::wstring& message, _In_ va_list& args, _Inout_ FILE* const stream)
 {
-    vfwprintf(stream, message.c_str(), args);
-    fputws(L"\n", stream);
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+    const int needed = _vscwprintf(message.c_str(), argsCopy);
+    va_end(argsCopy);
+
+    if (needed >= 0)
+    {
+        std::wstring formatted(static_cast<size_t>(needed) + 1, L'\0');
+        vswprintf(formatted.data(), formatted.size(), message.c_str(), args);
+        formatted.resize(static_cast<size_t>(needed));
+        formatted += L'\n';
+        Print(formatted, stream);
+    }
+    else
+    {
+        vfwprintf(stream, message.c_str(), args);
+        fputws(L"\n", stream);
+    }
 }
 
 void wsl::windows::common::wslutil::PrintMessageImpl(_In_ const std::wstring& message, _Inout_ FILE* const stream, ...)
@@ -1345,7 +1384,17 @@ void wsl::windows::common::wslutil::PrintMessageImpl(_In_ const std::wstring& me
 
 void wsl::windows::common::wslutil::PrintMessage(_In_ const std::wstring& message, _Inout_ FILE* const stream)
 {
-    fwprintf(stream, L"%ls\n", message.c_str());
+    Print(std::wstring{message} + L'\n', stream);
+}
+
+void wsl::windows::common::wslutil::PrintMessage(_In_ const std::string& message, _Inout_ FILE* const stream)
+{
+    PrintMessage(string::MultiByteToWide(message), stream);
+}
+
+void wsl::windows::common::wslutil::Print(_In_ std::string_view content, _Inout_ FILE* const stream)
+{
+    Print(string::MultiByteToWide(content), stream);
 }
 
 void wsl::windows::common::wslutil::SetCrtEncoding(int Mode)

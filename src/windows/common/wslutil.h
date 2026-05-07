@@ -292,6 +292,11 @@ void PrintMessageImpl(_In_ const std::wstring& message, _In_ va_list& args, _Ino
 void PrintMessageImpl(_In_ const std::wstring& message, _Inout_ FILE* stream = stdout, ...);
 
 void PrintMessage(_In_ const std::wstring& message, _Inout_ FILE* stream = stdout);
+void PrintMessage(_In_ const std::string& message, _Inout_ FILE* stream = stdout);
+
+// Like PrintMessage but does not append a newline.
+void Print(_In_ std::wstring_view content, _Inout_ FILE* stream = stdout);
+void Print(_In_ std::string_view content, _Inout_ FILE* stream = stdout);
 
 // This template is used to switch between the varargs and non-vararg versions of PrintMessage().
 // If no varargs are passed, then the string shouldn't be used as a printf format specifier.

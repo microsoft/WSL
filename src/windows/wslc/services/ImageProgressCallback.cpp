@@ -19,18 +19,19 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
+using namespace wsl::windows::common;
 
 auto ImageProgressCallback::MoveToLine(SHORT line)
 {
     if (line > 0)
     {
-        wprintf(L"\033[%iA", line);
+        wslutil::Print(std::format(L"\033[{}A", line));
     }
 
     return wil::scope_exit([line = line]() {
         if (line > 1)
         {
-            wprintf(L"\033[%iB", line - 1);
+            wslutil::Print(std::format(L"\033[{}B", line - 1));
         }
     });
 }
@@ -46,7 +47,7 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
 
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
-            wprintf(L"%hs\n", status);
+            wslutil::PrintMessage(status);
             m_currentLine++;
             return S_OK;
         }
@@ -58,13 +59,13 @@ HRESULT ImageProgressCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG cu
         {
             // If this is the first time we see this ID, create a new line for it.
             m_statuses.emplace(id, m_currentLine);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            wslutil::PrintMessage(GenerateStatusLine(status, id, current, total, info));
             m_currentLine++;
         }
         else
         {
             auto revert = MoveToLine(m_currentLine - it->second);
-            wprintf(L"%ls\n", GenerateStatusLine(status, id, current, total, info).c_str());
+            wslutil::PrintMessage(GenerateStatusLine(status, id, current, total, info));
         }
 
         return S_OK;

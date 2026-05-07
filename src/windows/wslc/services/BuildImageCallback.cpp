@@ -17,7 +17,7 @@ Abstract:
 
 namespace wsl::windows::wslc::services {
 
-using wsl::windows::common::string::MultiByteToWide;
+using namespace wsl::windows::common;
 
 BuildImageCallback::~BuildImageCallback()
 try
@@ -37,17 +37,11 @@ try
     {
         for (const auto& line : m_allLines)
         {
-            WriteTerminal(MultiByteToWide(line));
+            wslutil::Print(line);
         }
     }
 }
 CATCH_LOG()
-
-void BuildImageCallback::WriteTerminal(std::wstring_view content) const
-{
-    DWORD written;
-    LOG_IF_WIN32_BOOL_FALSE(WriteConsoleW(m_console, content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
-}
 
 bool BuildImageCallback::IsCancelled() const
 {
@@ -58,7 +52,7 @@ void BuildImageCallback::CollapseWindow()
 {
     if (m_displayedLines > 0)
     {
-        WriteTerminal(std::format(L"\033[{}A\033[J", m_displayedLines));
+        wslutil::Print(std::format(L"\033[{}A\033[J", m_displayedLines));
         m_displayedLines = 0;
     }
 
@@ -83,7 +77,7 @@ try
 
     if (m_verbose || !m_isConsole)
     {
-        wprintf(L"%hs", status);
+        wslutil::Print(status);
         return S_OK;
     }
 
@@ -95,7 +89,7 @@ try
     {
         // Permanent line: collapse the scrolling window then print directly.
         CollapseWindow();
-        WriteTerminal(MultiByteToWide(status));
+        wslutil::Print(status);
         return S_OK;
     }
 
@@ -191,7 +185,7 @@ void BuildImageCallback::Redraw()
     }
 
     auto appendLine = [&](const std::string& line) {
-        auto wline = MultiByteToWide(line);
+        auto wline = string::MultiByteToWide(line);
         if (static_cast<SHORT>(wline.size()) > consoleWidth)
         {
             wline.resize(consoleWidth);
@@ -219,7 +213,7 @@ void BuildImageCallback::Redraw()
 
     buffer += L"\033[22m\033[?25h";
 
-    WriteTerminal(buffer);
+    wslutil::Print(buffer);
     m_displayedLines = displayCount;
 }
 
