@@ -2630,11 +2630,21 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Ta bort containern när den stoppas</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signal to stop the container</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>Sessions-ID</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Sökväg för sessionslagring</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signal to send</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuell eller befintlig bildreferens i formatet image-name[:tag]</value>
@@ -2643,7 +2653,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <value>Tagg för den byggda bilden</value>
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
-    <value>Number of lines to show from the end of the logs</value>
+    <value>Antal rader som visas från slutet av loggarna</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Ny bildreferens i formatet image-name[:tag]</value>
@@ -2737,12 +2747,16 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: {}</value>
+    <value>Ogiltigt {} argumentvärde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Ogiltigt {}-värde: {} ligger utanför giltigt intervall ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Avbildningen {} hittades inte, hämtar</value>

@@ -2636,11 +2636,21 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Rimuovi il contenitore dopo l'arresto</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signal to stop the container</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>ID sessione</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Percorso di archiviazione sessione</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signal to send</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Riferimento all'immagine corrente o esistente nel formato nome-immagine[:tag]</value>
@@ -2649,7 +2659,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <value>Tag per l'immagine generata</value>
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
-    <value>Number of lines to show from the end of the logs</value>
+    <value>Numero di righe da visualizzare dalla fine dei log</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>Nuovo riferimento immagine nel formato nome-immagine[:tag]</value>
@@ -2743,12 +2753,16 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: {}</value>
+    <value>Valore {} non valido per l'argomento: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Valore {} non valido: {} non è compreso nell'intervallo valido ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Immagine '{}' non trovata, in fase di pull</value>

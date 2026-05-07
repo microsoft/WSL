@@ -169,7 +169,7 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Sağlanan yükleme konumu zaten kullanılıyor.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir ad seçmek için --name komutunu kullanın.</value>
+    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir ad seçmek için --name parametresini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -805,7 +805,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
     <value>EventViewer'ı aç</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım adını seçmek için --name seçeneğini kullanın.</value>
+    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım adını seçmek için --name parametresini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -2630,11 +2630,21 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
     <value>Kapsayıcı durduktan sonra kaldır</value>
   </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signal to stop the container</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
     <value>Oturum Kimliği</value>
   </data>
   <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
     <value>Oturum depolama alanı yolu</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signal to send</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde geçerli veya mevcut resim referansı</value>
@@ -2643,7 +2653,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Oluşturulan görüntünün etiketi</value>
   </data>
   <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
-    <value>Number of lines to show from the end of the logs</value>
+    <value>Günlüklerin sonundan itibaren gösterilecek satır sayısı</value>
   </data>
   <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde yeni resim referansı</value>
@@ -2737,12 +2747,16 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
-    <value>Invalid {} argument value: {}</value>
+    <value>Geçersiz {} bağımsız değişken değeri: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
     <value>Geçersiz {} değeri: {} geçerli aralığın dışında ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>'{}' görüntüsü bulunamadı, getiriliyor</value>
