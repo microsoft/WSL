@@ -2043,20 +2043,20 @@ try
 
     *SpaceReclaimed = pruneResult.SpaceReclaimed;
 
-    if (!pruneResult.Deleted.empty())
+    if (!pruneResult.Volumes.empty())
     {
-        auto output = wil::make_unique_cotaskmem<WSLCVolumeName[]>(pruneResult.Deleted.size());
-        for (size_t i = 0; i < pruneResult.Deleted.size(); ++i)
+        auto output = wil::make_unique_cotaskmem<WSLCVolumeName[]>(pruneResult.Volumes.size());
+        for (size_t i = 0; i < pruneResult.Volumes.size(); ++i)
         {
             THROW_HR_IF_MSG(
                 E_UNEXPECTED,
-                strcpy_s(output[i], pruneResult.Deleted[i].c_str()) != 0,
+                strcpy_s(output[i], pruneResult.Volumes[i].c_str()) != 0,
                 "Unexpected volume name length: %hs",
-                pruneResult.Deleted[i].c_str());
+                pruneResult.Volumes[i].c_str());
         }
 
         *Volumes = output.release();
-        *VolumesCount = static_cast<ULONG>(pruneResult.Deleted.size());
+        *VolumesCount = static_cast<ULONG>(pruneResult.Volumes.size());
     }
 
     return S_OK;

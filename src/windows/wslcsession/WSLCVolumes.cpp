@@ -277,7 +277,7 @@ WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const WSLCPruneVolumes
         return result;
     }
 
-    result.Deleted.reserve(dockerResult.VolumesDeleted->size());
+    result.Volumes.reserve(dockerResult.VolumesDeleted->size());
 
     // TODO: VHD volumes are exposed to docker as bind mounts, which docker's volume
     // prune skips. So this only ever prunes guest volumes today. VHD volume pruning
@@ -299,7 +299,7 @@ WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const WSLCPruneVolumes
 
         m_volumes.erase(it);
         m_expectedEvents.emplace_back(name, VolumeEvent::Destroy);
-        result.Deleted.push_back(name);
+        result.Volumes.push_back(name);
     }
 
     return result;

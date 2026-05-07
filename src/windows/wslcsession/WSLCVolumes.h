@@ -44,8 +44,8 @@ public:
 
     struct PruneVolumesResult
     {
-        std::vector<std::string> Deleted;
-        std::uint64_t SpaceReclaimed;
+        std::vector<std::string> Volumes;
+        std::uint64_t SpaceReclaimed{};
     };
 
     PruneVolumesResult PruneVolumes(_In_opt_ const WSLCPruneVolumesOptions* Options);
