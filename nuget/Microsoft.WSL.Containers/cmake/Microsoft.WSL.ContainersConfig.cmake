@@ -67,24 +67,29 @@ unset(_wslcsdk_lib_dir)
 #   find_package(Microsoft.WSL.Containers REQUIRED)
 #
 #   wslc_add_image(my-server
-#       IMAGE       ghcr.io/myorg/my-server
-#       DOCKERFILE  container/Dockerfile
-#       CONTEXT     container/
-#       SOURCES     container/src/*.cpp container/src/*.h
-#       TAG         latest
+#       IMAGE        ghcr.io/myorg/my-server
+#       DOCKERFILE   container/Dockerfile
+#       CONTEXT      container/
+#       SOURCES      container/src/*.cpp container/src/*.h
+#       TAG          latest
+#       TAR_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/my-server.tar
 #   )
 #
 #   add_dependencies(my_app my-server)
 #
 # The first positional argument is the CMake target name.
 # IMAGE is the container image reference (required).
+# TAR_LOCATION is the output path for the saved image tarball
+# (optional; defaults to ${CMAKE_CURRENT_BINARY_DIR}/<target>.tar).
+# The image is exported via 'wslc image save' on every build, even
+# when sources have not changed.
 
 function(wslc_add_image _target_name)
     cmake_parse_arguments(
         PARSE_ARGV 1 ARG
-        ""                                      # options (none)
-        "IMAGE;TAG;DOCKERFILE;CONTEXT"           # one-value keywords
-        "SOURCES"                                # multi-value keywords
+        ""                                            # options (none)
+        "IMAGE;TAG;DOCKERFILE;CONTEXT;TAR_LOCATION"   # one-value keywords
+        "SOURCES"                                     # multi-value keywords
     )
 
     # Validate required arguments
@@ -110,6 +115,13 @@ function(wslc_add_image _target_name)
     if(NOT ARG_TAG)
         set(ARG_TAG "latest")
     endif()
+    if(NOT ARG_TAR_LOCATION)
+        set(ARG_TAR_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/${_target_name}.tar")
+    endif()
+    # Normalize TAR_LOCATION to an absolute path. A bare filename or relative
+    # path would leave _tar_dir empty below and break `make_directory ""`.
+    get_filename_component(ARG_TAR_LOCATION "${ARG_TAR_LOCATION}" ABSOLUTE
+                           BASE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
     # Find wslc CLI
     if(NOT WSLC_CLI_PATH)
@@ -139,6 +151,8 @@ function(wslc_add_image _target_name)
         file(GLOB_RECURSE _resolved_sources CONFIGURE_DEPENDS "${_context_path}/*")
     endif()
 
+    get_filename_component(_tar_dir "${ARG_TAR_LOCATION}" DIRECTORY)
+
     add_custom_command(
         OUTPUT "${_stamp}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
@@ -149,6 +163,10 @@ function(wslc_add_image _target_name)
     )
 
     add_custom_target(${_target_name} ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${_tar_dir}"
+        COMMAND "${WSLC_CLI_PATH}" image save -o "${ARG_TAR_LOCATION}" "${_image_ref}"
         DEPENDS "${_stamp}"
+        COMMENT "WSLC: Saving image '${_image_ref}' to '${ARG_TAR_LOCATION}'..."
+        VERBATIM
     )
 endfunction()

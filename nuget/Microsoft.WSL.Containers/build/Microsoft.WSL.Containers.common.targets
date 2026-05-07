@@ -19,6 +19,7 @@
         <WslcImage>
             <Image></Image>
             <Tag>latest</Tag>
+            <TarLocation></TarLocation>
         </WslcImage>
     </ItemDefinitionGroup>
 
@@ -68,6 +69,10 @@
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildSingleImage"
                  Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
+
+        <MSBuild Projects="$(MSBuildProjectFullPath)"
+                 Targets="_WslcSaveSingleImage"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTag=%(WslcImage.Tag);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir)" />
     </Target>
 
     <!--
@@ -111,6 +116,32 @@
 
         <Message Importance="high"
                  Text="WSLC: Image '$(_WslcImageRef):$(_WslcTag)' built successfully." />
+    </Target>
+
+    <!-- Inner target: save a single image to a tar file. Has no Inputs/Outputs so it always runs.
+         Image must already exist in the wslc default session (left there by _WslcBuildSingleImage). -->
+    <Target Name="_WslcSaveSingleImage">
+
+        <PropertyGroup>
+            <!-- Resolve image reference: use Image metadata if set, otherwise fall back to Identity -->
+            <_WslcImageRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcImageRef>
+            <_WslcImageRef Condition="'$(_WslcImageRef)' == ''">$(_WslcName)</_WslcImageRef>
+            <_WslcFullRef>$(_WslcImageRef):$(_WslcTag)</_WslcFullRef>
+
+            <!-- Resolve tar path: user-provided TarLocation, else $(OutDir)<name>.tar -->
+            <_WslcTarPath Condition="'$(_WslcTarLocation)' != ''">$(_WslcTarLocation)</_WslcTarPath>
+            <_WslcTarPath Condition="'$(_WslcTarPath)' == ''">$(_WslcOutDir)$(_WslcName).tar</_WslcTarPath>
+
+            <_WslcTarDir>$([System.IO.Path]::GetDirectoryName('$(_WslcTarPath)'))</_WslcTarDir>
+        </PropertyGroup>
+
+        <MakeDir Directories="$(_WslcTarDir)" Condition="'$(_WslcTarDir)' != ''" />
+
+        <Message Importance="high"
+                 Text="WSLC: Saving image '$(_WslcFullRef)' to '$(_WslcTarPath)'..." />
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcTarPath)&quot; &quot;$(_WslcFullRef)&quot;"
+              ConsoleToMSBuild="true" />
     </Target>
 
     <!-- Clean container artifacts -->
