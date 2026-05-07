@@ -442,6 +442,7 @@ try
     }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+    WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, &result->session))))
     {
