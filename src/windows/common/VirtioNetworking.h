@@ -22,12 +22,7 @@ DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(
-        GnsChannel&& gnsChannel,
-        VirtioNetworkingFlags flags,
-        LPCWSTR dnsOptions,
-        std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-        wil::shared_handle userToken);
+    VirtioNetworking(GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
 
     ~VirtioNetworking();
 

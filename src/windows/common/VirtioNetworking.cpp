@@ -15,11 +15,7 @@ static constexpr auto c_eth0DeviceName = L"eth0";
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel,
-    VirtioNetworkingFlags flags,
-    LPCWSTR dnsOptions,
-    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-    wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
