@@ -395,13 +395,26 @@ class UnitTests
 
     WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
     {
-        auto revert = EnableSystemd();
-        VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+        WslShutdown();
+        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        auto revert = EnableSystemd("initTimeout=0");
+        // Wait for systemd to start
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Kill the WSL init process
-        LxsstuLaunchWsl(L"kill -9 2");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"kill -9 2"), 0L);
 
-        Sleep(3000);
+        // Wait for the distro to exit.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                const auto commandLine = LxssGenerateWslCommandLine(L"--list --running");
+                wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+                const auto output = process.RunAndCaptureOutput();
+                THROW_HR_IF(E_ABORT, output.Stdout.find(LXSS_DISTRO_NAME_TEST_L) != std::string::npos);
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
 
         // Verify that a new WSL command succeeds (the distro restarts cleanly).
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
