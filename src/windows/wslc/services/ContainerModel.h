@@ -37,6 +37,9 @@ struct ContainerOptions
     bool Remove = false;
     bool TTY = false;
     bool PublishAll = false;
+    WSLCSignal StopSignal = WSLCSignalNone;
+    std::optional<ULONGLONG> ShmSize{};
+    bool Gpu = false;
     std::vector<std::string> Ports;
     std::vector<std::wstring> Volumes;
     std::string WorkingDirectory;
@@ -60,7 +63,7 @@ struct StopContainerOptions
 {
     static constexpr LONG DefaultTimeout = -1;
 
-    WSLCSignal Signal = WSLCSignalSIGTERM;
+    WSLCSignal Signal = WSLCSignalNone;
     LONG Timeout = DefaultTimeout;
 };
 

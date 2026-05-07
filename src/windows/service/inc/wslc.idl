@@ -226,12 +226,19 @@ typedef struct _WSLCTmpfsMount
     [unique] LPCSTR Options;
 } WSLCTmpfsMount;
 
+typedef struct _WSLCUlimit
+{
+    [string] LPCSTR Name;
+    LONGLONG Soft;
+    LONGLONG Hard;
+} WSLCUlimit;
+
 typedef enum _WSLCContainerNetworkType
 {
     WSLCContainerNetworkTypeNone = 0,
     WSLCContainerNetworkTypeHost = 1,
     WSLCContainerNetworkTypeBridged = 2,
-    // WSLCContainerNetworkTypeCustom = 3 // TODO: Implement when implementing custom networks
+    WSLCContainerNetworkTypeCustom = 3
 } WSLCContainerNetworkType;
 
 typedef struct _WSLCContainerNetwork
@@ -243,8 +250,8 @@ typedef struct _WSLCContainerNetwork
 typedef enum _WSLCContainerFlags
 {
     WSLCContainerFlagsNone = 0,
-    WSLCContainerFlagsRm = 1, // Delete the container when it exits. TODO: Implement.
-    WSLCContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
+    WSLCContainerFlagsRm = 1, // Delete the container when it exits.
+    WSLCContainerFlagsGpu = 2, // Enable GPU access.
     WSLCContainerFlagsInit = 4, // Run the container under an init process.
     WSLCContainerFlagsPublishAll = 8, // Publish all exposed ports.
 } WSLCContainerFlags;
@@ -293,6 +300,11 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(NamedVolumesCount)] WSLCNamedVolume* NamedVolumes;
     ULONG NamedVolumesCount;
+
+    LONGLONG MemoryBytes;
+    LONGLONG NanoCpus;
+    [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
+    ULONG UlimitsCount;
 } WSLCContainerOptions;
 
 typedef enum _WSLCContainerState
@@ -674,6 +686,7 @@ typedef struct _WSLCSessionInitSettings
     LPCWSTR StoragePath;
     WSLCSessionStorageFlags StorageFlags;
     ULONGLONG MaximumStorageSizeMb;
+    ULONG SwapSizeMb;
     ULONG BootTimeoutMs;
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;

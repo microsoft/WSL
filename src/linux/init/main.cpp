@@ -122,7 +122,7 @@ std::optional<bool> g_EnableSocketLogging;
 
 int Chroot(const char* Target);
 
-void ConfigureMemoryReduction(int PageReportingOrder, LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
+void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode);
 
 void CreateSwap(unsigned int Lun);
 
@@ -265,19 +265,15 @@ Return Value:
     return 0;
 }
 
-void ConfigureMemoryReduction(int PageReportingOrder, LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
+void ConfigureMemoryReduction(LX_MINI_INIT_MEMORY_RECLAIM_MODE Mode)
 
 /*++
 
 Routine Description:
 
-    This routine sets the page reporting order.
+    This routine configures memory reduction behavior including memory reclaim and compaction.
 
 Arguments:
-
-    PageReportingOrder - Supplies the page reporting order. This value determines the size of cold discard hints
-        by using the equation: 2^PageReportingOrder * PAGE_SIZE
-        Example: 2^9 * 4096 = 2MB
 
     Mode - Supplies the memory reclaim mode.
 
@@ -290,32 +286,11 @@ Return Value:
 try
 {
     //
-    // Ensure the value falls within a reasonable range (single page to 2MB).
+    // Create a worker thread to periodically check if the VM is idle and performs memory compaction
+    // and memory reclaim. This ensures that the maximum number of pages can be discarded to the host.
     //
 
-    if (PageReportingOrder < 0 || PageReportingOrder > 9)
-    {
-        LOG_WARNING("Invalid page_reporting_order {}", PageReportingOrder);
-        PageReportingOrder = 0;
-    }
-    else
-    {
-        WriteToFile("/sys/module/page_reporting/parameters/page_reporting_order", std::to_string(PageReportingOrder).c_str());
-    }
-
-    //
-    // Create a worker thread to periodically check if the VM is idle and performs memory compaction.
-    // This ensures that the maximum number of pages can be discarded to the host.
-    //
-    // N.B. Compaction is not needed if page reporting order is set to single page mode.
-    //
-
-    if (PageReportingOrder == 0 && Mode == LxMiniInitMemoryReclaimModeDisabled)
-    {
-        return;
-    }
-
-    std::thread([PageReportingOrder = PageReportingOrder, Mode = Mode]() mutable {
+    std::thread([Mode]() mutable {
         try
         {
             //
@@ -422,11 +397,10 @@ try
 
                 //
                 // Perform memory compaction if the VM is idle.
-                //
-                // N.B. Memory compaction is not needed if the page reporting order is set to single page (0).
+                // This coalesces free pages into larger blocks for more efficient page reporting.
                 //
 
-                if (PageReportingOrder != 0 && (Start - Stop) > IdleThreshold)
+                if ((Start - Stop) > IdleThreshold)
                 {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                     Stop = GetUserCpuTime();
@@ -1502,15 +1476,6 @@ Return Value:
     //
 
     if (WriteToFile("/proc/sys/kernel/print-fatal-signals", "1\n") < 0)
-    {
-        return -1;
-    }
-
-    //
-    // Disable rate limiting of user writes to dmesg.
-    //
-
-    if (WriteToFile("/proc/sys/kernel/printk_devkmsg", "on\n") < 0)
     {
         return -1;
     }
@@ -2960,7 +2925,7 @@ Return Value:
                     return;
                 }
 
-                Target = GetMountTarget(Message->Buffer);
+                Target = GetMountTarget(wsl::shared::string::FromMessageBuffer<LX_MINI_INIT_UNMOUNT_MESSAGE>(Buffer));
 
                 Step = LxMiniInitMountStepUnmount;
                 Result = umount(Target.c_str());
@@ -3294,10 +3259,10 @@ try
         }
 
         //
-        // Configure page reporting and memory reclamation.
+        // Configure memory reclamation.
         //
 
-        ConfigureMemoryReduction(EarlyConfig->PageReportingOrder, EarlyConfig->MemoryReclaimMode);
+        ConfigureMemoryReduction(EarlyConfig->MemoryReclaimMode);
 
         //
         // Initialize system distro if supported.

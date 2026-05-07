@@ -261,6 +261,11 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.PublishAll = true;
     }
 
+    if (context.Args.Contains(ArgType::Gpus))
+    {
+        options.Gpu = true;
+    }
+
     if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAll<ArgType::Volume>();
@@ -274,6 +279,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Remove))
     {
         options.Remove = true;
+    }
+
+    if (context.Args.Contains(ArgType::StopSignal))
+    {
+        options.StopSignal = validation::GetWSLCSignalFromString(context.Args.Get<ArgType::StopSignal>());
+    }
+
+    if (context.Args.Contains(ArgType::ShmSize))
+    {
+        options.ShmSize = validation::GetMemorySizeFromString(context.Args.Get<ArgType::ShmSize>());
     }
 
     if (context.Args.Contains(ArgType::Command))
@@ -430,6 +445,13 @@ void ViewContainerLogs(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerId = context.Args.Get<ArgType::ContainerId>();
     bool follow = context.Args.Contains(ArgType::Follow);
-    ContainerService::Logs(session, WideToMultiByte(containerId), follow);
+
+    ULONGLONG tail = 0;
+    if (context.Args.Contains(ArgType::Tail))
+    {
+        tail = validation::GetIntegerFromString<ULONGLONG>(context.Args.Get<ArgType::Tail>());
+    }
+
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow, tail);
 }
 } // namespace wsl::windows::wslc::task

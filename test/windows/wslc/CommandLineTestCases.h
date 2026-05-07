@@ -116,6 +116,16 @@ COMMAND_LINE_TEST_CASE(L"run --dns 1.1.1.1 --dns-search example.com --dns-option
 COMMAND_LINE_TEST_CASE(L"run --dns", L"run", false)        // Missing value for --dns
 COMMAND_LINE_TEST_CASE(L"run --dns-search", L"run", false) // Missing value for --dns-search
 COMMAND_LINE_TEST_CASE(L"run --dns-option", L"run", false) // Missing value for --dns-option
+// GPU tests for container run
+COMMAND_LINE_TEST_CASE(L"run --gpus all ubuntu", L"run", true)
+COMMAND_LINE_TEST_CASE(L"container run --gpus all ubuntu sh", L"run", true)
+COMMAND_LINE_TEST_CASE(L"run --gpus invalid ubuntu", L"run", false) // Only 'all' is supported
+COMMAND_LINE_TEST_CASE(L"run --gpus", L"run", false)                // Missing value for --gpus
+// GPU tests for container create
+COMMAND_LINE_TEST_CASE(L"create --gpus all ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"container create --gpus all ubuntu sh", L"create", true)
+COMMAND_LINE_TEST_CASE(L"create --gpus none ubuntu", L"create", false) // Only 'all' is supported
+COMMAND_LINE_TEST_CASE(L"create --gpus", L"create", false)             // Missing value for --gpus
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
@@ -141,6 +151,18 @@ COMMAND_LINE_TEST_CASE(L"container logs cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --follow cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs cont1 -f", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --tail 10 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs -n 10 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs cont1 --tail 10", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --tail=10 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs -n=10 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --follow --tail 5 cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --tail 0 cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --tail abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs -n abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs -n=abc cont1", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs --tail", L"logs", false)
+COMMAND_LINE_TEST_CASE(L"container logs -n", L"logs", false)
 
 // Image command
 COMMAND_LINE_TEST_CASE(L"image build C:\\context", L"build", true)

@@ -632,13 +632,17 @@ class WSLCE2EContainerRunTests
         result.Verify({.Stdout = L"WSLC Named Volume Test", .Stderr = L"", .ExitCode = 0});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_NotFound_Fail)
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_NamedVolume_AutoCreate)
     {
         auto result = RunWslc(std::format(
             L"container run --rm --volume {}:/data {} sh -c \"echo -n 'WSLC Named Volume Test' > /data/test.txt\"",
             WslcVolumeName,
             DebianImage.NameAndTag()));
-        result.Verify({.Stderr = std::format(L"Volume not found: '{}'\r\nError code: WSLC_E_VOLUME_NOT_FOUND\r\n", WslcVolumeName), .ExitCode = 1});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Verify the volume was auto-created by removing it (fails if it doesn't exist).
+        result = RunWslc(std::format(L"volume rm {}", WslcVolumeName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_WithLabel_Success)
@@ -650,6 +654,72 @@ class WSLCE2EContainerRunTests
         auto inspect = InspectContainer(WslcContainerName);
         VERIFY_ARE_EQUAL("1", inspect.Labels["A"]);
         VERIFY_ARE_EQUAL("2", inspect.Labels["B"]);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopSignal)
+    {
+        constexpr int ExpectedExitCode = 42;
+        auto result = RunWslc(std::format(
+            LR"(container run -d --stop-signal SIGUSR1 --name {} {} bash -c "trap 'exit {}' SIGUSR1; while true; do sleep 1; done")",
+            WslcContainerName,
+            DebianImage.NameAndTag(),
+            ExpectedExitCode));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"container stop {}", WslcContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        const auto inspect = InspectContainer(WslcContainerName);
+        VERIFY_IS_FALSE(inspect.State.Running);
+        VERIFY_ARE_EQUAL(ExpectedExitCode, inspect.State.ExitCode);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize)
+    {
+        auto result = RunWslc(std::format(L"container run --rm --shm-size 128M {} df -h /dev/shm", DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_TRUE(result.Stdout->find(L"128M") != std::wstring::npos);
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_ShmSize_Invalid)
+    {
+        {
+            auto result =
+                RunWslc(std::format(L"container run --rm --shm-size invalid --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid shm-size argument value: 'invalid'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        {
+            auto result =
+                RunWslc(std::format(L"container run --rm --shm-size 128X --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid shm-size argument value: '128X'. Expected a memory size (e.g. 256M, 1G)\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_StopSignal_Invalid)
+    {
+        {
+            auto result = RunWslc(
+                std::format(L"container run --rm --stop-signal SIGINVALID --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop-signal value: SIGINVALID is not a recognized signal name or number (Example: SIGKILL, kill, or 9).\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        {
+            auto result =
+                RunWslc(std::format(L"container run --rm --stop-signal 0 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop-signal value: 0 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
+
+        {
+            auto result =
+                RunWslc(std::format(L"container run --rm --stop-signal 99 --name {} {}", WslcContainerName, DebianImage.NameAndTag()));
+            result.Verify({.Stderr = L"Invalid stop-signal value: 99 is out of valid range (1-31).\r\n", .ExitCode = 1});
+            EnsureContainerDoesNotExist(WslcContainerName);
+        }
     }
 
 private:
@@ -724,6 +794,7 @@ private:
                 << L"  --entrypoint      Specifies the container init process executable\r\n"
                 << L"  -e,--env          Key=Value pairs for environment variables\r\n"
                 << L"  --env-file        File containing key=value pairs of env variables\r\n"
+                << L"  --gpus            Add GPU devices to the container ('all' to pass all GPUs)\r\n"
                 << L"  -h,--hostname     Container host name\r\n"
                 << L"  -i,--interactive  Attach to stdin and keep it open\r\n"
                 << L"  -l,--label        Set metadata on an object\r\n"
@@ -732,6 +803,8 @@ private:
                 << L"  -P,--publish-all  Publish all exposed ports to random host ports\r\n"
                 << L"  --rm              Remove the container after it stops\r\n"
                 << L"  --session         Specify the session to use\r\n"
+                << L"  --shm-size        Size of /dev/shm (e.g. 64M, 1G)\r\n"
+                << L"  --stop-signal     Signal to stop the container\r\n"
                 << L"  --tmpfs           Mount tmpfs to the container at the given path\r\n"
                 << L"  -t,--tty          Open a TTY with the container process.\r\n"
                 << L"  -u,--user         User ID for the process (name|uid|uid:gid)\r\n"

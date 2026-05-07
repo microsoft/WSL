@@ -46,6 +46,7 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     auto containerFlags = WSLCContainerFlagsNone;
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsRm, options.Remove);
     WI_SetFlagIf(containerFlags, WSLCContainerFlagsPublishAll, options.PublishAll);
+    WI_SetFlagIf(containerFlags, WSLCContainerFlagsGpu, options.Gpu);
 
     wsl::windows::common::WSLCContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, options.EnvironmentVariables, WSLCContainerNetworkTypeBridged, processFlags);
@@ -94,6 +95,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
     }
 
     containerLauncher.SetContainerFlags(containerFlags);
+
+    if (options.StopSignal != WSLCSignalNone)
+    {
+        containerLauncher.SetDefaultStopSignal(options.StopSignal);
+    }
+
+    if (options.ShmSize.has_value())
+    {
+        containerLauncher.SetShmSize(options.ShmSize.value());
+    }
 
     if (!options.Entrypoint.empty())
     {
@@ -472,7 +483,7 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
-void ContainerService::Logs(Session& session, const std::string& id, bool follow)
+void ContainerService::Logs(Session& session, const std::string& id, bool follow, ULONGLONG tail)
 {
     wil::com_ptr<IWSLCContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -482,7 +493,7 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     WSLCLogsFlags flags = WSLCLogsFlagsNone;
     WI_SetFlagIf(flags, WSLCLogsFlagsFollow, follow);
 
-    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, 0));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutHandle, &stderrHandle, 0, 0, tail));
 
     wsl::windows::common::relay::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
