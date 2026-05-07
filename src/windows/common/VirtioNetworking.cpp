@@ -196,16 +196,11 @@ void VirtioNetworking::RefreshGuestConnection()
     };
 
     appendOption(L"client_ip", networkSettings->PreferredIpAddress.AddressString);
-    appendOption(L"client_mac", networkSettings->MacAddress);
-
     std::wstring default_route = networkSettings->GetBestGatewayAddressString();
     appendOption(L"gateway_ip", default_route);
-    appendOption(L"gateway_mac", networkSettings->GetBestGatewayMacAddress(AF_INET));
-
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::Ipv6))
     {
         appendOption(L"client_ip_ipv6", networkSettings->PreferredIpv6Address.AddressString);
-        appendOption(L"gateway_mac_ipv6", networkSettings->GetBestGatewayMacAddress(AF_INET6));
     }
 
     networking::DnsInfo currentDns{};

@@ -96,6 +96,16 @@ static wsl::windows::common::RunningWSLCContainer CreateInternal(Session& sessio
 
     containerLauncher.SetContainerFlags(containerFlags);
 
+    if (options.StopSignal != WSLCSignalNone)
+    {
+        containerLauncher.SetDefaultStopSignal(options.StopSignal);
+    }
+
+    if (options.ShmSize.has_value())
+    {
+        containerLauncher.SetShmSize(options.ShmSize.value());
+    }
+
     if (!options.Entrypoint.empty())
     {
         auto entrypoints = options.Entrypoint;
