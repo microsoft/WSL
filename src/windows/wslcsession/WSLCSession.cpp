@@ -1203,9 +1203,10 @@ try
             {
                 const auto& label = Options->Labels[i];
                 RETURN_HR_IF_NULL(E_POINTER, label.Key);
+                RETURN_HR_IF_NULL(E_POINTER, label.Value);
 
                 std::string labelFilter = label.Key;
-                if (label.Value != nullptr)
+                if (label.Value[0] != '\0')
                 {
                     labelFilter += "=";
                     labelFilter += label.Value;
@@ -1547,9 +1548,10 @@ try
             {
                 const auto& filter = Options->Labels[i];
                 RETURN_HR_IF_NULL(E_POINTER, filter.Key);
+                RETURN_HR_IF_NULL(E_POINTER, filter.Value);
 
                 std::string labelFilter = filter.Key;
-                if (filter.Value != nullptr)
+                if (filter.Value[0] != '\0')
                 {
                     labelFilter += "=";
                     labelFilter += filter.Value;
@@ -1790,9 +1792,10 @@ try
         for (DWORD i = 0; i < FiltersCount; ++i)
         {
             THROW_HR_IF_MSG(E_POINTER, Filters[i].Key == nullptr, "Filter key cannot be null (index %lu)", i);
+            THROW_HR_IF_MSG(E_POINTER, Filters[i].Value == nullptr, "Filter value cannot be null (index %lu)", i);
             std::string labelFilter = Filters[i].Key;
 
-            if (Filters[i].Value != nullptr)
+            if (Filters[i].Value[0] != '\0')
             {
                 labelFilter += '=';
                 labelFilter += Filters[i].Value;
@@ -1960,7 +1963,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListVolumes(WSLCVolumeInformation** Volumes, ULONG* Count)
+HRESULT WSLCSession::ListVolumes(const WSLCListVolumesOptions* Options, WSLCVolumeInformation** Volumes, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -1974,7 +1977,7 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
-    auto volumeList = m_volumes->ListVolumes();
+    auto volumeList = m_volumes->ListVolumes(Options);
 
     if (volumeList.empty())
     {
@@ -2016,12 +2019,49 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* /*Options*/, WSLCPruneVolumesResults* /*Results*/)
+HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* Options, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
+try
 {
-    // TODO: Implement volume pruning. Docker's volume prune API skips bind-mount volumes,
-    // so WSLC VHD volumes require custom handling.
-    return E_NOTIMPL;
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, Volumes);
+    RETURN_HR_IF_NULL(E_POINTER, VolumesCount);
+    RETURN_HR_IF_NULL(E_POINTER, SpaceReclaimed);
+    *Volumes = nullptr;
+    *VolumesCount = 0;
+    *SpaceReclaimed = 0;
+
+    auto lock = m_lock.lock_shared();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
+
+    WSLCVolumes::PruneVolumesResult pruneResult;
+    try
+    {
+        pruneResult = m_volumes->PruneVolumes(Options);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune volumes");
+
+    *SpaceReclaimed = pruneResult.SpaceReclaimed;
+
+    if (!pruneResult.Deleted.empty())
+    {
+        auto output = wil::make_unique_cotaskmem<WSLCVolumeName[]>(pruneResult.Deleted.size());
+        for (size_t i = 0; i < pruneResult.Deleted.size(); ++i)
+        {
+            THROW_HR_IF_MSG(
+                E_UNEXPECTED,
+                strcpy_s(output[i], pruneResult.Deleted[i].c_str()) != 0,
+                "Unexpected volume name length: %hs",
+                pruneResult.Deleted[i].c_str());
+        }
+
+        *Volumes = output.release();
+        *VolumesCount = static_cast<ULONG>(pruneResult.Deleted.size());
+    }
+
+    return S_OK;
 }
+CATCH_RETURN();
 
 int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs)
 {

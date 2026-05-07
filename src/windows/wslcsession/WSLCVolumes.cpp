@@ -140,8 +140,49 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
     m_expectedEvents.emplace_back(Name, VolumeEvent::Destroy);
 }
 
-std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes() const
+std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCListVolumesOptions* Options) const
 {
+    std::string driver;
+    std::optional<std::regex> nameRegex;
+    std::span<const WSLCLabel> labels;
+
+    if (Options != nullptr)
+    {
+        THROW_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCListVolumesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCListVolumesFlagsDanglingFalse));
+        THROW_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(static_cast<WSLCListVolumesFlags>(Options->Flags), ~WSLCListVolumesFlagsValid));
+        THROW_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
+
+        for (ULONG i = 0; i < Options->LabelsCount; ++i)
+        {
+            THROW_HR_IF_NULL(E_POINTER, Options->Labels[i].Key);
+            THROW_HR_IF_NULL(E_POINTER, Options->Labels[i].Value);
+        }
+
+        if (Options->Driver != nullptr)
+        {
+            driver = Options->Driver;
+        }
+
+        if (Options->Name != nullptr)
+        {
+            try
+            {
+                nameRegex.emplace(Options->Name);
+            }
+            catch (const std::regex_error&)
+            {
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(Options->Name));
+            }
+        }
+
+        labels = std::span(Options->Labels, Options->LabelsCount);
+    }
+
+    auto matchLabel = [](const std::map<std::string, std::string>& labels, const WSLCLabel& f) {
+        const auto it = labels.find(f.Key);
+        return it != labels.end() && (f.Value[0] == '\0' || it->second == f.Value);
+    };
+
     auto lock = m_lock.lock_shared();
 
     std::vector<WSLCVolumeInformation> result;
@@ -149,6 +190,22 @@ std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes() const
 
     for (const auto& [name, vol] : m_volumes)
     {
+        if (!driver.empty() && driver != vol->Driver())
+        {
+            continue;
+        }
+
+        if (nameRegex.has_value() && !std::regex_search(name, *nameRegex))
+        {
+            continue;
+        }
+
+        const auto& volLabels = vol->Labels();
+        if (!std::ranges::all_of(labels, [&](const WSLCLabel& f) { return matchLabel(volLabels, f); }))
+        {
+            continue;
+        }
+
         result.push_back(vol->GetVolumeInformation());
     }
 
@@ -169,6 +226,83 @@ bool WSLCVolumes::ContainsVolume(const std::string& Name) const
 {
     auto lock = m_lock.lock_shared();
     return m_volumes.contains(Name);
+}
+
+WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const WSLCPruneVolumesOptions* Options)
+{
+    DockerHTTPClient::PruneVolumesFilters filters;
+
+    if (Options != nullptr)
+    {
+        if (Options->All)
+        {
+            filters.all = true;
+        }
+
+        THROW_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
+
+        for (ULONG i = 0; i < Options->LabelsCount; ++i)
+        {
+            const auto& filter = Options->Labels[i];
+
+            THROW_HR_IF_NULL(E_POINTER, filter.Key);
+
+            std::string labelFilter = filter.Key;
+            if (filter.Value != nullptr && filter.Value[0] != '\0')
+            {
+                labelFilter += '=';
+                labelFilter += filter.Value;
+            }
+
+            if (filter.Present)
+            {
+                filters.presentLabels.emplace_back(std::move(labelFilter));
+            }
+            else
+            {
+                filters.absentLabels.emplace_back(std::move(labelFilter));
+            }
+        }
+    }
+
+    auto lock = m_lock.lock_exclusive();
+
+    auto dockerResult = m_dockerClient.PruneVolumes(filters);
+
+    PruneVolumesResult result{};
+    result.SpaceReclaimed = dockerResult.SpaceReclaimed;
+
+    if (!dockerResult.VolumesDeleted.has_value() || dockerResult.VolumesDeleted->empty())
+    {
+        return result;
+    }
+
+    result.Deleted.reserve(dockerResult.VolumesDeleted->size());
+
+    // TODO: VHD volumes are exposed to docker as bind mounts, which docker's volume
+    // prune skips. So this only ever prunes guest volumes today. VHD volume pruning
+    // requires custom handling that's not implemented yet.
+    for (const auto& name : dockerResult.VolumesDeleted.value())
+    {
+        // Only report volumes that we manage.
+        auto it = m_volumes.find(name);
+        if (it == m_volumes.end())
+        {
+            continue;
+        }
+
+        try
+        {
+            it->second->OnDeleted();
+        }
+        CATCH_LOG_MSG("Failed to release host resources for pruned volume: %hs", name.c_str());
+
+        m_volumes.erase(it);
+        m_expectedEvents.emplace_back(name, VolumeEvent::Destroy);
+        result.Deleted.push_back(name);
+    }
+
+    return result;
 }
 
 __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const std::string& volumeName)

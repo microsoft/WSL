@@ -40,7 +40,16 @@ public:
 
     void DeleteVolume(_In_ LPCSTR Name);
 
-    std::vector<WSLCVolumeInformation> ListVolumes() const;
+    std::vector<WSLCVolumeInformation> ListVolumes(_In_opt_ const WSLCListVolumesOptions* Options) const;
+
+    struct PruneVolumesResult
+    {
+        std::vector<std::string> Deleted;
+        std::uint64_t SpaceReclaimed;
+    };
+
+    PruneVolumesResult PruneVolumes(_In_opt_ const WSLCPruneVolumesOptions* Options);
+
     std::string InspectVolume(_In_ const std::string& Name) const;
 
     bool ContainsVolume(_In_ const std::string& Name) const;

@@ -606,12 +606,25 @@ typedef struct _WSLCVolumeInformation
     char Driver[WSLC_MAX_VOLUME_DRIVER_LENGTH + 1];
 } WSLCVolumeInformation;
 
-typedef struct _WSLCPruneVolumesResults
+typedef enum _WSLCListVolumesFlags
 {
-    [unique, size_is(VolumesCount)] WSLCVolumeName* Volumes;
-    ULONG VolumesCount;
-    ULONGLONG SpaceReclaimed;
-} WSLCPruneVolumesResults;
+    WSLCListVolumesFlagsNone = 0,
+    WSLCListVolumesFlagsDanglingTrue = 1,
+    WSLCListVolumesFlagsDanglingFalse = 2,
+} WSLCListVolumesFlags;
+
+cpp_quote("#define WSLCListVolumesFlagsValid (WSLCListVolumesFlagsDanglingTrue | WSLCListVolumesFlagsDanglingFalse)")
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListVolumesFlags);")
+
+typedef struct _WSLCListVolumesOptions
+{
+    DWORD Flags;
+    [unique] LPCSTR Driver;
+    [unique] LPCSTR Name;
+    [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
+    ULONG LabelsCount;
+} WSLCListVolumesOptions;
 
 typedef struct _WSLCNetworkOptions
 {
@@ -753,12 +766,12 @@ interface IWSLCSession : IUnknown
     // Volume management.
     HRESULT CreateVolume([in] const WSLCVolumeOptions* Options, [out] WSLCVolumeInformation* VolumeInfo);
     HRESULT DeleteVolume([in] LPCSTR Name);
-    HRESULT ListVolumes([out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
+    HRESULT ListVolumes([in, unique] const WSLCListVolumesOptions* Options, [out, size_is(, *Count)] WSLCVolumeInformation** Volumes, [out] ULONG* Count);
     HRESULT InspectVolume([in] LPCSTR Name, [out] LPSTR* Output);
 
     HRESULT Authenticate([in] LPCSTR ServerAddress, [in] LPCSTR Username, [in] LPCSTR Password, [out] LPSTR* IdentityToken);
     HRESULT PushImage([in] LPCSTR Image, [in] LPCSTR RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT PruneVolumes([in, unique] const WSLCPruneVolumesOptions* Options, [out] WSLCPruneVolumesResults* Results);
+    HRESULT PruneVolumes([in, unique] const WSLCPruneVolumesOptions* Options, [out, size_is(, *VolumesCount)] WSLCVolumeName** Volumes, [out] ULONG* VolumesCount, [out] ULONGLONG* SpaceReclaimed);
 
     // Network management.
     HRESULT CreateNetwork([in] const WSLCNetworkOptions* Options);

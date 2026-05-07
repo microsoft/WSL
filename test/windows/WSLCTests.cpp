@@ -535,6 +535,48 @@ class WSLCTests
         return std::move(deletedImages);
     }
 
+    std::set<std::string> ListVolumes(
+        const std::optional<std::string>& Driver = std::nullopt,
+        const std::optional<std::string>& Name = std::nullopt,
+        const std::vector<WSLCLabel>& Labels = {},
+        DWORD Flags = WSLCListVolumesFlagsNone)
+    {
+        WSLCListVolumesOptions options{};
+        options.Driver = Driver ? Driver->c_str() : nullptr;
+        options.Name = Name ? Name->c_str() : nullptr;
+        options.Labels = Labels.empty() ? nullptr : Labels.data();
+        options.LabelsCount = static_cast<ULONG>(Labels.size());
+        options.Flags = Flags;
+
+        wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(&options, volumes.addressof(), volumes.size_address<ULONG>()));
+
+        std::set<std::string> names;
+        for (const auto& v : volumes)
+        {
+            names.insert(v.Name);
+        }
+        return names;
+    }
+
+    void CreateNamedVolume(
+        const std::string& Name,
+        const std::string& Driver,
+        const std::vector<WSLCLabel>& Labels = {},
+        const std::vector<WSLCDriverOption>& DriverOpts = {})
+    {
+        WSLCVolumeOptions options{};
+        options.Name = Name.c_str();
+        options.Driver = Driver.c_str();
+        options.DriverOpts = DriverOpts.empty() ? nullptr : DriverOpts.data();
+        options.DriverOptsCount = static_cast<ULONG>(DriverOpts.size());
+        options.Labels = Labels.empty() ? nullptr : Labels.data();
+        options.LabelsCount = static_cast<ULONG>(Labels.size());
+
+        WSLCVolumeInformation info{};
+        VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&options, &info));
+    }
+
     WSLC_TEST_METHOD(PullImage)
     {
         {
@@ -999,7 +1041,7 @@ class WSLCTests
 
             // Test with single label filter
             {
-                WSLCLabel labels[] = {{.Key = "test.label", .Value = nullptr}};
+                WSLCLabel labels[] = {{.Key = "test.label", .Value = ""}};
                 options.Labels = labels;
                 options.LabelsCount = 1;
 
@@ -1008,7 +1050,7 @@ class WSLCTests
 
             // Test with multiple label filters (labels are AND'ed together)
             {
-                WSLCLabel labels[] = {{.Key = "test.label1", .Value = nullptr}, {.Key = "test.label2", .Value = "value"}};
+                WSLCLabel labels[] = {{.Key = "test.label1", .Value = ""}, {.Key = "test.label2", .Value = "value"}};
                 options.Labels = labels;
                 options.LabelsCount = 2;
 
@@ -2000,23 +2042,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
 
-        auto listAnonymousVolumes = [&]() {
-            wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
-            VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
-
-            std::vector<std::string> names;
-
-            // TODO: Replace with filter for anonymous volumes in ListVolumes API.
-            for (const auto& vol : volumes)
-            {
-                if (std::string(vol.Driver) == "guest")
-                {
-                    names.push_back(vol.Name);
-                }
-            }
-
-            return names;
-        };
+        const std::vector<WSLCLabel> anonymousVolumeLabels = {{.Key = "com.docker.volume.anonymous", .Value = ""}};
 
         // Session-restart scenario: an anonymous volume-backed container survives a session reset.
         {
@@ -2059,19 +2085,17 @@ class WSLCTests
 
             // Clean up any leaked anonymous volumes when this block exits.
             auto volumeCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                auto volumes = listAnonymousVolumes();
-                for (const auto& name : volumes)
-                {
-                    LOG_IF_FAILED(m_defaultSession->DeleteVolume(name.c_str()));
-                }
+                wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
+                ULONGLONG spaceReclaimed = 0;
+                LOG_IF_FAILED(m_defaultSession->PruneVolumes(nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
             });
 
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+            VERIFY_ARE_EQUAL(ListVolumes("guest", {}, anonymousVolumeLabels).size(), 1u);
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
 
             // Anonymous volume was NOT deleted by Docker.
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+            VERIFY_ARE_EQUAL(ListVolumes("guest", {}, anonymousVolumeLabels).size(), 1u);
         }
 
         // Delete container with WSLCDeleteFlagsDeleteVolumes -> anonymous volume is cleaned up.
@@ -2082,10 +2106,10 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
 
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+            VERIFY_ARE_EQUAL(ListVolumes("guest", {}, anonymousVolumeLabels).size(), 1u);
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsDeleteVolumes));
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+            VERIFY_ARE_EQUAL(ListVolumes("guest", {}, anonymousVolumeLabels).size(), 0u);
         }
 
         // Container with WSLCContainerFlagsRm -> anonymous volume cleaned up when the container auto-removes on exit.
@@ -2094,10 +2118,10 @@ class WSLCTests
             launcher.SetContainerFlags(WSLCContainerFlagsRm);
 
             auto container = launcher.Launch(*m_defaultSession);
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
+            VERIFY_ARE_EQUAL(ListVolumes("guest", {}, anonymousVolumeLabels).size(), 1u);
             VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
 
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+            VERIFY_ARE_EQUAL(ListVolumes("guest", {}, anonymousVolumeLabels).size(), 0u);
         }
     }
 
@@ -4111,7 +4135,7 @@ class WSLCTests
 
         // Verify empty list is returned when no volumes exist.
         wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
-        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(nullptr, volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(0u, volumes.size());
 
         // Create a VHD volume and verify list returns one entry.
@@ -4126,7 +4150,7 @@ class WSLCTests
         WSLCVolumeInformation volInfo{};
         VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&vhdOptions, &volInfo));
 
-        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(nullptr, volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
         VERIFY_ARE_EQUAL(std::string(volumes[0].Name), vhdVolumeName);
         VERIFY_ARE_EQUAL(std::string(volumes[0].Driver), std::string("vhd"));
@@ -4151,7 +4175,7 @@ class WSLCTests
         duplicateVhdOptions.DriverOptsCount = ARRAYSIZE(driverOpts);
         VERIFY_ARE_EQUAL(m_defaultSession->CreateVolume(&duplicateVhdOptions, &volInfo), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
-        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(nullptr, volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(2u, volumes.size());
 
         std::map<std::string, std::string> namesToDrivers;
@@ -4189,10 +4213,292 @@ class WSLCTests
 
         // Delete the VHD volume and verify only the guest volume remains.
         VERIFY_SUCCEEDED(m_defaultSession->DeleteVolume(vhdVolumeName.c_str()));
-        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(nullptr, volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
         VERIFY_ARE_EQUAL(std::string(volumes[0].Name), guestVolumeName);
         VERIFY_ARE_EQUAL(std::string(volumes[0].Driver), std::string("guest"));
+    }
+
+    WSLC_TEST_METHOD(ListVolumesFilters)
+    {
+        const std::string vhdA = "wslc-list-vhd-a";
+        const std::string vhdB = "wslc-list-vhd-b";
+        const std::string guestA = "wslc-list-guest-a";
+        const std::string guestB = "wslc-list-guest-b";
+        const std::string otherName = "wslc-list-other-name";
+
+        const std::vector<WSLCDriverOption> vhdOpts = {{"SizeBytes", "1073741824"}};
+
+        auto cleanup = wil::scope_exit([&]() {
+            for (const auto& name : {vhdA, vhdB, guestA, guestB, otherName})
+            {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(name.c_str()));
+            }
+        });
+
+        CreateNamedVolume(vhdA, "vhd", {{.Key = "env", .Value = "prod"}}, vhdOpts);
+        CreateNamedVolume(vhdB, "vhd", {{.Key = "env", .Value = "test"}, {.Key = "tier", .Value = "db"}}, vhdOpts);
+        CreateNamedVolume(guestA, "guest", {{.Key = "env", .Value = "prod"}});
+        CreateNamedVolume(guestB, "guest");
+        CreateNamedVolume(otherName, "guest", {{.Key = "env", .Value = "test"}});
+
+        auto verifyListVolumesFails = [&](HRESULT expected,
+                                          const std::optional<std::string>& driver,
+                                          const std::optional<std::string>& name,
+                                          const std::vector<WSLCLabel>& labels,
+                                          DWORD flags) {
+            WSLCListVolumesOptions options{};
+            options.Driver = driver ? driver->c_str() : nullptr;
+            options.Name = name ? name->c_str() : nullptr;
+            options.Labels = labels.empty() ? nullptr : labels.data();
+            options.LabelsCount = static_cast<ULONG>(labels.size());
+            options.Flags = flags;
+
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
+            VERIFY_ARE_EQUAL(expected, m_defaultSession->ListVolumes(&options, volumes.addressof(), volumes.size_address<ULONG>()));
+        };
+
+        const std::set<std::string> all{vhdA, vhdB, guestA, guestB, otherName};
+        const std::set<std::string> empty{};
+
+        // No filter returns every volume.
+        VERIFY_ARE_EQUAL(ListVolumes(), all);
+
+        // Filter by driver name.
+        VERIFY_ARE_EQUAL(ListVolumes("vhd"), (std::set<std::string>{vhdA, vhdB}));
+        VERIFY_ARE_EQUAL(ListVolumes("guest"), (std::set<std::string>{guestA, guestB, otherName}));
+        VERIFY_ARE_EQUAL(ListVolumes("nonexistent"), empty);
+
+        // Filter by volume name (substring match).
+        VERIFY_ARE_EQUAL(ListVolumes({}, "vhd"), (std::set<std::string>{vhdA, vhdB}));
+
+        // Anchored regex matches exactly one volume.
+        VERIFY_ARE_EQUAL(ListVolumes({}, "^" + vhdA + "$"), std::set<std::string>{vhdA});
+
+        // Regex name filter.
+        VERIFY_ARE_EQUAL(ListVolumes({}, "vhd-."), (std::set<std::string>{vhdA, vhdB}));
+
+        // Invalid regex is rejected.
+        verifyListVolumesFails(E_INVALIDARG, {}, "[", {}, WSLCListVolumesFlagsNone);
+
+        // Filter by label key (any value matches).
+        {
+            auto volumes = ListVolumes({}, {}, {{.Key = "env", .Value = ""}});
+            VERIFY_ARE_EQUAL(volumes, (std::set<std::string>{vhdA, vhdB, guestA, otherName}));
+        }
+
+        // Filter by label key=value.
+        {
+            auto volumes = ListVolumes({}, {}, {{.Key = "env", .Value = "prod"}});
+            VERIFY_ARE_EQUAL(volumes, (std::set<std::string>{vhdA, guestA}));
+        }
+
+        // Multiple labels are AND'ed together.
+        {
+            auto volumes = ListVolumes({}, {}, {{.Key = "env", .Value = "test"}, {.Key = "tier", .Value = "db"}});
+            VERIFY_ARE_EQUAL(volumes, std::set<std::string>{vhdB});
+        }
+
+        // Unknown label key matches nothing.
+        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "nope", .Value = ""}}), empty);
+
+        // Unknown name matches nothing.
+        VERIFY_ARE_EQUAL(ListVolumes({}, "nope"), empty);
+
+        // Combined driver + name + label filter.
+        VERIFY_ARE_EQUAL(ListVolumes("vhd", "a", {{.Key = "env", .Value = "prod"}}), std::set<std::string>{vhdA});
+
+        // Dangling flags are accepted but no-op today; update this test once dangling is wired up.
+        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {}, WSLCListVolumesFlagsDanglingTrue), all);
+
+        // Empty filter Value matches by-key only (any stored value): equivalent to passing no value at all.
+        // A volume labeled with an empty stored value is also matched by an empty filter Value.
+        {
+            const std::string emptyValVol = "wslc-list-empty-val";
+            auto emptyCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(emptyValVol.c_str())); });
+            CreateNamedVolume(emptyValVol, "guest", {{.Key = "marker", .Value = ""}});
+
+            // Filter Value="" matches any volume with the key (regardless of stored value).
+            VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "marker", .Value = ""}}), std::set<std::string>{emptyValVol});
+
+            // Filter Value="" on a key shared by other volumes matches them all.
+            VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "env", .Value = ""}}), (std::set<std::string>{vhdA, vhdB, guestA, otherName}));
+        }
+
+        verifyListVolumesFails(E_INVALIDARG, {}, {}, {}, WSLCListVolumesFlagsDanglingTrue | WSLCListVolumesFlagsDanglingFalse);
+        verifyListVolumesFails(E_INVALIDARG, {}, {}, {}, 0x80000000);
+        verifyListVolumesFails(E_POINTER, {}, {}, {{.Key = nullptr, .Value = "anything"}}, WSLCListVolumesFlagsNone);
+        verifyListVolumesFails(E_POINTER, {}, {}, {{.Key = "env", .Value = nullptr}}, WSLCListVolumesFlagsNone);
+    }
+
+    WSLC_TEST_METHOD(PruneVolumesTest)
+    {
+        auto pruneVolumes = [&](bool All = false, const std::vector<WSLCPruneLabelFilter>& Labels = {}) {
+            WSLCPruneVolumesOptions options{};
+            options.All = All ? TRUE : FALSE;
+            options.Labels = Labels.empty() ? nullptr : Labels.data();
+            options.LabelsCount = static_cast<ULONG>(Labels.size());
+
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
+            ULONGLONG spaceReclaimed = 0;
+            VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(&options, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+
+            return deleted;
+        };
+
+        auto expectDeleted = [](const wil::unique_cotaskmem_array_ptr<WSLCVolumeName>& deletedVolumes, const std::set<std::string>& expectedDeleted) {
+            VERIFY_ARE_EQUAL(deletedVolumes.size(), expectedDeleted.size());
+
+            for (size_t i = 0; i < deletedVolumes.size(); ++i)
+            {
+                VERIFY_IS_TRUE(expectedDeleted.contains(deletedVolumes[i]));
+            }
+        };
+
+        // Prune with no eligible volumes (none created yet) returns an empty set.
+        {
+            auto deleted = pruneVolumes(true);
+            expectDeleted(deleted, {});
+        }
+
+        // Default (no All) only prunes anonymous volumes; with none present, returns empty.
+        {
+            auto deleted = pruneVolumes();
+            expectDeleted(deleted, {});
+        }
+
+        // All=true prunes unused named guest volumes.
+        {
+            const std::string a = "wslc-prune-guest-a";
+            const std::string b = "wslc-prune-guest-b";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(a.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(b.c_str()));
+            });
+
+            CreateNamedVolume(a, "guest");
+            CreateNamedVolume(b, "guest");
+
+            auto deleted = pruneVolumes(true);
+            expectDeleted(deleted, {a, b});
+
+            auto volumes = ListVolumes();
+            VERIFY_IS_FALSE(volumes.contains(a));
+            VERIFY_IS_FALSE(volumes.contains(b));
+        }
+
+        // In-use volume is not pruned.
+        {
+            const std::string name = "wslc-prune-in-use";
+            CreateNamedVolume(name, "guest");
+
+            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(name.c_str())); });
+
+            WSLCContainerLauncher launcher("debian:latest", "wslc-prune-in-use-holder", {"sleep", "99999"});
+            launcher.AddNamedVolume(name, "/data", false);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto deleted = pruneVolumes(true);
+
+            expectDeleted(deleted, {});
+            VERIFY_IS_TRUE(ListVolumes().contains(name));
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+        }
+
+        // Label filter (present, key=value).
+        {
+            const std::string labeled = "wslc-prune-labeled";
+            const std::string unlabeled = "wslc-prune-unlabeled";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(labeled.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(unlabeled.c_str()));
+            });
+
+            CreateNamedVolume(labeled, "guest", {{.Key = "wslc-prune-test", .Value = "yes"}});
+            CreateNamedVolume(unlabeled, "guest");
+
+            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-test", .Value = "yes", .Present = TRUE}});
+            expectDeleted(deleted, {labeled});
+        }
+
+        // Label filter (present, key only).
+        {
+            const std::string labeled = "wslc-prune-keyonly";
+            const std::string unlabeled = "wslc-prune-keyonly-no";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(labeled.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(unlabeled.c_str()));
+            });
+
+            CreateNamedVolume(labeled, "guest", {{.Key = "wslc-prune-keyonly", .Value = "anything"}});
+            CreateNamedVolume(unlabeled, "guest");
+
+            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keyonly", .Value = "", .Present = TRUE}});
+            expectDeleted(deleted, {labeled});
+        }
+
+        // Label filter (absent).
+        {
+            const std::string keep = "wslc-prune-keep";
+            const std::string drop = "wslc-prune-drop";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(keep.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(drop.c_str()));
+            });
+
+            CreateNamedVolume(keep, "guest", {{.Key = "wslc-prune-keep", .Value = ""}});
+            CreateNamedVolume(drop, "guest");
+
+            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keep", .Value = "", .Present = FALSE}});
+            expectDeleted(deleted, {drop});
+        }
+
+        // VHD volumes are not pruned (docker skips bind-mount volumes).
+        {
+            const std::string vhdName = "wslc-prune-vhd-skip";
+            const std::string guestName = "wslc-prune-vhd-skip-guest";
+
+            auto cleanup = wil::scope_exit([&]() {
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(vhdName.c_str()));
+                LOG_IF_FAILED(m_defaultSession->DeleteVolume(guestName.c_str()));
+            });
+
+            CreateNamedVolume(vhdName, "vhd", {}, {{"SizeBytes", "1073741824"}});
+            CreateNamedVolume(guestName, "guest");
+
+            auto deleted = pruneVolumes(true);
+            expectDeleted(deleted, {guestName});
+
+            VERIFY_IS_TRUE(ListVolumes().contains(vhdName));
+        }
+
+        // ListVolumes / InspectVolume reflect prune results.
+        {
+            const std::string name = "wslc-prune-listsync";
+            CreateNamedVolume(name, "guest");
+
+            auto deleted = pruneVolumes(true);
+            expectDeleted(deleted, {name});
+            VERIFY_IS_FALSE(ListVolumes().contains(name));
+        }
+
+        // Label with null Key rejected.
+        {
+            WSLCPruneLabelFilter labels[] = {{.Key = nullptr, .Value = "", .Present = TRUE}};
+            WSLCPruneVolumesOptions options{};
+            options.Labels = labels;
+            options.LabelsCount = ARRAYSIZE(labels);
+
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
+            ULONGLONG spaceReclaimed = 0;
+
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->PruneVolumes(&options, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+        }
     }
 
     WSLC_TEST_METHOD(NetworkCreateDeleteListTest)
@@ -8403,7 +8709,7 @@ class WSLCTests
 
         // Validate error paths.
         {
-            WSLCPruneLabelFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
+            WSLCPruneLabelFilter filter{.Key = nullptr, .Value = "", .Present = false};
             PruneResult result;
 
             VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
@@ -8498,12 +8804,12 @@ class WSLCTests
 
             // Prune with a label filter that no dangling image has - should not prune anything.
             auto [deletedImages, spaceReclaimed] =
-                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = true}});
+                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = "", .Present = true}});
             VERIFY_ARE_EQUAL(deletedImages.size(), 0u);
 
             // Prune with absent label filter - dangling image doesn't have the label, so it matches.
             auto [deletedImages2, spaceReclaimed2] =
-                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = nullptr, .Present = false}});
+                pruneImages(WSLCPruneImagesFlagsNone, 0, {{.Key = "nonexistent.label", .Value = "", .Present = false}});
             VERIFY_IS_TRUE(deletedImages2.size() > 0);
         }
 
@@ -8547,7 +8853,7 @@ class WSLCTests
                 E_INVALIDARG);
 
             // Null label key.
-            WSLCPruneLabelFilter nullKeyFilter{.Key = nullptr, .Value = nullptr, .Present = false};
+            WSLCPruneLabelFilter nullKeyFilter{.Key = nullptr, .Value = "", .Present = false};
             invalidOptions.Flags = WSLCPruneImagesFlagsNone;
             invalidOptions.Labels = &nullKeyFilter;
             invalidOptions.LabelsCount = 1;
