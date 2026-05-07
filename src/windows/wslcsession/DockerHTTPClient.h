@@ -119,7 +119,7 @@ public:
 
     using HTTPResponse = boost::beast::http::message<false, boost::beast::http::buffer_body>;
 
-    DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
+    DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, IWSLCVirtualMachine* Vm, ULONG ConnectTimeoutMs);
 
     // Container management.
     struct PruneContainersFilters
@@ -285,7 +285,7 @@ private:
     }
 
     ULONG m_connectTimeoutMs{};
-    GUID m_vmId;
+    wil::com_ptr<IWSLCVirtualMachine> m_vm;
     shared::SocketChannel m_channel;
     HANDLE m_exitingEvent;
     wil::srwlock m_lock;

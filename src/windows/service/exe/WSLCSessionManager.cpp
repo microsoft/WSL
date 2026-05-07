@@ -29,6 +29,7 @@ Abstract:
 
 #include "WSLCSessionManager.h"
 #include "HcsVirtualMachine.h"
+#include "OpenVmmVirtualMachine.h"
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
 #include "wslutil.h"
@@ -36,6 +37,7 @@ Abstract:
 
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
+using wsl::windows::service::wslc::OpenVmmVirtualMachine;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace settings = wsl::windows::wslc::settings;
@@ -209,7 +211,34 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
         // Create the VM in the SYSTEM service (privileged).
-        auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+        // Select VMM backend: set WSLC_USE_OPENVMM=1 to use OpenVMM instead of HCS.
+        Microsoft::WRL::ComPtr<IWSLCVirtualMachine> vm;
+        wchar_t envBuffer[2]{};
+        const bool useOpenVmm = GetEnvironmentVariableW(L"WSLC_USE_OPENVMM", envBuffer, ARRAYSIZE(envBuffer)) > 0 && envBuffer[0] == L'1';
+
+        // For OpenVMM, disable unsupported features before creating the VM and session.
+        // The copy must outlive all uses of Settings below (CreateSessionSettings, etc.).
+        WSLCSessionSettings openVmmSettings;
+        if (useOpenVmm)
+        {
+            openVmmSettings = *Settings;
+            WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsGPU);
+            WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsVirtioFs);
+            WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
+
+            // OpenVMM provides networking via its built-in consomme backend.
+            // Set NetworkingMode to None so the session process skips GNS and
+            // port relay setup. DNS is configured directly in the guest via DHCP.
+            openVmmSettings.NetworkingMode = WSLCNetworkingModeNone;
+
+            Settings = &openVmmSettings;
+
+            vm = Microsoft::WRL::Make<OpenVmmVirtualMachine>(Settings);
+        }
+        else
+        {
+            vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
+        }
 
         // Launch per-user COM server factory and add it to our job object for crash cleanup.
         auto factory = wslutil::CreateComServerAsUser<IWSLCSessionFactory>(__uuidof(WSLCSessionFactory), userToken.get());

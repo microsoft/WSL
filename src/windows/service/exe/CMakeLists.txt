@@ -21,6 +21,7 @@ set(SOURCES
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
     HcsVirtualMachine.cpp
+    OpenVmmVirtualMachine.cpp
     WSLCSessionManager.cpp
     WSLCSessionManagerFactory.cpp
     main.rc
@@ -52,6 +53,7 @@ set(HEADERS
     WslCoreTcpIpStateTracking.h
     WslCoreVm.h
     HcsVirtualMachine.h
+    OpenVmmVirtualMachine.h
     WSLCSessionManager.h
     WSLCSessionManagerFactory.h)
 

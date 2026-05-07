@@ -263,11 +263,18 @@ void WSLCVirtualMachine::Initialize()
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
     // Start crash dump collection thread.
-    auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
-    THROW_LAST_ERROR_IF(!crashDumpSocket);
-
-    m_crashDumpThread = std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
-
+    // N.B. When using a non-HCS VMM backend (e.g., OpenVMM on WHP), the VM GUID
+    // is not registered with the HvSocket driver, so hvsocket::Listen will fail.
+    // In that case, skip crash dump collection gracefully.
+    try
+    {
+        auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
+        m_crashDumpThread = std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION_MSG("Crash dump collection disabled (hvsocket::Listen failed, expected for non-HCS VMs)");
+    }
     // Establish a socket channel with mini_init in the VM.
     wil::unique_socket socket;
     THROW_IF_FAILED(m_vm->AcceptConnection(reinterpret_cast<HANDLE*>(&socket)));
@@ -294,6 +301,38 @@ void WSLCVirtualMachine::Initialize()
 
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
+
+    // When using OpenVMM's built-in networking (NetworkingMode == None, meaning
+    // GNS is not launched), configure the guest's network interface and DNS
+    // BEFORE anything else starts. This must happen before containerd/dockerd
+    // launch, otherwise they cache the wrong DNS from /etc/resolv.conf.
+    // The virtio-net + consomme backend provides DHCP with DNS at 10.0.0.1.
+    if (m_networkingMode == WSLCNetworkingModeNone)
+    {
+        try
+        {
+            const char* args[] = {"/bin/sh", "-c",
+                "ip link set eth0 up && "
+                "ip addr add 10.0.0.2/24 dev eth0 && "
+                "ip route add default via 10.0.0.1 && "
+                "echo 'nameserver 10.0.0.1' > /etc/resolv.conf"};
+            const char* env[] = {"PATH=/usr/sbin:/usr/bin:/sbin:/bin"};
+
+            WSLCProcessOptions options{};
+            options.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+            options.Environment = {.Values = env, .Count = ARRAYSIZE(env)};
+
+            auto process = CreateLinuxProcess("/bin/sh", options);
+            auto exitEvent = process->GetExitEvent();
+            WaitForSingleObject(exitEvent, 10000);
+
+            WSLCProcessState state{};
+            int code{};
+            process->GetState(&state, &code);
+            WSL_LOG("OpenVmmConfigureDns", TraceLoggingValue(code, "ExitCode"));
+        }
+        CATCH_LOG();
+    }
 
     // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
     ConfigureNetworking();
@@ -546,7 +585,8 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLCVirtualMachine::For
 
     THROW_HR_IF_MSG(E_FAIL, pid <= 0, "fork() returned %i", pid);
 
-    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmTerminatingEvent.get(), m_bootTimeoutMs);
+    wil::unique_socket socket;
+    THROW_IF_FAILED(m_vm->ConnectToVsockPort(port, reinterpret_cast<HANDLE*>(&socket)));
 
     return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get()});
 }
@@ -561,7 +601,7 @@ WSLCVirtualMachine::ConnectedSocket WSLCVirtualMachine::ConnectSocket(wsl::share
     const auto& response = transaction.Receive<WSLC_ACCEPT::TResponse>();
 
     ConnectedSocket socket;
-    socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
+    THROW_IF_FAILED(m_vm->ConnectToVsockPort(response.Result, reinterpret_cast<HANDLE*>(&socket.Socket)));
 
     // If the FD was unspecified, read the Linux file descriptor from the guest.
     if (Fd == -1)

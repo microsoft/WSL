@@ -596,6 +596,15 @@ try
 }
 CATCH_RETURN()
 
+HRESULT HcsVirtualMachine::ConnectToVsockPort(_In_ ULONG Port, _Out_ HANDLE* Socket)
+try
+{
+    auto socket = hvsocket::Connect(m_vmId, Port, m_vmExitEvent.get(), m_bootTimeoutMs);
+    *Socket = reinterpret_cast<HANDLE>(socket.release());
+    return S_OK;
+}
+CATCH_RETURN()
+
 void CALLBACK HcsVirtualMachine::OnVmExitCallback(HCS_EVENT* Event, void* Context)
 try
 {

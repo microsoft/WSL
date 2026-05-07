@@ -165,6 +165,11 @@ public:
         return m_vmId;
     }
 
+    IWSLCVirtualMachine* Vm() const
+    {
+        return m_vm.get();
+    }
+
     bool FeatureEnabled(WSLCFeatureFlags Flag) const;
 
 private:
