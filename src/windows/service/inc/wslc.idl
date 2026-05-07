@@ -226,6 +226,13 @@ typedef struct _WSLCTmpfsMount
     [unique] LPCSTR Options;
 } WSLCTmpfsMount;
 
+typedef struct _WSLCUlimit
+{
+    [string] LPCSTR Name;
+    LONGLONG Soft;
+    LONGLONG Hard;
+} WSLCUlimit;
+
 typedef enum _WSLCContainerNetworkType
 {
     WSLCContainerNetworkTypeNone = 0,
@@ -293,6 +300,11 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(NamedVolumesCount)] WSLCNamedVolume* NamedVolumes;
     ULONG NamedVolumesCount;
+
+    LONGLONG MemoryBytes;
+    LONGLONG NanoCpus;
+    [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
+    ULONG UlimitsCount;
 } WSLCContainerOptions;
 
 typedef enum _WSLCContainerState

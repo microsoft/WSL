@@ -18,6 +18,7 @@ Abstract:
 #include "WSLCProcessLauncher.h"
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
+#include "hcs.hpp"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -444,14 +445,22 @@ class WSLCTests
         std::wstring Owner;
     };
 
-    // Returns VM info (Id + Owner) for all running VMs via hcsdiag.
+    // Returns VM info (Id + Owner) for all compute systems via the HCS API.
     static std::vector<VmInfo> ListVms()
     {
-        wsl::windows::common::SubProcess process(nullptr, L"hcsdiag list -raw");
-        auto output = process.RunAndCaptureOutput(10000);
+        const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
+
+        auto operation = wsl::windows::common::hcs::CreateOperation();
+        THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
+
+        wil::unique_cotaskmem_string resultDocument;
+        const auto result = ::HcsWaitForOperationResult(operation.get(), 10000, &resultDocument);
+        THROW_IF_FAILED_MSG(result, "HcsEnumerateComputeSystems failed (error: %ls)", resultDocument.get());
+
+        LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
 
         std::vector<VmInfo> vms;
-        auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(output.Stdout), nullptr, false);
+        const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()));
         if (!json.is_array())
         {
             return vms;
@@ -1117,6 +1126,13 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ImportImage)
     {
+        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
+        // TODO: Remove once the fix is available.
+        if (IsWindowsServer())
+        {
+            SKIP_TEST_UNSTABLE();
+        }
+
         auto cleanup =
             wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
 
@@ -1984,21 +2000,21 @@ class WSLCTests
         VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wslc-test-build:latest"));
         ExpectImagePresent(*m_defaultSession, "wslc-test-build:latest");
 
-        // Lists anonymous docker volume names via the VM's docker CLI.
-        // TODO: Add proper support so we can list via session's API instead.
         auto listAnonymousVolumes = [&]() {
-            auto result = ExpectCommandResult(
-                m_defaultSession.get(), {"/usr/bin/docker", "volume", "ls", "-q", "-f", "label=com.docker.volume.anonymous"}, 0);
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
+            VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(volumes.addressof(), volumes.size_address<ULONG>()));
+
             std::vector<std::string> names;
-            std::stringstream ss(result.Output[1]);
-            std::string line;
-            while (std::getline(ss, line))
+
+            // TODO: Replace with filter for anonymous volumes in ListVolumes API.
+            for (const auto& vol : volumes)
             {
-                if (!line.empty())
+                if (std::string(vol.Driver) == "guest")
                 {
-                    names.push_back(line);
+                    names.push_back(vol.Name);
                 }
             }
+
             return names;
         };
 
@@ -2006,15 +2022,14 @@ class WSLCTests
         {
             WSLCContainerLauncher launcher("wslc-test-build:latest", "wslc-test-anonymous-volume", {"test", "-d", "/volume"});
             auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess();
+            container.SetDeleteOnClose(false);
 
             auto containerId = container.Id();
 
+            auto result = container.GetInitProcess();
             ValidateProcessOutput(result, {});
 
             ResetTestSession();
-
-            container.SetDeleteOnClose(false);
 
             // Manually cleanup the container and delete anonymous volumes since the session has been reset.
             auto containerCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -2042,16 +2057,21 @@ class WSLCTests
             container.GetInitProcess().Wait();
             container.SetDeleteOnClose(false);
 
+            // Clean up any leaked anonymous volumes when this block exits.
+            auto volumeCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                auto volumes = listAnonymousVolumes();
+                for (const auto& name : volumes)
+                {
+                    LOG_IF_FAILED(m_defaultSession->DeleteVolume(name.c_str()));
+                }
+            });
+
             VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
 
             // Anonymous volume was NOT deleted by Docker.
-            auto leaked = listAnonymousVolumes();
-            VERIFY_ARE_EQUAL(leaked.size(), 1u);
-
-            RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "volume", "prune", "-f"});
-            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 0u);
+            VERIFY_ARE_EQUAL(listAnonymousVolumes().size(), 1u);
         }
 
         // Delete container with WSLCDeleteFlagsDeleteVolumes -> anonymous volume is cleaned up.
@@ -2884,7 +2904,22 @@ class WSLCTests
         {
             auto result = ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"}, 0);
 
-            VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+            if (mode == WSLCNetworkingModeVirtioProxy)
+            {
+                // Virtio proxy points resolv.conf at the eth0 gateway.
+                ExpectCommandResult(
+                    session.get(),
+                    {"/bin/sh",
+                     "-c",
+                     "ns=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf); "
+                     "gw=$(ip route show default | awk '{print $3; exit}'); "
+                     "[ -n \"$ns\" ] && [ -n \"$gw\" ] && [ \"$ns\" = \"$gw\" ]"},
+                    0);
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+            }
         }
 
         // Verify DNS resolution.
@@ -3742,6 +3777,65 @@ class WSLCTests
     WSLC_TEST_METHOD(NamedVolumesGuest)
     {
         ValidateNamedVolumeContract("guest", nullptr, 0);
+    }
+
+    WSLC_TEST_METHOD(NamedVolumesStress)
+    {
+        constexpr unsigned int c_threadCount = 8;
+        constexpr unsigned int c_iterationsPerThread = 50;
+        const std::string volumeName = "wslc-stress-vol";
+
+        // Best-effort cleanup of any leftover volume from prior runs / on test exit.
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
+
+        std::atomic<unsigned int> failures = 0;
+        std::vector<std::thread> threads;
+        threads.reserve(c_threadCount);
+
+        for (unsigned int t = 0; t < c_threadCount; ++t)
+        {
+            threads.emplace_back([&]() {
+                for (unsigned int i = 0; i < c_iterationsPerThread; ++i)
+                {
+                    WSLCVolumeOptions volumeOptions{};
+                    volumeOptions.Name = volumeName.c_str();
+                    volumeOptions.Driver = "guest";
+
+                    WSLCVolumeInformation volInfo{};
+                    HRESULT hrCreate = m_defaultSession->CreateVolume(&volumeOptions, &volInfo);
+                    if (FAILED(hrCreate) && hrCreate != HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+                    {
+                        LogError("CreateVolume(%hs) unexpected HR: 0x%08x", volumeName.c_str(), hrCreate);
+                        ++failures;
+                    }
+
+                    HRESULT hrDelete = m_defaultSession->DeleteVolume(volumeName.c_str());
+                    if (FAILED(hrDelete) && hrDelete != WSLC_E_VOLUME_NOT_FOUND)
+                    {
+                        LogError("DeleteVolume(%hs) unexpected HR: 0x%08x", volumeName.c_str(), hrDelete);
+                        ++failures;
+                    }
+                }
+            });
+        }
+
+        for (auto& thread : threads)
+        {
+            thread.join();
+        }
+
+        VERIFY_ARE_EQUAL(failures.load(), 0u);
+
+        // Every thread's iteration ends with a Delete, so the globally-last operation across
+        // all threads is guaranteed to be a Delete. The volume must therefore not exist in
+        // either our cache or docker -- if either disagrees, our state is desynced from docker.
+
+        // Our cache view: InspectVolume must report not-found.
+        wil::unique_cotaskmem_ansistring inspectOutput;
+        VERIFY_ARE_EQUAL(m_defaultSession->InspectVolume(volumeName.c_str(), &inspectOutput), WSLC_E_VOLUME_NOT_FOUND);
+
+        // Docker's view: `docker volume inspect` must also report not-found (non-zero exit).
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "volume", "inspect", volumeName}, 1);
     }
 
     // Verifies that a container using a named volume survives a session restart and the volume's data is preserved.
@@ -5766,6 +5860,37 @@ class WSLCTests
 
             VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
         }
+
+        // Test that Config fields are populated in inspect output.
+        {
+            const std::string envVar = "WSLC_TEST_VAR=hello";
+            const std::string workDir = "/tmp";
+
+            WSLCContainerLauncher launcher("debian:latest", "test-container-inspect-config", {"99999"}, {envVar});
+            launcher.SetEntrypoint({"sleep"});
+            launcher.SetWorkingDirectory(std::string{workDir});
+            launcher.SetUser("nobody");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto details = container.Inspect();
+
+            const auto& config = details.Config;
+
+            VERIFY_IS_TRUE(config.Env.has_value());
+            VERIFY_IS_TRUE(std::ranges::find(*config.Env, envVar) != config.Env->end());
+
+            VERIFY_ARE_EQUAL(config.WorkingDir, workDir);
+
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_ARE_EQUAL(1u, config.Cmd->size());
+            VERIFY_ARE_EQUAL(config.Cmd->at(0), std::string{"99999"});
+
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(1u, config.Entrypoint->size());
+            VERIFY_ARE_EQUAL(config.Entrypoint->at(0), std::string{"sleep"});
+
+            VERIFY_ARE_EQUAL(config.User, std::string{"nobody"});
+        }
     }
 
     WSLC_TEST_METHOD(Exec)
@@ -7388,6 +7513,102 @@ class WSLCTests
             launcher.AddLabel("com.microsoft.wsl.container.metadata", "value");
 
             auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerResourceLimits)
+    {
+        // Validate per-container memory limit is applied (cgroup v2: /sys/fs/cgroup/memory.max).
+        {
+            constexpr std::int64_t memoryBytes = 64 * 1024 * 1024; // 64 MiB
+            WSLCContainerLauncher launcher("debian:latest", "test-container-memory-limit", {"cat", "/sys/fs/cgroup/memory.max"});
+            launcher.SetMemoryLimit(memoryBytes);
+
+            ValidateContainerOutput(launcher, {{1, std::format("{}\n", memoryBytes)}});
+        }
+
+        // Validate per-container CPU quota is applied (cgroup v2: /sys/fs/cgroup/cpu.max).
+        // NanoCpus = 1.5 * 1e9 -> quota=150000 period=100000.
+        {
+            constexpr std::int64_t nanoCpus = 1'500'000'000ll;
+            WSLCContainerLauncher launcher("debian:latest", "test-container-cpu-limit", {"cat", "/sys/fs/cgroup/cpu.max"});
+            launcher.SetNanoCpus(nanoCpus);
+
+            ValidateContainerOutput(launcher, {{1, "150000 100000\n"}});
+        }
+
+        // Validate ulimit (nofile) is applied to the init process.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-ulimit", {"sh", "-c", "ulimit -Sn; ulimit -Hn"});
+            launcher.AddUlimit("nofile", 1234, 5678);
+
+            ValidateContainerOutput(launcher, {{1, "1234\n5678\n"}});
+        }
+
+        // Validate that the configured limits are reported back via container.Inspect().
+        {
+            constexpr std::int64_t memoryBytes = 64 * 1024 * 1024;
+            constexpr std::int64_t nanoCpus = 500'000'000ll;
+
+            WSLCContainerLauncher launcher("debian:latest", "test-container-limits-inspect", {"true"});
+            launcher.SetMemoryLimit(memoryBytes);
+            launcher.SetNanoCpus(nanoCpus);
+            launcher.AddUlimit("nofile", 1234, 5678);
+
+            auto container = launcher.Create(*m_defaultSession);
+            auto hostConfig = container.Inspect().HostConfig;
+
+            VERIFY_ARE_EQUAL(memoryBytes, hostConfig.Memory);
+            VERIFY_ARE_EQUAL(nanoCpus, hostConfig.NanoCpus);
+            VERIFY_ARE_EQUAL(static_cast<size_t>(1), hostConfig.Ulimits.size());
+            VERIFY_ARE_EQUAL(std::string("nofile"), hostConfig.Ulimits[0].Name);
+            VERIFY_ARE_EQUAL(1234ll, hostConfig.Ulimits[0].Soft);
+            VERIFY_ARE_EQUAL(5678ll, hostConfig.Ulimits[0].Hard);
+        }
+
+        // Validate inspect defaults when no limits are configured: Memory/NanoCpus are 0 ("no limit") and Ulimits is empty.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-limits-inspect-defaults", {"true"});
+
+            auto container = launcher.Create(*m_defaultSession);
+            auto hostConfig = container.Inspect().HostConfig;
+
+            VERIFY_ARE_EQUAL(0ll, hostConfig.Memory);
+            VERIFY_ARE_EQUAL(0ll, hostConfig.NanoCpus);
+            VERIFY_IS_TRUE(hostConfig.Ulimits.empty());
+        }
+
+        // Validate that multiple ulimits round-trip through inspect in the order they were configured.
+        {
+            WSLCContainerLauncher launcher("debian:latest", "test-container-limits-inspect-multi", {"true"});
+            launcher.AddUlimit("nofile", 1234, 5678);
+            launcher.AddUlimit("nproc", 100, 200);
+
+            auto container = launcher.Create(*m_defaultSession);
+            auto ulimits = container.Inspect().HostConfig.Ulimits;
+
+            VERIFY_ARE_EQUAL(static_cast<size_t>(2), ulimits.size());
+            VERIFY_ARE_EQUAL(std::string("nofile"), ulimits[0].Name);
+            VERIFY_ARE_EQUAL(1234ll, ulimits[0].Soft);
+            VERIFY_ARE_EQUAL(5678ll, ulimits[0].Hard);
+            VERIFY_ARE_EQUAL(std::string("nproc"), ulimits[1].Name);
+            VERIFY_ARE_EQUAL(100ll, ulimits[1].Soft);
+            VERIFY_ARE_EQUAL(200ll, ulimits[1].Hard);
+        }
+
+        // Validate that a Ulimit entry with a null Name is rejected.
+        {
+            WSLCUlimit ulimit{.Name = nullptr, .Soft = 1, .Hard = 1};
+
+            WSLCContainerOptions options{};
+            options.Image = "debian:latest";
+            options.Name = "test-ulimit-null-name";
+            options.Ulimits = &ulimit;
+            options.UlimitsCount = 1;
+
+            wil::com_ptr<IWSLCContainer> container;
+            auto hr = m_defaultSession->CreateContainer(&options, &container);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
     }

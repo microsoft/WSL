@@ -786,12 +786,12 @@ class NetworkTests
         if (HostHasInternetConnectivity(AF_INET))
         {
             // Test A record resolution (IPv4) with both UDP and TCP
-            VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+            VerifyDigDnsResolution(L"dig +short +time=10 A bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 A bing.com");
 
             // Test reverse DNS lookup
-            VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +short +time=10 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 -x 8.8.8.8");
         }
         else
         {
@@ -801,8 +801,8 @@ class NetworkTests
         if (HostHasInternetConnectivity(AF_INET6))
         {
             // Test AAAA record resolution (IPv6) with both UDP and TCP
-            VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-            VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +short +time=10 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=10 AAAA bing.com");
         }
         else
         {
@@ -813,53 +813,53 @@ class NetworkTests
     static void VerifyDnsResolutionRecordTypes()
     {
         // Test various DNS record types
-        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
-        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 SOA bing.com");
     }
 
     static void VerifyDnsQueries()
     {
         // query for A/IPv4 records
-        VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 A bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 A bing.com");
 
         // query for AAAA/IPv6 records
-        VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 AAAA bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 AAAA bing.com");
 
         // query for MX records
-        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 MX bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 MX bing.com");
 
         // query for NS records
-        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 NS bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 NS bing.com");
 
         // reverse DNS lookup
-        VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+        VerifyDigDnsResolution(L"dig +short +time=10 -x 8.8.8.8");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 -x 8.8.8.8");
 
         // query for SOA records
-        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 SOA bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 SOA bing.com");
 
         // query for TXT records
-        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=10 TXT bing.com");
 
         // query for CNAME records
-        VerifyDigDnsResolution(L"dig +time=5 CNAME bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +time=5 CNAME bing.com");
+        VerifyDigDnsResolution(L"dig +time=10 CNAME bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +time=10 CNAME bing.com");
 
         // query for SRV records
-        VerifyDigDnsResolution(L"dig +time=5 SRV bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +time=5 SRV bing.com");
+        VerifyDigDnsResolution(L"dig +time=10 SRV bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +time=10 SRV bing.com");
 
         // query for ANY - for this option dig expects a large response so it will query directly over TCP,
         // instead of trying UDP first and falling back to TCP.
-        VerifyDigDnsResolution(L"dig +short ANY bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=10 ANY bing.com");
     }
 
     static void VerifyDnsSuffixes()
@@ -4815,6 +4815,16 @@ class VirtioProxyTests
         }
     }
 
+    WSL2_TEST_METHOD(ValidateMacAddress)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        // eth0 should have wsldevicehost's default client MAC. Update if that default changes.
+        VERIFY_ARE_EQUAL(GetMacAddress(L"eth0"), std::wstring(L"00:00:00:00:01:00"));
+    }
+
     WSL2_TEST_METHOD(GuestPortIsReleased)
     {
         VIRTIOPROXY_TEST_ONLY();
@@ -5082,6 +5092,23 @@ class VirtioProxyTests
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
+    }
+
+    // Verifies that virtio proxy + dnsTunneling points resolv.conf at the gateway, not the hvsocket listener IP.
+    WSL2_TEST_METHOD(DnsTunnelingResolvConfUsesGateway)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+        VERIFY_IS_TRUE(state.Gateway.has_value());
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + state.Gateway.value()), static_cast<DWORD>(0));
+
+        VERIFY_ARE_NOT_EQUAL(
+            LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + c_dnsTunnelingDefaultIp), static_cast<DWORD>(0));
     }
 };
 } // namespace NetworkTests

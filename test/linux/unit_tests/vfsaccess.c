@@ -458,10 +458,8 @@ int VfsAccessFileObjectChecks(PLXT_ARGS Args)
     int Result;
     int ResultActual;
     int ResultExpected;
-    bool VirtiofsNoDax;
 
     LxtLogInfo("Fs type %d with dax = %d\n", g_LxtFsInfo.FsType, g_LxtFsInfo.Flags.Dax);
-    VirtiofsNoDax = g_LxtFsInfo.FsType == LxtFsTypeVirtioFs && g_LxtFsInfo.Flags.Dax == 0;
     memset(Files, -1, sizeof(Files));
     LxtCheckResult(VfsAccessFileObjectOpenFiles(Files));
     for (Index = 0; Index < VFS_FILE_OBJECT_COUNT; ++Index)
@@ -531,22 +529,15 @@ int VfsAccessFileObjectChecks(PLXT_ARGS Args)
         // N.B. The Linux 9p client does not allow mapping shared if the file is
         //      opened for write.
         //
-        // N.B. The virtiofs device relies on fuse mapping which only supports
-        //      shared in the presence of DAX.
-        //
 
         ErrnoExpected = EACCES;
         if (Files[Index].Flags == O_PATH)
         {
             ErrnoExpected = EBADF;
         }
-        else if (VirtiofsNoDax && (Files[Index].Flags == O_RDONLY || (Files[Index].Flags & O_ACCMODE) == O_RDWR))
-        {
-            ErrnoExpected = ENODEV;
-        }
 
         ResultExpected = -1;
-        if (!VirtiofsNoDax && (((Files[Index].Flags & O_ACCMODE) == O_RDONLY) || ((Files[Index].Flags & O_ACCMODE) == O_RDWR)) &&
+        if ((((Files[Index].Flags & O_ACCMODE) == O_RDONLY) || ((Files[Index].Flags & O_ACCMODE) == O_RDWR)) &&
             ((Files[Index].Flags & O_PATH) == 0))
         {
 
@@ -619,22 +610,15 @@ int VfsAccessFileObjectChecks(PLXT_ARGS Args)
         //
         // Validate map write shared and private
         //
-        // N.B. The virtiofs device relies on fuse mapping which only supports
-        //      shared in the presence of DAX.
-        //
 
         ErrnoExpected = EACCES;
         if (Files[Index].Flags == O_PATH)
         {
             ErrnoExpected = EBADF;
         }
-        else if (VirtiofsNoDax && (Files[Index].Flags & O_ACCMODE) == O_RDWR)
-        {
-            ErrnoExpected = ENODEV;
-        }
 
         ResultExpected = -1;
-        if (!VirtiofsNoDax && (Files[Index].Flags & O_ACCMODE) == O_RDWR)
+        if ((Files[Index].Flags & O_ACCMODE) == O_RDWR)
         {
             ResultExpected = 1;
         }
@@ -691,10 +675,8 @@ int VfsAccessFileObjectSymlinksChecks(PLXT_ARGS Args)
     int Result;
     int ResultActual;
     int ResultExpected;
-    bool VirtiofsNoDax;
 
     LxtLogInfo("Fs type %d with dax = %d\n", g_LxtFsInfo.FsType, g_LxtFsInfo.Flags.Dax);
-    VirtiofsNoDax = g_LxtFsInfo.FsType == LxtFsTypeVirtioFs && g_LxtFsInfo.Flags.Dax == 0;
 
     memset(Files, -1, sizeof(Files));
     LxtCheckResult(VfsAccessFileObjectOpenSymlinks(Files));
@@ -738,13 +720,9 @@ int VfsAccessFileObjectSymlinksChecks(PLXT_ARGS Args)
         {
             ErrnoExpected = EBADF;
         }
-        else if (VirtiofsNoDax && (Files[Index].Flags == O_RDONLY || (Files[Index].Flags & O_ACCMODE) == O_RDWR))
-        {
-            ErrnoExpected = ENODEV;
-        }
 
         ResultExpected = -1;
-        if (!VirtiofsNoDax && (((Files[Index].Flags & O_ACCMODE) == O_RDONLY) || ((Files[Index].Flags & O_ACCMODE) == O_RDWR)) &&
+        if ((((Files[Index].Flags & O_ACCMODE) == O_RDONLY) || ((Files[Index].Flags & O_ACCMODE) == O_RDWR)) &&
             ((Files[Index].Flags & O_PATH) == 0))
         {
 
@@ -770,13 +748,9 @@ int VfsAccessFileObjectSymlinksChecks(PLXT_ARGS Args)
         {
             ErrnoExpected = EBADF;
         }
-        else if (VirtiofsNoDax && (Files[Index].Flags & O_ACCMODE) == O_RDWR)
-        {
-            ErrnoExpected = ENODEV;
-        }
 
         ResultExpected = -1;
-        if (!VirtiofsNoDax && (Files[Index].Flags & O_ACCMODE) == O_RDWR)
+        if ((Files[Index].Flags & O_ACCMODE) == O_RDWR)
         {
             ResultExpected = 1;
         }
@@ -852,16 +826,11 @@ int VfsAccessRemapReference(PLXT_ARGS Args)
     char Buffer;
     int FdReadOnly = -1;
     int FdReadWrite = -1;
-    int MapFlags;
     void* MapResult;
     void* MapReadOnly = NULL;
     void* MapReadWrite = NULL;
     void* RemappedMemory = NULL;
     int Result;
-    bool VirtiofsNoDax;
-
-    VirtiofsNoDax = g_LxtFsInfo.FsType == LxtFsTypeVirtioFs && g_LxtFsInfo.Flags.Dax == 0;
-    MapFlags = VirtiofsNoDax ? MAP_PRIVATE : MAP_SHARED;
 
     //
     // Open and map a file whose only reference is read only and open second
@@ -869,9 +838,9 @@ int VfsAccessRemapReference(PLXT_ARGS Args)
     //
 
     LxtCheckErrno(FdReadOnly = open(g_VfsFiles[VFS_ACCESS_REMAP_FILE].Name, O_RDONLY, 0));
-    LxtCheckMapErrno(MapReadOnly = mmap(NULL, sizeof(Buffer), PROT_READ, MapFlags, FdReadOnly, 0));
+    LxtCheckMapErrno(MapReadOnly = mmap(NULL, sizeof(Buffer), PROT_READ, MAP_SHARED, FdReadOnly, 0));
     LxtCheckErrno(FdReadWrite = open(g_VfsFiles[VFS_ACCESS_REMAP_FILE].Name, O_RDWR, 0));
-    LxtCheckMapErrno(MapReadWrite = mmap(NULL, sizeof(Buffer), PROT_READ | PROT_WRITE, MapFlags, FdReadWrite, 0));
+    LxtCheckMapErrno(MapReadWrite = mmap(NULL, sizeof(Buffer), PROT_READ | PROT_WRITE, MAP_SHARED, FdReadWrite, 0));
     LxtCheckMapErrno(RemappedMemory = mremap(MapReadWrite, sizeof(Buffer), PAGE_SIZE * 2, MREMAP_MAYMOVE));
 
 ErrorExit:

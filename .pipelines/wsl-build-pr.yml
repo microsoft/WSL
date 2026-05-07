@@ -8,7 +8,6 @@ stages:
 - template: build-stage.yml@self
   parameters:
     isRelease: false
-    includePackageStage: false
     pool: 'wsl-build'
     vsoOrg: shine-oss
     vsoProject: wsl
