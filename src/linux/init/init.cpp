@@ -3533,7 +3533,7 @@ int WslInitWatcher(int Argc, char** Argv)
     }
     const pid_t wslInitPid = static_cast<pid_t>(parsed);
 
-    const int pidfd = syscall(__NR_pidfd_open, wslInitPid, 0);
+    const int pidfd = syscall(SYS_pidfd_open, wslInitPid, 0);
     if (pidfd < 0)
     {
         _exit(1);
