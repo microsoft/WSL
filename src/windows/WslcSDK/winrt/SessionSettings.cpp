@@ -16,84 +16,74 @@ Abstract:
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.SessionSettings.g.cpp"
 
-namespace WSLC = winrt::Microsoft::WSL::Containers;
-
-namespace winrt::Microsoft::WSL::Containers {
-implementation::SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath) :
-    m_name(name), m_storagePath(storagePath)
+namespace winrt::Microsoft::WSL::Containers::implementation
 {
-    winrt::check_hresult(WslcInitSessionSettings(m_name.c_str(), m_storagePath.c_str(), &m_sessionSettings));
+    SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath)
+    {
+        throw hresult_not_implemented();
+    }
+    hstring SessionSettings::Name()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::Name(hstring const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    hstring SessionSettings::StoragePath()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::StoragePath(hstring const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::CpuCount()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::CpuCount(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::MemoryMB()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::IReference<uint32_t> SessionSettings::TimeoutMS()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t> const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Microsoft::WSL::Containers::VhdRequirements SessionSettings::VhdRequirements()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdRequirements const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Microsoft::WSL::Containers::SessionFeatureFlags SessionSettings::FeatureFlags()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Microsoft::WSL::Containers::SessionTerminationHandler SessionSettings::TerminationHandler()
+    {
+        throw hresult_not_implemented();
+    }
+    void SessionSettings::TerminationHandler(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& value)
+    {
+        throw hresult_not_implemented();
+    }
 }
-
-hstring implementation::SessionSettings::Name()
-{
-    return hstring{m_name};
-}
-
-hstring implementation::SessionSettings::StoragePath()
-{
-    return hstring{m_storagePath};
-}
-
-uint32_t implementation::SessionSettings::CpuCount()
-{
-    return m_cpuCount;
-}
-
-void implementation::SessionSettings::CpuCount(uint32_t value)
-{
-    m_cpuCount = value;
-    winrt::check_hresult(WslcSetSessionSettingsCpuCount(&m_sessionSettings, m_cpuCount));
-}
-
-uint32_t implementation::SessionSettings::MemoryMb()
-{
-    return m_memoryMb;
-}
-
-void implementation::SessionSettings::MemoryMb(uint32_t value)
-{
-    m_memoryMb = value;
-    winrt::check_hresult(WslcSetSessionSettingsMemory(&m_sessionSettings, m_memoryMb));
-}
-
-uint32_t implementation::SessionSettings::TimeoutMS()
-{
-    return m_timeoutMS;
-}
-
-void implementation::SessionSettings::TimeoutMS(uint32_t value)
-{
-    m_timeoutMS = value;
-    winrt::check_hresult(WslcSetSessionSettingsTimeout(&m_sessionSettings, m_timeoutMS));
-}
-
-WSLC::VhdRequirements implementation::SessionSettings::VhdRequirements()
-{
-    return m_vhdRequirements;
-}
-
-void implementation::SessionSettings::VhdRequirements(WSLC::VhdRequirements const& value)
-{
-    m_vhdRequirements = value;
-    auto vhdRequirements =
-        m_vhdRequirements ? winrt::get_self<implementation::VhdRequirements>(m_vhdRequirements)->ToStructPointer() : nullptr;
-    winrt::check_hresult(WslcSetSessionSettingsVhd(&m_sessionSettings, vhdRequirements));
-}
-
-WSLC::SessionFeatureFlags implementation::SessionSettings::FeatureFlags()
-{
-    return m_featureFlags;
-}
-
-void implementation::SessionSettings::FeatureFlags(WSLC::SessionFeatureFlags const& value)
-{
-    m_featureFlags = value;
-    winrt::check_hresult(WslcSetSessionSettingsFeatureFlags(&m_sessionSettings, static_cast<WslcSessionFeatureFlags>(m_featureFlags)));
-}
-
-WslcSessionSettings* implementation::SessionSettings::ToStructPointer()
-{
-    return &m_sessionSettings;
-}
-} // namespace winrt::Microsoft::WSL::Containers

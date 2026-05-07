@@ -13,44 +13,61 @@ Abstract:
 --*/
 
 #include "precomp.h"
-
 #include "Session.h"
 #include "Microsoft.WSL.Containers.Session.g.cpp"
 
-namespace WSLC = winrt::Microsoft::WSL::Containers;
-
-namespace winrt::Microsoft::WSL::Containers {
-
-implementation::Session::~Session()
+namespace winrt::Microsoft::WSL::Containers::implementation
 {
-    if (m_session)
+    winrt::Microsoft::WSL::Containers::Session Session::Create(winrt::Microsoft::WSL::Containers::SessionSettings const& settings)
     {
-        WslcReleaseSession(m_session);
-        m_session = nullptr;
+        throw hresult_not_implemented();
+    }
+    void Session::Terminate()
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Microsoft::WSL::Containers::ContainerSettings const& containerSettings)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PullImageAsync(winrt::Microsoft::WSL::Containers::PullImageOptions options)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::ImportImageAsync(hstring path, hstring imageName)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::LoadImageAsync(hstring path)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PushImageAsync(winrt::Microsoft::WSL::Containers::PushImageOptions options)
+    {
+        throw hresult_not_implemented();
+    }
+    void Session::DeleteImage(hstring const& nameOrId)
+    {
+        throw hresult_not_implemented();
+    }
+    void Session::TagImage(winrt::Microsoft::WSL::Containers::TagImageOptions const& options)
+    {
+        throw hresult_not_implemented();
+    }
+    void Session::CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdRequirements const& options)
+    {
+        throw hresult_not_implemented();
+    }
+    void Session::DeleteVhdVolume(hstring const& name)
+    {
+        throw hresult_not_implemented();
+    }
+    hstring Session::Authenticate(winrt::Windows::Foundation::Uri const& serverAddress, hstring const& username, hstring const& password)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
+    {
+        throw hresult_not_implemented();
     }
 }
-
-WSLC::Session implementation::Session::Create(WSLC::SessionSettings const& settings)
-{
-    auto session = winrt::make_self<implementation::Session>();
-    wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcCreateSession(implementation::GetStructPointer(settings), implementation::GetHandlePointer(session), &errorMessage);
-    THROW_MSG_IF_FAILED(hr, errorMessage);
-    return *session;
-}
-
-void implementation::Session::Terminate()
-{
-    winrt::check_hresult(WslcTerminateSession(m_session));
-}
-
-WslcSession implementation::Session::ToHandle()
-{
-    return m_session;
-}
-
-WslcSession* implementation::Session::ToHandlePointer()
-{
-    return &m_session;
-}
-} // namespace winrt::Microsoft::WSL::Containers

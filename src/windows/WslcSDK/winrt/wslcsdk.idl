@@ -239,9 +239,9 @@ namespace Microsoft.WSL.Containers
 
     runtimeclass ServiceVersion
     {
-        UInt32 Major { get; }
-        UInt32 Minor { get; }
-        UInt32 Revision { get; }
+        UInt32 Major { get; };
+        UInt32 Minor { get; };
+        UInt32 Revision { get; };
     };
 
     runtimeclass InstallProgress

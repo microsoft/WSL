@@ -16,32 +16,34 @@ Abstract:
 #include "VhdRequirements.h"
 #include "Microsoft.WSL.Containers.VhdRequirements.g.cpp"
 
-namespace winrt::Microsoft::WSL::Containers::implementation {
-VhdRequirements::VhdRequirements(hstring const& name, uint64_t sizeInBytes, winrt::Microsoft::WSL::Containers::VhdType const& type) :
-    m_name(winrt::to_string(name))
+namespace winrt::Microsoft::WSL::Containers::implementation
 {
-    m_vhdRequirements.name = m_name.c_str();
-    m_vhdRequirements.sizeBytes = sizeInBytes;
-    m_vhdRequirements.type = static_cast<WslcVhdType>(type);
+    VhdRequirements::VhdRequirements(hstring const& name, uint64_t sizeInBytes, winrt::Microsoft::WSL::Containers::VhdType const& type)
+    {
+        throw hresult_not_implemented();
+    }
+    hstring VhdRequirements::Name()
+    {
+        throw hresult_not_implemented();
+    }
+    void VhdRequirements::Name(hstring const& value)
+    {
+        throw hresult_not_implemented();
+    }
+    uint64_t VhdRequirements::SizeInBytes()
+    {
+        throw hresult_not_implemented();
+    }
+    void VhdRequirements::SizeInBytes(uint64_t value)
+    {
+        throw hresult_not_implemented();
+    }
+    winrt::Microsoft::WSL::Containers::VhdType VhdRequirements::Type()
+    {
+        throw hresult_not_implemented();
+    }
+    void VhdRequirements::Type(winrt::Microsoft::WSL::Containers::VhdType const& value)
+    {
+        throw hresult_not_implemented();
+    }
 }
-
-hstring VhdRequirements::Name()
-{
-    return winrt::to_hstring(m_name);
-}
-
-uint64_t VhdRequirements::SizeInBytes()
-{
-    return m_vhdRequirements.sizeBytes;
-}
-
-winrt::Microsoft::WSL::Containers::VhdType VhdRequirements::Type()
-{
-    return static_cast<winrt::Microsoft::WSL::Containers::VhdType>(m_vhdRequirements.type);
-}
-
-WslcVhdRequirements* VhdRequirements::ToStructPointer()
-{
-    return &m_vhdRequirements;
-}
-} // namespace winrt::Microsoft::WSL::Containers::implementation
