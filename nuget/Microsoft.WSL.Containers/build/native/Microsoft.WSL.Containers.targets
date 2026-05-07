@@ -40,7 +40,7 @@
 
     <Target Name="_WslcWriteAllTlogs"
             AfterTargets="WslcBuildAllImages"
-            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != ''">
+            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != '' AND '$(DesignTimeBuild)' != 'true'">
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcWriteSingleTlog"

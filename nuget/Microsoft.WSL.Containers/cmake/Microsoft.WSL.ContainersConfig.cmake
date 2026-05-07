@@ -81,13 +81,12 @@ unset(_wslcsdk_lib_dir)
 # IMAGE is the container image reference (required).
 # TAR_LOCATION is the output path for the saved image tarball
 # (optional; defaults to ${CMAKE_CURRENT_BINARY_DIR}/<target>.tar).
-# The build, save, and prune steps run together when SOURCES change;
-# `cmake --build . --target clean` (and VS Clean) remove the tar.
+# Pass PRUNE_AFTER_BUILD to also run 'wslc image prune' after save.
 
 function(wslc_add_image _target_name)
     cmake_parse_arguments(
         PARSE_ARGV 1 ARG
-        ""                                            # options (none)
+        "PRUNE_AFTER_BUILD"                           # options (boolean flags)
         "IMAGE;TAG;DOCKERFILE;CONTEXT;TAR_LOCATION"   # one-value keywords
         "SOURCES"                                     # multi-value keywords
     )
@@ -159,23 +158,22 @@ function(wslc_add_image _target_name)
 
     get_filename_component(_tar_dir "${ARG_TAR_LOCATION}" DIRECTORY)
 
-    # build + save + prune live in one add_custom_command so the tar shows
-    # up as a known OUTPUT — this is what makes Visual Studio's Clean (and
-    # `cmake --build . --target clean`) actually delete the tar on rebuild.
-    # The chain is incremental: when ${_resolved_sources} hasn't changed,
-    # nothing reruns. (MSBuild side is unconditional save-every-build by
-    # design; CMake gets to be smarter because OUTPUT semantics demand it.)
+    set(_prune_command "")
+    set(_prune_comment "")
+    if(ARG_PRUNE_AFTER_BUILD)
+        set(_prune_command COMMAND "${WSLC_CLI_PATH}" image prune)
+        set(_prune_comment ", and pruning dangling images")
+    endif()
+
     add_custom_command(
         OUTPUT "${_stamp}" "${ARG_TAR_LOCATION}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${_tar_dir}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
         COMMAND "${WSLC_CLI_PATH}" image save -o "${ARG_TAR_LOCATION}" "${_image_ref}"
-        # Prune dangling images left behind by previous builds. The image we
-        # just tagged stays; only untagged predecessors get removed.
-        COMMAND "${WSLC_CLI_PATH}" image prune
+        ${_prune_command}
         COMMAND ${CMAKE_COMMAND} -E touch "${_stamp}"
         DEPENDS ${_resolved_sources} "${_dockerfile_path}"
-        COMMENT "WSLC: Building image '${_image_ref}', saving to '${ARG_TAR_LOCATION}', and pruning dangling images..."
+        COMMENT "WSLC: Building image '${_image_ref}', saving to '${ARG_TAR_LOCATION}'${_prune_comment}..."
         VERBATIM
     )
 

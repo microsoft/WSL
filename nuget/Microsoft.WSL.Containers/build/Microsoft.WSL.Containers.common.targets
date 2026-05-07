@@ -143,18 +143,17 @@
         <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcTarPath)&quot; &quot;$(_WslcFullRef)&quot;"
               ConsoleToMSBuild="true" />
 
-        <!-- Prune dangling images left behind by previous builds. The image
-             we just tagged stays; only untagged predecessors get removed. -->
+        <!-- Opt-in: <WslcPruneAfterBuild>true</WslcPruneAfterBuild> -->
         <Message Importance="high"
-                 Text="WSLC: Pruning dangling images..." />
+                 Text="WSLC: Pruning dangling images..."
+                 Condition="'$(WslcPruneAfterBuild)' == 'true'" />
 
         <Exec Command="&quot;$(WslcCliPath)&quot; image prune"
-              ConsoleToMSBuild="true" />
+              ConsoleToMSBuild="true"
+              Condition="'$(WslcPruneAfterBuild)' == 'true'" />
     </Target>
 
-    <!-- Clean container artifacts: incremental stamps + saved tar files.
-         Tar path resolution must match _WslcSaveSingleImage: user-provided
-         TarLocation if set, otherwise $(OutDir)<Identity>.tar. -->
+    <!-- Clean container artifacts -->
     <Target Name="WslcClean"
             AfterTargets="Clean"
             Condition="'@(WslcImage)' != ''">
