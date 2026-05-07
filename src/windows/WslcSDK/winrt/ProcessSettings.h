@@ -15,29 +15,21 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.ProcessSettings.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct ProcessSettings : ProcessSettingsT<ProcessSettings>
 {
-    struct ProcessSettings : ProcessSettingsT<ProcessSettings>
-    {
-        ProcessSettings() = default;
+    ProcessSettings() = default;
 
-        hstring WorkingDirectory();
-        void WorkingDirectory(hstring const& value);
-        winrt::Windows::Foundation::Collections::IVector<hstring> CmdLine();
-        void CmdLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
-        winrt::Windows::Foundation::Collections::IMap<hstring, hstring> EnvironmentVariables();
-        void EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value);
-        winrt::Microsoft::WSL::Containers::ProcessOutputHandler OnStdOut();
-        void OnStdOut(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& value);
-        winrt::Microsoft::WSL::Containers::ProcessOutputHandler OnStdErr();
-        void OnStdErr(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& value);
-        winrt::Microsoft::WSL::Containers::ProcessExitHandler OnExit();
-        void OnExit(winrt::Microsoft::WSL::Containers::ProcessExitHandler const& value);
-    };
-}
-namespace winrt::Microsoft::WSL::Containers::factory_implementation
+    hstring WorkingDirectory();
+    void WorkingDirectory(hstring const& value);
+    winrt::Windows::Foundation::Collections::IVector<hstring> CmdLine();
+    void CmdLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value);
+    winrt::Windows::Foundation::Collections::IMap<hstring, hstring> EnvironmentVariables();
+    void EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value);
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::factory_implementation {
+struct ProcessSettings : ProcessSettingsT<ProcessSettings, implementation::ProcessSettings>
 {
-    struct ProcessSettings : ProcessSettingsT<ProcessSettings, implementation::ProcessSettings>
-    {
-    };
-}
+};
+} // namespace winrt::Microsoft::WSL::Containers::factory_implementation

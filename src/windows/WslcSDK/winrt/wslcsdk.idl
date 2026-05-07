@@ -42,12 +42,13 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.IReference<UInt32> TimeoutMS;
         VhdRequirements VhdRequirements;
         SessionFeatureFlags FeatureFlags;
-        SessionTerminationHandler TerminationHandler;
     };
 
     runtimeclass Session
     {
         static Session Create(SessionSettings settings);
+
+        Session Start();
         void Terminate();
 
         Container CreateContainer(ContainerSettings containerSettings);
@@ -67,6 +68,8 @@ namespace Microsoft.WSL.Containers
         String Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
 
         IVectorView<ImageInfo> Images { get; };
+
+        event SessionTerminationHandler Terminated;
     };
 
 
@@ -191,10 +194,6 @@ namespace Microsoft.WSL.Containers
         StandardError = 2,
     };
 
-    delegate void ProcessOutputHandler(Process process, UInt8[] data);
-
-    delegate void ProcessExitHandler(Process process, Int32 exitCode);
-
     runtimeclass ProcessSettings
     {
         ProcessSettings();
@@ -202,10 +201,6 @@ namespace Microsoft.WSL.Containers
         String WorkingDirectory;
         IVector<String> CmdLine;
         IMap<String, String> EnvironmentVariables;
-
-        ProcessOutputHandler OnStdOut;
-        ProcessOutputHandler OnStdErr;
-        ProcessExitHandler OnExit;
     };
 
     enum ProcessState
@@ -216,16 +211,23 @@ namespace Microsoft.WSL.Containers
         Signalled = 3,
     };
 
+    delegate void ProcessOutputHandler(Process process, UInt8[] data);
+    delegate void ProcessExitHandler(Process process, Int32 exitCode);
+
     runtimeclass Process
     {
-        UInt32 Pid { get; };
-        ProcessState State { get; };
-        Int32 ExitCode { get; };
+        Process Start();
 
         void Signal(Signal signal);
         Windows.Storage.Streams.IInputStream GetOutputStream(ProcessOutputHandle outputHandle);
         Windows.Storage.Streams.IOutputStream GetInputStream();
 
+        UInt32 Pid { get; };
+        ProcessState State { get; };
+        Int32 ExitCode { get; };
+
+        event ProcessOutputHandler OutputReceived;
+        event ProcessOutputHandler ErrorReceived;
         event ProcessExitHandler Exited;
     };
 

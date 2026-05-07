@@ -15,24 +15,22 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.TagImageOptions.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct TagImageOptions : TagImageOptionsT<TagImageOptions>
 {
-    struct TagImageOptions : TagImageOptionsT<TagImageOptions>
-    {
-        TagImageOptions() = default;
+    TagImageOptions() = default;
 
-        TagImageOptions(hstring const& image, hstring const& repository, hstring const& tag);
-        hstring Image();
-        void Image(hstring const& value);
-        hstring Repository();
-        void Repository(hstring const& value);
-        hstring Tag();
-        void Tag(hstring const& value);
-    };
-}
-namespace winrt::Microsoft::WSL::Containers::factory_implementation
+    TagImageOptions(hstring const& image, hstring const& repository, hstring const& tag);
+    hstring Image();
+    void Image(hstring const& value);
+    hstring Repository();
+    void Repository(hstring const& value);
+    hstring Tag();
+    void Tag(hstring const& value);
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::factory_implementation {
+struct TagImageOptions : TagImageOptionsT<TagImageOptions, implementation::TagImageOptions>
 {
-    struct TagImageOptions : TagImageOptionsT<TagImageOptions, implementation::TagImageOptions>
-    {
-    };
-}
+};
+} // namespace winrt::Microsoft::WSL::Containers::factory_implementation

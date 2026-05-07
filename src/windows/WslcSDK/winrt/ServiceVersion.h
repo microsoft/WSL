@@ -15,14 +15,13 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.ServiceVersion.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct ServiceVersion : ServiceVersionT<ServiceVersion>
 {
-    struct ServiceVersion : ServiceVersionT<ServiceVersion>
-    {
-        ServiceVersion() = default;
+    ServiceVersion() = default;
 
-        uint32_t Major();
-        uint32_t Minor();
-        uint32_t Revision();
-    };
-}
+    uint32_t Major();
+    uint32_t Minor();
+    uint32_t Revision();
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation

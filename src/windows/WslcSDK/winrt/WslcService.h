@@ -15,20 +15,18 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.WslcService.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct WslcService
 {
-    struct WslcService
-    {
-        WslcService() = default;
+    WslcService() = default;
 
-        static winrt::Microsoft::WSL::Containers::ComponentFlags GetMissingComponents();
-        static winrt::Microsoft::WSL::Containers::ServiceVersion GetVersion();
-        static winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::InstallProgress> InstallWithDependenciesAsync();
-    };
-}
-namespace winrt::Microsoft::WSL::Containers::factory_implementation
+    static winrt::Microsoft::WSL::Containers::ComponentFlags GetMissingComponents();
+    static winrt::Microsoft::WSL::Containers::ServiceVersion GetVersion();
+    static winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::InstallProgress> InstallWithDependenciesAsync();
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::factory_implementation {
+struct WslcService : WslcServiceT<WslcService, implementation::WslcService>
 {
-    struct WslcService : WslcServiceT<WslcService, implementation::WslcService>
-    {
-    };
-}
+};
+} // namespace winrt::Microsoft::WSL::Containers::factory_implementation

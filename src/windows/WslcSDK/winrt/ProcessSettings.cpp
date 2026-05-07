@@ -16,54 +16,29 @@ Abstract:
 #include "ProcessSettings.h"
 #include "Microsoft.WSL.Containers.ProcessSettings.g.cpp"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+hstring ProcessSettings::WorkingDirectory()
 {
-    hstring ProcessSettings::WorkingDirectory()
-    {
-        throw hresult_not_implemented();
-    }
-    void ProcessSettings::WorkingDirectory(hstring const& value)
-    {
-        throw hresult_not_implemented();
-    }
-    winrt::Windows::Foundation::Collections::IVector<hstring> ProcessSettings::CmdLine()
-    {
-        throw hresult_not_implemented();
-    }
-    void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
-    {
-        throw hresult_not_implemented();
-    }
-    winrt::Windows::Foundation::Collections::IMap<hstring, hstring> ProcessSettings::EnvironmentVariables()
-    {
-        throw hresult_not_implemented();
-    }
-    void ProcessSettings::EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value)
-    {
-        throw hresult_not_implemented();
-    }
-    winrt::Microsoft::WSL::Containers::ProcessOutputHandler ProcessSettings::OnStdOut()
-    {
-        throw hresult_not_implemented();
-    }
-    void ProcessSettings::OnStdOut(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& value)
-    {
-        throw hresult_not_implemented();
-    }
-    winrt::Microsoft::WSL::Containers::ProcessOutputHandler ProcessSettings::OnStdErr()
-    {
-        throw hresult_not_implemented();
-    }
-    void ProcessSettings::OnStdErr(winrt::Microsoft::WSL::Containers::ProcessOutputHandler const& value)
-    {
-        throw hresult_not_implemented();
-    }
-    winrt::Microsoft::WSL::Containers::ProcessExitHandler ProcessSettings::OnExit()
-    {
-        throw hresult_not_implemented();
-    }
-    void ProcessSettings::OnExit(winrt::Microsoft::WSL::Containers::ProcessExitHandler const& value)
-    {
-        throw hresult_not_implemented();
-    }
+    throw hresult_not_implemented();
 }
+void ProcessSettings::WorkingDirectory(hstring const& value)
+{
+    throw hresult_not_implemented();
+}
+winrt::Windows::Foundation::Collections::IVector<hstring> ProcessSettings::CmdLine()
+{
+    throw hresult_not_implemented();
+}
+void ProcessSettings::CmdLine(winrt::Windows::Foundation::Collections::IVector<hstring> const& value)
+{
+    throw hresult_not_implemented();
+}
+winrt::Windows::Foundation::Collections::IMap<hstring, hstring> ProcessSettings::EnvironmentVariables()
+{
+    throw hresult_not_implemented();
+}
+void ProcessSettings::EnvironmentVariables(winrt::Windows::Foundation::Collections::IMap<hstring, hstring> const& value)
+{
+    throw hresult_not_implemented();
+}
+} // namespace winrt::Microsoft::WSL::Containers::implementation

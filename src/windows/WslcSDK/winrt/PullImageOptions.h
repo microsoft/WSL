@@ -15,22 +15,20 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.PullImageOptions.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct PullImageOptions : PullImageOptionsT<PullImageOptions>
 {
-    struct PullImageOptions : PullImageOptionsT<PullImageOptions>
-    {
-        PullImageOptions() = default;
+    PullImageOptions() = default;
 
-        PullImageOptions(hstring const& uri);
-        hstring Uri();
-        void Uri(hstring const& value);
-        hstring RegistryAuth();
-        void RegistryAuth(hstring const& value);
-    };
-}
-namespace winrt::Microsoft::WSL::Containers::factory_implementation
+    PullImageOptions(hstring const& uri);
+    hstring Uri();
+    void Uri(hstring const& value);
+    hstring RegistryAuth();
+    void RegistryAuth(hstring const& value);
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::factory_implementation {
+struct PullImageOptions : PullImageOptionsT<PullImageOptions, implementation::PullImageOptions>
 {
-    struct PullImageOptions : PullImageOptionsT<PullImageOptions, implementation::PullImageOptions>
-    {
-    };
-}
+};
+} // namespace winrt::Microsoft::WSL::Containers::factory_implementation

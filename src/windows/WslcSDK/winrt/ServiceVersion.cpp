@@ -16,18 +16,17 @@ Abstract:
 #include "ServiceVersion.h"
 #include "Microsoft.WSL.Containers.ServiceVersion.g.cpp"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+uint32_t ServiceVersion::Major()
 {
-    uint32_t ServiceVersion::Major()
-    {
-        throw hresult_not_implemented();
-    }
-    uint32_t ServiceVersion::Minor()
-    {
-        throw hresult_not_implemented();
-    }
-    uint32_t ServiceVersion::Revision()
-    {
-        throw hresult_not_implemented();
-    }
+    throw hresult_not_implemented();
 }
+uint32_t ServiceVersion::Minor()
+{
+    throw hresult_not_implemented();
+}
+uint32_t ServiceVersion::Revision()
+{
+    throw hresult_not_implemented();
+}
+} // namespace winrt::Microsoft::WSL::Containers::implementation

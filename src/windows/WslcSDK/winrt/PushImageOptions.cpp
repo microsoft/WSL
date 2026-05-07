@@ -16,26 +16,25 @@ Abstract:
 #include "PushImageOptions.h"
 #include "Microsoft.WSL.Containers.PushImageOptions.g.cpp"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+PushImageOptions::PushImageOptions(hstring const& image, hstring const& registryAuth)
 {
-    PushImageOptions::PushImageOptions(hstring const& image, hstring const& registryAuth)
-    {
-        throw hresult_not_implemented();
-    }
-    hstring PushImageOptions::Image()
-    {
-        throw hresult_not_implemented();
-    }
-    void PushImageOptions::Image(hstring const& value)
-    {
-        throw hresult_not_implemented();
-    }
-    hstring PushImageOptions::RegistryAuth()
-    {
-        throw hresult_not_implemented();
-    }
-    void PushImageOptions::RegistryAuth(hstring const& value)
-    {
-        throw hresult_not_implemented();
-    }
+    throw hresult_not_implemented();
 }
+hstring PushImageOptions::Image()
+{
+    throw hresult_not_implemented();
+}
+void PushImageOptions::Image(hstring const& value)
+{
+    throw hresult_not_implemented();
+}
+hstring PushImageOptions::RegistryAuth()
+{
+    throw hresult_not_implemented();
+}
+void PushImageOptions::RegistryAuth(hstring const& value)
+{
+    throw hresult_not_implemented();
+}
+} // namespace winrt::Microsoft::WSL::Containers::implementation

@@ -15,15 +15,14 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.ImageInfo.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct ImageInfo : ImageInfoT<ImageInfo>
 {
-    struct ImageInfo : ImageInfoT<ImageInfo>
-    {
-        ImageInfo() = default;
+    ImageInfo() = default;
 
-        hstring Name();
-        winrt::Windows::Storage::Streams::IBuffer Sha256();
-        uint64_t SizeBytes();
-        winrt::Windows::Foundation::DateTime CreatedTimestamp();
-    };
-}
+    hstring Name();
+    winrt::Windows::Storage::Streams::IBuffer Sha256();
+    uint64_t SizeBytes();
+    winrt::Windows::Foundation::DateTime CreatedTimestamp();
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation

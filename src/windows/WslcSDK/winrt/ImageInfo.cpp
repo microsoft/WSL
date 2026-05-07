@@ -16,22 +16,21 @@ Abstract:
 #include "ImageInfo.h"
 #include "Microsoft.WSL.Containers.ImageInfo.g.cpp"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+hstring ImageInfo::Name()
 {
-    hstring ImageInfo::Name()
-    {
-        throw hresult_not_implemented();
-    }
-    winrt::Windows::Storage::Streams::IBuffer ImageInfo::Sha256()
-    {
-        throw hresult_not_implemented();
-    }
-    uint64_t ImageInfo::SizeBytes()
-    {
-        throw hresult_not_implemented();
-    }
-    winrt::Windows::Foundation::DateTime ImageInfo::CreatedTimestamp()
-    {
-        throw hresult_not_implemented();
-    }
+    throw hresult_not_implemented();
 }
+winrt::Windows::Storage::Streams::IBuffer ImageInfo::Sha256()
+{
+    throw hresult_not_implemented();
+}
+uint64_t ImageInfo::SizeBytes()
+{
+    throw hresult_not_implemented();
+}
+winrt::Windows::Foundation::DateTime ImageInfo::CreatedTimestamp()
+{
+    throw hresult_not_implemented();
+}
+} // namespace winrt::Microsoft::WSL::Containers::implementation

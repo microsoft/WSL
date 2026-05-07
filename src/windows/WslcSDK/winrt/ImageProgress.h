@@ -15,15 +15,14 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.ImageProgress.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct ImageProgress : ImageProgressT<ImageProgress>
 {
-    struct ImageProgress : ImageProgressT<ImageProgress>
-    {
-        ImageProgress() = default;
+    ImageProgress() = default;
 
-        hstring Id();
-        winrt::Microsoft::WSL::Containers::ImageProgressStatus Status();
-        uint64_t CurrentBytes();
-        uint64_t TotalBytes();
-    };
-}
+    hstring Id();
+    winrt::Microsoft::WSL::Containers::ImageProgressStatus Status();
+    uint64_t CurrentBytes();
+    uint64_t TotalBytes();
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation

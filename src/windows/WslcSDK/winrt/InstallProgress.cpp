@@ -16,18 +16,17 @@ Abstract:
 #include "InstallProgress.h"
 #include "Microsoft.WSL.Containers.InstallProgress.g.cpp"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+winrt::Microsoft::WSL::Containers::ComponentFlags InstallProgress::Component()
 {
-    winrt::Microsoft::WSL::Containers::ComponentFlags InstallProgress::Component()
-    {
-        throw hresult_not_implemented();
-    }
-    uint32_t InstallProgress::Progress()
-    {
-        throw hresult_not_implemented();
-    }
-    uint32_t InstallProgress::Total()
-    {
-        throw hresult_not_implemented();
-    }
+    throw hresult_not_implemented();
 }
+uint32_t InstallProgress::Progress()
+{
+    throw hresult_not_implemented();
+}
+uint32_t InstallProgress::Total()
+{
+    throw hresult_not_implemented();
+}
+} // namespace winrt::Microsoft::WSL::Containers::implementation

@@ -15,14 +15,13 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.InstallProgress.g.h"
 
-namespace winrt::Microsoft::WSL::Containers::implementation
+namespace winrt::Microsoft::WSL::Containers::implementation {
+struct InstallProgress : InstallProgressT<InstallProgress>
 {
-    struct InstallProgress : InstallProgressT<InstallProgress>
-    {
-        InstallProgress() = default;
+    InstallProgress() = default;
 
-        winrt::Microsoft::WSL::Containers::ComponentFlags Component();
-        uint32_t Progress();
-        uint32_t Total();
-    };
-}
+    winrt::Microsoft::WSL::Containers::ComponentFlags Component();
+    uint32_t Progress();
+    uint32_t Total();
+};
+} // namespace winrt::Microsoft::WSL::Containers::implementation
