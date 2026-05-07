@@ -115,7 +115,7 @@ class WSLCE2EContainerCreateTests
 
         auto result = RunWslc(std::format(
             L"container create --cidfile \"{}\" --name {} {}", EscapePath(cidFilePath.wstring()), WslcContainerName, DebianImage.NameAndTag()));
-        result.Verify({.Stderr = L"", .ExitCode = S_OK});
+        result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto containerId = result.GetStdoutOneLine();
         VERIFY_IS_TRUE(std::filesystem::exists(cidFilePath));
