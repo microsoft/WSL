@@ -217,9 +217,6 @@ Installeren met wsl.exe {} &lt;Distro&gt;.
 Gebruik wsl.exe --list --online' om een lijst met geldige distributies op te halen.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageInstanceTerminated" xml:space="preserve">
-    <value>Het Windows-subsysteem voor Linux exemplaar is beëindigd.</value>
-  </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
     <value>Ongeldig opdrachtregelargument: {}
 Gebruik {} --help' om een lijst met ondersteunde argumenten op te halen.</value>
@@ -856,6 +853,10 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Kan de wisselschijf niet maken in {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateDisk" xml:space="preserve">
+    <value>Kan de schijf {} niet maken: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
@@ -1979,9 +1980,22 @@ Gebruik:
     <value>Sessiebeëindiging mislukt: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
+    <value>Standaardsessie niet gevonden</value>
+  </data>
+  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
+    <value>Kan standaardsessie niet openen</value>
+  </data>
+  <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
+    <value>Beëindigen van standaardsessie is mislukt</value>
+  </data>
   <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} is afgesloten met: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCreatedSession" xml:space="preserve">
+    <value>Sessie gemaakt: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcHeaderId" xml:space="preserve">
     <value>Id</value>
@@ -1995,6 +2009,25 @@ Gebruik:
   <data name="MessageWslcUnknownCommand" xml:space="preserve">
     <value>Onbekende opdracht: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
+    <value>De container {} is actief en kan niet worden verwijderd. Stop de container voordat u deze verwijdert of gebruik geforceerd verwijderen (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotRunning" xml:space="preserve">
+    <value>Container {} is niet actief.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerIsRunning" xml:space="preserve">
+    <value>Container {} wordt uitgevoerd.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotFound" xml:space="preserve">
+    <value>Kan de container {} niet vinden.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
+    <value>De netwerknaam van de container is verplicht voor een aangepast netwerktype.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Niet-herkende opdracht: '{}'</value>
@@ -2138,16 +2171,48 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Volume niet gevonden: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcInvalidVolumeOptions" xml:space="preserve">
-    <value>Ongeldige volumeopties: '{}'</value>
+  <data name="MessageWslcImageNotFound" xml:space="preserve">
+    <value>Installatiekopie {} niet gevonden.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
+    <value>Ontbrekende vereiste optie: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Niet-ondersteund volumetype: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
+    <value>opties voor niet-ondersteund volumestuurprogramma: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
     <value>Volume '{}' is in gebruik.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkNotFound" xml:space="preserve">
+    <value>Netwerk niet gevonden: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
+    <value>Niet-ondersteund netwerkstuurprogramma: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkInUse" xml:space="preserve">
+    <value>Het netwerk {} heeft actieve eindpunten.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
+    <value>Netwerk {} bestaat al.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
+    <value>Kan volume '{}' niet maken: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcPortInUse" xml:space="preserve">
+    <value>Poort {} is al in gebruik, kan container {} niet starten</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
@@ -2162,360 +2227,668 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
     <value>Geen Containerfile of Dockerfile gevonden in '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
+    <value>Geen WSLC-sessie gevonden in '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
+    <value>Ongeldige indeling van afbeeldingstag: {}. Verwachte indeling is 'naam:tag'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
-    <value>WSLC is the Windows Subsystem for Linux Container CLI tool.</value>
+    <value>WSLC is het Windows-subsysteem voor Linux Container CCLI-hulpprogramma.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_RootCommandLongDesc" xml:space="preserve">
-    <value>WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL containers from the command line.</value>
+    <value>WSLC is het hulpprogramma Windows-subsysteem voor Linux Container CLI. Hiermee wordt beheer en interactie met WSL containers vanaf de opdrachtregel ingeschakeld.</value>
     <comment>{Locked="WSLC"}{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerCommandDesc" xml:space="preserve">
-    <value>Manage containers.</value>
+    <value>Containers beheren.</value>
   </data>
   <data name="WSLCCLI_ContainerCommandLongDesc" xml:space="preserve">
-    <value>Manage the lifecycle of WSL containers, including creating, starting, stopping, and removing them.</value>
+    <value>Beheer de levenscyclus van WSL containers, waaronder het maken, starten, stoppen en verwijderen van containers.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerAttachDesc" xml:space="preserve">
-    <value>Attach to a container.</value>
+    <value>Attach aan een container.</value>
   </data>
   <data name="WSLCCLI_ContainerAttachLongDesc" xml:space="preserve">
-    <value>Attaches to a container.</value>
+    <value>Koppelt aan een container.</value>
   </data>
   <data name="WSLCCLI_ContainerCreateDesc" xml:space="preserve">
-    <value>Create a container.</value>
+    <value>Een container maken.</value>
   </data>
   <data name="WSLCCLI_ContainerCreateLongDesc" xml:space="preserve">
-    <value>Creates a container.</value>
+    <value>Maakt een container.</value>
   </data>
   <data name="WSLCCLI_ContainerExecDesc" xml:space="preserve">
-    <value>Execute a command in a running container.</value>
+    <value>Voert een opdracht uit in een actieve container.</value>
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
-    <value>Executes a command in a running container.</value>
+    <value>Voert een opdracht uit in een draaiende container.</value>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
-    <value>Inspect a container.</value>
+    <value>Een container inspecteren.</value>
   </data>
   <data name="WSLCCLI_ContainerInspectLongDesc" xml:space="preserve">
-    <value>Display detailed information about a container.</value>
+    <value>Toon gedetailleerde informatie over een container.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kill containers.</value>
+    <value>Containers beëindigen.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Kills containers.</value>
+    <value>Beëindigt containers.</value>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
-    <value>List containers.</value>
+    <value>Containers weergeven.</value>
   </data>
   <data name="WSLCCLI_ContainerListLongDesc" xml:space="preserve">
-    <value>Lists containers. By default, only running containers are shown; use --all to include all containers.</value>
+    <value>Toont een lijst van containers. Standaard worden alleen actieve containers getoond; gebruik --all om alle containers te tonen.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerLogsDesc" xml:space="preserve">
-    <value>View container logs.</value>
+    <value>Containerlogboeken weergeven.</value>
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
-    <value>View logs for a container.</value>
+    <value>Logboeken van een container weergeven.</value>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
-    <value>Remove containers.</value>
+    <value>Verwijdert containers.</value>
   </data>
   <data name="WSLCCLI_ContainerRemoveLongDesc" xml:space="preserve">
-    <value>Removes containers.</value>
+    <value>Containers worden verwijderd.</value>
   </data>
   <data name="WSLCCLI_ContainerRunDesc" xml:space="preserve">
-    <value>Run a container.</value>
+    <value>Een container uitvoeren.</value>
   </data>
   <data name="WSLCCLI_ContainerRunLongDesc" xml:space="preserve">
-    <value>Runs a container. By default, the container is started in the background; use --detach to run in the foreground.</value>
+    <value>Hiermee wordt een container uitgevoerd. De container wordt standaard op de voorgrond gestart; Gebruik --detach om op de achtergrond uit te voeren.</value>
     <comment>{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerStartDesc" xml:space="preserve">
-    <value>Start a container.</value>
+    <value>Een container starten.</value>
   </data>
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
-    <value>Starts a container.</value>
+    <value>Start een container.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
-    <value>Stop containers.</value>
+    <value>Containers stoppen.</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
-    <value>Stops containers.</value>
+    <value>Stopt containers.</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
-    <value>Manage images.</value>
+    <value>Installatiekopieën beheren.</value>
   </data>
   <data name="WSLCCLI_ImageCommandLongDesc" xml:space="preserve">
-    <value>Manage container images, including building, pulling, listing, and removing them.</value>
+    <value>Beheer containerimages, waaronder daarmee bouwen, ophalen, weergeven en verwijderen.</value>
   </data>
   <data name="WSLCCLI_ImageBuildDesc" xml:space="preserve">
-    <value>Build an image from a Dockerfile.</value>
+    <value>Bouw een installatiekopie vanuit een Dockerfile.</value>
     <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageBuildLongDesc" xml:space="preserve">
-    <value>Builds an image from a Dockerfile and a build context directory.</value>
+    <value>Maakt een installatiekopie vanuit een Dockerfile en een buildcontextmap.</value>
     <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageInspectDesc" xml:space="preserve">
-    <value>Inspect images.</value>
+    <value>Afbeeldingen inspecteren.</value>
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
-    <value>Inspect images.</value>
+    <value>Afbeeldingen inspecteren.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
-    <value>List images.</value>
+    <value>Afbeeldingen weergeven.</value>
   </data>
   <data name="WSLCCLI_ImageListLongDesc" xml:space="preserve">
-    <value>Lists images.</value>
+    <value>Geeft afbeeldingen weer.</value>
   </data>
   <data name="WSLCCLI_ImageLoadDesc" xml:space="preserve">
-    <value>Load images.</value>
+    <value>Afbeeldingen laden.</value>
   </data>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
-    <value>Loads images.</value>
+    <value>Laadt afbeeldingen.</value>
   </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
-    <value>Pull images.</value>
+    <value>Afbeeldingen ophalen.</value>
   </data>
   <data name="WSLCCLI_ImagePullLongDesc" xml:space="preserve">
-    <value>Pulls images.</value>
+    <value>Haalt afbeelding op.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllArgDescription" xml:space="preserve">
+    <value>Verwijder alle ongebruikte installatiekopieën, niet alleen de zwevende kopieën.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
+    <value>Verwijderd: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
+    <value>Verwijder ongebruikte installatiekopieën.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
+    <value>Verwijdert alle zwevende installatiekopieën. Als --all is opgegeven, verwijder je alle installatiekopieën die niet door een container worden gebruikt.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
+    <value>Totale opnieuw vrijgemaakt ruimte: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
+    <value>Zonder label: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
+    <value>Upload een installatiekopie naar een register.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
+    <value>Upload een installatiekopie naar een register.</value>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
-    <value>Remove images.</value>
+    <value>Afbeeldingen verwijderen.</value>
   </data>
   <data name="WSLCCLI_ImageRemoveLongDesc" xml:space="preserve">
-    <value>Removes images.</value>
+    <value>Verwijdert afbeeldingen.</value>
   </data>
   <data name="WSLCCLI_ImageSaveDesc" xml:space="preserve">
-    <value>Save images.</value>
+    <value>Afbeeldingen opslaan.</value>
   </data>
   <data name="WSLCCLI_ImageSaveLongDesc" xml:space="preserve">
-    <value>Saves images.</value>
+    <value>Slaat afbeeldingen op.</value>
+  </data>
+  <data name="WSLCCLI_LoginDesc" xml:space="preserve">
+    <value>Meld je aan bij een register.</value>
+  </data>
+  <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
+    <value>Meld u aan bij een register. Als er geen server is opgegeven, wordt de standaardwaarde gedefinieerd door de sessie.</value>
+  </data>
+  <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
+    <value>Meld je af bij een register.</value>
+  </data>
+  <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
+    <value>Meld u af bij een register. Als er geen server is opgegeven, wordt de standaardwaarde gedefinieerd door de sessie.</value>
+  </data>
+  <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
+    <value>Aanmelden geslaagd</value>
+  </data>
+  <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
+    <value>Aanmeldingsgegevens voor {} verwijderen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
+    <value>Niet aangemeld bij {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
+    <value>Kan het referentiebestand {} niet parseren: mogelijk is het beschadigd.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
+    <value>{} schrijven mislukt: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
+    <value>Gebruikersnaam</value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
+    <value>Wachtwoord of persoonlijk toegangstoken (PAT)</value>
+    <comment>{Locked="PAT"}Acronym should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
+    <value>Het wachtwoord of persoonlijke toegangstoken (PAT) van stdin ophalen</value>
+    <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
+    <value>--password en --password-stdin sluiten elkaar wederzijds uit</value>
+    <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
+    <value>Moet --username opgeven met --password-stdin</value>
+    <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
+    <value>Gebruikersnaam: </value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
+    <value>Wachtwoord: </value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
+    <value>Inloggegevens voor register beheren.</value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
+    <value>Beheer registerreferenties, inclusief aan- en afmelden bij containerregisters.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
+    <value>Een afbeelding taggen.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagLongDesc" xml:space="preserve">
+    <value>Een afbeelding taggen.</value>
   </data>
   <data name="WSLCCLI_SessionCommandDesc" xml:space="preserve">
-    <value>Manage sessions.</value>
+    <value>Beheer sessies.</value>
   </data>
   <data name="WSLCCLI_SessionCommandLongDesc" xml:space="preserve">
-    <value>Manage WSL container sessions, including listing active sessions and launching interactive shells.</value>
+    <value>Beheer WSL-containersessies, waaronder het weergeven van actieve sessies en het starten van interactieve shells.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionListDesc" xml:space="preserve">
-    <value>List sessions.</value>
+    <value>Sessies weergeven.</value>
   </data>
   <data name="WSLCCLI_SessionListLongDesc" xml:space="preserve">
-    <value>Lists active session(s).</value>
+    <value>Actieve sessie(s) weergeven.</value>
   </data>
   <data name="WSLCCLI_SessionShellDesc" xml:space="preserve">
-    <value>Attach to a session.</value>
+    <value>Toevoegen aan een sessie.</value>
   </data>
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
-    <value>Attaches to an active session. If no session ID is provided, the wslc default session will be used.</value>
+    <value>Wordt gekoppeld aan een actieve sessie. Als er geen sessie-id is opgegeven, wordt de wslc standaardsessie gebruikt.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
-    <value>Terminate a session.</value>
+    <value>Beëindig een sessie.</value>
   </data>
   <data name="WSLCCLI_SessionTerminateLongDesc" xml:space="preserve">
-    <value>Terminates an active session. If no session is specified, the default session will be terminated.</value>
+    <value>Hiermee wordt een actieve sessie beëindigd. Als er geen sessie is opgegeven, wordt de standaardsessie beëindigd.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterDesc" xml:space="preserve">
+    <value>Start een tijdelijke sessie.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterLongDesc" xml:space="preserve">
+    <value>Hiermee maakt u een niet-permanente sessie met het opgegeven opslagpad en opent u een shell. De sessie wordt verwijderd wanneer de shell wordt afgesloten. Als er geen naam is opgegeven, wordt een GUID gegenereerd en afgedrukt naar stderr.</value>
+    <comment>{Locked="GUID"}{Locked="stderr"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionEnterNameArgDescription" xml:space="preserve">
+    <value>Naam voor de sessie. Als deze optie niet is opgegeven, wordt een GUID gegenereerd.</value>
+    <comment>{Locked="GUID"}Technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SettingsCommandDesc" xml:space="preserve">
-    <value>Open the settings file in the default editor.</value>
+    <value>Open het instellingenbestand in de standaardeditor.</value>
   </data>
   <data name="WSLCCLI_SettingsCommandLongDesc" xml:space="preserve">
-    <value>Opens the wslc user settings file in the system default editor for .yaml files.
-On first run, creates the file with all settings commented out at their defaults.</value>
+    <value>Opent het wslc-gebruikersinstellingenbestand in de standaardeditor van het systeem voor .yaml-bestanden.
+Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen gecommentarieerd op hun standaardwaarden.</value>
     <comment>{Locked="wslc"}{Locked=".yaml"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SettingsResetDesc" xml:space="preserve">
-    <value>Reset settings to built-in defaults.</value>
+    <value>Instellingen herstellen naar standaardwaarden.</value>
   </data>
   <data name="WSLCCLI_SettingsResetLongDesc" xml:space="preserve">
-    <value>Overwrites the settings file with a commented-out defaults template.</value>
+    <value>Overschrijft het instellingenbestand met een standaardsjabloon waarin de standaardinstellingen zijn uitgecommentarieerd.</value>
   </data>
   <data name="WSLCCLI_SettingsResetConfirm" xml:space="preserve">
-    <value>Settings reset to defaults.</value>
+    <value>Instellingen opnieuw ingesteld op standaardwaarden.</value>
+  </data>
+  <data name="WSLCCLI_VersionDesc" xml:space="preserve">
+    <value>Versiegegevens weergeven.</value>
+  </data>
+  <data name="WSLCCLI_VersionLongDesc" xml:space="preserve">
+    <value>Versiegegevens voor dit hulpprogramma weergeven.</value>
   </data>
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
-    <value>Show all regardless of state.</value>
+    <value>Alles weergeven, ongeacht de status.</value>
   </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
     <value>Set build-time variables (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
+    <value>Probeer altijd een nieuwere versie van de installatiekopie op te halen</value>
+  </data>
+  <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
+    <value>De doelbuildfase instellen op build</value>
+  </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
-    <value>The command to run</value>
+    <value>De opdracht om uit te voeren</value>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
-    <value>Delete containers even if they are running</value>
+    <value>Containers verwijderen, zelfs als ze worden uitgevoerd</value>
   </data>
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
-    <value>Run container in detached mode</value>
+    <value>Container uitvoeren in gedetacheerde modus</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
-    <value>Specifies the container init process executable</value>
+    <value>Specificeert het uitvoerbare bestand van het container-init-proces</value>
   </data>
   <data name="WSLCCLI_EnvArgDescription" xml:space="preserve">
-    <value>Key=Value pairs for environment variables</value>
+    <value>Key=Value voor omgevingsvariabelen</value>
     <comment>{Locked="Key=Value"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvFileArgDescription" xml:space="preserve">
-    <value>File containing key=value pairs of env variables</value>
+    <value>Bestand met key=value-paren van omgevingsvariabelen</value>
     <comment>{Locked="key=value"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FileArgDescription" xml:space="preserve">
-    <value>Path to the Dockerfile (use "-" to read from stdin)</value>
+    <value>Pad naar de Dockerfile (gebruik "-" om te lezen vanaf stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
-    <value>Follow log output</value>
+    <value>Logboekuitvoer volgen</value>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
-    <value>Output formatting (json or table) (Default: table)</value>
+    <value>Uitvoeropmaak (json of table) (Standaard: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to container's init process</value>
+    <value>Argumenten om door te geven aan het init-proces van de container</value>
   </data>
-  <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
-    <value>Delete images even if they are being used</value>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Voeg GPU-apparaten toe aan de container ('all' om alle GPU's door te geven)</value>
+    <comment>{Locked="all"}</comment>
   </data>
-  <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
-    <value>Image name</value>
-  </data>
-  <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
-    <value>Provides path to the tar archive file containing the image</value>
-  </data>
-  <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
-    <value>Name of the container</value>
-  </data>
-  <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
-    <value>Do not delete untagged parents</value>
-  </data>
-  <data name="WSLCCLI_NoTruncArgDescription" xml:space="preserve">
-    <value>Do not truncate output</value>
-  </data>
-  <data name="WSLCCLI_OutputArgDescription" xml:space="preserve">
-    <value>Path for the saved image</value>
-  </data>
-  <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Path to the build context directory</value>
-  </data>
-  <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
-    <value>Publish a port from a container to host</value>
-  </data>
-  <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
-    <value>Outputs the container IDs only</value>
-  </data>
-  <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
-    <value>Remove the container after it stops</value>
-  </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Session ID</value>
-  </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send (default: {})</value>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Ongeldige {}-waarde: {}. Alleen 'all' wordt ondersteund.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
+    <value>Afbeeldingen verwijderen, zelfs als ze worden gebruikt</value>
+  </data>
+  <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
+    <value>Naam van installatiekopie</value>
+  </data>
+  <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
+    <value>Geeft het pad naar het tar-archiefbestand met de afbeelding</value>
+  </data>
+  <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
+    <value>Metagegevens instellen voor een object</value>
+  </data>
+  <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
+    <value>Labelsleutel mag niet leeg zijn</value>
+  </data>
+  <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
+    <value>Hostnaam van container</value>
+  </data>
+  <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
+    <value>Naam van de container</value>
+  </data>
+  <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
+    <value>Gebruik geen cache bij het bouwen van de image</value>
+  </data>
+  <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
+    <value>Verwijder geen niet-getagde bovenliggende items</value>
+  </data>
+  <data name="WSLCCLI_NoTruncArgDescription" xml:space="preserve">
+    <value>Kap uitvoer niet af</value>
+  </data>
+  <data name="WSLCCLI_OutputArgDescription" xml:space="preserve">
+    <value>Pad voor de opgeslagen afbeelding</value>
+  </data>
+  <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
+    <value>Pad naar de buildcontextmap</value>
+  </data>
+  <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
+    <value>Een poort van een container naar de host publiceren</value>
+  </data>
+  <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
+    <value>Alle weergegeven poorten publiceren naar willekeurige hostpoorten</value>
+  </data>
+  <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
+    <value>Geeft alleen de container-id's weer</value>
+  </data>
+  <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
+    <value>Verwijder de container nadat deze stopt</value>
+  </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signaal om de container te stoppen</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Grootte van /dev/shm (bijv. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
+    <value>Sessie-id</value>
+  </data>
+  <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
+    <value>Pad naar sessieopslag</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signaal om te verzenden</value>
+  </data>
+  <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
+    <value>Huidige of bestaande afbeeldingsverwijzing in de indeling voor de afbeeldingsnaam [:tag]</value>
+  </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
-    <value>Tag for the built image</value>
+    <value>Tag voor de gebouwde installatiekopie</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Aantal regels dat moet worden weergegeven vanaf het einde van de logboeken</value>
+  </data>
+  <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
+    <value>Nieuwe afbeeldingsverwijzing in de indeling image-name[:tag]</value>
   </data>
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
-    <value>Time in seconds to wait before executing (default 5)</value>
+    <value>Tijd in seconden om te wachten voor uitvoeren (standaard 5)</value>
   </data>
   <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
-    <value>Open a TTY with the container process.</value>
+    <value>Een TTY met het containerproces openen.</value>
     <comment>{Locked="TTY"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_VerboseArgDescription" xml:space="preserve">
-    <value>Output verbose details</value>
+    <value>Uitgebreide details weergeven</value>
   </data>
   <data name="WSLCCLI_VersionArgDescription" xml:space="preserve">
-    <value>Show version information for this tool</value>
+    <value>Versiegegevens voor dit hulpprogramma weergeven</value>
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
-    <value>Bind mount a volume to the container</value>
+    <value>Een volume koppelen aan de container</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
+    <value>Werkmap binnen de container</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Write the container ID to the provided path.</value>
+    <value>Schrijf de container-id naar het opgegeven pad.</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
-    <value>IP address of the DNS nameserver in resolv.conf</value>
+    <value>IP-adres van de DNS-nameserver in resolv.conf</value>
     <comment>{Locked="resolv.conf"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DNSDomainArgDescription" xml:space="preserve">
-    <value>Set the default DNS Domain</value>
+    <value>Het standaard DNS-domein instellen</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DNSOptionArgDescription" xml:space="preserve">
-    <value>Set DNS options</value>
+    <value>DNS-opties instellen</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DNSSearchArgDescription" xml:space="preserve">
     <value>Set DNS search domains</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
+    <value>Naam van containerdomein</value>
+  </data>
   <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
-    <value>Group Id for the process</value>
+    <value>Groeps-id voor het proces</value>
   </data>
   <data name="WSLCCLI_NoDNSArgDescription" xml:space="preserve">
-    <value>No configuration of DNS in the container</value>
+    <value>Geen configuratie van DNS in de container</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Progress type (format: none|ansi) (default: ansi)</value>
+    <value>Voortgangstype (formaat: none|ansi) (standaard: ansi)</value>
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Image pull policy (always|missing|never) (default:never)</value>
+    <value>Beleid voor het ophalen van afbeeldingen (always|missing|never) (standaard:never)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
-    <value>Use this scheme for registry connection</value>
+    <value>Gebruik dit schema voor registry-verbinding</value>
   </data>
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
-    <value>Mount tmpfs to the container at the given path</value>
+    <value>Koppel tmpfs naar de container op het opgegeven pad</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
-    <value>User ID for the process (name|uid|uid:gid)</value>
+    <value>Gebruikers-id voor het proces (name|uid|uid:gid)</value>
     <comment>{Locked="name|uid|uid:gid"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
-    <value>Expose virtualization capabilities to the container</value>
+    <value>Virtualisatiemogelijkheden zichtbaar maken voor de container</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being executed inside the container</value>
+    <value>Argumenten om door te geven aan de opdracht die binnen de container wordt uitgevoerd</value>
   </data>
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
-    <value>Show detailed information about the listed sessions.</value>
+    <value>Toon gedetailleerde informatie over de weergegeven sessies.</value>
   </data>
   <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Invalid format type specified. Supported format types are: json, table</value>
+    <value>Ongeldig indelingstype opgegeven. Ondersteunde indelingstypen zijn: json, table</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
+    <value>Ongeldige {}-waarde: {} is geen herkend inspectietype. Ondersteunde inspectietypen zijn: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).</value>
+    <value>Ongeldige {}-waarde: {} is geen herkende signaalnaam of -getal (voorbeeld: SIGKILL, kill of 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Ongeldige {} parameterwaarde: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
-    <value>Invalid {} value: {} is out of valid range ({}-{}).</value>
+    <value>Ongeldige {}-waarde: {} valt buiten het geldige bereik ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Ongeldige {} argumentwaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Image '{}' not found, pulling</value>
+    <value>Afbeelding {} niet gevonden, wordt opgehaald</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
-    <value>Environment variable key cannot be empty</value>
+    <value>De sleutel van de omgevingsvariabele mag niet leeg zijn</value>
   </data>
   <data name="WSLCCLI_EnvKeyWhitespaceError" xml:space="preserve">
-    <value>Environment variable key '{}' cannot contain whitespace</value>
+    <value>De omgevingsvariabelesleutel {} mag geen witruimte bevatten</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
-    <value>Requested load but no input provided.</value>
+    <value>Laden aangevraagd, maar geen invoer opgegeven.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
+    <value>Volumes beheren.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
+    <value>Beheer de levenscyclus van WSL volumes, inclusief het maken, inspecteren, vermelden en verwijderen ervan.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
+    <value>Maak een volume.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
+    <value>Maakt een benoemd volume dat aan containers kan worden gekoppeld.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
+    <value>Verwijder een of meer volumes.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
+    <value>Hiermee worden een of meer volumes verwijderd. Een volume kan niet worden verwijderd als het wordt gebruikt door een container.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectDesc" xml:space="preserve">
+    <value>Gedetailleerde informatie weergeven op een of meer volumes.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectLongDesc" xml:space="preserve">
+    <value>Gedetailleerde informatie weergeven op een of meer volumes.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
+    <value>Volumes weergeven.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
+    <value>Toont alle volumes in de sessie.</value>
+  </data>
+  <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
+    <value>Volumenaam</value>
+  </data>
+  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
+    <value>Geef de naam van het volumestuurprogramma op (standaard {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
+    <value>Stuurprogrammaspecifieke opties instellen</value>
+  </data>
+  <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
+    <value>Voert alleen de volumenamen uit</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
+    <value>Kan de installatiekopieën niet naar de terminal schrijven. Gebruik de -o-vlag of omleidings-stdout.</value>
+  </data>
+  <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
+    <value>Verwachte indeling: &lt;hostpad | benoemd volume&gt;:&lt;containerpad&gt;[:modus]</value>
+    <comment>Usage string for volume mount specification.</comment>
+  </data>
+  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
+    <value>Ongeldige volumespecificaties: {}. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
+    <value>Ongeldige volumespecificaties: {}. Het hostpad mag niet leeg zijn. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
+    <value>Ongeldige volumespecificaties: {}. Het containerpad mag niet leeg zijn. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
+    <value>Ongeldige volumespecificaties: {}. Het containerpad moet een absoluut pad zijn (beginnend met /). {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
+    <value>Ongeldige volumespecificaties: {}. Hostpad {} is geen geldig Windows-pad.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
+    <value>Naam of id van een objecttype</value>
+  </data>
+  <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
+    <value>Type van het object dat moet worden geïnspecteerd</value>
+  </data>
+  <data name="WSLCCLI_InspectDesc" xml:space="preserve">
+    <value>Objecten inspecteren.</value>
+  </data>
+  <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
+    <value>Objecten inspecteren.</value>
+  </data>
+  <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
+    <value>Object niet gevonden: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
+    <value>Waarschuwing: Ongeldige waarde voor het instellen van {} in {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
+    <value>Waarschuwing: ongeldig type voor het instellen van {} in {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_NonStringKey" xml:space="preserve">
+    <value>Waarschuwing: niet-tekenreekssleutel in sectie {} in {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownSection" xml:space="preserve">
+    <value>Waarschuwing: onbekende instellingssectie {} in {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
+    <value>Waarschuwing: onbekende instelling {} in {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
+    <value>Waarschuwing: het instellingenbestand kan niet worden geopend op {}. Fout: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_ParseError" xml:space="preserve">
+    <value>Waarschuwing: het instellingenbestand op {} kan niet worden geparseerd. Fout: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
+    <value>Waarschuwing: het instellingenbestand op {} is leeg of heeft een ongeldige structuur. Verwacht een YAML-toewijzing.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

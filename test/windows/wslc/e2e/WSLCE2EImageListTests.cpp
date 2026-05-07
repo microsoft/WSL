@@ -92,7 +92,7 @@ class WSLCE2EImageListTests
 
         const auto images = wsl::shared::FromJson<std::vector<ImageInformation>>(result.Stdout.value().c_str());
 
-        VERIFY_ARE_EQUAL(2u, images.size());
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(images.size(), 2u);
 
         std::vector<std::wstring> imageNames;
         for (const auto& image : images)

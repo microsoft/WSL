@@ -76,15 +76,21 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
     vmSettings.ComputeTopology.Processor.Count = Settings->CpuCount;
 
-    // Configure backing page size, fault cluster shift size, and cold discard hint size to favor density (lower vmmem usage).
+    // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
     //
-    // N.B. Cold discard hint size should be a multiple of the fault cluster shift size.
+    // N.B. Page reporting order must be >= fault cluster size shift.
     const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+    int pageReportingOrder;
     if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
     {
         vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
         vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;
         vmSettings.ComputeTopology.Memory.DirectMapFaultClusterSizeShift = 4;
+        pageReportingOrder = 5; // 128k
+    }
+    else
+    {
+        pageReportingOrder = 9; // 2MB
     }
 
     if (helpers::IsVmemmSuffixSupported() && Settings->DisplayName)
@@ -105,8 +111,8 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
     kernelCmdLine += std::format(L" nr_cpus={}", Settings->CpuCount);
 
-    // Enable timesync workaround to sync on resume from sleep in modern standby.
-    kernelCmdLine += L" hv_utils.timesync_implicit=1";
+    // Append common kernel parameters shared between WSL2 and WSLC.
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, pageReportingOrder);
 
     // Setup dmesg collector with optional DmesgOutput handle.
     // TODO: move dmesg collector to user session process.
@@ -366,24 +372,24 @@ try
     // so we need our own copies to take ownership.
     wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
     wil::unique_socket dnsSocketHandle;
+
+    // The DNS hvsocket is only allocated for NAT mode.
+    THROW_HR_IF(E_INVALIDARG, (FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode == WSLCNetworkingModeNAT) != (DnsSocket != nullptr));
+
+    // The check still applies to virtio proxy because the host virtio proxy uses the same Windows DNS APIs.
     if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
-        THROW_HR_IF(E_INVALIDARG, DnsSocket == nullptr);
-
         const auto result = wsl::core::networking::DnsResolver::LoadDnsResolverMethods();
         if (FAILED(result))
         {
             LOG_HR_MSG(result, "Failed to load DNS resolver methods, DNS tunneling will be disabled");
             WI_ClearFlag(m_featureFlags, WslcFeatureFlagsDnsTunneling);
         }
-        else
-        {
-            dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
-        }
     }
-    else
+
+    if (DnsSocket != nullptr && FeatureEnabled(WslcFeatureFlagsDnsTunneling))
     {
-        THROW_HR_IF(E_INVALIDARG, DnsSocket != nullptr);
+        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
     }
 
     if (m_networkingMode == WSLCNetworkingModeNAT)
@@ -419,11 +425,11 @@ try
         wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
         if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
         {
-            WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunnelingSocket);
+            WI_SetFlag(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling);
         }
 
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken, std::move(dnsSocketHandle));
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
     else
     {

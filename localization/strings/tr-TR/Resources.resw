@@ -169,7 +169,7 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Sağlanan yükleme konumu zaten kullanılıyor.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir ad seçmek için --name komutunu kullanın.</value>
+    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir ad seçmek için --name parametresini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -216,9 +216,6 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Geçersiz dağıtım adı: '{}'.
 Geçerli dağıtımların listesini almak için 'wsl.exe --list --online' komutunu kullanın.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageInstanceTerminated" xml:space="preserve">
-    <value>Linux için Windows Alt Sistemi örneği sonlandırıldı.</value>
   </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
     <value>Geçersiz komut satırı bağımsız değişkeni: {}
@@ -808,7 +805,7 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
     <value>EventViewer'ı aç</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım adını seçmek için --name seçeneğini kullanın.</value>
+    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım adını seçmek için --name parametresini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -856,6 +853,10 @@ Admin Protection hakkında daha fazla bilgi için lütfen https://aka.ms/apdevgu
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>'{}' içinde takas diski oluşturulamadı: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateDisk" xml:space="preserve">
+    <value>Disk '{}' oluşturulamadı: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
@@ -1979,9 +1980,22 @@ Kullanım:
     <value>Oturum sonlandırılamadı: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
+    <value>Varsayılan oturum bulunamadı</value>
+  </data>
+  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
+    <value>Varsayılan oturum açılamadı</value>
+  </data>
+  <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
+    <value>Varsayılan oturum sonlandırılamadı</value>
+  </data>
   <data name="MessageWslcShellExited" xml:space="preserve">
     <value>{} şu kodla çıktı: {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCreatedSession" xml:space="preserve">
+    <value>Oturum oluşturuldu: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcHeaderId" xml:space="preserve">
     <value>Kimlik</value>
@@ -1995,6 +2009,25 @@ Kullanım:
   <data name="MessageWslcUnknownCommand" xml:space="preserve">
     <value>Bilinmeyen komut: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
+    <value>'{}' kapsayıcısı çalışıyor ve kaldırılamaz. Kaldırmadan önce kapsayıcıyı durdurun veya zorla kaldırmayı (-f) kullanın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotRunning" xml:space="preserve">
+    <value>'{}' kapsayıcısı çalışmıyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerIsRunning" xml:space="preserve">
+    <value>'{}' kapsayıcısı çalışıyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotFound" xml:space="preserve">
+    <value>'{}' kapsayıcısı bulunamadı.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
+    <value>Özel ağ türü için kapsayıcı ağ adı gereklidir.</value>
   </data>
   <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
     <value>Tanınmayan komut: '{}'</value>
@@ -2138,16 +2171,48 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Birim bulunamadı: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcInvalidVolumeOptions" xml:space="preserve">
-    <value>Geçersiz birim seçenekleri: '{}'</value>
+  <data name="MessageWslcImageNotFound" xml:space="preserve">
+    <value>'{}' görüntüsü bulunamadı.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
+    <value>Gerekli seçenek eksik: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
     <value>Desteklenmeyen birim türü: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
+    <value>desteklenmeyen birim sürücü seçenekleri: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcVolumeInUse" xml:space="preserve">
     <value>'{}' birimi kullanımda.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkNotFound" xml:space="preserve">
+    <value>Ağ bulunamadı: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
+    <value>Desteklenmeyen ağ sürücüsü: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkInUse" xml:space="preserve">
+    <value>'{}' ağının etkin uç noktaları var.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
+    <value>'{}' ağı zaten var.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
+    <value>'{}': {} disk birimi oluşturulamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcPortInUse" xml:space="preserve">
+    <value>{} bağlantı noktası zaten kullanımda, {} kapsayıcısı başlatılamıyor</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
@@ -2162,360 +2227,668 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>'{}' içinde Containerfile veya Dockerfile bulunamadı</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
+    <value>'{}' içinde WSLC oturumu bulunamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
+    <value>Geçersiz resim etiketi biçimi: '{}'. Beklenen biçim: 'ad:etiket'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
-    <value>WSLC is the Windows Subsystem for Linux Container CLI tool.</value>
+    <value>WSLC, Linux için Windows Alt Sistemi Kapsayıcı CLI aracıdır.</value>
     <comment>{Locked="WSLC"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_RootCommandLongDesc" xml:space="preserve">
-    <value>WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL containers from the command line.</value>
+    <value>WSLC, Linux için Windows Alt Sistemi Kapsayıcı CLI aracıdır. Komut satırından WSL kapsayıcılarını yönetmeyi ve onlarla etkileşim kurmayı sağlar.</value>
     <comment>{Locked="WSLC"}{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerCommandDesc" xml:space="preserve">
-    <value>Manage containers.</value>
+    <value>Kapsayıcıları yönet.</value>
   </data>
   <data name="WSLCCLI_ContainerCommandLongDesc" xml:space="preserve">
-    <value>Manage the lifecycle of WSL containers, including creating, starting, stopping, and removing them.</value>
+    <value>Kapsayıcı oluşturma, WSL kaldırma dahil olmak üzere kapsayıcıların yaşam döngüsünü yönetin.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerAttachDesc" xml:space="preserve">
-    <value>Attach to a container.</value>
+    <value>Kapsayıcıya bağlan.</value>
   </data>
   <data name="WSLCCLI_ContainerAttachLongDesc" xml:space="preserve">
-    <value>Attaches to a container.</value>
+    <value>Bir kapsayıcıya bağlanır.</value>
   </data>
   <data name="WSLCCLI_ContainerCreateDesc" xml:space="preserve">
-    <value>Create a container.</value>
+    <value>Kapsayıcı oluştur.</value>
   </data>
   <data name="WSLCCLI_ContainerCreateLongDesc" xml:space="preserve">
-    <value>Creates a container.</value>
+    <value>Kapsayıcı oluşturur.</value>
   </data>
   <data name="WSLCCLI_ContainerExecDesc" xml:space="preserve">
-    <value>Execute a command in a running container.</value>
+    <value>Çalışan kapsayıcıda bir komut yürütün.</value>
   </data>
   <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
-    <value>Executes a command in a running container.</value>
+    <value>Çalışan bir kapsayıcıda komut yürütür.</value>
   </data>
   <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
-    <value>Inspect a container.</value>
+    <value>Bir kapsayıcıyı incele.</value>
   </data>
   <data name="WSLCCLI_ContainerInspectLongDesc" xml:space="preserve">
-    <value>Display detailed information about a container.</value>
+    <value>Bir kapsayıcı hakkında ayrıntılı bilgi gösterir.</value>
   </data>
   <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
-    <value>Kill containers.</value>
+    <value>Kapsayıcıları sonlandır.</value>
   </data>
   <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
-    <value>Kills containers.</value>
+    <value>Kapsayıcıları sonlandırır.</value>
   </data>
   <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
-    <value>List containers.</value>
+    <value>Kapsayıcıları listele.</value>
   </data>
   <data name="WSLCCLI_ContainerListLongDesc" xml:space="preserve">
-    <value>Lists containers. By default, only running containers are shown; use --all to include all containers.</value>
+    <value>Kapsayıcıları listeler. Varsayılan olarak, yalnızca çalışmakta olan kapsayıcılar gösterilir; tüm kapsayıcıları dahil etmek için --all parametresini kullanın.</value>
     <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerLogsDesc" xml:space="preserve">
-    <value>View container logs.</value>
+    <value>Kapsayıcı günlüklerini görüntüle.</value>
   </data>
   <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
-    <value>View logs for a container.</value>
+    <value>Kapsayıcının günlüklerini görüntüle.</value>
   </data>
   <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
-    <value>Remove containers.</value>
+    <value>Kapsayıcılar kaldır.</value>
   </data>
   <data name="WSLCCLI_ContainerRemoveLongDesc" xml:space="preserve">
-    <value>Removes containers.</value>
+    <value>Kapsayıcıları kaldırır.</value>
   </data>
   <data name="WSLCCLI_ContainerRunDesc" xml:space="preserve">
-    <value>Run a container.</value>
+    <value>Kapsayıcı çalıştır.</value>
   </data>
   <data name="WSLCCLI_ContainerRunLongDesc" xml:space="preserve">
-    <value>Runs a container. By default, the container is started in the background; use --detach to run in the foreground.</value>
+    <value>Bir kapsayıcı çalıştırır. Varsayılan olarak, kapsayıcı ön planda başlatılır; Arka planda çalıştırmak için --detach kullanın.</value>
     <comment>{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ContainerStartDesc" xml:space="preserve">
-    <value>Start a container.</value>
+    <value>Bir kapsayıcı başlat.</value>
   </data>
   <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
-    <value>Starts a container.</value>
+    <value>Kapsayıcıyı başlatır.</value>
   </data>
   <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
-    <value>Stop containers.</value>
+    <value>Kapsayıcıları durdur.</value>
   </data>
   <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
-    <value>Stops containers.</value>
+    <value>Kapsayıcıları durdurur.</value>
   </data>
   <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
-    <value>Manage images.</value>
+    <value>Görüntüleri yönet.</value>
   </data>
   <data name="WSLCCLI_ImageCommandLongDesc" xml:space="preserve">
-    <value>Manage container images, including building, pulling, listing, and removing them.</value>
+    <value>Kapsayıcı görüntülerini oluşturma, çekme, listeleme ve kaldırma gibi kapsayıcı görüntülerini yönetme.</value>
   </data>
   <data name="WSLCCLI_ImageBuildDesc" xml:space="preserve">
-    <value>Build an image from a Dockerfile.</value>
+    <value>Dockerfile'dan bir görüntü oluştur.</value>
     <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageBuildLongDesc" xml:space="preserve">
-    <value>Builds an image from a Dockerfile and a build context directory.</value>
+    <value>Bir Dockerfile ve derleme bağlamı dizininden bir görüntü oluşturur.</value>
     <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageInspectDesc" xml:space="preserve">
-    <value>Inspect images.</value>
+    <value>Görüntüleri incele.</value>
   </data>
   <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
-    <value>Inspect images.</value>
+    <value>Görüntüleri incele.</value>
   </data>
   <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
-    <value>List images.</value>
+    <value>Görüntüleri listele.</value>
   </data>
   <data name="WSLCCLI_ImageListLongDesc" xml:space="preserve">
-    <value>Lists images.</value>
+    <value>Görüntüleri listeler.</value>
   </data>
   <data name="WSLCCLI_ImageLoadDesc" xml:space="preserve">
-    <value>Load images.</value>
+    <value>Görüntüleri yükle.</value>
   </data>
   <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
-    <value>Loads images.</value>
+    <value>Görüntüleri yükler.</value>
   </data>
   <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
-    <value>Pull images.</value>
+    <value>Görüntüleri getir.</value>
   </data>
   <data name="WSLCCLI_ImagePullLongDesc" xml:space="preserve">
-    <value>Pulls images.</value>
+    <value>Görüntüleri çeker.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllArgDescription" xml:space="preserve">
+    <value>Yalnızca bağlantısız olanlar değil, tüm kullanılmayan görüntüleri kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
+    <value>Silindi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
+    <value>Kullanılmayan görüntüleri kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
+    <value>Tüm bağlantısız görüntüleri kaldırır. --all belirtilirse, herhangi bir kapsayıcı tarafından kullanılmayan tüm görüntüleri kaldırır.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
+    <value>Geri kazanılan toplam alan: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
+    <value>Etiketsiz: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
+    <value>Bir görüntüyü kayıt defterine yükleyin.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
+    <value>Bir görüntüyü kayıt defterine yükleyin.</value>
   </data>
   <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
-    <value>Remove images.</value>
+    <value>Görüntüleri kaldır.</value>
   </data>
   <data name="WSLCCLI_ImageRemoveLongDesc" xml:space="preserve">
-    <value>Removes images.</value>
+    <value>Resmi kaldırır.</value>
   </data>
   <data name="WSLCCLI_ImageSaveDesc" xml:space="preserve">
-    <value>Save images.</value>
+    <value>Resimleri kaydet.</value>
   </data>
   <data name="WSLCCLI_ImageSaveLongDesc" xml:space="preserve">
-    <value>Saves images.</value>
+    <value>Görüntüleri kaydeder.</value>
+  </data>
+  <data name="WSLCCLI_LoginDesc" xml:space="preserve">
+    <value>Registry’ye giriş yapın.</value>
+  </data>
+  <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
+    <value>Bir kayıt defterinde oturum açın. Sunucu belirtilmezse, varsayılan değer oturum tarafından tanımlanır.</value>
+  </data>
+  <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
+    <value>Registry’den çıkış yapın.</value>
+  </data>
+  <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
+    <value>Kayıt defterinin oturumunu kapatın. Sunucu belirtilmezse, varsayılan değer oturum tarafından tanımlanır.</value>
+  </data>
+  <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
+    <value>Oturum Açma Başarılı Oldu</value>
+  </data>
+  <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
+    <value>{} için oturum açma kimlik bilgileri kaldırılıyor</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
+    <value>{} oturumu açılmadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
+    <value>'{}' kimlik bilgileri dosyası ayrıştırılamadı: Dosya bozuk olabilir.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
+    <value>'{}' yazılamadı: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
+    <value>Sunucu</value>
+  </data>
+  <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
+    <value>Kullanıcı adı</value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
+    <value>Parola veya Kişisel Erişim Belirteci (PAT)</value>
+    <comment>{Locked="PAT"}Acronym should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
+    <value>Parolayı veya Kişisel Erişim Belirtecini (PAT) stdin'den alın</value>
+    <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
+    <value>--password ile --password-stdin parametreleri birbirini dışlar</value>
+    <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
+    <value>--password-stdin ile birlikte --username sağlanmalıdır</value>
+    <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
+    <value>Kullanıcı adı: </value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
+    <value>Parola: </value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
+    <value>Kayıt defteri kimlik bilgilerini yönetin.</value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
+    <value>Kapsayıcı kayıt defterlerinde oturum açma ve oturumu kapatma da dahil olmak üzere kayıt defteri kimlik bilgilerini yönetin.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
+    <value>Bir resmi etiketleyin.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagLongDesc" xml:space="preserve">
+    <value>Bir resmi etiketler.</value>
   </data>
   <data name="WSLCCLI_SessionCommandDesc" xml:space="preserve">
-    <value>Manage sessions.</value>
+    <value>Oturumları yönet.</value>
   </data>
   <data name="WSLCCLI_SessionCommandLongDesc" xml:space="preserve">
-    <value>Manage WSL container sessions, including listing active sessions and launching interactive shells.</value>
+    <value>Etkin oturumların listelenmesi ve etkileşimli kabukların başlatılması da dahil WSL kapsayıcı oturumlarını yönet.</value>
     <comment>{Locked="WSL"}Product names should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionListDesc" xml:space="preserve">
-    <value>List sessions.</value>
+    <value>Oturumları listele.</value>
   </data>
   <data name="WSLCCLI_SessionListLongDesc" xml:space="preserve">
-    <value>Lists active session(s).</value>
+    <value>Etkin oturumları listeler.</value>
   </data>
   <data name="WSLCCLI_SessionShellDesc" xml:space="preserve">
-    <value>Attach to a session.</value>
+    <value>Bir oturuma bağlan.</value>
   </data>
   <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
-    <value>Attaches to an active session. If no session ID is provided, the wslc default session will be used.</value>
+    <value>Etkin bir oturuma bağlanır. Oturum kimliği verilmezse varsayılan wslc oturumu kullanılır.</value>
     <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
-    <value>Terminate a session.</value>
+    <value>Bir oturumu sonlandır.</value>
   </data>
   <data name="WSLCCLI_SessionTerminateLongDesc" xml:space="preserve">
-    <value>Terminates an active session. If no session is specified, the default session will be terminated.</value>
+    <value>Etkin bir oturumu sonlandırılır. Oturum belirtilmezse, varsayılan oturum sonlandırılacak.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterDesc" xml:space="preserve">
+    <value>Geçici bir oturuma girin.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterLongDesc" xml:space="preserve">
+    <value>Belirtilen depolama yolunda geçici bir oturum oluşturur ve bu oturumda bir kabuk açar. Kabuk kapandığında oturum silinir. İsim belirtilmezse, bir GUID oluşturulur ve stderr'e yazdırılır.</value>
+    <comment>{Locked="GUID"}{Locked="stderr"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionEnterNameArgDescription" xml:space="preserve">
+    <value>Oturumun adı. Belirtilmemişse, GUID oluşturulur.</value>
+    <comment>{Locked="GUID"}Technical terms should not be translated</comment>
   </data>
   <data name="WSLCCLI_SettingsCommandDesc" xml:space="preserve">
-    <value>Open the settings file in the default editor.</value>
+    <value>Ayarlar dosyasını varsayılan düzenleyicide açın.</value>
   </data>
   <data name="WSLCCLI_SettingsCommandLongDesc" xml:space="preserve">
-    <value>Opens the wslc user settings file in the system default editor for .yaml files.
-On first run, creates the file with all settings commented out at their defaults.</value>
+    <value>wslc kullanıcı ayarları dosyasını sistemin .yaml dosyaları için varsayılan düzenleyicisinde açar.
+İlk çalıştırmada, tüm ayarların varsayılan değerleriyle ve yorum satırı halinde olduğu dosyayı oluşturur.</value>
     <comment>{Locked="wslc"}{Locked=".yaml"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SettingsResetDesc" xml:space="preserve">
-    <value>Reset settings to built-in defaults.</value>
+    <value>Ayarları yerleşik varsayılan değerlere sıfırla.</value>
   </data>
   <data name="WSLCCLI_SettingsResetLongDesc" xml:space="preserve">
-    <value>Overwrites the settings file with a commented-out defaults template.</value>
+    <value>Yorum satırlarına alınmış varsayılanlar bulunan şablonla Ayarlar dosyasının üzerine yazar.</value>
   </data>
   <data name="WSLCCLI_SettingsResetConfirm" xml:space="preserve">
-    <value>Settings reset to defaults.</value>
+    <value>Ayarlar varsayılanlara sıfırlandı.</value>
+  </data>
+  <data name="WSLCCLI_VersionDesc" xml:space="preserve">
+    <value>Sürüm bilgilerini göster.</value>
+  </data>
+  <data name="WSLCCLI_VersionLongDesc" xml:space="preserve">
+    <value>Bu aracın sürüm bilgisini göster.</value>
   </data>
   <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
-    <value>Show all regardless of state.</value>
+    <value>Durum ne olursa olsun tümünü göster.</value>
   </data>
   <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
-    <value>Set build-time variables (KEY=VALUE)</value>
+    <value>Derleme zamanı değişkenlerini ayarla (KEY=VALUE)</value>
     <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
+    <value>Her zaman görüntünün daha yeni sürümünü çekmeye çalışın</value>
+  </data>
+  <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
+    <value>Hedef derleme aşamasını derleme olarak ayarlayın</value>
+  </data>
   <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
-    <value>The command to run</value>
+    <value>Çalıştırılacak komut</value>
   </data>
   <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
-    <value>Delete containers even if they are running</value>
+    <value>Çalışıyor olsa bile kapsayıcıları sil</value>
   </data>
   <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
-    <value>Run container in detached mode</value>
+    <value>Kapsayıcıyı ayrık modda çalıştır</value>
   </data>
   <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
-    <value>Specifies the container init process executable</value>
+    <value>Kapsayıcı başlatma işlemi yürütülebilir dosyasını belirtir</value>
   </data>
   <data name="WSLCCLI_EnvArgDescription" xml:space="preserve">
-    <value>Key=Value pairs for environment variables</value>
+    <value>Ortam değişkenleri için Key=Value çiftleri</value>
     <comment>{Locked="Key=Value"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvFileArgDescription" xml:space="preserve">
-    <value>File containing key=value pairs of env variables</value>
+    <value>Çevre değişkenlerinin key=value çiftlerini içeren dosya</value>
     <comment>{Locked="key=value"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FileArgDescription" xml:space="preserve">
-    <value>Path to the Dockerfile (use "-" to read from stdin)</value>
+    <value>Uygulamanın yolu Dockerfile ("-"'tan okumak için stdin)</value>
     <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
-    <value>Follow log output</value>
+    <value>Günlük çıktısını takip et</value>
   </data>
   <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
-    <value>Output formatting (json or table) (Default: table)</value>
+    <value>Çıkış biçimlendirmesi (json veya table) (varsayılan: table)</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to container's init process</value>
+    <value>Kapsayıcının init işlemine geçirilecek bağımsız değişkenler</value>
   </data>
-  <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
-    <value>Delete images even if they are being used</value>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="all"}</comment>
   </data>
-  <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
-    <value>Image name</value>
-  </data>
-  <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
-    <value>Provides path to the tar archive file containing the image</value>
-  </data>
-  <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
-    <value>Name of the container</value>
-  </data>
-  <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
-    <value>Do not delete untagged parents</value>
-  </data>
-  <data name="WSLCCLI_NoTruncArgDescription" xml:space="preserve">
-    <value>Do not truncate output</value>
-  </data>
-  <data name="WSLCCLI_OutputArgDescription" xml:space="preserve">
-    <value>Path for the saved image</value>
-  </data>
-  <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
-    <value>Path to the build context directory</value>
-  </data>
-  <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
-    <value>Publish a port from a container to host</value>
-  </data>
-  <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
-    <value>Outputs the container IDs only</value>
-  </data>
-  <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
-    <value>Remove the container after it stops</value>
-  </data>
-  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
-    <value>Session ID</value>
-  </data>
-  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send (default: {})</value>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Geçersiz {} değeri: '{}'. Yalnızca 'tümü' desteklenir.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
+    <value>Görüntüleri kullanılıyor olsalar bile sil</value>
+  </data>
+  <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
+    <value>Görüntü adı</value>
+  </data>
+  <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
+    <value>Görüntüyü içeren tar arşiv dosyasının yolunu sağlar</value>
+  </data>
+  <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
+    <value>Bir nesneye meta veri ayarlayın</value>
+  </data>
+  <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
+    <value>Etiket anahtarı boş olamaz</value>
+  </data>
+  <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
+    <value>Kapsayıcı ana bilgisayar adı</value>
+  </data>
+  <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
+    <value>Kapsayıcının adı</value>
+  </data>
+  <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
+    <value>Görüntüyü oluştururken önbelleği kullanma</value>
+  </data>
+  <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
+    <value>Etiketlenmemiş üst öğeleri silme</value>
+  </data>
+  <data name="WSLCCLI_NoTruncArgDescription" xml:space="preserve">
+    <value>Çıktıyı kesme</value>
+  </data>
+  <data name="WSLCCLI_OutputArgDescription" xml:space="preserve">
+    <value>Kaydedilen görüntünün yolu</value>
+  </data>
+  <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
+    <value>Derleme bağlamı dizininin yolu</value>
+  </data>
+  <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
+    <value>Kapsayıcıdan ana bilgisayara bağlantı noktası yayımla</value>
+  </data>
+  <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
+    <value>Açığa çıkarılan tüm bağlantı noktalarını rastgele ana bilgisayar bağlantı noktalarına yayımla</value>
+  </data>
+  <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
+    <value>Yalnızca kapsayıcı kimliklerini çıktı olarak verir</value>
+  </data>
+  <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
+    <value>Kapsayıcı durduktan sonra kaldır</value>
+  </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signal to stop the container</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
+    <value>Oturum Kimliği</value>
+  </data>
+  <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
+    <value>Oturum depolama alanı yolu</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signal to send</value>
+  </data>
+  <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
+    <value>image-name[:tag] biçiminde geçerli veya mevcut resim referansı</value>
+  </data>
   <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
-    <value>Tag for the built image</value>
+    <value>Oluşturulan görüntünün etiketi</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>Günlüklerin sonundan itibaren gösterilecek satır sayısı</value>
+  </data>
+  <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
+    <value>image-name[:tag] biçiminde yeni resim referansı</value>
   </data>
   <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
-    <value>Time in seconds to wait before executing (default 5)</value>
+    <value>Yürütmeden önce beklenecek süre (varsayılan 5)</value>
   </data>
   <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
-    <value>Open a TTY with the container process.</value>
+    <value>Kapsayıcı işlemiyle bir TTY aç.</value>
     <comment>{Locked="TTY"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_VerboseArgDescription" xml:space="preserve">
-    <value>Output verbose details</value>
+    <value>Ayrıntılı çıktı ver</value>
   </data>
   <data name="WSLCCLI_VersionArgDescription" xml:space="preserve">
-    <value>Show version information for this tool</value>
+    <value>Bu aracın sürüm bilgisini göster</value>
   </data>
   <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
-    <value>Bind mount a volume to the container</value>
+    <value>Bir birimi kapsayıcıya sabit olarak bağla</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
+    <value>Kapsayıcı içindeki çalışma dizini</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Write the container ID to the provided path.</value>
+    <value>Kapsayıcı kimliğini sağlanan yola yazın.</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
-    <value>IP address of the DNS nameserver in resolv.conf</value>
+    <value>resolv.conf'deki DNS ad sunucusunun IP adresi</value>
     <comment>{Locked="resolv.conf"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DNSDomainArgDescription" xml:space="preserve">
-    <value>Set the default DNS Domain</value>
+    <value>Varsayılan DNS alan adını ayarla</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DNSOptionArgDescription" xml:space="preserve">
-    <value>Set DNS options</value>
+    <value>DNS seçeneklerini ayarla</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_DNSSearchArgDescription" xml:space="preserve">
-    <value>Set DNS search domains</value>
+    <value>DNS arama etki alanlarını ayarla</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
+    <value>Kapsayıcı etki alanı adı</value>
+  </data>
   <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
-    <value>Group Id for the process</value>
+    <value>İşlemin grup kimliği</value>
   </data>
   <data name="WSLCCLI_NoDNSArgDescription" xml:space="preserve">
-    <value>No configuration of DNS in the container</value>
+    <value>Kapsayıcıda DNS yapılandırması yok</value>
     <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
-    <value>Progress type (format: none|ansi) (default: ansi)</value>
+    <value>İlerleme türü (biçim: none|ansi) (varsayılan: ansi)</value>
     <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
-    <value>Image pull policy (always|missing|never) (default:never)</value>
+    <value>Görüntü çekme ilkesi (always|missing|never) (varsayılan:never)</value>
     <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
-    <value>Use this scheme for registry connection</value>
+    <value>Kayıt defteri bağlantısı için bu düzeni kullan</value>
   </data>
   <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
-    <value>Mount tmpfs to the container at the given path</value>
+    <value>Belirtilen yoldaki kapsayıcıya tmpfs bağla</value>
     <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
-    <value>User ID for the process (name|uid|uid:gid)</value>
+    <value>İşlemin kullanıcı kimliği (name|uid|uid:gid)</value>
     <comment>{Locked="name|uid|uid:gid"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
-    <value>Expose virtualization capabilities to the container</value>
+    <value>Kapsayıcının sanallaştırma özelliklerini kullanabilmesini sağla</value>
   </data>
   <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
-    <value>Arguments to pass to the command being executed inside the container</value>
+    <value>Kapsayıcı içinde yürütülen komuta geçirilecek bağımsız değişkenler</value>
   </data>
   <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
-    <value>Show detailed information about the listed sessions.</value>
+    <value>Listelenen oturumlarla ilgili ayrıntılı bilgileri göster.</value>
   </data>
   <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
-    <value>Invalid format type specified. Supported format types are: json, table</value>
+    <value>Geçersiz biçim türü belirtildi. Desteklenen biçim türleri: json, table</value>
     <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
+    <value>Geçersiz {} değeri: {} tanınan bir denetleme türü değil. Desteklenen denetleme türleri şunlardır: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
-    <value>Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).</value>
+    <value>Geçersiz {} değeri: {} tanınan bir sinyal adı veya numarası değil (Örnek: SIGKILL, kill veya 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Geçersiz {} bağımsız değişken değeri: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
-    <value>Invalid {} value: {} is out of valid range ({}-{}).</value>
+    <value>Geçersiz {} değeri: {} geçerli aralığın dışında ({}-{}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Geçersiz {} bağımsız değişken değeri: '{}'. Beklenen bellek boyutu (ör. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
-    <value>Image '{}' not found, pulling</value>
+    <value>'{}' görüntüsü bulunamadı, getiriliyor</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
-    <value>Environment variable key cannot be empty</value>
+    <value>Ortam değişkeni anahtarı boş olamaz</value>
   </data>
   <data name="WSLCCLI_EnvKeyWhitespaceError" xml:space="preserve">
-    <value>Environment variable key '{}' cannot contain whitespace</value>
+    <value>'{}' ortam değişkeni anahtarı boşluk içeremez</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
-    <value>Requested load but no input provided.</value>
+    <value>Yükleme istendi ancak giriş sağlanmadı.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
+    <value>Birimleri yönetin.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
+    <value>Oluşturma, inceleme, listeleme ve silme işlemleri de dahil olmak üzere WSL birimlerinin yaşam döngüsünü yönetin.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
+    <value>Birim oluşturun.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
+    <value>Kapsayıcılara eklenebilen adlandırılmış bir birim oluşturur.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
+    <value>Bir veya birden fazla birimi kaldırın.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
+    <value>Bir veya birden çok birimi kaldırır. Birim, bir kapsayıcı tarafından kullanılıyorsa kaldırılamaz.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectDesc" xml:space="preserve">
+    <value>Bir veya birden çok birim hakkında ayrıntılı bilgi görüntüler.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectLongDesc" xml:space="preserve">
+    <value>Bir veya birden çok birim hakkında ayrıntılı bilgi görüntüler.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
+    <value>Birimleri listeleyin.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
+    <value>Oturumdaki tüm birimleri listeler.</value>
+  </data>
+  <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
+    <value>Birim adı</value>
+  </data>
+  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
+    <value>Birim sürücü adını belirtin (varsayılan {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
+    <value>Sürücüye özgü seçenekleri ayarlayın</value>
+  </data>
+  <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
+    <value>Yalnızca birim adlarının çıkışını oluşturur</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
+    <value>Görüntü terminale yazılamıyor. -o bayrağını kullanın veya stdout'u yeniden yönlendirin.</value>
+  </data>
+  <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
+    <value>Beklenen biçim: &lt;ana bilgisayar yolu | adlandırılmış birim&gt;:&lt;kapsayıcı yolu&gt;[:mode]</value>
+    <comment>Usage string for volume mount specification.</comment>
+  </data>
+  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
+    <value>Geçersiz birim belirtimleri: '{}'. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
+    <value>Geçersiz birim belirtimleri: '{}'. Konak yolu boş olamaz. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
+    <value>Geçersiz birim belirtimleri: '{}'. Kapsayıcı yolu boş olamaz. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
+    <value>Geçersiz birim belirtimleri: '{}'. Kapsayıcı yolu mutlak bir yol olmalıdır ('/' ile başlayan). {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
+    <value>Geçersiz birim belirtimleri: '{}'. '{}' konak yolu geçerli bir Windows yolu değil.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
+    <value>Herhangi bir nesne türünün adı veya kimliği</value>
+  </data>
+  <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
+    <value>İncelenecek nesnenin türü</value>
+  </data>
+  <data name="WSLCCLI_InspectDesc" xml:space="preserve">
+    <value>Nesneleri inceleyin.</value>
+  </data>
+  <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
+    <value>Nesneleri inceleyin.</value>
+  </data>
+  <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
+    <value>Nesne bulunamadı: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
+    <value>Uyarı: {}:{} içinde '{}' ayarı için geçersiz değer.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
+    <value>Uyarı: {}:{} içinde '{}' ayarı için geçersiz tür.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_NonStringKey" xml:space="preserve">
+    <value>Uyarı: {}:{} içinde '{}' bölümünde dize olmayan anahtar.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownSection" xml:space="preserve">
+    <value>Uyarı: {}:{} içinde bilinmeyen ayar bölümü '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
+    <value>Uyarı: {}:{} içinde bilinmeyen '{}' ayarı.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
+    <value>Uyarı: {} konumundaki ayarlar dosyası açılamadı. Hata: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_ParseError" xml:space="preserve">
+    <value>Uyarı: {} konumundaki ayarlar dosyası ayrıştırılamadı. Hata: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
+    <value>Uyarı: {} konumundaki ayarlar dosyası boş veya dosyanın yapısı geçersiz. YAML eşlemesi bekleniyordu.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

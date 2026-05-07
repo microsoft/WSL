@@ -212,8 +212,13 @@ jobs:
               if (Test-Path "generated\dev-cert.pfx") { Copy-Item "generated\dev-cert.pfx" "$(ob_outputDirectory)\installer\dev-cert.pfx" }
               New-Item -ItemType Directory -Path "$(ob_outputDirectory)\sdk\${{ parameters.platform }}" -Force
               Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.lib" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.lib"
-              Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
-              Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdkcs.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdkcs.dll"
+              if ('${{ parameters.isRelease }}' -eq 'True') {
+                  Copy-Item -Path "$(packageStagingDir)\${{ parameters.platform }}\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
+                  Copy-Item -Path "$(packageStagingDir)\${{ parameters.platform }}\wslcsdkcs.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdkcs.dll"
+              } else {
+                  Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdk.dll"
+                  Copy-Item -Path "bin\${{ parameters.platform }}\release\wslcsdkcs.dll" -Destination "$(ob_outputDirectory)\sdk\${{ parameters.platform }}\wslcsdkcs.dll"
+              }
 
       - task: PowerShell@2
         displayName: "Create CAB from ${{ parameters.platform }} installer msi"

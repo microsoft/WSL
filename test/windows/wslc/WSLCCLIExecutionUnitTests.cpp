@@ -284,6 +284,60 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(std::string("/app"), options.WorkingDirectory);
     }
 
+    TEST_METHOD(RunCommand_ParseGpusAll_SetsGpuOption)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus all ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.Gpu);
+    }
+
+    TEST_METHOD(RunCommand_ParseGpusInvalid_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus invalid ubuntu sh");
+
+        ContainerRunCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
+    TEST_METHOD(CreateCommand_ParseGpusAll_SetsGpuOption)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus all ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+        command.ValidateArguments(context.Args);
+
+        wsl::windows::wslc::task::SetContainerOptionsFromArgs(context);
+
+        const auto& options = context.Data.Get<Data::ContainerOptions>();
+        VERIFY_IS_TRUE(options.Gpu);
+    }
+
+    TEST_METHOD(CreateCommand_ParseGpusInvalid_ThrowsArgumentException)
+    {
+        auto invocation = CreateInvocationFromCommandLine(L"wslc --gpus none ubuntu sh");
+
+        ContainerCreateCommand command{L""};
+        CLIExecutionContext context;
+        command.ParseArguments(invocation, context.Args);
+
+        VERIFY_THROWS_SPECIFIC(
+            command.ValidateArguments(context.Args), wsl::windows::wslc::ArgumentException, [](const auto&) { return true; });
+    }
+
     // Test: Command Line test parsing all cases defined in CommandLineTestCases.h
     // This test verifies the command line parsing logic used by the CLI and executes the same
     // code as the CLI up to the point of command execution, including parsing and argument validtion.

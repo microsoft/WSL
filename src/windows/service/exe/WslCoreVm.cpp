@@ -509,11 +509,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->SwapLun = swapLun;
     message->SystemDistroDeviceType = m_systemDistroDeviceType;
     message->SystemDistroDeviceId = m_systemDistroDeviceId;
-    message->PageReportingOrder = m_coldDiscardShiftSize;
     message->MemoryReclaimMode = static_cast<LX_MINI_INIT_MEMORY_RECLAIM_MODE>(m_vmConfig.MemoryReclaim);
     message->EnableDebugShell = m_vmConfig.EnableDebugShell;
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
-    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling;
+    // Virtio proxy forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by NAT and Mirrored modes.
+    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::VirtioProxy;
     message->DefaultKernel = m_defaultKernel;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
@@ -572,9 +572,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             {
                 wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
                 WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
-                WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunnelingSocket, m_vmConfig.EnableDnsTunneling);
+                WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
+                // NAT may have fallen back to virtio proxy after the early-config message; drop the unused DNS hvsocket.
+                dnsTunnelingSocket.reset();
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken, std::move(dnsTunnelingSocket));
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -1381,9 +1383,9 @@ std::wstring WslCoreVm::GenerateConfigJson()
     vmSettings.ComputeTopology.Memory.EnableDeferredCommit = true;
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
 
-    // Configure backing page size, fault cluster shift size, and cold discard hint size to favor density (lower vmmem usage).
+    // Configure backing page size, fault cluster shift size, and page reporting order to favor density (lower vmmem usage).
     //
-    // N.B. Cold discard hint size should be a multiple of the fault cluster shift size.
+    // N.B. Page reporting order must be >= fault cluster size shift.
     //
     // N.B. This is only done on builds that have the fix for the VID deadlock on partition teardown.
     if ((m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
@@ -1394,11 +1396,11 @@ std::wstring WslCoreVm::GenerateConfigJson()
         vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
         vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;          // 64k
         vmSettings.ComputeTopology.Memory.DirectMapFaultClusterSizeShift = 4; // 64k
-        m_coldDiscardShiftSize = 5;                                           // 128k
+        m_pageReportingOrder = 5;                                             // 128k
     }
     else
     {
-        m_coldDiscardShiftSize = 9; // 2MB
+        m_pageReportingOrder = 9; // 2MB
     }
 
     // May need more MMIO than the default 16GB. WSL uses a vpci device per Plan9 share, WSLg adds a GPU device,
@@ -1524,8 +1526,8 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Set number of processors.
     kernelCmdLine += std::format(L" nr_cpus={}", m_vmConfig.ProcessorCount);
 
-    // Enable timesync workaround to sync on resume from sleep in modern standby.
-    kernelCmdLine += L" hv_utils.timesync_implicit=1";
+    // Append common kernel parameters shared between WSL2 and WSLC.
+    helpers::AppendCommonKernelCommandLine(kernelCmdLine, m_pageReportingOrder);
 
     // If using virtio features, enable SWIOTLB as a perf optimization (will cause VM to consume 64MB more memory).
     if (m_vmConfig.EnableVirtio9p || m_vmConfig.EnableVirtioFs || m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
@@ -1905,7 +1907,9 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
 
 bool WslCoreVm::IsDnsTunnelingSupported() const
 {
-    WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored);
+    WI_ASSERT(
+        m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored ||
+        m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy);
 
     return SUCCEEDED_LOG(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
 }
@@ -2854,7 +2858,7 @@ void WslCoreVm::ValidateNetworkingMode()
         EMIT_USER_WARNING(Localization::MessageLocalhostForwardingNotSupportedMirroredMode());
     }
 
-    // If DNS tunneling was requested, ensure it is supported by Windows.
+    // The DnsResolver support check still applies to virtio proxy because the host virtio proxy uses the same Windows DNS APIs.
     if (m_vmConfig.EnableDnsTunneling && !IsDnsTunnelingSupported())
     {
         // Since DNS tunneling is enabled by default, only show the warning if the user explicitly asked for it.

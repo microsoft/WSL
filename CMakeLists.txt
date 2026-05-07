@@ -158,6 +158,9 @@ find_nuget_package(Microsoft.Windows.SDK.NET.Ref WINDOWS_SDK_DOTNET /)
 find_nuget_package(Microsoft.Xaml.Behaviors.WinUI.Managed XAML_BEHAVIORS /)
 find_nuget_package(WinUIEx WINUIEX /)
 
+# WSLC C# API packages
+find_nuget_package(Microsoft.Windows.CsWinRT CSWINRT /)
+
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
@@ -313,12 +316,6 @@ endif()
 if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /CETCOMPAT")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
-endif()
-
-if (WSL_BUILD_SDKCS OR WSL_BUILD_WSL_SETTINGS)
-    set(CMAKE_CSharp_FLAGS "${CMAKE_CSharp_FLAGS} /langversion:latest /debug:full")
-    set(CMAKE_DOTNET_SDK "Microsoft.NET.Sdk")
-    set(CMAKE_DOTNET_TARGET_FRAMEWORK "net8.0-windows${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
 endif()
 
 # Common link libraries
@@ -541,10 +538,6 @@ add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslc)
 add_subdirectory(src/windows/WslcSDK)
-
-if (WSL_BUILD_SDKCS)
-    add_subdirectory(src/windows/WslcSDK/csharp)
-endif()
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

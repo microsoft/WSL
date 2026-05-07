@@ -39,6 +39,12 @@ public:
     // (e.g. detach/delete the VHD for VHD volumes). Throws on failure.
     virtual void Delete() = 0;
 
+    // Called when Docker has already destroyed the volume (e.g. container delete with -v).
+    // Releases any host-side resources without contacting Docker. Default is a no-op.
+    virtual void OnDeleted()
+    {
+    }
+
     // Returns a JSON string for the COM-facing InspectVolume result.
     virtual std::string Inspect() const = 0;
 
