@@ -21,7 +21,6 @@ Abstract:
 #include <WSLCProcessLauncher.h>
 #include <CommandLine.h>
 #include <filesystem>
-#include <fstream>
 #include <unordered_map>
 #include <wslc.h>
 

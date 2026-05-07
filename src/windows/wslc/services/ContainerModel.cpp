@@ -349,7 +349,7 @@ CidFile::CidFile(const std::optional<std::wstring>& path)
             THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(openError), Localization::WSLCCLI_CIDFileAlreadyExistsError(*m_path));
         }
 
-        const auto errorMessage = wsl::shared::string::MultiByteToWide(std::system_category().message(openError));
+        const auto errorMessage = wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(openError));
         THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(openError), Localization::MessageWslcFailedToOpenFile(*m_path, errorMessage));
     }
 
