@@ -187,8 +187,8 @@ wil::unique_handle wsl::windows::common::security::GetUserToken(_In_ TOKEN_TYPE 
         TOKEN_MANDATORY_LABEL tokenLabel{};
         tokenLabel.Label.Attributes = SE_GROUP_INTEGRITY;
         tokenLabel.Label.Sid = sid;
-        THROW_IF_WIN32_BOOL_FALSE(::SetTokenInformation(
-            newToken.get(), TokenIntegrityLevel, &tokenLabel, (sizeof(tokenLabel) + ::GetLengthSid(sid))));
+        THROW_IF_WIN32_BOOL_FALSE(
+            ::SetTokenInformation(newToken.get(), TokenIntegrityLevel, &tokenLabel, (sizeof(tokenLabel) + ::GetLengthSid(sid))));
     }
 
     return newToken;
