@@ -183,19 +183,12 @@ wil::unique_handle wsl::windows::common::security::GetUserToken(_In_ TOKEN_TYPE 
     // high integrity level and objects created with a higher integrity level token may be inaccessible.
     if (GetUserBasicIntegrityLevel(newToken.get()) == SECURITY_MANDATORY_SYSTEM_RID)
     {
-        union
-        {
-            SID sid;
-            BYTE buffer[SECURITY_SID_SIZE(1)];
-        } sidBuffer;
-        SID_IDENTIFIER_AUTHORITY micSidAuthority = SECURITY_MANDATORY_LABEL_AUTHORITY;
-        THROW_IF_NTSTATUS_FAILED(::RtlInitializeSidEx(&sidBuffer.sid, &micSidAuthority, 1, SECURITY_MANDATORY_HIGH_RID));
-
+        auto [sid, sidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_MANDATORY_LABEL_AUTHORITY, SECURITY_MANDATORY_HIGH_RID);
         TOKEN_MANDATORY_LABEL tokenLabel{};
         tokenLabel.Label.Attributes = SE_GROUP_INTEGRITY;
-        tokenLabel.Label.Sid = &sidBuffer.sid;
+        tokenLabel.Label.Sid = sid;
         THROW_IF_WIN32_BOOL_FALSE(::SetTokenInformation(
-            newToken.get(), TokenIntegrityLevel, &tokenLabel, (sizeof(tokenLabel) + ::GetLengthSid(&sidBuffer.sid))));
+            newToken.get(), TokenIntegrityLevel, &tokenLabel, (sizeof(tokenLabel) + ::GetLengthSid(sid))));
     }
 
     return newToken;
