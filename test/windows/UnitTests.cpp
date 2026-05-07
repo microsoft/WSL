@@ -6666,9 +6666,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             wsl::windows::common::relay::MultiHandleWait io;
             io.AddHandle(std::make_unique<wsl::windows::common::relay::ReadSocketMessageHandle>(
-                wsl::windows::common::relay::HandleWrapper{std::move(server)},
-                buffer,
-                [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                wsl::windows::common::relay::HandleWrapper{std::move(server)}, buffer, [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
                     callbackInvoked = true;
                     message.assign(received.begin(), received.end());
                 }));
@@ -6836,9 +6834,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             exitEvent.SetEvent();
             wsl::shared::SocketChannel channel{std::move(server), "server", std::vector<HANDLE>{exitEvent.get()}};
 
-            const auto hr = wil::ResultFromException([&]() {
-                channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>();
-            });
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
             VERIFY_ARE_EQUAL(hr, E_ABORT);
         }
 
@@ -6867,12 +6863,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
             message.Result = 0;
             VERIFY_ARE_EQUAL(
-                send(client.get(), reinterpret_cast<const char*>(&message), sizeof(message), 0),
-                gsl::narrow_cast<int>(sizeof(message)));
+                send(client.get(), reinterpret_cast<const char*>(&message), sizeof(message), 0), gsl::narrow_cast<int>(sizeof(message)));
 
-            const auto hr = wil::ResultFromException([&]() {
-                channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>();
-            });
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
 
@@ -6889,12 +6882,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::REQUEST);
             message.Result = 0;
             VERIFY_ARE_EQUAL(
-                send(client.get(), reinterpret_cast<const char*>(&message), sizeof(message), 0),
-                gsl::narrow_cast<int>(sizeof(message)));
+                send(client.get(), reinterpret_cast<const char*>(&message), sizeof(message), 0), gsl::narrow_cast<int>(sizeof(message)));
 
-            const auto hr = wil::ResultFromException([&]() {
-                channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>();
-            });
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
 
@@ -6910,12 +6900,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             header.TransactionId = 1;
             header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
             VERIFY_ARE_EQUAL(
-                send(client.get(), reinterpret_cast<const char*>(&header), sizeof(header), 0),
-                gsl::narrow_cast<int>(sizeof(header)));
+                send(client.get(), reinterpret_cast<const char*>(&header), sizeof(header), 0), gsl::narrow_cast<int>(sizeof(header)));
 
-            const auto hr = wil::ResultFromException([&]() {
-                channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>();
-            });
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
 
@@ -6925,9 +6912,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             auto [client, server] = MakeSocketPair();
             wsl::shared::SocketChannel channel{std::move(server), "server"};
 
-            const auto hr = wil::ResultFromException([&]() {
-                channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100);
-            });
+            const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, 100); });
             VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }
     }

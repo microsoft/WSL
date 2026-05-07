@@ -1585,77 +1585,6 @@ HANDLE ReadSocketMessageHandle::GetHandle() const
     return Event.get();
 }
 
-SocketWriteHandle::SocketWriteHandle(HandleWrapper&& MovedSocket, gsl::span<const gsl::byte> Buffer) :
-    Socket(std::move(MovedSocket)), Buffer(Buffer.begin(), Buffer.end())
-{
-    Overlapped.hEvent = Event.get();
-}
-
-SocketWriteHandle::~SocketWriteHandle()
-{
-    if (State == IOHandleStatus::Pending)
-    {
-        CancelPendingIo(Socket.Get(), Overlapped);
-    }
-}
-
-void SocketWriteHandle::Schedule()
-{
-    WI_ASSERT(State == IOHandleStatus::Standby);
-
-    Event.ResetEvent();
-
-    WSABUF wsaBuf = {gsl::narrow_cast<ULONG>(Buffer.size()), reinterpret_cast<CHAR*>(Buffer.data())};
-    DWORD bytesWritten{};
-    if (WSASend(reinterpret_cast<SOCKET>(Socket.Get()), &wsaBuf, 1, &bytesWritten, 0, &Overlapped, nullptr) == 0)
-    {
-        Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
-        if (Buffer.empty())
-        {
-            State = IOHandleStatus::Completed;
-        }
-    }
-    else
-    {
-        auto error = WSAGetLastError();
-        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != WSA_IO_PENDING, "Socket: 0x%p", (void*)Socket.Get());
-
-        State = IOHandleStatus::Pending;
-    }
-}
-
-void SocketWriteHandle::Collect()
-{
-    WI_ASSERT(State == IOHandleStatus::Pending);
-
-    State = IOHandleStatus::Standby;
-
-    DWORD bytesWritten{};
-    DWORD flags{};
-    THROW_IF_WIN32_BOOL_FALSE(WSAGetOverlappedResult(reinterpret_cast<SOCKET>(Socket.Get()), &Overlapped, &bytesWritten, FALSE, &flags));
-
-    Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
-    if (Buffer.empty())
-    {
-        State = IOHandleStatus::Completed;
-    }
-}
-
-void SocketWriteHandle::Push(gsl::span<const gsl::byte> Content)
-{
-    WI_ASSERT(State == IOHandleStatus::Standby || State == IOHandleStatus::Completed);
-    WI_ASSERT(!Content.empty());
-
-    Buffer.insert(Buffer.end(), Content.begin(), Content.end());
-
-    State = IOHandleStatus::Standby;
-}
-
-HANDLE SocketWriteHandle::GetHandle() const
-{
-    return Event.get();
-}
-
 WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Source) :
     Handle(std::move(MovedHandle)), Buffer(Source.size()), Offset(InitializeFileOffset(Handle.Get()))
 {
@@ -1735,9 +1664,7 @@ void WriteHandle::Push(const gsl::span<char>& Content)
     WI_ASSERT(!Content.empty());
 
     // Resize() throws E_UNEXPECTED if Buffer does not own its storage.
-    const auto oldSize = Buffer.Size();
-    Buffer.Resize(oldSize + Content.size());
-    std::memcpy(Buffer.Span().data() + oldSize, Content.data(), Content.size());
+    Buffer.Append(Content);
 
     State = IOHandleStatus::Standby;
 }

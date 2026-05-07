@@ -258,6 +258,13 @@ public:
         m_owned->resize(size);
     }
 
+    void Append(gsl::span<char> Span)
+    {
+        THROW_HR_IF_MSG(E_UNEXPECTED, !Owned(), "BufferWrapper::Resize called on a non-owned buffer");
+
+        m_owned->insert(m_owned->end(), Span.begin(), Span.end());
+    }
+
     void Consume(size_t bytes) noexcept
     {
         WI_ASSERT(bytes <= Size());
@@ -423,26 +430,6 @@ private:
     bool ReadingHeader = true;
     size_t BytesRemaining = sizeof(MESSAGE_HEADER);
     size_t CurrentOffset = 0;
-};
-
-class SocketWriteHandle : public OverlappedIOHandle
-{
-public:
-    NON_COPYABLE(SocketWriteHandle);
-    NON_MOVABLE(SocketWriteHandle);
-
-    SocketWriteHandle(HandleWrapper&& Socket, gsl::span<const gsl::byte> Buffer = {});
-    ~SocketWriteHandle();
-    void Schedule() override;
-    void Collect() override;
-    HANDLE GetHandle() const override;
-    void Push(gsl::span<const gsl::byte> Buffer);
-
-private:
-    HandleWrapper Socket;
-    wil::unique_event Event{wil::EventOptions::ManualReset};
-    OVERLAPPED Overlapped{};
-    std::vector<gsl::byte> Buffer;
 };
 
 class WriteHandle : public OverlappedIOHandle
