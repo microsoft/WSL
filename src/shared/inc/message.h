@@ -93,6 +93,13 @@ public:
         gsl::copy(Span, InsertBuffer(Span.size()));
     }
 
+    template <typename T>
+    gsl::span<T> InsertArray(unsigned int& Index, unsigned int& SizeInMessage, unsigned int ArraySize)
+    {
+        SizeInMessage = ArraySize;
+        return InsertBuffer(Index, ArraySize * sizeof(T));
+    }
+
     gsl::span<std::byte> InsertBuffer(unsigned int& Index, size_t BufferSize, unsigned int& Size)
     {
         Size = BufferSize;
@@ -138,6 +145,38 @@ public:
     void WriteString(unsigned int& Index, const wchar_t* String)
     {
         WriteString(Index, wsl::shared::string::WideToMultiByte(String));
+    }
+
+    // Write an array of strings.
+    // Each field is prefixed with its size as int32_t, and the array ends with a -1 terminator.
+    void WriteStringArray(unsigned int& Index, const char* const* String, size_t Count)
+    {
+        size_t totalSize = sizeof(int32_t); // The array ends with a '-1' terminator.
+        for (size_t i = 0; i < Count; i++)
+        {
+            totalSize += strlen(String[i]) + sizeof(int32_t);
+        }
+
+        auto span = InsertBuffer(Index, totalSize);
+        auto it = span.begin();
+
+        auto insertSize = [&](int32_t size) {
+            it = std::copy(reinterpret_cast<const std::byte*>(&size), reinterpret_cast<const std::byte*>(&size) + sizeof(size), it);
+        };
+
+        for (size_t i = 0; i < Count; i++)
+        {
+            auto size = strlen(String[i]);
+            THROW_INVALID_ARG_IF(size > std::numeric_limits<int32_t>::max());
+
+            insertSize(static_cast<int32_t>(size));
+
+            it = std::copy(reinterpret_cast<const std::byte*>(String[i]), reinterpret_cast<const std::byte*>(String[i] + size), it);
+        }
+
+        insertSize(-1);
+
+        assert(it == span.end());
     }
 
     gsl::span<std::byte> Span()

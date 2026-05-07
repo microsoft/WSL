@@ -51,7 +51,7 @@ std::wstring GetKeyPath(_In_ HKEY Key)
     std::vector<char> buffer(requiredSize, 0);
 
     status = ZwQueryKey(Key, KeyNameInformation, buffer.data(), static_cast<ULONG>(buffer.size()), &requiredSize);
-    THROW_IF_WIN32_ERROR(status);
+    THROW_IF_NTSTATUS_FAILED(status);
 
     const auto* info = reinterpret_cast<KEY_NAME_INFORMATION*>(buffer.data());
 

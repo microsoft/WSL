@@ -217,9 +217,6 @@ Telepítés a wsl.exe {} &lt;Distro&gt; használatával.
 Az érvényes disztribúciók listájának eléréséhez használja a 'wsl.exe --list --online' parancsot.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageInstanceTerminated" xml:space="preserve">
-    <value>A Linuxos Windows-alrendszer példánya leállt.</value>
-  </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
     <value>Érvénytelen parancssori argumentum: {}
 A támogatott argumentumok listájának beolvasásához használja a(z) {} --help'.</value>
@@ -808,7 +805,7 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
     <value>Eseménynapló megnyitása</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Ez a terjesztés nem tartalmaz alapértelmezett nevet. A terjesztési név kiválasztásához használja a --name .</value>
+    <value>Ez a disztribúció nem tartalmaz alapértelmezett nevet. A --name segítségével válassza ki a disztribúció nevét.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -856,6 +853,10 @@ A Admin Protection kapcsolatos további információért látogasson el a https:
   </data>
   <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
     <value>Nem sikerült létrehozni a felcserélési lemezt itt: {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateDisk" xml:space="preserve">
+    <value>Nem sikerült létrehozni a(z) {} lemezt: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
@@ -1949,5 +1950,945 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   </data>
   <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
     <value>Visual Studio-integráció</value>
+  </data>
+  <data name="MessageWslcUsage" xml:space="preserve">
+    <value>wslc - WSL Container CLI
+Usage:
+  wslc --help</value>
+    <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionNotFound" xml:space="preserve">
+    <value>Session not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidIp" xml:space="preserve">
+    <value>Érvénytelen IP-cím: „{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcOpenSessionFailed" xml:space="preserve">
+    <value>OpenSessionByName('{}') failed</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNoSessionsFound" xml:space="preserve">
+    <value>Nem találhatók WSLC-munkamenetek.</value>
+  </data>
+  <data name="MessageWslcSessionsFound" xml:space="preserve">
+    <value>{} talált WSLC-munkamenet{}:</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTerminateSessionFailed" xml:space="preserve">
+    <value>A munkamenet lezárása nem sikerült: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDefaultSessionNotFound" xml:space="preserve">
+    <value>Az alapértelmezett munkamenet nem található</value>
+  </data>
+  <data name="MessageWslcOpenDefaultSessionFailed" xml:space="preserve">
+    <value>Nem sikerült megnyitni az alapértelmezett munkamenetet</value>
+  </data>
+  <data name="MessageWslcTerminateDefaultSessionFailed" xml:space="preserve">
+    <value>Az alapértelmezett munkamenet lezárása nem sikerült</value>
+  </data>
+  <data name="MessageWslcShellExited" xml:space="preserve">
+    <value>{} exited with: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCreatedSession" xml:space="preserve">
+    <value>Létrehozott munkamenet: „{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcHeaderId" xml:space="preserve">
+    <value>Azonosító</value>
+  </data>
+  <data name="MessageWslcHeaderCreatorPid" xml:space="preserve">
+    <value>Létrehozó folyamatazonosítója</value>
+  </data>
+  <data name="MessageWslcHeaderDisplayName" xml:space="preserve">
+    <value>Megjelenítendő név</value>
+  </data>
+  <data name="MessageWslcUnknownCommand" xml:space="preserve">
+    <value>Unknown command: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcCannotRemoveRunningContainer" xml:space="preserve">
+    <value>A(z) {} tároló fut, és nem távolítható el. Eltávolítás előtt állítsa le a tárolót, vagy használja a kényszerített eltávolítást (-f).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotRunning" xml:space="preserve">
+    <value>A(z) {} tároló nem fut.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerIsRunning" xml:space="preserve">
+    <value>A(z) {} tároló fut.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNotFound" xml:space="preserve">
+    <value>A(z) {} tároló nem található.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerNetworkNameRequired" xml:space="preserve">
+    <value>Az egyéni hálózattípushoz meg kell adni a tárolóhálózat nevét.</value>
+  </data>
+  <data name="WSLCCLI_UnrecognizedCommandError" xml:space="preserve">
+    <value>Ismeretlen parancs: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_RequiredArgumentError" xml:space="preserve">
+    <value>Egy kötelező argumentum nincs megadva: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_TooManyArgumentsError" xml:space="preserve">
+    <value>Az argumentum az engedélyezettnél többször van megadva: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
+    <value>A kiválasztott parancs súgójának megjelenítése</value>
+  </data>
+  <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
+    <value>Több egymást kölcsönösen kizáró argumentum van megadva: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
+    <value>A(z) {} argumentum csak a következővel használható: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_Usage" xml:space="preserve">
+    <value>Használat: {} {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_Command" xml:space="preserve">
+    <value>parancs</value>
+  </data>
+  <data name="WSLCCLI_Options" xml:space="preserve">
+    <value>beállítások</value>
+  </data>
+  <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
+    <value>A következő parancs-aliasok érhetők el:</value>
+  </data>
+  <data name="WSLCCLI_AvailableCommands" xml:space="preserve">
+    <value>A következő parancsok használhatók:</value>
+  </data>
+  <data name="WSLCCLI_AvailableSubcommands" xml:space="preserve">
+    <value>A következő alparancsok használhatók:</value>
+  </data>
+  <data name="WSLCCLI_AvailableOptions" xml:space="preserve">
+    <value>A következő kapcsolók használhatók:</value>
+  </data>
+  <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
+    <value>A következő argumentumok használhatók:</value>
+  </data>
+  <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
+    <value>Ha további információra van szüksége egy adott parancsról, adja meg hozzá a súgó argumentumát.</value>
+  </data>
+  <data name="WSLCCLI_InvalidNameError" xml:space="preserve">
+    <value>Az aktuális parancs argumentumának neve nem ismerhető fel: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
+    <value>Ennek a parancsnak a végrehajtásához rendszergazdai jogosultságok szükségesek.</value>
+  </data>
+  <data name="WSLCCLI_SessionIdArgDescription" xml:space="preserve">
+    <value>Adja meg a használni kívánt munkamenetet</value>
+  </data>
+  <data name="WSLCCLI_AttachArgDescription" xml:space="preserve">
+    <value>Csatolja a tároló stdout/stderr kimenetéhez</value>
+  </data>
+  <data name="WSLCCLI_InteractiveArgDescription" xml:space="preserve">
+    <value>Csatolja egy standard bemenethez és tartsa nyitva</value>
+  </data>
+  <data name="WSLCCLI_PortArgDescription" xml:space="preserve">
+    <value>Adja meg a használandó portot</value>
+  </data>
+  <data name="WSLCCLI_ContainerIdArgDescription" xml:space="preserve">
+    <value>Tárolóazonosító</value>
+  </data>
+  <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
+    <value>Hiányzó argumentumérték: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidAliasError" xml:space="preserve">
+    <value>Az aktuális parancs argumentumának aliasa nem ismerhető fel: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
+     <value>Érvénytelen argumentummegadás: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_AdjoinedNotFoundError" xml:space="preserve">
+     <value>A szomszédossági jelölő aliasa nem található: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_AdjoinedNotFlagError" xml:space="preserve">
+     <value>A szomszédossági alias nem jelölő: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SingleCharAfterDashError" xml:space="preserve">
+     <value>Érvénytelen argumentummegadás: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FlagContainAdjoinedError" xml:space="preserve">
+     <value>A jelölő argumentum nem tartalmazhat szomszédos értéket: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ExtraPositionalError" xml:space="preserve">
+     <value>Nem várt helyen pozícióhoz kötött argumentum található: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
+     <value>Hiányzik az argumentum neve a következő helyen: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
+     <value>Nem sikerült feloldani a továbbított argumentumokat a következő argumentumtól kezdődően: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
+     <value>Érvénytelen extra argumentum észlelve: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
+     <value>Az értékekkel rendelkező alias-argumentumoknak az aliaslánc végén kell szerepelniük: {}</value>
+     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
+     <value>Szerzői jog (c) Microsoft Corporation. Minden jog fenntartva.
+További információ a termékről: https://aka.ms/privacy.</value>
+     <comment>Copyright notice and privacy link</comment>
+  </data>
+  <data name="MessageWslcInvalidImage" xml:space="preserve">
+    <value>Érvénytelen kép: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidName" xml:space="preserve">
+    <value>Érvénytelen név: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePathNotAbsolute" xml:space="preserve">
+    <value>Az elérési út nem abszolút: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeNotFound" xml:space="preserve">
+    <value>Nem található kötet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcImageNotFound" xml:space="preserve">
+    <value>A(z) {} kép nem található.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcMissingVolumeOption" xml:space="preserve">
+    <value>Hiányzó kötelező opció: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidVolumeType" xml:space="preserve">
+    <value>Nem támogatott kötettípus: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUnsupportedVolumeDriverOpts" xml:space="preserve">
+    <value>nem támogatott kötetillesztő-beállítások: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcVolumeInUse" xml:space="preserve">
+    <value>A(z) {} kötet használatban van.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkNotFound" xml:space="preserve">
+    <value>A hálózat nem található: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcInvalidNetworkDriver" xml:space="preserve">
+    <value>Nem támogatott hálózati illesztőprogram: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkInUse" xml:space="preserve">
+    <value>A(z) {} hálózat aktív végpontokkal rendelkezik.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcNetworkAlreadyExists" xml:space="preserve">
+    <value>A(z) {} hálózat már létezik.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToMountVolume" xml:space="preserve">
+    <value>Nem sikerült létrehozni a(z) „{}” kötetet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcPortInUse" xml:space="preserve">
+    <value>A(z) {} port már használatban van, nem indítható el a(z) {} tároló</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBothDockerAndContainerFileFound" xml:space="preserve">
+    <value>Dockerfile és Containerfile is található. Az -f billentyűkombinációval válassza ki a használni kívánt fájlt</value>
+    <comment>{FixedPlaceholder="Dockerfile"}{FixedPlaceholder="Containerfile"}{FixedPlaceholder="-f"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToOpenFile" xml:space="preserve">
+    <value>Nem sikerült megnyitni a következőt: {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcBuildFileNotFound" xml:space="preserve">
+    <value>Nem található Containerfile vagy Dockerfile a(z) {} helyen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcSessionStorageNotFound" xml:space="preserve">
+    <value>Nem található WSLC-munkamenet a(z) „{}” helyen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcTagImageInvalidFormat" xml:space="preserve">
+    <value>Érvénytelen képcímke-formátum: „{}”. A várt formátum a következő: „name:tag”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_RootCommandDesc" xml:space="preserve">
+    <value>A WSLC a Linuxos Windows-alrendszer tároló CLI eszköze.</value>
+    <comment>{Locked="WSLC"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_RootCommandLongDesc" xml:space="preserve">
+    <value>A WSLC a Linuxos Windows-alrendszer tároló CLI eszköze. Lehetővé teszi a WSL-tárolók kezelését és az azokhoz való hozzáférést a parancssorból.</value>
+    <comment>{Locked="WSLC"}{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerCommandDesc" xml:space="preserve">
+    <value>Tárolók kezelése.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCommandLongDesc" xml:space="preserve">
+    <value>Kezeli a WSL -tárolók életciklusát, beleértve azok létrehozását, indítását, leállítását és eltávolítását.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerAttachDesc" xml:space="preserve">
+    <value>Csatolás egy tárolóhoz.</value>
+  </data>
+  <data name="WSLCCLI_ContainerAttachLongDesc" xml:space="preserve">
+    <value>Tárolóhoz csatlakozik.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCreateDesc" xml:space="preserve">
+    <value>Hozzon létre egy tárolót.</value>
+  </data>
+  <data name="WSLCCLI_ContainerCreateLongDesc" xml:space="preserve">
+    <value>Létrehoz egy tárolót.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExecDesc" xml:space="preserve">
+    <value>Hajtson végre egy parancsot egy futó tárolóban.</value>
+  </data>
+  <data name="WSLCCLI_ContainerExecLongDesc" xml:space="preserve">
+    <value>Végrehajt egy parancsot egy futó tárolóban.</value>
+  </data>
+  <data name="WSLCCLI_ContainerInspectDesc" xml:space="preserve">
+    <value>Tároló vizsgálata.</value>
+  </data>
+  <data name="WSLCCLI_ContainerInspectLongDesc" xml:space="preserve">
+    <value>Tároló részletes adatainak megjelenítése.</value>
+  </data>
+  <data name="WSLCCLI_ContainerKillDesc" xml:space="preserve">
+    <value>Tárolók leállítása.</value>
+  </data>
+  <data name="WSLCCLI_ContainerKillLongDesc" xml:space="preserve">
+    <value>Leállítja a tárolókat.</value>
+  </data>
+  <data name="WSLCCLI_ContainerListDesc" xml:space="preserve">
+    <value>Tárolók listázása.</value>
+  </data>
+  <data name="WSLCCLI_ContainerListLongDesc" xml:space="preserve">
+    <value>Listázza a tárolókat. Alapértelmezés szerint csak a futó tárolók jelennek meg; használja az --all parancsot az összes tároló belefoglalásához.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerLogsDesc" xml:space="preserve">
+    <value>Tárolónaplók megtekintése.</value>
+  </data>
+  <data name="WSLCCLI_ContainerLogsLongDesc" xml:space="preserve">
+    <value>Tároló naplóinak megtekintése.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRemoveDesc" xml:space="preserve">
+    <value>Tárolók eltávolítása.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRemoveLongDesc" xml:space="preserve">
+    <value>Eltávolítja a tárolókat.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRunDesc" xml:space="preserve">
+    <value>Futtasson egy tárolót.</value>
+  </data>
+  <data name="WSLCCLI_ContainerRunLongDesc" xml:space="preserve">
+    <value>Futtat egy tárolót. Alapértelmezés szerint a tároló az előtérben indul el; a háttérben való futtatáshoz használja a --detach kapcsolót.</value>
+    <comment>{Locked="--detach "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ContainerStartDesc" xml:space="preserve">
+    <value>Indítson el egy tárolót.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStartLongDesc" xml:space="preserve">
+    <value>Elindít egy tárolót.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopDesc" xml:space="preserve">
+    <value>Tárolók leállítása.</value>
+  </data>
+  <data name="WSLCCLI_ContainerStopLongDesc" xml:space="preserve">
+    <value>Leállítja a tárolókat.</value>
+  </data>
+  <data name="WSLCCLI_ImageCommandDesc" xml:space="preserve">
+    <value>Képek kezelése.</value>
+  </data>
+  <data name="WSLCCLI_ImageCommandLongDesc" xml:space="preserve">
+    <value>Tárolórendszerképek kezelése, beleértve az összeállítást, a lekérést, a listázást és az eltávolítást.</value>
+  </data>
+  <data name="WSLCCLI_ImageBuildDesc" xml:space="preserve">
+    <value>Rendszerkép létrehozása Dockerfile-ból.</value>
+    <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageBuildLongDesc" xml:space="preserve">
+    <value>Lemezképet hoz létre egy Dockerfile és egy buildkörnyezeti könyvtár alapján.</value>
+    <comment>{Locked="Dockerfile"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageInspectDesc" xml:space="preserve">
+    <value>Képek vizsgálata.</value>
+  </data>
+  <data name="WSLCCLI_ImageInspectLongDesc" xml:space="preserve">
+    <value>Képek vizsgálata.</value>
+  </data>
+  <data name="WSLCCLI_ImageListDesc" xml:space="preserve">
+    <value>Képek listázása.</value>
+  </data>
+  <data name="WSLCCLI_ImageListLongDesc" xml:space="preserve">
+    <value>Képek listázása.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadDesc" xml:space="preserve">
+    <value>Képek betöltése.</value>
+  </data>
+  <data name="WSLCCLI_ImageLoadLongDesc" xml:space="preserve">
+    <value>Betölti a képeket.</value>
+  </data>
+  <data name="WSLCCLI_ImagePullDesc" xml:space="preserve">
+    <value>Képek lekérése.</value>
+  </data>
+  <data name="WSLCCLI_ImagePullLongDesc" xml:space="preserve">
+    <value>Lekéri a képeket.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneAllArgDescription" xml:space="preserve">
+    <value>Távolítsa el az összes nem használt lemezképet, nem csak az adathiányosakat.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneDeleted" xml:space="preserve">
+    <value>Törölve: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneDesc" xml:space="preserve">
+    <value>Távolítsa el a nem használt lemezképeket.</value>
+  </data>
+  <data name="WSLCCLI_ImagePruneLongDesc" xml:space="preserve">
+    <value>Eltávolítja az összes értékhiányos lemezképet. Ha az --all paraméter meg van adva, eltávolítja a tárolók által nem használt összes lemezképet.</value>
+    <comment>{Locked="--all "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneSpaceReclaimed" xml:space="preserve">
+    <value>Teljes felszabadított terület: {:.2f} MB</value>
+    <comment>{FixedPlaceholder="{:.2f}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePruneUntagged" xml:space="preserve">
+    <value>Címkézetlen: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImagePushDesc" xml:space="preserve">
+    <value>Lemezkép feltöltése egy beállításjegyzékbe.</value>
+  </data>
+  <data name="WSLCCLI_ImagePushLongDesc" xml:space="preserve">
+    <value>Lemezkép feltöltése egy beállításjegyzékbe.</value>
+  </data>
+  <data name="WSLCCLI_ImageRemoveDesc" xml:space="preserve">
+    <value>Képek eltávolítása.</value>
+  </data>
+  <data name="WSLCCLI_ImageRemoveLongDesc" xml:space="preserve">
+    <value>Eltávolítja a képeket.</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveDesc" xml:space="preserve">
+    <value>Képek mentése.</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveLongDesc" xml:space="preserve">
+    <value>Képek mentése.</value>
+  </data>
+  <data name="WSLCCLI_LoginDesc" xml:space="preserve">
+    <value>Jelentkezzen be egy beállításjegyzékbe.</value>
+  </data>
+  <data name="WSLCCLI_LoginLongDesc" xml:space="preserve">
+    <value>Jelentkezzen be egy beállításjegyzékbe. Ha nincs megadva kiszolgáló, az alapértelmezett beállítást a munkamenet határozza meg.</value>
+  </data>
+  <data name="WSLCCLI_LogoutDesc" xml:space="preserve">
+    <value>Jelentkezzen ki egy beállításjegyzékből.</value>
+  </data>
+  <data name="WSLCCLI_LogoutLongDesc" xml:space="preserve">
+    <value>Jelentkezzen ki egy beállításjegyzékből. Ha nincs megadva kiszolgáló, az alapértelmezett értéket a munkamenet határozza meg.</value>
+  </data>
+  <data name="WSLCCLI_LoginSucceeded" xml:space="preserve">
+    <value>Sikeres bejelentkezés</value>
+  </data>
+  <data name="WSLCCLI_LogoutSucceeded" xml:space="preserve">
+    <value>{} bejelentkezési hitelesítő adatainak eltávolítása</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LogoutNotFound" xml:space="preserve">
+    <value>Nincs bejelentkezve ide: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_CredentialFileCorrupt" xml:space="preserve">
+    <value>Nem sikerült elemezni a(z) {} hitelesítőadat-fájlt: lehet, hogy a fájl sérült.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcFailedToWriteFile" xml:space="preserve">
+    <value>A(z) {} írása nem sikerült: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginServerArgDescription" xml:space="preserve">
+    <value>Kiszolgáló</value>
+  </data>
+  <data name="WSLCCLI_LoginUsernameArgDescription" xml:space="preserve">
+    <value>Felhasználónév</value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordArgDescription" xml:space="preserve">
+    <value>Jelszó vagy személyes hozzáférési jogkivonat (PAT)</value>
+    <comment>{Locked="PAT"}Acronym should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinArgDescription" xml:space="preserve">
+    <value>A jelszó vagy a személyes hozzáférési jogkivonat (PAT) átvétele az stdin-ről</value>
+    <comment>{Locked="PAT"}{Locked="stdin"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordAndStdinMutuallyExclusive" xml:space="preserve">
+    <value>A --password és a --password-stdin kölcsönösen kizárják egymást</value>
+    <comment>{Locked="--password "}{Locked="--password-stdin "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginPasswordStdinRequiresUsername" xml:space="preserve">
+    <value>Meg kell adni a --username paramétert a --password-stdin paraméterrel</value>
+    <comment>{Locked="--username "}{Locked="--password-stdin"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_LoginUsernamePrompt" xml:space="preserve">
+    <value>Felhasználónév: </value>
+  </data>
+  <data name="WSLCCLI_LoginPasswordPrompt" xml:space="preserve">
+    <value>Jelszó: </value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandDesc" xml:space="preserve">
+    <value>A beállításjegyzék hitelesítő adatainak kezelése.</value>
+  </data>
+  <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
+    <value>A beállításjegyzék hitelesítő adatainak kezelése, beleértve a tárolóregisztrációs adatbázisokba való bejelentkezést és a tárolóregisztrációs adatbázisokból való kijelentkezéseket.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
+    <value>Kép címkézése.</value>
+  </data>
+  <data name="WSLCCLI_ImageTagLongDesc" xml:space="preserve">
+    <value>Megcímkéz egy képet.</value>
+  </data>
+  <data name="WSLCCLI_SessionCommandDesc" xml:space="preserve">
+    <value>Munkamenetek kezelése.</value>
+  </data>
+  <data name="WSLCCLI_SessionCommandLongDesc" xml:space="preserve">
+    <value>A WSL-tároló munkameneteinek kezelése, beleértve az aktív munkamenetek felsorolását és az interaktív rendszerhéjak indítását.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionListDesc" xml:space="preserve">
+    <value>Munkamenetek listázása.</value>
+  </data>
+  <data name="WSLCCLI_SessionListLongDesc" xml:space="preserve">
+    <value>Az aktív munkamenet(ek) listázása.</value>
+  </data>
+  <data name="WSLCCLI_SessionShellDesc" xml:space="preserve">
+    <value>Csatolás munkamenethez.</value>
+  </data>
+  <data name="WSLCCLI_SessionShellLongDesc" xml:space="preserve">
+    <value>Aktív munkamenethez csatlakozik. Ha nincs megadva munkamenet-azonosító, a rendszer a wslc alapértelmezett munkamenetet használja.</value>
+    <comment>{Locked="wslc"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionTerminateDesc" xml:space="preserve">
+    <value>Munkamenet leállítása.</value>
+  </data>
+  <data name="WSLCCLI_SessionTerminateLongDesc" xml:space="preserve">
+    <value>Leállít egy aktív munkamenetet. Ha nincs megadva munkamenet, az alapértelmezett munkamenet lezárul.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterDesc" xml:space="preserve">
+    <value>Lépjen be egy ideiglenes munkamenetbe.</value>
+  </data>
+  <data name="WSLCCLI_SessionEnterLongDesc" xml:space="preserve">
+    <value>Nem állandó munkamenetet hoz létre a megadott tárolási elérési úttal, és megnyit benne egy felületet. A munkamenet törlődik, amikor a felület bezárul. Ha nincs megadva név, egy GUID jön létre, és a stderr-re íródik.</value>
+    <comment>{Locked="GUID"}{Locked="stderr"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionEnterNameArgDescription" xml:space="preserve">
+    <value>A munkamenet neve. Ha nincs megadva, egy GUID jön létre.</value>
+    <comment>{Locked="GUID"}Technical terms should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SettingsCommandDesc" xml:space="preserve">
+    <value>Nyissa meg a beállításfájlt az alapértelmezett szerkesztőben.</value>
+  </data>
+  <data name="WSLCCLI_SettingsCommandLongDesc" xml:space="preserve">
+    <value>Megnyitja a wslc felhasználói beállításokat tartalmazó fájlt a .yaml-fájlok alapértelmezett szerkesztőjében.
+Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállítás alapértelmezett értékre van állítva.</value>
+    <comment>{Locked="wslc"}{Locked=".yaml"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SettingsResetDesc" xml:space="preserve">
+    <value>Beállítások visszaállítása a beépített alapértelmezett értékekre.</value>
+  </data>
+  <data name="WSLCCLI_SettingsResetLongDesc" xml:space="preserve">
+    <value>Felülírja a beállításfájlt egy megjegyzésekkel ellátott alapértelmezett sablonnal.</value>
+  </data>
+  <data name="WSLCCLI_SettingsResetConfirm" xml:space="preserve">
+    <value>A beállítások visszaállnak az alapértelmezett értékekre.</value>
+  </data>
+  <data name="WSLCCLI_VersionDesc" xml:space="preserve">
+    <value>Verzióadatok megjelenítése.</value>
+  </data>
+  <data name="WSLCCLI_VersionLongDesc" xml:space="preserve">
+    <value>Az eszköz verzióinformációinak megjelenítése.</value>
+  </data>
+  <data name="WSLCCLI_AllArgDescription" xml:space="preserve">
+    <value>Az összes megjelenítése állapottól függetlenül.</value>
+  </data>
+  <data name="WSLCCLI_BuildArgDescription" xml:space="preserve">
+    <value>Buildelési idő változóinak beállítása (KEY=VALUE)</value>
+    <comment>{Locked="KEY=VALUE"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_BuildPullArgDescription" xml:space="preserve">
+    <value>Mindig próbálja meg lekérni a lemezkép újabb verzióját</value>
+  </data>
+  <data name="WSLCCLI_BuildTargetArgDescription" xml:space="preserve">
+    <value>A cél létrehozási állapotának beállítása build értékre</value>
+  </data>
+  <data name="WSLCCLI_CommandArgDescription" xml:space="preserve">
+    <value>A futtatandó parancs</value>
+  </data>
+  <data name="WSLCCLI_ForceArgDescription" xml:space="preserve">
+    <value>Tárolók törlése akkor is, ha futnak</value>
+  </data>
+  <data name="WSLCCLI_DetachArgDescription" xml:space="preserve">
+    <value>Tároló futtatása leválasztott módban</value>
+  </data>
+  <data name="WSLCCLI_EntrypointArgDescription" xml:space="preserve">
+    <value>Megadja a tároló inicializálási folyamatának végrehajtható fájlját</value>
+  </data>
+  <data name="WSLCCLI_EnvArgDescription" xml:space="preserve">
+    <value>Key=Value párok környezeti változókhoz</value>
+    <comment>{Locked="Key=Value"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_EnvFileArgDescription" xml:space="preserve">
+    <value>Az env változók key=value párjait tartalmazó fájl</value>
+    <comment>{Locked="key=value"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FileArgDescription" xml:space="preserve">
+    <value>A Dockerfile elérési útja (az stdinből való olvasáshoz használja a „-” karaktert)</value>
+    <comment>{Locked="Dockerfile"}{Locked="stdin"}{Locked="-"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
+    <value>Naplókimenet követése</value>
+  </data>
+  <data name="WSLCCLI_FormatArgDescription" xml:space="preserve">
+    <value>Kimeneti formázás (json vagy table) (Alapértelmezett: table)</value>
+    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ForwardArgsDescription" xml:space="preserve">
+    <value>A tároló inicializálási folyamatának átadandó argumentumok</value>
+  </data>
+  <data name="WSLCCLI_GpusArgDescription" xml:space="preserve">
+    <value>Add GPU devices to the container ('all' to pass all GPUs)</value>
+    <comment>{Locked="all"}</comment>
+  </data>
+  <data name="WSLCCLI_GpusInvalidValue" xml:space="preserve">
+    <value>Érvénytelen {} érték: {}. Csak az "all" támogatott.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageForceArgDescription" xml:space="preserve">
+    <value>Képek törlése akkor is, ha használatban vannak</value>
+  </data>
+  <data name="WSLCCLI_ImageIdArgDescription" xml:space="preserve">
+    <value>Lemezkép neve</value>
+  </data>
+  <data name="WSLCCLI_InputArgDescription" xml:space="preserve">
+    <value>A lemezképet tartalmazó archív tar fájl elérési útját adja meg</value>
+  </data>
+  <data name="WSLCCLI_LabelArgDescription" xml:space="preserve">
+    <value>Metaadatok beállítása egy objektumon</value>
+  </data>
+  <data name="WSLCCLI_LabelKeyEmptyError" xml:space="preserve">
+    <value>A címkekulcs nem lehet üres</value>
+  </data>
+  <data name="WSLCCLI_HostnameArgDescription" xml:space="preserve">
+    <value>Tároló gazdagépének neve</value>
+  </data>
+  <data name="WSLCCLI_NameArgDescription" xml:space="preserve">
+    <value>A tároló neve</value>
+  </data>
+  <data name="WSLCCLI_NoCacheArgDescription" xml:space="preserve">
+    <value>Ne használjon gyorsítótárat a lemezkép létrehozásakor</value>
+  </data>
+  <data name="WSLCCLI_NoPruneArgDescription" xml:space="preserve">
+    <value>Ne törölje a címkézetlen szülőket</value>
+  </data>
+  <data name="WSLCCLI_NoTruncArgDescription" xml:space="preserve">
+    <value>Kimenet csonkolásának mellőzése</value>
+  </data>
+  <data name="WSLCCLI_OutputArgDescription" xml:space="preserve">
+    <value>A mentett kép elérési útja</value>
+  </data>
+  <data name="WSLCCLI_PathArgDescription" xml:space="preserve">
+    <value>A buildkörnyezet könyvtárának elérési útja</value>
+  </data>
+  <data name="WSLCCLI_PublishArgDescription" xml:space="preserve">
+    <value>Port közzététele tárolóból gazdagépre</value>
+  </data>
+  <data name="WSLCCLI_PublishAllArgDescription" xml:space="preserve">
+    <value>Az összes közzétett port közzététele véletlenszerű gazdaportokon</value>
+  </data>
+  <data name="WSLCCLI_QuietArgDescription" xml:space="preserve">
+    <value>Csak a tárolóazonosítókat adja eredményként</value>
+  </data>
+  <data name="WSLCCLI_RemoveArgDescription" xml:space="preserve">
+    <value>A tároló eltávolítása a leállása után</value>
+  </data>
+  <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
+    <value>Signal to stop the container</value>
+  </data>
+  <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
+    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
+    <value>Munkamenet-azonosító</value>
+  </data>
+  <data name="WSLCCLI_SessionStoragePositionalArgDescription" xml:space="preserve">
+    <value>Munkamenet-tároló útvonala</value>
+  </data>
+  <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
+    <value>Signal to send</value>
+  </data>
+  <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
+    <value>Jelenlegi vagy meglévő lemezkép-hivatkozás image-name[:tag] formátumban</value>
+  </data>
+  <data name="WSLCCLI_TagArgDescription" xml:space="preserve">
+    <value>A beépített rendszerkép címkéje</value>
+  </data>
+  <data name="WSLCCLI_TailArgDescription" xml:space="preserve">
+    <value>A naplók végéről megjelenítendő sorok száma</value>
+  </data>
+  <data name="WSLCCLI_TargetArgDescription" xml:space="preserve">
+    <value>Új képhivatkozás képnév[:címke] formátumban</value>
+  </data>
+  <data name="WSLCCLI_TimeArgDescription" xml:space="preserve">
+    <value>Várakozási idő másodpercben a végrehajtás előtt (alapértelmezés szerint 5)</value>
+  </data>
+  <data name="WSLCCLI_TTYArgDescription" xml:space="preserve">
+    <value>Nyisson meg egy TTY-t a tárolófolyamattal.</value>
+    <comment>{Locked="TTY"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VerboseArgDescription" xml:space="preserve">
+    <value>Kimenet részletes adatai</value>
+  </data>
+  <data name="WSLCCLI_VersionArgDescription" xml:space="preserve">
+    <value>Az eszköz verzióinformációinak megjelenítése</value>
+  </data>
+  <data name="WSLCCLI_VolumeArgDescription" xml:space="preserve">
+    <value>Kötet csatlakoztatása a tárolóhoz</value>
+  </data>
+  <data name="WSLCCLI_WorkingDirArgDescription" xml:space="preserve">
+    <value>Munkakönyvtár a tárolón belül</value>
+  </data>
+  <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
+    <value>Írja a tárolóazonosítót a megadott elérési útra.</value>
+  </data>
+  <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
+    <value>A DNS-névkiszolgáló IP-címe a resolv.conf fájlban</value>
+    <comment>{Locked="resolv.conf"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DNSDomainArgDescription" xml:space="preserve">
+    <value>Az alapértelmezett DNS-tartomány beállítása</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DNSOptionArgDescription" xml:space="preserve">
+    <value>DNS-beállítások megadása</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DNSSearchArgDescription" xml:space="preserve">
+    <value>DNS-keresési tartományok beállítása</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DomainnameArgDescription" xml:space="preserve">
+    <value>Tároló tartományneve</value>
+  </data>
+  <data name="WSLCCLI_GroupIdArgDescription" xml:space="preserve">
+    <value>A folyamat csoportazonosítója</value>
+  </data>
+  <data name="WSLCCLI_NoDNSArgDescription" xml:space="preserve">
+    <value>Nincs DNS-konfiguráció a tárolóban</value>
+    <comment>{Locked="DNS"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ProgressArgDescription" xml:space="preserve">
+    <value>Folyamat típusa (formátum: none|ansi) (alapértelmezett: ansi)</value>
+    <comment>{Locked="none"}{Locked="ansi"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_PullArgDescription" xml:space="preserve">
+    <value>Kép lekérési szabályzata (always|missing|never) (default:never)</value>
+    <comment>{Locked="always"}{Locked="missing"}{Locked="never"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SchemeArgDescription" xml:space="preserve">
+    <value>Ezt a sémát használja a beállításjegyzék-kapcsolathoz</value>
+  </data>
+  <data name="WSLCCLI_TMPFSArgDescription" xml:space="preserve">
+    <value>tmpfs-k csatlakoztatása a tárolóhoz a megadott elérési úton</value>
+    <comment>{Locked="tmpfs"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_UserArgDescription" xml:space="preserve">
+    <value>A folyamat felhasználói azonosítója (name|uid|uid:gid)</value>
+    <comment>{Locked="name|uid|uid:gid"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VirtualArgDescription" xml:space="preserve">
+    <value>Virtualizálási képességek közzétehetők a tárolóban</value>
+  </data>
+  <data name="WSLCCLI_ContainerExecForwardArgsDescription" xml:space="preserve">
+    <value>A tárolóban végrehajtott parancsnak átadandó argumentumok</value>
+  </data>
+  <data name="WSLCCLI_SessionListVerboseArgDescription" xml:space="preserve">
+    <value>A listázott munkamenetek részletes adatainak megjelenítése.</value>
+  </data>
+  <data name="WSLCCLI_InvalidFormatError" xml:space="preserve">
+    <value>Érvénytelen formátumtípus van megadva. A támogatott formátumtípusok a következők: json, table</value>
+    <comment>{Locked="json"}{Locked="table"}Command line arguments should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidInspectError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a(z) {} nem felismerhető vizsgálati típus. A támogatott vizsgálati típusok a következők: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidSignalError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a(z) {} nem felismerhető jelnév vagy -szám (például: SIGKILL, kill vagy 9).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidIntegerArgumentError" xml:space="preserve">
+    <value>Érvénytelen {} argumentumérték: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_SignalOutOfRangeError" xml:space="preserve">
+    <value>Érvénytelen {} érték: a(z) {} kívül esik az érvényes tartományon ({}-{}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
+    <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
+    <value>A(z) {} kép nem található, lekérés</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_EnvKeyEmptyError" xml:space="preserve">
+    <value>A környezeti változó kulcsa nem lehet üres</value>
+  </data>
+  <data name="WSLCCLI_EnvKeyWhitespaceError" xml:space="preserve">
+    <value>A(z) {} környezetiváltozó-kulcs nem tartalmazhat szóközt</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ImageLoadNoInputError" xml:space="preserve">
+    <value>Betöltés kérelmezve, de nincs megadva bevitel.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandDesc" xml:space="preserve">
+    <value>Kötetek kezelése.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCommandLongDesc" xml:space="preserve">
+    <value>A WSL-kötetek életciklusának kezelése, beleértve azok létrehozását, vizsgálatát, listázását és törlését.</value>
+    <comment>{Locked="WSL"}Product names should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeCreateDesc" xml:space="preserve">
+    <value>Kötet létrehozása.</value>
+  </data>
+  <data name="WSLCCLI_VolumeCreateLongDesc" xml:space="preserve">
+    <value>Létrehoz egy elnevezett kötetet, amely tárolókhoz csatolható.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveDesc" xml:space="preserve">
+    <value>Távolítson el egy vagy több kötetet.</value>
+  </data>
+  <data name="WSLCCLI_VolumeRemoveLongDesc" xml:space="preserve">
+    <value>Egy vagy több kötet eltávolítása. A kötet nem távolítható el, ha egy tároló használja.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectDesc" xml:space="preserve">
+    <value>Részletes információk megjelenítése egy vagy több kötetről.</value>
+  </data>
+  <data name="WSLCCLI_VolumeInspectLongDesc" xml:space="preserve">
+    <value>Részletes információk megjelenítése egy vagy több kötetről.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListDesc" xml:space="preserve">
+    <value>Kötetek listázása.</value>
+  </data>
+  <data name="WSLCCLI_VolumeListLongDesc" xml:space="preserve">
+    <value>Kilistázza a munkamenetben szereplő összes kötetet.</value>
+  </data>
+  <data name="WSLCCLI_VolumeNameArgDescription" xml:space="preserve">
+    <value>Kötet neve</value>
+  </data>
+  <data name="WSLCCLI_DriverArgDescription" xml:space="preserve">
+    <value>Kötetillesztő nevének megadása (alapértelmezett {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_OptionsArgDescription" xml:space="preserve">
+    <value>Illesztőprogram-specifikus beállítások beállítása</value>
+  </data>
+  <data name="WSLCCLI_VolumeListQuietArgDesc" xml:space="preserve">
+    <value>Csak a kötetneveket adja ki</value>
+  </data>
+  <data name="WSLCCLI_ImageSaveStdoutIsTerminalError" xml:space="preserve">
+    <value>A rendszerkép nem írható a terminálba. Használja az -o jelzőt vagy irányítsa át a stdout-ot.</value>
+  </data>
+  <data name="WSLCCLI_VolumeFormatUsage" xml:space="preserve">
+    <value>Várt formátum: &lt;gazdaelérési út | elnevezett kötet&gt;:&lt;tároló elérési útja&gt;[:mód]</value>
+    <comment>Usage string for volume mount specification.</comment>
+  </data>
+  <data name="WSLCCLI_VolumeInvalidSpec" xml:space="preserve">
+    <value>Érvénytelen kötetspecifikációk: {}. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathEmpty" xml:space="preserve">
+    <value>Érvénytelen kötetspecifikációk: {}. A gazdagép elérési útja nem lehet üres. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathEmpty" xml:space="preserve">
+    <value>Érvénytelen kötetspecifikációk: {}. A tároló elérési útja nem lehet üres. {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeContainerPathNotAbsolute" xml:space="preserve">
+    <value>Érvénytelen kötetspecifikációk: '{}'. A tároló elérési útjának abszolút elérési útnak kell lennie (/ karakterrel kezdődik). {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_VolumeHostPathInvalid" xml:space="preserve">
+    <value>Érvénytelen kötetspecifikációk: {}. A gazdagép {} elérési útja nem érvényes Windows-elérési út.</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ObjectIdArgDescription" xml:space="preserve">
+    <value>Bármely objektumtípus neve vagy azonosítója</value>
+  </data>
+  <data name="WSLCCLI_TypeArgDescription" xml:space="preserve">
+    <value>A vizsgálandó objektum típusa</value>
+  </data>
+  <data name="WSLCCLI_InspectDesc" xml:space="preserve">
+    <value>Objektumok vizsgálata.</value>
+  </data>
+  <data name="WSLCCLI_InspectLongDesc" xml:space="preserve">
+    <value>Objektumok vizsgálata.</value>
+  </data>
+  <data name="WSLCCLI_ObjectNotFoundError" xml:space="preserve">
+    <value>Az objektum nem található: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidValue" xml:space="preserve">
+    <value>Figyelmeztetés: Érvénytelen a(z) '{}' beállítás értéke a következőben: {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
+    <value>Figyelmeztetés: Érvénytelen típus a(z) {} beállításhoz a következőben: {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_NonStringKey" xml:space="preserve">
+    <value>Figyelmeztetés: Nem sztring típusú kulcs a(z) {} {} szakaszában: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownSection" xml:space="preserve">
+    <value>Figyelmeztetés: Ismeretlen beállítási szakasz: {} itt: {}:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_UnknownKey" xml:space="preserve">
+    <value>Figyelmeztetés: Ismeretlen {} beállítás a(z) {} helyen:{}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_FailedToOpen" xml:space="preserve">
+    <value>Figyelmeztetés: Nem sikerült megnyitni a beállításfájlt a következő helyen: {}. Hiba: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_ParseError" xml:space="preserve">
+    <value>Figyelmeztetés: Nem sikerült elemezni a(z) {} helyen található beállításfájlt. Hiba: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCUserSettings_Warning_InvalidStructure" xml:space="preserve">
+    <value>Figyelmeztetés: A(z) {} helyen található beállításfájl üres vagy érvénytelen szerkezetű. A rendszer YAML-leképezést várt.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

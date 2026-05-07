@@ -69,3 +69,6 @@ doc/site/
 directory.build.targets
 test-storage/
 *.vhdx
+*.tar
+*.etl
+*.lscache
