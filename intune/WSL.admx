@@ -191,7 +191,7 @@
       <parentCategory ref="WSLContainer" />
       <supportedOn ref="windows:SUPPORTED_Windows10" />
       <elements>
-        <list id="WSLContainerCLIRegistryAllowlist_Input" key="Software\Policies\WSL\WSLContainerCLIRegistryAllowlist" valuePrefix="" />
+        <list id="WSLContainerCLIRegistryAllowlist_Input" key="Software\Policies\WSL\WSLContainerCLIRegistryAllowlist" valuePrefix="AllowedRegistry" />
       </elements>
     </policy>
 
