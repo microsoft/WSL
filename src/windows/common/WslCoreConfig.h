@@ -383,5 +383,6 @@ struct Config
     GUID NatNetworkId() const noexcept;
     LPCWSTR NatNetworkName() const noexcept;
     std::wstring SwiotlbCfg;
+    std::wstring SwiotlbKernelCfg;
 };
 } // namespace wsl::core

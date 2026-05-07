@@ -1582,9 +1582,9 @@ std::wstring WslCoreVm::GenerateConfigJson()
         kernelCmdLine += L" swiotlb=force";
 
         // Add the swiotlb configuration kernel command line parameter.
-        if (!m_vmConfig.SwiotlbCfg.empty())
+        if (!m_vmConfig.SwiotlbKernelCfg.empty())
         {
-            kernelCmdLine += L" hv_pci_swiotlb=" + m_vmConfig.SwiotlbCfg;
+            kernelCmdLine += L" hv_pci_swiotlb=" + m_vmConfig.SwiotlbKernelCfg;
         }
     }
 

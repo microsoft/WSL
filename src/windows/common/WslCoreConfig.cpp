@@ -22,6 +22,10 @@ constexpr auto c_natGatewayAddress = L"NatGatewayIpAddress";
 constexpr auto c_natNetwork = L"NatNetwork";
 constexpr auto c_natIpAddress = L"NatIpAddress";
 
+#define SWIOTLB_KERNEL_REGEX L"0x[0-9a-fA-F]+,[0-9]+[mk]"
+constexpr auto c_swiotlbKernelPattern = L"^(" SWIOTLB_KERNEL_REGEX L")$";
+constexpr auto c_swiotlbPattern = L"^(" SWIOTLB_KERNEL_REGEX L"|lowmem)$";
+
 wsl::core::Config::Config(_In_opt_ LPCWSTR Path, _In_opt_ HANDLE UserToken)
 {
     ParseConfigFile(Path, UserToken);
@@ -491,6 +495,24 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     {
         VALIDATE_CONFIG_OPTION((NetworkingMode != NetworkingMode::Mirrored), IgnoredPorts, std::set<uint16_t>{});
         VALIDATE_CONFIG_OPTION((NetworkingMode != NetworkingMode::Mirrored), EnableHostAddressLoopback, false);
+    }
+
+    if (!SwiotlbCfg.empty())
+    {
+        try
+        {
+            std::wregex swiotlbPattern(c_swiotlbPattern, std::regex::icase);
+            THROW_HR_IF_MSG(E_INVALIDARG,
+                !std::regex_match(SwiotlbCfg, swiotlbPattern),
+                "Invalid SWIOTLB configuration");
+
+            std::wregex swiotlbKernelPattern(c_swiotlbKernelPattern, std::regex::icase);
+            if (std::regex_match(SwiotlbCfg, swiotlbKernelPattern))
+            {
+                SwiotlbKernelCfg = SwiotlbCfg;
+            }
+        }
+        CATCH_LOG()
     }
 }
 
