@@ -169,7 +169,7 @@ Mit "wsl.exe {} &lt;Distro&gt;" installieren.
     <value>Der angegebene Installationsspeicherort wird bereits verwendet.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Eine Distribution mit dem angegebenen Namen ist bereits vorhanden. Verwenden Sie --name , um einen anderen Namen zu wählen.</value>
+    <value>A distribution with the supplied name already exists. Use --name to choose a different name.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -811,7 +811,7 @@ Weitere Informationen zu Admin Protection finden Sie unter https://aka.ms/apdevg
     <value>Open EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Diese Distribution enthält keinen Standardnamen. Verwenden Sie --name , um den Distributionsnamen zu wählen.</value>
+    <value>This distribution doesn't contain a default name. Use --name to choose the distribution name.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -2763,6 +2763,10 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Ungültiger {}-Argumentwert: "{}". Arbeitsspeichergröße erwartet (z. B. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Image „{}“ nicht gefunden, wird abgerufen</value>

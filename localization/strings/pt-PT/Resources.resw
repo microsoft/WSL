@@ -2678,7 +2678,7 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Diretório de trabalho dentro do contentor</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Escreva o ID do contentor no caminho fornecido.</value>
+    <value>Escrever o ID do contentor no caminho fornecido</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Endereço IP do servidor de nomes DNS no ficheiro resolv.conf</value>
@@ -2757,6 +2757,10 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Valor de argumento {} inválido: "{}". Era esperado um tamanho de memória (por exemplo, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Imagem "{}" não encontrada, a carregar</value>

@@ -2685,7 +2685,7 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
     <value>Répertoire de travail à l’intérieur du conteneur</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Écrivez l’ID de conteneur dans le chemin d’accès fourni.</value>
+    <value>Écrire l’ID de conteneur dans le chemin d’accès fourni</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Adresse IP du serveur de noms DNS dans resolv.conf</value>
@@ -2764,6 +2764,10 @@ Lors de la première exécution, crée le fichier avec tous les paramètres comm
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Valeur d’argument {} non valide : « {} ». Taille de mémoire attendue (par exemple, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Image '{}' non trouvée, extraction en cours</value>

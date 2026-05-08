@@ -3171,7 +3171,7 @@ class WSLCTests
             else
             {
                 return std::format(
-                    "/win-path*9p*{},relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
+                    "/win-path*9p*{},relatime,aname=*,cache=0x5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
             }
         };
 
@@ -3368,7 +3368,7 @@ class WSLCTests
             ExpectMount(
                 session.get(),
                 "/usr/lib/wsl/drivers",
-                "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+                "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=0x5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
 
             ExpectMount(
                 session.get(),
