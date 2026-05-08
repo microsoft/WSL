@@ -91,6 +91,11 @@ function(wslc_add_image _target_name)
         "SOURCES"                                    # multi-value keywords
     )
 
+    # Reject typos / unknown keywords so they can't silently slip through.
+    if(ARG_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR "wslc_add_image: unknown argument(s): ${ARG_UNPARSED_ARGUMENTS}")
+    endif()
+
     # Validate required arguments
     if(NOT ARG_IMAGE)
         message(FATAL_ERROR "wslc_add_image: IMAGE is required")

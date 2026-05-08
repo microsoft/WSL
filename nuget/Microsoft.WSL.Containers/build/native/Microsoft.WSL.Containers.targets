@@ -44,16 +44,22 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcWriteSingleTlog"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
-    <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles).
+    <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles)
+         and _WslcResolveSavePath to get $(_WslcTarPath).
+         The tar is listed in the write tlog so a manually-deleted tar invalidates
+         the VS Fast Up-to-Date check (without it, VS would skip MSBuild entirely
+         and leave the tar missing).
          tlog format requires one path per line; build ItemGroups so WriteLinesToFile
          emits each entry on its own line instead of joining with ';'. -->
-    <Target Name="_WslcWriteSingleTlog" DependsOnTargets="_WslcCollectSources">
+    <Target Name="_WslcWriteSingleTlog"
+            DependsOnTargets="_WslcCollectSources;_WslcResolveSavePath">
         <PropertyGroup>
             <_WslcTlogToolPath>$([System.IO.Path]::GetFullPath('$(WslcCliPath)'))</_WslcTlogToolPath>
             <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).built'))</_WslcMarkerFullPath>
+            <_WslcTarFullPath>$([System.IO.Path]::GetFullPath('$(_WslcTarPath)'))</_WslcTarFullPath>
         </PropertyGroup>
 
         <ItemGroup>
@@ -61,6 +67,7 @@
             <_WslcTlogReadLines Include="@(_WslcSourceFiles->'%(FullPath)')" />
             <_WslcTlogWriteLines Include="^$(_WslcTlogToolPath)" />
             <_WslcTlogWriteLines Include="$(_WslcMarkerFullPath)" />
+            <_WslcTlogWriteLines Include="$(_WslcTarFullPath)" />
         </ItemGroup>
 
         <WriteLinesToFile

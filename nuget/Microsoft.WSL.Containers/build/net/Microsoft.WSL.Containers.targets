@@ -35,12 +35,18 @@
     <!-- C# specific: CPS Up-to-Date Check for container source files       -->
     <!-- ================================================================== -->
 
-    <!-- Register build stamp and source files for CPS up-to-date check -->
+    <!-- Register build stamp, saved tar, and source files for CPS up-to-date check.
+         The tar is included so a manually-deleted tar invalidates the up-to-date
+         check (without it, VS would skip the build and leave the tar missing). -->
     <Target Name="_WslcRegisterUpToDateCheckInputs"
             BeforeTargets="CollectUpToDateCheckBuiltDesignTime"
             Condition="'$(UsingMicrosoftNETSdk)' == 'true' AND '@(WslcImage)' != ''">
         <ItemGroup>
             <UpToDateCheckBuilt Include="$(_WslcIntDir)wslc_%(WslcImage.Identity).built" />
+            <UpToDateCheckBuilt Include="%(WslcImage.TarLocation)"
+                                Condition="'%(WslcImage.TarLocation)' != ''" />
+            <UpToDateCheckBuilt Include="$(OutDir)%(WslcImage.Identity).tar"
+                                Condition="'%(WslcImage.TarLocation)' == ''" />
             <UpToDateCheckInput Include="%(WslcImage.Dockerfile)" Condition="'%(WslcImage.Dockerfile)' != ''" />
             <_WslcUpToDateDirs Include="@(WslcImage->'%(Sources)')" Condition="'%(WslcImage.Sources)' != ''" />
             <UpToDateCheckInput Include="%(_WslcUpToDateDirs.Identity)\**\*" Condition="'%(_WslcUpToDateDirs.Identity)' != ''" />
