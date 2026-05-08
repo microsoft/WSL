@@ -4439,7 +4439,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
         VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
         VERIFY_ARE_EQUAL(std::string("172.31.0.0/16"), inspect.IPAM.Config->at(0).Subnet);
@@ -4539,7 +4539,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, networkName);
         VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
         VERIFY_IS_FALSE(inspect.Id.empty());
@@ -4567,7 +4567,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, networkName);
         VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
         VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
