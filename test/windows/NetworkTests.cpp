@@ -4143,6 +4143,8 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
+        WslKeepAlive keepAlive;
+
         // Verify that when guest has two binds on the same port (with reuseport) and the first
         // bind is released, the port remains allocated to the guest because the second bind is
         // still active. This validates the relaxed port+protocol matching in mirrored mode.
