@@ -59,7 +59,7 @@ void Session::TagImage(winrt::Microsoft::WSL::Containers::TagImageOptions const&
 {
     throw hresult_not_implemented();
 }
-void Session::CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdRequirements const& options)
+void Session::CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdOptions const& options)
 {
     throw hresult_not_implemented();
 }

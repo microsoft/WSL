@@ -32,7 +32,7 @@ struct Session : SessionT<Session>
         winrt::Microsoft::WSL::Containers::PushImageOptions options);
     void DeleteImage(hstring const& nameOrId);
     void TagImage(winrt::Microsoft::WSL::Containers::TagImageOptions const& options);
-    void CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdRequirements const& options);
+    void CreateVhdVolume(winrt::Microsoft::WSL::Containers::VhdOptions const& options);
     void DeleteVhdVolume(hstring const& name);
     hstring Authenticate(winrt::Windows::Foundation::Uri const& serverAddress, hstring const& username, hstring const& password);
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Images();

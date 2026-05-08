@@ -40,7 +40,7 @@ namespace Microsoft.WSL.Containers
         Windows.Foundation.IReference<UInt32> CpuCount;
         Windows.Foundation.IReference<UInt32> MemoryMB;
         Windows.Foundation.IReference<UInt32> TimeoutMS;
-        VhdRequirements VhdRequirements;
+        VhdOptions VhdRequirements;
         SessionFeatureFlags FeatureFlags;
     };
 
@@ -62,7 +62,7 @@ namespace Microsoft.WSL.Containers
         void DeleteImage(String nameOrId);
         void TagImage(TagImageOptions options);
 
-        void CreateVhdVolume(VhdRequirements options);
+        void CreateVhdVolume(VhdOptions options);
         void DeleteVhdVolume(String name);
 
         String Authenticate(Windows.Foundation.Uri serverAddress, String username, String password);
@@ -266,9 +266,9 @@ namespace Microsoft.WSL.Containers
         Fixed = 1,
     };
 
-    runtimeclass VhdRequirements
+    runtimeclass VhdOptions
     {
-        VhdRequirements(String name, UInt64 sizeInBytes, VhdType type);
+        VhdOptions(String name, UInt64 sizeInBytes, VhdType type);
 
         String Name;
         UInt64 SizeInBytes;

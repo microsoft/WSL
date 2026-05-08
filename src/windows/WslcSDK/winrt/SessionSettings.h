@@ -31,8 +31,8 @@ struct SessionSettings : SessionSettingsT<SessionSettings>
     void MemoryMB(winrt::Windows::Foundation::IReference<uint32_t> const& value);
     winrt::Windows::Foundation::IReference<uint32_t> TimeoutMS();
     void TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t> const& value);
-    winrt::Microsoft::WSL::Containers::VhdRequirements VhdRequirements();
-    void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdRequirements const& value);
+    winrt::Microsoft::WSL::Containers::VhdOptions VhdRequirements();
+    void VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value);
     winrt::Microsoft::WSL::Containers::SessionFeatureFlags FeatureFlags();
     void FeatureFlags(winrt::Microsoft::WSL::Containers::SessionFeatureFlags const& value);
 };

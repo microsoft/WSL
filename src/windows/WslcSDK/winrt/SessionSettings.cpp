@@ -61,11 +61,11 @@ void SessionSettings::TimeoutMS(winrt::Windows::Foundation::IReference<uint32_t>
 {
     throw hresult_not_implemented();
 }
-winrt::Microsoft::WSL::Containers::VhdRequirements SessionSettings::VhdRequirements()
+winrt::Microsoft::WSL::Containers::VhdOptions SessionSettings::VhdRequirements()
 {
     throw hresult_not_implemented();
 }
-void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdRequirements const& value)
+void SessionSettings::VhdRequirements(winrt::Microsoft::WSL::Containers::VhdOptions const& value)
 {
     throw hresult_not_implemented();
 }

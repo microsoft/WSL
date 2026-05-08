@@ -4,23 +4,23 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    VhdRequirements.h
+    VhdOptions.h
 
 Abstract:
 
-    This file contains the definition of the WinRT wrapper for the WSLC SDK VhdRequirements class.
+    This file contains the definition of the WinRT wrapper for the WSLC SDK VhdOptions class.
 
 --*/
 
 #pragma once
-#include "Microsoft.WSL.Containers.VhdRequirements.g.h"
+#include "Microsoft.WSL.Containers.VhdOptions.g.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-struct VhdRequirements : VhdRequirementsT<VhdRequirements>
+struct VhdOptions : VhdOptionsT<VhdOptions>
 {
-    VhdRequirements() = default;
+    VhdOptions() = default;
 
-    VhdRequirements(hstring const& name, uint64_t sizeInBytes, winrt::Microsoft::WSL::Containers::VhdType const& type);
+    VhdOptions(hstring const& name, uint64_t sizeInBytes, winrt::Microsoft::WSL::Containers::VhdType const& type);
     hstring Name();
     void Name(hstring const& value);
     uint64_t SizeInBytes();
@@ -30,7 +30,7 @@ struct VhdRequirements : VhdRequirementsT<VhdRequirements>
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {
-struct VhdRequirements : VhdRequirementsT<VhdRequirements, implementation::VhdRequirements>
+struct VhdOptions : VhdOptionsT<VhdOptions, implementation::VhdOptions>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation

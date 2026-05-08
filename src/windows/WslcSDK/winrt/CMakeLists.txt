@@ -18,7 +18,7 @@ set(SOURCES
     Session.cpp
     SessionSettings.cpp
     TagImageOptions.cpp
-    VhdRequirements.cpp
+    VhdOptions.cpp
     WslcService.cpp
 )
 
@@ -40,7 +40,7 @@ set(HEADERS
     Session.h
     SessionSettings.h
     TagImageOptions.h
-    VhdRequirements.h
+    VhdOptions.h
     WslcService.h
 )
 
