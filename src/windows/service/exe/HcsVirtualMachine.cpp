@@ -363,10 +363,6 @@ try
     std::lock_guard lock(m_lock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkEngine != nullptr);
 
-    // Consomme networking is only supported with the OpenVMM backend.
-    WI_ASSERT(m_networkingMode != WSLCNetworkingModeConsomme);
-    THROW_HR_IF(E_INVALIDARG, m_networkingMode == WSLCNetworkingModeConsomme);
-
     if (m_networkingMode == WSLCNetworkingModeNone)
     {
         return S_OK;
@@ -596,15 +592,6 @@ try
 {
     *Event = wslutil::DuplicateHandle(m_vmExitEvent.get());
 
-    return S_OK;
-}
-CATCH_RETURN()
-
-HRESULT HcsVirtualMachine::ConnectToVsockPort(_In_ ULONG Port, _Out_ HANDLE* Socket)
-try
-{
-    auto socket = hvsocket::Connect(m_vmId, Port, m_vmExitEvent.get(), m_bootTimeoutMs);
-    *Socket = reinterpret_cast<HANDLE>(socket.release());
     return S_OK;
 }
 CATCH_RETURN()
