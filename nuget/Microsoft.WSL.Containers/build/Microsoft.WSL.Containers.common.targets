@@ -65,7 +65,7 @@
     <Target Name="WslcBuildAllImages"
             AfterTargets="Build"
             DependsOnTargets="WslcCheckDependencies;_WslcValidateItems"
-            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true'">
+            Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true' AND '$(IsCrossTargetingBuild)' != 'true'">
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildSingleImage"
