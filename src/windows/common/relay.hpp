@@ -292,13 +292,48 @@ public:
     virtual void Schedule() = 0;
     virtual void Collect() = 0;
     virtual HANDLE GetHandle() const = 0;
-    virtual void Register(HANDLE, OverlappedIOHandle*)
-    {
-    }
+
+    // Register this handle as a top-level participant in an IOCP-driven wait loop.
+    // Completions originating from this handle (or any descendant child handles
+    // owned by composite types) will wake the IOCP with `this` as the completion
+    // target, which is what MultiHandleWait::Run uses to look up the handle in
+    // its m_handles list.
+    //
+    // This method is the only entry point for completion-target routing, so
+    // callers cannot (mis)specify a target that doesn't match the registration.
+    void Register(HANDLE iocp);
+
     IOHandleStatus GetState() const;
 
 protected:
+    // Helper for composite handles: register a child sub-handle so that its
+    // completions wake the same top-level handle that owns this composite. The
+    // composite must call this from its OnRegister() override for each owned
+    // child. Safe to call on `this`'s child sub-handles even when nested
+    // (e.g., a composite-of-composites): the propagated completion target is
+    // always the outermost top-level handle.
+    void RegisterChild(OverlappedIOHandle& child);
+
     IOHandleStatus State = IOHandleStatus::Standby;
+
+    // IOCP routing state shared by all derived types. Set by Register()/RegisterChild()
+    // through Bind(); read by leaf classes when wiring up IOCP / wait bridges.
+    HANDLE m_iocp{};
+    OverlappedIOHandle* m_completionTarget{};
+
+private:
+    // Records routing state with idempotency enforcement, then dispatches to OnRegister().
+    // Treat repeated calls with the same iocp/target as a no-op; calls with mismatched
+    // arguments are a programming error.
+    void Bind(HANDLE iocp, OverlappedIOHandle* completionTarget);
+
+    // Override hook. Default is a no-op (handles that don't participate in IOCP).
+    // Leaves override to do IOCP association / RegisterWaitForSingleObject wiring,
+    // reading m_iocp/m_completionTarget. Composites override to call RegisterChild()
+    // for each owned child.
+    virtual void OnRegister()
+    {
+    }
 };
 
 class EventHandle : public OverlappedIOHandle
@@ -309,19 +344,17 @@ public:
 
     EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
     ~EventHandle();
-    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    void OnRegister() override;
     static VOID CALLBACK WaitCallback(PVOID context, BOOLEAN timedOut);
 
     HandleWrapper Handle;
     std::function<void()> OnSignalled;
-    HANDLE Iocp{};
-    OverlappedIOHandle* CompletionTarget{};
-    unique_registered_wait WaitHandle;
+    unique_registered_wait WaitBridge;
 };
 
 class ReadHandle : public OverlappedIOHandle
@@ -333,12 +366,12 @@ public:
     ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
     virtual ~ReadHandle();
 
-    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    void OnRegister() override;
     static VOID CALLBACK WaitBridgeCallback(PVOID context, BOOLEAN timedOut);
 
     HandleWrapper Handle;
@@ -347,8 +380,6 @@ private:
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
     LARGE_INTEGER Offset{};
-    HANDLE Iocp{};
-    OverlappedIOHandle* CompletionTarget{};
     bool RegisteredWithIocp{};
     unique_registered_wait WaitBridge;
 };
@@ -362,12 +393,12 @@ public:
     SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
     ~SingleAcceptHandle();
 
-    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
+    void OnRegister() override;
     static VOID CALLBACK WaitBridgeCallback(PVOID context, BOOLEAN timedOut);
 
     HandleWrapper ListenSocket;
@@ -376,8 +407,6 @@ private:
     OVERLAPPED Overlapped{};
     std::function<void()> OnAccepted;
     char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
-    HANDLE Iocp{};
-    OverlappedIOHandle* CompletionTarget{};
     bool RegisteredWithIocp{};
     unique_registered_wait WaitBridge;
 };
@@ -425,13 +454,13 @@ public:
 
     WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Buffer = {});
     ~WriteHandle();
-    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
     void Push(const gsl::span<char>& Buffer);
 
 private:
+    void OnRegister() override;
     static VOID CALLBACK WaitBridgeCallback(PVOID context, BOOLEAN timedOut);
 
     HandleWrapper Handle;
@@ -439,8 +468,6 @@ private:
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer;
     LARGE_INTEGER Offset{};
-    HANDLE Iocp{};
-    OverlappedIOHandle* CompletionTarget{};
     bool RegisteredWithIocp{};
     unique_registered_wait WaitBridge;
 };
@@ -455,12 +482,6 @@ public:
     RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output) :
         Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(Output))
     {
-    }
-
-    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override
-    {
-        Read.Register(iocp, completionTarget);
-        Write.Register(iocp, completionTarget);
     }
 
     void Schedule() override
@@ -532,6 +553,12 @@ public:
     }
 
 private:
+    void OnRegister() override
+    {
+        RegisterChild(Read);
+        RegisterChild(Write);
+    }
+
     void OnRead(const gsl::span<char>& Content)
     {
         PendingBuffer.insert(PendingBuffer.end(), Content.begin(), Content.end());
@@ -555,7 +582,6 @@ public:
     };
 
     DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat);
-    void Register(HANDLE iocp, OverlappedIOHandle* completionTarget) override;
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -572,6 +598,7 @@ public:
     static_assert(sizeof(MultiplexedHeader) == 8);
 
 private:
+    void OnRegister() override;
     void OnRead(const gsl::span<char>& Buffer);
     void ProcessNextHeader();
 
@@ -581,7 +608,6 @@ private:
     std::vector<char> PendingBuffer;
     WriteHandle* ActiveHandle = nullptr;
     size_t RemainingBytes = 0;
-    OverlappedIOHandle* CompletionTarget{};
 };
 
 class MultiHandleWait

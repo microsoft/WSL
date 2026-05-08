@@ -964,7 +964,7 @@ CATCH_LOG()
 void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
     EnsureIocp();
-    handle->Register(m_iocp.get(), handle.get());
+    handle->Register(m_iocp.get());
     m_handles.emplace_back(flags, std::move(handle));
 }
 
@@ -1129,6 +1129,40 @@ IOHandleStatus OverlappedIOHandle::GetState() const
     return State;
 }
 
+void OverlappedIOHandle::Register(HANDLE iocp)
+{
+    THROW_HR_IF(E_INVALIDARG, iocp == nullptr);
+    Bind(iocp, this);
+}
+
+void OverlappedIOHandle::RegisterChild(OverlappedIOHandle& child)
+{
+    // m_iocp/m_completionTarget have been populated by Bind() prior to OnRegister()
+    // running on the parent, so they're available for forwarding here. Propagating
+    // m_completionTarget (rather than `this`) lets nested composites work correctly:
+    // every descendant ends up wired to the outermost top-level handle.
+    WI_ASSERT(m_iocp != nullptr && m_completionTarget != nullptr);
+    child.Bind(m_iocp, m_completionTarget);
+}
+
+void OverlappedIOHandle::Bind(HANDLE iocp, OverlappedIOHandle* completionTarget)
+{
+    if (m_iocp != nullptr)
+    {
+        // Idempotent: identical re-registration is a no-op. Mismatched re-registration
+        // is a programming error -- routing state must be consistent for the lifetime
+        // of the handle, otherwise the IOCP completion key (set on first Register only)
+        // would diverge from m_completionTarget used by wait-bridge callbacks.
+        WI_ASSERT(m_iocp == iocp && m_completionTarget == completionTarget);
+        THROW_HR_IF(E_UNEXPECTED, m_iocp != iocp || m_completionTarget != completionTarget);
+        return;
+    }
+
+    m_iocp = iocp;
+    m_completionTarget = completionTarget;
+    OnRegister();
+}
+
 EventHandle::EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled) :
     Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
 {
@@ -1138,19 +1172,19 @@ EventHandle::~EventHandle()
 {
 }
 
-void EventHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+void EventHandle::OnRegister()
 {
-    CompletionTarget = completionTarget;
-    Iocp = iocp;
+    // No IOCP wiring needed at registration time -- events use the wait-bridge path
+    // exclusively, set up lazily in Schedule().
 }
 
 void EventHandle::Schedule()
 {
     // If registered with an IOCP, use RegisterWaitForSingleObject to bridge the event.
-    if (Iocp != nullptr && !WaitHandle)
+    if (m_iocp != nullptr && !WaitBridge)
     {
         THROW_IF_WIN32_BOOL_FALSE(
-            RegisterWaitForSingleObject(&WaitHandle, Handle.Get(), &EventHandle::WaitCallback, this, INFINITE, WT_EXECUTEONLYONCE));
+            RegisterWaitForSingleObject(&WaitBridge, Handle.Get(), &EventHandle::WaitCallback, this, INFINITE, WT_EXECUTEONLYONCE));
     }
 
     State = IOHandleStatus::Pending;
@@ -1159,13 +1193,13 @@ void EventHandle::Schedule()
 VOID CALLBACK EventHandle::WaitCallback(PVOID context, BOOLEAN /*timedOut*/)
 {
     auto* self = static_cast<EventHandle*>(context);
-    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
+    PostQueuedCompletionStatus(self->m_iocp, 0, reinterpret_cast<ULONG_PTR>(self->m_completionTarget), nullptr);
 }
 
 void EventHandle::Collect()
 {
     // Clean up the wait registration so it can be re-registered if needed.
-    WaitHandle.reset();
+    WaitBridge.reset();
 
     State = IOHandleStatus::Completed;
     OnSignalled();
@@ -1221,10 +1255,8 @@ ReadHandle::~ReadHandle()
     }
 }
 
-void ReadHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+void ReadHandle::OnRegister()
 {
-    CompletionTarget = completionTarget;
-    Iocp = iocp;
     if (!RegisteredWithIocp)
     {
         // Try to associate the handle with the IOCP. Not all handle types support this
@@ -1236,7 +1268,7 @@ void ReadHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
         // type, fall back to event-based mode entirely.
         if (SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
         {
-            auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            auto result = CreateIoCompletionPort(Handle.Get(), m_iocp, reinterpret_cast<ULONG_PTR>(m_completionTarget), 0);
             if (result != nullptr)
             {
                 // Clear the event from OVERLAPPED — completions now go to the IOCP.
@@ -1293,7 +1325,7 @@ void ReadHandle::Schedule()
 
         // If not registered with IOCP, bridge the event to the IOCP so
         // GetQueuedCompletionStatus will wake up when this I/O completes.
-        if (!RegisteredWithIocp && Iocp != nullptr && !WaitBridge)
+        if (!RegisteredWithIocp && m_iocp != nullptr && !WaitBridge)
         {
             THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
                 &WaitBridge, Event.get(), &ReadHandle::WaitBridgeCallback, this, INFINITE, WT_EXECUTEONLYONCE));
@@ -1304,7 +1336,7 @@ void ReadHandle::Schedule()
 VOID CALLBACK ReadHandle::WaitBridgeCallback(PVOID context, BOOLEAN /*timedOut*/)
 {
     auto* self = static_cast<ReadHandle*>(context);
-    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
+    PostQueuedCompletionStatus(self->m_iocp, 0, reinterpret_cast<ULONG_PTR>(self->m_completionTarget), nullptr);
 }
 
 void ReadHandle::Collect()
@@ -1386,15 +1418,13 @@ SingleAcceptHandle::~SingleAcceptHandle()
     }
 }
 
-void SingleAcceptHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+void SingleAcceptHandle::OnRegister()
 {
-    CompletionTarget = completionTarget;
-    Iocp = iocp;
     if (!RegisteredWithIocp)
     {
         if (SetFileCompletionNotificationModes(ListenSocket.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
         {
-            auto result = CreateIoCompletionPort(ListenSocket.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            auto result = CreateIoCompletionPort(ListenSocket.Get(), m_iocp, reinterpret_cast<ULONG_PTR>(m_completionTarget), 0);
             if (result != nullptr)
             {
                 Overlapped.hEvent = nullptr;
@@ -1423,7 +1453,7 @@ void SingleAcceptHandle::Schedule()
 
         State = IOHandleStatus::Pending;
 
-        if (!RegisteredWithIocp && Iocp != nullptr && !WaitBridge)
+        if (!RegisteredWithIocp && m_iocp != nullptr && !WaitBridge)
         {
             THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
                 &WaitBridge, Event.get(), &SingleAcceptHandle::WaitBridgeCallback, this, INFINITE, WT_EXECUTEONLYONCE));
@@ -1434,7 +1464,7 @@ void SingleAcceptHandle::Schedule()
 VOID CALLBACK SingleAcceptHandle::WaitBridgeCallback(PVOID context, BOOLEAN /*timedOut*/)
 {
     auto* self = static_cast<SingleAcceptHandle*>(context);
-    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
+    PostQueuedCompletionStatus(self->m_iocp, 0, reinterpret_cast<ULONG_PTR>(self->m_completionTarget), nullptr);
 }
 
 void SingleAcceptHandle::Collect()
@@ -1654,15 +1684,13 @@ WriteHandle::~WriteHandle()
     }
 }
 
-void WriteHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+void WriteHandle::OnRegister()
 {
-    CompletionTarget = completionTarget;
-    Iocp = iocp;
     if (!RegisteredWithIocp)
     {
         if (SetFileCompletionNotificationModes(Handle.Get(), FILE_SKIP_COMPLETION_PORT_ON_SUCCESS))
         {
-            auto result = CreateIoCompletionPort(Handle.Get(), iocp, reinterpret_cast<ULONG_PTR>(completionTarget), 0);
+            auto result = CreateIoCompletionPort(Handle.Get(), m_iocp, reinterpret_cast<ULONG_PTR>(m_completionTarget), 0);
             if (result != nullptr)
             {
                 Overlapped.hEvent = nullptr;
@@ -1701,7 +1729,7 @@ void WriteHandle::Schedule()
         // The write is pending, update to 'Pending'
         State = IOHandleStatus::Pending;
 
-        if (!RegisteredWithIocp && Iocp != nullptr && !WaitBridge)
+        if (!RegisteredWithIocp && m_iocp != nullptr && !WaitBridge)
         {
             THROW_IF_WIN32_BOOL_FALSE(RegisterWaitForSingleObject(
                 &WaitBridge, Event.get(), &WriteHandle::WaitBridgeCallback, this, INFINITE, WT_EXECUTEONLYONCE));
@@ -1712,7 +1740,7 @@ void WriteHandle::Schedule()
 VOID CALLBACK WriteHandle::WaitBridgeCallback(PVOID context, BOOLEAN /*timedOut*/)
 {
     auto* self = static_cast<WriteHandle*>(context);
-    PostQueuedCompletionStatus(self->Iocp, 0, reinterpret_cast<ULONG_PTR>(self->CompletionTarget), nullptr);
+    PostQueuedCompletionStatus(self->m_iocp, 0, reinterpret_cast<ULONG_PTR>(self->m_completionTarget), nullptr);
 }
 
 void WriteHandle::Collect()
@@ -1767,12 +1795,11 @@ DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapp
     }
 }
 
-void DockerIORelayHandle::Register(HANDLE iocp, OverlappedIOHandle* completionTarget)
+void DockerIORelayHandle::OnRegister()
 {
-    CompletionTarget = completionTarget;
-    Read->Register(iocp, completionTarget);
-    WriteStdout.Register(iocp, completionTarget);
-    WriteStderr.Register(iocp, completionTarget);
+    RegisterChild(*Read);
+    RegisterChild(WriteStdout);
+    RegisterChild(WriteStderr);
 }
 
 void DockerIORelayHandle::Schedule()
