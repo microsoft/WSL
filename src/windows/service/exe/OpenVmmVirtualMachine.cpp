@@ -410,16 +410,12 @@ CATCH_RETURN()
 HRESULT OpenVmmVirtualMachine::AcceptConnection(_Out_ HANDLE* Socket)
 try
 {
-    // The listener was already created in the constructor at m_initListenPath
-    // (before the VM was launched), so the guest's init connection is queued.
     THROW_HR_IF(E_UNEXPECTED, m_initListenSocket == INVALID_SOCKET);
 
     WSL_LOG("OpenVmmAcceptConnection",
         TraceLoggingValue(m_initListenPath.c_str(), "ListenPath"),
         TraceLoggingValue(m_vmIdString.c_str(), "VmId"));
 
-    // Wait for OpenVMM to connect (relaying guest mini_init's vsock port 50000).
-    // Use WSAEventSelect to make the accept cancellable via the VM exit event.
     wil::unique_event acceptEvent(wil::EventOptions::ManualReset);
     WSAEventSelect(m_initListenSocket, acceptEvent.get(), FD_ACCEPT);
 
@@ -430,15 +426,10 @@ try
     SOCKET unixSock = accept(m_initListenSocket, nullptr, nullptr);
     THROW_LAST_ERROR_IF(unixSock == INVALID_SOCKET);
 
-    // Close the listener — we only need one connection.
     closesocket(m_initListenSocket);
     m_initListenSocket = INVALID_SOCKET;
     DeleteFileW(m_initListenPath.c_str());
 
-    // Windows AF_UNIX sockets don't support overlapped I/O, but SocketChannel
-    // uses overlapped WSARecv. Bridge via a TCP loopback socket pair:
-    // create a TCP listener on localhost, connect to it, accept, then relay
-    // data between the Unix socket and the TCP socket in a background thread.
     SOCKET tcpListener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     THROW_LAST_ERROR_IF(tcpListener == INVALID_SOCKET);
     auto closeListener = wil::scope_exit([&] { closesocket(tcpListener); });
@@ -446,34 +437,29 @@ try
     sockaddr_in loopback{};
     loopback.sin_family = AF_INET;
     loopback.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    loopback.sin_port = 0; // Let OS pick a port
+    loopback.sin_port = 0;
     THROW_LAST_ERROR_IF(bind(tcpListener, reinterpret_cast<sockaddr*>(&loopback), sizeof(loopback)) == SOCKET_ERROR);
     THROW_LAST_ERROR_IF(listen(tcpListener, 1) == SOCKET_ERROR);
 
-    // Get the port that was assigned
     sockaddr_in boundAddr{};
     int addrLen = sizeof(boundAddr);
     THROW_LAST_ERROR_IF(getsockname(tcpListener, reinterpret_cast<sockaddr*>(&boundAddr), &addrLen) == SOCKET_ERROR);
 
-    // Connect to ourselves
     SOCKET tcpClient = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     THROW_LAST_ERROR_IF(tcpClient == INVALID_SOCKET);
     auto closeClient = wil::scope_exit([&] { closesocket(tcpClient); });
 
     THROW_LAST_ERROR_IF(connect(tcpClient, reinterpret_cast<sockaddr*>(&boundAddr), sizeof(boundAddr)) == SOCKET_ERROR);
 
-    // Accept the connection — this is the socket we'll relay through
     SOCKET tcpServer = accept(tcpListener, nullptr, nullptr);
     THROW_LAST_ERROR_IF(tcpServer == INVALID_SOCKET);
 
     closeListener.release();
     closesocket(tcpListener);
 
-    // Start a relay thread: copies data between unixSock ↔ tcpServer
     m_socketRelayThread = std::thread(
         &OpenVmmVirtualMachine::RelaySocketData, unixSock, tcpServer, m_vmExitEvent.get());
 
-    // Return the TCP client socket — this supports overlapped I/O.
     closeClient.release();
     *Socket = reinterpret_cast<HANDLE>(tcpClient);
     return S_OK;
@@ -638,23 +624,11 @@ CATCH_RETURN()
 HRESULT OpenVmmVirtualMachine::ConnectToVsockPort(_In_ ULONG Port, _Out_ HANDLE* Socket)
 try
 {
-    // Host-initiated connection to a guest vsock port via the hybrid_vsock bridge.
-    //
-    // Protocol (from hybrid_vsock/src/lib.rs):
-    //   1. Connect to the main bridge Unix socket at m_vsockPath
-    //   2. Send: "CONNECT <port>\n"
-    //   3. Read: "OK <id>\n"
-    //   4. Socket is now a bidirectional channel to the guest
-    //
-    // This is different from guest-initiated connections (like port 50000)
-    // where OpenVMM connects to <path>_<GUID> on the host.
-
     WSL_LOG("OpenVmmConnectToVsockPort",
         TraceLoggingValue(Port, "Port"),
         TraceLoggingValue(m_vsockPath.c_str(), "BridgePath"),
         TraceLoggingValue(m_vmIdString.c_str(), "VmId"));
 
-    // Connect to the main vsock bridge Unix socket.
     SOCKET unixSock = ::socket(AF_UNIX, SOCK_STREAM, 0);
     THROW_LAST_ERROR_IF(unixSock == INVALID_SOCKET);
     auto closeUnix = wil::scope_exit([&] { closesocket(unixSock); });
@@ -668,13 +642,11 @@ try
 
     THROW_LAST_ERROR_IF(connect(unixSock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR);
 
-    // Send the CONNECT handshake: "CONNECT <port>\n"
     auto connectMsg = std::format("CONNECT {}\n", Port);
     int sent = send(unixSock, connectMsg.c_str(), static_cast<int>(connectMsg.size()), 0);
     THROW_LAST_ERROR_IF(sent == SOCKET_ERROR);
     THROW_HR_IF(E_FAIL, sent != static_cast<int>(connectMsg.size()));
 
-    // Read the "OK <id>\n" response (max ~50 bytes).
     char response[64]{};
     int totalRead = 0;
     while (totalRead < static_cast<int>(sizeof(response) - 1))
@@ -697,7 +669,6 @@ try
         TraceLoggingValue(Port, "Port"),
         TraceLoggingValue(response, "Response"));
 
-    // Bridge via TCP loopback since AF_UNIX doesn't support overlapped I/O.
     SOCKET tcpListener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     THROW_LAST_ERROR_IF(tcpListener == INVALID_SOCKET);
     auto closeListener = wil::scope_exit([&] { closesocket(tcpListener); });
@@ -725,7 +696,6 @@ try
     closeListener.release();
     closesocket(tcpListener);
 
-    // Start relay thread: Unix ↔ TCP
     closeUnix.release();
     {
         std::lock_guard lock(m_relayLock);
@@ -761,8 +731,6 @@ void OpenVmmVirtualMachine::FreeLun(ULONG Lun)
 
 void OpenVmmVirtualMachine::RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HANDLE exitEvent)
 {
-    // Bidirectional relay between two sockets using select().
-    // Runs until either socket closes or exitEvent is signaled.
     auto cleanup = wil::scope_exit([&] {
         closesocket(unixSock);
         closesocket(tcpSock);
@@ -772,7 +740,6 @@ void OpenVmmVirtualMachine::RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HAN
 
     while (true)
     {
-        // Check if we should exit.
         if (WaitForSingleObject(exitEvent, 0) == WAIT_OBJECT_0)
         {
             break;
@@ -795,10 +762,9 @@ void OpenVmmVirtualMachine::RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HAN
 
         if (ready == 0)
         {
-            continue; // Timeout, loop and check exitEvent
+            continue;
         }
 
-        // Unix → TCP
         if (FD_ISSET(unixSock, &readSet))
         {
             int bytes = recv(unixSock, buffer, sizeof(buffer), 0);
@@ -819,7 +785,6 @@ void OpenVmmVirtualMachine::RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HAN
             }
         }
 
-        // TCP → Unix
         if (FD_ISSET(tcpSock, &readSet))
         {
             int bytes = recv(tcpSock, buffer, sizeof(buffer), 0);
