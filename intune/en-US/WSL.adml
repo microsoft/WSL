@@ -8,7 +8,7 @@
         <string id="WindowsSubsystemForLinux">Windows Subsystem for Linux</string>
 
         <string id="AllowWSL">Allow the Windows Subsystem for Linux</string>
-        <string id="AllowWSLExplain">When set to disabled, this policy disables access to the Windows Subsystem for Linux for all users on the machine.</string>
+        <string id="AllowWSLExplain">When set to disabled, this policy disables access to running Linux distributions in the Windows Subsystem for Linux for all users on the machine.</string>
 
         <string id="AllowInboxWSL">Allow the Inbox version of the Windows Subsystem for Linux</string>
         <string id="AllowInboxWSLExplain">When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem for Linux. If this policy is disabled, only the store version of WSL can be used.</string>
@@ -49,10 +49,21 @@
         <string id="NetworkingModeNAT">NAT</string>
         <string id="NetworkingModeMirrored">Mirrored</string>
         <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+
+        <string id="WSLContainer">WSL Container</string>
+
+        <string id="AllowWSLContainer">Allow WSL Container</string>
+        <string id="AllowWSLContainerExplain">This policy controls whether WSL Container can be used on this machine. When enabled or not configured, users and Windows applications can run Linux containers via WSL. When set to disabled, WSL Container is blocked for all users and Windows apps cannot run Linux containers. Warning: Setting this to 'Disabled' can break Windows apps that depend on Linux containers.</string>
+
+        <string id="WSLContainerCLIRegistryAllowlist">Allowlist for WSL container CLI registries</string>
+        <string id="WSLContainerCLIRegistryAllowlistExplain">When enabled, the WSL Container CLI will only be allowed to pull images from the registries listed here.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">
         <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Default Networking Mode</dropdownList>
+      </presentation>
+      <presentation id="WSLContainerCLIRegistryAllowlist">
+        <listBox refId="WSLContainerCLIRegistryAllowlist_Input">Allowed registries</listBox>
       </presentation>
     </presentationTable>
   </resources>

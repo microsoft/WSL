@@ -15,29 +15,13 @@ static constexpr auto c_eth0DeviceName = L"eth0";
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel,
-    VirtioNetworkingFlags flags,
-    LPCWSTR dnsOptions,
-    std::shared_ptr<GuestDeviceManager> guestDeviceManager,
-    wil::shared_handle userToken,
-    wil::unique_socket&& dnsHvsocket) :
+    GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_flags(flags),
     m_dnsOptions(dnsOptions)
 {
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        ((!!dnsHvsocket != WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket)) ||
-         (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket) && WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))),
-        "Incompatible DNS settings");
-
-    if (dnsHvsocket)
-    {
-        networking::DnsResolverFlags resolverFlags{};
-        m_dnsTunnelingResolver.emplace(std::move(dnsHvsocket), resolverFlags);
-    }
 }
 
 VirtioNetworking::~VirtioNetworking()
@@ -207,10 +191,6 @@ void VirtioNetworking::RefreshGuestConnection()
     if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
     {
         currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
-    }
-    else if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunnelingSocket))
-    {
-        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(TEXT(LX_INIT_DNS_TUNNELING_IP_ADDRESS));
     }
     else
     {

@@ -5093,5 +5093,22 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
         NetworkTests::VerifyDnsResolutionRecordTypes();
     }
+
+    // Verifies that virtio proxy + dnsTunneling points resolv.conf at the gateway, not the hvsocket listener IP.
+    WSL2_TEST_METHOD(DnsTunnelingResolvConfUsesGateway)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+        DNS_TUNNELING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .dnsTunneling = true}));
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+        VERIFY_IS_TRUE(state.Gateway.has_value());
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + state.Gateway.value()), static_cast<DWORD>(0));
+
+        VERIFY_ARE_NOT_EQUAL(
+            LxsstuLaunchWsl(L"cat /etc/resolv.conf | grep nameserver | grep -F " + c_dnsTunnelingDefaultIp), static_cast<DWORD>(0));
+    }
 };
 } // namespace NetworkTests

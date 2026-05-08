@@ -226,6 +226,13 @@ typedef struct _WSLCTmpfsMount
     [unique] LPCSTR Options;
 } WSLCTmpfsMount;
 
+typedef struct _WSLCUlimit
+{
+    [string] LPCSTR Name;
+    LONGLONG Soft;
+    LONGLONG Hard;
+} WSLCUlimit;
+
 typedef enum _WSLCContainerNetworkType
 {
     WSLCContainerNetworkTypeNone = 0,
@@ -293,6 +300,11 @@ typedef struct _WSLCContainerOptions
 
     [unique, size_is(NamedVolumesCount)] WSLCNamedVolume* NamedVolumes;
     ULONG NamedVolumesCount;
+
+    LONGLONG MemoryBytes;
+    LONGLONG NanoCpus;
+    [unique, size_is(UlimitsCount)] const WSLCUlimit* Ulimits;
+    ULONG UlimitsCount;
 } WSLCContainerOptions;
 
 typedef enum _WSLCContainerState
@@ -823,6 +835,7 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionFlags);")
 interface IWSLCSessionManager : IUnknown
 {
     HRESULT GetVersion([out] WSLCVersion* Version);
+    HRESULT IsClientVersionSupported([in] const WSLCVersion* ClientVersion, [out] BOOL* IsSupported);
 
     // Session management.
     HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
@@ -843,3 +856,4 @@ cpp_quote("#define WSLC_E_SESSION_RESERVED MAKE_HRESULT(SEVERITY_ERROR, FACILITY
 cpp_quote("#define WSLC_E_INVALID_SESSION_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 8) /* 0x80040608 */")
 cpp_quote("#define WSLC_E_NETWORK_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 9) /* 0x80040609 */")
 cpp_quote("#define WSLC_E_WU_SEARCH_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 10) /* 0x8004060A */")
+cpp_quote("#define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11) /* 0x8004060B */")
