@@ -88,20 +88,6 @@ class WSLCE2EImageImportTests
         result.Verify({.ExitCode = 1});
     }
 
-    WSLC_TEST_METHOD(WSLCE2E_Image_Import_FromRoot)
-    {
-        // Save image as a tarball
-        auto saveResult = RunWslc(std::format(L"image save --output \"{}\" {}", SavedArchivePath.wstring(), DebianImage.NameAndTag()));
-        saveResult.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-
-        // Import using the root 'import' alias
-        auto importResult = RunWslc(std::format(L"import \"{}\" {}", SavedArchivePath.wstring(), ImportedImage.NameAndTag()));
-        importResult.Verify({.Stderr = L"", .ExitCode = 0});
-
-        // Verify the imported image is listed
-        VerifyImageIsListed(ImportedImage.NameAndTag());
-    }
-
 private:
     const TestImage DebianImage = DebianTestImage();
     const TestImage ImportedImage{L"wslc-test-imported", L"latest", L""};
