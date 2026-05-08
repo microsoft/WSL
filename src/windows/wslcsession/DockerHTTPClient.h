@@ -109,8 +109,18 @@ public:
 
         HTTPRequestContext(wil::unique_socket&& Socket) : stream(context)
         {
-            boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
-            stream.assign(hv_proto, Socket.release());
+            // Detect the socket's address family to create the correct protocol descriptor.
+            WSAPROTOCOL_INFOW protocolInfo{};
+            int infoLen = sizeof(protocolInfo);
+            int family = AF_INET; // Default to TCP/IPv4.
+            if (getsockopt(Socket.get(), SOL_SOCKET, SO_PROTOCOL_INFOW,
+                    reinterpret_cast<char*>(&protocolInfo), &infoLen) == 0)
+            {
+                family = protocolInfo.iAddressFamily;
+            }
+
+            boost::asio::generic::stream_protocol proto(family, SOCK_STREAM);
+            stream.assign(proto, Socket.release());
         }
 
         boost::asio::io_context context;

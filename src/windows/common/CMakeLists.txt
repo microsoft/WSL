@@ -31,6 +31,7 @@ set(SOURCES
     relay.cpp
     RingBuffer.cpp
     socket.cpp
+    SocketTransport.cpp
     string.cpp
     SubProcess.cpp
     svccomm.cpp
@@ -113,6 +114,7 @@ set(HEADERS
     relay.hpp
     RingBuffer.h
     socket.hpp
+    SocketTransport.h
     string.hpp
     Stringify.h
     SubProcess.h

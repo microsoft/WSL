@@ -359,22 +359,6 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
         m_processWatchThread.join();
     }
 
-    if (m_socketRelayThread.joinable())
-    {
-        m_socketRelayThread.join();
-    }
-
-    {
-        std::lock_guard lock(m_relayLock);
-        for (auto& t : m_relayThreads)
-        {
-            if (t.joinable())
-            {
-                t.join();
-            }
-        }
-    }
-
     // Clean up the init listener socket if still open.
     if (m_initListenSocket != INVALID_SOCKET)
     {
@@ -430,38 +414,9 @@ try
     m_initListenSocket = INVALID_SOCKET;
     DeleteFileW(m_initListenPath.c_str());
 
-    SOCKET tcpListener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    THROW_LAST_ERROR_IF(tcpListener == INVALID_SOCKET);
-    auto closeListener = wil::scope_exit([&] { closesocket(tcpListener); });
-
-    sockaddr_in loopback{};
-    loopback.sin_family = AF_INET;
-    loopback.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    loopback.sin_port = 0;
-    THROW_LAST_ERROR_IF(bind(tcpListener, reinterpret_cast<sockaddr*>(&loopback), sizeof(loopback)) == SOCKET_ERROR);
-    THROW_LAST_ERROR_IF(listen(tcpListener, 1) == SOCKET_ERROR);
-
-    sockaddr_in boundAddr{};
-    int addrLen = sizeof(boundAddr);
-    THROW_LAST_ERROR_IF(getsockname(tcpListener, reinterpret_cast<sockaddr*>(&boundAddr), &addrLen) == SOCKET_ERROR);
-
-    SOCKET tcpClient = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    THROW_LAST_ERROR_IF(tcpClient == INVALID_SOCKET);
-    auto closeClient = wil::scope_exit([&] { closesocket(tcpClient); });
-
-    THROW_LAST_ERROR_IF(connect(tcpClient, reinterpret_cast<sockaddr*>(&boundAddr), sizeof(boundAddr)) == SOCKET_ERROR);
-
-    SOCKET tcpServer = accept(tcpListener, nullptr, nullptr);
-    THROW_LAST_ERROR_IF(tcpServer == INVALID_SOCKET);
-
-    closeListener.release();
-    closesocket(tcpListener);
-
-    m_socketRelayThread = std::thread(
-        &OpenVmmVirtualMachine::RelaySocketData, unixSock, tcpServer, m_vmExitEvent.get());
-
-    closeClient.release();
-    *Socket = reinterpret_cast<HANDLE>(tcpClient);
+    // Return the AF_UNIX socket directly. SocketChannel will auto-detect
+    // the socket type and use SyncSocketTransport for non-overlapped I/O.
+    *Socket = reinterpret_cast<HANDLE>(unixSock);
     return S_OK;
 }
 CATCH_RETURN()
@@ -669,41 +624,10 @@ try
         TraceLoggingValue(Port, "Port"),
         TraceLoggingValue(response, "Response"));
 
-    SOCKET tcpListener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    THROW_LAST_ERROR_IF(tcpListener == INVALID_SOCKET);
-    auto closeListener = wil::scope_exit([&] { closesocket(tcpListener); });
-
-    sockaddr_in loopback{};
-    loopback.sin_family = AF_INET;
-    loopback.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    loopback.sin_port = 0;
-    THROW_LAST_ERROR_IF(bind(tcpListener, reinterpret_cast<sockaddr*>(&loopback), sizeof(loopback)) == SOCKET_ERROR);
-    THROW_LAST_ERROR_IF(listen(tcpListener, 1) == SOCKET_ERROR);
-
-    sockaddr_in boundAddr{};
-    int addrLen = sizeof(boundAddr);
-    THROW_LAST_ERROR_IF(getsockname(tcpListener, reinterpret_cast<sockaddr*>(&boundAddr), &addrLen) == SOCKET_ERROR);
-
-    SOCKET tcpClient = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    THROW_LAST_ERROR_IF(tcpClient == INVALID_SOCKET);
-    auto closeClient = wil::scope_exit([&] { closesocket(tcpClient); });
-
-    THROW_LAST_ERROR_IF(connect(tcpClient, reinterpret_cast<sockaddr*>(&boundAddr), sizeof(boundAddr)) == SOCKET_ERROR);
-
-    SOCKET tcpServer = accept(tcpListener, nullptr, nullptr);
-    THROW_LAST_ERROR_IF(tcpServer == INVALID_SOCKET);
-
-    closeListener.release();
-    closesocket(tcpListener);
-
+    // Return the AF_UNIX socket directly. SocketChannel will auto-detect
+    // the socket type and use SyncSocketTransport for non-overlapped I/O.
     closeUnix.release();
-    {
-        std::lock_guard lock(m_relayLock);
-        m_relayThreads.emplace_back(&OpenVmmVirtualMachine::RelaySocketData, unixSock, tcpServer, m_vmExitEvent.get());
-    }
-
-    closeClient.release();
-    *Socket = reinterpret_cast<HANDLE>(tcpClient);
+    *Socket = reinterpret_cast<HANDLE>(unixSock);
     return S_OK;
 }
 CATCH_RETURN()
@@ -727,82 +651,4 @@ void OpenVmmVirtualMachine::FreeLun(ULONG Lun)
     WI_ASSERT(Lun < OPENVMM_MAX_VHD_COUNT);
     WI_ASSERT(m_lunBitmap.test(Lun));
     m_lunBitmap.reset(Lun);
-}
-
-void OpenVmmVirtualMachine::RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HANDLE exitEvent)
-{
-    auto cleanup = wil::scope_exit([&] {
-        closesocket(unixSock);
-        closesocket(tcpSock);
-    });
-
-    char buffer[65536];
-
-    while (true)
-    {
-        if (WaitForSingleObject(exitEvent, 0) == WAIT_OBJECT_0)
-        {
-            break;
-        }
-
-        fd_set readSet;
-        FD_ZERO(&readSet);
-        FD_SET(unixSock, &readSet);
-        FD_SET(tcpSock, &readSet);
-
-        timeval timeout{};
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 100000; // 100ms poll
-
-        int ready = select(0, &readSet, nullptr, nullptr, &timeout);
-        if (ready == SOCKET_ERROR)
-        {
-            break;
-        }
-
-        if (ready == 0)
-        {
-            continue;
-        }
-
-        if (FD_ISSET(unixSock, &readSet))
-        {
-            int bytes = recv(unixSock, buffer, sizeof(buffer), 0);
-            if (bytes <= 0)
-            {
-                break;
-            }
-
-            int sent = 0;
-            while (sent < bytes)
-            {
-                int n = send(tcpSock, buffer + sent, bytes - sent, 0);
-                if (n <= 0)
-                {
-                    return;
-                }
-                sent += n;
-            }
-        }
-
-        if (FD_ISSET(tcpSock, &readSet))
-        {
-            int bytes = recv(tcpSock, buffer, sizeof(buffer), 0);
-            if (bytes <= 0)
-            {
-                break;
-            }
-
-            int sent = 0;
-            while (sent < bytes)
-            {
-                int n = send(unixSock, buffer + sent, bytes - sent, 0);
-                if (n <= 0)
-                {
-                    return;
-                }
-                sent += n;
-            }
-        }
-    }
 }

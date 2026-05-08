@@ -63,9 +63,6 @@ private:
     // Monitor the openvmm process and signal m_vmExitEvent on exit.
     void WatchProcessExit();
 
-    // Relay data between a Unix domain socket and a TCP socket.
-    static void RelaySocketData(SOCKET unixSock, SOCKET tcpSock, HANDLE exitEvent);
-
     ULONG AllocateLun();
     void FreeLun(ULONG Lun);
 
@@ -105,12 +102,6 @@ private:
     // Must be listening BEFORE the VM boots so the guest can connect.
     SOCKET m_initListenSocket = INVALID_SOCKET;
     std::wstring m_initListenPath;
-
-    // Relay thread: bridges AF_UNIX (vsock bridge) ↔ AF_INET (TCP loopback)
-    // because SocketChannel requires overlapped I/O which AF_UNIX doesn't support.
-    std::thread m_socketRelayThread;
-    std::vector<std::thread> m_relayThreads;
-    std::mutex m_relayLock;
 
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
 

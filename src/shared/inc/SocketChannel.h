@@ -19,7 +19,9 @@ Abstract:
 #include "socketshared.h"
 #include "lxinitshared.h"
 
-#ifndef WIN32
+#ifdef WIN32
+#include "../../windows/common/SocketTransport.h"
+#else
 #include <assert.h>
 #include "lxwil.h"
 #include "../../linux/init/util.h"
@@ -100,6 +102,7 @@ public:
 
 #ifdef WIN32
         m_exitEvent = std::move(other.m_exitEvent);
+        m_transport = std::move(other.m_transport);
 #endif
         m_ignore_sequence = other.m_ignore_sequence;
         m_sent_non_transaction_messages = other.m_sent_non_transaction_messages;
@@ -118,6 +121,22 @@ public:
     SocketChannel(TSocket&& socket, std::string&& name, HANDLE exitEvent) :
         m_socket(std::move(socket)), m_exitEvent(exitEvent), m_name(std::move(name))
     {
+    }
+
+    // Transport-aware constructor: auto-detects socket type and creates the
+    // appropriate SocketTransport. Use this when the socket may be AF_UNIX
+    // (which does not support overlapped I/O).
+    SocketChannel(TSocket&& socket, std::string&& name, HANDLE exitEvent, bool useTransport) :
+        m_exitEvent(exitEvent), m_name(std::move(name))
+    {
+        if (useTransport)
+        {
+            m_transport = wsl::windows::common::CreateSocketTransport(std::move(socket), exitEvent);
+        }
+        else
+        {
+            m_socket = std::move(socket);
+        }
     }
 
 #endif
@@ -161,7 +180,15 @@ public:
 
 #ifdef WIN32
 
-        auto sentBytes = wsl::windows::common::socket::Send(m_socket.get(), span, m_exitEvent);
+        int sentBytes;
+        if (m_transport)
+        {
+            sentBytes = m_transport->Send(span);
+        }
+        else
+        {
+            sentBytes = wsl::windows::common::socket::Send(m_socket.get(), span, m_exitEvent);
+        }
 
         WSL_LOG(
             "SentMessage",
@@ -547,21 +574,51 @@ public:
 
     void Close()
     {
-        m_socket.reset();
+#ifdef WIN32
+        if (m_transport)
+        {
+            m_transport->Close();
+        }
+        else
+#endif
+        {
+            m_socket.reset();
+        }
     }
 
     auto Socket() const
     {
+#ifdef WIN32
+        if (m_transport)
+        {
+            return m_transport->Socket();
+        }
+#endif
+
         return m_socket.get();
     }
 
     auto Release()
     {
+#ifdef WIN32
+        if (m_transport)
+        {
+            return m_transport->Release();
+        }
+#endif
+
         return std::move(m_socket);
     }
 
     bool Connected() const
     {
+#ifdef WIN32
+        if (m_transport)
+        {
+            return m_transport->Socket() != INVALID_SOCKET;
+        }
+#endif
+
         return m_socket.get() >= 0;
     }
 
@@ -584,6 +641,16 @@ private:
 
     gsl::span<gsl::byte> ReceiveImpl(auto expectedMessage, TTimeout timeout)
     {
+        if (m_transport)
+        {
+            return wsl::shared::socket::RecvMessageWith(
+                [&](gsl::span<gsl::byte> buf, DWORD flags, DWORD t) {
+                    return m_transport->Receive(buf, flags, t);
+                },
+                m_buffer,
+                timeout);
+        }
+
         return wsl::shared::socket::RecvMessage(m_socket.get(), m_buffer, m_exitEvent, timeout);
     }
 
@@ -665,6 +732,7 @@ private:
 #ifdef WIN32
 
     HANDLE m_exitEvent{};
+    std::unique_ptr<wsl::windows::common::SocketTransport> m_transport;
 
 #endif
     uint32_t m_sent_non_transaction_messages = 0;
