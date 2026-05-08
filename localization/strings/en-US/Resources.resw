@@ -2179,6 +2179,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>Missing required option: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslcInvalidVolumeOption" xml:space = "preserve" >
+    <value>Invalid value for option '{}': '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name = "MessageWslcInvalidVolumeType" xml:space = "preserve" >
     <value>Unsupported volume type: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

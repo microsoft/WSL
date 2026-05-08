@@ -1992,13 +1992,107 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
 
-        // Negative: fixed VHD type is not yet supported.
+        // Negative: invalid VHD type must fail.
         {
             WslcVhdRequirements vhd{};
             vhd.name = c_volumeName;
             vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = static_cast<WslcVhdType>(42);
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Positive: fixed-allocation VHD must produce a .vhdx whose on-disk size
+        // is at least the requested SizeBytes (dynamic VHDs are typically much
+        // smaller until populated).
+        {
+            constexpr auto c_fixedVolumeName = "wslc-sdk-vhd-fixed";
+            constexpr auto c_fixedSizeBytes = 64ull * _1MB;
+            WslcVhdRequirements vhd{};
+            vhd.name = c_fixedVolumeName;
+            vhd.sizeBytes = c_fixedSizeBytes;
             vhd.type = WSLC_VHD_TYPE_FIXED;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_NOTIMPL);
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_fixedVolumeName) + ".vhdx");
+            VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
+            VERIFY_IS_GREATER_THAN_OR_EQUAL(std::filesystem::file_size(expectedVhdPath), c_fixedSizeBytes);
+
+            wil::unique_cotaskmem_string deleteErr;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_fixedVolumeName, &deleteErr));
+        }
+
+        // Positive: owner + mode flags must be honored — a non-root container
+        // user can write the volume root.
+        {
+            constexpr auto c_ownedVolumeName = "wslc-sdk-vhd-owned";
+            WslcVhdRequirements vhd{};
+            vhd.name = c_ownedVolumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_OWNER | WSLC_VHD_REQ_FLAG_MODE;
+            vhd.uid = 65534; // nobody
+            vhd.gid = 65534; // nogroup
+            vhd.mode = 0750;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            wil::unique_cotaskmem_string deleteErr;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_ownedVolumeName, &deleteErr));
+        }
+
+        // Negative: out-of-range mode (> 07777) must be rejected.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_MODE;
+            vhd.mode = 0x10000; // out of range
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: mode=0 with FLAG_MODE set is a foot-gun (chmod 0 makes
+        // the volume root inaccessible to the container's non-root user) and
+        // must be rejected client-side.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_MODE;
+            vhd.mode = 0;
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Negative: unknown flag bits are rejected so future flag additions
+        // can never be silently ignored by older SDK versions.
+        {
+            WslcVhdRequirements vhd{};
+            vhd.name = c_volumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = static_cast<WslcVhdRequirementsFlags>(0x80000000); // unassigned bit
+            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+        }
+
+        // Positive: flags=NONE with non-zero uid/gid must silently ignore
+        // those fields (no chown is emitted, defaults to root:root).
+        {
+            constexpr auto c_unflaggedVolumeName = "wslc-sdk-vhd-unflagged";
+            WslcVhdRequirements vhd{};
+            vhd.name = c_unflaggedVolumeName;
+            vhd.sizeBytes = c_vhdSizeBytes;
+            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
+            vhd.flags = WSLC_VHD_REQ_FLAG_NONE;
+            vhd.uid = 1000;
+            vhd.gid = 1000;
+            vhd.mode = 0750;
+            wil::unique_cotaskmem_string errorMsg;
+            VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
+
+            wil::unique_cotaskmem_string deleteErr;
+            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_unflaggedVolumeName, &deleteErr));
         }
     }
 
