@@ -15,9 +15,8 @@
         <_WslcIntDir Condition="'$(_WslcIntDir)' == ''">obj\</_WslcIntDir>
     </PropertyGroup>
 
-    <!-- Default metadata for WslcImage items.
-         Image holds the full ref including the tag (e.g. "echo-server:latest").
-         If only a repo (no ':') is given, ':latest' is appended automatically. -->
+    <!-- Default metadata for WslcImage items. Image is the full ref;
+         ':latest' is appended automatically when no tag is given. -->
     <ItemDefinitionGroup>
         <WslcImage>
             <Image></Image>
@@ -57,11 +56,6 @@
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
                Text="WslcImage item '%(WslcImage.Identity)' must be a valid file name." />
-
-        <!-- Tag was merged into Image; surface a clear migration error. -->
-        <Error Condition="'%(WslcImage.Tag)' != ''"
-               Code="WSLC0006"
-               Text="WslcImage 'Tag' metadata is no longer supported; include the tag in 'Image' (e.g. Image='echo-server:latest')." />
     </Target>
 
     <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:

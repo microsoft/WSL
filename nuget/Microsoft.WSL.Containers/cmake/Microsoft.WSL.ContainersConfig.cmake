@@ -86,15 +86,10 @@ unset(_wslcsdk_lib_dir)
 function(wslc_add_image _target_name)
     cmake_parse_arguments(
         PARSE_ARGV 1 ARG
-        "PRUNE_AFTER_BUILD"                       # options (boolean flags)
-        "IMAGE;TAG;DOCKERFILE;CONTEXT;TAR_LOCATION" # one-value keywords (TAG kept only to error)
-        "SOURCES"                                 # multi-value keywords
+        "PRUNE_AFTER_BUILD"                          # options (boolean flags)
+        "IMAGE;DOCKERFILE;CONTEXT;TAR_LOCATION"      # one-value keywords
+        "SOURCES"                                    # multi-value keywords
     )
-
-    # TAG was merged into IMAGE — error explicitly to guide migration.
-    if(DEFINED ARG_TAG)
-        message(FATAL_ERROR "wslc_add_image: TAG is no longer supported; include the tag in IMAGE (e.g. IMAGE my-server:v1).")
-    endif()
 
     # Validate required arguments
     if(NOT ARG_IMAGE)
@@ -107,8 +102,8 @@ function(wslc_add_image _target_name)
         message(FATAL_ERROR "wslc_add_image: CONTEXT is required")
     endif()
 
-    # Resolve image ref: append :latest if IMAGE has no tag (no ':' after the
-    # last '/' — this keeps registry-port refs like localhost:5000/repo intact).
+    # Append :latest when IMAGE has no tag. Detect by looking for ':' after the
+    # last '/', so registry-port refs like localhost:5000/repo aren't misread.
     string(FIND "${ARG_IMAGE}" "/" _last_slash_pos REVERSE)
     string(FIND "${ARG_IMAGE}" ":" _last_colon_pos REVERSE)
     if(_last_colon_pos GREATER _last_slash_pos)
