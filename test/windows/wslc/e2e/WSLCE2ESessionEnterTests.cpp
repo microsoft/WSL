@@ -58,7 +58,7 @@ class WSLCE2ESessionEnterTests
         RunWslc(L"image ls").Verify({.ExitCode = 0});
 
         // Terminate the wslc session since we use its storage path in this test class.
-        RunWslc(L"session terminate");
+        RunWslc(L"system session terminate");
         return true;
     }
 
@@ -67,7 +67,7 @@ class WSLCE2ESessionEnterTests
         constexpr auto sessionName = L"test-wslc-session-enter";
 
         // Run an interactive session enter with an explicit name.
-        auto session = RunWslcInteractive(std::format(L"session enter \"{}\" --name {}", GetDefaultStoragePath(), sessionName));
+        auto session = RunWslcInteractive(std::format(L"system session enter \"{}\" --name {}", GetDefaultStoragePath(), sessionName));
         VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
         session.ExpectStdout(VT::SESSION_PROMPT);
@@ -80,7 +80,7 @@ class WSLCE2ESessionEnterTests
         session.ExpectStdout(VT::SESSION_PROMPT);
 
         // Verify the session appears in session list.
-        auto listResult = RunWslc(L"session list");
+        auto listResult = RunWslc(L"system session list");
         listResult.Verify({.Stderr = L"", .ExitCode = S_OK});
         VERIFY_IS_TRUE(listResult.Stdout.has_value());
         VERIFY_IS_TRUE(listResult.Stdout->find(sessionName) != std::wstring::npos);
@@ -89,7 +89,7 @@ class WSLCE2ESessionEnterTests
         VERIFY_ARE_EQUAL(session.Exit(), 0);
 
         // Verify the session is no longer in the session list after exiting.
-        listResult = RunWslc(L"session list");
+        listResult = RunWslc(L"system session list");
         listResult.Verify({.Stderr = L"", .ExitCode = S_OK});
         VERIFY_IS_TRUE(listResult.Stdout.has_value());
         VERIFY_IS_FALSE(listResult.Stdout->find(sessionName) != std::wstring::npos);
@@ -97,7 +97,7 @@ class WSLCE2ESessionEnterTests
 
     WSLC_TEST_METHOD(WSLCE2E_SessionEnter_WithoutName_GeneratesGuid)
     {
-        auto session = RunWslcInteractive(std::format(L"session enter \"{}\"", GetDefaultStoragePath()));
+        auto session = RunWslcInteractive(std::format(L"system session enter \"{}\"", GetDefaultStoragePath()));
         VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
         session.ExpectStderr("Created session: ");
@@ -108,7 +108,7 @@ class WSLCE2ESessionEnterTests
 
     WSLC_TEST_METHOD(WSLCE2E_SessionEnter_StoragePathNotFound)
     {
-        auto result = RunWslc(L"session enter does-not-exist");
+        auto result = RunWslc(L"system session enter does-not-exist");
         result.Verify({
             .Stderr = L"The system cannot find the path specified. \r\nError code: ERROR_PATH_NOT_FOUND\r\n",
             .ExitCode = 1,
