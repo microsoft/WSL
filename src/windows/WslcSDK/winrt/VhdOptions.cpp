@@ -17,36 +17,97 @@ Abstract:
 #include "Microsoft.WSL.Containers.VhdOptions.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-VhdOptions::VhdOptions(hstring const& name, uint64_t sizeInBytes, winrt::Microsoft::WSL::Containers::VhdType const& type)
+
+VhdOptions::VhdOptions(hstring const& name, uint64_t sizeInBytes, VhdType const& type) :
+    m_name(winrt::to_string(name)), m_sizeInBytes(sizeInBytes), m_type(type)
 {
-    throw hresult_not_implemented();
+    if (name.empty() || sizeInBytes == 0)
+    {
+        throw hresult_invalid_argument();
+    }
+
+    if (type != VhdType::Dynamic)
+    {
+        throw hresult_not_implemented();
+    }
 }
+
 hstring VhdOptions::Name()
 {
-    throw hresult_not_implemented();
+    return winrt::to_hstring(m_name);
 }
+
 void VhdOptions::Name(hstring const& value)
 {
-    throw hresult_not_implemented();
+    if (m_VhdOptions)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    if (value.empty())
+    {
+        throw hresult_invalid_argument();
+    }
+
+    m_name = winrt::to_string(value);
 }
+
 uint64_t VhdOptions::SizeInBytes()
 {
-    throw hresult_not_implemented();
+    return m_sizeInBytes;
 }
+
 void VhdOptions::SizeInBytes(uint64_t value)
 {
-    throw hresult_not_implemented();
+    if (m_VhdOptions)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    if (value == 0)
+    {
+        throw hresult_invalid_argument();
+    }
+
+    m_sizeInBytes = value;
 }
-winrt::Microsoft::WSL::Containers::VhdType VhdOptions::Type()
+
+VhdType VhdOptions::Type()
 {
-    throw hresult_not_implemented();
+    return m_type;
 }
-void VhdOptions::Type(winrt::Microsoft::WSL::Containers::VhdType const& value)
+
+void VhdOptions::Type(VhdType const& value)
 {
-    throw hresult_not_implemented();
+    if (m_VhdOptions)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    if (value != VhdType::Dynamic)
+    {
+        throw hresult_not_implemented();
+    }
+
+    m_type = value;
 }
+
 void VhdOptions::SetOwner(uint32_t uid, uint32_t gid)
 {
     throw hresult_not_implemented();
 }
+
+WslcVhdRequirements* VhdOptions::ToStructPointer()
+{
+    if (!m_VhdOptions)
+    {
+        m_VhdOptions = std::make_unique<WslcVhdRequirements>();
+        m_VhdOptions->name = m_name.c_str();
+        m_VhdOptions->sizeBytes = m_sizeInBytes;
+        m_VhdOptions->type = static_cast<WslcVhdType>(m_type);
+    }
+
+    return m_VhdOptions.get();
+}
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

@@ -14,11 +14,14 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.Process.g.h"
+#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Process : ProcessT<Process>
 {
     Process() = default;
+    Process(WslcProcess process);
+    Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings);
 
     void Start();
     uint32_t Pid();
@@ -33,5 +36,18 @@ struct Process : ProcessT<Process>
     void ErrorReceived(winrt::event_token const& token) noexcept;
     winrt::event_token Exited(winrt::Microsoft::WSL::Containers::ProcessExitHandler const& handler);
     void Exited(winrt::event_token const& token) noexcept;
+
+    WslcProcess ToHandle();
+    WslcProcess* ToHandlePointer();
+
+private:
+    void EnsureStarted() const;
+    // Only kept until Start() is called
+    winrt::Microsoft::WSL::Containers::Container m_container{nullptr};
+    winrt::Microsoft::WSL::Containers::ProcessSettings m_settings{nullptr};
+
+    wil::unique_any<WslcProcess, decltype(&WslcReleaseProcess), &WslcReleaseProcess> m_process{nullptr};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
+
+DEFINE_TYPE_HELPERS(Process);

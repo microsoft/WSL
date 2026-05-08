@@ -14,11 +14,13 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.Container.g.h"
+#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Container : ContainerT<Container>
 {
     Container() = default;
+    Container(WslcContainer container);
 
     void Start(winrt::Microsoft::WSL::Containers::ContainerStartFlags const& flags);
     void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, uint32_t timeoutSeconds);
@@ -28,5 +30,14 @@ struct Container : ContainerT<Container>
     hstring Id();
     winrt::Microsoft::WSL::Containers::Process InitProcess();
     winrt::Microsoft::WSL::Containers::ContainerState State();
+
+    WslcContainer* ToHandlePointer();
+    WslcContainer ToHandle();
+
+private:
+    wil::unique_any<WslcContainer, decltype(&WslcReleaseContainer), &WslcReleaseContainer> m_container;
 };
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation
+
+DEFINE_TYPE_HELPERS(Container);

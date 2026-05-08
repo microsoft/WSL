@@ -19,18 +19,41 @@ Abstract:
 namespace winrt::Microsoft::WSL::Containers::implementation {
 hstring ImageProgress::Id()
 {
-    throw hresult_not_implemented();
+    return m_id;
 }
+
+void ImageProgress::Id(hstring const& value)
+{
+    m_id = value;
+}
+
 winrt::Microsoft::WSL::Containers::ImageProgressStatus ImageProgress::Status()
 {
-    throw hresult_not_implemented();
+    return m_status;
 }
+
+void ImageProgress::Status(winrt::Microsoft::WSL::Containers::ImageProgressStatus const& value)
+{
+    m_status = value;
+}
+
 uint64_t ImageProgress::CurrentBytes()
 {
-    throw hresult_not_implemented();
+    return m_currentBytes;
 }
+
+void ImageProgress::CurrentBytes(uint64_t value)
+{
+    m_currentBytes = value;
+}
+
 uint64_t ImageProgress::TotalBytes()
 {
-    throw hresult_not_implemented();
+    return m_totalBytes;
+}
+
+void ImageProgress::TotalBytes(uint64_t value)
+{
+    m_totalBytes = value;
 }
 } // namespace winrt::Microsoft::WSL::Containers::implementation

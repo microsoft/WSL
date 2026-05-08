@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 #include "Microsoft.WSL.Containers.Session.g.h"
+#include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Session : SessionT<Session>
@@ -38,6 +39,15 @@ struct Session : SessionT<Session>
     winrt::Windows::Foundation::Collections::IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Images();
     winrt::event_token Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler);
     void Terminated(winrt::event_token const& token) noexcept;
+
+    WslcSession ToHandle();
+    WslcSession* ToHandlePointer();
+
+private:
+    void EnsureStarted() const;
+    winrt::Microsoft::WSL::Containers::SessionSettings m_settings; // Only kept until Start() is called
+
+    wil::unique_any<WslcSession, decltype(&WslcReleaseSession), &WslcReleaseSession> m_session{nullptr};
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 namespace winrt::Microsoft::WSL::Containers::factory_implementation {
@@ -45,3 +55,5 @@ struct Session : SessionT<Session, implementation::Session>
 {
 };
 } // namespace winrt::Microsoft::WSL::Containers::factory_implementation
+
+DEFINE_TYPE_HELPERS(Session);

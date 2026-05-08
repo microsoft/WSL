@@ -17,40 +17,92 @@ Abstract:
 #include "Microsoft.WSL.Containers.ContainerPortMapping.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-ContainerPortMapping::ContainerPortMapping(uint16_t windowsPort, uint16_t containerPort, winrt::Microsoft::WSL::Containers::PortProtocol const& protocol)
+
+ContainerPortMapping::ContainerPortMapping(uint16_t windowsPort, uint16_t containerPort, winrt::Microsoft::WSL::Containers::PortProtocol const& protocol) :
+    m_windowsPort(windowsPort), m_containerPort(containerPort), m_protocol(protocol)
 {
-    throw hresult_not_implemented();
 }
+
 uint16_t ContainerPortMapping::WindowsPort()
 {
-    throw hresult_not_implemented();
+    return m_windowsPort;
 }
+
 void ContainerPortMapping::WindowsPort(uint16_t value)
 {
-    throw hresult_not_implemented();
+    if (m_containerPortMapping)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    m_windowsPort = value;
 }
+
 uint16_t ContainerPortMapping::ContainerPort()
 {
-    throw hresult_not_implemented();
+    return m_containerPort;
 }
+
 void ContainerPortMapping::ContainerPort(uint16_t value)
 {
-    throw hresult_not_implemented();
+    if (m_containerPortMapping)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    m_containerPort = value;
 }
+
 winrt::Microsoft::WSL::Containers::PortProtocol ContainerPortMapping::Protocol()
 {
-    throw hresult_not_implemented();
+    return m_protocol;
 }
+
 void ContainerPortMapping::Protocol(winrt::Microsoft::WSL::Containers::PortProtocol const& value)
 {
-    throw hresult_not_implemented();
+    if (m_containerPortMapping)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    m_protocol = value;
 }
+
 winrt::Windows::Networking::HostName ContainerPortMapping::WindowsAddress()
 {
-    throw hresult_not_implemented();
+    return m_windowsAddress;
 }
+
 void ContainerPortMapping::WindowsAddress(winrt::Windows::Networking::HostName const& value)
 {
-    throw hresult_not_implemented();
+    if (m_containerPortMapping)
+    {
+        throw hresult_illegal_state_change();
+    }
+
+    m_windowsAddress = value;
 }
+
+WslcContainerPortMapping ContainerPortMapping::ToStruct()
+{
+    if (!m_containerPortMapping)
+    {
+        m_containerPortMapping = std::make_unique<WslcContainerPortMapping>();
+        m_containerPortMapping->windowsPort = m_windowsPort;
+        m_containerPortMapping->containerPort = m_containerPort;
+        m_containerPortMapping->protocol = static_cast<WslcPortProtocol>(m_protocol);
+
+        if (m_windowsAddress)
+        {
+            throw hresult_not_implemented();
+        }
+        else
+        {
+            m_containerPortMapping->windowsAddress = nullptr;
+        }
+    }
+
+    return *m_containerPortMapping;
+}
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

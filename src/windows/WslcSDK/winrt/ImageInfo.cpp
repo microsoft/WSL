@@ -17,20 +17,29 @@ Abstract:
 #include "Microsoft.WSL.Containers.ImageInfo.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
+ImageInfo::ImageInfo(WslcImageInfo const& info) : m_info(info)
+{
+}
+
 hstring ImageInfo::Name()
 {
-    throw hresult_not_implemented();
+    return winrt::to_hstring(m_info.name);
 }
+
 winrt::Windows::Storage::Streams::IBuffer ImageInfo::Sha256()
 {
-    throw hresult_not_implemented();
+    winrt::Windows::Storage::Streams::DataWriter writer;
+    writer.WriteBytes(m_info.sha256);
+    return writer.DetachBuffer();
 }
+
 uint64_t ImageInfo::SizeBytes()
 {
-    throw hresult_not_implemented();
+    return m_info.sizeBytes;
 }
+
 winrt::Windows::Foundation::DateTime ImageInfo::CreatedTimestamp()
 {
-    throw hresult_not_implemented();
+    return winrt::clock::from_time_t(static_cast<time_t>(m_info.createdUnixTime));
 }
 } // namespace winrt::Microsoft::WSL::Containers::implementation

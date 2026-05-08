@@ -47,6 +47,12 @@ auto* GetStructPointer(const T& obj)
 }
 
 template <typename T>
+auto GetStruct(const T& obj)
+{
+    return winrt::get_self<typename implementation_type<T>::type>(obj)->ToStruct();
+}
+
+template <typename T>
 auto* GetHandlePointer(const T& obj)
 {
     return obj ? winrt::get_self<typename implementation_type<T>::type>(obj)->ToHandlePointer() : nullptr;
@@ -62,6 +68,12 @@ template <typename T>
 auto* GetStructPointer(const winrt::com_ptr<T>& obj)
 {
     return obj ? obj->ToStructPointer() : nullptr;
+}
+
+template <typename T>
+auto GetStruct(const winrt::com_ptr<T>& obj)
+{
+    return obj->ToStruct();
 }
 
 template <typename T>
