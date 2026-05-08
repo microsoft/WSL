@@ -922,19 +922,27 @@ class WSLCTests
             VERIFY_IS_FALSE(debianId.empty());
             VERIFY_IS_FALSE(pythonId.empty());
 
+            // Both Created timestamps must be populated and distinct so that the since/before
+            // boundaries are unambiguous. Equal timestamps would make Docker's filter behavior
+            // ambiguous and could reintroduce flakiness.
+            VERIFY_IS_GREATER_THAN(debianCreated, 0LL);
+            VERIFY_IS_GREATER_THAN(pythonCreated, 0LL);
+            VERIFY_ARE_NOT_EQUAL(debianCreated, pythonCreated);
+
             // Determine which image is older/newer based on actual creation timestamps.
             // Image creation times come from the registry and can change independently.
-            const auto& olderId = (debianCreated <= pythonCreated) ? debianId : pythonId;
-            const auto& newerId = (debianCreated <= pythonCreated) ? pythonId : debianId;
-            const auto* newerName = (debianCreated <= pythonCreated) ? "python:3.12-alpine" : "debian:latest";
-            const auto* olderName = (debianCreated <= pythonCreated) ? "debian:latest" : "python:3.12-alpine";
+            const bool debianIsOlder = debianCreated < pythonCreated;
+            const auto& olderId = debianIsOlder ? debianId : pythonId;
+            const auto& newerId = debianIsOlder ? pythonId : debianId;
+            const auto* olderName = debianIsOlder ? "debian:latest" : "python:3.12-alpine";
+            const auto* newerName = debianIsOlder ? "python:3.12-alpine" : "debian:latest";
 
             LogInfo(
                 "Older image: %hs (Created: %lld), Newer image: %hs (Created: %lld)",
                 olderName,
-                std::min(debianCreated, pythonCreated),
+                debianIsOlder ? debianCreated : pythonCreated,
                 newerName,
-                std::max(debianCreated, pythonCreated));
+                debianIsOlder ? pythonCreated : debianCreated);
 
             // Test 'since' filter - images created after the older image
             {
