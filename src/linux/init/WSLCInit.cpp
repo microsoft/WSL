@@ -670,6 +670,62 @@ void HandleMessageImpl(
     Transaction.SendResultMessage(result < 0 ? errno : 0);
 }
 
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel,
+    wsl::shared::Transaction& Transaction,
+    const WSLC_CONFIGURE_NETWORKING& Message,
+    const gsl::span<gsl::byte>& Buffer)
+{
+    int result = -EINVAL;
+    auto sendResult = wil::scope_exit([&]() { Transaction.SendResultMessage<int32_t>(result); });
+
+    const auto* iface = wsl::shared::string::FromSpan(Buffer, Message.InterfaceOffset);
+    const auto* address = wsl::shared::string::FromSpan(Buffer, Message.AddressOffset);
+    const auto* gateway = wsl::shared::string::FromSpan(Buffer, Message.GatewayOffset);
+    const auto* dnsServer = wsl::shared::string::FromSpan(Buffer, Message.DnsServerOffset);
+
+    THROW_ERRNO_IF(EINVAL, iface == nullptr || address == nullptr || gateway == nullptr || dnsServer == nullptr);
+
+    // Bring up the interface and configure the static address, route, and DNS.
+    auto configCmd = std::format(
+        "ip link set {} up && ip addr add {} dev {} && ip route add default via {}",
+        iface, address, iface, gateway);
+
+    int childPid = UtilCreateChildProcess("ConfigureNetworking", [&configCmd]() {
+        execl("/bin/sh", "/bin/sh", "-c", configCmd.c_str(), nullptr);
+        LOG_ERROR("execl(/bin/sh) failed, {}", errno);
+    });
+
+    if (childPid < 0)
+    {
+        result = -errno;
+        return;
+    }
+
+    int status = -1;
+    if (TEMP_FAILURE_RETRY(waitpid(childPid, &status, 0)) < 0)
+    {
+        result = -errno;
+        return;
+    }
+
+    result = UtilProcessChildExitCode(status, "ConfigureNetworking");
+    if (result != 0)
+    {
+        return;
+    }
+
+    // Write DNS configuration.
+    auto resolv = std::format("nameserver {}\n", dnsServer);
+    if (WriteToFile("/etc/resolv.conf", resolv.c_str()) < 0)
+    {
+        result = -errno;
+        return;
+    }
+
+    result = 0;
+}
+
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_UNMOUNT&, const gsl::span<gsl::byte>& Buffer)
 {
     auto* path = wsl::shared::string::FromMessageBuffer<WSLC_UNMOUNT>(Buffer);
@@ -831,7 +887,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_CONFIGURE_NETWORKING>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

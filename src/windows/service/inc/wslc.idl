@@ -381,7 +381,8 @@ typedef enum _WSLCNetworkingMode
 {
     WSLCNetworkingModeNone,
     WSLCNetworkingModeNAT,
-    WSLCNetworkingModeVirtioProxy
+    WSLCNetworkingModeVirtioProxy,
+    WSLCNetworkingModeConsomme
 } WSLCNetworkingMode;
 
 typedef enum _WSLCFeatureFlags

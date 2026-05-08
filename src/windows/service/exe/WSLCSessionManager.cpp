@@ -227,9 +227,9 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
             WI_ClearFlag(openVmmSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
             // OpenVMM provides networking via its built-in consomme backend.
-            // Set NetworkingMode to None so the session process skips GNS and
-            // port relay setup. DNS is configured directly in the guest via DHCP.
-            openVmmSettings.NetworkingMode = WSLCNetworkingModeNone;
+            // Use ConsommeNetworking mode so the session process skips GNS but
+            // still configures the networking engine and port relay.
+            openVmmSettings.NetworkingMode = WSLCNetworkingModeConsomme;
 
             Settings = &openVmmSettings;
 

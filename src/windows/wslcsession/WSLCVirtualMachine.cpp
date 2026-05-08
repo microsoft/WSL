@@ -21,6 +21,7 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "wslutil.h"
 #include "lxinitshared.h"
+#include "ConsommeNetworking.h"
 
 using namespace wsl::windows::common;
 using wsl::windows::service::wslc::TypedHandle;
@@ -302,38 +303,6 @@ void WSLCVirtualMachine::Initialize()
     // Configure GPU mounts if enabled
     MountGpuLibraries(c_gpuLibrariesPath, c_gpuDriversPath);
 
-    // When using OpenVMM's built-in networking (NetworkingMode == None, meaning
-    // GNS is not launched), configure the guest's network interface and DNS
-    // BEFORE anything else starts. This must happen before containerd/dockerd
-    // launch, otherwise they cache the wrong DNS from /etc/resolv.conf.
-    // The virtio-net + consomme backend provides DHCP with DNS at 10.0.0.1.
-    if (m_networkingMode == WSLCNetworkingModeNone)
-    {
-        try
-        {
-            const char* args[] = {"/bin/sh", "-c",
-                "ip link set eth0 up && "
-                "ip addr add 10.0.0.2/24 dev eth0 && "
-                "ip route add default via 10.0.0.1 && "
-                "echo 'nameserver 10.0.0.1' > /etc/resolv.conf"};
-            const char* env[] = {"PATH=/usr/sbin:/usr/bin:/sbin:/bin"};
-
-            WSLCProcessOptions options{};
-            options.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
-            options.Environment = {.Values = env, .Count = ARRAYSIZE(env)};
-
-            auto process = CreateLinuxProcess("/bin/sh", options);
-            auto exitEvent = process->GetExitEvent();
-            WaitForSingleObject(exitEvent, 10000);
-
-            WSLCProcessState state{};
-            int code{};
-            process->GetState(&state, &code);
-            WSL_LOG("OpenVmmConfigureDns", TraceLoggingValue(code, "ExitCode"));
-        }
-        CATCH_LOG();
-    }
-
     // Configure networking. This must happen after all filesystems are mounted since /gns needs to access /sys.
     ConfigureNetworking();
 }
@@ -373,6 +342,39 @@ void WSLCVirtualMachine::ConfigureNetworking()
 {
     if (m_networkingMode == WSLCNetworkingModeNone)
     {
+        return;
+    }
+
+    if (m_networkingMode == WSLCNetworkingModeConsomme)
+    {
+        // Consomme networking: no GNS daemon needed. The VMM provides NAT,
+        // DHCP, and DNS directly via the virtio-net device.
+        //
+        // Send a message to mini_init to configure the guest's network
+        // interface statically. This must happen before containerd/dockerd
+        // start, as they cache DNS from /etc/resolv.conf at launch.
+        auto address = std::format("{}/{}", wsl::core::c_consommeGuestIp, wsl::core::c_consommeSubnetMask);
+
+        wsl::shared::MessageWriter<WSLC_CONFIGURE_NETWORKING> netMessage;
+        netMessage.WriteString(netMessage->InterfaceOffset, wsl::core::c_consommeInterface);
+        netMessage.WriteString(netMessage->AddressOffset, address);
+        netMessage.WriteString(netMessage->GatewayOffset, wsl::core::c_consommeGatewayIp);
+        netMessage.WriteString(netMessage->DnsServerOffset, wsl::core::c_consommeGatewayIp);
+
+        const auto& response = m_initChannel.Transaction<WSLC_CONFIGURE_NETWORKING>(netMessage.Span());
+        THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Consomme guest network setup failed: %d", response.Result);
+
+        WSL_LOG("ConsommeConfigureGuestNetwork", TraceLoggingValue(response.Result, "Result"));
+
+        // No ConfigureNetworking COM call needed — ConsommeNetworking is
+        // initialized eagerly in the OpenVmmVirtualMachine constructor
+        // (the system_handle IDL attribute can't marshal INVALID_HANDLE_VALUE).
+
+        // Skip LaunchPortRelay — the relay uses wslrelay.exe which connects
+        // via hvsocket (m_vmId), and OpenVMM/WHP VMs are not registered with
+        // the HvSocket driver. Port forwarding for OpenVMM will need a
+        // different mechanism (e.g. consomme's own NAT port forwarding).
+        // TODO: Implement port forwarding for OpenVMM consomme backend.
         return;
     }
 

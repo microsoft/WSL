@@ -24,6 +24,7 @@ set(SOURCES
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
+    ConsommeNetworking.cpp
     NatNetworking.cpp
     notifications.cpp
     Redirector.cpp
@@ -100,6 +101,7 @@ set(HEADERS
     hcs_schema.h
     helpers.hpp
     hvsocket.hpp
+    ConsommeNetworking.h
     INetworkingEngine.h
     interop.hpp
     LxssMessagePort.h

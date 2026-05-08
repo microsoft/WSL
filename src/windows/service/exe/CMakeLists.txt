@@ -22,6 +22,7 @@ set(SOURCES
     WslCoreVm.cpp
     HcsVirtualMachine.cpp
     OpenVmmVirtualMachine.cpp
+    TtrpcClient.cpp
     WSLCSessionManager.cpp
     WSLCSessionManagerFactory.cpp
     main.rc
@@ -54,6 +55,7 @@ set(HEADERS
     WslCoreVm.h
     HcsVirtualMachine.h
     OpenVmmVirtualMachine.h
+    TtrpcClient.h
     WSLCSessionManager.h
     WSLCSessionManagerFactory.h)
 

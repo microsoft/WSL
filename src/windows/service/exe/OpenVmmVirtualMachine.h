@@ -19,11 +19,13 @@ Abstract:
 #pragma once
 
 #include "wslc.h"
+#include "INetworkingEngine.h"
+#include "TtrpcClient.h"
 #include <filesystem>
 #include <map>
 #include <bitset>
 
-#define OPENVMM_MAX_VHD_COUNT 254
+#define MAX_VHD_COUNT 254
 
 namespace wsl::windows::service::wslc {
 
@@ -54,10 +56,13 @@ private:
 
     bool FeatureEnabled(WSLCFeatureFlags Value) const;
 
-    // Build the openvmm.exe command line from the stored settings.
+    // Build the openvmm.exe command line (ttrpc-only in orchestration mode).
     std::wstring BuildCommandLine() const;
 
-    // Spawn the openvmm.exe process and wait for it to be ready.
+    // Build a ttrpc CreateVM configuration from stored VM settings.
+    TtrpcClient::VmConfig BuildVmConfig() const;
+
+    // Spawn the openvmm.exe process, connect ttrpc, and create+resume the VM.
     void LaunchOpenVmm();
 
     // Monitor the openvmm process and signal m_vmExitEvent on exit.
@@ -106,10 +111,17 @@ private:
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
 
     std::map<ULONG, DiskInfo> m_attachedDisks;
-    std::bitset<OPENVMM_MAX_VHD_COUNT> m_lunBitmap;
+    std::bitset<MAX_VHD_COUNT> m_lunBitmap;
 
     // Shares: key is ShareId, value is Windows path.
     std::map<GUID, std::wstring, wsl::windows::common::helpers::GuidLess> m_shares;
+
+    // Networking engine (ConsommeNetworking for the OpenVMM backend).
+    std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
+
+    // ttrpc client for runtime VM management (disk hot-add/remove etc.).
+    std::filesystem::path m_ttrpcSocketPath;
+    std::unique_ptr<TtrpcClient> m_ttrpcClient;
 };
 
 } // namespace wsl::windows::service::wslc

@@ -363,6 +363,10 @@ try
     std::lock_guard lock(m_lock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkEngine != nullptr);
 
+    // Consomme networking is only supported with the OpenVMM backend.
+    WI_ASSERT(m_networkingMode != WSLCNetworkingModeConsomme);
+    THROW_HR_IF(E_INVALIDARG, m_networkingMode == WSLCNetworkingModeConsomme);
+
     if (m_networkingMode == WSLCNetworkingModeNone)
     {
         return S_OK;

@@ -400,6 +400,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCWatchProcesses,
     LxMessageWSLCProcessExited,
     LxMessageWSLCUnixConnect,
+    LxMessageWSLCConfigureNetworking,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -510,6 +511,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCWatchProcesses)
         X(LxMessageWSLCProcessExited)
         X(LxMessageWSLCUnixConnect)
+        X(LxMessageWSLCConfigureNetworking)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1831,6 +1833,28 @@ struct WSLC_UNIX_CONNECT
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset));
+};
+
+struct WSLC_CONFIGURE_NETWORKING
+{
+    static inline auto Type = LxMessageWSLCConfigureNetworking;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(WSLC_CONFIGURE_NETWORKING);
+
+    MESSAGE_HEADER Header;
+    unsigned int InterfaceOffset{};
+    unsigned int AddressOffset{};    // e.g., "10.0.0.2/24"
+    unsigned int GatewayOffset{};    // e.g., "10.0.0.1"
+    unsigned int DnsServerOffset{};  // e.g., "10.0.0.1"
+    char Buffer[];
+
+    PRETTY_PRINT(
+        FIELD(Header),
+        STRING_FIELD(InterfaceOffset),
+        STRING_FIELD(AddressOffset),
+        STRING_FIELD(GatewayOffset),
+        STRING_FIELD(DnsServerOffset));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT
