@@ -209,7 +209,7 @@ void ImageService::Import(wsl::windows::wslc::models::Session& session, const st
         contentLength = fileSize.QuadPart;
     }
 
-    THROW_IF_FAILED(session.Get()->ImportImage(ToCOMInputHandle(imageHandle), imageName.c_str(), nullptr, contentLength));
+    THROW_IF_FAILED(session.Get()->ImportImage(ToCOMInputHandle(imageHandle), imageName.empty() ? nullptr : imageName.c_str(), nullptr, contentLength));
 }
 
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
