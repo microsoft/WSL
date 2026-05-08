@@ -3417,6 +3417,9 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
 
     const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
+        // Move child into the memory-limited user cgroup.
+        WriteToFile(WSL_USER_CGROUP_PROCS, "0");
+
         try
         {
             wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};

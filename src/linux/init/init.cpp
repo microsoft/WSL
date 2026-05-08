@@ -1202,6 +1202,9 @@ try
 
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
+                // Move session leader into the memory-limited user cgroup.
+                WriteToFile(WSL_USER_CGROUP_PROCS, "0");
+
                 umask(Config.Umask);
                 Channel.Close();
 
@@ -1251,6 +1254,9 @@ try
 
         SessionLeader = UtilCreateChildProcess(
             "SessionLeader", [ListenSocket = std::move(ListenSocket), &Channel, &Config, Mask = Config.Umask, SocketAddress]() {
+                // Move session leader into the memory-limited user cgroup.
+                WriteToFile(WSL_USER_CGROUP_PROCS, "0");
+
                 umask(Mask);
                 Channel.Close();
 
@@ -2384,6 +2390,13 @@ Return Value:
             };
 
             CreateWslSystemdUnits(Config);
+
+            //
+            // Move systemd into the memory-limited user cgroup so that all
+            // services and user processes run under the memory cap.
+            //
+
+            WriteToFile(WSL_USER_CGROUP_PROCS, "0");
 
             const char* Argv[] = {INIT_PATH, nullptr};
             std::vector<const char*> Env;

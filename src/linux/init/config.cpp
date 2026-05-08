@@ -992,6 +992,9 @@ try
     if (Config.BootCommand.has_value())
     {
         UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
+            // Move boot command into the memory-limited user cgroup.
+            WriteToFile(WSL_USER_CGROUP_PROCS, "0");
+
             //
             // Restore default signal dispositions for the child process.
             //

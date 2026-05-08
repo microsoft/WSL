@@ -90,6 +90,8 @@ Abstract:
 #define RESOLV_CONF_FILE "resolv.conf"
 #define RESOLV_CONF_PATH ETC_PATH "/" RESOLV_CONF_FILE
 #define RECLAIM_PATH "/sys/fs/cgroup/memory.reclaim"
+#define WSL_USER_CGROUP_PATH CGROUP_MOUNTPOINT "/wsl-user"
+#define WSL_USER_CGROUP_MEMORY_MAX WSL_USER_CGROUP_PATH "/memory.max"
 #define SCSI_DEVICE_PATH "/sys/bus/scsi/devices"
 #define SCSI_DEVICE_NAME_PREFIX "0:0:0:"
 #define SCSI_DEVICE_PREFIX SCSI_DEVICE_PATH "/" SCSI_DEVICE_NAME_PREFIX
@@ -103,6 +105,7 @@ Abstract:
 #define syscall_arch (offsetof(struct seccomp_data, arch))
 
 constexpr auto c_trueString = "1";
+constexpr size_t c_systemReservedMemory = 128 * 1024 * 1024; // 128MB reserved for WSL system processes
 
 struct VmConfiguration
 {
@@ -218,6 +221,8 @@ void StartTimeSyncAgent(void);
 void WaitForBlockDevice(const char* Path);
 
 int WaitForChild(pid_t Pid, const char* Name);
+
+void SetupWslUserCgroup();
 
 int Chroot(const char* Target)
 
@@ -3883,6 +3888,69 @@ void EnableDebugMode(const std::string& Mode)
     }
 }
 
+void SetupWslUserCgroup()
+
+/*++
+
+Routine Description:
+
+    This routine creates a memory-limited cgroup for user processes. All user workloads
+    (systemd, session leaders, boot commands) are placed into this cgroup so that they
+    cannot exhaust all VM memory. This reserves a fixed amount of memory for critical
+    WSL system processes (mini_init, GNS, Plan9, WSL init) that remain in the root cgroup.
+
+    The memory.max limit is set to totalram - c_systemReservedMemory, which provides a
+    hard cap. When this limit is reached, the cgroup-local OOM killer activates and only
+    kills processes within wsl-user, leaving system processes unaffected.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    None.
+
+--*/
+
+try
+{
+    struct sysinfo info = {};
+    if (sysinfo(&info) < 0)
+    {
+        LOG_ERROR("sysinfo failed {}", errno);
+        return;
+    }
+
+    if (info.totalram <= c_systemReservedMemory)
+    {
+        LOG_WARNING("Total RAM ({}) is too small to reserve {} for system processes", info.totalram, c_systemReservedMemory);
+        return;
+    }
+
+    if (UtilMkdir(WSL_USER_CGROUP_PATH, 0755) < 0)
+    {
+        LOG_ERROR("Failed to create wsl-user cgroup directory {}", errno);
+        return;
+    }
+
+    if (WriteToFile(CGROUP_MOUNTPOINT "/cgroup.subtree_control", "+memory") < 0)
+    {
+        LOG_ERROR("Failed to enable memory controller {}", errno);
+        return;
+    }
+
+    auto userMemoryMax = std::to_string(info.totalram - c_systemReservedMemory);
+    if (WriteToFile(WSL_USER_CGROUP_MEMORY_MAX, userMemoryMax.c_str()) < 0)
+    {
+        LOG_ERROR("Failed to set memory.max for wsl-user cgroup {}", errno);
+        return;
+    }
+
+    LOG_INFO("WSL user cgroup created with memory.max={} (totalram={}, reserved={})", userMemoryMax, info.totalram, c_systemReservedMemory);
+}
+CATCH_LOG()
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -4091,6 +4159,8 @@ int main(int Argc, char* Argv[])
     }
 
     UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr);
+
+    SetupWslUserCgroup();
 
     UtilSetThreadName("mini_init");
 
