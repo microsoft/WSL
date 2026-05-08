@@ -2209,6 +2209,7 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   </data>
   <data name = "MessageWslcAdditionalNetworksRequirePrimary" xml:space = "preserve" >
     <value>Additional networks are not allowed when the primary network mode is 'host' or 'none'.</value>
+    <comment>{Locked="host"}{Locked="none"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name = "MessageWslcDuplicateNetwork" xml:space = "preserve" >
     <value>Duplicate network: '{}'</value>

@@ -381,23 +381,6 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
     }
 }
 
-void ValidateNamedVolumes(
-    const std::vector<wsl::windows::common::docker_schema::Mount>& mounts,
-    const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
-    const std::unordered_set<std::string>& anonymousVolumes)
-{
-    for (const auto& mount : mounts)
-    {
-        if (mount.Type == "volume" && !mount.Name.empty())
-        {
-            THROW_HR_WITH_USER_ERROR_IF(
-                WSLC_E_VOLUME_NOT_FOUND,
-                Localization::MessageWslcVolumeNotFound(mount.Name),
-                !sessionVolumes.contains(mount.Name) && !anonymousVolumes.contains(mount.Name));
-        }
-    }
-}
-
 void ProcessAdditionalNetworks(
     const WSLCContainerOptions& containerOptions,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
