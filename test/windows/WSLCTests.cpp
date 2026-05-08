@@ -929,7 +929,12 @@ class WSLCTests
             const auto* newerName = (debianCreated <= pythonCreated) ? "python:3.12-alpine" : "debian:latest";
             const auto* olderName = (debianCreated <= pythonCreated) ? "debian:latest" : "python:3.12-alpine";
 
-            LogInfo("Older image: %hs (Created: %lld), Newer image: %hs (Created: %lld)", olderName, std::min(debianCreated, pythonCreated), newerName, std::max(debianCreated, pythonCreated));
+            LogInfo(
+                "Older image: %hs (Created: %lld), Newer image: %hs (Created: %lld)",
+                olderName,
+                std::min(debianCreated, pythonCreated),
+                newerName,
+                std::max(debianCreated, pythonCreated));
 
             // Test 'since' filter - images created after the older image
             {
