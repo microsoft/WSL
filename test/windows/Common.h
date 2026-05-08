@@ -92,6 +92,15 @@ using namespace std::chrono_literals;
         } \
     }
 
+#define SKIP_TEST_SERVER() \
+    { \
+        if (IsWindowsServer()) \
+        { \
+            LogSkipped("This test is skipped on Windows Server SKUs"); \
+            return; \
+        } \
+    }
+
 #define SKIP_TEST_UNSTABLE() \
     { \
         LogSkipped("This test is skipped because it's unstable"); \

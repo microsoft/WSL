@@ -145,6 +145,7 @@ public:
 
     // Volume management.
     common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
+    common::docker_schema::Volume InspectVolume(const std::string& Name);
     void RemoveVolume(const std::string& Name);
     std::vector<common::docker_schema::Volume> ListVolumes();
 
