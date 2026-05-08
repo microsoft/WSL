@@ -7,6 +7,9 @@
   <resources minRequiredRevision="0.1" fallbackCulture="en-US"/>
   <categories>
     <category name="WSL" displayName="$(string.WindowsSubsystemForLinux)"/>
+    <category name="WSLContainer" displayName="$(string.WSLContainer)">
+      <parentCategory ref="WSL" />
+    </category>
   </categories>
   <policies>
     <policy name="AllowWSL" class="Machine" displayName="$(string.AllowWSL)" explainText="$(string.AllowWSLExplain)" key="Software\Policies\WSL" valueName="AllowWSL">
@@ -168,6 +171,27 @@
             </value>
           </item>
         </enum>
+      </elements>
+    </policy>
+
+    <!-- WSL Container Policies -->
+
+    <policy name="AllowWSLContainer" class="Machine" displayName="$(string.AllowWSLContainer)" explainText="$(string.AllowWSLContainerExplain)" key="Software\Policies\WSL" valueName="AllowWSLContainer">
+      <parentCategory ref="WSLContainer" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="WSLContainerCLIRegistryAllowlist" class="Machine" displayName="$(string.WSLContainerCLIRegistryAllowlist)" explainText="$(string.WSLContainerCLIRegistryAllowlistExplain)" presentation="$(presentation.WSLContainerCLIRegistryAllowlist)" key="Software\Policies\WSL">
+      <parentCategory ref="WSLContainer" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <elements>
+        <list id="WSLContainerCLIRegistryAllowlist_Input" key="Software\Policies\WSL\WSLContainerCLIRegistryAllowlist" valuePrefix="AllowedRegistry" />
       </elements>
     </policy>
 

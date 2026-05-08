@@ -913,14 +913,13 @@ void WSLCContainerImpl::Delete(WSLCDeleteFlags Flags)
     {
         auto lock = m_lock.lock_exclusive();
         wrapper = DeleteExclusiveLockHeld(Flags);
+    }
 
-        // Wait for the docker destroy event so anonymous volume cleanup is reflected in tracking by
-        // the time we return. Safe to wait here: OnEvent() signals m_destroyEvent before
-        // taking m_lock. Callers on the docker event-loop thread (OnEvent) must not wait.
-        if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
-        {
-            m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
-        }
+    // Wait for the docker destroy event so anonymous volume cleanup is reflected in tracking by
+    // the time we return.
+    if (WI_IsFlagSet(Flags, WSLCDeleteFlagsDeleteVolumes))
+    {
+        m_wslcSession.WaitForEventOrSessionTerminating(m_destroyEvent.get(), 60s);
     }
 }
 
