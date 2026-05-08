@@ -17,6 +17,14 @@ Abstract:
 #include "Microsoft.WSL.Containers.ImageProgress.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
+ImageProgress::ImageProgress(const WslcImageProgressMessage* progress) :
+    m_id(winrt::to_hstring(progress->id)),
+    m_status(static_cast<ImageProgressStatus>(progress->status)),
+    m_currentBytes(progress->detail.currentBytes),
+    m_totalBytes(progress->detail.totalBytes)
+{
+}
+
 hstring ImageProgress::Id()
 {
     return m_id;

@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.SessionSettings.g.cpp"
+#include "Session.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 SessionSettings::SessionSettings(hstring const& name, hstring const& storagePath) : m_name(name), m_storagePath(storagePath)
@@ -161,4 +162,5 @@ WslcSessionSettings* SessionSettings::ToStructPointer()
 
     return m_sessionSettings.get();
 }
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

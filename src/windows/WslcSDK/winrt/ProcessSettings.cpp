@@ -14,9 +14,27 @@ Abstract:
 
 #include "precomp.h"
 #include "ProcessSettings.h"
+#include "Process.h"
 #include "Microsoft.WSL.Containers.ProcessSettings.g.cpp"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
+
+StringArray::StringArray(size_t capacity)
+{
+    m_strings.reserve(capacity);
+    m_rawStrings.reserve(capacity);
+}
+
+void StringArray::Add(std::string&& s)
+{
+    m_strings.push_back(std::move(s));
+    m_rawStrings.push_back(m_strings.back().c_str());
+}
+
+PCSTR* StringArray::GetRawPointer()
+{
+    return m_rawStrings.data();
+}
 
 hstring ProcessSettings::WorkingDirectory()
 {
@@ -80,32 +98,26 @@ WslcProcessSettings* ProcessSettings::ToStructPointer()
 
     if (m_cmdLine.Size() > 0)
     {
-        m_cmdLineStrings.clear();
-        m_cmdLineStrings.reserve(m_cmdLine.Size());
-        std::vector<PCSTR> argv;
-        argv.reserve(m_cmdLine.Size());
+        auto argc = m_cmdLine.Size();
+        m_cmdLineStrings = StringArray{argc};
         for (auto const& arg : m_cmdLine)
         {
-            m_cmdLineStrings.push_back(winrt::to_string(arg));
-            argv.push_back(m_cmdLineStrings.back().c_str());
+            m_cmdLineStrings.Add(winrt::to_string(arg));
         }
 
-        winrt::check_hresult(WslcSetProcessSettingsCmdLine(m_processSettings.get(), argv.data(), argv.size()));
+        winrt::check_hresult(WslcSetProcessSettingsCmdLine(m_processSettings.get(), m_cmdLineStrings.GetRawPointer(), argc));
     }
 
     if (m_environmentVariables.Size() > 0)
     {
-        m_envStrings.clear();
-        m_envStrings.reserve(m_environmentVariables.Size());
-        std::vector<PCSTR> keyValues;
-        keyValues.reserve(m_environmentVariables.Size());
+        auto size = m_environmentVariables.Size();
+        m_envStrings = StringArray{size};
         for (auto const& [key, value] : m_environmentVariables)
         {
-            m_envStrings.push_back(winrt::to_string(key) + "=" + winrt::to_string(value));
-            keyValues.push_back(m_envStrings.back().c_str());
+            m_envStrings.Add(winrt::to_string(key) + "=" + winrt::to_string(value));
         }
 
-        winrt::check_hresult(WslcSetProcessSettingsEnvVariables(m_processSettings.get(), keyValues.data(), keyValues.size()));
+        winrt::check_hresult(WslcSetProcessSettingsEnvVariables(m_processSettings.get(), m_envStrings.GetRawPointer(), size));
     }
 
     return m_processSettings.get();

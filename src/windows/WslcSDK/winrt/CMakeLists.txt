@@ -17,6 +17,7 @@ set(SOURCES
     ServiceVersion.cpp
     Session.cpp
     SessionSettings.cpp
+    Streams.cpp
     TagImageOptions.cpp
     VhdOptions.cpp
     WslcService.cpp
@@ -39,6 +40,7 @@ set(HEADERS
     ServiceVersion.h
     Session.h
     SessionSettings.h
+    Streams.h
     TagImageOptions.h
     VhdOptions.h
     WslcService.h

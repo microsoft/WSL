@@ -9,7 +9,6 @@ Module Name:
 Abstract:
 
     This file contains the definition of the WinRT wrapper for the WSLC SDK Process class.
-
 --*/
 
 #pragma once
@@ -17,11 +16,13 @@ Abstract:
 #include "Helpers.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
+
 struct Process : ProcessT<Process>
 {
     Process() = default;
     Process(WslcProcess process);
     Process(winrt::Microsoft::WSL::Containers::Container const& container, winrt::Microsoft::WSL::Containers::ProcessSettings const& settings);
+    ~Process();
 
     void Start();
     uint32_t Pid();
@@ -38,16 +39,39 @@ struct Process : ProcessT<Process>
     void Exited(winrt::event_token const& token) noexcept;
 
     WslcProcess ToHandle();
-    WslcProcess* ToHandlePointer();
+    bool ApplyCallbacksToSettings(WslcProcessSettings* settings);
+    void AttachHandle(WslcProcess handle);
 
 private:
     void EnsureStarted() const;
+    void EnsureNotStarted() const;
+    void StartExitThread();
+
+    static void CALLBACK OutputCallback(
+        WslcProcessIOHandle ioHandle, _In_reads_bytes_(dataBytes) const BYTE* data, _In_ uint32_t dataBytes, _In_opt_ PVOID context);
+    static void CALLBACK ExitCallback(INT32 exitCode, _In_opt_ PVOID context);
+
+    // Returns true if external references still exist (i.e. not only the callback AddRef).
+    bool HasExternalReferences();
+
     // Only kept until Start() is called
     winrt::Microsoft::WSL::Containers::Container m_container{nullptr};
     winrt::Microsoft::WSL::Containers::ProcessSettings m_settings{nullptr};
 
     wil::unique_any<WslcProcess, decltype(&WslcReleaseProcess), &WslcReleaseProcess> m_process{nullptr};
+    winrt::event<winrt::Microsoft::WSL::Containers::ProcessExitHandler> m_exitedEvent;
+
+    // For processes created with Start() (callback path):
+    std::optional<winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler>> m_outputReceivedEvent{};
+    std::optional<winrt::event<winrt::Microsoft::WSL::Containers::ProcessOutputHandler>> m_errorReceivedEvent{};
+    bool m_hasExitCallback{false};
+
+    // For processes created from a WslcProcess handle (exit thread path):
+    wil::unique_handle m_exitEventHandle;
+    wil::unique_event m_destructedEvent;
+    std::thread m_exitThread;
 };
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 
 DEFINE_TYPE_HELPERS(Process);

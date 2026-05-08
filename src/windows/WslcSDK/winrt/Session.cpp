@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Session.h"
+#include "SessionSettings.h"
 #include "Microsoft.WSL.Containers.Session.g.cpp"
 
 using namespace winrt::Windows::Foundation;
@@ -21,24 +22,51 @@ using namespace winrt::Windows::Foundation::Collections;
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 
+namespace {
+
+    HRESULT CALLBACK ImageProgressCallback(const WslcImageProgressMessage* progressMessage, PVOID context) noexcept
+    {
+        auto progress = winrt::make<implementation::ImageProgress>(progressMessage);
+        ProgressCallbackHelper<decltype(progress)>::ReportProgress(context, progress);
+        return S_OK;
+    }
+
+} // namespace
+
 Session::Session(winrt::Microsoft::WSL::Containers::SessionSettings const& settings) : m_settings(settings)
 {
+    if (!m_settings)
+    {
+        throw winrt::hresult_invalid_argument(L"Session settings cannot be null");
+    }
 }
 
 void Session::Start()
 {
+    if (m_session)
+    {
+        throw winrt::hresult_illegal_method_call(L"Session has already been started");
+    }
+
+    winrt::check_hresult(WslcSetSessionSettingsTerminationCallback(GetStructPointer(m_settings), TerminatedCallback, /* context */ this));
+
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateSession(GetStructPointer(m_settings), m_session.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
     m_settings = nullptr;
+
+    // This object needs to stay alive for as long as the callbacks may be invoked even if all other references to it are dropped.
+    // We increase its ref count here, and decrease it once the session terminates.
+    AddRef();
+
     return *this;
 }
 
 void Session::EnsureStarted() const
 {
-    if (m_settings)
+    if (!m_session)
     {
-        throw winrt::hresult_illegal_method_call();
+        throw winrt::hresult_illegal_method_call(L"Session has not been started");
     }
 }
 
@@ -49,37 +77,95 @@ void Session::Terminate()
 
 winrt::Microsoft::WSL::Containers::Container Session::CreateContainer(winrt::Microsoft::WSL::Containers::ContainerSettings const& containerSettings)
 {
+    EnsureStarted();
+
+    if (!containerSettings)
+    {
+        throw winrt::hresult_error(E_POINTER);
+    }
+
+    return winrt::make<implementation::Container>(ToHandle(), containerSettings);
+}
+
+IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PullImageAsync(winrt::Microsoft::WSL::Containers::PullImageOptions options)
+{
+    auto self = get_strong(); // keep session alive across suspension
+    co_await winrt::resume_background();
+
+    auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::ImageProgress>{co_await winrt::get_progress_token()};
+
+    auto uri = winrt::to_string(options.Uri());
+    auto auth = winrt::to_string(options.RegistryAuth());
+
+    WslcPullImageOptions pullOptions{};
+    pullOptions.uri = uri.c_str();
+    pullOptions.registryAuth = auth.empty() ? nullptr : auth.c_str();
+    pullOptions.progressCallback = ImageProgressCallback;
+    pullOptions.progressCallbackContext = &context;
+
     wil::unique_cotaskmem_string errorMessage;
-    WslcContainer containerHandle;
-    auto hr = WslcCreateContainer(ToHandle(), GetStructPointer(containerSettings), &containerHandle, errorMessage.put());
+    auto hr = WslcPullSessionImage(ToHandle(), &pullOptions, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
-    return winrt::make<implementation::Container>(containerHandle);
 }
 
-winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PullImageAsync(
-    winrt::Microsoft::WSL::Containers::PullImageOptions options)
+IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::ImportImageAsync(hstring path, hstring imageName)
 {
+    if (path.empty() || imageName.empty())
+    {
+        throw winrt::hresult_invalid_argument();
+    }
+
+    auto self = get_strong(); // keep session alive across suspension
     co_await winrt::resume_background();
-    throw hresult_not_implemented();
+
+    auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::ImageProgress>{co_await winrt::get_progress_token()};
+
+    auto name = winrt::to_string(imageName);
+
+    WslcImportImageOptions importOptions{};
+    importOptions.progressCallback = ImageProgressCallback;
+    importOptions.progressCallbackContext = &context;
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcImportSessionImageFromFile(ToHandle(), name.c_str(), path.c_str(), &importOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
-winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::ImportImageAsync(hstring path, hstring imageName)
+IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::LoadImageAsync(hstring path)
 {
+    if (path.empty())
+    {
+        throw winrt::hresult_invalid_argument();
+    }
+
+    auto self = get_strong(); // keep session alive across suspension
     co_await winrt::resume_background();
-    throw hresult_not_implemented();
+
+    auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::ImageProgress>{co_await winrt::get_progress_token()};
+
+    WslcLoadImageOptions loadOptions{};
+    loadOptions.progressCallback = ImageProgressCallback;
+    loadOptions.progressCallbackContext = &context;
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcLoadSessionImageFromFile(ToHandle(), path.c_str(), &loadOptions, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
-winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::LoadImageAsync(hstring path)
+IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PushImageAsync(winrt::Microsoft::WSL::Containers::PushImageOptions options)
 {
+    auto self = get_strong(); // keep session alive across suspension
     co_await winrt::resume_background();
-    throw hresult_not_implemented();
-}
 
-winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::ImageProgress> Session::PushImageAsync(
-    winrt::Microsoft::WSL::Containers::PushImageOptions options)
-{
-    co_await winrt::resume_background();
-    throw hresult_not_implemented();
+    auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::ImageProgress>{co_await winrt::get_progress_token()};
+
+    auto pushStruct = GetStructPointer(options);
+    pushStruct->progressCallback = ImageProgressCallback;
+    pushStruct->progressCallbackContext = &context;
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcPushSessionImage(ToHandle(), pushStruct, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
 void Session::DeleteImage(hstring const& nameOrId)
@@ -127,19 +213,22 @@ hstring Session::Authenticate(Uri const& serverAddress, hstring const& username,
 
 winrt::event_token Session::Terminated(winrt::Microsoft::WSL::Containers::SessionTerminationHandler const& handler)
 {
-    throw winrt::hresult_not_implemented();
+    return m_terminatedEvent.add(handler);
 }
 
 void Session::Terminated(winrt::event_token const& token) noexcept
 {
-    assert(false); // TODO: not implemented, but this can't throw
+    m_terminatedEvent.remove(token);
 }
 
 IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::Images()
 {
-    wil::unique_cotaskmem_array_ptr<WslcImageInfo> imagesArray;
+    WslcImageInfo* imagesArrayPtr = nullptr;
     uint32_t count = 0;
-    winrt::check_hresult(WslcListSessionImages(ToHandle(), imagesArray.put(), &count));
+    winrt::check_hresult(WslcListSessionImages(ToHandle(), &imagesArrayPtr, &count));
+
+    // We can't pass this directly to WslcListSessionImages because the field for size is of a different type.
+    wil::unique_cotaskmem_array_ptr<WslcImageInfo> imagesArray{imagesArrayPtr, count};
 
     auto images = winrt::single_threaded_vector<winrt::Microsoft::WSL::Containers::ImageInfo>();
     for (uint32_t i = 0; i < count; i++)
@@ -156,9 +245,15 @@ WslcSession Session::ToHandle()
     return m_session.get();
 }
 
-WslcSession* Session::ToHandlePointer()
+void CALLBACK Session::TerminatedCallback(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context)
 {
-    EnsureStarted();
-    return m_session.addressof();
+    winrt::com_ptr<Session> session;
+
+    // No other callback should be called after this event, so we no longer need to keep the object alive.
+    // This takes ownership without increasing the ref count to account for the AddRef in Start().
+    session.attach(static_cast<Session*>(context));
+
+    session->m_terminatedEvent(*session, static_cast<SessionTerminationReason>(reason));
 }
+
 } // namespace winrt::Microsoft::WSL::Containers::implementation

@@ -88,6 +88,11 @@ void ContainerSettings::NetworkingMode(winrt::Windows::Foundation::IReference<wi
         throw hresult_illegal_state_change();
     }
 
+    if (value && value.Value() != ContainerNetworkingMode::None && value.Value() != ContainerNetworkingMode::Bridged)
+    {
+        throw hresult_invalid_argument();
+    }
+
     m_networkingMode = value;
 }
 
@@ -131,11 +136,6 @@ void ContainerSettings::Flags(ContainerFlags const& value)
     if (m_containerSettings)
     {
         throw hresult_illegal_state_change();
-    }
-
-    if (WI_IsFlagSet(value, ContainerFlags::Privileged))
-    {
-        throw hresult_not_implemented();
     }
 
     m_flags = value;

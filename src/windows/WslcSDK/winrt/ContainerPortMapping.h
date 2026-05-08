@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.ContainerPortMapping.g.h"
 #include "Helpers.h"
+#include <winrt/Windows.Networking.h>
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct ContainerPortMapping : ContainerPortMappingT<ContainerPortMapping>
@@ -40,6 +41,7 @@ private:
     winrt::Windows::Networking::HostName m_windowsAddress{nullptr};
 
     std::unique_ptr<WslcContainerPortMapping> m_containerPortMapping;
+    std::optional<sockaddr_storage> m_windowsAddressStorage;
 };
 } // namespace winrt::Microsoft::WSL::Containers::implementation
 

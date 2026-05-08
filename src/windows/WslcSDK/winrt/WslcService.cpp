@@ -16,8 +16,21 @@ Abstract:
 #include "WslcService.h"
 #include "Microsoft.WSL.Containers.WslcService.g.cpp"
 #include "ServiceVersion.h"
+#include "InstallProgress.h"
+
+using namespace winrt::Windows::Foundation;
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
+
+namespace {
+    void CALLBACK InstallProgressCallback(WslcComponentFlags component, uint32_t progressSteps, uint32_t totalSteps, PVOID context) noexcept
+    {
+        auto installProgress = winrt::make<implementation::InstallProgress>(
+            static_cast<winrt::Microsoft::WSL::Containers::ComponentFlags>(component), progressSteps, totalSteps);
+        ProgressCallbackHelper<decltype(installProgress)>::ReportProgress(context, installProgress);
+    }
+} // namespace
+
 winrt::Microsoft::WSL::Containers::ComponentFlags WslcService::GetMissingComponents()
 {
     WslcComponentFlags missing;
@@ -32,8 +45,10 @@ winrt::Microsoft::WSL::Containers::ServiceVersion WslcService::GetVersion()
     return winrt::make<implementation::ServiceVersion>(version.major, version.minor, version.revision);
 }
 
-winrt::Windows::Foundation::IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::InstallProgress> WslcService::InstallWithDependenciesAsync()
+IAsyncActionWithProgress<winrt::Microsoft::WSL::Containers::InstallProgress> WslcService::InstallWithDependenciesAsync()
 {
-    throw hresult_not_implemented();
+    co_await winrt::resume_background();
+    auto context = ProgressCallbackHelper<winrt::Microsoft::WSL::Containers::InstallProgress>{co_await winrt::get_progress_token()};
+    winrt::check_hresult(WslcInstallWithDependencies(InstallProgressCallback, &context));
 }
 } // namespace winrt::Microsoft::WSL::Containers::implementation

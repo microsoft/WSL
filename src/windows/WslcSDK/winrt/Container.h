@@ -15,12 +15,13 @@ Abstract:
 #pragma once
 #include "Microsoft.WSL.Containers.Container.g.h"
 #include "Helpers.h"
+#include "Process.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 struct Container : ContainerT<Container>
 {
     Container() = default;
-    Container(WslcContainer container);
+    Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings);
 
     void Start(winrt::Microsoft::WSL::Containers::ContainerStartFlags const& flags);
     void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, uint32_t timeoutSeconds);
@@ -31,11 +32,15 @@ struct Container : ContainerT<Container>
     winrt::Microsoft::WSL::Containers::Process InitProcess();
     winrt::Microsoft::WSL::Containers::ContainerState State();
 
-    WslcContainer* ToHandlePointer();
     WslcContainer ToHandle();
 
 private:
+    void EnsureCreated();
+
+    WslcSession m_session{};
+    winrt::Microsoft::WSL::Containers::ContainerSettings m_settings{nullptr};
     wil::unique_any<WslcContainer, decltype(&WslcReleaseContainer), &WslcReleaseContainer> m_container;
+    winrt::com_ptr<implementation::Process> m_initProcess;
 };
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

@@ -21,14 +21,9 @@ namespace winrt::Microsoft::WSL::Containers::implementation {
 VhdOptions::VhdOptions(hstring const& name, uint64_t sizeInBytes, VhdType const& type) :
     m_name(winrt::to_string(name)), m_sizeInBytes(sizeInBytes), m_type(type)
 {
-    if (name.empty() || sizeInBytes == 0)
+    if (sizeInBytes == 0)
     {
         throw hresult_invalid_argument();
-    }
-
-    if (type != VhdType::Dynamic)
-    {
-        throw hresult_not_implemented();
     }
 }
 
@@ -82,11 +77,6 @@ void VhdOptions::Type(VhdType const& value)
     if (m_VhdOptions)
     {
         throw hresult_illegal_state_change();
-    }
-
-    if (value != VhdType::Dynamic)
-    {
-        throw hresult_not_implemented();
     }
 
     m_type = value;
