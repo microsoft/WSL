@@ -2758,6 +2758,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Ongeldige {} argumentwaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Afbeelding {} niet gevonden, wordt opgehaald</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

@@ -2758,6 +2758,10 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Image '{}' not found, pulling</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

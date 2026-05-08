@@ -2758,6 +2758,10 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Valor de argumento {} inválido: "{}". Era esperado um tamanho de memória (por exemplo, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Imagem "{}" não encontrada, a carregar</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
