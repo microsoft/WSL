@@ -40,9 +40,7 @@ using namespace std::chrono_literals;
 
 //
 // Test method declaration macros that tag tests with TAEF metadata for version-based selection.
-// Use these instead of TEST_METHOD() for tests that only apply to a specific WSL version.
-// When run via run-tests.ps1 or CloudTest, inapplicable tests are excluded from the run
-// entirely (no "skipped" noise) via TAEF /select: queries.
+// If the test version doesn't match the version passed to te.exe, the test is ignored.
 //
 #define WSL1_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
