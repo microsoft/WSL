@@ -986,6 +986,79 @@ void MultiHandleWait::EnsureIocp()
     }
 }
 
+MultiHandleWait::~MultiHandleWait()
+{
+    DrainPending();
+}
+
+void MultiHandleWait::DrainPending() noexcept
+try
+{
+    if (!m_iocp || m_handles.empty())
+    {
+        return;
+    }
+
+    // Issue cancellation for every outstanding overlapped op nested under the top-level
+    // handles. Cancellation is fire-and-forget; we drain the resulting completions next.
+    for (auto& [flags, handle] : m_handles)
+    {
+        if (handle && handle->HasOutstandingIo())
+        {
+            handle->CancelOutstandingIo();
+        }
+    }
+
+    // Pump completions on this thread until every nested overlapped op has been retired
+    // by the kernel and dispatched via ShutdownCollect(). It is critical that the IOCP is
+    // pumped here -- in IOCP-associated mode the OVERLAPPED isn't safe to free until the
+    // matching completion packet has been dequeued. Without this loop the destructors of
+    // our owned handles would either hang waiting on the IOCP (which is no longer pumped
+    // by the original Run() loop) or, if they didn't wait, free OVERLAPPEDs the kernel
+    // still references.
+    auto anyOutstanding = [this]() {
+        return std::ranges::any_of(m_handles, [](const auto& entry) {
+            return entry.second && entry.second->HasOutstandingIo();
+        });
+    };
+
+    while (anyOutstanding())
+    {
+        DWORD bytesTransferred{};
+        ULONG_PTR completionKey{};
+        OVERLAPPED* completedOverlapped{};
+        BOOL success = GetQueuedCompletionStatus(m_iocp.get(), &bytesTransferred, &completionKey, &completedOverlapped, INFINITE);
+
+        if (!success && completedOverlapped == nullptr)
+        {
+            // GetQueuedCompletionStatus failed without a completion packet (e.g., the IOCP
+            // handle was closed elsewhere). We can't safely make further progress; bail
+            // out -- the destructor warnings on remaining handles will surface the issue.
+            LOG_LAST_ERROR();
+            break;
+        }
+
+        if (completionKey == 0)
+        {
+            // Spurious cancel signal. We are already shutting down; ignore.
+            continue;
+        }
+
+        auto* completionTarget = reinterpret_cast<OverlappedIOHandle*>(completionKey);
+        auto it = std::ranges::find_if(
+            m_handles, [completionTarget](const auto& entry) { return entry.second.get() == completionTarget; });
+
+        if (it == m_handles.end())
+        {
+            // Handle was already removed (e.g., by CancelOnCompleted before drain started).
+            continue;
+        }
+
+        it->second->ShutdownCollect();
+    }
+}
+CATCH_LOG()
+
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     m_cancel = false; // Run may be called multiple times.
@@ -1220,29 +1293,28 @@ ReadHandle::~ReadHandle()
 {
     WaitBridge.reset();
 
+    // Outstanding overlapped I/O must have been retired by MultiHandleWait::DrainPending()
+    // before this destructor runs. The shutdown contract (HasOutstandingIo /
+    // CancelOutstandingIo / ShutdownCollect) is responsible for that. If we get here with
+    // State == Pending, the handle was used outside MultiHandleWait or DrainPending failed
+    // -- in which case waiting on the OVERLAPPED is unsafe in IOCP mode (the IOCP isn't
+    // being pumped) and would hang. Best-effort fall back to event-mode cancel for handles
+    // that were never associated with an IOCP; otherwise log loudly and leak the OVERLAPPED.
     if (State == IOHandleStatus::Pending)
     {
         if (RegisteredWithIocp)
         {
-            // In IOCP mode, Overlapped.hEvent is nullptr and cancellation completions go
-            // to the IOCP queue. Set a temporary event so GetOverlappedResult can wait
-            // for the cancel to complete, ensuring the OVERLAPPED isn't freed while the
-            // kernel still references it.
-            wil::unique_event cancelEvent(wil::EventOptions::ManualReset);
-            Overlapped.hEvent = cancelEvent.get();
-
-            if (CancelIoEx(Handle.Get(), &Overlapped))
-            {
-                DWORD bytesRead{};
-                GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true);
-            }
-
-            Overlapped.hEvent = nullptr;
+            LOG_HR_MSG(
+                E_UNEXPECTED, "ReadHandle destroyed with pending IOCP I/O (DrainPending skipped or failed); leaking OVERLAPPED");
+            return;
         }
-        else if (CancelIoEx(Handle.Get(), &Overlapped))
+
+        // Fallback (event-based) mode: Overlapped.hEvent == Event member, signaled by the
+        // kernel on completion. Safe to wait synchronously.
+        if (CancelIoEx(Handle.Get(), &Overlapped))
         {
             DWORD bytesRead{};
-            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, TRUE))
             {
                 auto error = GetLastError();
                 LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
@@ -1253,6 +1325,38 @@ ReadHandle::~ReadHandle()
             LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
         }
     }
+}
+
+bool ReadHandle::HasOutstandingIo() const noexcept
+{
+    return State == IOHandleStatus::Pending;
+}
+
+void ReadHandle::CancelOutstandingIo() noexcept
+{
+    if (State != IOHandleStatus::Pending)
+    {
+        return;
+    }
+
+    // Fire-and-forget cancel. The completion will arrive via the IOCP (in IOCP mode) or
+    // via the wait bridge (in fallback mode); MultiHandleWait::DrainPending pumps it up
+    // and dispatches to ShutdownCollect. We do not reset WaitBridge here -- the bridge is
+    // still needed in fallback mode to deliver the cancellation completion to the IOCP.
+    if (!CancelIoEx(Handle.Get(), &Overlapped))
+    {
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+    }
+}
+
+void ReadHandle::ShutdownCollect() noexcept
+{
+    // The kernel has retired the OVERLAPPED (the matching completion packet was just
+    // dequeued by MultiHandleWait::DrainPending). Tear down the wait bridge and mark
+    // the handle as no longer outstanding. We deliberately do NOT call OnRead here --
+    // shutdown must not invoke user callbacks or run follow-on protocol work.
+    WaitBridge.reset();
+    State = IOHandleStatus::Completed;
 }
 
 void ReadHandle::OnRegister()
@@ -1387,26 +1491,19 @@ SingleAcceptHandle::~SingleAcceptHandle()
 {
     WaitBridge.reset();
 
+    // See the analogous note in ~ReadHandle: outstanding socket I/O must have been retired
+    // by MultiHandleWait::DrainPending(). Waiting in IOCP mode here is unsafe.
     if (State == IOHandleStatus::Pending)
     {
         if (RegisteredWithIocp)
         {
-            wil::unique_event cancelEvent(wil::EventOptions::ManualReset);
-            Overlapped.hEvent = cancelEvent.get();
-
-            if (CancelIoEx(ListenSocket.Get(), &Overlapped))
-            {
-                DWORD bytesProcessed{};
-                DWORD flagsReturned{};
-                WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned);
-            }
-
-            Overlapped.hEvent = nullptr;
+            LOG_HR_MSG(
+                E_UNEXPECTED, "SingleAcceptHandle destroyed with pending IOCP I/O (DrainPending skipped or failed); leaking OVERLAPPED");
+            return;
         }
-        else
-        {
-            LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
 
+        if (CancelIoEx(ListenSocket.Get(), &Overlapped))
+        {
             DWORD bytesProcessed{};
             DWORD flagsReturned{};
             if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
@@ -1415,7 +1512,36 @@ SingleAcceptHandle::~SingleAcceptHandle()
                 LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
             }
         }
+        else
+        {
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        }
     }
+}
+
+bool SingleAcceptHandle::HasOutstandingIo() const noexcept
+{
+    return State == IOHandleStatus::Pending;
+}
+
+void SingleAcceptHandle::CancelOutstandingIo() noexcept
+{
+    if (State != IOHandleStatus::Pending)
+    {
+        return;
+    }
+
+    if (!CancelIoEx(ListenSocket.Get(), &Overlapped))
+    {
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+    }
+}
+
+void SingleAcceptHandle::ShutdownCollect() noexcept
+{
+    // Shutdown -- do NOT invoke OnAccepted. Just retire the wait bridge and exit Pending.
+    WaitBridge.reset();
+    State = IOHandleStatus::Completed;
 }
 
 void SingleAcceptHandle::OnRegister()
@@ -1653,25 +1779,20 @@ WriteHandle::~WriteHandle()
 {
     WaitBridge.reset();
 
+    // See ~ReadHandle for rationale.
     if (State == IOHandleStatus::Pending)
     {
         if (RegisteredWithIocp)
         {
-            wil::unique_event cancelEvent(wil::EventOptions::ManualReset);
-            Overlapped.hEvent = cancelEvent.get();
-
-            if (CancelIoEx(Handle.Get(), &Overlapped))
-            {
-                DWORD bytesRead{};
-                GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true);
-            }
-
-            Overlapped.hEvent = nullptr;
+            LOG_HR_MSG(
+                E_UNEXPECTED, "WriteHandle destroyed with pending IOCP I/O (DrainPending skipped or failed); leaking OVERLAPPED");
+            return;
         }
-        else if (CancelIoEx(Handle.Get(), &Overlapped))
+
+        if (CancelIoEx(Handle.Get(), &Overlapped))
         {
             DWORD bytesRead{};
-            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, TRUE))
             {
                 auto error = GetLastError();
                 LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
@@ -1682,6 +1803,30 @@ WriteHandle::~WriteHandle()
             LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
         }
     }
+}
+
+bool WriteHandle::HasOutstandingIo() const noexcept
+{
+    return State == IOHandleStatus::Pending;
+}
+
+void WriteHandle::CancelOutstandingIo() noexcept
+{
+    if (State != IOHandleStatus::Pending)
+    {
+        return;
+    }
+
+    if (!CancelIoEx(Handle.Get(), &Overlapped))
+    {
+        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+    }
+}
+
+void WriteHandle::ShutdownCollect() noexcept
+{
+    WaitBridge.reset();
+    State = IOHandleStatus::Completed;
 }
 
 void WriteHandle::OnRegister()
@@ -1910,6 +2055,37 @@ HANDLE DockerIORelayHandle::GetHandle() const
     else
     {
         return Read->GetHandle();
+    }
+}
+
+bool DockerIORelayHandle::HasOutstandingIo() const noexcept
+{
+    return (Read && Read->HasOutstandingIo()) || WriteStdout.HasOutstandingIo() || WriteStderr.HasOutstandingIo();
+}
+
+void DockerIORelayHandle::CancelOutstandingIo() noexcept
+{
+    if (Read)
+    {
+        Read->CancelOutstandingIo();
+    }
+    WriteStdout.CancelOutstandingIo();
+    WriteStderr.CancelOutstandingIo();
+}
+
+void DockerIORelayHandle::ShutdownCollect() noexcept
+{
+    if (Read && Read->HasOutstandingIo())
+    {
+        Read->ShutdownCollect();
+    }
+    else if (WriteStdout.HasOutstandingIo())
+    {
+        WriteStdout.ShutdownCollect();
+    }
+    else if (WriteStderr.HasOutstandingIo())
+    {
+        WriteStderr.ShutdownCollect();
     }
 }
 

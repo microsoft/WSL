@@ -305,6 +305,35 @@ public:
 
     IOHandleStatus GetState() const;
 
+    // Shutdown contract used by MultiHandleWait::DrainPending() to retire any
+    // outstanding overlapped I/O before the handle is destroyed. These are
+    // distinct from the normal Schedule()/Collect() state machine so shutdown
+    // does not invoke user callbacks or follow-on protocol work, and does not
+    // confuse the normal IOHandleStatus semantics.
+    //
+    //   HasOutstandingIo()  - does this handle (or any nested child) currently
+    //                         have an in-flight overlapped op the kernel may
+    //                         still complete via the IOCP?
+    //   CancelOutstandingIo - issue CancelIoEx (or its socket equivalent) for
+    //                         every nested in-flight op. Does NOT wait.
+    //   ShutdownCollect     - dispatch a shutdown completion packet to the
+    //                         specific child whose op just completed; transition
+    //                         it out of "outstanding" state. Must not throw and
+    //                         must not invoke normal completion callbacks.
+    //
+    // Default implementations are no-ops (correct for handles like EventHandle
+    // that don't issue overlapped I/O).
+    virtual bool HasOutstandingIo() const noexcept
+    {
+        return false;
+    }
+    virtual void CancelOutstandingIo() noexcept
+    {
+    }
+    virtual void ShutdownCollect() noexcept
+    {
+    }
+
 protected:
     // Helper for composite handles: register a child sub-handle so that its
     // completions wake the same top-level handle that owns this composite. The
@@ -370,6 +399,10 @@ public:
     void Collect() override;
     HANDLE GetHandle() const override;
 
+    bool HasOutstandingIo() const noexcept override;
+    void CancelOutstandingIo() noexcept override;
+    void ShutdownCollect() noexcept override;
+
 private:
     void OnRegister() override;
     static VOID CALLBACK WaitBridgeCallback(PVOID context, BOOLEAN timedOut);
@@ -396,6 +429,10 @@ public:
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
+
+    bool HasOutstandingIo() const noexcept override;
+    void CancelOutstandingIo() noexcept override;
+    void ShutdownCollect() noexcept override;
 
 private:
     void OnRegister() override;
@@ -458,6 +495,10 @@ public:
     void Collect() override;
     HANDLE GetHandle() const override;
     void Push(const gsl::span<char>& Buffer);
+
+    bool HasOutstandingIo() const noexcept override;
+    void CancelOutstandingIo() noexcept override;
+    void ShutdownCollect() noexcept override;
 
 private:
     void OnRegister() override;
@@ -552,6 +593,29 @@ public:
         }
     }
 
+    bool HasOutstandingIo() const noexcept override
+    {
+        return Read.HasOutstandingIo() || Write.HasOutstandingIo();
+    }
+
+    void CancelOutstandingIo() noexcept override
+    {
+        Read.CancelOutstandingIo();
+        Write.CancelOutstandingIo();
+    }
+
+    void ShutdownCollect() noexcept override
+    {
+        if (Read.HasOutstandingIo())
+        {
+            Read.ShutdownCollect();
+        }
+        else if (Write.HasOutstandingIo())
+        {
+            Write.ShutdownCollect();
+        }
+    }
+
 private:
     void OnRegister() override
     {
@@ -585,6 +649,10 @@ public:
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
+
+    bool HasOutstandingIo() const noexcept override;
+    void CancelOutstandingIo() noexcept override;
+    void ShutdownCollect() noexcept override;
 
 #pragma pack(push, 1)
     struct MultiplexedHeader
@@ -625,6 +693,7 @@ public:
     };
 
     MultiHandleWait() = default;
+    ~MultiHandleWait();
 
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
@@ -632,6 +701,12 @@ public:
 
 private:
     void EnsureIocp();
+
+    // Cancel any outstanding overlapped I/O on owned handles and drain the
+    // resulting completion packets from the IOCP. Called from the destructor
+    // (and only the destructor) to ensure the kernel has fully retired every
+    // OVERLAPPED before the owning handles are freed.
+    void DrainPending() noexcept;
 
     wil::unique_handle m_iocp;
     std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
