@@ -55,7 +55,7 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
             if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, nullptr))
             {
                 auto error = WSAGetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+                LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && WSAECONNRESET);
             }
         }
         else
@@ -64,7 +64,7 @@ void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
             if (!GetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true))
             {
                 auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && WSAECONNRESET);
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
             }
         }
     }
