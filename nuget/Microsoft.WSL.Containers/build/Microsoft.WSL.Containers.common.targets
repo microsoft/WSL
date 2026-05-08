@@ -122,10 +122,9 @@
                  Text="WSLC: Image '$(_WslcImageRef):$(_WslcTag)' built successfully." />
     </Target>
 
-    <!-- Inner target: save a single image to a tar file. Has no Inputs/Outputs so it always runs.
-         Image must already exist in the wslc default session (left there by _WslcBuildSingleImage). -->
-    <Target Name="_WslcSaveSingleImage">
-
+    <!-- Resolve image ref and tar path into properties so _WslcSaveSingleImage
+         can reference them in its Inputs/Outputs attributes. -->
+    <Target Name="_WslcResolveSavePath">
         <PropertyGroup>
             <!-- Resolve image reference: use Image metadata if set, otherwise fall back to Identity -->
             <_WslcImageRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcImageRef>
@@ -138,11 +137,23 @@
 
             <_WslcTarDir>$([System.IO.Path]::GetDirectoryName('$(_WslcTarPath)'))</_WslcTarDir>
         </PropertyGroup>
+    </Target>
+
+    <!-- Inner target: save a single image to a tar file. Incremental — only re-saves
+         when the build stamp is newer than the tar. The Delete before Exec ensures a
+         failed save doesn't leave a partial tar that would look up-to-date next build.
+         Image must already exist in the wslc default session (left there by _WslcBuildSingleImage). -->
+    <Target Name="_WslcSaveSingleImage"
+            DependsOnTargets="_WslcResolveSavePath"
+            Inputs="$(_WslcIntDir)wslc_$(_WslcName).built"
+            Outputs="$(_WslcTarPath)">
 
         <MakeDir Directories="$(_WslcTarDir)" Condition="'$(_WslcTarDir)' != ''" />
 
         <Message Importance="high"
                  Text="WSLC: Saving image '$(_WslcFullRef)' to '$(_WslcTarPath)'..." />
+
+        <Delete Files="$(_WslcTarPath)" />
 
         <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcTarPath)&quot; &quot;$(_WslcFullRef)&quot;"
               ConsoleToMSBuild="true" />
