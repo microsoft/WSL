@@ -7797,6 +7797,124 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerStats_RunningContainer)
+    {
+        // Start a long-lived detached container on a bridged network so network stats are populated.
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
+
+        auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats", &container));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(container->Stats(&output));
+        VERIFY_IS_NOT_NULL(output.get());
+        VERIFY_IS_FALSE(std::string(output.get()).empty());
+
+        const auto stats = wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+
+        // cpu_stats
+        // The VM has been running so system_cpu_usage is non-zero.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.system_cpu_usage, 0ull);
+
+        // The container process itself has consumed some CPU.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.cpu_usage.total_usage, 0ull);
+
+        // Kernel + user time together must not exceed total CPU time.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(
+            stats.cpu_stats.cpu_usage.usage_in_kernelmode + stats.cpu_stats.cpu_usage.usage_in_usermode, stats.cpu_stats.cpu_usage.total_usage);
+
+        // The session was created with 4 CPUs.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.online_cpus, 0u);
+
+        // precpu_stats
+        // precpu_stats is a prior snapshot; its total must not exceed the current total.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.precpu_stats.cpu_usage.total_usage, stats.cpu_stats.cpu_usage.total_usage);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.precpu_stats.system_cpu_usage, stats.cpu_stats.system_cpu_usage);
+
+        // memory_stats
+        // Limit is the VM memory ceiling — must be non-zero.
+        VERIFY_IS_GREATER_THAN(stats.memory_stats.limit, 0ull);
+
+        // The sleep process occupies at least some memory.
+        VERIFY_IS_GREATER_THAN(stats.memory_stats.usage, 0ull);
+
+        // Usage must never exceed the reported limit.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.memory_stats.usage, stats.memory_stats.limit);
+
+        // pids_stats
+        // At minimum the sleep process itself must be counted.
+        VERIFY_IS_GREATER_THAN(stats.pids_stats.current, 0ull);
+
+        // networks
+        // A bridged container always has at least one network interface.
+        VERIFY_IS_TRUE(stats.networks.has_value());
+        VERIFY_IS_FALSE(stats.networks->empty());
+
+        // Every interface entry must have consistent packet/byte counts
+        // (bytes >= 0 is trivially true for unsigned, but packets imply bytes >= 0 too).
+        for (const auto& [iface, net] : *stats.networks)
+        {
+            VERIFY_IS_FALSE(iface.empty());
+
+            // If packets were received/sent, the byte count must also be non-zero.
+            if (net.rx_packets > 0)
+            {
+                VERIFY_IS_GREATER_THAN(net.rx_bytes, 0ull);
+            }
+            if (net.tx_packets > 0)
+            {
+                VERIFY_IS_GREATER_THAN(net.tx_bytes, 0ull);
+            }
+        }
+
+        // blkio_stats
+        // io_service_bytes_recursive may be absent for a container with no disk I/O,
+        // but if present every entry must have a non-empty operation name.
+        if (stats.blkio_stats.io_service_bytes_recursive.has_value())
+        {
+            for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
+            {
+                VERIFY_IS_FALSE(entry.op.empty());
+            }
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerStats_NullOutputPointer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats-null", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
+        auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats-null", &container));
+
+        // Passing nullptr for Output must fail.
+        VERIFY_FAILED(container->Stats(nullptr));
+    }
+
+    WSLC_TEST_METHOD(ContainerStats_CreatedContainer_ReturnsZeroedStats)
+    {
+        // A created-but-not-started container returns zeroed stats from Docker rather than an error.
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats-created", {}, {}, WSLCContainerNetworkTypeBridged);
+        auto [result, runningContainer] = launcher.CreateNoThrow(*m_defaultSession);
+        VERIFY_SUCCEEDED(result);
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats-created", &container));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce)); });
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(container->Stats(&output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        // A non-running container has no active processes.
+        auto stats = wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+        VERIFY_ARE_EQUAL(0ull, stats.pids_stats.current);
+    }
+
     WSLC_TEST_METHOD(InvalidNames)
     {
         auto expectInvalidArg = [&](const std::string& name) {
