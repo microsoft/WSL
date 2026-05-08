@@ -6,29 +6,27 @@
 
     <!-- Default properties -->
     <PropertyGroup>
-        <!-- Auto-detect wslc CLI from MSI install path. Override with WslcCliPath property if needed. -->
-        <WslcCliPath Condition="'$(WslcCliPath)' == '' AND Exists('$(ProgramW6432)\WSL\wslc.exe')">$(ProgramW6432)\WSL\wslc.exe</WslcCliPath>
+        <!-- Default to bare 'wslc' so cmd.exe resolves it via PATH (the WSL MSI puts wslc.exe there).
+             Override with WslcCliPath property if needed. -->
+        <WslcCliPath Condition="'$(WslcCliPath)' == ''">wslc</WslcCliPath>
         <!-- Unified intermediate directory: $(IntDir) for C++, $(IntermediateOutputPath) for .NET -->
         <_WslcIntDir Condition="'$(IntDir)' != ''">$(IntDir)</_WslcIntDir>
         <_WslcIntDir Condition="'$(_WslcIntDir)' == '' AND '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</_WslcIntDir>
         <_WslcIntDir Condition="'$(_WslcIntDir)' == ''">obj\</_WslcIntDir>
     </PropertyGroup>
 
-    <!-- Default metadata for WslcImage items -->
+    <!-- Default metadata for WslcImage items.
+         Image holds the full ref including the tag (e.g. "echo-server:latest").
+         If only a repo (no ':') is given, ':latest' is appended automatically. -->
     <ItemDefinitionGroup>
         <WslcImage>
             <Image></Image>
-            <Tag>latest</Tag>
             <TarLocation></TarLocation>
         </WslcImage>
     </ItemDefinitionGroup>
 
     <!-- Check that wslc CLI is installed (invoked via DependsOnTargets from WslcBuildAllImages) -->
     <Target Name="WslcCheckDependencies">
-
-        <Error Condition="'$(WslcCliPath)' == ''"
-               Code="WSLC0005"
-               Text="WslcCliPath is empty: wslc CLI not auto-detected. Install WSL by running: wsl --install --no-distribution, or set the WslcCliPath property to point at wslc.exe." />
 
         <Exec Command="&quot;$(WslcCliPath)&quot; --version"
               IgnoreExitCode="true"
@@ -59,6 +57,11 @@
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
                Text="WslcImage item '%(WslcImage.Identity)' must be a valid file name." />
+
+        <!-- Tag was merged into Image; surface a clear migration error. -->
+        <Error Condition="'%(WslcImage.Tag)' != ''"
+               Code="WSLC0006"
+               Text="WslcImage 'Tag' metadata is no longer supported; include the tag in 'Image' (e.g. Image='echo-server:latest')." />
     </Target>
 
     <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:
@@ -72,11 +75,11 @@
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcBuildSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTag=%(WslcImage.Tag);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
                  Targets="_WslcSaveSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTag=%(WslcImage.Tag);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir)" />
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir)" />
     </Target>
 
     <!--
@@ -96,41 +99,43 @@
         </ItemGroup>
     </Target>
 
+    <!-- Resolve _WslcFullRef from _WslcImage (with Identity fallback). If the
+         resolved ref has no tag — i.e. no ':' after the last '/' (so registry-port
+         refs like localhost:5000/repo aren't mistaken for tagged) — append ':latest'. -->
+    <Target Name="_WslcResolveImageRef">
+        <PropertyGroup>
+            <_WslcRawRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcRawRef>
+            <_WslcRawRef Condition="'$(_WslcRawRef)' == ''">$(_WslcName)</_WslcRawRef>
+            <_WslcLastSlash>$([System.String]::Copy('$(_WslcRawRef)').LastIndexOf('/'))</_WslcLastSlash>
+            <_WslcLastColon>$([System.String]::Copy('$(_WslcRawRef)').LastIndexOf(':'))</_WslcLastColon>
+            <_WslcFullRef Condition="$(_WslcLastColon) &gt; $(_WslcLastSlash)">$(_WslcRawRef)</_WslcFullRef>
+            <_WslcFullRef Condition="'$(_WslcFullRef)' == ''">$(_WslcRawRef):latest</_WslcFullRef>
+        </PropertyGroup>
+    </Target>
+
     <!-- Inner target: build a single image with incremental check -->
     <Target Name="_WslcBuildSingleImage"
-            DependsOnTargets="_WslcCollectSources"
+            DependsOnTargets="_WslcCollectSources;_WslcResolveImageRef"
             Inputs="@(_WslcSourceFiles)"
             Outputs="$(_WslcIntDir)wslc_$(_WslcName).built">
 
         <MakeDir Directories="$(_WslcIntDir)" />
 
-        <!-- Resolve image reference: use Image metadata if set, otherwise fall back to Identity -->
-        <PropertyGroup>
-            <_WslcImageRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcImageRef>
-            <_WslcImageRef Condition="'$(_WslcImageRef)' == ''">$(_WslcName)</_WslcImageRef>
-        </PropertyGroup>
-
         <Message Importance="high"
-                 Text="WSLC: Building image '$(_WslcImageRef):$(_WslcTag)'..." />
+                 Text="WSLC: Building image '$(_WslcFullRef)'..." />
 
-        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcImageRef):$(_WslcTag)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcFullRef)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
               ConsoleToMSBuild="true" />
 
         <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).built" AlwaysCreate="true" />
 
         <Message Importance="high"
-                 Text="WSLC: Image '$(_WslcImageRef):$(_WslcTag)' built successfully." />
+                 Text="WSLC: Image '$(_WslcFullRef)' built successfully." />
     </Target>
 
-    <!-- Resolve image ref and tar path into properties so _WslcSaveSingleImage
-         can reference them in its Inputs/Outputs attributes. -->
-    <Target Name="_WslcResolveSavePath">
+    <!-- Resolve tar path into a property so _WslcSaveSingleImage can use it in Inputs/Outputs. -->
+    <Target Name="_WslcResolveSavePath" DependsOnTargets="_WslcResolveImageRef">
         <PropertyGroup>
-            <!-- Resolve image reference: use Image metadata if set, otherwise fall back to Identity -->
-            <_WslcImageRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcImageRef>
-            <_WslcImageRef Condition="'$(_WslcImageRef)' == ''">$(_WslcName)</_WslcImageRef>
-            <_WslcFullRef>$(_WslcImageRef):$(_WslcTag)</_WslcFullRef>
-
             <!-- Resolve tar path: user-provided TarLocation, else $(OutDir)<name>.tar -->
             <_WslcTarPath Condition="'$(_WslcTarLocation)' != ''">$(_WslcTarLocation)</_WslcTarPath>
             <_WslcTarPath Condition="'$(_WslcTarPath)' == ''">$(_WslcOutDir)$(_WslcName).tar</_WslcTarPath>
@@ -140,8 +145,11 @@
     </Target>
 
     <!-- Inner target: save a single image to a tar file. Incremental — only re-saves
-         when the build stamp is newer than the tar. The Delete before Exec ensures a
-         failed save doesn't leave a partial tar that would look up-to-date next build.
+         when the build stamp is newer than the tar.
+         Save writes to <tar>.tmp and atomically renames on success. wslc image save
+         uses CREATE_ALWAYS, which truncates the destination on entry, so a failed
+         save would otherwise leave a partial tar with newer mtime than sources
+         (and break incremental). The Move only runs if save succeeded.
          Image must already exist in the wslc default session (left there by _WslcBuildSingleImage). -->
     <Target Name="_WslcSaveSingleImage"
             DependsOnTargets="_WslcResolveSavePath"
@@ -153,10 +161,10 @@
         <Message Importance="high"
                  Text="WSLC: Saving image '$(_WslcFullRef)' to '$(_WslcTarPath)'..." />
 
-        <Delete Files="$(_WslcTarPath)" />
-
-        <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcTarPath)&quot; &quot;$(_WslcFullRef)&quot;"
+        <Exec Command="&quot;$(WslcCliPath)&quot; image save -o &quot;$(_WslcTarPath).tmp&quot; &quot;$(_WslcFullRef)&quot;"
               ConsoleToMSBuild="true" />
+
+        <Move SourceFiles="$(_WslcTarPath).tmp" DestinationFiles="$(_WslcTarPath)" />
 
         <!-- Opt-in: <WslcPruneAfterBuild>true</WslcPruneAfterBuild> -->
         <Message Importance="high"
