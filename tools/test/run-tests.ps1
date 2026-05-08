@@ -103,6 +103,9 @@ if ($AttachDebugger)
 else
 {
     te.exe $teArgList
-    exit $?
+    if (!$?)
+    {
+        exit 1
+    }
 }
 
