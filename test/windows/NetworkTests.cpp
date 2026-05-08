@@ -4136,6 +4136,51 @@ class MirroredTests
         NetworkTests::VerifyAcceptedConnectionPortTracking();
     }
 
+    WSL2_TEST_METHOD(MirroredReusePortOnGuest)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        // Verify that when guest has two binds on the same port (with reuseport) and the first
+        // bind is released, the port remains allocated to the guest because the second bind is
+        // still active. This validates the relaxed port+protocol matching in mirrored mode.
+        {
+            auto [guestLocal, read1] = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234,bind=127.0.0.1,reuseport", true);
+
+            auto guestWild = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234,bind=0.0.0.0,reuseport", true);
+
+            // Release the first bind (127.0.0.1)
+            guestLocal.reset();
+            read1.reset();
+
+            // Wait > 60 seconds so that the port tracker's deallocation logic kicks in.
+            // See c_bind_timeout_seconds in GnsPortTracker.cpp
+            std::this_thread::sleep_for(std::chrono::seconds(90));
+
+            // The host tries to bind on 127.0.0.1 (matching the released guest bind). This should
+            // still fail because the second guest bind (0.0.0.0) is still active and the mirrored
+            // mode port tracker matches by port+protocol, not the full allocation tuple.
+            NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false, false, true);
+        }
+
+        // Both binds are now released. Verify the port is eventually released.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(1234);
+                addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2));
+    }
+
     WSL2_TEST_METHOD(PortZeroRebindSucceeds)
     {
         MIRRORED_NETWORKING_TEST_ONLY();

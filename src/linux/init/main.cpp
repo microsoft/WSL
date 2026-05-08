@@ -211,7 +211,7 @@ int StartDhcpClient(int DhcpTimeout);
 
 int StartGuestNetworkService(int GnsFd, wil::unique_fd&& DnsTunnelingFd, uint32_t DnsTunnelingIpAddress);
 
-void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type);
+void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type, LX_MINI_INIT_NETWORKING_MODE NetworkingMode);
 
 void StartTimeSyncAgent(void);
 
@@ -1327,7 +1327,7 @@ Return Value:
     return (ChildPid < 0) ? -1 : 0;
 }
 
-void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type)
+void StartPortTracker(LX_MINI_INIT_PORT_TRACKER_TYPE Type, LX_MINI_INIT_NETWORKING_MODE NetworkingMode)
 
 /*++
 
@@ -1338,6 +1338,8 @@ Routine Description:
 Arguments:
 
     Type - specifies the type of port tracker (localhost relay or mirrored).
+
+    NetworkingMode - specifies the networking mode (mirrored, virtio, etc.).
 
 Return Value:
 
@@ -1400,7 +1402,8 @@ Return Value:
         [PortTrackerFd = std::move(PortTrackerFd),
          NetlinkSocket = std::move(NetlinkSocket),
          BpfFd = std::move(BpfFd),
-         GuestRelayFd = std::move(GuestRelayFd)]() {
+         GuestRelayFd = std::move(GuestRelayFd),
+         NetworkingMode]() {
             execl(
                 LX_INIT_PATH,
                 LX_INIT_LOCALHOST_RELAY,
@@ -1412,6 +1415,8 @@ Return Value:
                 std::format("{}", NetlinkSocket.get()).c_str(),
                 INIT_PORT_TRACKER_LOCALHOST_RELAY,
                 std::format("{}", GuestRelayFd.get()).c_str(),
+                INIT_PORT_TRACKER_NETWORKING_MODE_ARG,
+                std::format("{}", static_cast<int>(NetworkingMode)).c_str(),
                 NULL);
 
             LOG_ERROR("execl failed {}", errno);
@@ -3432,7 +3437,7 @@ try
         Config.NetworkingMode = NetworkingConfiguration->NetworkingMode;
         if (NetworkingConfiguration->PortTrackerType != LxMiniInitPortTrackerTypeNone)
         {
-            StartPortTracker(NetworkingConfiguration->PortTrackerType);
+            StartPortTracker(NetworkingConfiguration->PortTrackerType, NetworkingConfiguration->NetworkingMode);
         }
 
         if (NetworkingConfiguration->DisableIpv6)

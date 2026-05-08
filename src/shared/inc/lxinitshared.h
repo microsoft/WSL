@@ -273,6 +273,7 @@ Abstract:
 #define INIT_BPF_FD_ARG "--bpf-fd"
 #define INIT_NETLINK_FD_ARG "--netlink-fd"
 #define INIT_PORT_TRACKER_LOCALHOST_RELAY "--localhost-relay"
+#define INIT_PORT_TRACKER_NETWORKING_MODE_ARG "--networking-mode"
 
 //
 // The types of messages that can be sent to init and mini init.
