@@ -187,6 +187,31 @@ void ImageService::Load(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->LoadImage(ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
 }
 
+void ImageService::Import(wsl::windows::wslc::models::Session& session, const std::wstring& input, const std::string& imageName)
+{
+    HANDLE imageHandle = nullptr;
+    wil::unique_hfile imageFile;
+    ULONGLONG contentLength = 0;
+
+    if (input == L"-")
+    {
+        imageHandle = GetStdHandle(STD_INPUT_HANDLE);
+    }
+    else
+    {
+        imageFile.reset(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(!imageFile);
+
+        LARGE_INTEGER fileSize{};
+        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+
+        imageHandle = imageFile.get();
+        contentLength = fileSize.QuadPart;
+    }
+
+    THROW_IF_FAILED(session.Get()->ImportImage(ToCOMInputHandle(imageHandle), imageName.c_str(), nullptr, contentLength));
+}
+
 void ImageService::Delete(wsl::windows::wslc::models::Session& session, const std::string& image, bool force, bool noPrune)
 {
     WSLCDeleteImageOptions options{};

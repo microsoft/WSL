@@ -534,6 +534,7 @@ private:
             {L"create", Localization::WSLCCLI_ContainerCreateDesc()},
             {L"exec", Localization::WSLCCLI_ContainerExecDesc()},
             {L"images", Localization::WSLCCLI_ImageListDesc()},
+            {L"import", Localization::WSLCCLI_ImageImportDesc()},
             {L"inspect", Localization::WSLCCLI_InspectDesc()},
             {L"kill", Localization::WSLCCLI_ContainerKillDesc()},
             {L"list", Localization::WSLCCLI_ContainerListDesc()},
