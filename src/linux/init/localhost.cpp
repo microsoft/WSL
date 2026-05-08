@@ -443,6 +443,12 @@ int RunPortTracker(int Argc, char** Argv)
         return 1;
     }
 
+    if (NetworkingMode < LxMiniInitNetworkingModeNone || NetworkingMode > LxMiniInitNetworkingModeVirtioProxy)
+    {
+        LOG_WARNING("Invalid networking mode ({}), falling back to None", NetworkingMode);
+        NetworkingMode = LxMiniInitNetworkingModeNone;
+    }
+
     const bool synchronousMode = BpfFd != -1 && NetlinkSocketFd != -1;
     const bool localhostRelay = GuestRelayFd != -1;
     auto hvSocketChannel = std::make_shared<wsl::shared::SocketChannel>(wil::unique_fd{PortTrackerFd}, "localhost");
