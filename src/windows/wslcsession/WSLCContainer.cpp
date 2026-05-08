@@ -403,11 +403,6 @@ void ProcessAdditionalNetworks(
         Localization::MessageWslcAdditionalNetworksRequirePrimary(),
         primaryNetworkMode == "host" || primaryNetworkMode == "none");
 
-    std::unordered_set<std::string> seenNetworks;
-
-    // Track the primary network name to detect duplicates in the additional networks list.
-    seenNetworks.insert(primaryNetworkMode);
-
     // Add the primary and all additional networks to EndpointsConfig so Docker attaches them all at create time.
     auto& endpointsConfig = request.NetworkingConfig.EndpointsConfig;
     endpointsConfig[primaryNetworkMode] = {};
@@ -418,13 +413,11 @@ void ProcessAdditionalNetworks(
 
         const std::string networkName = containerOptions.AdditionalNetworks[i];
 
-        THROW_HR_WITH_USER_ERROR_IF(
-            E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(networkName), !seenNetworks.insert(networkName).second);
+        auto [_, inserted] = endpointsConfig.insert({networkName, EmptyObject{}});
+        THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(networkName), !inserted);
 
         THROW_HR_WITH_USER_ERROR_IF(
             WSLC_E_NETWORK_NOT_FOUND, Localization::MessageWslcNetworkNotFound(networkName), !sessionNetworks.contains(networkName));
-
-        endpointsConfig[networkName] = {};
     }
 }
 
