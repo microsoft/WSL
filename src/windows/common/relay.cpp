@@ -45,15 +45,27 @@ LARGE_INTEGER InitializeFileOffset(HANDLE File)
     return Offset;
 }
 
-void CancelPendingIo(HANDLE Handle, OVERLAPPED& Overlapped)
+void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
 {
     DWORD bytesTransferred{};
-    if (CancelIoEx(Handle, &Overlapped))
+    if (CancelIoEx((HANDLE)Handle, &Overlapped))
     {
-        if (!GetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true))
+        if constexpr (std::is_same_v<decltype(Handle), SOCKET>)
         {
-            auto error = GetLastError();
-            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, nullptr))
+            {
+                auto error = WSAGetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            }
+        }
+        else
+        {
+            static_assert(std::is_same_v<decltype(Handle), HANDLE>);
+            if (!GetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true))
+            {
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && WSAECONNRESET);
+            }
         }
     }
     else
@@ -1465,7 +1477,7 @@ ReadSocketMessageHandle::~ReadSocketMessageHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        CancelPendingIo(Socket.Get(), Overlapped);
+        CancelPendingIo((SOCKET)Socket.Get(), Overlapped);
     }
 }
 

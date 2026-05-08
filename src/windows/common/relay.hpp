@@ -260,7 +260,7 @@ public:
 
     void Append(gsl::span<char> Span)
     {
-        THROW_HR_IF_MSG(E_UNEXPECTED, !Owned(), "BufferWrapper::Resize called on a non-owned buffer");
+        THROW_HR_IF_MSG(E_UNEXPECTED, !Owned(), "BufferWrapper::Append called on a non-owned buffer");
 
         m_owned->insert(m_owned->end(), Span.begin(), Span.end());
     }
