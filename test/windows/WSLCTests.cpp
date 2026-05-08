@@ -898,69 +898,81 @@ class WSLCTests
 
         LogInfo("Test: Before/Since filters");
         {
-            // Get all images to find their IDs
+            // Get all images to find their IDs and creation times
             wil::unique_cotaskmem_array_ptr<WSLCImageInformation> allImages;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
 
             std::string debianId, pythonId;
+            LONGLONG debianCreated = 0, pythonCreated = 0;
             for (const auto& image : allImages)
             {
                 std::string imageName = image.Image;
                 if (imageName == "debian:latest")
                 {
                     debianId = image.Hash;
+                    debianCreated = image.Created;
                 }
                 else if (imageName == "python:3.12-alpine")
                 {
                     pythonId = image.Hash;
+                    pythonCreated = image.Created;
                 }
             }
 
             VERIFY_IS_FALSE(debianId.empty());
             VERIFY_IS_FALSE(pythonId.empty());
 
-            // Test 'since' filter - images created after debian
+            // Determine which image is older/newer based on actual creation timestamps.
+            // Image creation times come from the registry and can change independently.
+            const auto& olderId = (debianCreated <= pythonCreated) ? debianId : pythonId;
+            const auto& newerId = (debianCreated <= pythonCreated) ? pythonId : debianId;
+            const auto* newerName = (debianCreated <= pythonCreated) ? "python:3.12-alpine" : "debian:latest";
+            const auto* olderName = (debianCreated <= pythonCreated) ? "debian:latest" : "python:3.12-alpine";
+
+            LogInfo("Older image: %hs (Created: %lld), Newer image: %hs (Created: %lld)", olderName, std::min(debianCreated, pythonCreated), newerName, std::max(debianCreated, pythonCreated));
+
+            // Test 'since' filter - images created after the older image
             {
                 WSLCListImageOptions options{};
                 options.Flags = WSLCListImagesFlagsNone;
-                options.Since = debianId.c_str();
+                options.Since = olderId.c_str();
 
                 wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
 
-                bool foundPython = false;
+                bool foundNewer = false;
                 for (const auto& image : images)
                 {
                     LogInfo("Image: %hs, Hash: %hs, Created: %lld", image.Image, image.Hash, image.Created);
-                    if (std::string{image.Image} == "python:3.12-alpine")
+                    if (std::string{image.Image} == newerName)
                     {
-                        foundPython = true;
+                        foundNewer = true;
                     }
                 }
 
-                VERIFY_IS_TRUE(foundPython);
+                VERIFY_IS_TRUE(foundNewer);
             }
 
-            // Test 'before' filter - images created before python
+            // Test 'before' filter - images created before the newer image
             {
                 WSLCListImageOptions options{};
                 options.Flags = WSLCListImagesFlagsNone;
-                options.Before = pythonId.c_str();
+                options.Before = newerId.c_str();
                 wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
 
-                bool foundDebian = false;
+                bool foundOlder = false;
                 for (const auto& image : images)
                 {
-                    if (std::string{image.Image} == "debian:latest")
+                    if (std::string{image.Image} == olderName)
                     {
-                        foundDebian = true;
+                        foundOlder = true;
                     }
                 }
 
-                VERIFY_IS_TRUE(foundDebian);
+                VERIFY_IS_TRUE(foundOlder);
             }
         }
 
