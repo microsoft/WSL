@@ -4171,6 +4171,13 @@ class WSLCTests
         WSLCDriverOption emptyMode[] = {{"SizeBytes", "1073741824"}, {"Mode", ""}};
         validateInvalidOptionsFailure(emptyMode, ARRAYSIZE(emptyMode), E_INVALIDARG, L"Invalid value for option 'Mode': ''");
 
+        // Mode=0 is the documented invalid value (spec is 1..07777). chmod 0000
+        // would make the volume root inaccessible, so it is rejected by Parse()
+        // for parity with the SDK-side check and to keep direct COM callers
+        // and persisted-metadata reload aligned with the public contract.
+        WSLCDriverOption zeroMode[] = {{"SizeBytes", "1073741824"}, {"Mode", "0"}};
+        validateInvalidOptionsFailure(zeroMode, ARRAYSIZE(zeroMode), E_INVALIDARG, L"Invalid value for option 'Mode': '0'");
+
         // Unknown options are rejected (catches typos and unsupported keys).
         WSLCDriverOption unknownOpt[] = {{"SizeBytes", "1073741824"}, {"Bogus", "value"}};
         validateInvalidOptionsFailure(
