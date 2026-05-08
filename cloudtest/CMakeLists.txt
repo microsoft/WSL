@@ -38,7 +38,7 @@ endif()
 
 function(add_test_group image version)
     set(DIR ${OUT}/${image}-wsl${version})
-    set(TEST_FILTER "(@TestCategory='WSLC')")
+    set(TEST_FILTER "not (@TestCategory='WSLC')")
 
     file(MAKE_DIRECTORY ${DIR})
 
