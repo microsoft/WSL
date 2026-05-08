@@ -262,6 +262,9 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
     // Create a listening socket for mini_init to connect to once the VM is running.
     m_listenSocket = wsl::windows::common::hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_INIT_PORT);
 
+    // Create a listening socket for crash dump collection from the guest.
+    m_crashDumpListenSocket = wsl::windows::common::hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
+
     // Start the virtual machine
     hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
 
@@ -763,3 +766,25 @@ void HcsVirtualMachine::FreeLun(ULONG Lun)
 
     m_lunBitmap[Lun] = false;
 }
+
+HRESULT HcsVirtualMachine::ConnectToVsockPort(_In_ ULONG Port, _Out_ HANDLE* Socket)
+try
+{
+    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, Port);
+    *Socket = reinterpret_cast<HANDLE>(socket.release());
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT HcsVirtualMachine::AcceptCrashDumpConnection(_Out_ HANDLE* Socket)
+try
+{
+    auto socket = wsl::windows::common::hvsocket::CancellableAccept(
+        m_crashDumpListenSocket.get(), INFINITE, m_vmExitEvent.get());
+
+    THROW_HR_IF(E_ABORT, !socket.has_value());
+
+    *Socket = reinterpret_cast<HANDLE>(socket->release());
+    return S_OK;
+}
+CATCH_RETURN()

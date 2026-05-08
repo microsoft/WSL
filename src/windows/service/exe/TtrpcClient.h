@@ -82,6 +82,18 @@ public:
             std::string MacAddress;  // "12-34-56-78-9A-BC"
         };
         std::optional<ConsommeNic> Nic;
+
+        // Serial ports (16550 UART COM ports, e.g. earlycon on port 0).
+        struct SerialPort
+        {
+            uint32_t Port;          // 0-3 (COM1-COM4)
+            std::string SocketPath; // Named pipe or Unix domain socket path
+        };
+        std::vector<SerialPort> SerialPorts;
+
+        // Virtio console device (/dev/hvc0 in the guest).
+        // Path to a named pipe or Unix domain socket for the console backend.
+        std::string VirtioConsolePath;
     };
 
     // CreateVM: configure and create the VM (left in paused state).

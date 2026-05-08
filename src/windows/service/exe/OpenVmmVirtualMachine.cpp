@@ -135,6 +135,18 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     // Use a page reporting order of 5 (128KB) matching modern Windows builds.
     helpers::AppendCommonKernelCommandLine(m_kernelCmdLine, 5);
 
+    // Setup dmesg collector with optional DmesgOutput handle, matching HcsVirtualMachine.
+    // The DmesgCollector creates named pipes that we pass to OpenVMM via serial and
+    // virtio console configs to capture kernel output.
+    wil::unique_handle dmesgOutputHandle;
+    if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
+    {
+        dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
+    }
+
+    m_dmesgCollector = DmesgCollector::Create(
+        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+
     if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
     {
         m_kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
@@ -194,9 +206,26 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
 
     WSL_LOG("OpenVmmInitListenerReady", TraceLoggingValue(m_initListenPath.c_str(), "ListenPath"));
 
-    // Note: When using ttrpc orchestration, consomme networking is handled
-    // server-side by OpenVMM (via the ConsommeBackend in NICConfig). The
-    // host-side ConsommeNetworking engine is not needed in this mode.
+    // Create a Unix domain socket listener for crash dump collection.
+    // Same hybrid_vsock pattern as the init connection, but for port 50005.
+    auto crashPortHex = std::format(L"{:08x}", LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
+    m_crashDumpListenPath = std::format(L"{}_{}-facb-11e6-bd58-64006a7986d3", m_vsockPath.wstring(), crashPortHex);
+    DeleteFileW(m_crashDumpListenPath.c_str());
+
+    m_crashDumpListenSocket = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    THROW_LAST_ERROR_IF(m_crashDumpListenSocket == INVALID_SOCKET);
+
+    sockaddr_un crashAddr{};
+    crashAddr.sun_family = AF_UNIX;
+    auto narrowCrashPath = wsl::shared::string::WideToMultiByte(m_crashDumpListenPath);
+    THROW_HR_IF_MSG(E_INVALIDARG, narrowCrashPath.size() >= sizeof(crashAddr.sun_path),
+        "vsock bridge path too long: %hs", narrowCrashPath.c_str());
+    memcpy(crashAddr.sun_path, narrowCrashPath.c_str(), narrowCrashPath.size() + 1);
+
+    THROW_LAST_ERROR_IF(bind(m_crashDumpListenSocket, reinterpret_cast<sockaddr*>(&crashAddr), sizeof(crashAddr)) == SOCKET_ERROR);
+    THROW_LAST_ERROR_IF(listen(m_crashDumpListenSocket, 1) == SOCKET_ERROR);
+
+    WSL_LOG("OpenVmmCrashDumpListenerReady", TraceLoggingValue(m_crashDumpListenPath.c_str(), "ListenPath"));
 
     // Launch the openvmm process.
     LaunchOpenVmm();
@@ -271,6 +300,19 @@ TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
         };
     }
 
+    // Serial ports for dmesg collection.
+    // Early boot console: COM1 (port 0) connected to the DmesgCollector's early console pipe.
+    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
+    {
+        config.SerialPorts.push_back({
+            .Port = 0,
+            .SocketPath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->EarlyConsoleName()),
+        });
+    }
+
+    // Virtio serial console (/dev/hvc0) connected to the DmesgCollector's virtio console pipe.
+    config.VirtioConsolePath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->VirtioConsoleName());
+
     return config;
 }
 
@@ -282,31 +324,19 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
 
     SubProcess process(m_openvmmPath.c_str(), cmd.c_str());
 
-    // Create a pipe for stdin (kept for potential future REPL use).
-    SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE}; // bInheritHandle = TRUE
-    wil::unique_hfile stdinRead;
-    wil::unique_hfile stdinWrite;
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&stdinRead, &stdinWrite, &sa, 0));
-
-    // Only the read end should be inherited by the child.
-    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdinWrite.get(), HANDLE_FLAG_INHERIT, 0));
-
     // Redirect stdout and stderr to a log file for diagnostics.
+    SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE}; // bInheritHandle = TRUE
     auto logPath = m_vsockPath.wstring() + L".log";
     wil::unique_hfile logFile{CreateFileW(
         logPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
 
-    process.SetStdHandles(stdinRead.get(), logFile.get(), logFile.get());
+    process.SetStdHandles(nullptr, logFile.get(), logFile.get());
 
     // Start the process. The returned handle is the process handle.
     m_processHandle = process.Start();
 
-    // Keep the write end of stdin for potential future use.
-    m_stdinWrite = std::move(stdinWrite);
-
-    // Close our copies of the read end and log handle.
-    stdinRead.reset();
+    // Close our copy of the log handle.
     logFile.reset();
 
     // Start a thread to watch for openvmm process exit.
@@ -383,6 +413,14 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
         m_initListenSocket = INVALID_SOCKET;
     }
     DeleteFileW(m_initListenPath.c_str());
+
+    // Clean up the crash dump listener socket if still open.
+    if (m_crashDumpListenSocket != INVALID_SOCKET)
+    {
+        closesocket(m_crashDumpListenSocket);
+        m_crashDumpListenSocket = INVALID_SOCKET;
+    }
+    DeleteFileW(m_crashDumpListenPath.c_str());
 
     // Clean up the vsock and ttrpc socket files.
     try
@@ -613,6 +651,30 @@ try
     // Return the AF_UNIX socket directly. SocketChannel will auto-detect
     // the socket type and use SyncSocketTransport for non-overlapped I/O.
     closeUnix.release();
+    *Socket = reinterpret_cast<HANDLE>(unixSock);
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT OpenVmmVirtualMachine::AcceptCrashDumpConnection(_Out_ HANDLE* Socket)
+try
+{
+    THROW_HR_IF(E_UNEXPECTED, m_crashDumpListenSocket == INVALID_SOCKET);
+
+    WSL_LOG("OpenVmmAcceptCrashDumpConnection",
+        TraceLoggingValue(m_crashDumpListenPath.c_str(), "ListenPath"),
+        TraceLoggingValue(m_vmIdString.c_str(), "VmId"));
+
+    wil::unique_event acceptEvent(wil::EventOptions::ManualReset);
+    WSAEventSelect(m_crashDumpListenSocket, acceptEvent.get(), FD_ACCEPT);
+
+    HANDLE waitHandles[] = { acceptEvent.get(), m_vmExitEvent.get() };
+    auto waitResult = WaitForMultipleObjects(ARRAYSIZE(waitHandles), waitHandles, FALSE, INFINITE);
+    THROW_HR_IF(E_ABORT, waitResult != WAIT_OBJECT_0);
+
+    SOCKET unixSock = accept(m_crashDumpListenSocket, nullptr, nullptr);
+    THROW_LAST_ERROR_IF(unixSock == INVALID_SOCKET);
+
     *Socket = reinterpret_cast<HANDLE>(unixSock);
     return S_OK;
 }

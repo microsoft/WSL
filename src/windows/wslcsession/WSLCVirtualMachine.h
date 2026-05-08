@@ -200,7 +200,7 @@ private:
 
     void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
 
-    void CollectCrashDumps(wil::unique_socket&& listenSocket);
+    void CollectCrashDumps();
 
     struct AttachedDisk
     {

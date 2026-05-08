@@ -21,6 +21,7 @@ Abstract:
 #include "wslc.h"
 #include "INetworkingEngine.h"
 #include "TtrpcClient.h"
+#include "Dmesg.h"
 #include <filesystem>
 #include <map>
 #include <bitset>
@@ -46,6 +47,7 @@ public:
     IFACEMETHOD(RemoveShare)(_In_ REFGUID ShareId) override;
     IFACEMETHOD(GetTerminationEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(ConnectToVsockPort)(_In_ ULONG Port, _Out_ HANDLE* Socket) override;
+    IFACEMETHOD(AcceptCrashDumpConnection)(_Out_ HANDLE* Socket) override;
 
 private:
     struct DiskInfo
@@ -82,7 +84,6 @@ private:
 
     // OpenVMM process handle and management.
     wil::unique_handle m_processHandle;
-    wil::unique_hfile m_stdinWrite; // Write end of stdin pipe for REPL commands.
     std::thread m_processWatchThread;
 
     // Paths for VM boot configuration.
@@ -108,6 +109,11 @@ private:
     SOCKET m_initListenSocket = INVALID_SOCKET;
     std::wstring m_initListenPath;
 
+    // Pre-created Unix domain socket listener for crash dump collection.
+    // Uses the hybrid_vsock bridge to receive crash dump connections from the guest.
+    SOCKET m_crashDumpListenSocket = INVALID_SOCKET;
+    std::wstring m_crashDumpListenPath;
+
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
 
     std::map<ULONG, DiskInfo> m_attachedDisks;
@@ -122,6 +128,9 @@ private:
     // ttrpc client for runtime VM management (disk hot-add/remove etc.).
     std::filesystem::path m_ttrpcSocketPath;
     std::unique_ptr<TtrpcClient> m_ttrpcClient;
+
+    // Dmesg collector for early boot and virtio serial console output.
+    std::shared_ptr<DmesgCollector> m_dmesgCollector;
 };
 
 } // namespace wsl::windows::service::wslc

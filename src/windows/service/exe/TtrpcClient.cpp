@@ -466,11 +466,43 @@ std::vector<uint8_t> TtrpcClient::EncodeCreateVmRequest(const VmConfig& config)
         devicesConfig.insert(devicesConfig.end(), nicConfig.begin(), nicConfig.end());
     }
 
+    // Virtio console device (DevicesConfig field 6 = VirtioConsoleConfig).
+    if (!config.VirtioConsolePath.empty())
+    {
+        // Build VirtioConsoleConfig sub-message:
+        //   field 1: socket_path (string)
+        //   field 2: connect (bool) - connect as client to existing pipe
+        std::vector<uint8_t> virtioConsoleConfig;
+        EncodeStringField(1, config.VirtioConsolePath, virtioConsoleConfig);
+        EncodeBoolField(2, true, virtioConsoleConfig);
+
+        EncodeTag(6, c_wireTypeLengthDelimited, devicesConfig);
+        EncodeVarint(virtioConsoleConfig.size(), devicesConfig);
+        devicesConfig.insert(devicesConfig.end(), virtioConsoleConfig.begin(), virtioConsoleConfig.end());
+    }
+
     // Build DirectBoot sub-message.
     std::vector<uint8_t> directBoot;
     EncodeStringField(1, config.KernelPath, directBoot);
     EncodeStringField(2, config.InitrdPath, directBoot);
     EncodeStringField(3, config.KernelCmdLine, directBoot);
+
+    // Build SerialConfig sub-message (VMConfig field 4).
+    // SerialConfig { repeated Config ports = 3; }
+    // Config { uint32 port = 1; string socket_path = 2; }
+    std::vector<uint8_t> serialConfig;
+    for (const auto& port : config.SerialPorts)
+    {
+        std::vector<uint8_t> portConfig;
+        EncodeVarintField(1, port.Port, portConfig);
+        EncodeStringField(2, port.SocketPath, portConfig);
+        EncodeBoolField(3, true, portConfig);
+
+        // SerialConfig field 3 = repeated Config (embedded message).
+        EncodeTag(3, c_wireTypeLengthDelimited, serialConfig);
+        EncodeVarint(portConfig.size(), serialConfig);
+        serialConfig.insert(serialConfig.end(), portConfig.begin(), portConfig.end());
+    }
 
     // Build HVSocketConfig sub-message.
     std::vector<uint8_t> hvsocketConfig;
@@ -501,6 +533,14 @@ std::vector<uint8_t> TtrpcClient::EncodeCreateVmRequest(const VmConfig& config)
         EncodeTag(3, c_wireTypeLengthDelimited, vmConfig);
         EncodeVarint(devicesConfig.size(), vmConfig);
         vmConfig.insert(vmConfig.end(), devicesConfig.begin(), devicesConfig.end());
+    }
+
+    // field 4: SerialConfig
+    if (!serialConfig.empty())
+    {
+        EncodeTag(4, c_wireTypeLengthDelimited, vmConfig);
+        EncodeVarint(serialConfig.size(), vmConfig);
+        vmConfig.insert(vmConfig.end(), serialConfig.begin(), serialConfig.end());
     }
 
     // field 5: DirectBoot (oneof BootConfig)

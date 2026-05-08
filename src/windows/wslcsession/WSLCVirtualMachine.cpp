@@ -264,18 +264,11 @@ void WSLCVirtualMachine::Initialize()
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
     // Start crash dump collection thread.
-    // N.B. When using a non-HCS VMM backend (e.g., OpenVMM on WHP), the VM GUID
-    // is not registered with the HvSocket driver, so hvsocket::Listen will fail.
-    // In that case, skip crash dump collection gracefully.
-    try
-    {
-        auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
-        m_crashDumpThread = std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
-    }
-    catch (...)
-    {
-        LOG_CAUGHT_EXCEPTION_MSG("Crash dump collection disabled (hvsocket::Listen failed, expected for non-HCS VMs)");
-    }
+    // The VM backend handles the listen socket creation (HV socket for HCS,
+    // Unix domain socket for OpenVMM). AcceptCrashDumpConnection blocks until
+    // a connection arrives or the VM exits.
+    m_crashDumpThread = std::thread{[this]() { CollectCrashDumps(); }};
+
     // Establish a socket channel with mini_init in the VM.
     wil::unique_socket socket;
     THROW_IF_FAILED(m_vm->AcceptConnection(reinterpret_cast<HANDLE*>(&socket)));
@@ -1221,7 +1214,7 @@ wil::unique_socket WSLCVirtualMachine::ConnectUnixSocket(const char* Path)
     return channel.Release();
 }
 
-void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
+void WSLCVirtualMachine::CollectCrashDumps()
 {
     // No impersonation needed - the session process already runs as the user.
     wslutil::SetThreadDescription(L"CrashDumpCollection");
@@ -1232,17 +1225,19 @@ void WSLCVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
     {
         try
         {
-            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
-            if (!socket)
+            wil::unique_socket socket;
+            HRESULT hr = m_vm->AcceptCrashDumpConnection(reinterpret_cast<HANDLE*>(&socket));
+            if (hr == E_ABORT)
             {
                 // VM is exiting.
                 break;
             }
+            THROW_IF_FAILED(hr);
 
             constexpr DWORD timeout = 30 * 1000;
-            THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
+            THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmTerminatingEvent.get(), true};
+            auto channel = wsl::shared::SocketChannel{std::move(socket), "crash_dump", m_vmTerminatingEvent.get(), true};
 
             auto transaction = channel.ReceiveTransaction();
             gsl::span<gsl::byte> responseSpan;
