@@ -34,9 +34,13 @@ class OptionParser
 public:
     NON_COPYABLE(OptionParser);
 
-    // The supplied options map must outlive this OptionParser instance —
-    // accessors return references into it. Typical use is a function-local
-    // parser that lives only for the duration of one Parse() call.
+    // The supplied options map must outlive this OptionParser instance.
+    // The parser stores a non-owning reference to the map. Only Find()
+    // returns a pointer into the map's backing storage (used internally);
+    // Required/Optional/OptionalBool return parsed values *by value*, so
+    // callers do not need to keep the map alive past the accessor call.
+    // Typical use is a function-local parser that lives only for the
+    // duration of one Parse() call.
     explicit OptionParser(const std::map<std::string, std::string>& Options) noexcept;
 
     // Parses a required unsigned integer value. Throws E_INVALIDARG with

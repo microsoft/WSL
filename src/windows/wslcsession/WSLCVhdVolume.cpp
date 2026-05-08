@@ -72,8 +72,16 @@ namespace {
 
             // Mode (optional). Parsed as octal so we can range-check against
             // c_maxModeBits and reject non-octal characters via the shared
-            // OptionParser validation.
+            // OptionParser validation. Mode==0 makes the volume root
+            // inaccessible to the container's non-root user (defeating the
+            // entire point of MODE), so reject it here for parity with the
+            // SDK-side check — direct COM callers and persisted metadata
+            // both flow through Parse.
             opts.Mode = parser.Optional<uint32_t>(c_modeOpt, c_maxModeBits, 8);
+            if (opts.Mode.has_value() && *opts.Mode == 0)
+            {
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_modeOpt, std::string("0")));
+            }
 
             // Anything else is unrecognized and a user error.
             parser.RejectUnknown();

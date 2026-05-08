@@ -2022,8 +2022,10 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_fixedVolumeName, &deleteErr));
         }
 
-        // Positive: owner + mode flags must be honored — a non-root container
-        // user can write the volume root.
+        // Positive: owner + mode flags must be honored — chown/chmod are
+        // applied to the volume root so a non-root container user can read
+        // and write it. Verify by stat-ing the mount inside a container
+        // (rather than just trusting the SDK-side option emission).
         {
             constexpr auto c_ownedVolumeName = "wslc-sdk-vhd-owned";
             WslcVhdRequirements vhd{};
@@ -2037,8 +2039,29 @@ class WslcSdkTests
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
 
-            wil::unique_cotaskmem_string deleteErr;
-            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_ownedVolumeName, &deleteErr));
+            auto deleteVolume =
+                wil::scope_exit([&]() { LOG_IF_FAILED(WslcDeleteSessionVhdVolume(session.get(), c_ownedVolumeName, nullptr)); });
+
+            // Mount the volume into a container and stat it. Expect uid=65534,
+            // gid=65534, mode=750 (octal). The trailing newline from `stat` is
+            // included in the comparison.
+            WslcProcessSettings procSettings;
+            VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+            const char* argv[] = {"/usr/bin/stat", "-c", "%u %g %a", "/data"};
+            VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+            WslcContainerSettings containerSettings;
+            VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+            WslcContainerNamedVolume namedVol{};
+            namedVol.name = c_ownedVolumeName;
+            namedVol.containerPath = "/data";
+            namedVol.readOnly = FALSE;
+            VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
+
+            auto output = RunContainerAndCapture(session.get(), containerSettings);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "65534 65534 750\n");
         }
 
         // Negative: out-of-range mode (> 07777) must be rejected.

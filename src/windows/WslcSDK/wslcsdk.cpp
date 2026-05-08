@@ -509,11 +509,14 @@ try
 
     // Build the driver-options vector dynamically. Strings referenced by
     // WSLCDriverOption are LPCSTR, so the std::string holders below must
-    // outlive the WSLCDriverOption[] passed to CreateVolume.
+    // outlive the WSLCDriverOption[] passed to CreateVolume. Format
+    // uid/gid/mode only when their flag is set — the underlying fields are
+    // documented as "honored iff the flag is set" and a defensive caller may
+    // leave them uninitialized.
     const auto sizeStr = std::to_string(options->sizeBytes);
-    const auto uidStr = std::to_string(options->uid);
-    const auto gidStr = std::to_string(options->gid);
-    const auto modeStr = std::format("{:o}", options->mode); // forwarded as octal so the service parses base-8
+    std::string uidStr;
+    std::string gidStr;
+    std::string modeStr;
 
     std::vector<WSLCDriverOption> driverOpts;
     driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
@@ -529,12 +532,15 @@ try
 
     if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_OWNER))
     {
+        uidStr = std::to_string(options->uid);
+        gidStr = std::to_string(options->gid);
         driverOpts.push_back({"Uid", uidStr.c_str()});
         driverOpts.push_back({"Gid", gidStr.c_str()});
     }
 
     if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_MODE))
     {
+        modeStr = std::format("{:o}", options->mode); // forwarded as octal so the service parses base-8
         driverOpts.push_back({"Mode", modeStr.c_str()});
     }
 

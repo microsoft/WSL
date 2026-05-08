@@ -58,13 +58,17 @@ namespace Microsoft.WSL.Containers
 
         // Sets the POSIX owner uid and gid that the volume root will be chowned to
         // after creation. Both values are set together to avoid half-configured ownership.
-        // Has no effect when called on a VhdRequirements used with the session rootfs VHD.
+        // Owner/mode are only supported on named volumes created via Session.Create's
+        // VHD volume API; if the resulting VhdRequirements is assigned to
+        // SessionSettings.VhdRequirements (the session rootfs VHD), Session creation
+        // will fail with E_INVALIDARG.
         void SetOwner(UInt32 uid, UInt32 gid);
 
         // Sets the POSIX mode bits (e.g. 0o750) that the volume root will be chmoded to
-        // after creation. Maximum legal value is 07777 (decimal 4095); larger values are
-        // rejected by the service. Has no effect when called on a VhdRequirements used
-        // with the session rootfs VHD.
+        // after creation. Must be non-zero and <= 07777; out-of-range or zero values
+        // are rejected. Owner/mode are only supported on named volumes; if the
+        // resulting VhdRequirements is assigned to SessionSettings.VhdRequirements
+        // (the session rootfs VHD), Session creation will fail with E_INVALIDARG.
         void SetMode(UInt32 mode);
     };
 }
