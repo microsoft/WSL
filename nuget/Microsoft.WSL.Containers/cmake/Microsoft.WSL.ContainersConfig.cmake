@@ -77,8 +77,8 @@ unset(_wslcsdk_lib_dir)
 #   add_dependencies(my_app my-server)
 #
 # The first positional argument is the CMake target name.
-# IMAGE is the full container image reference, including the tag (required).
-# When the tag is omitted, ':latest' is appended automatically.
+# IMAGE is the container image reference (required); may include a tag
+# (e.g. 'my-server:v1'). ':latest' is appended automatically when omitted.
 # TAR_LOCATION is the output path for the saved image tarball
 # (optional; defaults to ${CMAKE_CURRENT_BINARY_DIR}/<target>.tar).
 # Pass PRUNE_AFTER_BUILD to also run 'wslc image prune' after save.
