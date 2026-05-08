@@ -2452,7 +2452,7 @@ try
             WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
         }
 
-        if (m_virtualMachine)
+        if (m_virtualMachine && m_containerdProcess.has_value())
         {
             // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
             try

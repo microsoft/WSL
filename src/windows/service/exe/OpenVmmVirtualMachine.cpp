@@ -144,13 +144,13 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
         dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
     }
 
+    // REVIEW: Can we always enable earlycon?
     m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+        m_vmId, m_vmExitEvent, true, false, L"", true /* always enable earlycon for OpenVMM */, std::move(dmesgOutputHandle));
 
-    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
-    {
-        m_kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
-    }
+    // OpenVMM always uses earlycon to capture kernel output from the very start
+    // of boot via COM1, before the virtio console (hvc0) driver loads.
+    m_kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
 
     m_kernelCmdLine += L" console=hvc0 debug";
 
@@ -302,13 +302,11 @@ TtrpcClient::VmConfig OpenVmmVirtualMachine::BuildVmConfig() const
 
     // Serial ports for dmesg collection.
     // Early boot console: COM1 (port 0) connected to the DmesgCollector's early console pipe.
-    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
-    {
-        config.SerialPorts.push_back({
-            .Port = 0,
-            .SocketPath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->EarlyConsoleName()),
-        });
-    }
+    // Always enabled for OpenVMM to capture output before hvc0 driver loads.
+    config.SerialPorts.push_back({
+        .Port = 0,
+        .SocketPath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->EarlyConsoleName()),
+    });
 
     // Virtio serial console (/dev/hvc0) connected to the DmesgCollector's virtio console pipe.
     config.VirtioConsolePath = wsl::shared::string::WideToMultiByte(m_dmesgCollector->VirtioConsoleName());
@@ -336,6 +334,18 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
     // Start the process. The returned handle is the process handle.
     m_processHandle = process.Start();
 
+    // Assign the openvmm process to a kill-on-close job object. This ensures
+    // the child process is terminated if the service exits without running our
+    // destructor (e.g., killed or crashes).
+    m_jobObject.reset(CreateJobObjectW(nullptr, nullptr));
+    THROW_LAST_ERROR_IF(!m_jobObject);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits{};
+    jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(
+        m_jobObject.get(), JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)));
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_jobObject.get(), m_processHandle.get()));
+
     // Close our copy of the log handle.
     logFile.reset();
 
@@ -360,6 +370,34 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
     THROW_IF_FAILED_MSG(
         m_ttrpcClient->ResumeVm(),
         "Failed to resume VM via ttrpc ResumeVM");
+
+    // Start a thread that calls WaitVM to detect when the guest halts.
+    // This is analogous to HCS's OnVmExitCallback — when the guest performs
+    // an ACPI S5 power-down, WaitVM returns and we signal m_vmExitEvent.
+    // Uses a separate ttrpc connection because WaitVM blocks indefinitely and
+    // SendRequest holds the client lock for the entire send+recv — a single
+    // connection would deadlock all other RPCs (AttachDisk, etc.).
+    m_waitVmThread = std::thread([this]() {
+        TtrpcClient waitClient;
+        auto hr = waitClient.Connect(m_ttrpcSocketPath.wstring(), 30000);
+        if (SUCCEEDED(hr))
+        {
+            hr = waitClient.WaitVm();
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            WSL_LOG("OpenVmmGuestHalted", TraceLoggingValue(m_vmIdString.c_str(), "VmId"));
+        }
+        else
+        {
+            WSL_LOG("OpenVmmWaitVmFailed",
+                TraceLoggingValue(hr, "hr"),
+                TraceLoggingValue(m_vmIdString.c_str(), "VmId"));
+        }
+
+        m_vmExitEvent.SetEvent();
+    });
 }
 
 void OpenVmmVirtualMachine::WatchProcessExit()
@@ -384,14 +422,17 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     // Signal termination to any pending operations.
     m_vmExitEvent.SetEvent();
 
-    // Disconnect the ttrpc client before terminating the process.
+    // Ask openvmm to release all VM resources via TeardownVM.
+    // This unblocks WaitVM and allows the process to exit.
     if (m_ttrpcClient)
     {
+        LOG_IF_FAILED(m_ttrpcClient->TeardownVm());
         m_ttrpcClient->Disconnect();
         m_ttrpcClient.reset();
     }
 
-    // Terminate the openvmm process if still running.
+    // Wait up to 5 seconds for the openvmm process to exit gracefully.
+    // If it doesn't, forcefully terminate it.
     if (m_processHandle)
     {
         if (WaitForSingleObject(m_processHandle.get(), 5000) == WAIT_TIMEOUT)
@@ -404,6 +445,11 @@ OpenVmmVirtualMachine::~OpenVmmVirtualMachine()
     if (m_processWatchThread.joinable())
     {
         m_processWatchThread.join();
+    }
+
+    if (m_waitVmThread.joinable())
+    {
+        m_waitVmThread.join();
     }
 
     // Clean up the init listener socket if still open.

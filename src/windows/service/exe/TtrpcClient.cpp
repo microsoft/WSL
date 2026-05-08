@@ -182,6 +182,28 @@ try
 }
 CATCH_RETURN()
 
+HRESULT TtrpcClient::WaitVm()
+try
+{
+    WSL_LOG("TtrpcWaitVm");
+
+    // WaitVM takes google.protobuf.Empty — blocks until the VM halts or is torn down.
+    std::vector<uint8_t> emptyPayload;
+    return SendRequest(c_serviceName, c_waitVmMethod, emptyPayload);
+}
+CATCH_RETURN()
+
+HRESULT TtrpcClient::TeardownVm()
+try
+{
+    WSL_LOG("TtrpcTeardownVm");
+
+    // TeardownVM takes google.protobuf.Empty — releases VM resources and unblocks WaitVM.
+    std::vector<uint8_t> emptyPayload;
+    return SendRequest(c_serviceName, c_teardownVmMethod, emptyPayload);
+}
+CATCH_RETURN()
+
 HRESULT TtrpcClient::SendRequest(
     const std::string& service, const std::string& method, const std::vector<uint8_t>& payload)
 {

@@ -691,10 +691,25 @@ void HandleMessageImpl(
         "ip link set {} up && ip addr add {} dev {} && ip route add default via {}",
         iface, address, iface, gateway);
 
-    int childPid = UtilCreateChildProcess("ConfigureNetworking", [&configCmd]() {
+    // Use a pipe to detect child completion. The child inherits the write end;
+    // when it exits (via execl or _exit), the write end is closed and read()
+    // returns 0. This avoids racing with the WSLC_WATCH_PROCESSES handler's
+    // waitpid(-1) which may reap the child before we can.
+    int pipeFds[2]{};
+    THROW_LAST_ERROR_IF(pipe2(pipeFds, O_CLOEXEC) < 0);
+    wil::unique_fd pipeRead{pipeFds[0]};
+    wil::unique_fd pipeWrite{pipeFds[1]};
+
+    int childPid = UtilCreateChildProcess("ConfigureNetworking", [&configCmd, &pipeWrite]() {
+        // Clear CLOEXEC on the write end so it stays open across execl.
+        // When the shell exits, the fd is closed and the parent's read returns.
+        fcntl(pipeWrite.get(), F_SETFD, 0);
         execl("/bin/sh", "/bin/sh", "-c", configCmd.c_str(), nullptr);
         LOG_ERROR("execl(/bin/sh) failed, {}", errno);
     });
+
+    // Close the write end in the parent — only the child holds it now.
+    pipeWrite.reset();
 
     if (childPid < 0)
     {
@@ -702,11 +717,28 @@ void HandleMessageImpl(
         return;
     }
 
+    // Wait for the child to exit by reading from the pipe. When the child
+    // (and the shell it exec'd) exits, all write ends are closed and read
+    // returns 0.
+    char dummy{};
+    TEMP_FAILURE_RETRY(read(pipeRead.get(), &dummy, sizeof(dummy)));
+
+    // Try to reap the child. If WSLC_WATCH_PROCESSES already reaped it, we
+    // get ECHILD which is fine — the pipe close confirms the child exited.
     int status = -1;
     if (TEMP_FAILURE_RETRY(waitpid(childPid, &status, 0)) < 0)
     {
-        result = -errno;
-        return;
+        if (errno == ECHILD)
+        {
+            // Child was already reaped by the WatchProcesses handler.
+            // The pipe confirmed it exited, so treat as success.
+            status = 0;
+        }
+        else
+        {
+            result = -errno;
+            return;
+        }
     }
 
     result = UtilProcessChildExitCode(status, "ConfigureNetworking");
@@ -863,7 +895,9 @@ void HandleMessageImpl(
 
             if (!exitedProcess)
             {
-                LOG_ERROR("Received SIGCHLD but no children have exited");
+                // This can happen legitimately when another handler (e.g.
+                // ConfigureNetworking) reaps its own child before we get to it.
+                // Not an error — just means the SIGCHLD was already handled.
             }
         }
 

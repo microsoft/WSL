@@ -102,6 +102,12 @@ public:
     // ResumeVM: start a paused VM.
     HRESULT ResumeVm();
 
+    // WaitVM: blocks until the VM halts or is torn down.
+    HRESULT WaitVm();
+
+    // TeardownVM: release all VM resources and unblock the WaitVM call.
+    HRESULT TeardownVm();
+
 private:
     // ttrpc message types (from the ttrpc spec).
     static constexpr uint8_t c_messageTypeRequest = 1;
@@ -111,6 +117,8 @@ private:
     static constexpr char c_serviceName[] = "vmservice.VM";
     static constexpr char c_createVmMethod[] = "CreateVM";
     static constexpr char c_resumeVmMethod[] = "ResumeVM";
+    static constexpr char c_waitVmMethod[] = "WaitVM";
+    static constexpr char c_teardownVmMethod[] = "TeardownVM";
     static constexpr char c_modifyResourceMethod[] = "ModifyResource";
 
     // vmservice.proto ModifyType enum values.

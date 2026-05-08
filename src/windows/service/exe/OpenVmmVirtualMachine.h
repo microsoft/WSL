@@ -84,7 +84,9 @@ private:
 
     // OpenVMM process handle and management.
     wil::unique_handle m_processHandle;
+    wil::unique_handle m_jobObject;
     std::thread m_processWatchThread;
+    std::thread m_waitVmThread;
 
     // Paths for VM boot configuration.
     std::filesystem::path m_kernelPath;
