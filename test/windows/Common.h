@@ -46,19 +46,19 @@ using namespace std::chrono_literals;
 //
 #define WSL1_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"1") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=1)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSL2_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSLC_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 

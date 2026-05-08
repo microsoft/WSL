@@ -38,6 +38,7 @@ endif()
 
 function(add_test_group image version)
     set(DIR ${OUT}/${image}-wsl${version})
+    set(TEST_FILTER "(@TestCategory='WSLC')")
 
     file(MAKE_DIRECTORY ${DIR})
 
@@ -46,13 +47,15 @@ function(add_test_group image version)
 endfunction()
 
 function(add_wslc_test_group image)
-    set(version "c")
+    set(version "2")
     set(DIR ${OUT}/${image}-wslc)
+    set(TEST_FILTER "(@TestCategory='WSLC')")
 
     file(MAKE_DIRECTORY ${DIR})
 
+
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestMap.xml.in ${DIR}/TestMap.xml)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup-wslc.xml.in ${DIR}/TestGroup.xml)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup.xml.in ${DIR}/TestGroup.xml)
 endfunction()
 
 foreach(image ${CLOUDTEST_IMAGES})
