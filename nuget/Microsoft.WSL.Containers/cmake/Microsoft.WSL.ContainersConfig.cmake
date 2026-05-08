@@ -169,6 +169,9 @@ function(wslc_add_image _target_name)
         OUTPUT "${_stamp}" "${ARG_TAR_LOCATION}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${_tar_dir}"
         COMMAND "${WSLC_CLI_PATH}" image build -t "${_image_ref}" -f "${_dockerfile_path}" "${_context_path}"
+        # Remove any tar from a previous (possibly failed) save so a partial file
+        # doesn't sit on disk pretending to be a valid image.
+        COMMAND ${CMAKE_COMMAND} -E rm -f "${ARG_TAR_LOCATION}"
         COMMAND "${WSLC_CLI_PATH}" image save -o "${ARG_TAR_LOCATION}" "${_image_ref}"
         ${_prune_command}
         COMMAND ${CMAKE_COMMAND} -E touch "${_stamp}"

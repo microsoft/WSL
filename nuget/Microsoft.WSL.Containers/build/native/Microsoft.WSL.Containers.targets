@@ -47,22 +47,31 @@
                  Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
-    <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles) -->
+    <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles).
+         tlog format requires one path per line; build ItemGroups so WriteLinesToFile
+         emits each entry on its own line instead of joining with ';'. -->
     <Target Name="_WslcWriteSingleTlog" DependsOnTargets="_WslcCollectSources">
         <PropertyGroup>
             <_WslcTlogToolPath>$([System.IO.Path]::GetFullPath('$(WslcCliPath)'))</_WslcTlogToolPath>
             <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).built'))</_WslcMarkerFullPath>
         </PropertyGroup>
 
+        <ItemGroup>
+            <_WslcTlogReadLines Include="^$(_WslcTlogToolPath)" />
+            <_WslcTlogReadLines Include="@(_WslcSourceFiles->'%(FullPath)')" />
+            <_WslcTlogWriteLines Include="^$(_WslcTlogToolPath)" />
+            <_WslcTlogWriteLines Include="$(_WslcMarkerFullPath)" />
+        </ItemGroup>
+
         <WriteLinesToFile
             File="$(_WslcTlogDir)wslc.$(_WslcName).read.1.tlog"
-            Lines="^$(_WslcTlogToolPath);@(_WslcSourceFiles->'%(FullPath)')"
+            Lines="@(_WslcTlogReadLines)"
             Overwrite="true"
             Encoding="Unicode" />
 
         <WriteLinesToFile
             File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
-            Lines="^$(_WslcTlogToolPath);$(_WslcMarkerFullPath)"
+            Lines="@(_WslcTlogWriteLines)"
             Overwrite="true"
             Encoding="Unicode" />
     </Target>

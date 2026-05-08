@@ -26,6 +26,10 @@
     <!-- Check that wslc CLI is installed (invoked via DependsOnTargets from WslcBuildAllImages) -->
     <Target Name="WslcCheckDependencies">
 
+        <Error Condition="'$(WslcCliPath)' == ''"
+               Code="WSLC0005"
+               Text="WslcCliPath is empty: wslc CLI not auto-detected. Install WSL by running: wsl --install --no-distribution, or set the WslcCliPath property to point at wslc.exe." />
+
         <Exec Command="&quot;$(WslcCliPath)&quot; --version"
               IgnoreExitCode="true"
               ConsoleToMSBuild="true"
