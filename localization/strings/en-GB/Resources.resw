@@ -2678,7 +2678,7 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Working directory inside the container</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Write the container ID to the provided path.</value>
+    <value>Write the container ID to the provided path</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP address of the DNS nameserver in resolv.conf</value>
@@ -2757,6 +2757,10 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Image '{}' not found, pulling</value>

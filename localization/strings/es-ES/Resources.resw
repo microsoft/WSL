@@ -2637,10 +2637,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Quitar el contenedor después de detenerse</value>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
-    <value>Signal to stop the container</value>
+    <value>Señal para detener el contenedor</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
-    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <value>Tamaño de /dev/shm (por ejemplo, 64 M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
@@ -2650,7 +2650,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Ruta de almacenamiento de sesión</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send</value>
+    <value>Señal para enviar</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Referencia de imagen actual o existente en formato nombre-de-imagen[:etiqueta]</value>
@@ -2684,7 +2684,7 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>Directorio de trabajo dentro del contenedor</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Escriba el id. de contenedor en la ruta de acceso proporcionada.</value>
+    <value>Escribir el id. de contenedor en la ruta de acceso proporcionada</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>Dirección IP del servidor de nombres DNS en resolv.conf</value>
@@ -2763,6 +2763,10 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Valor de argumento {} no válido: '{}'. Se esperaba un tamaño de memoria (por ejemplo, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>No se encontró la imagen "{}", extrayendo</value>

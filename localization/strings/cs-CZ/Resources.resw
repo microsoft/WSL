@@ -805,7 +805,7 @@ Další informace o Admin Protection najdete na https://aka.ms/apdevguide</value
     <value>Otevřít EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Tato distribuce neobsahuje výchozí název. Pokud chcete zvolit název distribuce, použijte --name .</value>
+    <value>This distribution doesn't contain a default name. Use --name to choose the distribution name.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -2631,10 +2631,10 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Odstranit kontejner po jeho zastavení</value>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
-    <value>Signal to stop the container</value>
+    <value>Signál k zastavení kontejneru</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
-    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <value>Velikost /dev/shm (např. 64 mil., 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
@@ -2644,7 +2644,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <value>Cesta k úložišti relace</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send</value>
+    <value>Signál k odeslání</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuální nebo existující odkaz na obrázek ve formátu image-name[:tag]</value>
@@ -2755,8 +2755,12 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
-    <value>Invalid {} argument value: '{}'. Expected a memory size (e.g. 256M, 1G)</value>
+    <value>Neplatná hodnota argumentu {}: {} Očekávaná velikost paměti (např. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Image {} nebyl nalezen, stahuje se</value>

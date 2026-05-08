@@ -2631,10 +2631,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Kapsayıcı durduktan sonra kaldır</value>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
-    <value>Signal to stop the container</value>
+    <value>Kapsayıcıyı durdurma sinyali</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
-    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <value>/dev/shm klasörünün boyutu (örneğin 64 MB, 1 GB)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
@@ -2644,7 +2644,7 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
     <value>Oturum depolama alanı yolu</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send</value>
+    <value>Gönderilecek sinyal</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>image-name[:tag] biçiminde geçerli veya mevcut resim referansı</value>
@@ -2757,6 +2757,10 @@ Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfa
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Geçersiz {} bağımsız değişken değeri: '{}'. Beklenen bellek boyutu (ör. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>'{}' görüntüsü bulunamadı, getiriliyor</value>

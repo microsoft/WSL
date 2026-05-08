@@ -2684,7 +2684,7 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
     <value>컨테이너 내부의 작업 디렉터리</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>제공된 경로에 컨테이너 ID를 씁니다.</value>
+    <value>제공된 경로에 컨테이너 ID 쓰기</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>resolv.conf DNS 이름 서버의 IP 주소</value>
@@ -2763,6 +2763,10 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>잘못된 {} 인수 값: '{}'. 메모리 크기가 필요합니다(예: 256M, 1G).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID file '{}' already exists</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>이미지 '{}'을(를) 찾을 수 없습니다. 끌어오는 중</value>

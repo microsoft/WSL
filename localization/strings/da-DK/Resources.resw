@@ -2631,10 +2631,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Fjern objektbeholderen, når den stopper</value>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
-    <value>Signal to stop the container</value>
+    <value>Signal om at stoppe objektbeholderen</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
-    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <value>Størrelse på /dev/shm (f.eks. 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
@@ -2644,7 +2644,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Sti til sessionslager</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send</value>
+    <value>Signal, der skal sendes</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Aktuel eller eksisterende billedreference i formatet image-name[:tag]</value>
@@ -2678,7 +2678,7 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
     <value>Arbejdsmappe inde i objektbeholderen</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Skriv objektbeholder-id'et til den angivne sti.</value>
+    <value>Skriv container-id'et til den angivne sti</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adressen på DNS-navneserveren i resolv.conf</value>
@@ -2757,6 +2757,10 @@ Ved første kørsel oprettes filen med alle indstillinger kommenteret som standa
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Ugyldig {}-argumentværdi: '{}'. Forventede en hukommelsesstørrelse (f.eks. 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID-filen "{}" findes allerede</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Billedet '{}' blev ikke fundet, henter</value>
