@@ -424,7 +424,7 @@ int RunPortTracker(int Argc, char** Argv)
     int PortTrackerFd = -1;
     int NetlinkSocketFd = -1;
     int GuestRelayFd = -1;
-    int NetworkingMode = static_cast<int>(LxMiniInitNetworkingModeMirrored);
+    int NetworkingMode = static_cast<int>(LxMiniInitNetworkingModeNone);
 
     ArgumentParser parser(Argc, Argv);
     parser.AddArgument(Integer{BpfFd}, INIT_BPF_FD_ARG);
