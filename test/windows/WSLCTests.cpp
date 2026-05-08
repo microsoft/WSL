@@ -4226,11 +4226,12 @@ class WSLCTests
         const std::string guestA = "wslc-list-guest-a";
         const std::string guestB = "wslc-list-guest-b";
         const std::string otherName = "wslc-list-other-name";
+        const std::string emptyValVol = "wslc-list-empty-val";
 
         const std::vector<WSLCDriverOption> vhdOpts = {{"SizeBytes", "1073741824"}};
 
         auto cleanup = wil::scope_exit([&]() {
-            for (const auto& name : {vhdA, vhdB, guestA, guestB, otherName})
+            for (const auto& name : {vhdA, vhdB, guestA, guestB, otherName, emptyValVol})
             {
                 LOG_IF_FAILED(m_defaultSession->DeleteVolume(name.c_str()));
             }
@@ -4241,6 +4242,7 @@ class WSLCTests
         CreateNamedVolume(guestA, "guest", {{.Key = "env", .Value = "prod"}});
         CreateNamedVolume(guestB, "guest");
         CreateNamedVolume(otherName, "guest", {{.Key = "env", .Value = "test"}});
+        CreateNamedVolume(emptyValVol, "guest", {{.Key = "marker", .Value = ""}});
 
         auto verifyListVolumesFails = [&](HRESULT expected,
                                           const std::optional<std::string>& driver,
@@ -4258,7 +4260,7 @@ class WSLCTests
             VERIFY_ARE_EQUAL(expected, m_defaultSession->ListVolumes(&options, volumes.addressof(), volumes.size_address<ULONG>()));
         };
 
-        const std::set<std::string> all{vhdA, vhdB, guestA, guestB, otherName};
+        const std::set<std::string> all{vhdA, vhdB, guestA, guestB, otherName, emptyValVol};
         const std::set<std::string> empty{};
 
         // No filter returns every volume.
@@ -4266,7 +4268,7 @@ class WSLCTests
 
         // Filter by driver name.
         VERIFY_ARE_EQUAL(ListVolumes("vhd"), (std::set<std::string>{vhdA, vhdB}));
-        VERIFY_ARE_EQUAL(ListVolumes("guest"), (std::set<std::string>{guestA, guestB, otherName}));
+        VERIFY_ARE_EQUAL(ListVolumes("guest"), (std::set<std::string>{guestA, guestB, otherName, emptyValVol}));
         VERIFY_ARE_EQUAL(ListVolumes("nonexistent"), empty);
 
         // Filter by volume name (substring match).
@@ -4281,9 +4283,9 @@ class WSLCTests
         // Invalid regex is rejected.
         verifyListVolumesFails(E_INVALIDARG, {}, "[", {}, WSLCListVolumesFlagsNone);
 
-        // Filter by label key (any value matches).
+        // Filter by label key (any value matches): Value = nullptr.
         {
-            auto volumes = ListVolumes({}, {}, {{.Key = "env", .Value = ""}});
+            auto volumes = ListVolumes({}, {}, {{.Key = "env", .Value = nullptr}});
             VERIFY_ARE_EQUAL(volumes, (std::set<std::string>{vhdA, vhdB, guestA, otherName}));
         }
 
@@ -4300,7 +4302,7 @@ class WSLCTests
         }
 
         // Unknown label key matches nothing.
-        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "nope", .Value = ""}}), empty);
+        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "nope", .Value = nullptr}}), empty);
 
         // Unknown name matches nothing.
         VERIFY_ARE_EQUAL(ListVolumes({}, "nope"), empty);
@@ -4311,24 +4313,21 @@ class WSLCTests
         // Dangling flags are accepted but no-op today; update this test once dangling is wired up.
         VERIFY_ARE_EQUAL(ListVolumes({}, {}, {}, WSLCListVolumesFlagsDanglingTrue), all);
 
-        // Empty filter Value matches by-key only (any stored value): equivalent to passing no value at all.
-        // A volume labeled with an empty stored value is also matched by an empty filter Value.
-        {
-            const std::string emptyValVol = "wslc-list-empty-val";
-            auto emptyCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(emptyValVol.c_str())); });
-            CreateNamedVolume(emptyValVol, "guest", {{.Key = "marker", .Value = ""}});
+        // Value=nullptr (key-only) matches the volume with the marker label regardless of stored value.
+        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "marker", .Value = nullptr}}), std::set<std::string>{emptyValVol});
 
-            // Filter Value="" matches any volume with the key (regardless of stored value).
-            VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "marker", .Value = ""}}), std::set<std::string>{emptyValVol});
+        // Value="" matches only volumes whose stored value is also the empty string.
+        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "marker", .Value = ""}}), std::set<std::string>{emptyValVol});
 
-            // Filter Value="" on a key shared by other volumes matches them all.
-            VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "env", .Value = ""}}), (std::set<std::string>{vhdA, vhdB, guestA, otherName}));
-        }
+        // No volume stores `env` with an empty value, so env="" matches nothing.
+        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "env", .Value = ""}}), empty);
+
+        // env=nullptr (key-only) matches every volume that has the key, regardless of its stored value.
+        VERIFY_ARE_EQUAL(ListVolumes({}, {}, {{.Key = "env", .Value = nullptr}}), (std::set<std::string>{vhdA, vhdB, guestA, otherName}));
 
         verifyListVolumesFails(E_INVALIDARG, {}, {}, {}, WSLCListVolumesFlagsDanglingTrue | WSLCListVolumesFlagsDanglingFalse);
         verifyListVolumesFails(E_INVALIDARG, {}, {}, {}, 0x80000000);
         verifyListVolumesFails(E_POINTER, {}, {}, {{.Key = nullptr, .Value = "anything"}}, WSLCListVolumesFlagsNone);
-        verifyListVolumesFails(E_POINTER, {}, {}, {{.Key = "env", .Value = nullptr}}, WSLCListVolumesFlagsNone);
     }
 
     WSLC_TEST_METHOD(PruneVolumesTest)
@@ -4437,11 +4436,12 @@ class WSLCTests
             CreateNamedVolume(labeled, "guest", {{.Key = "wslc-prune-keyonly", .Value = "anything"}});
             CreateNamedVolume(unlabeled, "guest");
 
-            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keyonly", .Value = "", .Present = TRUE}});
+            // Value=nullptr matches any volume with the key (Docker `label=key`).
+            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keyonly", .Value = nullptr, .Present = TRUE}});
             expectDeleted(deleted, {labeled});
         }
 
-        // Label filter (absent).
+        // Label filter (absent, key only).
         {
             const std::string keep = "wslc-prune-keep";
             const std::string drop = "wslc-prune-drop";
@@ -4451,10 +4451,11 @@ class WSLCTests
                 LOG_IF_FAILED(m_defaultSession->DeleteVolume(drop.c_str()));
             });
 
-            CreateNamedVolume(keep, "guest", {{.Key = "wslc-prune-keep", .Value = ""}});
+            CreateNamedVolume(keep, "guest", {{.Key = "wslc-prune-keep", .Value = "yes"}});
             CreateNamedVolume(drop, "guest");
 
-            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keep", .Value = "", .Present = FALSE}});
+            // Value=nullptr filters by key only (Docker `label!=key`).
+            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keep", .Value = nullptr, .Present = FALSE}});
             expectDeleted(deleted, {drop});
         }
 

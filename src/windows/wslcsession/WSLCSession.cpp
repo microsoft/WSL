@@ -1203,10 +1203,9 @@ try
             {
                 const auto& label = Options->Labels[i];
                 RETURN_HR_IF_NULL(E_POINTER, label.Key);
-                RETURN_HR_IF_NULL(E_POINTER, label.Value);
 
                 std::string labelFilter = label.Key;
-                if (label.Value[0] != '\0')
+                if (label.Value != nullptr)
                 {
                     labelFilter += "=";
                     labelFilter += label.Value;
@@ -1548,10 +1547,9 @@ try
             {
                 const auto& filter = Options->Labels[i];
                 RETURN_HR_IF_NULL(E_POINTER, filter.Key);
-                RETURN_HR_IF_NULL(E_POINTER, filter.Value);
 
                 std::string labelFilter = filter.Key;
-                if (filter.Value[0] != '\0')
+                if (filter.Value != nullptr)
                 {
                     labelFilter += "=";
                     labelFilter += filter.Value;
@@ -1792,10 +1790,9 @@ try
         for (DWORD i = 0; i < FiltersCount; ++i)
         {
             THROW_HR_IF_MSG(E_POINTER, Filters[i].Key == nullptr, "Filter key cannot be null (index %lu)", i);
-            THROW_HR_IF_MSG(E_POINTER, Filters[i].Value == nullptr, "Filter value cannot be null (index %lu)", i);
             std::string labelFilter = Filters[i].Key;
 
-            if (Filters[i].Value[0] != '\0')
+            if (Filters[i].Value != nullptr)
             {
                 labelFilter += '=';
                 labelFilter += Filters[i].Value;

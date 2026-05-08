@@ -155,7 +155,6 @@ std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCListVolume
         for (ULONG i = 0; i < Options->LabelsCount; ++i)
         {
             THROW_HR_IF_NULL(E_POINTER, Options->Labels[i].Key);
-            THROW_HR_IF_NULL(E_POINTER, Options->Labels[i].Value);
         }
 
         if (Options->Driver != nullptr)
@@ -180,7 +179,13 @@ std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCListVolume
 
     auto matchLabel = [](const std::map<std::string, std::string>& labels, const WSLCLabel& f) {
         const auto it = labels.find(f.Key);
-        return it != labels.end() && (f.Value[0] == '\0' || it->second == f.Value);
+
+        if (it == labels.end())
+        {
+            return false;
+        }
+
+        return f.Value == nullptr || it->second == f.Value;
     };
 
     auto lock = m_lock.lock_shared();
@@ -248,7 +253,7 @@ WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const WSLCPruneVolumes
             THROW_HR_IF_NULL(E_POINTER, filter.Key);
 
             std::string labelFilter = filter.Key;
-            if (filter.Value != nullptr && filter.Value[0] != '\0')
+            if (filter.Value != nullptr)
             {
                 labelFilter += '=';
                 labelFilter += filter.Value;
