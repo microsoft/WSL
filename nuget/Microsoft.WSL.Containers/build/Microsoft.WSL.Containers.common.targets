@@ -52,28 +52,32 @@
                Text="WslcImage '%(WslcImage.Identity)' is missing required Context metadata." />
 
         <!-- Check for characters invalid in Windows file names: / \ : * ? " < > |
+             The Identity (= the value of the Include attribute) is used internally
+             as the build marker filename, so it must be a valid file name.
              XML entities: &quot; = "  &lt; = <  &gt; = >  -->
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
-               Text="WslcImage item '%(WslcImage.Identity)' must be a valid file name." />
+               Text="WslcImage with Include='%(WslcImage.Identity)' contains a character invalid for use as a build marker filename (one of / \ : * ? &quot; &lt; &gt; |). Use a simple identity in Include (e.g. Include=&quot;my-image&quot;) and put the registry/org/tag in the Image metadata." />
     </Target>
 
     <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:
          1. Sources may contain semicolons (multi-directory) which conflict with Properties syntax
          2. Wildcard expansion in Inputs requires an intermediate ItemGroup (_WslcCollectSources)
-            that must run per-image in a separate evaluation context -->
+            that must run per-image in a separate evaluation context
+
+         Each image is built and saved atomically in one inner target so a failure
+         partway through the list leaves a coherent on-disk state (no half-state
+         where image N is in the daemon but its tar is missing). StopOnFirstFailure
+         halts the batch as soon as any image fails. -->
     <Target Name="WslcBuildAllImages"
             AfterTargets="Build"
             DependsOnTargets="WslcCheckDependencies;_WslcValidateItems"
             Condition="'@(WslcImage)' != '' AND '$(DesignTimeBuild)' != 'true' AND '$(IsCrossTargetingBuild)' != 'true'">
 
         <MSBuild Projects="$(MSBuildProjectFullPath)"
-                 Targets="_WslcBuildSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir)" />
-
-        <MSBuild Projects="$(MSBuildProjectFullPath)"
-                 Targets="_WslcSaveSingleImage"
-                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir)" />
+                 Targets="_WslcBuildAndSaveSingleImage"
+                 StopOnFirstFailure="true"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcImage=%(WslcImage.Image);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir)" />
     </Target>
 
     <!--
@@ -107,27 +111,7 @@
         </PropertyGroup>
     </Target>
 
-    <!-- Inner target: build a single image with incremental check -->
-    <Target Name="_WslcBuildSingleImage"
-            DependsOnTargets="_WslcCollectSources;_WslcResolveImageRef"
-            Inputs="@(_WslcSourceFiles)"
-            Outputs="$(_WslcIntDir)wslc_$(_WslcName).built">
-
-        <MakeDir Directories="$(_WslcIntDir)" />
-
-        <Message Importance="high"
-                 Text="WSLC: Building image '$(_WslcFullRef)'..." />
-
-        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcFullRef)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
-              ConsoleToMSBuild="true" />
-
-        <Touch Files="$(_WslcIntDir)wslc_$(_WslcName).built" AlwaysCreate="true" />
-
-        <Message Importance="high"
-                 Text="WSLC: Image '$(_WslcFullRef)' built successfully." />
-    </Target>
-
-    <!-- Resolve tar path into a property so _WslcSaveSingleImage can use it in Inputs/Outputs. -->
+    <!-- Resolve tar path into a property so _WslcBuildAndSaveSingleImage can use it in Inputs/Outputs. -->
     <Target Name="_WslcResolveSavePath" DependsOnTargets="_WslcResolveImageRef">
         <PropertyGroup>
             <!-- Resolve tar path: user-provided TarLocation, else $(OutDir)<name>.tar -->
@@ -138,19 +122,25 @@
         </PropertyGroup>
     </Target>
 
-    <!-- Inner target: save a single image to a tar file. Incremental — only re-saves
-         when the build stamp is newer than the tar.
-         Save writes to <tar>.tmp and atomically renames on success. wslc image save
-         uses CREATE_ALWAYS, which truncates the destination on entry, so a failed
-         save would otherwise leave a partial tar with newer mtime than sources
-         (and break incremental). The Move only runs if save succeeded.
-         Image must already exist in the wslc default session (left there by _WslcBuildSingleImage). -->
-    <Target Name="_WslcSaveSingleImage"
-            DependsOnTargets="_WslcResolveSavePath"
-            Inputs="$(_WslcIntDir)wslc_$(_WslcName).built"
+    <!-- Inner target: build + save a single image atomically. Per-image atomicity
+         (rather than batched build-all-then-save-all) means a failure mid-list
+         leaves a coherent state — never "image N is in the daemon but its tar is
+         missing". The tar is the canonical incremental output (no separate stamp
+         file); save writes <tar>.tmp and Moves on success so a failed save can't
+         leave a partial tar that would mislead later incremental checks. -->
+    <Target Name="_WslcBuildAndSaveSingleImage"
+            DependsOnTargets="_WslcCollectSources;_WslcResolveImageRef;_WslcResolveSavePath"
+            Inputs="@(_WslcSourceFiles)"
             Outputs="$(_WslcTarPath)">
 
+        <MakeDir Directories="$(_WslcIntDir)" />
         <MakeDir Directories="$(_WslcTarDir)" Condition="'$(_WslcTarDir)' != ''" />
+
+        <Message Importance="high"
+                 Text="WSLC: Building image '$(_WslcFullRef)'..." />
+
+        <Exec Command="&quot;$(WslcCliPath)&quot; image build -t &quot;$(_WslcFullRef)&quot; -f &quot;$(_WslcDockerfile)&quot; &quot;$(_WslcContext)&quot;"
+              ConsoleToMSBuild="true" />
 
         <Message Importance="high"
                  Text="WSLC: Saving image '$(_WslcFullRef)' to '$(_WslcTarPath)'..." />
@@ -170,18 +160,19 @@
               Condition="'$(WslcPruneAfterBuild)' == 'true'" />
     </Target>
 
-    <!-- Clean container artifacts -->
+    <!-- Clean container artifacts. ContinueOnError so a transient file lock
+         (AV scanner, downstream consumer) doesn't block the rest of clean. -->
     <Target Name="WslcClean"
             AfterTargets="Clean"
             Condition="'@(WslcImage)' != ''">
 
-        <Delete Files="$(_WslcIntDir)wslc_%(WslcImage.Identity).built" />
-
         <Delete Files="%(WslcImage.TarLocation)"
-                Condition="'%(WslcImage.TarLocation)' != ''" />
+                Condition="'%(WslcImage.TarLocation)' != ''"
+                ContinueOnError="WarnAndContinue" />
 
         <Delete Files="$(OutDir)%(WslcImage.Identity).tar"
-                Condition="'%(WslcImage.TarLocation)' == ''" />
+                Condition="'%(WslcImage.TarLocation)' == ''"
+                ContinueOnError="WarnAndContinue" />
     </Target>
 
 </Project>

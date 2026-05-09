@@ -48,17 +48,14 @@
     </Target>
 
     <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles)
-         and _WslcResolveSavePath to get $(_WslcTarPath).
-         The tar is listed in the write tlog so a manually-deleted tar invalidates
-         the VS Fast Up-to-Date check (without it, VS would skip MSBuild entirely
-         and leave the tar missing).
+         and _WslcResolveSavePath to get $(_WslcTarPath). The tar is the sole
+         write output (build is now atomic with save — see _WslcBuildAndSaveSingleImage).
          tlog format requires one path per line; build ItemGroups so WriteLinesToFile
          emits each entry on its own line instead of joining with ';'. -->
     <Target Name="_WslcWriteSingleTlog"
             DependsOnTargets="_WslcCollectSources;_WslcResolveSavePath">
         <PropertyGroup>
             <_WslcTlogToolPath>$([System.IO.Path]::GetFullPath('$(WslcCliPath)'))</_WslcTlogToolPath>
-            <_WslcMarkerFullPath>$([System.IO.Path]::GetFullPath('$(_WslcIntDir)wslc_$(_WslcName).built'))</_WslcMarkerFullPath>
             <_WslcTarFullPath>$([System.IO.Path]::GetFullPath('$(_WslcTarPath)'))</_WslcTarFullPath>
         </PropertyGroup>
 
@@ -66,7 +63,6 @@
             <_WslcTlogReadLines Include="^$(_WslcTlogToolPath)" />
             <_WslcTlogReadLines Include="@(_WslcSourceFiles->'%(FullPath)')" />
             <_WslcTlogWriteLines Include="^$(_WslcTlogToolPath)" />
-            <_WslcTlogWriteLines Include="$(_WslcMarkerFullPath)" />
             <_WslcTlogWriteLines Include="$(_WslcTarFullPath)" />
         </ItemGroup>
 
@@ -90,8 +86,10 @@
         <PropertyGroup>
             <_WslcTlogDir>$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))</_WslcTlogDir>
         </PropertyGroup>
-        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).read.1.tlog" />
-        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).write.1.tlog" />
+        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).read.1.tlog"
+                ContinueOnError="WarnAndContinue" />
+        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).write.1.tlog"
+                ContinueOnError="WarnAndContinue" />
     </Target>
 
 </Project>
