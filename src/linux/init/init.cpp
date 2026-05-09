@@ -3508,7 +3508,7 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
 
 int WslInitWatcher(int Argc, char** Argv)
 {
-    // Igore log initialization failure. Not critical.
+    // Ignore log initialization failure. Not critical.
     InitializeLogging(false);
 
     UtilSetThreadName(LX_INIT_WSL_INIT_WATCHER);

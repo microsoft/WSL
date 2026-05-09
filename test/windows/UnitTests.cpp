@@ -6185,7 +6185,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         }
 
         return LxssDistributionStateInvalid;
-    };
+    }
 
     TEST_METHOD(DistroTimeout)
     {
