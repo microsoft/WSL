@@ -2407,18 +2407,10 @@ Return Value:
         // the PID namespace if it exits unexpectedly.
         //
 
-        const auto wslInitPid = std::to_string(getpid());
-        const int WatcherPid = fork();
-        if (WatcherPid < 0)
-        {
-            FATAL_ERROR("fork failed {}", errno);
-        }
-        else if (WatcherPid == 0)
-        {
-            execl(LX_INIT_PATH, LX_INIT_WSL_INIT_WATCHER, wslInitPid.c_str(), static_cast<char*>(nullptr));
+        UtilCreateChildProcess(LX_INIT_WSL_INIT_WATCHER, [&]() {
+            execl(LX_INIT_PATH, LX_INIT_WSL_INIT_WATCHER, static_cast<char*>(nullptr));
             LOG_ERROR("execl({}) failed {}", LX_INIT_WSL_INIT_WATCHER, errno);
-            _exit(1);
-        }
+        });
 
         //
         // Keep track of the new pid for WSL init.
@@ -3516,26 +3508,16 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
 
 int WslInitWatcher(int Argc, char** Argv)
 {
-    // Keep this as simple as possible. Log is not used.
+    // Igore log initialization failure. Not critical.
+    InitializeLogging(false);
 
-    prctl(PR_SET_NAME, LX_INIT_WSL_INIT_WATCHER, 0, 0, 0);
+    UtilSetThreadName(LX_INIT_WSL_INIT_WATCHER);
 
-    if (Argc < 2)
-    {
-        _exit(1);
-    }
-
-    char* end = nullptr;
-    const long parsed = strtol(Argv[1], &end, 10);
-    if (end == Argv[1] || *end != '\0' || parsed <= 0 || parsed != static_cast<pid_t>(parsed))
-    {
-        _exit(1);
-    }
-    const pid_t wslInitPid = static_cast<pid_t>(parsed);
-
+    const pid_t wslInitPid = getppid();
     const int pidfd = syscall(SYS_pidfd_open, wslInitPid, 0);
     if (pidfd < 0)
     {
+        LOG_ERROR("pidfd_open failed {}", errno);
         _exit(1);
     }
 
@@ -3546,8 +3528,11 @@ int WslInitWatcher(int Argc, char** Argv)
     }
     if (rc <= 0 || (pfd.revents & POLLIN) == 0)
     {
+        LOG_ERROR("poll failed {} {}", rc, errno);
         _exit(1);
     }
+
+    LOG_ERROR("wsl-init has exited, shutting down the VM");
 
     // Teardown the current PID namespace. Not shutting down the VM.
     reboot(RB_POWER_OFF);
