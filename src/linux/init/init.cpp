@@ -3532,7 +3532,7 @@ int WslInitWatcher(int Argc, char** Argv)
         _exit(1);
     }
 
-    LOG_ERROR("wsl-init has exited, shutting down the VM");
+    LOG_ERROR("wsl init has exited, shutting down the distro");
 
     // Teardown the current PID namespace. Not shutting down the VM.
     reboot(RB_POWER_OFF);
