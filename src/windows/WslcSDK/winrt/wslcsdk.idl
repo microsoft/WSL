@@ -66,9 +66,10 @@ namespace Microsoft.WSL.Containers
 
         // Sets the POSIX mode bits (e.g. 0o750) that the volume root will be chmoded to
         // after creation. Must be non-zero and <= 07777; out-of-range or zero values
-        // are rejected. Owner/mode are only supported on named volumes; if the
-        // resulting VhdRequirements is assigned to SessionSettings.VhdRequirements
-        // (the session rootfs VHD), Session creation will fail with E_INVALIDARG.
+        // are rejected immediately by the setter with E_INVALIDARG. Owner/mode are only
+        // supported on named volumes; if the resulting VhdRequirements is assigned to
+        // SessionSettings.VhdRequirements (the session rootfs VHD), Session creation
+        // will fail with E_INVALIDARG.
         void SetMode(UInt32 mode);
     };
 }
