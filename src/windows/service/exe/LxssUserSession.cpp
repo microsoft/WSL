@@ -1858,10 +1858,9 @@ try
     const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
     const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
-    RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
     const auto& vhdPath = configuration.VhdFilePath;
-    if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str()))
+    if (m_runningInstances.contains(*DistroGuid) || (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str())))
     {
         THROW_HR_WITH_USER_ERROR(WSL_E_DISTRO_NOT_STOPPED, wsl::shared::Localization::MessageVhdInUse());
     }
