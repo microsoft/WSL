@@ -55,7 +55,7 @@ namespace {
 
             opts.SizeBytes = parser.Required<ULONGLONG>(c_sizeBytesOpt);
             THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sizeBytesOpt, std::string("0")), opts.SizeBytes == 0);
+                E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_sizeBytesOpt, DriverOpts.at(c_sizeBytesOpt)), opts.SizeBytes == 0);
 
             opts.Fixed = parser.OptionalBool(c_fixedOpt).value_or(false);
 
@@ -80,7 +80,7 @@ namespace {
             opts.Mode = parser.Optional<uint32_t>(c_modeOpt, c_maxModeBits, 8);
             if (opts.Mode.has_value() && *opts.Mode == 0)
             {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_modeOpt, std::string("0")));
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_modeOpt, DriverOpts.at(c_modeOpt)));
             }
 
             // Anything else is unrecognized and a user error.
