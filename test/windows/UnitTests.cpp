@@ -3278,6 +3278,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
+
+        LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --resize 1500GB --allow-unsafe", name), -1);
     }
 
     // Verifies that VHD-mutating manage operations (--resize, --set-sparse, --move) are rejected while a
@@ -3356,6 +3358,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(err, L"");
 
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact --allow-unsafe", name), -1);
         VERIFY_ARE_EQUAL(err, L"");
 
         std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
