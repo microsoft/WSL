@@ -29,6 +29,7 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
+constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -42,12 +43,14 @@ std::string IndentLines(const std::string& input, const std::string& prefix)
     }
 
     std::string result = prefix;
-    for (size_t i = 0; i < input.size(); i++)
+    for (auto it = input.begin(); it != input.end(); ++it)
     {
-        result.push_back(input[i]);
-        if (i + 1 < input.size())
+        result.push_back(*it);
+
+        const auto next = std::next(it);
+        if (next != input.end())
         {
-            if (input[i] == '\n' || (input[i] == '\r' && input[i + 1] != '\n'))
+            if (*it == '\n' || (*it == '\r' && *next != '\n'))
             {
                 result.append(prefix);
             }
@@ -423,8 +426,6 @@ try
         return;
     }
 
-    constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
-
     std::string entry = {Buffer.begin(), Buffer.end()};
     WSL_LOG(
         "ContainerdLog",
@@ -765,7 +766,7 @@ try
         }
     };
 
-    static constexpr char c_logId[] = "log";
+    constexpr auto c_logId = "log";
 
     auto flushLine = [&]() {
         if (needsNewline)
@@ -1223,7 +1224,7 @@ try
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
-    auto entries = std::accumulate<decltype(images.begin()), size_t>(images.begin(), images.end(), 0, [](auto sum, const auto& e) {
+    auto entries = std::accumulate(images.begin(), images.end(), size_t{0}, [](auto sum, const auto& e) {
         return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
     });
 

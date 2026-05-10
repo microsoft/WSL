@@ -12,7 +12,7 @@
 .PARAMETER TestDataPath
     Path to test data folder. Defaults to ".\test_data".
 .PARAMETER Package
-    Path to the wsl.msix package to install. Defaults to ".\wsl.msix".
+    Path to the wsl.msix package to install. Defaults to ".\installer.msix".
 .PARAMETER UnitTestsPath
     Path to the linux/unit_tests directory to copy and install the unit tests.
 .PARAMETER PullRequest
@@ -103,9 +103,9 @@ if ($AttachDebugger)
 else
 {
     te.exe $teArgList
-    if (!$?)
+    if ($LASTEXITCODE -ne 0)
     {
-        exit 1
+        exit $LASTEXITCODE
     }
 }
 
