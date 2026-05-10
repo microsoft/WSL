@@ -5594,7 +5594,10 @@ class WSLCTests
         options.Name = "test-custom-network-empty";
         options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
         options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeCustom;
-        options.ContainerNetwork.ContainerNetworkName = "";
+        WSLCNetworkAttachment emptyNet{};
+        emptyNet.NetworkName = "";
+        options.ContainerNetwork.Networks = &emptyNet;
+        options.ContainerNetwork.NetworksCount = 1;
 
         wil::com_ptr<IWSLCContainer> container;
         auto hr = m_defaultSession->CreateContainer(&options, &container);
@@ -5948,6 +5951,41 @@ class WSLCTests
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateRunning);
 
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), m_defaultSession->DeleteNetwork(additionalNetwork.c_str()));
+    }
+
+    WSLC_TEST_METHOD(ContainerNetworkAttachmentIpAddressRejectedTest)
+    {
+        // ContainerIpAddress is reserved and must be null today.
+        LPCSTR args[] = {"sleep", "99999"};
+
+        WSLCContainerOptions options{};
+        options.Image = "debian:latest";
+        options.Name = "test-network-ip-reserved";
+        options.InitProcessOptions.CommandLine = {.Values = args, .Count = ARRAYSIZE(args)};
+        options.ContainerNetwork.ContainerNetworkType = WSLCContainerNetworkTypeBridged;
+        WSLCNetworkAttachment netWithIp{};
+        netWithIp.NetworkName = "bridge";
+        netWithIp.ContainerIpAddress = "10.0.0.5";
+        options.ContainerNetwork.Networks = &netWithIp;
+        options.ContainerNetwork.NetworksCount = 1;
+
+        wil::com_ptr<IWSLCContainer> container;
+        auto hr = m_defaultSession->CreateContainer(&options, &container);
+        VERIFY_ARE_EQUAL(E_NOTIMPL, hr);
+        ValidateCOMErrorMessage(L"ContainerIpAddress is not yet supported.");
+    }
+
+    WSLC_TEST_METHOD(ContainerCustomNetworkMissingPrimaryWithAdditionalRejectedTest)
+    {
+        // Custom + additional networks without a primary network name must be rejected,
+        // not silently promote the first additional to primary.
+        WSLCContainerLauncher launcher(
+            "debian:latest", "test-custom-no-primary", {"sleep", "99999"}, {}, WSLCContainerNetworkType::WSLCContainerNetworkTypeCustom);
+        launcher.AddAdditionalNetwork("any-net");
+
+        auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
+        VERIFY_ARE_EQUAL(E_INVALIDARG, retVal.first);
+        ValidateCOMErrorMessage(L"Container network name is required for custom network type.");
     }
 
     WSLC_TEST_METHOD(ContainerInspect)

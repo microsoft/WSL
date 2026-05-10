@@ -381,19 +381,43 @@ void ProcessNamedVolumes(const WSLCContainerOptions& containerOptions, wsl::wind
     }
 }
 
+constexpr ULONG GetAdditionalStartIndex(WSLCContainerNetworkType type)
+{
+    // For Custom, Networks[0] is the primary user network; additionals start at 1.
+    // For Bridged/Host/None, the primary mode is implicit, so all entries are additional.
+    return type == WSLCContainerNetworkTypeCustom ? 1 : 0;
+}
+
+LPCSTR GetPrimaryCustomNetworkName(const WSLCContainerNetwork& network)
+{
+    if (network.ContainerNetworkType != WSLCContainerNetworkTypeCustom || network.NetworksCount == 0)
+    {
+        return nullptr;
+    }
+    THROW_HR_IF_MSG(E_INVALIDARG, network.Networks == nullptr, "Networks pointer is null but NetworksCount=%lu", network.NetworksCount);
+    return network.Networks[0].NetworkName;
+}
+
 void ProcessAdditionalNetworks(
-    const WSLCContainerOptions& containerOptions,
+    const WSLCContainerNetwork& network,
     const std::unordered_map<std::string, NetworkEntry>& sessionNetworks,
     const std::string& primaryNetworkMode,
     wsl::windows::common::docker_schema::CreateContainer& request)
 {
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        containerOptions.AdditionalNetworksCount > 0 && containerOptions.AdditionalNetworks == nullptr,
-        "AdditionalNetworks pointer is null but AdditionalNetworksCount=%lu",
-        containerOptions.AdditionalNetworksCount);
+    // Validate pointer/count consistency and reject unsupported fields across all entries.
+    if (network.NetworksCount > 0)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, network.Networks == nullptr, "Networks pointer is null but NetworksCount=%lu", network.NetworksCount);
 
-    if (containerOptions.AdditionalNetworksCount == 0)
+        for (ULONG i = 0; i < network.NetworksCount; i++)
+        {
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_NOTIMPL, Localization::MessageWslcContainerIpAddressNotSupported(), network.Networks[i].ContainerIpAddress != nullptr);
+        }
+    }
+
+    const ULONG startIndex = GetAdditionalStartIndex(network.ContainerNetworkType);
+    if (network.NetworksCount <= startIndex)
     {
         return;
     }
@@ -407,11 +431,12 @@ void ProcessAdditionalNetworks(
     auto& endpointsConfig = request.NetworkingConfig.EndpointsConfig;
     endpointsConfig[primaryNetworkMode] = {};
 
-    for (ULONG i = 0; i < containerOptions.AdditionalNetworksCount; i++)
+    for (ULONG i = startIndex; i < network.NetworksCount; i++)
     {
-        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.AdditionalNetworks[i], "AdditionalNetworks at index %lu is null", i);
-
-        const std::string networkName = containerOptions.AdditionalNetworks[i];
+        // NetworkName may arrive as null when the caller passed "" (MIDL marshals empty LPCSTR as null).
+        // Both null and empty fall through to the network lookup, returning WSLC_E_NETWORK_NOT_FOUND.
+        const char* rawName = network.Networks[i].NetworkName;
+        const std::string networkName = rawName != nullptr ? rawName : "";
 
         auto [_, inserted] = endpointsConfig.insert({networkName, EmptyObject{}});
         THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcDuplicateNetwork(networkName), !inserted);
@@ -1545,11 +1570,11 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
         containerOptions.ContainerNetwork.ContainerNetworkType,
         virtualMachine,
         sessionNetworks,
-        containerOptions.ContainerNetwork.ContainerNetworkName);
+        GetPrimaryCustomNetworkName(containerOptions.ContainerNetwork));
 
     request.HostConfig.NetworkMode = networkMode;
 
-    ProcessAdditionalNetworks(containerOptions, sessionNetworks, networkMode, request);
+    ProcessAdditionalNetworks(containerOptions.ContainerNetwork, sessionNetworks, networkMode, request);
 
     for (const auto& e : mappedPorts)
     {
@@ -1597,7 +1622,8 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
 
     // Post-create verification: confirm every requested network is actually attached.
     // If Docker rejected any endpoint, throw here so deleteOnFailure cleans up the orphan container.
-    if (containerOptions.AdditionalNetworksCount > 0)
+    const ULONG verifyStartIndex = GetAdditionalStartIndex(containerOptions.ContainerNetwork.ContainerNetworkType);
+    if (containerOptions.ContainerNetwork.NetworksCount > verifyStartIndex)
     {
         THROW_HR_IF_MSG(
             E_UNEXPECTED,
@@ -1606,9 +1632,10 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
             networkMode.c_str());
     }
 
-    for (ULONG i = 0; i < containerOptions.AdditionalNetworksCount; i++)
+    for (ULONG i = verifyStartIndex; i < containerOptions.ContainerNetwork.NetworksCount; i++)
     {
-        const std::string networkName = containerOptions.AdditionalNetworks[i];
+        const char* rawName = containerOptions.ContainerNetwork.Networks[i].NetworkName;
+        const std::string networkName = rawName != nullptr ? rawName : "";
         THROW_HR_IF_MSG(
             E_UNEXPECTED,
             !inspectData.NetworkSettings.Networks.contains(networkName),
