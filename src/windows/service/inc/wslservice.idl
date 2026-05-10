@@ -344,7 +344,15 @@ interface ILxssUserSession : IUnknown
         [in] LPCGUID DistroGuid,
         [in] LPCWSTR DistributionName, 
         [ in, out ] LXSS_ERROR_INFO * Error);
+};
 
+[
+    uuid(3FB7842D-7DDB-482F-9A79-DF6D876092F5),
+    pointer_default(unique),
+    object
+]
+interface ILxssUserSession2 : ILxssUserSession
+{
     HRESULT CompactDistribution(
         [in] LPCGUID DistroGuid,
         [in, out] LXSS_ERROR_INFO* Error);

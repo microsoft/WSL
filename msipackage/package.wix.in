@@ -146,6 +146,12 @@
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
+                <RegistryKey Root="HKCR" Key="Interface\{3FB7842D-7DDB-482F-9A79-DF6D876092F5}">
+                    <RegistryValue Value="ILxssUserSession2" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
 
                 <!-- WSLServiceProxyStub. -->
                 <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}">
@@ -685,4 +691,3 @@
         <Property Id="MSIRMSHUTDOWN" Value="1" Secure="yes" />
     </Package>
 </Wix>
-
