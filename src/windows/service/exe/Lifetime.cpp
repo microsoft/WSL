@@ -69,7 +69,7 @@ void LifetimeManager::ClearCallbacks()
         {
             if (callback.timer)
             {
-                callback.CancelTimer();
+                SetThreadpoolTimer(callback.timer.get(), nullptr, 0, 0);
                 timers.emplace_back(callback.timer.release());
             }
 
@@ -169,7 +169,7 @@ bool LifetimeManager::RemoveCallback(_In_ ULONG64 ClientKey)
     {
         if (oldClient.timer)
         {
-            oldClient.CancelTimer();
+            SetThreadpoolTimer(oldClient.timer.get(), nullptr, 0, 0);
             timers.emplace_back(oldClient.timer.release());
         }
 
