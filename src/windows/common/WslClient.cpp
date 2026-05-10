@@ -887,6 +887,7 @@ int Manage(_In_ std::wstring_view commandLine)
     std::optional<std::wstring> move;
     std::optional<std::wstring> defaultUser;
     std::optional<uint64_t> resize;
+    bool compact = false;
     bool allowUnsafe = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME, 0);
@@ -895,6 +896,7 @@ int Manage(_In_ std::wstring_view commandLine)
     parser.AddArgument(AbsolutePath(move), WSL_MANAGE_ARG_MOVE_OPTION_LONG, WSL_MANAGE_ARG_MOVE_OPTION);
     parser.AddArgument(defaultUser, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG);
     parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_RESIZE_OPTION_LONG, WSL_MANAGE_ARG_RESIZE_OPTION);
+    parser.AddArgument(compact, WSL_MANAGE_ARG_COMPACT_OPTION_LONG);
     parser.AddArgument(allowUnsafe, WSL_MANAGE_ARG_ALLOW_UNSAFE);
     parser.Parse();
 
@@ -903,7 +905,7 @@ int Manage(_In_ std::wstring_view commandLine)
     wsl::windows::common::SvcComm service;
     auto distroGuid = service.GetDistributionId(distribution);
 
-    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() != 1)
+    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() + compact != 1)
     {
         THROW_HR(WSL_E_INVALID_USAGE);
     }
@@ -949,6 +951,10 @@ int Manage(_In_ std::wstring_view commandLine)
     else if (resize)
     {
         THROW_IF_FAILED(service.ResizeDistribution(&distroGuid, resize.value()));
+    }
+    else if (compact)
+    {
+        THROW_IF_FAILED(service.CompactDistribution(&distroGuid));
     }
 
     wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
