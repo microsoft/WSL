@@ -58,6 +58,7 @@ void LifetimeManager::ClearCallbacks()
     //     scope).
     std::vector<ClientCallback> callbacks;
     std::vector<wil::unique_threadpool_wait> waits;
+    std::vector<wil::unique_threadpool_timer> timers;
     {
         std::lock_guard<std::mutex> lock(m_lock);
 
@@ -66,8 +67,15 @@ void LifetimeManager::ClearCallbacks()
 
         for (auto& callback : m_callbackList)
         {
+            if (callback.timer)
+            {
+                callback.CancelTimer();
+                timers.emplace_back(callback.timer.release());
+            }
+
             for (auto& child : callback.clientProcesses)
             {
+                SetThreadpoolWait(child.terminationWait.get(), nullptr, nullptr);
                 waits.emplace_back(child.terminationWait.release());
             }
 
@@ -144,13 +152,32 @@ bool LifetimeManager::RemoveCallback(_In_ ULONG64 ClientKey)
 {
     bool callbackFound = false;
     ClientCallback oldClient{};
-    std::lock_guard<std::mutex> lock(m_lock);
-    const auto client = _FindClient(ClientKey);
-    if (client != m_callbackList.end())
+    std::vector<wil::unique_threadpool_wait> waits;
+    std::vector<wil::unique_threadpool_timer> timers;
     {
-        oldClient = std::move(*client);
-        m_callbackList.erase(client);
-        callbackFound = true;
+        std::lock_guard<std::mutex> lock(m_lock);
+        const auto client = _FindClient(ClientKey);
+        if (client != m_callbackList.end())
+        {
+            oldClient = std::move(*client);
+            m_callbackList.erase(client);
+            callbackFound = true;
+        }
+    }
+
+    if (callbackFound)
+    {
+        if (oldClient.timer)
+        {
+            oldClient.CancelTimer();
+            timers.emplace_back(oldClient.timer.release());
+        }
+
+        for (auto& process : oldClient.clientProcesses)
+        {
+            SetThreadpoolWait(process.terminationWait.get(), nullptr, nullptr);
+            waits.emplace_back(process.terminationWait.release());
+        }
     }
 
     return callbackFound;
