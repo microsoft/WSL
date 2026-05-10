@@ -473,6 +473,9 @@ Argumenty pro správu Subsystému Windows pro Linux:
             --resize &lt;MemoryString&gt;
                 Změní velikost disku distribuce na zadanou velikost.
 
+            --compact
+                Compact the VHDX file of a stopped WSL 2 distribution.
+
     --mount &lt;Disk&gt;
         Propojí a připojí fyzický nebo virtuální disk ve všech distribucích WSL 2.
 
@@ -591,7 +594,8 @@ Argumenty pro správu distribucí v Subsystému Windows pro Linux:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

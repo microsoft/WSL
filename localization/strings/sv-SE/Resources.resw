@@ -473,6 +473,9 @@ Argument för att hantera Windows-undersystem för Linux:
             --resize &lt;MemoryString&gt;
                 Ändra storlek på disken för fördelningen till den angivna storleken.
 
+            --compact
+                Compact the VHDX file of a stopped WSL 2 distribution.
+
     --mount &lt;Disk&gt;
         Ansluter och monterar en fysisk eller virtuell disk i alla WSL 2-distributioner.
 
@@ -591,7 +594,8 @@ Arguments for managing Argument för att hantera distributioner i Windows-unders
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--compact
+"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
