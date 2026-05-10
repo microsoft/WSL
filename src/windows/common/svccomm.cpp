@@ -653,6 +653,14 @@ wsl::windows::common::SvcComm::ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ 
 }
 
 HRESULT
+wsl::windows::common::SvcComm::CompactDistribution(_In_ LPCGUID DistroGuid) const
+{
+    ClientExecutionContext context;
+
+    RETURN_HR(m_userSession->CompactDistribution(DistroGuid, context.OutError()));
+}
+
+HRESULT
 wsl::windows::common::SvcComm::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version) const
 {
     ClientExecutionContext context;

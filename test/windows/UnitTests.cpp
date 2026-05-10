@@ -1304,6 +1304,12 @@ class UnitTests
                 L"--manage test_distro --resize 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
+
+            // wsl.exe --manage --compact requires WSL2.
+            ValidateErrorMessage(
+                L"--manage test_distro --compact",
+                L"This operation is only supported by WSL2.",
+                L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
 
         ValidateErrorMessage(
@@ -1562,6 +1568,9 @@ Arguments for managing Windows Subsystem for Linux:
 
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --compact
+                Compact the VHDX file of a stopped WSL 2 distribution.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -2944,6 +2953,35 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 L"The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe "
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
+        }
+    }
+
+    WSL2_TEST_METHOD(Compact)
+    {
+        constexpr auto name = L"compact-test-distro";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
+        WslShutdown();
+
+        auto cleanupName =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --compact", name));
+        VERIFY_ARE_EQUAL(err, L"");
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", name));
+        VERIFY_ARE_EQUAL(out, L"ok\n");
+        VERIFY_ARE_EQUAL(err, L"");
+        WslShutdown();
+
+        {
+            WslKeepAlive keepAlive;
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --compact", -1);
+            VERIFY_IS_TRUE(out.find(L"Wsl/Service/WSL_E_DISTRO_NOT_STOPPED") != std::wstring::npos);
+            VERIFY_ARE_EQUAL(err, L"");
         }
     }
 

@@ -492,6 +492,18 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::CompactDistribution(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CompactDistribution(DistroGuid);
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -1833,6 +1845,34 @@ try
         wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE);
     }
 
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::CompactDistribution(_In_ LPCGUID DistroGuid)
+try
+{
+    auto runAsUser = wil::CoImpersonateClient();
+    std::lock_guard lock(m_instanceLock);
+    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+    const auto configuration = s_GetDistributionConfiguration(registration);
+    RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+    RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
+
+    const auto& vhdPath = configuration.VhdFilePath;
+    if (m_utilityVm && m_utilityVm->IsVhdAttached(vhdPath.c_str()))
+    {
+        THROW_HR_WITH_USER_ERROR(WSL_E_DISTRO_NOT_STOPPED, wsl::shared::Localization::MessageVhdInUse());
+    }
+
+    const auto result = wil::ResultFromException([&] { wsl::core::filesystem::CompactVhd(vhdPath.c_str()); });
+    if (result == HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION))
+    {
+        THROW_HR_WITH_USER_ERROR(result, wsl::shared::Localization::MessageVhdInUse());
+    }
+
+    THROW_IF_FAILED(result);
     return S_OK;
 }
 CATCH_RETURN()

@@ -344,6 +344,10 @@ interface ILxssUserSession : IUnknown
         [in] LPCGUID DistroGuid,
         [in] LPCWSTR DistributionName, 
         [ in, out ] LXSS_ERROR_INFO * Error);
+
+    HRESULT CompactDistribution(
+        [in] LPCGUID DistroGuid,
+        [in, out] LXSS_ERROR_INFO* Error);
 };
 
 
