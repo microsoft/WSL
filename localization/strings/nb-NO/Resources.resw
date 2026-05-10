@@ -2678,7 +2678,7 @@ Ved første kjøring opprettes filen med alle innstillinger kommentert ut som st
     <value>Arbeidsmappe i beholderen</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Skriv beholder-ID-en til den angitte banen</value>
+    <value>Skriv beholder-ID-en til banen som er angitt</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adresse for DNS-navneserveren i resolv.conf</value>
