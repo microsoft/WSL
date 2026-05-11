@@ -2231,7 +2231,12 @@ Return Value:
 
     if (LxtFsTimestampDiff(Timestamp1, Timestamp2) <= 0)
     {
-        LxtLogError("Time %lld.%.9ld not greater than time %lld.%.9ld", Timestamp1, Timestamp2);
+        LxtLogError(
+            "Time %lld.%.9ld not greater than time %lld.%.9ld",
+            (long long)Timestamp1->tv_sec,
+            (long)Timestamp1->tv_nsec,
+            (long long)Timestamp2->tv_sec,
+            (long)Timestamp2->tv_nsec);
 
         Result = LXT_RESULT_FAILURE;
         goto ErrorExit;
