@@ -19,6 +19,7 @@ Abstract:
 
 #pragma once
 
+#include <cerrno>
 #include <limits>
 #include <map>
 #include <optional>
@@ -59,6 +60,7 @@ private:
 
     [[noreturn]] static void ThrowInvalid(std::string_view Key, const std::string& Value);
     [[noreturn]] static void ThrowMissing(std::string_view Key);
+    [[noreturn]] static void ThrowUnknown(std::string_view Key);
 
     template <typename T>
     static T ParseUnsignedValue(std::string_view Key, const std::string& Value, T Max);

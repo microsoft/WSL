@@ -2012,12 +2012,12 @@ class WslcSdkTests
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
 
+            auto deleteVolume =
+                wil::scope_exit([&]() { LOG_IF_FAILED(WslcDeleteSessionVhdVolume(session.get(), c_fixedVolumeName, nullptr)); });
+
             std::filesystem::path expectedVhdPath = vhdSessionStorage / "volumes" / (std::string(c_fixedVolumeName) + ".vhdx");
             VERIFY_IS_TRUE(std::filesystem::exists(expectedVhdPath));
             VERIFY_IS_GREATER_THAN_OR_EQUAL(std::filesystem::file_size(expectedVhdPath), c_fixedSizeBytes);
-
-            wil::unique_cotaskmem_string deleteErr;
-            VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_fixedVolumeName, &deleteErr));
         }
 
         // Positive: owner flags are honored — uid/gid baked into the volume root

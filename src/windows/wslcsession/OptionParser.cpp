@@ -59,7 +59,7 @@ void OptionParser::RejectUnknown()
     {
         if (m_consumed.find(key) == m_consumed.end())
         {
-            ThrowInvalid(key, value);
+            ThrowUnknown(key);
         }
     }
 }
@@ -72,6 +72,11 @@ void OptionParser::ThrowInvalid(std::string_view Key, const std::string& Value)
 void OptionParser::ThrowMissing(std::string_view Key)
 {
     THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(std::string(Key)));
+}
+
+void OptionParser::ThrowUnknown(std::string_view Key)
+{
+    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcUnknownVolumeOption(std::string(Key)));
 }
 
 } // namespace wsl::windows::service::wslc

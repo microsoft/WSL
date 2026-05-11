@@ -4152,8 +4152,7 @@ class WSLCTests
 
         // Unknown options are rejected (catches typos and unsupported keys).
         WSLCDriverOption unknownOpt[] = {{"SizeBytes", "1073741824"}, {"Bogus", "value"}};
-        validateInvalidOptionsFailure(
-            unknownOpt, ARRAYSIZE(unknownOpt), E_INVALIDARG, L"Invalid value for option 'Bogus': 'value'");
+        validateInvalidOptionsFailure(unknownOpt, ARRAYSIZE(unknownOpt), E_INVALIDARG, L"Unknown option: 'Bogus'");
     }
 
     WSLC_TEST_METHOD(NamedVolumesVhdOwnership)

@@ -482,8 +482,8 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uin
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
 
     // Uid/Gid must be paired; the named-volume parser enforces this for user
-    // input — this catches future internal callers that bypass it.
-    WI_ASSERT(Uid.has_value() == Gid.has_value());
+    // input — this guards future internal callers that bypass it.
+    THROW_HR_IF(E_UNEXPECTED, Uid.has_value() != Gid.has_value());
 
     std::vector<std::string> args = {mkfsPath};
     std::string rootOwner;
