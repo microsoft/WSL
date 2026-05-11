@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "SessionModel.h"
 #include "ContainerModel.h"
+#include <docker_schema.h>
 #include <wslc_schema.h>
 
 namespace wsl::windows::wslc::services {
@@ -33,5 +34,6 @@ struct ContainerService
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);
     static wsl::windows::common::wslc_schema::InspectContainer Inspect(models::Session& session, const std::string& id);
     static void Logs(models::Session& session, const std::string& id, bool follow, ULONGLONG tail = 0);
+    static wsl::windows::common::docker_schema::ContainerStats Stats(models::Session& session, const std::string& id);
 };
 } // namespace wsl::windows::wslc::services

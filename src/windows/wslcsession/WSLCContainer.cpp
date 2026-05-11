@@ -1739,6 +1739,12 @@ void WSLCContainerImpl::Stats(LPSTR* Output) const
     try
     {
         auto stats = m_dockerClient.ContainerStats(m_id);
+
+        // Always inject the authoritative id and name from this instance.
+        // The response may omit them or use inconsistent casing.
+        stats.id = m_id;
+        stats.name = m_name;
+
         std::string json = wsl::shared::ToJson(stats);
         *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(json.c_str()).release();
     }

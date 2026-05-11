@@ -168,6 +168,13 @@ struct TableOutput
         m_consoleWidthOverride = width;
     }
 
+    // Set whether to drop columns that have no data rows (default: false).
+    // When false, columns are always rendered at least as wide as their header.
+    void SetDropEmptyColumns(bool drop)
+    {
+        m_dropEmptyColumns = drop;
+    }
+
     void OutputLine(line_t&& line)
     {
         m_empty = false;
@@ -223,6 +230,7 @@ private:
     bool m_limitColumnWidths = false;
     bool m_alwaysShowHeader = true;
     bool m_showHeader = true;
+    bool m_dropEmptyColumns = false;
     std::wstringstream m_stream;
     OutputFn m_outputFn;
     size_t m_consoleWidthOverride = 0;
@@ -269,8 +277,9 @@ private:
             return static_cast<size_t>(consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1);
         }
 
-        // Default to 80 columns if console info is unavailable
-        return 80;
+        // stdout is not a real console (e.g. redirected/piped). Return a large value
+        // so column shrinking is not applied — the receiver controls its own display width.
+        return std::numeric_limits<size_t>::max();
     }
 
     void OutputHeaderOnly()
@@ -319,10 +328,12 @@ private:
             }
         }
 
-        // If there are actually columns with data, then also bring in the minimum size
+        // If there are actually columns with data, then also bring in the minimum size.
+        // When m_dropEmptyColumns is false, always apply MinLength so empty columns
+        // still render at least as wide as their header.
         for (size_t i = 0; i < FieldCount; ++i)
         {
-            if (m_columns[i].MaxLength)
+            if (m_columns[i].MaxLength || !m_dropEmptyColumns)
             {
                 m_columns[i].MaxLength = std::max(m_columns[i].MaxLength, m_columns[i].MinLength);
             }

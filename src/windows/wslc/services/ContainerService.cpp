@@ -518,4 +518,13 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
     // TODO: Handle ctrl-c.
     io.Run({});
 }
+
+wsl::windows::common::docker_schema::ContainerStats ContainerService::Stats(Session& session, const std::string& id)
+{
+    wil::com_ptr<IWSLCContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(container->Stats(&output));
+    return wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+}
 } // namespace wsl::windows::wslc::services

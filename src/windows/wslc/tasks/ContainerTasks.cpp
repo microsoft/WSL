@@ -170,15 +170,20 @@ void ListContainers(CLIExecutionContext& context)
         bool trunc = !context.Args.Contains(ArgType::NoTrunc);
 
         // Create table with or without column limits based on --no-trunc flag
-        auto table =
-            trunc ? wsl::windows::wslc::TableOutput<6>(
-                        {{{L"CONTAINER ID", {Config::NoLimit, 12, false}},
-                          {L"NAME", {Config::NoLimit, 20, true}},
-                          {L"IMAGE", {Config::NoLimit, 20, false}},
-                          {L"CREATED", {Config::NoLimit, Config::NoLimit, false}},
-                          {L"STATUS", {Config::NoLimit, Config::NoLimit, false}},
-                          {L"PORTS", {Config::NoLimit, Config::NoLimit, false}}}})
-                  : wsl::windows::wslc::TableOutput<6>({L"CONTAINER ID", L"NAME", L"IMAGE", L"CREATED", L"STATUS", L"PORTS"});
+        auto table = trunc ? wsl::windows::wslc::TableOutput<6>(
+                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
+                                   {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
+                                   {Localization::WSLCCLI_TableHeaderImage(), {Config::NoLimit, 20, false}},
+                                   {Localization::WSLCCLI_TableHeaderCreated(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderStatus(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderPorts(), {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<6>(
+                                 {Localization::WSLCCLI_TableHeaderContainerId(),
+                                  Localization::WSLCCLI_TableHeaderName(),
+                                  Localization::WSLCCLI_TableHeaderImage(),
+                                  Localization::WSLCCLI_TableHeaderCreated(),
+                                  Localization::WSLCCLI_TableHeaderStatus(),
+                                  Localization::WSLCCLI_TableHeaderPorts()});
 
         // Add each container as a row
         for (const auto& container : containers)
@@ -412,6 +417,174 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
     }
 
     context.Data.Add<Data::ContainerOptions>(std::move(options));
+}
+
+void ShowContainerStats(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+
+    auto containers = context.Args.GetAll<ArgType::ContainerId>();
+
+    // If any are specified we use those, otherwise we show all containers.
+    if (containers.empty())
+    {
+        GetContainers(context);
+        const auto& allContainers = context.Data.Get<Data::Containers>();
+        for (const auto& container : allContainers)
+        {
+            // Skip non-running containers unless --all is specified.
+            if (!context.Args.Contains(ArgType::All) && container.State != WSLCContainerState::WslcContainerStateRunning)
+            {
+                continue;
+            }
+
+            containers.push_back(MultiByteToWide(container.Id));
+        }
+    }
+
+    using Config = wsl::windows::wslc::ColumnWidthConfig;
+    bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+    // Create table with or without column limits based on --no-trunc flag
+    auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
+                             {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
+                               {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
+                               {Localization::WSLCCLI_TableHeaderCpuPercent(), {Config::NoLimit, Config::NoLimit, false}},
+                               {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {Config::NoLimit, Config::NoLimit, false}},
+                               {Localization::WSLCCLI_TableHeaderMemPercent(), {Config::NoLimit, Config::NoLimit, false}},
+                               {Localization::WSLCCLI_TableHeaderNetIo(), {Config::NoLimit, Config::NoLimit, false}},
+                               {Localization::WSLCCLI_TableHeaderBlockIo(), {Config::NoLimit, Config::NoLimit, false}},
+                               {Localization::WSLCCLI_TableHeaderPids(), {Config::NoLimit, Config::NoLimit, false}}}})
+                       : wsl::windows::wslc::TableOutput<8>(
+                             {Localization::WSLCCLI_TableHeaderContainerId(),
+                              Localization::WSLCCLI_TableHeaderName(),
+                              Localization::WSLCCLI_TableHeaderCpuPercent(),
+                              Localization::WSLCCLI_TableHeaderMemUsageLimit(),
+                              Localization::WSLCCLI_TableHeaderMemPercent(),
+                              Localization::WSLCCLI_TableHeaderNetIo(),
+                              Localization::WSLCCLI_TableHeaderBlockIo(),
+                              Localization::WSLCCLI_TableHeaderPids()});
+
+    for (const auto& containerId : containers)
+    {
+        wsl::windows::common::docker_schema::ContainerStats stats;
+        try
+        {
+            stats = ContainerService::Stats(session, WideToMultiByte(containerId));
+        }
+        catch (const wil::ResultException& ex)
+        {
+            if (ex.GetErrorCode() == WSLC_E_CONTAINER_NOT_FOUND)
+            {
+                // If user input bad container input or the container is no longer present this is expected.
+                continue;
+            }
+            else
+            {
+                // Don't fail on unexpected error, but log it.
+                LOG_HR_MSG(ex.GetErrorCode(), "Failed to get stats for container %ws", containerId.c_str());
+                continue;
+            }
+        }
+
+        // Calculate CPU %
+        double cpuPercent = 0.0;
+        const auto cpuDelta = static_cast<double>(stats.cpu_stats.cpu_usage.total_usage) -
+                              static_cast<double>(stats.precpu_stats.cpu_usage.total_usage);
+        const auto systemDelta =
+            static_cast<double>(stats.cpu_stats.system_cpu_usage) - static_cast<double>(stats.precpu_stats.system_cpu_usage);
+        const auto onlineCpus = stats.cpu_stats.online_cpus > 0 ? stats.cpu_stats.online_cpus : 1u;
+        if (systemDelta > 0.0 && cpuDelta >= 0.0)
+        {
+            cpuPercent = (cpuDelta / systemDelta) * static_cast<double>(onlineCpus) * 100.0;
+        }
+
+        // Calculate memory %
+        double memPercent = 0.0;
+        if (stats.memory_stats.limit > 0)
+        {
+            memPercent = (static_cast<double>(stats.memory_stats.usage) / static_cast<double>(stats.memory_stats.limit)) * 100.0;
+        }
+
+        // Aggregate network I/O
+        uint64_t netRxBytes = 0;
+        uint64_t netTxBytes = 0;
+        if (stats.networks.has_value())
+        {
+            for (const auto& [iface, netStats] : *stats.networks)
+            {
+                netRxBytes += netStats.rx_bytes;
+                netTxBytes += netStats.tx_bytes;
+            }
+        }
+
+        // Aggregate block I/O
+        uint64_t blkReadBytes = 0;
+        uint64_t blkWriteBytes = 0;
+        if (stats.blkio_stats.io_service_bytes_recursive.has_value())
+        {
+            for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
+            {
+                if (entry.op == "read" || entry.op == "Read")
+                {
+                    blkReadBytes += entry.value;
+                }
+                else if (entry.op == "write" || entry.op == "Write")
+                {
+                    blkWriteBytes += entry.value;
+                }
+            }
+        }
+
+        auto formatBytes = [](uint64_t bytes) -> std::wstring {
+            constexpr uint64_t c_kib = 1024;
+            constexpr uint64_t c_mib = 1024 * c_kib;
+            constexpr uint64_t c_gib = 1024 * c_mib;
+            wchar_t buf[64];
+            if (bytes >= c_gib)
+            {
+                swprintf_s(buf, L"%.2f GiB", static_cast<double>(bytes) / static_cast<double>(c_gib));
+            }
+            else if (bytes >= c_mib)
+            {
+                swprintf_s(buf, L"%.2f MiB", static_cast<double>(bytes) / static_cast<double>(c_mib));
+            }
+            else if (bytes >= c_kib)
+            {
+                swprintf_s(buf, L"%.2f KiB", static_cast<double>(bytes) / static_cast<double>(c_kib));
+            }
+            else
+            {
+                swprintf_s(buf, L"%llu B", static_cast<unsigned long long>(bytes));
+            }
+            return buf;
+        };
+
+        const auto truncId = trunc ? TruncateId(stats.id) : stats.id;
+        const auto containerName = stats.name.empty() ? truncId : stats.name;
+        const auto memUsage = std::format(L"{} / {}", formatBytes(stats.memory_stats.usage), formatBytes(stats.memory_stats.limit));
+        const auto netIo = std::format(L"{} / {}", formatBytes(netRxBytes), formatBytes(netTxBytes));
+        const auto blkIo = std::format(L"{} / {}", formatBytes(blkReadBytes), formatBytes(blkWriteBytes));
+
+        wchar_t cpuBuf[16];
+        swprintf_s(cpuBuf, L"%.2f%%", cpuPercent);
+        wchar_t memPercentBuf[16];
+        swprintf_s(memPercentBuf, L"%.2f%%", memPercent);
+
+        table.OutputLine({
+            MultiByteToWide(trunc ? TruncateId(stats.id) : stats.id),
+            MultiByteToWide(containerName),
+            cpuBuf,
+            memUsage,
+            memPercentBuf,
+            netIo,
+            blkIo,
+            std::to_wstring(stats.pids_stats.current),
+        });
+    }
+
+    table.Complete();
 }
 
 void StartContainer(CLIExecutionContext& context)

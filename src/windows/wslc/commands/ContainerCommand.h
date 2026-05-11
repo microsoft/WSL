@@ -183,6 +183,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Stats Command
+struct ContainerStatsCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"stats";
+    ContainerStatsCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Stop Command
 struct ContainerStopCommand final : public Command
 {
