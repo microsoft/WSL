@@ -668,3 +668,5 @@ void VerifyAreEqualUnordered(const std::vector<T>& expected, const std::vector<T
 }
 
 void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_MODE Mode);
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size);

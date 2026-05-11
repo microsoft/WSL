@@ -83,6 +83,11 @@ private:
     /** Use uint32_t as step can go beyond FIRST_REPLY */
     uint32_t m_step;
     std::optional<std::chrono::steady_clock::time_point> m_deadline;
+
+#ifndef WIN32
+    // This is required because the Linux timeout logic requires a pointer. Returning a pointer is OK because only thread can use a transaction at a given time.
+    mutable timeval m_timeoutStorage{};
+#endif
 };
 
 class SocketChannel
@@ -751,15 +756,27 @@ inline std::optional<std::chrono::steady_clock::time_point> Transaction::Compute
 inline TTimeout Transaction::RemainingTimeout() const
 {
 #ifdef WIN32
-    if (!m_deadline)
+
+    if (!m_deadline.has_value())
     {
         return INFINITE;
     }
 
     auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*m_deadline - std::chrono::steady_clock::now());
     return remaining.count() > 0 ? static_cast<DWORD>(remaining.count()) : 0;
+
 #else
-    return nullptr;
+
+    auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*m_deadline - std::chrono::steady_clock::now());
+    if (!m_deadline.has_value())
+    {
+        return nullptr;
+    }
+
+    m_timeoutStorage.tv_sec = static_cast<time_t>(remaining.count() / 1000);
+    m_timeoutStorage.tv_usec = static_cast<suseconds_t>((remaining.count() % 1000) * 1000);
+    return &m_timeoutStorage;
+
 #endif
 }
 

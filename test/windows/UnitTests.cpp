@@ -6677,10 +6677,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             return message;
         };
 
-        auto sendBytes = [](SOCKET socket, const void* data, size_t size) {
-            VERIFY_ARE_EQUAL(send(socket, static_cast<const char*>(data), gsl::narrow_cast<int>(size), 0), gsl::narrow_cast<int>(size));
-        };
-
         // Scenario 1: A complete header-only message is delivered intact.
         {
             auto [client, server] = MakeSocketPair();
@@ -6690,7 +6686,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             header.MessageSize = sizeof(header);
             header.TransactionId = 7;
             header.TransactionStep = 1;
-            sendBytes(client.get(), &header, sizeof(header));
+            WriteSocket(client.get(), &header, sizeof(header));
             client.reset();
 
             const auto message = readMessage(std::move(server));
@@ -6713,7 +6709,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             {
                 payload[sizeof(MESSAGE_HEADER) + i] = static_cast<gsl::byte>(i & 0xFF);
             }
-            sendBytes(client.get(), payload.data(), payload.size());
+            WriteSocket(client.get(), payload.data(), payload.size());
             client.reset();
 
             const auto message = readMessage(std::move(server));
@@ -6738,7 +6734,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             std::array<gsl::byte, sizeof(MESSAGE_HEADER) - 1> partialHeader{};
             std::memset(partialHeader.data(), 0xCC, partialHeader.size());
-            sendBytes(client.get(), partialHeader.data(), partialHeader.size());
+            WriteSocket(client.get(), partialHeader.data(), partialHeader.size());
             client.reset();
 
             readMessage(std::move(server), E_UNEXPECTED);
@@ -6756,11 +6752,11 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             header.MessageSize = gsl::narrow_cast<unsigned int>(sizeof(header) + fullBodySize);
             header.TransactionId = 11;
             header.TransactionStep = 1;
-            sendBytes(client.get(), &header, sizeof(header));
+            WriteSocket(client.get(), &header, sizeof(header));
 
             std::array<gsl::byte, partialBodySize> partialBody{};
             std::memset(partialBody.data(), 0x55, partialBody.size());
-            sendBytes(client.get(), partialBody.data(), partialBody.size());
+            WriteSocket(client.get(), partialBody.data(), partialBody.size());
             client.reset();
 
             readMessage(std::move(server), E_UNEXPECTED);
@@ -6862,8 +6858,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             message.Header.TransactionId = 99;
             message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
             message.Result = 0;
-            VERIFY_ARE_EQUAL(
-                send(client.get(), reinterpret_cast<const char*>(&message), sizeof(message), 0), gsl::narrow_cast<int>(sizeof(message)));
+            WriteSocket(client.get(), &message, sizeof(message));
 
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
@@ -6881,8 +6876,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             message.Header.TransactionId = 1;
             message.Header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::REQUEST);
             message.Result = 0;
-            VERIFY_ARE_EQUAL(
-                send(client.get(), reinterpret_cast<const char*>(&message), sizeof(message), 0), gsl::narrow_cast<int>(sizeof(message)));
+            WriteSocket(client.get(), &message, sizeof(message));
 
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
@@ -6899,8 +6893,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             header.MessageSize = sizeof(header);
             header.TransactionId = 1;
             header.TransactionStep = static_cast<unsigned int>(TRANSACTION_STEP::NONE);
-            VERIFY_ARE_EQUAL(
-                send(client.get(), reinterpret_cast<const char*>(&header), sizeof(header), 0), gsl::narrow_cast<int>(sizeof(header)));
+            WriteSocket(client.get(), &header, sizeof(header));
 
             const auto hr = wil::ResultFromException([&]() { channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(); });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);

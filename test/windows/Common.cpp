@@ -2962,3 +2962,15 @@ void SetPathAccess(const std::filesystem::path& path, DWORD Permissions, ACCESS_
     THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
         const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl.get(), nullptr));
 }
+
+void WriteSocket(SOCKET Socket, const void* data, size_t size)
+{
+    while (size > 0)
+    {
+        auto result = send(Socket, static_cast<const char*>(data), gsl::narrow_cast<int>(size), 0);
+        VERIFY_IS_TRUE(result > 0);
+
+        size -= result;
+        data = static_cast<const char*>(data) + result;
+    }
+}
