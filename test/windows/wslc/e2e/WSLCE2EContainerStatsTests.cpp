@@ -193,6 +193,42 @@ class WSLCE2EContainerStatsTests
         VERIFY_IS_TRUE(foundContainer, L"Stopped container not found in stats --all output");
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Stats_JsonFormat)
+    {
+        // Run a container in the background
+        auto result = RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto containerId = result.GetStdoutOneLine();
+        VERIFY_IS_FALSE(containerId.empty());
+
+        // Get stats in JSON format
+        result = RunWslc(std::format(L"container stats --no-trunc --format json {}", containerId));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        // Parse and validate the JSON output
+        const auto json = nlohmann::json::parse(WideToMultiByte(result.Stdout.value()));
+        VERIFY_IS_TRUE(json.is_array());
+        VERIFY_IS_GREATER_THAN_OR_EQUAL(json.size(), 1U);
+
+        const auto& entry = json[0];
+        VERIFY_IS_TRUE(entry.contains("ID"));
+        VERIFY_IS_TRUE(entry.contains("Name"));
+        VERIFY_IS_TRUE(entry.contains("CPUPerc"));
+        VERIFY_IS_TRUE(entry.contains("MemUsage"));
+        VERIFY_IS_TRUE(entry.contains("MemPerc"));
+        VERIFY_IS_TRUE(entry.contains("NetIO"));
+        VERIFY_IS_TRUE(entry.contains("BlockIO"));
+        VERIFY_IS_TRUE(entry.contains("PIDs"));
+
+        VERIFY_ARE_EQUAL(containerId, MultiByteToWide(entry["ID"].get<std::string>()));
+        VERIFY_IS_TRUE(entry["CPUPerc"].is_string());
+        VERIFY_IS_TRUE(entry["MemUsage"].is_string());
+        VERIFY_IS_TRUE(entry["MemPerc"].is_string());
+        VERIFY_IS_TRUE(entry["NetIO"].is_string());
+        VERIFY_IS_TRUE(entry["BlockIO"].is_string());
+        VERIFY_IS_TRUE(entry["PIDs"].is_number_unsigned());
+    }
+
 private:
     const std::wstring WslcContainerName = L"wslc-stats-test";
     const TestImage& DebianImage = DebianTestImage();

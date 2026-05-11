@@ -32,6 +32,34 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
+namespace {
+
+std::string FormatBytes(uint64_t bytes)
+{
+    constexpr uint64_t c_kib = 1024;
+    constexpr uint64_t c_mib = 1024 * c_kib;
+    constexpr uint64_t c_gib = 1024 * c_mib;
+
+    if (bytes >= c_gib)
+    {
+        return std::format("{:.2f} GiB", static_cast<double>(bytes) / static_cast<double>(c_gib));
+    }
+    else if (bytes >= c_mib)
+    {
+        return std::format("{:.2f} MiB", static_cast<double>(bytes) / static_cast<double>(c_mib));
+    }
+    else if (bytes >= c_kib)
+    {
+        return std::format("{:.2f} KiB", static_cast<double>(bytes) / static_cast<double>(c_kib));
+    }
+    else
+    {
+        return std::format("{} B", bytes);
+    }
+}
+
+} // namespace
+
 namespace wsl::windows::wslc::task {
 
 static bool TryInspectContainer(Session& session, const std::string& containerId, std::optional<wslc_schema::InspectContainer>& inspectData)
@@ -443,29 +471,8 @@ void ShowContainerStats(CLIExecutionContext& context)
         }
     }
 
-    using Config = wsl::windows::wslc::ColumnWidthConfig;
-    bool trunc = !context.Args.Contains(ArgType::NoTrunc);
-
-    // Create table with or without column limits based on --no-trunc flag
-    auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
-                             {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
-                               {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
-                               {Localization::WSLCCLI_TableHeaderCpuPercent(), {Config::NoLimit, Config::NoLimit, false}},
-                               {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {Config::NoLimit, Config::NoLimit, false}},
-                               {Localization::WSLCCLI_TableHeaderMemPercent(), {Config::NoLimit, Config::NoLimit, false}},
-                               {Localization::WSLCCLI_TableHeaderNetIo(), {Config::NoLimit, Config::NoLimit, false}},
-                               {Localization::WSLCCLI_TableHeaderBlockIo(), {Config::NoLimit, Config::NoLimit, false}},
-                               {Localization::WSLCCLI_TableHeaderPids(), {Config::NoLimit, Config::NoLimit, false}}}})
-                       : wsl::windows::wslc::TableOutput<8>(
-                             {Localization::WSLCCLI_TableHeaderContainerId(),
-                              Localization::WSLCCLI_TableHeaderName(),
-                              Localization::WSLCCLI_TableHeaderCpuPercent(),
-                              Localization::WSLCCLI_TableHeaderMemUsageLimit(),
-                              Localization::WSLCCLI_TableHeaderMemPercent(),
-                              Localization::WSLCCLI_TableHeaderNetIo(),
-                              Localization::WSLCCLI_TableHeaderBlockIo(),
-                              Localization::WSLCCLI_TableHeaderPids()});
-
+    // Build stats as a json array first for later filtering or display either as json or table format.
+    nlohmann::json statsJson = nlohmann::json::array();
     for (const auto& containerId : containers)
     {
         wsl::windows::common::docker_schema::ContainerStats stats;
@@ -537,54 +544,83 @@ void ShowContainerStats(CLIExecutionContext& context)
             }
         }
 
-        auto formatBytes = [](uint64_t bytes) -> std::wstring {
-            constexpr uint64_t c_kib = 1024;
-            constexpr uint64_t c_mib = 1024 * c_kib;
-            constexpr uint64_t c_gib = 1024 * c_mib;
-            wchar_t buf[64];
-            if (bytes >= c_gib)
-            {
-                swprintf_s(buf, L"%.2f GiB", static_cast<double>(bytes) / static_cast<double>(c_gib));
-            }
-            else if (bytes >= c_mib)
-            {
-                swprintf_s(buf, L"%.2f MiB", static_cast<double>(bytes) / static_cast<double>(c_mib));
-            }
-            else if (bytes >= c_kib)
-            {
-                swprintf_s(buf, L"%.2f KiB", static_cast<double>(bytes) / static_cast<double>(c_kib));
-            }
-            else
-            {
-                swprintf_s(buf, L"%llu B", static_cast<unsigned long long>(bytes));
-            }
-            return buf;
-        };
+        const auto& containerName = stats.name.empty() ? stats.id : stats.name;
+        const auto cpuPercentStr = std::format("{:.2f}%", cpuPercent);
+        const auto memPercentStr = std::format("{:.2f}%", memPercent);
+        const auto memUsage = std::format("{} / {}", FormatBytes(stats.memory_stats.usage), FormatBytes(stats.memory_stats.limit));
+        const auto netIo = std::format("{} / {}", FormatBytes(netRxBytes), FormatBytes(netTxBytes));
+        const auto blkIo = std::format("{} / {}", FormatBytes(blkReadBytes), FormatBytes(blkWriteBytes));
 
-        const auto truncId = trunc ? TruncateId(stats.id) : stats.id;
-        const auto containerName = stats.name.empty() ? truncId : stats.name;
-        const auto memUsage = std::format(L"{} / {}", formatBytes(stats.memory_stats.usage), formatBytes(stats.memory_stats.limit));
-        const auto netIo = std::format(L"{} / {}", formatBytes(netRxBytes), formatBytes(netTxBytes));
-        const auto blkIo = std::format(L"{} / {}", formatBytes(blkReadBytes), formatBytes(blkWriteBytes));
-
-        wchar_t cpuBuf[16];
-        swprintf_s(cpuBuf, L"%.2f%%", cpuPercent);
-        wchar_t memPercentBuf[16];
-        swprintf_s(memPercentBuf, L"%.2f%%", memPercent);
-
-        table.OutputLine({
-            MultiByteToWide(truncId),
-            MultiByteToWide(containerName),
-            cpuBuf,
-            memUsage,
-            memPercentBuf,
-            netIo,
-            blkIo,
-            std::to_wstring(stats.pids_stats.current),
+        statsJson.push_back({
+            {"ID", stats.id},
+            {"Name", containerName},
+            {"CPUPerc", cpuPercentStr},
+            {"MemUsage", memUsage},
+            {"MemPerc", memPercentStr},
+            {"NetIO", netIo},
+            {"BlockIO", blkIo},
+            {"PIDs", stats.pids_stats.current},
         });
     }
 
-    table.Complete();
+    FormatType format = FormatType::Table; // Default is table
+    if (context.Args.Contains(ArgType::Format))
+    {
+        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+    }
+
+    switch (format)
+    {
+    case FormatType::Json:
+    {
+        PrintMessage(MultiByteToWide(statsJson.dump(c_jsonPrettyPrintIndent)));
+        break;
+    }
+    case FormatType::Table:
+    {
+        using Config = wsl::windows::wslc::ColumnWidthConfig;
+        bool trunc = !context.Args.Contains(ArgType::NoTrunc);
+
+        auto table = trunc ? wsl::windows::wslc::TableOutput<8>(
+                                 {{{Localization::WSLCCLI_TableHeaderContainerId(), {Config::NoLimit, 12, false}},
+                                   {Localization::WSLCCLI_TableHeaderName(), {Config::NoLimit, 20, true}},
+                                   {Localization::WSLCCLI_TableHeaderCpuPercent(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderMemUsageLimit(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderMemPercent(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderNetIo(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderBlockIo(), {Config::NoLimit, Config::NoLimit, false}},
+                                   {Localization::WSLCCLI_TableHeaderPids(), {Config::NoLimit, Config::NoLimit, false}}}})
+                           : wsl::windows::wslc::TableOutput<8>(
+                                 {Localization::WSLCCLI_TableHeaderContainerId(),
+                                  Localization::WSLCCLI_TableHeaderName(),
+                                  Localization::WSLCCLI_TableHeaderCpuPercent(),
+                                  Localization::WSLCCLI_TableHeaderMemUsageLimit(),
+                                  Localization::WSLCCLI_TableHeaderMemPercent(),
+                                  Localization::WSLCCLI_TableHeaderNetIo(),
+                                  Localization::WSLCCLI_TableHeaderBlockIo(),
+                                  Localization::WSLCCLI_TableHeaderPids()});
+
+        for (const auto& entry : statsJson)
+        {
+            const auto id = entry["ID"].get<std::string>();
+            table.OutputLine({
+                MultiByteToWide(trunc ? TruncateId(id) : id),
+                MultiByteToWide(entry["Name"].get<std::string>()),
+                MultiByteToWide(entry["CPUPerc"].get<std::string>()),
+                MultiByteToWide(entry["MemUsage"].get<std::string>()),
+                MultiByteToWide(entry["MemPerc"].get<std::string>()),
+                MultiByteToWide(entry["NetIO"].get<std::string>()),
+                MultiByteToWide(entry["BlockIO"].get<std::string>()),
+                std::to_wstring(entry["PIDs"].get<uint64_t>()),
+            });
+        }
+
+        table.Complete();
+        break;
+    }
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
 }
 
 void StartContainer(CLIExecutionContext& context)
