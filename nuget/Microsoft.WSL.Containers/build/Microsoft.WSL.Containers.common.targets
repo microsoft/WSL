@@ -62,10 +62,11 @@
          2. Wildcard expansion in Inputs requires an intermediate ItemGroup (_WslcCollectSources)
             that must run per-image in a separate evaluation context
 
-         Each image is built and saved atomically in one inner target so a failure
-         partway through the list leaves a coherent on-disk state (no half-state
-         where image N is in the daemon but its tar is missing). StopOnFirstFailure
-         halts the batch as soon as any image fails. -->
+         Build + save run together per image, and StopOnFirstFailure halts the
+         batch on the first failure — so later images aren't attempted before
+         earlier ones are finished. Within an image, save uses .tmp+Move so a
+         half-written tar is never visible (a build-success/save-failure does
+         still leave the image in the daemon without a tar on disk). -->
     <Target Name="WslcBuildAllImages"
             AfterTargets="Build"
             DependsOnTargets="WslcCheckDependencies;_WslcValidateItems"
