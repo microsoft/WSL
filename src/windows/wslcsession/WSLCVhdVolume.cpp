@@ -37,16 +37,13 @@ namespace {
     // Maximum valid file mode bits: setuid | setgid | sticky | rwxrwxrwx == 07777.
     constexpr uint32_t c_maxModeBits = 07777;
 
-    // Parsed and validated VHD-driver-specific options. All option semantics
-    // (defaults, validation, cross-field constraints) live in Parse() so the
-    // create / open paths can simply consume the result.
     struct VhdVolumeOptions
     {
         ULONGLONG SizeBytes{};
         bool Fixed{false};
         std::optional<uint32_t> Uid;
         std::optional<uint32_t> Gid;
-        std::optional<uint32_t> Mode; // octal mode bits, 0..c_maxModeBits
+        std::optional<uint32_t> Mode;
 
         static VhdVolumeOptions Parse(const std::map<std::string, std::string>& DriverOpts)
         {
@@ -59,9 +56,8 @@ namespace {
 
             opts.Fixed = parser.OptionalBool(c_fixedOpt).value_or(false);
 
-            // Uid / Gid (optional uint32). Must be supplied together — chown
-            // semantics would otherwise leak the mkfs default (root) into one
-            // half, which is a confusing footgun.
+            // Uid and Gid must be supplied together — leaving one as the
+            // mkfs default (root) is a confusing footgun.
             opts.Uid = parser.Optional<uint32_t>(c_uidOpt);
             opts.Gid = parser.Optional<uint32_t>(c_gidOpt);
             if (opts.Uid.has_value() != opts.Gid.has_value())
@@ -70,20 +66,13 @@ namespace {
                 THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(missing));
             }
 
-            // Mode (optional). Parsed as octal so we can range-check against
-            // c_maxModeBits and reject non-octal characters via the shared
-            // OptionParser validation. Mode==0 makes the volume root
-            // inaccessible to the container's non-root user (defeating the
-            // entire point of MODE), so reject it here for parity with the
-            // SDK-side check — direct COM callers and persisted metadata
-            // both flow through Parse.
+            // chmod 0 makes the volume root inaccessible to the container's non-root user.
             opts.Mode = parser.Optional<uint32_t>(c_modeOpt, c_maxModeBits, 8);
             if (opts.Mode.has_value() && *opts.Mode == 0)
             {
                 THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_modeOpt, DriverOpts.at(c_modeOpt)));
             }
 
-            // Anything else is unrecognized and a user error.
             parser.RejectUnknown();
 
             return opts;

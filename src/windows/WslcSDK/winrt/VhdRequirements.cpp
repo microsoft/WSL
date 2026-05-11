@@ -49,13 +49,8 @@ void VhdRequirements::SetOwner(uint32_t uid, uint32_t gid)
 
 void VhdRequirements::SetMode(uint32_t mode)
 {
-    // Match the documented contract on the IDL surface: chmod 0000 makes the
-    // volume root inaccessible (defeating the point of explicit mode bits) and
-    // POSIX file modes are bounded by setuid/setgid/sticky + rwx triplet at
-    // 07777. Rejecting at the setter gives WinRT callers immediate feedback
-    // instead of an opaque E_INVALIDARG hours later from CreateVolume.
-    constexpr uint32_t c_maxModeBits = 07777;
-    if (mode == 0 || mode > c_maxModeBits)
+    // Match the IDL contract: chmod 0 makes the root inaccessible and POSIX modes are bounded by 07777.
+    if (mode == 0 || mode > 07777)
     {
         throw winrt::hresult_invalid_argument(L"mode must be non-zero and <= 07777");
     }

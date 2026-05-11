@@ -103,14 +103,12 @@ typedef struct WslcVhdRequirements
     _In_ uint64_t sizeBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;
     // The remaining fields are only honored by WslcCreateSessionVhdVolume.
-    // WslcSetSessionSettingsVhd manages the session's root VHD where
-    // ownership/mode have no meaning, and rejects any non-NONE flags with
-    // E_INVALIDARG so callers do not silently miss the limitation.
+    // WslcSetSessionSettingsVhd rejects non-NONE flags with E_INVALIDARG.
     _In_ WslcVhdRequirementsFlags flags;
     _In_ uint32_t uid;  // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
     _In_ uint32_t gid;  // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
-    _In_ uint32_t mode; // octal file mode (e.g. 0750), honored iff (flags & WSLC_VHD_REQ_FLAG_MODE).
-                        // Must be non-zero and <= 07777 when WSLC_VHD_REQ_FLAG_MODE is set.
+    _In_ uint32_t mode; // octal mode (e.g. 0750), non-zero and <= 07777,
+                        // honored iff (flags & WSLC_VHD_REQ_FLAG_MODE)
 } WslcVhdRequirements;
 
 typedef enum WslcSessionFeatureFlags

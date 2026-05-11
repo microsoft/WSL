@@ -494,25 +494,19 @@ try
     RETURN_HR_IF_NULL(E_INVALIDARG, options->name);
     RETURN_HR_IF(E_INVALIDARG, options->sizeBytes == 0);
 
-    // Reject unknown flag bits up-front so future flag additions cannot be
-    // silently ignored by older SDK versions.
+    // Reject unknown flag bits so future additions can't be silently ignored.
     constexpr WslcVhdRequirementsFlags c_knownFlags = WSLC_VHD_REQ_FLAG_OWNER | WSLC_VHD_REQ_FLAG_MODE;
     RETURN_HR_IF(E_INVALIDARG, (options->flags & ~c_knownFlags) != WSLC_VHD_REQ_FLAG_NONE);
 
-    // chmod 0 makes the volume root inaccessible to the container's non-root
-    // user (the entire reason MODE exists). Treat it as caller error rather
-    // than honoring it silently.
     if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_MODE))
     {
-        RETURN_HR_IF(E_INVALIDARG, options->mode == 0);
+        // chmod 0 makes the volume root inaccessible; > 07777 isn't a valid POSIX mode.
+        RETURN_HR_IF(E_INVALIDARG, options->mode == 0 || options->mode > 07777);
     }
 
-    // Build the driver-options vector dynamically. Strings referenced by
-    // WSLCDriverOption are LPCSTR, so the std::string holders below must
-    // outlive the WSLCDriverOption[] passed to CreateVolume. Format
-    // uid/gid/mode only when their flag is set — the underlying fields are
-    // documented as "honored iff the flag is set" and a defensive caller may
-    // leave them uninitialized.
+    // uid/gid/mode are documented as "honored iff their flag is set", so materialize
+    // their strings only inside the flag-guarded blocks below. Holders live at function
+    // scope so the c_str() pointers stored in driverOpts stay valid through CreateVolume.
     const auto sizeStr = std::to_string(options->sizeBytes);
     std::string uidStr;
     std::string gidStr;
@@ -540,7 +534,7 @@ try
 
     if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_MODE))
     {
-        modeStr = std::format("{:o}", options->mode); // forwarded as octal so the service parses base-8
+        modeStr = std::format("{:o}", options->mode);
         driverOpts.push_back({"Mode", modeStr.c_str()});
     }
 
