@@ -71,14 +71,14 @@ class WSLCE2EContainerStatsTests
 
         // Verify the header row contains all expected column titles.
         const auto& header = lines[0];
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"CONTAINER ID"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"NAME"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"CPU %"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"MEM USAGE / LIMIT"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"MEM %"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"NET I/O"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"BLOCK I/O"));
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(L"PIDS"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderContainerId()));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderName()));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderCpuPercent()));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderMemUsageLimit()));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderMemPercent()));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderNetIo()));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderBlockIo()));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, header.find(Localization::WSLCCLI_TableHeaderPids()));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Stats_RunningContainer_ContainerIdAndNamePresent)
