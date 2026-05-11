@@ -17,6 +17,7 @@ Abstract:
 #include <array>
 #include <cwchar>
 #include <functional>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>

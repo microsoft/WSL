@@ -47,7 +47,6 @@ void ContainerStatsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context              //
         << CreateSession //
-        << GetContainers //
         << ShowContainerStats;
 }
 } // namespace wsl::windows::wslc

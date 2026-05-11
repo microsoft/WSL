@@ -59,11 +59,8 @@ class WSLCE2EContainerStatsTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Stats_RunningContainer_HasExpectedColumns)
     {
-        // Start a CPU-active container so stats has something to report.
-        auto runResult = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"while true; do dd if=/dev/zero of=/dev/null bs=1M count=1024; done\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
 
         auto result = RunWslc(L"container stats");
@@ -86,11 +83,8 @@ class WSLCE2EContainerStatsTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Stats_RunningContainer_ContainerIdAndNamePresent)
     {
-        // Start a container in the background.
-        auto runResult = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"while true; do dd if=/dev/zero of=/dev/null bs=1M count=1024; done\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = TruncateId(runResult.GetStdoutOneLine());
         VERIFY_IS_FALSE(containerId.empty());
@@ -115,10 +109,8 @@ class WSLCE2EContainerStatsTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Stats_RunningContainer_NoTrunc)
     {
-        auto runResult = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"while true; do dd if=/dev/zero of=/dev/null bs=1M count=1024; done\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
         const auto fullContainerId = runResult.GetStdoutOneLine();
         VERIFY_IS_FALSE(fullContainerId.empty());
@@ -142,10 +134,8 @@ class WSLCE2EContainerStatsTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_Stats_SpecificContainerId)
     {
-        auto runResult = RunWslc(std::format(
-            L"container run -d --name {} {} sh -c \"while true; do dd if=/dev/zero of=/dev/null bs=1M count=1024; done\"",
-            WslcContainerName,
-            DebianImage.NameAndTag()));
+        auto runResult =
+            RunWslc(std::format(L"container run -d --name {} {} sleep infinity", WslcContainerName, DebianImage.NameAndTag()));
         runResult.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = TruncateId(runResult.GetStdoutOneLine());
         VERIFY_IS_FALSE(containerId.empty());
