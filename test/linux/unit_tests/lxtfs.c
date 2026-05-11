@@ -149,7 +149,7 @@ void LxtFsUtimeRoundToNt(struct timespec* Timespec);
 
 //
 // All real timestamps are offset from the year 2000 because FAT can only
-// accept timestamps afer 1980.
+// accept timestamps after 1980.
 
 BASIC_TEST_CASE BasicTestCases[] = {
     {{{FS_UNIX_TIME_2000 + 1111111, 2222222}, {FS_UNIX_TIME_2000 + 3333333, 4444444}},
@@ -2056,7 +2056,7 @@ Arguments:
     DrvFsDir - Supplies the DrvFs directory to use for testing. This must
         start with a slash, and be relative from the root of the DrvFs mount.
 
-    UseDrvFs - Supplies a pa value indicating whether DrvFs is being used.
+    UseDrvFs - Supplies a value indicating whether DrvFs is being used.
 
 Return Value:
 
