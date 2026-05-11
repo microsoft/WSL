@@ -890,7 +890,7 @@ int Manage(_In_ std::wstring_view commandLine)
     bool getLocation = false;
     bool getSparse = false;
     bool getDefaultUser = false;
-    bool getDiskSize = false;
+    bool getSize = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME, 0);
     parser.AddPositionalArgument(distribution, 0);
@@ -899,12 +899,12 @@ int Manage(_In_ std::wstring_view commandLine)
     parser.AddArgument(AbsolutePath(move), WSL_MANAGE_ARG_SET_LOCATION_OPTION_LONG);
     parser.AddArgument(defaultUser, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG);
     parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_RESIZE_OPTION_LONG, WSL_MANAGE_ARG_RESIZE_OPTION);
-    parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_SET_DISK_SIZE_OPTION_LONG);
+    parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_SET_SIZE_OPTION_LONG);
     parser.AddArgument(allowUnsafe, WSL_MANAGE_ARG_ALLOW_UNSAFE);
     parser.AddArgument(getLocation, WSL_MANAGE_ARG_GET_LOCATION_OPTION_LONG);
     parser.AddArgument(getSparse, WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG);
     parser.AddArgument(getDefaultUser, WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG);
-    parser.AddArgument(getDiskSize, WSL_MANAGE_ARG_GET_DISK_SIZE_OPTION_LONG);
+    parser.AddArgument(getSize, WSL_MANAGE_ARG_GET_SIZE_OPTION_LONG);
     parser.Parse();
 
     THROW_HR_IF(WSL_E_INVALID_USAGE, distribution == nullptr);
@@ -915,7 +915,7 @@ int Manage(_In_ std::wstring_view commandLine)
     // Exactly one operation must be selected.
     if (static_cast<int>(sparse.has_value()) + static_cast<int>(move.has_value()) + static_cast<int>(defaultUser.has_value()) +
             static_cast<int>(resize.has_value()) + static_cast<int>(getLocation) + static_cast<int>(getSparse) +
-            static_cast<int>(getDefaultUser) + static_cast<int>(getDiskSize) !=
+            static_cast<int>(getDefaultUser) + static_cast<int>(getSize) !=
         1)
     {
         THROW_HR(WSL_E_INVALID_USAGE);
@@ -965,11 +965,17 @@ int Manage(_In_ std::wstring_view commandLine)
     }
     else if (getSparse)
     {
-        wprintf(L"%ls\n", service.GetDistributionSparse(&distroGuid) ? L"true" : L"false");
+        wprintf(L"%ls\n", service.GetSparse(&distroGuid) ? L"true" : L"false");
     }
     else if (getDefaultUser)
     {
-        const auto uid = service.GetDistributionDefaultUid(&distroGuid);
+        wil::unique_cotaskmem_string distroName;
+        ULONG version{};
+        ULONG uid{};
+        wil::unique_cotaskmem_array_ptr<wil::unique_cotaskmem_ansistring> defaultEnvironment;
+        ULONG flags{};
+        service.GetDistributionConfiguration(
+            &distroGuid, &distroName, &version, &uid, defaultEnvironment.size_address<ULONG>(), &defaultEnvironment, &flags);
 
         auto wslExe = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
         auto subCommandLine = std::format(
@@ -988,14 +994,14 @@ int Manage(_In_ std::wstring_view commandLine)
     }
     else if (getLocation)
     {
-        wprintf(L"%ls\n", service.GetDistributionVhdLocation(&distroGuid).c_str());
+        wprintf(L"%ls\n", service.GetDistributionLocation(&distroGuid).c_str());
     }
-    else if (getDiskSize)
+    else if (getSize)
     {
-        wprintf(L"%llu\n", service.GetDistributionVhdSize(&distroGuid));
+        wprintf(L"%llu\n", service.GetDistributionSize(&distroGuid));
     }
 
-    if (!getSparse && !getDefaultUser && !getLocation && !getDiskSize)
+    if (!getSparse && !getDefaultUser && !getLocation && !getSize)
     {
         wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
     }

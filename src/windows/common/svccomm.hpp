@@ -94,13 +94,11 @@ public:
     HRESULT
     SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOL Sparse, _In_ BOOL AllowUnsafe) const;
 
-    std::wstring GetDistributionVhdLocation(_In_ LPCGUID DistroGuid) const;
+    std::wstring GetDistributionLocation(_In_ LPCGUID DistroGuid) const;
 
-    ULONG64 GetDistributionVhdSize(_In_ LPCGUID DistroGuid) const;
+    ULONG64 GetDistributionSize(_In_ LPCGUID DistroGuid) const;
 
-    bool GetDistributionSparse(_In_ LPCGUID DistroGuid) const;
-
-    ULONG GetDistributionDefaultUid(_In_ LPCGUID DistroGuid) const;
+    bool GetSparse(_In_ LPCGUID DistroGuid) const;
 
     HRESULT
     SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version) const;

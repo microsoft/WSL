@@ -375,6 +375,24 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::GetDistributionLocation(_In_ LPCGUID DistroGuid, _Out_ LPWSTR* VhdLocation, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    *VhdLocation = nullptr;
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    std::wstring location;
+    RETURN_IF_FAILED(session->GetDistributionLocation(DistroGuid, location));
+
+    *VhdLocation = wil::make_cotaskmem_string(location.c_str()).release();
+    RETURN_IF_NULL_ALLOC(*VhdLocation);
+    return S_OK;
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::RegisterDistribution(
     _In_ LPCWSTR DistributionName,
     _In_ ULONG Version,
@@ -480,6 +498,19 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::GetSparse(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN* Sparse, _Out_ LXSS_ERROR_INFO* Error)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    *Sparse = FALSE;
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->GetSparse(DistroGuid, *Sparse);
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
@@ -492,25 +523,7 @@ try
 }
 CATCH_RETURN()
 
-HRESULT STDMETHODCALLTYPE LxssUserSession::GetDistributionVhdLocation(_In_ LPCGUID DistroGuid, _Out_ LPWSTR* VhdLocation, _Out_ LXSS_ERROR_INFO* Error)
-try
-{
-    ServiceExecutionContext context(Error);
-
-    *VhdLocation = nullptr;
-    const auto session = m_session.lock();
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-
-    std::wstring location;
-    RETURN_IF_FAILED(session->GetDistributionVhdLocation(DistroGuid, location));
-
-    *VhdLocation = wil::make_cotaskmem_string(location.c_str()).release();
-    RETURN_IF_NULL_ALLOC(*VhdLocation);
-    return S_OK;
-}
-CATCH_RETURN()
-
-HRESULT STDMETHODCALLTYPE LxssUserSession::GetDistributionVhdSize(_In_ LPCGUID DistroGuid, _Out_ ULONG64* VhdSize, _Out_ LXSS_ERROR_INFO* Error)
+HRESULT STDMETHODCALLTYPE LxssUserSession::GetDistributionSize(_In_ LPCGUID DistroGuid, _Out_ ULONG64* VhdSize, _Out_ LXSS_ERROR_INFO* Error)
 try
 {
     ServiceExecutionContext context(Error);
@@ -519,33 +532,7 @@ try
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->GetDistributionVhdSize(DistroGuid, *VhdSize);
-}
-CATCH_RETURN()
-
-HRESULT STDMETHODCALLTYPE LxssUserSession::GetDistributionSparse(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN* Sparse, _Out_ LXSS_ERROR_INFO* Error)
-try
-{
-    ServiceExecutionContext context(Error);
-
-    *Sparse = FALSE;
-    const auto session = m_session.lock();
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-
-    return session->GetDistributionSparse(DistroGuid, *Sparse);
-}
-CATCH_RETURN()
-
-HRESULT STDMETHODCALLTYPE LxssUserSession::GetDistributionDefaultUid(_In_ LPCGUID DistroGuid, _Out_ ULONG* DefaultUid, _Out_ LXSS_ERROR_INFO* Error)
-try
-{
-    ServiceExecutionContext context(Error);
-
-    *DefaultUid = 0;
-    const auto session = m_session.lock();
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-
-    return session->GetDistributionDefaultUid(DistroGuid, *DefaultUid);
+    return session->GetDistributionSize(DistroGuid, *VhdSize);
 }
 CATCH_RETURN()
 
@@ -1041,6 +1028,23 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
 
     return S_OK;
 }
+
+HRESULT LxssUserSessionImpl::GetDistributionLocation(_In_ LPCGUID DistroGuid, _Out_ std::wstring& VhdLocation)
+try
+{
+    auto runAsUser = wil::CoImpersonateClient();
+    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+    std::lock_guard lock(m_instanceLock);
+
+    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+    const auto configuration = s_GetDistributionConfiguration(registration);
+
+    RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+    VhdLocation = configuration.BasePath.wstring();
+    return S_OK;
+}
+CATCH_RETURN()
 
 HRESULT LxssUserSessionImpl::EnumerateDistributions(_Out_ PULONG DistributionCount, _Out_ LXSS_ENUMERATE_INFO** Distributions)
 {
@@ -1839,66 +1843,7 @@ try
 }
 CATCH_RETURN()
 
-// Read-only getters used by `wsl --manage <distro> --get <property>`.
-// Each takes the per-distro lock and reads from the registration / VHD on disk.
-
-HRESULT LxssUserSessionImpl::GetDistributionVhdLocation(_In_ LPCGUID DistroGuid, _Out_ std::wstring& VhdLocation)
-try
-{
-    auto runAsUser = wil::CoImpersonateClient();
-    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
-    std::lock_guard lock(m_instanceLock);
-
-    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
-    const auto configuration = s_GetDistributionConfiguration(registration);
-
-    RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
-
-    // Return the folder (BasePath), not the VHD file path. This matches what
-    // MoveDistribution writes via Property::BasePath, so `--get location`
-    // round-trips with `--set location`.
-    VhdLocation = configuration.BasePath.wstring();
-    return S_OK;
-}
-CATCH_RETURN()
-
-HRESULT LxssUserSessionImpl::GetDistributionVhdSize(_In_ LPCGUID DistroGuid, _Out_ ULONG64& VhdSize)
-try
-{
-    auto runAsUser = wil::CoImpersonateClient();
-    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
-    std::lock_guard lock(m_instanceLock);
-
-    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
-    const auto configuration = s_GetDistributionConfiguration(registration);
-
-    RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
-
-    // Virtual disk size = the maximum size set by ResizeDistribution.
-    //
-    // We must support reading the size while the distro (and therefore the VHD) is
-    // attached to the utility VM. The standard OpenVhd path uses VERSION_1 parameters
-    // which fail with E_ACCESSDENIED against an attached VHD. The VERSION_2 form with
-    // VIRTUAL_DISK_ACCESS_NONE returns a handle suitable only for metadata queries
-    // (GetVirtualDiskInformation), bypassing the exclusive attach lock.
-    VIRTUAL_STORAGE_TYPE storageType{};
-    storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_UNKNOWN;
-    storageType.VendorId = VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN;
-
-    OPEN_VIRTUAL_DISK_PARAMETERS openParameters{};
-    openParameters.Version = OPEN_VIRTUAL_DISK_VERSION_2;
-    openParameters.Version2.GetInfoOnly = TRUE;
-
-    wil::unique_handle diskHandle;
-    THROW_IF_WIN32_ERROR(::OpenVirtualDisk(
-        &storageType, configuration.VhdFilePath.c_str(), VIRTUAL_DISK_ACCESS_NONE, OPEN_VIRTUAL_DISK_FLAG_NONE, &openParameters, &diskHandle));
-
-    VhdSize = wsl::core::filesystem::GetDiskSize(diskHandle.get());
-    return S_OK;
-}
-CATCH_RETURN()
-
-HRESULT LxssUserSessionImpl::GetDistributionSparse(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN& Sparse)
+HRESULT LxssUserSessionImpl::GetSparse(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN& Sparse)
 try
 {
     auto runAsUser = wil::CoImpersonateClient();
@@ -1914,19 +1859,6 @@ try
     THROW_LAST_ERROR_IF(attributes == INVALID_FILE_ATTRIBUTES);
 
     Sparse = WI_IsFlagSet(attributes, FILE_ATTRIBUTE_SPARSE_FILE) ? TRUE : FALSE;
-    return S_OK;
-}
-CATCH_RETURN()
-
-HRESULT LxssUserSessionImpl::GetDistributionDefaultUid(_In_ LPCGUID DistroGuid, _Out_ ULONG& DefaultUid)
-try
-{
-    auto runAsUser = wil::CoImpersonateClient();
-    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
-    std::lock_guard lock(m_instanceLock);
-
-    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
-    DefaultUid = registration.Read(Property::DefaultUid);
     return S_OK;
 }
 CATCH_RETURN()
@@ -1982,6 +1914,35 @@ try
         wsl::core::filesystem::ResizeExistingVhd(diskHandle.get(), NewSize, RESIZE_VIRTUAL_DISK_FLAG_ALLOW_UNSAFE_VIRTUAL_SIZE);
     }
 
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::GetDistributionSize(_In_ LPCGUID DistroGuid, _Out_ ULONG64& VhdSize)
+try
+{
+    auto runAsUser = wil::CoImpersonateClient();
+    const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
+    std::lock_guard lock(m_instanceLock);
+
+    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+    const auto configuration = s_GetDistributionConfiguration(registration);
+
+    RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
+
+    VIRTUAL_STORAGE_TYPE storageType{};
+    storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_UNKNOWN;
+    storageType.VendorId = VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN;
+
+    OPEN_VIRTUAL_DISK_PARAMETERS openParameters{};
+    openParameters.Version = OPEN_VIRTUAL_DISK_VERSION_2;
+    openParameters.Version2.GetInfoOnly = TRUE;
+
+    wil::unique_handle diskHandle;
+    THROW_IF_WIN32_ERROR(::OpenVirtualDisk(
+        &storageType, configuration.VhdFilePath.c_str(), VIRTUAL_DISK_ACCESS_NONE, OPEN_VIRTUAL_DISK_FLAG_NONE, &openParameters, &diskHandle));
+
+    VhdSize = wsl::core::filesystem::GetDiskSize(diskHandle.get());
     return S_OK;
 }
 CATCH_RETURN()

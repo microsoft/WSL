@@ -191,6 +191,11 @@ public:
     IFACEMETHOD(ResizeDistribution)(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Returns the virtual disk size in bytes for a distribution.
+    /// </summary>
+    IFACEMETHOD(GetDistributionSize)(_In_ LPCGUID DistroGuid, _Out_ ULONG64* VhdSize, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Sets the default distribution.
     /// </summary>
     IFACEMETHOD(SetDefaultDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
@@ -199,6 +204,11 @@ public:
     /// Sets or unsets the sparse flag for a distribution.
     /// </summary>
     IFACEMETHOD(SetSparse)(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Returns whether the distribution's VHD has the sparse flag.
+    /// </summary>
+    IFACEMETHOD(GetSparse)(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN* Sparse, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
     /// Sets the version for a distribution.
@@ -236,24 +246,9 @@ public:
     IFACEMETHOD(MoveDistribution)(_In_ LPCGUID DistroGuid, _In_ LPCWSTR Location, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Returns the folder containing the distribution's VHD (matches what --move sets). WSL2 only.
+    /// Returns the location of a distribution.
     /// </summary>
-    IFACEMETHOD(GetDistributionVhdLocation)(_In_ LPCGUID DistroGuid, _Out_ LPWSTR* VhdLocation, _Out_ LXSS_ERROR_INFO* Error) override;
-
-    /// <summary>
-    /// Returns the virtual disk size in bytes for a distribution. WSL2 only.
-    /// </summary>
-    IFACEMETHOD(GetDistributionVhdSize)(_In_ LPCGUID DistroGuid, _Out_ ULONG64* VhdSize, _Out_ LXSS_ERROR_INFO* Error) override;
-
-    /// <summary>
-    /// Returns whether the distribution's VHD has the sparse file attribute. WSL2 only.
-    /// </summary>
-    IFACEMETHOD(GetDistributionSparse)(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN* Sparse, _Out_ LXSS_ERROR_INFO* Error) override;
-
-    /// <summary>
-    /// Returns the configured default UID for a distribution.
-    /// </summary>
-    IFACEMETHOD(GetDistributionDefaultUid)(_In_ LPCGUID DistroGuid, _Out_ ULONG* DefaultUid, _Out_ LXSS_ERROR_INFO* Error) override;
+    IFACEMETHOD(GetDistributionLocation)(_In_ LPCGUID DistroGuid, _Out_ LPWSTR* VhdLocation, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
     /// Terminates all running instances and the Linux utility vm.
@@ -464,24 +459,9 @@ public:
     HRESULT MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCWSTR Location);
 
     /// <summary>
-    /// Returns the folder containing the distribution's VHD (matches what --move sets). WSL2 only.
+    /// Returns the location of a distribution.
     /// </summary>
-    HRESULT GetDistributionVhdLocation(_In_ LPCGUID DistroGuid, _Out_ std::wstring& VhdLocation);
-
-    /// <summary>
-    /// Returns the virtual disk size (max size, set by ResizeDistribution) in bytes. WSL2 only.
-    /// </summary>
-    HRESULT GetDistributionVhdSize(_In_ LPCGUID DistroGuid, _Out_ ULONG64& VhdSize);
-
-    /// <summary>
-    /// Returns whether the distribution's VHD has the sparse file attribute. WSL2 only.
-    /// </summary>
-    HRESULT GetDistributionSparse(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN& Sparse);
-
-    /// <summary>
-    /// Returns the configured default UID for a distribution.
-    /// </summary>
-    HRESULT GetDistributionDefaultUid(_In_ LPCGUID DistroGuid, _Out_ ULONG& DefaultUid);
+    HRESULT GetDistributionLocation(_In_ LPCGUID DistroGuid, _Out_ std::wstring& VhdLocation);
 
     HRESULT MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name);
 
@@ -508,6 +488,11 @@ public:
     ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize);
 
     /// <summary>
+    /// Returns the distribution's disk size in bytes.
+    /// </summary>
+    HRESULT GetDistributionSize(_In_ LPCGUID DistroGuid, _Out_ ULONG64& VhdSize);
+
+    /// <summary>
     /// Sets the default distribution.
     /// </summary>
     HRESULT
@@ -518,6 +503,11 @@ public:
     /// </summary>
     HRESULT
     SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe);
+
+    /// <summary>
+    /// Returns whether the backing vhdx is sparse.
+    /// </summary>
+    HRESULT GetSparse(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN& Sparse);
 
     /// <summary>
     /// Sets the version for a distribution.

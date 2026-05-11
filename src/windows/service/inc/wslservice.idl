@@ -345,26 +345,19 @@ interface ILxssUserSession : IUnknown
         [in] LPCWSTR DistributionName, 
         [ in, out ] LXSS_ERROR_INFO * Error);
 
-    // Returns the folder containing the distribution's VHD on disk. This is the
-    // value written by --move; round-trips with `--set location`. WSL2 only.
-    HRESULT GetDistributionVhdLocation(
+    HRESULT GetDistributionLocation(
         [in] LPCGUID DistroGuid,
         [out, string] LPWSTR* VhdLocation,
         [in, out] LXSS_ERROR_INFO* Error);
 
-    HRESULT GetDistributionVhdSize(
+    HRESULT GetDistributionSize(
         [in] LPCGUID DistroGuid,
         [out] ULONG64* VhdSize,
         [in, out] LXSS_ERROR_INFO* Error);
 
-    HRESULT GetDistributionSparse(
+    HRESULT GetSparse(
         [in] LPCGUID DistroGuid,
         [out] BOOLEAN* Sparse,
-        [in, out] LXSS_ERROR_INFO* Error);
-
-    HRESULT GetDistributionDefaultUid(
-        [in] LPCGUID DistroGuid,
-        [out] ULONG* DefaultUid,
         [in, out] LXSS_ERROR_INFO* Error);
 };
 

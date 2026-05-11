@@ -1305,9 +1305,9 @@ class UnitTests
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
 
-            // Same case using the new `--set-disk-size` syntax.
+            // Same case using the new `--set-size` syntax.
             ValidateErrorMessage(
-                L"--manage test_distro --set-disk-size 10GB",
+                L"--manage test_distro --set-size 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
@@ -1342,16 +1342,16 @@ class UnitTests
 
         ValidateErrorMessage(L"--manage test_distro --resize foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
 
-        // Same coverage using the new `--set-disk-size` / `--get-disk-size` syntax.
+        // Same coverage using the new `--set-size` / `--get-size` syntax.
         ValidateErrorMessage(
-            L"--manage DoesNotExist --set-disk-size 10GB",
+            L"--manage DoesNotExist --set-size 10GB",
             L"There is no distribution with the supplied name.",
             L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
-        ValidateErrorMessage(L"--manage test_distro --set-disk-size foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
+        ValidateErrorMessage(L"--manage test_distro --set-size foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
 
         ValidateErrorMessage(
-            L"--manage DoesNotExist --get-disk-size",
+            L"--manage DoesNotExist --get-size",
             L"There is no distribution with the supplied name.",
             L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
@@ -1594,10 +1594,10 @@ Arguments for managing Windows Subsystem for Linux:
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
 
-            --set-disk-size <MemoryString>
+            --set-size <MemoryString>
                 Alias for --resize.
 
-            --get-disk-size
+            --get-size
                 Get the size of the distribution's disk in bytes.
 
     --mount <Disk>
@@ -6751,16 +6751,11 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 if (original == L"true")
                 {
                     LxsstuLaunchWsl(std::format(
-                        L"{} {} {} true {}",
-                        WSL_MANAGE_ARG,
-                        LXSS_DISTRO_NAME_TEST_L,
-                        WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG,
-                        WSL_MANAGE_ARG_ALLOW_UNSAFE));
+                        L"{} {} {} true {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, WSL_MANAGE_ARG_ALLOW_UNSAFE));
                 }
                 else
                 {
-                    LxsstuLaunchWsl(std::format(
-                        L"{} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG));
+                    LxsstuLaunchWsl(std::format(L"{} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG));
                 }
             });
 
@@ -6769,40 +6764,33 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             TerminateDistribution();
 
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"{} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG)),
+                LxsstuLaunchWsl(std::format(L"{} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG)),
                 (DWORD)0);
             VERIFY_ARE_EQUAL(manageGet(WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG), std::wstring{L"false"});
 
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} true {}",
-                    WSL_MANAGE_ARG,
-                    LXSS_DISTRO_NAME_TEST_L,
-                    WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG,
-                    WSL_MANAGE_ARG_ALLOW_UNSAFE)),
+                    L"{} {} {} true {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, WSL_MANAGE_ARG_ALLOW_UNSAFE)),
                 (DWORD)0);
             VERIFY_ARE_EQUAL(manageGet(WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG), std::wstring{L"true"});
         }
 
-        // ----- disk-size: --set-disk-size <bytes> -> --get-disk-size must echo the same byte count.
+        // ----- size: --set-size <bytes> -> --get-size must echo the same byte count.
         {
-            const auto originalStr = manageGet(WSL_MANAGE_ARG_GET_DISK_SIZE_OPTION_LONG);
+            const auto originalStr = manageGet(WSL_MANAGE_ARG_GET_SIZE_OPTION_LONG);
             VERIFY_IS_FALSE(originalStr.empty());
             const auto original = std::stoull(originalStr);
 
             auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-                LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DISK_SIZE_OPTION_LONG, original));
+                LxsstuLaunchWsl(std::format(L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SIZE_OPTION_LONG, original));
             });
 
             const ULONG64 grown = original + (1ULL << 30);
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DISK_SIZE_OPTION_LONG, grown)),
+                LxsstuLaunchWsl(std::format(L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SIZE_OPTION_LONG, grown)),
                 (DWORD)0);
 
-            const auto afterStr = manageGet(WSL_MANAGE_ARG_GET_DISK_SIZE_OPTION_LONG);
+            const auto afterStr = manageGet(WSL_MANAGE_ARG_GET_SIZE_OPTION_LONG);
             VERIFY_ARE_EQUAL(std::stoull(afterStr), grown);
         }
 
@@ -6817,8 +6805,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             });
 
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"{} {} {} root", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG)),
+                LxsstuLaunchWsl(std::format(L"{} {} {} root", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG)),
                 (DWORD)0);
             VERIFY_ARE_EQUAL(manageGet(WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG), std::wstring{L"root"});
         }

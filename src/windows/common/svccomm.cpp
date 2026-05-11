@@ -632,36 +632,28 @@ wsl::windows::common::SvcComm::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOL Spar
     RETURN_HR(m_userSession->SetSparse(DistroGuid, Sparse, AllowUnsafe, context.OutError()));
 }
 
-std::wstring wsl::windows::common::SvcComm::GetDistributionVhdLocation(_In_ LPCGUID DistroGuid) const
+std::wstring wsl::windows::common::SvcComm::GetDistributionLocation(_In_ LPCGUID DistroGuid) const
 {
     ClientExecutionContext context;
     wil::unique_cotaskmem_string vhdLocation;
-    THROW_IF_FAILED(m_userSession->GetDistributionVhdLocation(DistroGuid, &vhdLocation, context.OutError()));
+    THROW_IF_FAILED(m_userSession->GetDistributionLocation(DistroGuid, &vhdLocation, context.OutError()));
     return std::wstring{vhdLocation.get()};
 }
 
-ULONG64 wsl::windows::common::SvcComm::GetDistributionVhdSize(_In_ LPCGUID DistroGuid) const
+ULONG64 wsl::windows::common::SvcComm::GetDistributionSize(_In_ LPCGUID DistroGuid) const
 {
     ClientExecutionContext context;
     ULONG64 vhdSize{};
-    THROW_IF_FAILED(m_userSession->GetDistributionVhdSize(DistroGuid, &vhdSize, context.OutError()));
+    THROW_IF_FAILED(m_userSession->GetDistributionSize(DistroGuid, &vhdSize, context.OutError()));
     return vhdSize;
 }
 
-bool wsl::windows::common::SvcComm::GetDistributionSparse(_In_ LPCGUID DistroGuid) const
+bool wsl::windows::common::SvcComm::GetSparse(_In_ LPCGUID DistroGuid) const
 {
     ClientExecutionContext context;
     BOOLEAN sparse{};
-    THROW_IF_FAILED(m_userSession->GetDistributionSparse(DistroGuid, &sparse, context.OutError()));
+    THROW_IF_FAILED(m_userSession->GetSparse(DistroGuid, &sparse, context.OutError()));
     return sparse != FALSE;
-}
-
-ULONG wsl::windows::common::SvcComm::GetDistributionDefaultUid(_In_ LPCGUID DistroGuid) const
-{
-    ClientExecutionContext context;
-    ULONG defaultUid{};
-    THROW_IF_FAILED(m_userSession->GetDistributionDefaultUid(DistroGuid, &defaultUid, context.OutError()));
-    return defaultUid;
 }
 
 HRESULT
