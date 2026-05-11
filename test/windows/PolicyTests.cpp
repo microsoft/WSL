@@ -62,6 +62,11 @@ class PolicyTest
     static auto SetRegistryAllowlist(std::initializer_list<std::wstring_view> entries)
     {
         const auto policies = OpenKey(HKEY_LOCAL_MACHINE, c_registryKey, KEY_ALL_ACCESS);
+
+        // Drop any pre-existing sub-key so stale `AllowedRegistryN` values from a previous
+        // (possibly interrupted) test run can't leak into this one.
+        DeleteKey(policies.get(), c_wslContainerRegistryAllowlist);
+
         const auto subKey = CreateKey(policies.get(), c_wslContainerRegistryAllowlist);
         DWORD index = 1;
         for (const auto& entry : entries)
@@ -419,7 +424,9 @@ class PolicyTest
     // Build the absolute path to the installed wslc.exe.
     static std::wstring GetWslcExePath()
     {
-        return (std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslc.exe").wstring();
+        auto msiPath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        THROW_HR_IF_MSG(E_UNEXPECTED, !msiPath.has_value(), "MSI install location not found in registry; is WSL installed?");
+        return (std::filesystem::path(*msiPath) / L"wslc.exe").wstring();
     }
 
     // Verifies AllowWSLContainer=0 gates the WSLCSessionManager COM factory itself, so that
