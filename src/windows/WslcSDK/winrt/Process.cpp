@@ -84,29 +84,29 @@ void Process::StartExitThread()
     m_destructedEvent.create(wil::EventOptions::ManualReset);
     m_exitThread = std::thread(
         [weak_this = get_weak(), exitEventHandle = m_exitEventHandle.get(), destructedEventHandle = m_destructedEvent.get()]() {
-        try
-        {
-            HANDLE handles[] = {exitEventHandle, destructedEventHandle};
-            auto waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-            if (waitResult != WAIT_OBJECT_0)
+            try
             {
-                return;
-            }
-
-            // After this point, we ensure that the Process object is not destructed until we're done.
-            if (auto strong_this = weak_this.get())
-            {
-                int32_t exitCode = 0;
-                if (FAILED(WslcGetProcessExitCode(strong_this->ToHandle(), &exitCode)))
+                HANDLE handles[] = {exitEventHandle, destructedEventHandle};
+                auto waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+                if (waitResult != WAIT_OBJECT_0)
                 {
                     return;
                 }
 
-                strong_this->m_exitedEvent(*strong_this, exitCode);
+                // After this point, we ensure that the Process object is not destructed until we're done.
+                if (auto strong_this = weak_this.get())
+                {
+                    int32_t exitCode = 0;
+                    if (FAILED(WslcGetProcessExitCode(strong_this->ToHandle(), &exitCode)))
+                    {
+                        return;
+                    }
+
+                    strong_this->m_exitedEvent(*strong_this, exitCode);
+                }
             }
-        }
-        CATCH_LOG()
-    });
+            CATCH_LOG()
+        });
 }
 
 void Process::Start()

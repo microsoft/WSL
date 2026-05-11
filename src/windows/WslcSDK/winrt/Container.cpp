@@ -20,8 +20,8 @@ Abstract:
 #include "ProcessSettings.h"
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
-Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings)
-    : m_session(session), m_settings(settings)
+Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::ContainerSettings const& settings) :
+    m_session(session), m_settings(settings)
 {
 }
 
