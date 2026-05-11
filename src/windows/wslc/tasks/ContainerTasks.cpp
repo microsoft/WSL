@@ -573,7 +573,7 @@ void ShowContainerStats(CLIExecutionContext& context)
         swprintf_s(memPercentBuf, L"%.2f%%", memPercent);
 
         table.OutputLine({
-            MultiByteToWide(trunc ? TruncateId(stats.id) : stats.id),
+            MultiByteToWide(truncId),
             MultiByteToWide(containerName),
             cpuBuf,
             memUsage,
