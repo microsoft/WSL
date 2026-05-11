@@ -552,4 +552,80 @@ struct CreateImageProgress
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail, errorDetail);
 };
 
+// Container stats (GET /containers/{id}/stats?stream=false)
+// See: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Container/operation/ContainerStats
+
+struct ContainerStatsCpuUsage
+{
+    uint64_t total_usage{};
+    std::optional<std::vector<uint64_t>> percpu_usage;
+    uint64_t usage_in_kernelmode{};
+    uint64_t usage_in_usermode{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStatsCpuUsage, total_usage, percpu_usage, usage_in_kernelmode, usage_in_usermode);
+};
+
+struct ContainerStatsCpuStats
+{
+    ContainerStatsCpuUsage cpu_usage;
+    uint64_t system_cpu_usage{};
+    uint32_t online_cpus{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStatsCpuStats, cpu_usage, system_cpu_usage, online_cpus);
+};
+
+struct ContainerStatsMemoryStats
+{
+    uint64_t usage{};
+    uint64_t limit{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStatsMemoryStats, usage, limit);
+};
+
+struct ContainerStatsNetworkEntry
+{
+    uint64_t rx_bytes{};
+    uint64_t rx_packets{};
+    uint64_t tx_bytes{};
+    uint64_t tx_packets{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStatsNetworkEntry, rx_bytes, rx_packets, tx_bytes, tx_packets);
+};
+
+struct ContainerStatsBlkioEntry
+{
+    std::string op;
+    uint64_t value{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStatsBlkioEntry, op, value);
+};
+
+struct ContainerStatsBlkioStats
+{
+    std::optional<std::vector<ContainerStatsBlkioEntry>> io_service_bytes_recursive;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStatsBlkioStats, io_service_bytes_recursive);
+};
+
+struct ContainerStatsPidsStats
+{
+    uint64_t current{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStatsPidsStats, current);
+};
+
+struct ContainerStats
+{
+    std::string id;
+    std::string name;
+    ContainerStatsCpuStats cpu_stats;
+    ContainerStatsCpuStats precpu_stats;
+    ContainerStatsMemoryStats memory_stats;
+    std::optional<std::map<std::string, ContainerStatsNetworkEntry>> networks;
+    ContainerStatsBlkioStats blkio_stats;
+    ContainerStatsPidsStats pids_stats;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerStats, id, name, cpu_stats, precpu_stats, memory_stats, networks, blkio_stats, pids_stats);
+};
+
 } // namespace wsl::windows::common::docker_schema

@@ -18,6 +18,7 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslcsdk.h"
 
 using namespace wsl::windows::common::registry;
 
@@ -418,6 +419,41 @@ class InstallerTests
         UninstallMsi();
         InstallGitHubRelease(L"2.0.2");
         CallWslUpdateViaMsi();
+    }
+
+    WSLC_TEST_METHOD(WslcSdkVersionDetection)
+    {
+        auto restore = wil::scope_exit([this]() { InstallMsi(); });
+
+        UninstallMsi();
+
+        // Validate that the SDK detects that the WSL package is not installed.
+        WslcComponentFlags flags{};
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+
+        // Validate that the SDK detects that the installed version of WSL is too old.
+        InstallGitHubRelease(L"2.0.2");
+
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_WSL_PACKAGE);
+
+        restore.reset();
+
+        // Validate that the SDK supports the current package.
+        VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, 0);
+
+        // TODO: Add test coverage for a more recent version of the package that doesn't support the SDK, if ever needed.
+        // In the meantime, the below block can be commented to manual test this scenario with a manual code change.
+        /*VERIFY_SUCCEEDED(WslcGetMissingComponents(&flags));
+        VERIFY_ARE_EQUAL(flags, WSLC_COMPONENT_FLAG_SDK_NEEDS_UPDATE);
+
+        WslcSessionSettings sessionSettings{};
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"should-fail", L"C:\\", &sessionSettings));
+
+        WslcSession session{};
+        VERIFY_ARE_EQUAL(WslcCreateSession(&sessionSettings, &session, nullptr), WSLC_E_SDK_UPDATE_NEEDED);*/
     }
 
     TEST_METHOD(MsrdcPluginKey)

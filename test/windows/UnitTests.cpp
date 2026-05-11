@@ -1809,7 +1809,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(
                     L"mount | grep -iF '" TEXT(
-                        LXSS_GPU_DRIVERS_SHARE) L" on /usr/lib/wsl/drivers type 9p (ro,nosuid,nodev,noatime,aname=" TEXT(LXSS_GPU_DRIVERS_SHARE) L";fmask=222;dmask=222,cache=5,access=client,msize=65536,trans=fd,rfd=8,wfd=8)'",
+                        LXSS_GPU_DRIVERS_SHARE) L" on /usr/lib/wsl/drivers type 9p (ro,nosuid,nodev,noatime,aname=" TEXT(LXSS_GPU_DRIVERS_SHARE) L";fmask=222;dmask=222,cache=0x5,access=client,msize=65536,trans=fd,rfd=8,wfd=8)'",
                     nullptr,
                     nullptr,
                     nullptr,

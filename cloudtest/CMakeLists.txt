@@ -36,27 +36,16 @@ else()
     set(TEST_PACKAGE_FILE "installer.msix")
 endif()
 
-function(add_test_group image version)
-    set(DIR ${OUT}/${image}-wsl${version})
-
+function(add_test_group image version suffix filter)
+    set(DIR ${OUT}/${image}-${suffix})
     file(MAKE_DIRECTORY ${DIR})
 
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestMap.xml.in ${DIR}/TestMap.xml)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup.xml.in ${DIR}/TestGroup.xml)
 endfunction()
 
-function(add_wslc_test_group image)
-    set(version "c")
-    set(DIR ${OUT}/${image}-wslc)
-
-    file(MAKE_DIRECTORY ${DIR})
-
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestMap.xml.in ${DIR}/TestMap.xml)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/TestGroup-wslc.xml.in ${DIR}/TestGroup.xml)
-endfunction()
-
 foreach(image ${CLOUDTEST_IMAGES})
-    add_test_group("${image}" "1")
-    add_test_group("${image}" "2")
-    add_wslc_test_group("${image}")
+    add_test_group("${image}" "1" "wsl1" "not (@TestCategory='WSLC')")
+    add_test_group("${image}" "2" "wsl2" "not (@TestCategory='WSLC')")
+    add_test_group("${image}" "2" "wslc" "@TestCategory='WSLC'")
 endforeach()

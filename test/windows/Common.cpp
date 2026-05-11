@@ -58,6 +58,7 @@ static HANDLE g_OriginalStderr;
 static BOOL g_RelogEverything = TRUE;
 static bool g_LogDmesgAfterEachTest = false;
 static PTP_TIMER g_WatchdogTimer;
+
 static BOOL g_VmMode;
 static std::wstring g_originalConfig;
 static std::wstring g_originalDefaultDistro;
@@ -69,6 +70,7 @@ std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
 bool g_fastTestRun = false; // True when test.bat was invoked with -f
 static wil::unique_mta_usage_cookie g_mtaCookie;
+static wil::unique_handle g_processJob;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -1976,6 +1978,15 @@ Return Value:
     wsl::windows::common::wslutil::InitializeWil();
 
     THROW_IF_FAILED(CoIncrementMTAUsage(&g_mtaCookie));
+
+    // Assign a job object to the current process to ensure that we don't leak processes on failure.
+    g_processJob.reset(CreateJobObjectW(nullptr, nullptr));
+    THROW_LAST_ERROR_IF(!g_processJob);
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(g_processJob.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(g_processJob.get(), GetCurrentProcess()));
 
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG

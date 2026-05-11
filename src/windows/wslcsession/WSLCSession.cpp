@@ -29,6 +29,7 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
+constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -422,8 +423,6 @@ try
     {
         return;
     }
-
-    constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 
     std::string entry = {Buffer.begin(), Buffer.end()};
     WSL_LOG(
@@ -1223,7 +1222,7 @@ try
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
-    auto entries = std::accumulate<decltype(images.begin()), size_t>(images.begin(), images.end(), 0, [](auto sum, const auto& e) {
+    auto entries = std::accumulate(images.begin(), images.end(), size_t{0}, [](auto sum, const auto& e) {
         return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
     });
 
@@ -2253,7 +2252,7 @@ try
 
     const auto& entry = it->second;
 
-    wslc_schema::InspectNetwork result;
+    wslc_schema::Network result;
     result.Id = entry.Id;
     result.Name = name;
     result.Driver = entry.Driver;
@@ -2267,7 +2266,7 @@ try
         auto& configs = result.IPAM.Config.emplace();
         for (const auto& cfg : *entry.IPAM.Config)
         {
-            wslc_schema::InspectIPAMConfig inspectCfg;
+            wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
             inspectCfg.Gateway = cfg.Gateway;
             configs.push_back(std::move(inspectCfg));
