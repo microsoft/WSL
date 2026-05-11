@@ -332,6 +332,7 @@ set(COMMON_LINK_LIBRARIES
     synchronization.lib
     Bcrypt.lib
     Crypt32.lib
+    Dbghelp.lib
     icu.lib)
 
 set(MSI_LINK_LIBRARIES
