@@ -14,6 +14,8 @@ Abstract:
 
 #pragma once
 
+#include <array>
+#include <memory>
 #include <string>
 #include <functional>
 #include <type_traits>
@@ -35,7 +37,7 @@ using TChar = char;
 using TString = std::basic_string<TChar>;
 
 using TMatchMethod = std::function<bool(const TChar*, int)>;
-using TParseMethod = std::function<int(const TChar*)>;
+using TParseMethod = std::function<int(const TChar* const* values, int available)>;
 
 struct Argument
 {
@@ -337,22 +339,40 @@ public:
     template <typename T>
     void AddArgument(T&& Output, const TChar* LongName, TChar ShortName = '\0')
     {
-        auto match = [LongName, ShortName](const TChar* Name, int Pos) {
-            if (Name == nullptr)
+        m_arguments.emplace_back(MakeLongShortMatcher(LongName, ShortName), WrapSingle(BuildParseMethod(std::forward<T>(Output))), false);
+    }
+
+    template <typename... Ts>
+    void AddMultiArgument(const TChar* LongName, TChar ShortName, Ts&&... Outputs)
+    {
+        static_assert(sizeof...(Outputs) >= 2, "Use AddArgument for single-value options.");
+        static_assert(
+            (... && IsValueTaking<std::remove_reference_t<Ts>>),
+            "AddMultiArgument outputs must each consume exactly one value. "
+            "Flags (bool&), zero-arg callables (SetFlag/ClearFlag/UniqueSetValue), and "
+            "void-returning one-arg callables (NoOp) are not allowed.");
+
+        constexpr int valueCount = static_cast<int>(sizeof...(Outputs));
+        auto consumers = std::make_shared<std::array<std::function<int(const TChar*)>, valueCount>>(
+            std::array<std::function<int(const TChar*)>, valueCount>{BuildParseMethod(std::forward<Ts>(Outputs))...});
+
+        TParseMethod consume = [consumers](const TChar* const* values, int available) -> int {
+            if (available < valueCount)
             {
-                return false;
+                return -1;
             }
-            else if (LongName != nullptr && wsl::shared::string::IsEqual(Name, LongName))
+            for (int i = 0; i < valueCount; ++i)
             {
-                return true;
+                // != 0 Guarded at compile time. This check is redundant but makes the intent clear.
+                if ((*consumers)[i](values[i]) != 1)
+                {
+                    return -1;
+                }
             }
-            else
-            {
-                return ShortName != '\0' && Name[0] == '-' && Name[1] == ShortName && Name[2] == '\0';
-            }
+            return valueCount;
         };
 
-        m_arguments.emplace_back(std::move(match), BuildParseMethod(std::forward<T>(Output)), false);
+        m_arguments.emplace_back(MakeLongShortMatcher(LongName, ShortName), std::move(consume), false);
     }
 
     template <typename T>
@@ -362,7 +382,7 @@ public:
 
         auto match = [Position](const TChar*, int Index) { return Position == Index; };
 
-        m_arguments.emplace_back(std::move(match), BuildParseMethod(std::forward<T>(Output)), true);
+        m_arguments.emplace_back(std::move(match), WrapSingle(BuildParseMethod(std::forward<T>(Output))), true);
     }
 
     void Parse()
@@ -392,7 +412,7 @@ public:
                         const TChar fullArgument[] = {'-', *arg, '\0'};
                         if (!e.Positional && e.Matches(fullArgument, -1))
                         {
-                            e.Consume(nullptr);
+                            e.Consume(nullptr, 0);
                             foundMatch = true;
                             break;
                         }
@@ -413,20 +433,23 @@ public:
                             stopParameters ? nullptr : m_argv[m_parseIndex],
                             m_argv[m_parseIndex][0] == '-' && m_argv[m_parseIndex][1] != '\0' && !stopParameters ? -1 : argumentPosition))
                     {
-                        const TChar* value = nullptr;
+                        const TChar* const* values = nullptr;
+                        int available = 0;
                         if (e.Positional)
                         {
-                            value = m_argv[m_parseIndex]; // Positional arguments directly receive argv[i]
+                            // Positional arguments directly receive argv[i].
+                            values = &m_argv[m_parseIndex];
+                            available = 1;
                         }
                         else if (m_parseIndex + 1 < m_argc)
                         {
-                            value = m_argv[m_parseIndex + 1];
+                            values = &m_argv[m_parseIndex + 1];
+                            available = m_argc - (m_parseIndex + 1);
                         }
 
-                        offset = e.Consume(value);
+                        offset = e.Consume(values, available);
                         if (offset < 0)
                         {
-                            WI_ASSERT(value == nullptr);
                             THROW_USER_ERROR(
                                 wsl::shared::Localization::MessageMissingArgument(m_argv[m_parseIndex], m_name ? m_name : m_argv[0]));
                         }
@@ -478,6 +501,56 @@ public:
     }
 
 private:
+    static TMatchMethod MakeLongShortMatcher(const TChar* LongName, TChar ShortName)
+    {
+        return [LongName, ShortName](const TChar* Name, int /*Pos*/) {
+            if (Name == nullptr)
+            {
+                return false;
+            }
+            else if (LongName != nullptr && wsl::shared::string::IsEqual(Name, LongName))
+            {
+                return true;
+            }
+            else
+            {
+                return ShortName != '\0' && Name[0] == '-' && Name[1] == ShortName && Name[2] == '\0';
+            }
+        };
+    }
+
+    static TParseMethod WrapSingle(std::function<int(const TChar*)> Inner)
+    {
+        return [inner = std::move(Inner)](const TChar* const* values, int available) -> int {
+            return inner(available > 0 ? values[0] : nullptr);
+        };
+    }
+
+    // Compile-time predicate: does T's BuildParseMethod-wrapped consumer return 1
+    template <typename T>
+    static constexpr bool IsValueTaking = []() {
+        if constexpr (std::is_same_v<T, bool>)
+        {
+            return false;
+        }
+        else if constexpr (std::is_invocable_v<T, const TChar*>)
+        {
+            // One-arg callables are value-taking iff they return non-void
+            // (void-returning ones, like NoOp, consume 0 tokens).
+            return !std::is_same_v<std::invoke_result_t<T, const TChar*>, void>;
+        }
+        else if constexpr (std::is_invocable_v<T>)
+        {
+            // Zero-arg callables (SetFlag, ClearFlag, UniqueSetValue) consume 0 tokens.
+            return false;
+        }
+        else
+        {
+            // Plain types (std::wstring, GUID, std::filesystem::path, etc.) all consume 1.
+            return true;
+        }
+    }();
+
     template <typename T>
     static std::function<int(const TChar*)> BuildParseMethod(T&& Output)
     {

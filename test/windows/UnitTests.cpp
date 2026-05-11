@@ -5988,6 +5988,117 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             VERIFY_IS_TRUE(a);
             VERIFY_ARE_EQUAL(pos, L"-");
         }
+
+        // Multi-value option: happy path. --set <property> <value>
+        {
+            ArgumentParser parser(L"--set sparse true pos-value", entryPoint, 0);
+            std::wstring property;
+            std::wstring value;
+            std::wstring pos;
+
+            parser.AddMultiArgument(L"--set", '\0', property, value);
+            parser.AddPositionalArgument(pos, 0);
+
+            parse(parser);
+
+            VERIFY_ARE_EQUAL(property, L"sparse");
+            VERIFY_ARE_EQUAL(value, L"true");
+            VERIFY_ARE_EQUAL(pos, L"pos-value");
+        }
+
+        // Multi-value option mixed with another flag after it.
+        {
+            ArgumentParser parser(L"--set sparse true --allow-unsafe", entryPoint, 0);
+            std::wstring property;
+            std::wstring value;
+            bool allowUnsafe{};
+
+            parser.AddMultiArgument(L"--set", '\0', property, value);
+            parser.AddArgument(allowUnsafe, L"--allow-unsafe");
+
+            parse(parser);
+
+            VERIFY_ARE_EQUAL(property, L"sparse");
+            VERIFY_ARE_EQUAL(value, L"true");
+            VERIFY_IS_TRUE(allowUnsafe);
+        }
+
+        // Multi-value option with a typed child consumer (ParsedBool).
+        {
+            ArgumentParser parser(L"--set sparse true", entryPoint, 0);
+            std::wstring property;
+            std::optional<bool> value;
+
+            parser.AddMultiArgument(L"--set", '\0', property, ParsedBool(value));
+
+            parse(parser);
+
+            VERIFY_ARE_EQUAL(property, L"sparse");
+            VERIFY_IS_TRUE(value.has_value());
+            VERIFY_IS_TRUE(value.value());
+        }
+
+        // Multi-value option missing the second value.
+        {
+            ArgumentParser parser(L"--set sparse", entryPoint, 0);
+            std::wstring property;
+            std::wstring value;
+
+            parser.AddMultiArgument(L"--set", '\0', property, value);
+
+            parse(
+                parser,
+                std::format(
+                    L"Command line argument --set requires a value.\n"
+                    "Please use '{} --help' to get a list of supported arguments.",
+                    entryPoint)
+                    .c_str());
+        }
+
+        // Multi-value option with no values at all.
+        {
+            ArgumentParser parser(L"--set", entryPoint, 0);
+            std::wstring property;
+            std::wstring value;
+
+            parser.AddMultiArgument(L"--set", '\0', property, value);
+
+            parse(
+                parser,
+                std::format(
+                    L"Command line argument --set requires a value.\n"
+                    "Please use '{} --help' to get a list of supported arguments.",
+                    entryPoint)
+                    .c_str());
+        }
+
+        // Three-value option to verify variadic parameter pack.
+        {
+            ArgumentParser parser(L"--triple a b c", entryPoint, 0);
+            std::wstring v1, v2, v3;
+
+            parser.AddMultiArgument(L"--triple", '\0', v1, v2, v3);
+
+            parse(parser);
+
+            VERIFY_ARE_EQUAL(v1, L"a");
+            VERIFY_ARE_EQUAL(v2, L"b");
+            VERIFY_ARE_EQUAL(v3, L"c");
+        }
+
+        // Multi-value option specified twice: last one wins (consistent with single-value).
+        {
+            ArgumentParser parser(L"--set a b --set c d", entryPoint, 0);
+            std::wstring property;
+            std::wstring value;
+
+            parser.AddMultiArgument(L"--set", '\0', property, value);
+
+            parse(parser);
+
+            VERIFY_ARE_EQUAL(property, L"c");
+            VERIFY_ARE_EQUAL(value, L"d");
+        }
     }
 
     TEST_METHOD(CaseSensitivity)
