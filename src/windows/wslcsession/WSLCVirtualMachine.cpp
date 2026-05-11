@@ -500,7 +500,7 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uin
     }
     args.push_back(Device);
 
-    ServiceProcessLauncher launcher(mkfsPath, std::move(args));
+    ServiceProcessLauncher launcher(mkfsPath, args);
     auto result = launcher.Launch(*this).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
