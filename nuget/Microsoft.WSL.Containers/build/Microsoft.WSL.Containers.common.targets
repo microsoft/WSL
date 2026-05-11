@@ -37,7 +37,7 @@
 
         <Error Condition="'$(_WslcExitCode)' != '0'"
                Code="WSLC0001"
-               Text="The wslc CLI at '$(WslcCliPath)' could not be found or did not run successfully. Install WSL by running: wsl --install --no-distribution" />
+               Text="The wslc CLI check failed: '$(WslcCliPath) --version' returned exit code $(_WslcExitCode). Install WSL by running 'wsl --install --no-distribution', or set the WslcCliPath property to a specific wslc.exe path." />
     </Target>
 
     <!-- Validate required metadata on WslcImage items (invoked via DependsOnTargets from WslcBuildAllImages) -->
