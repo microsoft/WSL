@@ -1855,8 +1855,8 @@ try
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
     // Return the folder (BasePath), not the VHD file path. This matches what
-    // MoveDistribution writes via Property::BasePath, so `--get vhd-location`
-    // round-trips with `--set vhd-location`.
+    // MoveDistribution writes via Property::BasePath, so `--get location`
+    // round-trips with `--set location`.
     VhdLocation = configuration.BasePath.wstring();
     return S_OK;
 }

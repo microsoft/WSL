@@ -79,7 +79,7 @@ Abstract:
 #define WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG L"--set-default-user"
 #define WSL_MANAGE_PROPERTY_SPARSE L"sparse"
 #define WSL_MANAGE_PROPERTY_DEFAULT_USER L"default-user"
-#define WSL_MANAGE_PROPERTY_VHD_LOCATION L"vhd-location"
+#define WSL_MANAGE_PROPERTY_LOCATION L"location"
 #define WSL_MANAGE_PROPERTY_VHD_SIZE L"vhd-size"
 #define WSL_MOUNT_ARG L"--mount"
 #define WSL_MOUNT_ARG_VHD_OPTION_LONG L"--vhd"

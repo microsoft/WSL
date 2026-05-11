@@ -939,7 +939,7 @@ int Manage(_In_ std::wstring_view commandLine)
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), colon == std::wstring::npos);
             wprintf(L"%ls\n", result.Stdout.substr(0, colon).c_str());
         }
-        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_LOCATION))
+        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_LOCATION))
         {
             wprintf(L"%ls\n", service.GetDistributionVhdLocation(&distroGuid).c_str());
         }
@@ -968,7 +968,7 @@ int Manage(_In_ std::wstring_view commandLine)
         {
             defaultUser = std::move(setValue);
         }
-        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_LOCATION))
+        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_LOCATION))
         {
             std::wstring resolved;
             AbsolutePath{resolved}(setValue->c_str());

@@ -6797,15 +6797,15 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             return output;
         };
 
-        // ----- vhd-location: --set vhd-location <folder> -> --get vhd-location must echo the
+        // ----- location: --set location <folder> -> --get location must echo the
         // same folder (with the trailing path component normalized by std::filesystem). The
         // setter physically moves the VHD; we move it to a temp folder and back.
         {
-            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_LOCATION);
+            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_LOCATION);
             VERIFY_IS_FALSE(original.empty());
 
             // Two consecutive --get calls must agree.
-            const auto repeated = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_LOCATION);
+            const auto repeated = manageGetProperty(WSL_MANAGE_PROPERTY_LOCATION);
             VERIFY_ARE_EQUAL(original, repeated);
 
             // Set up a sibling temp folder for the move.
@@ -6816,7 +6816,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
                 WslShutdown();
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} \"{}\"", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_VHD_LOCATION, original));
+                    L"{} {} {} {} \"{}\"", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_LOCATION, original));
                 std::filesystem::remove_all(destination);
             });
 
@@ -6830,13 +6830,13 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                     WSL_MANAGE_ARG,
                     LXSS_DISTRO_NAME_TEST_L,
                     WSL_MANAGE_ARG_SET_OPTION_LONG,
-                    WSL_MANAGE_PROPERTY_VHD_LOCATION,
+                    WSL_MANAGE_PROPERTY_LOCATION,
                     destination.wstring())),
                 (DWORD)0);
 
             // Compare via std::filesystem::equivalent to absorb path-string normalization
             // differences (trailing slash, casing, \\?\ prefix).
-            const auto reported = std::filesystem::path(manageGetProperty(WSL_MANAGE_PROPERTY_VHD_LOCATION));
+            const auto reported = std::filesystem::path(manageGetProperty(WSL_MANAGE_PROPERTY_LOCATION));
             std::error_code ec;
             VERIFY_IS_TRUE(std::filesystem::equivalent(reported, destination, ec));
         }
