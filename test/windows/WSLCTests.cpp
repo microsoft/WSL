@@ -369,7 +369,7 @@ class WSLCTests
 
         // Act: list sessions
         {
-            wil::unique_cotaskmem_array_ptr<WSLCSessionInformation> sessions;
+            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
             VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
             // Assert
@@ -384,7 +384,7 @@ class WSLCTests
         {
             auto session2 = CreateSession(GetDefaultSessionSettings(L"wslc-test-list-2"));
 
-            wil::unique_cotaskmem_array_ptr<WSLCSessionInformation> sessions;
+            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
             VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
             VERIFY_ARE_EQUAL(sessions.size(), 2);
@@ -430,7 +430,7 @@ class WSLCTests
 
         // Reject DisplayName at exact boundary (no room for null terminator).
         {
-            std::wstring boundaryName(std::size(WSLCSessionInformation{}.DisplayName), L'x');
+            std::wstring boundaryName(std::size(WSLCSessionListEntry{}.DisplayName), L'x');
             auto settings = GetDefaultSessionSettings(boundaryName.c_str());
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
@@ -438,7 +438,7 @@ class WSLCTests
 
         // Reject too long DisplayName.
         {
-            std::wstring longName(std::size(WSLCSessionInformation{}.DisplayName) + 1, L'x');
+            std::wstring longName(std::size(WSLCSessionListEntry{}.DisplayName) + 1, L'x');
             auto settings = GetDefaultSessionSettings(longName.c_str());
             wil::com_ptr<IWSLCSession> session;
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &session), WSLC_E_INVALID_SESSION_NAME);
@@ -7190,7 +7190,7 @@ class WSLCTests
         auto manager = OpenSessionManager();
 
         auto expectSessions = [&](const std::vector<std::wstring>& expectedSessions) {
-            wil::unique_cotaskmem_array_ptr<WSLCSessionInformation> sessions;
+            wil::unique_cotaskmem_array_ptr<WSLCSessionListEntry> sessions;
             VERIFY_SUCCEEDED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
             std::set<std::wstring> displayNames;

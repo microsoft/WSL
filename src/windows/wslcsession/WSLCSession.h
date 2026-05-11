@@ -83,6 +83,22 @@ public:
     // Used by the COM server host to signal process exit.
     void SetDestructionCallback(std::function<void()>&& callback);
 
+    // Returns the cross-process plugin notifier supplied by the SYSTEM service, or nullptr
+    // if no plugins are loaded. Used by container/image flows to forward plugin events.
+    IWSLCPluginNotifier* GetPluginNotifier() const noexcept
+    {
+        return m_pluginNotifier.get();
+    }
+
+    // Helper used by image flows to notify the SYSTEM service plugin manager
+    // that an image was created. Best-effort: any failures (including no plugin
+    // installed) are swallowed so they cannot break the image flow.
+    void NotifyImageCreatedByName(const std::string& ImageNameOrId) noexcept;
+
+    // Notify the SYSTEM service plugin manager that an image is about to be deleted.
+    // Must be called before DeleteImage so the plugin can still inspect the image.
+    void NotifyImageDeletedByName(const std::string& ImageNameOrId) noexcept;
+
     // IWSLCSession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
     IFACEMETHOD(Initialize)(_In_ const WSLCSessionInitSettings* Settings, _In_ IWSLCVirtualMachine* Vm) override;
@@ -216,6 +232,11 @@ private:
     std::function<void()> m_destructionCallback;
     std::atomic<bool> m_terminating{false};
     std::atomic<bool> m_terminated{false};
+
+    // Optional cross-process notifier used to forward plugin-related events
+    // (container started/stopped, image created/deleted) back to the SYSTEM
+    // service's PluginManager. Null when no plugins are loaded.
+    wil::com_ptr<IWSLCPluginNotifier> m_pluginNotifier;
 
     // User-provided handles that the session is currently doing IO on.
     std::mutex m_userHandlesLock;

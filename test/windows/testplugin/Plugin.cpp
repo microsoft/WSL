@@ -338,6 +338,158 @@ HRESULT OnDistributionUnregistered(const WSLSessionInformation* Session, const W
     return S_OK;
 }
 
+// Extracts the value of a "key":"value" string field from a flat JSON document.
+// Returns an empty string if the field is not present. Used by WSLC handlers to
+// keep logs deterministic without pulling in a full JSON parser.
+static std::string ExtractJsonStringField(const char* json, std::string_view key)
+{
+    if (json == nullptr)
+    {
+        return {};
+    }
+
+    std::string needle = "\"";
+    needle.append(key);
+    needle.append("\":\"");
+
+    const char* start = strstr(json, needle.c_str());
+    if (start == nullptr)
+    {
+        return {};
+    }
+    start += needle.size();
+
+    std::string out;
+    while (*start != '\0' && *start != '"')
+    {
+        if (*start == '\\' && start[1] != '\0')
+        {
+            out.push_back(start[1]);
+            start += 2;
+            continue;
+        }
+        out.push_back(*start);
+        ++start;
+    }
+    return out;
+}
+
+HRESULT OnWslcSessionCreated(const WSLCSessionInformation* Session)
+{
+    g_logfile << "WSLC Session created, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
+              << ", id=" << Session->SessionId << ", pid=" << Session->ApplicationPid
+              << ", token=" << (Session->UserToken != nullptr ? "set" : "null")
+              << ", sid=" << (Session->UserSid != nullptr ? "set" : "null") << std::endl;
+
+    if (g_testType == PluginTestType::WslcSessionRejected)
+    {
+        g_logfile << "OnWslcSessionCreated: E_UNEXPECTED" << std::endl;
+        return E_UNEXPECTED;
+    }
+
+    return S_OK;
+}
+
+HRESULT OnWslcSessionStopping(const WSLCSessionInformation* Session)
+{
+    g_logfile << "WSLC Session stopping, name=" << wsl::shared::string::WideToMultiByte(Session->DisplayName)
+              << ", id=" << Session->SessionId << std::endl;
+
+    return S_OK;
+}
+
+HRESULT OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectContainer)
+{
+    auto id = ExtractJsonStringField(InspectContainer, "Id");
+    auto image = ExtractJsonStringField(InspectContainer, "Image");
+
+    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << id << ", image=" << image << std::endl;
+
+    if (g_testType == PluginTestType::WslcContainerRejected)
+    {
+        g_logfile << "OnWslcContainerStarted: E_UNEXPECTED" << std::endl;
+        return E_UNEXPECTED;
+    }
+
+    if (g_testType == PluginTestType::WslcSuccess && g_api != nullptr && g_api->Wslc != nullptr)
+    {
+        // Mount a Windows folder, run a process in the root namespace, wait for it to exit,
+        // then unmount. Validates the full plugin -> WSLC API surface in one go.
+        std::filesystem::path modulePath = wil::GetModuleFileNameW(wil::GetModuleInstanceHandle()).get();
+        auto mountSource = modulePath.parent_path().wstring();
+
+        wchar_t mountpoint[256] = {};
+        const auto mountResult =
+            g_api->Wslc->MountFolder(Session->SessionId, mountSource.c_str(), TRUE, L"plugin-test-mount", mountpoint);
+        if (FAILED(mountResult))
+        {
+            g_logfile << "WSLC MountFolder failed: " << mountResult << std::endl;
+            return S_OK;
+        }
+
+        g_logfile << "WSLC Folder mounted at: " << wsl::shared::string::WideToMultiByte(mountpoint) << std::endl;
+
+        std::vector<const char*> arguments = {"/bin/sh", "-c", "echo wslc-plugin-ok", nullptr};
+        WSLCProcess process{};
+        const auto procResult = g_api->Wslc->CreateProcess(Session->SessionId, arguments[0], arguments.data(), nullptr, &process);
+        if (FAILED(procResult))
+        {
+            g_logfile << "WSLC CreateProcess failed: " << procResult << std::endl;
+        }
+        else
+        {
+            g_logfile << "WSLC Process created, pid=" << process.Pid << std::endl;
+
+            int status = 0;
+            const auto waitResult = g_api->Wslc->WaitPid(Session->SessionId, static_cast<LONG>(process.Pid), 30000, &status);
+            g_logfile << "WSLC WaitPid result=" << waitResult << ", status=" << status << std::endl;
+
+            if (process.Stdin != INVALID_SOCKET)
+            {
+                closesocket(process.Stdin);
+            }
+            if (process.Stdout != INVALID_SOCKET)
+            {
+                closesocket(process.Stdout);
+            }
+            if (process.Stderr != INVALID_SOCKET)
+            {
+                closesocket(process.Stderr);
+            }
+            if (process.ExitEvent != nullptr)
+            {
+                CloseHandle(process.ExitEvent);
+            }
+        }
+
+        const auto unmountResult = g_api->Wslc->UnmountFolder(Session->SessionId, mountpoint);
+        g_logfile << "WSLC Folder unmounted, result=" << unmountResult << std::endl;
+    }
+
+    return S_OK;
+}
+
+HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectContainer)
+{
+    auto id = ExtractJsonStringField(InspectContainer, "Id");
+    g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << id << std::endl;
+    return S_OK;
+}
+
+HRESULT OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectImage)
+{
+    auto id = ExtractJsonStringField(InspectImage, "Id");
+    g_logfile << "WSLC Image created, session=" << Session->SessionId << ", id=" << id << std::endl;
+    return S_OK;
+}
+
+HRESULT OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectImage)
+{
+    auto id = ExtractJsonStringField(InspectImage, "Id");
+    g_logfile << "WSLC Image deleted, session=" << Session->SessionId << ", id=" << id << std::endl;
+    return S_OK;
+}
+
 EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPluginAPIV1* Api, WSLPluginHooksV1* Hooks)
 {
     try
@@ -349,7 +501,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::GetUsername));
+        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcContainerRejected));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;
@@ -359,6 +511,12 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         Hooks->OnDistributionStopping = &OnDistroStopping;
         Hooks->OnDistributionRegistered = &OnDistributionRegistered;
         Hooks->OnDistributionUnregistered = &OnDistributionUnregistered;
+        Hooks->OnSessionCreated = &OnWslcSessionCreated;
+        Hooks->OnSessionStopping = &OnWslcSessionStopping;
+        Hooks->ContainerStarted = &OnWslcContainerStarted;
+        Hooks->ContainerStopping = &OnWslcContainerStopping;
+        Hooks->ImageCreated = &OnWslcImageCreated;
+        Hooks->ImageDeleted = &OnWslcImageDeleted;
 
         if (g_testType == PluginTestType::FailToLoad)
         {

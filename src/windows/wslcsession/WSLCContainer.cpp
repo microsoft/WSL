@@ -738,6 +738,38 @@ void WSLCContainerImpl::Start(WSLCContainerStartFlags Flags, LPCSTR DetachKeys)
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
+    // Notify plugin manager (cross-process via the SYSTEM service) before finalizing state
+    // so the container can be cleanly torn down on rejection by letting the scope_exit guards
+    // unwind ports/volumes/init. Inspect inline because m_lock is already held exclusive.
+    auto* notifier = m_wslcSession.GetPluginNotifier();
+    if (notifier != nullptr)
+    {
+        std::string inspectJson;
+        try
+        {
+            auto dockerInspect = m_dockerClient.InspectContainer(m_id);
+            auto wslcInspect = BuildInspectContainer(dockerInspect);
+            inspectJson = wsl::shared::ToJson(wslcInspect);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            inspectJson = std::format("{{\"Id\":\"{}\"}}", m_id);
+        }
+
+        const auto rejectionResult = notifier->NotifyContainerStarted(inspectJson.c_str());
+        if (FAILED(rejectionResult))
+        {
+            LOG_HR_MSG(rejectionResult, "Plugin rejected container '%hs'; stopping it", m_id.c_str());
+            try
+            {
+                m_dockerClient.StopContainer(m_id, std::nullopt, std::nullopt);
+            }
+            CATCH_LOG();
+            THROW_HR(rejectionResult);
+        }
+    }
+
     portCleanup.release();
     volumeCleanup.release();
 
@@ -880,6 +912,27 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::OnStopped(std::optional<std::uint64_t> stopTimestamp)
 {
     unique_com_disconnect comWrapper;
+
+    // Notify plugin manager (best-effort) that the container is stopping. Errors are ignored.
+    auto* notifier = m_wslcSession.GetPluginNotifier();
+    if (notifier != nullptr && m_state == WslcContainerStateRunning)
+    {
+        std::string inspectJson;
+        try
+        {
+            // Inspect without re-acquiring m_lock (already held exclusive by caller).
+            auto dockerInspect = m_dockerClient.InspectContainer(m_id);
+            auto wslcInspect = BuildInspectContainer(dockerInspect);
+            inspectJson = wsl::shared::ToJson(wslcInspect);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            inspectJson = std::format("{{\"Id\":\"{}\"}}", m_id);
+        }
+
+        LOG_IF_FAILED(notifier->NotifyContainerStopping(inspectJson.c_str()));
+    }
 
     ReleaseProcesses();
     ReleaseRuntimeResources();

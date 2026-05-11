@@ -222,6 +222,7 @@ try
     m_id = Settings->SessionId;
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
     m_featureFlags = Settings->FeatureFlags;
+    m_pluginNotifier = Settings->PluginNotifier;
 
     // Get user token for the current process
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
@@ -603,6 +604,47 @@ void WSLCSession::StreamImageOperation(DockerHTTPClient::HTTPRequestContext& req
     }
 }
 
+void WSLCSession::NotifyImageCreatedByName(const std::string& ImageNameOrId) noexcept
+try
+{
+    if (!m_pluginNotifier || !m_dockerClient.has_value())
+    {
+        return;
+    }
+
+    std::string json;
+    try
+    {
+        auto dockerInspect = m_dockerClient->InspectImage(ImageNameOrId.c_str());
+        auto wslcInspect = ConvertInspectImage(dockerInspect);
+        json = wsl::shared::ToJson(wslcInspect);
+    }
+    catch (...)
+    {
+        // Best-effort: fall back to a minimal payload if inspect fails.
+        LOG_CAUGHT_EXCEPTION();
+        json = std::format("{{\"Id\":\"{}\"}}", ImageNameOrId);
+    }
+
+    LOG_IF_FAILED(m_pluginNotifier->NotifyImageCreated(json.c_str()));
+}
+CATCH_LOG()
+
+void WSLCSession::NotifyImageDeletedByName(const std::string& ImageNameOrId) noexcept
+try
+{
+    if (!m_pluginNotifier)
+    {
+        return;
+    }
+
+    // The image is gone (or about to be) so use a minimal JSON keyed by ID.
+    auto json = std::format("{{\"Id\":\"{}\"}}", ImageNameOrId);
+
+    LOG_IF_FAILED(m_pluginNotifier->NotifyImageDeleted(json.c_str()));
+}
+CATCH_LOG()
+
 HRESULT WSLCSession::PullImage(LPCSTR Image, LPCSTR RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
@@ -629,6 +671,8 @@ try
 
     auto requestContext = m_dockerClient->PullImage(repo, tagOrDigest, registryAuth);
     StreamImageOperation(*requestContext, Image, "Pull", ProgressCallback);
+
+    NotifyImageCreatedByName(Image);
 
     return S_OK;
 }
@@ -962,6 +1006,8 @@ try
     auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
+
+    // Note: image name is unknown for LoadImage; rely on docker events to trigger plugin notifications instead.
     return S_OK;
 }
 CATCH_RETURN();
@@ -987,6 +1033,8 @@ try
     auto requestContext = m_dockerClient->ImportImage(repo, tagOrDigest.value(), ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
+
+    NotifyImageCreatedByName(ImageName);
     return S_OK;
 }
 CATCH_RETURN();
@@ -1368,6 +1416,14 @@ try
 
     *Count = static_cast<ULONG>(deletedImages.size());
     *DeletedImages = output.release();
+
+    // Notify plugin manager of deleted images (best-effort).
+    for (size_t i = 0; i < deletedImages.size(); ++i)
+    {
+        const auto& image = deletedImages[i];
+        const auto& name = image.Deleted.empty() ? image.Untagged : image.Deleted;
+        NotifyImageDeletedByName(name);
+    }
 
     return S_OK;
 }

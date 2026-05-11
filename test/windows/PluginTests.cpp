@@ -16,10 +16,14 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslc.h"
+#include "WSLCContainerLauncher.h"
+#include "WSLCProcessLauncher.h"
 
 using namespace wsl::windows::common::registry;
 
 extern std::wstring g_testDistroPath;
+extern std::wstring g_testDataPath;
 
 class PluginTests
 {
@@ -592,6 +596,167 @@ class PluginTests
         StartWsl(0);
         ValidateLogFile(ExpectedOutput);
     }
+    static wil::com_ptr<IWSLCSessionManager> OpenWslcSessionManager()
+    {
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        return sessionManager;
+    }
+
+    static wil::com_ptr<IWSLCSession> CreateWslcSession(LPCWSTR Name, std::filesystem::path const& StoragePath)
+    {
+        WSLCSessionSettings settings{};
+        settings.DisplayName = Name;
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        const auto storagePathStr = StoragePath.wstring();
+        settings.StoragePath = storagePathStr.c_str();
+        settings.MaximumStorageSizeMb = 1024 * 20; // 20GB.
+        settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLCSessionStateRunning);
+
+        return session;
+    }
+
+    static void LoadDebianImage(IWSLCSession* session)
+    {
+        const auto imagePath = GetTestImagePath("debian:latest");
+        wil::unique_hfile imageFile{
+            CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!imageFile);
+
+        LARGE_INTEGER fileSize{};
+        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+
+        VERIFY_SUCCEEDED(session->LoadImage(wsl::windows::common::wslutil::ToCOMInputHandle(imageFile.get()), nullptr, fileSize.QuadPart));
+    }
+
+    WSL2_TEST_METHOD(WslcSuccess)
+    {
+        ConfigurePlugin(PluginTestType::WslcSuccess);
+
+        const auto storagePath = std::filesystem::current_path() / "wslc-plugin-storage";
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-test", storagePath);
+
+            LoadDebianImage(session.get());
+
+            // Run a container that exits quickly. Use the launcher to set up everything.
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-container", {"/bin/sh", "-c", "echo wslc-plugin-ok"});
+            {
+                auto container = launcher.Launch(*session, WSLCContainerStartFlagsAttach);
+                auto process = container.GetInitProcess();
+                const int exitCode = process.Wait(30 * 1000);
+                VERIFY_ARE_EQUAL(exitCode, 0);
+            }
+
+            // Delete the image so we get an ImageDeleted notification before the session goes away.
+            WSLCDeleteImageOptions options{.Image = "debian:latest", .Flags = WSLCDeleteImageFlagsForce};
+            wil::unique_cotaskmem_array_ptr<WSLCDeletedImageInformation> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+        }
+
+        // The expected output uses '*' wildcards for variable values. The container init
+        // exits via SIGTERM-ish signaling so the order of "Container stopping" relative to
+        // session shutdown is deterministic - it fires when Stop()/Delete() runs above.
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=18
+            WSLC Session created, name=plugin-wslc-test, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=*
+            WSLC Container started, session=*, id=*, image=debian:latest
+            WSLC Folder mounted at: /mnt/wsl-plugin/plugin-test-mount
+            WSLC Process created, pid=*
+            WSLC WaitPid result=0, status=0
+            WSLC Folder unmounted, result=0
+            WSLC Container stopping, session=*, id=*
+            WSLC Image deleted, session=*, id=*
+            WSLC Session stopping, name=plugin-wslc-test, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcSessionRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcSessionRejected);
+
+        const auto storagePath = std::filesystem::current_path() / "wslc-plugin-storage-rejected";
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+        });
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"plugin-wslc-rejected";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        const auto storagePathStr = storagePath.wstring();
+        settings.StoragePath = storagePathStr.c_str();
+        settings.MaximumStorageSizeMb = 1024 * 20;
+        settings.NetworkingMode = WSLCNetworkingModeVirtioProxy;
+
+        auto manager = OpenWslcSessionManager();
+        wil::com_ptr<IWSLCSession> session;
+        const auto hr = manager->CreateSession(&settings, WSLCSessionFlagsNone, &session);
+        VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=19
+            WSLC Session created, name=plugin-wslc-rejected, id=*, pid=*, token=set, sid=set
+            OnWslcSessionCreated: E_UNEXPECTED)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
+    WSL2_TEST_METHOD(WslcContainerRejected)
+    {
+        ConfigurePlugin(PluginTestType::WslcContainerRejected);
+
+        const auto storagePath = std::filesystem::current_path() / "wslc-plugin-storage-container-rejected";
+        auto storageCleanup = wil::scope_exit([&]() {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+        });
+
+        {
+            auto session = CreateWslcSession(L"plugin-wslc-container-rejected", storagePath);
+
+            LoadDebianImage(session.get());
+
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                "debian:latest", "wslc-plugin-rejected-container", {"/bin/sh", "-c", "echo nope"});
+
+            auto [hr, container] = launcher.LaunchNoThrow(*session, WSLCContainerStartFlagsAttach);
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+        constexpr auto ExpectedOutput =
+            LR"(Plugin loaded. TestMode=20
+            WSLC Session created, name=plugin-wslc-container-rejected, id=*, pid=*, token=set, sid=set
+            WSLC Image created, session=*, id=*
+            WSLC Container started, session=*, id=*, image=debian:latest
+            OnWslcContainerStarted: E_UNEXPECTED
+            WSLC Session stopping, name=plugin-wslc-container-rejected, id=*)";
+
+        ValidateLogFile(ExpectedOutput);
+    }
+
     // This test must run last so it doesn't break test cases that depends on plugin signature.
     WSL2_TEST_METHOD(InvalidPluginSignature)
     {

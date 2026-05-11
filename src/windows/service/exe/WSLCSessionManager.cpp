@@ -31,12 +31,17 @@ Abstract:
 #include "HcsVirtualMachine.h"
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
+#include "WSLCPluginNotifier.h"
+#include "PluginManager.h"
 #include "wslutil.h"
 #include "filesystem.hpp"
+
+extern std::optional<wsl::windows::service::PluginManager> g_pluginManager;
 
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::HcsVirtualMachine;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
+using wsl::windows::service::wslc::WSLCPluginNotifier;
 namespace wslutil = wsl::windows::common::wslutil;
 namespace settings = wsl::windows::wslc::settings;
 
@@ -123,9 +128,29 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
     std::lock_guard lock(m_wslcSessionsLock);
     for (auto& entry : m_sessions)
     {
+        FireSessionStoppingLocked(entry);
         LOG_IF_FAILED(entry.Ref->Terminate());
     }
 }
+
+void WSLCSessionManagerImpl::FireSessionStoppingLocked(SessionEntry& entry) noexcept
+try
+{
+    if (entry.StoppingNotified || !g_pluginManager.has_value())
+    {
+        return;
+    }
+
+    entry.StoppingNotified = true;
+    WSLCSessionInformation info{};
+    info.SessionId = static_cast<WSLCSessionId>(entry.SessionId);
+    info.DisplayName = entry.DisplayName.c_str();
+    info.ApplicationPid = entry.CreatorPid;
+    info.UserToken = entry.UserToken.get();
+    info.UserSid = entry.UserSid.empty() ? nullptr : entry.UserSid.data();
+    g_pluginManager->OnWslcSessionStopping(&info);
+}
+CATCH_LOG()
 
 void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, IWSLCSession** WslcSession)
 {
@@ -144,7 +169,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
     {
         THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, Settings->DisplayName == nullptr || wcslen(Settings->DisplayName) == 0);
         THROW_HR_IF(E_INVALIDARG, Settings->StoragePath != nullptr && wcslen(Settings->StoragePath) == 0);
-        THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, wcslen(Settings->DisplayName) >= std::size(WSLCSessionInformation{}.DisplayName));
+        THROW_HR_IF(WSLC_E_INVALID_SESSION_NAME, wcslen(Settings->DisplayName) >= std::size(WSLCSessionListEntry{}.DisplayName));
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             WI_IsAnyFlagSet(Settings->StorageFlags, ~WSLCSessionStorageFlagsValid),
@@ -208,6 +233,43 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
 
         const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
+        // Capture a duplicated user token + raw SID so PluginManager can build
+        // WSLCSessionInformation later (e.g. on shutdown) without re-impersonating.
+        wil::unique_handle storedUserToken;
+        THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
+            userToken.get(),
+            TOKEN_QUERY | TOKEN_DUPLICATE,
+            nullptr,
+            SecurityImpersonation,
+            TokenImpersonation,
+            &storedUserToken));
+
+        const DWORD sidLen = GetLengthSid(tokenInfo.TokenInfo->User.Sid);
+        std::vector<BYTE> storedSid(sidLen);
+        THROW_IF_WIN32_BOOL_FALSE(CopySid(sidLen, storedSid.data(), tokenInfo.TokenInfo->User.Sid));
+
+        // Build the plugin notifier service-side. Lifetime tracked via the SessionEntry.
+        Microsoft::WRL::ComPtr<IWSLCPluginNotifier> notifier;
+        if (g_pluginManager.has_value())
+        {
+            wil::unique_handle notifierToken;
+            THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
+                userToken.get(),
+                TOKEN_QUERY | TOKEN_DUPLICATE,
+                nullptr,
+                SecurityImpersonation,
+                TokenImpersonation,
+                &notifierToken));
+
+            notifier = wil::MakeOrThrow<WSLCPluginNotifier>(
+                g_pluginManager.value(),
+                sessionId,
+                creatorPid,
+                resolvedDisplayName,
+                std::move(notifierToken),
+                std::vector<BYTE>(storedSid));
+        }
+
         // Create the VM in the SYSTEM service (privileged).
         auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
 
@@ -216,19 +278,59 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         AddSessionProcessToJobObject(factory.get());
 
         // Create the session via the factory.
-        const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
+        auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings, resolvedDisplayName.c_str());
+        sessionSettings.PluginNotifier = notifier.Get();
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), &session, &serviceRef));
 
         // Track the session via its service ref, along with metadata and security info.
-        m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, resolvedDisplayName, std::move(tokenInfo)});
+        m_sessions.push_back(SessionEntry{
+            std::move(serviceRef),
+            sessionId,
+            creatorPid,
+            resolvedDisplayName,
+            std::move(tokenInfo),
+            notifier,
+            false,
+            std::move(storedUserToken),
+            std::move(storedSid)});
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
         if (persistent)
         {
             m_persistentSessions.emplace_back(sessionId, session);
+        }
+
+        // Notify plugins that the session was created. A failure here aborts session creation.
+        if (g_pluginManager.has_value())
+        {
+            try
+            {
+                auto& entry = m_sessions.back();
+                WSLCSessionInformation info{};
+                info.SessionId = static_cast<WSLCSessionId>(entry.SessionId);
+                info.DisplayName = entry.DisplayName.c_str();
+                info.ApplicationPid = entry.CreatorPid;
+                info.UserToken = entry.UserToken.get();
+                info.UserSid = entry.UserSid.data();
+                g_pluginManager->OnWslcSessionCreated(&info);
+            }
+            catch (...)
+            {
+                const auto error = wil::ResultFromCaughtException();
+
+                // Plugin rejected the session: tear it down before propagating.
+                m_sessions.back().StoppingNotified = true; // Don't fire stopping for a session that never started successfully.
+                LOG_IF_FAILED(m_sessions.back().Ref->Terminate());
+                m_sessions.pop_back();
+
+                auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == sessionId; });
+                m_persistentSessions.erase(remove.begin(), remove.end());
+
+                THROW_HR(error);
+            }
         }
 
         *WslcSession = session.detach();
@@ -297,9 +399,9 @@ void WSLCSessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLCSession
     THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%ls' not found", DisplayName);
 }
 
-void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount)
+void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
 {
-    std::vector<WSLCSessionInformation> sessionInfo;
+    std::vector<WSLCSessionListEntry> sessionInfo;
 
     ForEachSession<void>([&](auto& entry, const auto&) noexcept {
         try
@@ -307,15 +409,15 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionInformation** Session
             wil::unique_hlocal_string sidString;
             THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString));
 
-            auto& it = sessionInfo.emplace_back(WSLCSessionInformation{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
+            auto& it = sessionInfo.emplace_back(WSLCSessionListEntry{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
             wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
             wcscpy_s(it.DisplayName, _countof(it.DisplayName), entry.DisplayName.c_str());
         }
         CATCH_LOG()
     });
 
-    auto output = wil::make_unique_cotaskmem<WSLCSessionInformation[]>(sessionInfo.size());
-    memcpy(output.get(), sessionInfo.data(), sessionInfo.size() * sizeof(WSLCSessionInformation));
+    auto output = wil::make_unique_cotaskmem<WSLCSessionListEntry[]>(sessionInfo.size());
+    memcpy(output.get(), sessionInfo.data(), sessionInfo.size() * sizeof(WSLCSessionListEntry));
 
     *Sessions = output.release();
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
@@ -487,7 +589,7 @@ HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR 
     return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WslcSession);
 }
 
-HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionInformation** Sessions, _Out_ ULONG* SessionsCount)
+HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
 {
     return CallImpl(&WSLCSessionManagerImpl::ListSessions, Sessions, SessionsCount);
 }
@@ -501,3 +603,69 @@ HRESULT WSLCSessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IW
 {
     return CallImpl(&WSLCSessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }
+
+namespace {
+// Global accessor used by PluginManager / WSLCPluginNotifier to resolve sessions.
+// Owned by WSLCSessionManagerFactory.
+std::atomic<wsl::windows::service::wslc::WSLCSessionManagerImpl*> g_managerInstance{nullptr};
+} // namespace
+
+namespace wsl::windows::service::wslc {
+
+WSLCSessionManagerImpl* WSLCSessionManagerImpl::Instance() noexcept
+{
+    return g_managerInstance.load();
+}
+
+void WSLCSessionManagerImpl::SetInstance(WSLCSessionManagerImpl* Instance) noexcept
+{
+    g_managerInstance.store(Instance);
+}
+
+std::optional<WSLCSessionManagerImpl::ResolvedSession> WSLCSessionManagerImpl::FindSession(ULONG Id)
+{
+    std::optional<ResolvedSession> resolved;
+
+    ForEachSession<HRESULT>([&](SessionEntry& entry, const wil::com_ptr<IWSLCSession>& session) noexcept -> std::optional<HRESULT> {
+        if (entry.SessionId != Id)
+        {
+            return std::nullopt;
+        }
+
+        try
+        {
+            ResolvedSession r;
+            r.Session = session;
+            r.SessionId = entry.SessionId;
+            r.CreatorPid = entry.CreatorPid;
+            r.DisplayName = entry.DisplayName;
+            r.UserSid = entry.UserSid;
+
+            // Duplicate the user token so the resolved session has an independent handle.
+            wil::unique_handle dup;
+            if (entry.UserToken.is_valid())
+            {
+                THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
+                    entry.UserToken.get(),
+                    TOKEN_QUERY | TOKEN_DUPLICATE,
+                    nullptr,
+                    SecurityImpersonation,
+                    TokenImpersonation,
+                    &dup));
+            }
+            r.UserToken = std::move(dup);
+
+            resolved.emplace(std::move(r));
+            return S_OK; // stops iteration
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            return wil::ResultFromCaughtException();
+        }
+    });
+
+    return resolved;
+}
+
+} // namespace wsl::windows::service::wslc

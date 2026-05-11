@@ -17,6 +17,7 @@ Abstract:
 #include "PluginManager.h"
 #include "WslPluginApi.h"
 #include "LxssUserSessionFactory.h"
+#include "WSLCSessionManager.h"
 
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
@@ -99,7 +100,226 @@ try
 CATCH_RETURN();
 }
 
-static constexpr WSLPluginAPIV1 ApiV1 = {Version, &MountFolder, &ExecuteBinary, &PluginError, &ExecuteBinaryInDistribution};
+namespace {
+
+// Tracks WSLC processes created by plugins via WSLCPluginAPI_CreateProcess so that
+// the corresponding WSLCPluginAPI_WaitPid call can resolve them by (session, pid).
+struct WslcProcessKey
+{
+    ::WSLCSessionId Session;
+    LONG Pid;
+    auto operator<=>(const WslcProcessKey&) const = default;
+};
+
+std::mutex g_wslcProcessesMutex;
+std::map<WslcProcessKey, wil::com_ptr<IWSLCProcess>> g_wslcProcesses;
+
+std::optional<wsl::windows::service::wslc::WSLCSessionManagerImpl::ResolvedSession> ResolveWslcSession(WSLCSessionId Session)
+{
+    auto* mgr = wsl::windows::service::wslc::WSLCSessionManagerImpl::Instance();
+    if (mgr == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    return mgr->FindSession(static_cast<ULONG>(Session));
+}
+
+} // namespace
+
+extern "C" {
+
+HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, BOOL ReadOnly, LPCWSTR Name, LPWSTR Mountpoint)
+try
+{
+    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Name == nullptr || Mountpoint == nullptr);
+
+    auto resolved = ResolveWslcSession(Session);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !resolved.has_value());
+
+    // Mount the folder under /mnt/wsl-plugin/<Name>. Convert Name to UTF-8 for the Linux path.
+    const auto nameUtf8 = wsl::shared::string::WideToMultiByte(Name);
+    const auto linuxPath = std::format("/mnt/wsl-plugin/{}", nameUtf8);
+
+    auto result = resolved->Session->MountWindowsFolder(WindowsPath, linuxPath.c_str(), ReadOnly);
+
+    WSL_LOG(
+        "WslcPluginMountFolderCall",
+        TraceLoggingValue(WindowsPath, "WindowsPath"),
+        TraceLoggingValue(linuxPath.c_str(), "LinuxPath"),
+        TraceLoggingValue(ReadOnly, "ReadOnly"),
+        TraceLoggingValue(Name, "Name"),
+        TraceLoggingValue(result, "Result"));
+
+    if (SUCCEEDED(result))
+    {
+        const auto wideLinuxPath = wsl::shared::string::MultiByteToWide(linuxPath);
+        wcsncpy_s(Mountpoint, 256, wideLinuxPath.c_str(), _TRUNCATE);
+    }
+
+    return result;
+}
+CATCH_RETURN();
+
+HRESULT WSLCUnmountFolder(WSLCSessionId Session, LPCWSTR Mountpoint)
+try
+{
+    RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
+
+    auto resolved = ResolveWslcSession(Session);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !resolved.has_value());
+
+    const auto mountpointUtf8 = wsl::shared::string::WideToMultiByte(Mountpoint);
+    auto result = resolved->Session->UnmountWindowsFolder(mountpointUtf8.c_str());
+
+    WSL_LOG(
+        "WslcPluginUnmountFolderCall",
+        TraceLoggingValue(Mountpoint, "Mountpoint"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
+
+HRESULT WSLCCreateProcess(WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcess* Process)
+try
+{
+    RETURN_HR_IF(E_POINTER, Executable == nullptr || Process == nullptr);
+
+    auto resolved = ResolveWslcSession(Session);
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !resolved.has_value());
+
+    // Count NULL-terminated arrays.
+    auto countArray = [](LPCSTR* arr) -> ULONG {
+        if (arr == nullptr)
+        {
+            return 0;
+        }
+        ULONG count = 0;
+        while (arr[count] != nullptr)
+        {
+            ++count;
+        }
+        return count;
+    };
+
+    WSLCProcessOptions options{};
+    options.CommandLine.Values = Arguments;
+    options.CommandLine.Count = countArray(Arguments);
+    options.Environment.Values = Env;
+    options.Environment.Count = countArray(Env);
+
+    wil::com_ptr<IWSLCProcess> process;
+    int errnoValue = 0;
+    auto result = resolved->Session->CreateRootNamespaceProcess(Executable, &options, &process, &errnoValue);
+    if (FAILED(result))
+    {
+        WSL_LOG(
+            "WslcPluginCreateProcessCall",
+            TraceLoggingValue(Executable, "Executable"),
+            TraceLoggingValue(result, "Result"),
+            TraceLoggingValue(errnoValue, "Errno"));
+        return result;
+    }
+
+    int pid = 0;
+    THROW_IF_FAILED(process->GetPid(&pid));
+
+    // Retrieve std handles + exit event. Each must be SOCKET-typed by the plugin contract.
+    auto getSocket = [&](WSLCFD fd, SOCKET& out) -> HRESULT {
+        WSLCHandle handle{};
+        RETURN_IF_FAILED(process->GetStdHandle(fd, &handle));
+        if (handle.Type != WSLCHandleTypeSocket)
+        {
+            return E_UNEXPECTED;
+        }
+        out = reinterpret_cast<SOCKET>(handle.Handle.Socket);
+        return S_OK;
+    };
+
+    SOCKET stdinSock = INVALID_SOCKET;
+    SOCKET stdoutSock = INVALID_SOCKET;
+    SOCKET stderrSock = INVALID_SOCKET;
+    HANDLE exitEvent = nullptr;
+    THROW_IF_FAILED(getSocket(WSLCFDStdin, stdinSock));
+    THROW_IF_FAILED(getSocket(WSLCFDStdout, stdoutSock));
+    THROW_IF_FAILED(getSocket(WSLCFDStderr, stderrSock));
+    THROW_IF_FAILED(process->GetExitEvent(&exitEvent));
+
+    {
+        std::lock_guard lock(g_wslcProcessesMutex);
+        g_wslcProcesses[{Session, pid}] = process;
+    }
+
+    Process->Pid = static_cast<ULONG>(pid);
+    Process->Stdin = stdinSock;
+    Process->Stdout = stdoutSock;
+    Process->Stderr = stderrSock;
+    Process->ExitEvent = exitEvent;
+
+    WSL_LOG(
+        "WslcPluginCreateProcessCall",
+        TraceLoggingValue(Executable, "Executable"),
+        TraceLoggingValue(pid, "Pid"),
+        TraceLoggingValue(S_OK, "Result"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLCWaitPid(WSLCSessionId Session, LONG Pid, ULONGLONG Timeout, int* Status)
+try
+{
+    RETURN_HR_IF(E_POINTER, Status == nullptr);
+
+    wil::com_ptr<IWSLCProcess> process;
+    {
+        std::lock_guard lock(g_wslcProcessesMutex);
+        auto it = g_wslcProcesses.find({Session, Pid});
+        if (it == g_wslcProcesses.end())
+        {
+            return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        }
+        process = it->second;
+    }
+
+    wil::unique_handle exitEvent;
+    THROW_IF_FAILED(process->GetExitEvent(exitEvent.put()));
+
+    const DWORD timeoutMs = (Timeout == 0 || Timeout > MAXDWORD) ? INFINITE : static_cast<DWORD>(Timeout);
+    const auto waitResult = WaitForSingleObject(exitEvent.get(), timeoutMs);
+    if (waitResult == WAIT_TIMEOUT)
+    {
+        WSL_LOG("WslcPluginWaitPidCall", TraceLoggingValue(Pid, "Pid"), TraceLoggingValue(HRESULT_FROM_WIN32(WAIT_TIMEOUT), "Result"));
+        return HRESULT_FROM_WIN32(WAIT_TIMEOUT);
+    }
+    THROW_LAST_ERROR_IF(waitResult != WAIT_OBJECT_0);
+
+    WSLCProcessState state{};
+    int code = 0;
+    THROW_IF_FAILED(process->GetState(&state, &code));
+    *Status = code;
+
+    {
+        std::lock_guard lock(g_wslcProcessesMutex);
+        g_wslcProcesses.erase({Session, Pid});
+    }
+
+    WSL_LOG(
+        "WslcPluginWaitPidCall",
+        TraceLoggingValue(Pid, "Pid"),
+        TraceLoggingValue(code, "Status"),
+        TraceLoggingValue(S_OK, "Result"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+} // extern "C"
+
+static constexpr WSLCPluginAPIV1 WslcApiV1 = {&WSLCMountFolder, &WSLCUnmountFolder, &WSLCCreateProcess, &WSLCWaitPid};
+
+static constexpr WSLPluginAPIV1 ApiV1 = {Version, &MountFolder, &ExecuteBinary, &PluginError, &ExecuteBinaryInDistribution, &WslcApiV1};
 
 void PluginManager::LoadPlugins()
 {
@@ -320,5 +540,130 @@ void PluginManager::ThrowIfFatalPluginError() const
     else
     {
         THROW_HR_WITH_USER_ERROR(m_pluginError->error, wsl::shared::Localization::MessageFatalPluginError(m_pluginError->plugin));
+    }
+}
+
+void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.OnSessionCreated != nullptr)
+        {
+            WSL_LOG(
+                "PluginOnWslcSessionCreatedCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"),
+                TraceLoggingValue(Session->DisplayName, "DisplayName"));
+
+            const auto result = e.hooks.OnSessionCreated(Session);
+            // Reuse ThrowIfPluginError for the user-error / fatal-error semantics.
+            // SessionId on the WSL plugin error path expects WSLSessionId; reuse 0 since this is a WSLC session.
+            ThrowIfPluginError(result, 0, e.name.c_str());
+        }
+    }
+}
+
+void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session) const
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.OnSessionStopping != nullptr)
+        {
+            WSL_LOG(
+                "PluginOnWslcSessionStoppingCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"));
+
+            const auto result = e.hooks.OnSessionStopping(Session);
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
+    }
+}
+
+HRESULT PluginManager::OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+try
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.ContainerStarted != nullptr)
+        {
+            WSL_LOG(
+                "PluginOnWslcContainerStartedCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"));
+
+            // Failure here aborts the container creation. Surface the first error.
+            const auto result = e.hooks.ContainerStarted(Session, InspectJson);
+            if (FAILED(result))
+            {
+                LOG_HR_MSG(result, "Plugin '%ls' rejected container creation", e.name.c_str());
+                return result;
+            }
+        }
+    }
+    return S_OK;
+}
+CATCH_RETURN()
+
+void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.ContainerStopping != nullptr)
+        {
+            WSL_LOG(
+                "PluginOnWslcContainerStoppingCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"));
+
+            const auto result = e.hooks.ContainerStopping(Session, InspectJson);
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
+    }
+}
+
+void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.ImageCreated != nullptr)
+        {
+            WSL_LOG(
+                "PluginOnWslcImageCreatedCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"));
+
+            const auto result = e.hooks.ImageCreated(Session, InspectJson);
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
+    }
+}
+
+void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+{
+    ExecutionContext context(Context::Plugin);
+
+    for (const auto& e : m_plugins)
+    {
+        if (e.hooks.ImageDeleted != nullptr)
+        {
+            WSL_LOG(
+                "PluginOnWslcImageDeletedCall",
+                TraceLoggingValue(e.name.c_str(), "Plugin"),
+                TraceLoggingValue(Session->SessionId, "SessionId"));
+
+            const auto result = e.hooks.ImageDeleted(Session, InspectJson);
+            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+        }
     }
 }

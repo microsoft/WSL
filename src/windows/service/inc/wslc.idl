@@ -117,6 +117,32 @@ interface IProgressCallback : IUnknown
     HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
 
+//
+// IWSLCPluginNotifier - Callback from the per-user WSLC session into the SYSTEM service
+// for plugin-related events that originate inside the per-user process.
+// SYSTEM service implements this and dispatches to PluginManager.
+//
+[
+    uuid(F3E6D5B2-1D40-4E8B-9C39-7A45D1C0F8A2),
+    pointer_default(unique),
+    object
+]
+interface IWSLCPluginNotifier : IUnknown
+{
+    // 'InspectJson' follows the wslc_schema::InspectContainer format.
+    // Returning failure prevents the container creation.
+    HRESULT NotifyContainerStarted([in] LPCSTR InspectJson);
+
+    // Called when a container is about to stop. Errors are logged but ignored.
+    HRESULT NotifyContainerStopping([in] LPCSTR InspectJson);
+
+    // 'InspectJson' follows the wslc_schema::InspectImage format. Errors are logged but ignored.
+    HRESULT NotifyImageCreated([in] LPCSTR InspectJson);
+
+    // Called when an image is deleted. Errors are logged but ignored.
+    HRESULT NotifyImageDeleted([in] LPCSTR InspectJson);
+};
+
 typedef struct _WSLCImageInformation
 {
     char Image[WSLC_MAX_IMAGE_NAME_LENGTH + 1];
@@ -691,6 +717,9 @@ typedef struct _WSLCSessionInitSettings
     WSLCNetworkingMode NetworkingMode;
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
+    // Optional notifier used by the per-user process to forward plugin-related events
+    // (container started/stopped, image created/deleted) back to the SYSTEM service.
+    [unique] IWSLCPluginNotifier* PluginNotifier;
 } WSLCSessionInitSettings;
 
 [
@@ -809,13 +838,13 @@ interface IWSLCSessionFactory : IUnknown
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 }
 
-typedef struct _WSLCSessionInformation
+typedef struct _WSLCSessionListEntry
 {
     ULONG SessionId;
     DWORD CreatorPid;
     wchar_t DisplayName[256];
     wchar_t Sid[256 + 1]; // MAX_SID_SIZE = 256
-} WSLCSessionInformation;
+} WSLCSessionListEntry;
 
 typedef enum _WSLCSessionFlags
 {
@@ -840,7 +869,7 @@ interface IWSLCSessionManager : IUnknown
     // Session management.
     HRESULT CreateSession([in, unique] const WSLCSessionSettings* Settings, WSLCSessionFlags Flags, [out] IWSLCSession** Session);
     HRESULT EnterSession([in, ref] LPCWSTR DisplayName, [in, ref] LPCWSTR StoragePath, [out] IWSLCSession** Session);
-    HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLCSessionInformation** Sessions, [out] ULONG* SessionsCount);
+    HRESULT ListSessions([out, size_is(, *SessionsCount)] WSLCSessionListEntry** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLCSession** Session);
     HRESULT OpenSessionByName([in, unique] LPCWSTR DisplayName, [out] IWSLCSession** Session);
 }
