@@ -368,7 +368,7 @@ std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
     {
         if (const auto dot = normalized.find('.', tPos + 1); dot != std::string::npos)
         {
-            const auto tzStart = normalized.find_first_of("Z+-", dot);
+            const auto tzStart = normalized.find_first_of("Z+-", dot + 1);
             normalized.erase(dot, (tzStart == std::string::npos) ? std::string::npos : tzStart - dot);
         }
     }
