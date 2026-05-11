@@ -362,8 +362,19 @@ DockerNetworkMode ParseDockerNetworkMode(const std::string& mode)
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
 {
     // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
+    // We only need epoch seconds, so strip the optional fractional component before parsing.
+    std::string normalized = timestamp;
+    if (const auto tPos = normalized.find('T'); tPos != std::string::npos)
+    {
+        if (const auto dot = normalized.find('.', tPos + 1); dot != std::string::npos)
+        {
+            const auto tzStart = normalized.find_first_of("Z+-", dot);
+            normalized.erase(dot, (tzStart == std::string::npos) ? std::string::npos : tzStart - dot);
+        }
+    }
+
     std::chrono::sys_seconds utcSeconds;
-    std::istringstream stream(timestamp);
+    std::istringstream stream(normalized);
     stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
     THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
 
