@@ -2461,6 +2461,12 @@ Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stron�
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Zarządzaj poświadczeniami rejestru, w tym logowaniem i wylogowywaniem z rejestrów kontenerów.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Oznacz obraz.</value>
   </data>
