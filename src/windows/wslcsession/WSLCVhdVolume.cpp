@@ -136,11 +136,8 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
     auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });
 
-    // Owner is baked into the ext4 root inode at format time via -E root_owner
-    // so a non-root container user can write to the volume without any
-    // post-mount chown step. For a fresh filesystem the root inode is the
-    // only user-visible inode, so this is sufficient: anything the container
-    // later creates inherits its own uid/gid.
+    // Ownership is baked into the ext4 root inode at format time so the
+    // container user can write without a post-mount chown.
     VirtualMachine.Ext4Format(device, opts.Uid, opts.Gid);
 
     auto virtualMachinePath = std::format("/mnt/wslc-volumes/{}", name);

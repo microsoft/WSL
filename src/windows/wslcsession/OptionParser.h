@@ -34,34 +34,27 @@ class OptionParser
 public:
     NON_COPYABLE(OptionParser);
 
-    // The supplied options map must outlive this OptionParser. Required/Optional/
-    // OptionalBool return parsed values by value; only Find() (used internally)
-    // returns a pointer into the map.
+    // Options map must outlive this OptionParser.
     explicit OptionParser(const std::map<std::string, std::string>& Options) noexcept;
 
-    // Parses a required unsigned integer value. Throws E_INVALIDARG with
-    // MessageWslcMissingVolumeOption if Key is absent, or
-    // MessageWslcInvalidVolumeOption if the value is empty, has a leading
-    // sign, contains non-digit characters, overflows, or exceeds Max.
+    // Required unsigned integer. Throws E_INVALIDARG if missing, empty,
+    // signed, non-decimal, overflows, or > Max.
     template <typename T>
     T Required(std::string_view Key, T Max = (std::numeric_limits<T>::max)());
 
-    // Same validation as Required, but returns nullopt when the key is absent.
+    // As Required, but returns nullopt when the key is absent.
     template <typename T>
     std::optional<T> Optional(std::string_view Key, T Max = (std::numeric_limits<T>::max)());
 
-    // Parses an optional boolean using wsl::shared::string::ParseBool semantics
-    // (accepts "0"/"1"/"true"/"false", case-insensitive). Throws on unknown
-    // values; returns nullopt when the key is absent.
+    // Parses an optional boolean via wsl::shared::string::ParseBool
+    // ("0"/"1"/"true"/"false", case-insensitive). Throws on unknown values.
     std::optional<bool> OptionalBool(std::string_view Key);
 
-    // Throws E_INVALIDARG with MessageWslcInvalidVolumeOption on the first
-    // option that was supplied but never consumed by Required/Optional/etc.
+    // Throws E_INVALIDARG on the first option that was supplied but never consumed.
     void RejectUnknown();
 
 private:
-    // Returns a pointer to the value for Key (or nullptr if absent) and marks
-    // the key as consumed.
+    // Returns the value for Key (nullptr if absent) and marks it consumed.
     const std::string* Find(std::string_view Key);
 
     [[noreturn]] static void ThrowInvalid(std::string_view Key, const std::string& Value);
@@ -103,11 +96,8 @@ inline T OptionParser::ParseUnsignedValue(std::string_view Key, const std::strin
 {
     static_assert(std::is_unsigned_v<T>, "OptionParser numeric accessors only support unsigned integer types");
 
-    // ToUInt64 (which wraps strtoull) interprets a leading '-' as wraparound
-    // (e.g. "-1" parses to ULLONG_MAX) and silently accepts a leading '+'.
-    // Reject either explicit sign and empty input up-front so signed/empty
-    // options are reported as user errors instead of producing surprising
-    // unsigned values.
+    // strtoull treats a leading '-' as unsigned wraparound and accepts '+';
+    // reject both (and empty input) up-front.
     if (Value.empty() || Value.front() == '-' || Value.front() == '+')
     {
         ThrowInvalid(Key, Value);
@@ -116,8 +106,7 @@ inline T OptionParser::ParseUnsignedValue(std::string_view Key, const std::strin
     errno = 0;
     char* end = nullptr;
     const auto parsed = wsl::shared::string::ToUInt64(Value.c_str(), &end, 10);
-    // Capture errno immediately so any subsequent call (debug allocators,
-    // logging hooks, etc.) cannot stomp on it before we inspect it.
+    // Capture errno immediately so debug allocators/logging hooks can't stomp it.
     const int parseErrno = errno;
     if (parseErrno != 0 || end == nullptr || *end != '\0' || parsed > static_cast<uint64_t>(Max))
     {

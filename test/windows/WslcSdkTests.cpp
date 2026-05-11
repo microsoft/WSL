@@ -2001,9 +2001,7 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
 
-        // Positive: fixed-allocation VHD must produce a .vhdx whose on-disk size
-        // is at least the requested SizeBytes (dynamic VHDs are typically much
-        // smaller until populated).
+        // Positive: fixed-allocation VHD; on-disk file size must be >= SizeBytes.
         {
             constexpr auto c_fixedVolumeName = "wslc-sdk-vhd-fixed";
             constexpr auto c_fixedSizeBytes = 64ull * _1MB;

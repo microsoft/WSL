@@ -481,13 +481,8 @@ void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uin
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
 
-    // -E root_owner=UID:GID sets the ownership of the root inode at format
-    // time, so a non-root container can write to the volume without us having
-    // to spawn a separate chown helper after mount. ext4 has no uid/gid mount
-    // option, so on-disk inode ownership is the only persistent knob.
-    // Uid and Gid must be supplied together; callers in the named-volume
-    // driver enforce this at parse time, this assert catches future callers
-    // that bypass that path.
+    // Uid/Gid must be paired; the named-volume parser enforces this for user
+    // input — this catches future internal callers that bypass it.
     WI_ASSERT(Uid.has_value() == Gid.has_value());
 
     std::vector<std::string> args = {mkfsPath};

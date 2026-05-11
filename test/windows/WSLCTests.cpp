@@ -4143,9 +4143,7 @@ class WSLCTests
         WSLCDriverOption negGid[] = {{"SizeBytes", "1073741824"}, {"Uid", "0"}, {"Gid", "-1"}};
         validateInvalidOptionsFailure(negGid, ARRAYSIZE(negGid), E_INVALIDARG, L"Invalid value for option 'Gid': '-1'");
 
-        // Uid without Gid (or vice versa) is rejected: chown semantics for
-        // 'foo' vs ':foo' differ and silently leaving one side as the mkfs
-        // default (root) is a footgun.
+        // Uid without Gid (or vice versa) is rejected.
         WSLCDriverOption uidOnly[] = {{"SizeBytes", "1073741824"}, {"Uid", "1000"}};
         validateInvalidOptionsFailure(uidOnly, ARRAYSIZE(uidOnly), E_INVALIDARG, L"Missing required option: 'Gid'");
 
@@ -4160,8 +4158,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(NamedVolumesVhdOwnership)
     {
-        // Verify that Uid/Gid driver options are baked into the volume root inode
-        // at mkfs time, allowing a non-root container user to read/write the volume.
+        // Verify Uid/Gid are baked into the root inode at mkfs time so a
+        // non-root container user can write to the volume.
         const std::string volumeName = "wslc-test-vhd-ownership";
 
         LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
@@ -4205,9 +4203,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(NamedVolumesVhdFixed)
     {
-        // Verify that Fixed=true creates a fixed-allocation VHD: the .vhdx file
-        // size on disk should be at least the requested SizeBytes (it includes a
-        // small metadata header beyond the raw payload).
+        // Fixed=true produces a .vhdx whose on-disk size is at least SizeBytes.
         const std::string volumeName = "wslc-test-vhd-fixed";
         const std::filesystem::path volumeVhdPath = m_storagePath / "volumes" / (volumeName + ".vhdx");
         constexpr ULONGLONG c_sizeBytes = 64 * _1MB;

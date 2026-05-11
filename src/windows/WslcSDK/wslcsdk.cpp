@@ -498,10 +498,8 @@ try
     constexpr WslcVhdRequirementsFlags c_knownFlags = WSLC_VHD_REQ_FLAG_OWNER;
     RETURN_HR_IF(E_INVALIDARG, (options->flags & ~c_knownFlags) != WSLC_VHD_REQ_FLAG_NONE);
 
-    // uid/gid are documented as "honored iff their flag is set", so materialize
-    // their strings only inside the flag-guarded block below. Holders live at
-    // function scope so the c_str() pointers stored in driverOpts stay valid
-    // through CreateVolume.
+    // Hold uid/gid strings at function scope so the c_str() pointers stored
+    // in driverOpts stay valid through CreateVolume.
     const auto sizeStr = std::to_string(options->sizeBytes);
     std::string uidStr;
     std::string gidStr;
@@ -560,9 +558,8 @@ try
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
         RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
 
-        // Owner driver options are only honored on named volumes
-        // (WslcCreateSessionVhdVolume). Reject them here so callers don't
-        // mistakenly believe they applied to the session rootfs VHD.
+        // Owner is only honored on named volumes; reject here so callers can't
+        // mistakenly believe it applied to the session rootfs VHD.
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->flags != WSLC_VHD_REQ_FLAG_NONE);
 
         internalType->vhdRequirements = *vhdRequirements;
