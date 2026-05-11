@@ -238,7 +238,8 @@ typedef enum _WSLCContainerNetworkType
     WSLCContainerNetworkTypeNone = 0,
     WSLCContainerNetworkTypeHost = 1,
     WSLCContainerNetworkTypeBridged = 2,
-    WSLCContainerNetworkTypeCustom = 3
+    WSLCContainerNetworkTypeCustom = 3,
+    WSLCContainerNetworkTypeContainer = 4 // Share network namespace with an existing container (container:<name|id>).
 } WSLCContainerNetworkType;
 
 typedef struct _WSLCNetworkAttachment
