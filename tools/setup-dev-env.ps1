@@ -55,6 +55,12 @@ else
 }
 
 $configPath = Join-Path $configDir $configFile
+if (-not (Test-Path -LiteralPath $configPath -PathType Leaf))
+{
+    Write-Host "Configuration file not found: $configPath" -ForegroundColor Red
+    Write-Host "Ensure the repository is fully checked out and the .config folder contains $configFile." -ForegroundColor Yellow
+    exit 1
+}
 
 # ── Run WinGet Configuration ────────────────────────────────────────
 Write-Host ""
@@ -72,7 +78,7 @@ if ($LASTEXITCODE -ne 0)
 winget configure -f "$configPath" --accept-configuration-agreements
 if ($LASTEXITCODE -ne 0)
 {
-    Write-Host "Failed to apply WinGet configuration file: $configFile" -ForegroundColor Red
+    Write-Host "Failed to apply WinGet configuration file: $configPath" -ForegroundColor Red
     exit 1
 }
 

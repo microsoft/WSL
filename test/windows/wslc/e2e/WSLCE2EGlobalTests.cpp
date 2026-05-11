@@ -83,7 +83,7 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the admin session name
-        result = RunWslc(L"session list", ElevationType::Elevated);
+        result = RunWslc(L"system session list", ElevationType::Elevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.Stdout.has_value());
@@ -98,7 +98,7 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the non-admin session name
-        result = RunWslc(L"session list", ElevationType::NonElevated);
+        result = RunWslc(L"system session list", ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         VERIFY_IS_TRUE(result.Stdout.has_value());
@@ -244,17 +244,17 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the admin session name
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(adminName) != std::wstring::npos);
 
         // Terminate the session
-        result = RunWslc(L"session terminate");
+        result = RunWslc(L"system session terminate");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(adminName) != std::wstring::npos);
@@ -266,17 +266,17 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the non-elevated session name
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(nonAdminName + L"\r\n") != std::wstring::npos);
 
         // Terminate the session
-        result = RunWslc(L"session terminate", ElevationType::NonElevated);
+        result = RunWslc(L"system session terminate", ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(nonAdminName + L"\r\n") != std::wstring::npos);
@@ -292,17 +292,17 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the admin session name
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(adminName) != std::wstring::npos);
 
         // Terminate the session
-        result = RunWslc(std::format(L"session terminate {}", adminName));
+        result = RunWslc(std::format(L"system session terminate {}", adminName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(adminName) != std::wstring::npos);
@@ -314,17 +314,17 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows the non-elevated session name
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(nonAdminName + L"\r\n") != std::wstring::npos);
 
         // Terminate the session
-        result = RunWslc(std::format(L"session terminate {}", nonAdminName), ElevationType::NonElevated);
+        result = RunWslc(std::format(L"system session terminate {}", nonAdminName), ElevationType::NonElevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session no longer shows up
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(nonAdminName + L"\r\n") != std::wstring::npos);
@@ -342,22 +342,22 @@ class WSLCE2EGlobalTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify session list shows both sessions.
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_TRUE(result.Stdout->find(adminName) != std::wstring::npos);
         VERIFY_IS_TRUE(result.Stdout->find(nonAdminName + L"\r\n") != std::wstring::npos);
 
         // Attempt to terminate the admin session from the non-elevated process and fail.
-        result = RunWslc(std::format(L"session terminate {}", adminName), ElevationType::NonElevated);
+        result = RunWslc(std::format(L"system session terminate {}", adminName), ElevationType::NonElevated);
         result.Verify({.Stderr = L"The requested operation requires elevation. \r\nError code: ERROR_ELEVATION_REQUIRED\r\n", .ExitCode = 1});
 
         // Terminate the non-elevated session from the elevated process.
-        result = RunWslc(std::format(L"session terminate {}", nonAdminName), ElevationType::Elevated);
+        result = RunWslc(std::format(L"system session terminate {}", nonAdminName), ElevationType::Elevated);
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify non-elevated session no longer shows up
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
         VERIFY_IS_TRUE(result.Stdout.has_value());
         VERIFY_IS_FALSE(result.Stdout->find(nonAdminName + L"\r\n") != std::wstring::npos);
@@ -382,7 +382,7 @@ class WSLCE2EGlobalTests
         result.Verify({.Stdout = L"", .Stderr = L"Element not found. \r\nError code: ERROR_NOT_FOUND\r\n", .ExitCode = 1});
 
         // Verify session list
-        result = RunWslc(L"session list");
+        result = RunWslc(L"system session list");
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         // Verify there is a session with the name of the test session in the session list output.
@@ -419,7 +419,7 @@ class WSLCE2EGlobalTests
             Log::Comment(L"Testing elevated interactive session");
             // Session shell should attach to the correct default session.
             // Test should be elevated, therefore this should be the admin session.
-            auto session = RunWslcInteractive(L"session shell");
+            auto session = RunWslcInteractive(L"system session shell");
             VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
             session.ExpectStdout(VT::SESSION_PROMPT);
@@ -444,7 +444,7 @@ class WSLCE2EGlobalTests
             Log::Comment(L"Testing non-elevated interactive session with explicit session name");
             // Non-Elevated session shell should attach to the wslc by name also.
             auto nonAdminName = GetExpectedDefaultSessionName(false);
-            auto session = RunWslcInteractive(std::format(L"session shell {}", nonAdminName), ElevationType::NonElevated);
+            auto session = RunWslcInteractive(std::format(L"system session shell {}", nonAdminName), ElevationType::NonElevated);
             VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
             session.ExpectStdout(VT::SESSION_PROMPT);
@@ -469,7 +469,7 @@ class WSLCE2EGlobalTests
             Log::Comment(L"Testing elevated interactive session with explicit admin session name");
             // Elevated session shell should attach to the wslc by name also.
             auto adminName = GetExpectedDefaultSessionName(true);
-            auto session = RunWslcInteractive(std::format(L"session shell {}", adminName), ElevationType::Elevated);
+            auto session = RunWslcInteractive(std::format(L"system session shell {}", adminName), ElevationType::Elevated);
             VERIFY_IS_TRUE(session.IsRunning(), L"Session should be running");
 
             session.ExpectStdout(VT::SESSION_PROMPT);
@@ -526,8 +526,8 @@ private:
             {L"container", Localization::WSLCCLI_ContainerCommandDesc()},
             {L"image", Localization::WSLCCLI_ImageCommandDesc()},
             {L"registry", Localization::WSLCCLI_RegistryCommandDesc()},
-            {L"session", Localization::WSLCCLI_SessionCommandDesc()},
             {L"settings", Localization::WSLCCLI_SettingsCommandDesc()},
+            {L"system", Localization::WSLCCLI_SystemCommandDesc()},
             {L"volume", Localization::WSLCCLI_VolumeCommandDesc()},
             {L"attach", Localization::WSLCCLI_ContainerAttachDesc()},
             {L"build", Localization::WSLCCLI_ImageBuildDesc()},

@@ -385,6 +385,14 @@ docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::st
     return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
 }
 
+docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string& Id)
+{
+    auto url = URL::Create("/containers/{}/stats", Id);
+    url.SetParameter("stream", false);
+    url.SetParameter("one-shot", true);
+    return Transaction<EmptyRequest, docker_schema::ContainerStats>(verb::get, url);
+}
+
 docker_schema::InspectExec DockerHTTPClient::InspectExec(const std::string& Id)
 {
     return Transaction<EmptyRequest, docker_schema::InspectExec>(verb::get, URL::Create("/exec/{}/json", Id));

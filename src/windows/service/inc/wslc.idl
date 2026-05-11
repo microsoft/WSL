@@ -527,6 +527,7 @@ interface IWSLCContainer : IUnknown
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
     HRESULT Kill([in] WSLCSignal Signal);
+    HRESULT Stats([out] LPSTR* Output);
 }
 
 typedef enum _WSLCDeletedImageType

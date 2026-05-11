@@ -17,8 +17,8 @@ Abstract:
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
 #include "RegistryCommand.h"
-#include "SessionCommand.h"
 #include "SettingsCommand.h"
+#include "SystemCommand.h"
 #include "InspectCommand.h"
 #include "VersionCommand.h"
 #include "VolumeCommand.h"
@@ -33,8 +33,8 @@ std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<ImageCommand>(FullName()));
     commands.push_back(std::make_unique<RegistryCommand>(FullName()));
-    commands.push_back(std::make_unique<SessionCommand>(FullName()));
     commands.push_back(std::make_unique<SettingsCommand>(FullName()));
+    commands.push_back(std::make_unique<SystemCommand>(FullName()));
     commands.push_back(std::make_unique<VolumeCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerAttachCommand>(FullName()));
     commands.push_back(std::make_unique<ImageBuildCommand>(FullName()));

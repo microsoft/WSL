@@ -187,11 +187,11 @@
       </disabledValue>
     </policy>
 
-    <policy name="WSLContainerCLIRegistryAllowlist" class="Machine" displayName="$(string.WSLContainerCLIRegistryAllowlist)" explainText="$(string.WSLContainerCLIRegistryAllowlistExplain)" presentation="$(presentation.WSLContainerCLIRegistryAllowlist)" key="Software\Policies\WSL">
+    <policy name="WSLContainerRegistryAllowlist" class="Machine" displayName="$(string.WSLContainerRegistryAllowlist)" explainText="$(string.WSLContainerRegistryAllowlistExplain)" presentation="$(presentation.WSLContainerRegistryAllowlist)" key="Software\Policies\WSL">
       <parentCategory ref="WSLContainer" />
       <supportedOn ref="windows:SUPPORTED_Windows10" />
       <elements>
-        <list id="WSLContainerCLIRegistryAllowlist_Input" key="Software\Policies\WSL\WSLContainerCLIRegistryAllowlist" valuePrefix="AllowedRegistry" />
+        <list id="WSLContainerRegistryAllowlist_Input" key="Software\Policies\WSL\WSLContainerRegistryAllowlist" valuePrefix="AllowedRegistry" />
       </elements>
     </policy>
 

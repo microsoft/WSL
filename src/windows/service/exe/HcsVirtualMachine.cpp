@@ -14,6 +14,8 @@ Abstract:
 
 #include "HcsVirtualMachine.h"
 #include <format>
+#include <string>
+#include <string_view>
 #include "hcs_schema.h"
 #include "VirtioNetworking.h"
 #include "NatNetworking.h"
@@ -29,6 +31,28 @@ using wsl::windows::service::wslc::HcsVirtualMachine;
 constexpr auto MAX_VM_CRASH_FILES = 3;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
+
+namespace {
+
+// Replace any character outside the conservative ASCII allowlist with '_' so the
+// result is safe to use as the HCS HostingProcessNameSuffix (which becomes the
+// vmmem-XXX process name visible in Task Manager and parsed by various tooling).
+std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
+{
+    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+    std::wstring sanitized{name};
+    for (auto& c : sanitized)
+    {
+        if (c_allowed.find(c) == std::wstring_view::npos)
+        {
+            c = L'_';
+        }
+    }
+
+    return sanitized;
+}
+
+} // namespace
 
 HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 {
@@ -95,7 +119,10 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings)
 
     if (helpers::IsVmemmSuffixSupported() && Settings->DisplayName)
     {
-        vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = Settings->DisplayName;
+        // The vmmem-XXX process name shown in Task Manager (and parsed by tooling)
+        // can't tolerate spaces / unicode / etc., so sanitize before use. Note that
+        // Settings->DisplayName itself (e.g. the HCS Owner) is left untouched.
+        vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = SanitizeHostingProcessNameSuffix(Settings->DisplayName);
     }
 
 #ifdef _AMD64_
