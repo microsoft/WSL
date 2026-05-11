@@ -329,7 +329,7 @@ DockerNetworkMode ParseDockerNetworkMode(const std::string& mode)
     if (mode.starts_with(containerPrefix))
     {
         auto target = mode.substr(containerPrefix.size());
-        THROW_HR_IF_MSG(E_INVALIDARG, target.empty(), "Unsupported Docker network mode: %hs", mode.c_str());
+        THROW_HR_IF_MSG(E_INVALIDARG, target.empty(), "Invalid Docker network mode: missing container id/name in '%hs'", mode.c_str());
         return {WSLCContainerNetworkTypeContainer, std::move(target)};
     }
 
