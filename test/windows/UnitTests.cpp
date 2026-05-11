@@ -6785,5 +6785,141 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             -1);
     }
 
+    WSL2_TEST_METHOD(ManageGetSetRoundTrip)
+    {
+        auto manageGetProperty = [](LPCWSTR property) -> std::wstring {
+            auto [output, err] = LxsstuLaunchWslAndCaptureOutput(
+                std::format(L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_GET_OPTION_LONG, property));
+            while (!output.empty() && (output.back() == L'\r' || output.back() == L'\n'))
+            {
+                output.pop_back();
+            }
+            return output;
+        };
+
+        // ----- vhd-location: --set vhd-location <folder> -> --get vhd-location must echo the
+        // same folder (with the trailing path component normalized by std::filesystem). The
+        // setter physically moves the VHD; we move it to a temp folder and back.
+        {
+            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_LOCATION);
+            VERIFY_IS_FALSE(original.empty());
+
+            // Two consecutive --get calls must agree.
+            const auto repeated = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_LOCATION);
+            VERIFY_ARE_EQUAL(original, repeated);
+
+            // Set up a sibling temp folder for the move.
+            const auto destination = std::filesystem::path(original).parent_path() / L"wsl-test-vhd-move";
+            std::filesystem::remove_all(destination);
+            VERIFY_IS_TRUE(std::filesystem::create_directories(destination));
+
+            auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                WslShutdown();
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} {} \"{}\"", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_VHD_LOCATION, original));
+                std::filesystem::remove_all(destination);
+            });
+
+            // Move requires the utility VM to be fully shut down so the VHD detaches;
+            // a per-distro terminate is not enough.
+            WslShutdown();
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} {} \"{}\"",
+                    WSL_MANAGE_ARG,
+                    LXSS_DISTRO_NAME_TEST_L,
+                    WSL_MANAGE_ARG_SET_OPTION_LONG,
+                    WSL_MANAGE_PROPERTY_VHD_LOCATION,
+                    destination.wstring())),
+                (DWORD)0);
+
+            // Compare via std::filesystem::equivalent to absorb path-string normalization
+            // differences (trailing slash, casing, \\?\ prefix).
+            const auto reported = std::filesystem::path(manageGetProperty(WSL_MANAGE_PROPERTY_VHD_LOCATION));
+            std::error_code ec;
+            VERIFY_IS_TRUE(std::filesystem::equivalent(reported, destination, ec));
+        }
+
+        // ----- sparse: --set sparse <bool> -> --get sparse must echo the same bool.
+        // We round-trip through both states. Restore to the original value at the end.
+        {
+            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_SPARSE);
+            VERIFY_IS_TRUE(original == L"true" || original == L"false");
+
+            auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                if (original == L"true")
+                {
+                    LxsstuLaunchWsl(std::format(
+                        L"{} {} {} {} true {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE, WSL_MANAGE_ARG_ALLOW_UNSAFE));
+                }
+                else
+                {
+                    LxsstuLaunchWsl(std::format(
+                        L"{} {} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE));
+                }
+            });
+
+            // Setting sparse requires the distro to be stopped, since SetSparse opens
+            // the VHD with GENERIC_WRITE (which fails while it is attached to the VM).
+            TerminateDistribution();
+
+            // false -> get returns false.
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"{} {} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE)),
+                (DWORD)0);
+            VERIFY_ARE_EQUAL(manageGetProperty(WSL_MANAGE_PROPERTY_SPARSE), std::wstring{L"false"});
+
+            // true -> get returns true. Enabling sparse requires --allow-unsafe.
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} {} true {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE, WSL_MANAGE_ARG_ALLOW_UNSAFE)),
+                (DWORD)0);
+            VERIFY_ARE_EQUAL(manageGetProperty(WSL_MANAGE_PROPERTY_SPARSE), std::wstring{L"true"});
+        }
+
+        // ----- vhd-size: --set vhd-size <bytes> -> --get vhd-size must echo the same byte count.
+        // We grow the VHD by 1 GiB to avoid any shrink-side complications, then resize back.
+        {
+            const auto originalStr = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_SIZE);
+            VERIFY_IS_FALSE(originalStr.empty());
+            const auto original = std::stoull(originalStr);
+
+            // Restore the original size at the end of the test.
+            auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_VHD_SIZE, original));
+            });
+
+            // Grow by 1 GiB and read back. The byte count printed by --get must match exactly.
+            const ULONG64 grown = original + (1ULL << 30);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_VHD_SIZE, grown)),
+                (DWORD)0);
+
+            const auto afterStr = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_SIZE);
+            VERIFY_ARE_EQUAL(std::stoull(afterStr), grown);
+        }
+
+        // ----- default-user: --set default-user <name> -> --get default-user must echo the same name.
+        // We toggle to root (always present) and back to the original user.
+        {
+            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_DEFAULT_USER);
+            VERIFY_IS_FALSE(original.empty());
+
+            auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DEFAULT_USER, original));
+            });
+
+            // Set to root.
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"{} {} {} {} root", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DEFAULT_USER)),
+                (DWORD)0);
+            VERIFY_ARE_EQUAL(manageGetProperty(WSL_MANAGE_PROPERTY_DEFAULT_USER), std::wstring{L"root"});
+        }
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests

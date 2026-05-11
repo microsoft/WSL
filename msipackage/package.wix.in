@@ -140,7 +140,7 @@
             <Component Id="wslservice" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134735" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
 
                 <!-- WslServiceProxyStub -->
-                <RegistryKey Root="HKCR" Key="Interface\{38541BDC-F54F-4CEB-85D0-37F0F3D2617E}">
+                <RegistryKey Root="HKCR" Key="Interface\{67A8A693-9EF8-4560-85BC-AE44009D3B46}">
                     <RegistryValue Value="ILxssUserSession" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />

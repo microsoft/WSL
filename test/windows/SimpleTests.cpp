@@ -177,7 +177,12 @@ class SimpleTests
 
         ValidateOutput(
             std::format(
-                L"{} {} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE, L"false")
+                L"{} {} {} {} {}",
+                WSL_MANAGE_ARG,
+                tempDistro,
+                WSL_MANAGE_ARG_SET_OPTION_LONG,
+                WSL_MANAGE_PROPERTY_SPARSE,
+                L"false")
                 .c_str(),
             L"The operation completed successfully. \r\n",
             L"",

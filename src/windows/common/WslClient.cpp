@@ -19,7 +19,6 @@ Abstract:
 #include "Distribution.h"
 #include "CommandLine.h"
 #include <conio.h>
-#include "WslCoreFilesystem.h"
 
 #define BASH_PATH L"/bin/bash"
 
@@ -890,6 +889,7 @@ int Manage(_In_ std::wstring_view commandLine)
     bool allowUnsafe = false;
     std::optional<std::wstring> setProperty;
     std::optional<std::wstring> setValue;
+    std::optional<std::wstring> getProperty;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME, 0);
     parser.AddPositionalArgument(distribution, 0);
@@ -899,6 +899,7 @@ int Manage(_In_ std::wstring_view commandLine)
     parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_RESIZE_OPTION_LONG, WSL_MANAGE_ARG_RESIZE_OPTION);
     parser.AddArgument(allowUnsafe, WSL_MANAGE_ARG_ALLOW_UNSAFE);
     parser.AddMultiArgument(WSL_MANAGE_ARG_SET_OPTION_LONG, L'\0', setProperty, setValue);
+    parser.AddArgument(getProperty, WSL_MANAGE_ARG_GET_OPTION_LONG);
     parser.Parse();
 
     THROW_HR_IF(WSL_E_INVALID_USAGE, distribution == nullptr);
@@ -906,9 +907,53 @@ int Manage(_In_ std::wstring_view commandLine)
     wsl::windows::common::SvcComm service;
     auto distroGuid = service.GetDistributionId(distribution);
 
-    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() + setProperty.has_value() != 1)
+    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() + setProperty.has_value() +
+            getProperty.has_value() !=
+        1)
     {
         THROW_HR(WSL_E_INVALID_USAGE);
+    }
+
+    if (getProperty.has_value())
+    {
+        if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_SPARSE))
+        {
+            wprintf(L"%ls\n", service.GetDistributionSparse(&distroGuid) ? L"true" : L"false");
+        }
+        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_DEFAULT_USER))
+        {
+            const auto uid = service.GetDistributionDefaultUid(&distroGuid);
+
+            auto wslExe = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
+            auto subCommandLine = std::format(
+                L"\"{}\" {} -u root /usr/bin/getent passwd {}", wslExe, wsl::shared::string::GuidToString<wchar_t>(distroGuid), uid);
+
+            wsl::windows::common::SubProcess process{wslExe.c_str(), subCommandLine.c_str()};
+            auto result = process.RunAndCaptureOutput(INFINITE, GetStdHandle(STD_ERROR_HANDLE));
+            if (result.ExitCode != 0)
+            {
+                return result.ExitCode;
+            }
+
+            const auto colon = result.Stdout.find(L':');
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), colon == std::wstring::npos);
+            wprintf(L"%ls\n", result.Stdout.substr(0, colon).c_str());
+        }
+        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_LOCATION))
+        {
+            wprintf(L"%ls\n", service.GetDistributionVhdLocation(&distroGuid).c_str());
+        }
+        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_SIZE))
+        {
+            wprintf(L"%llu\n", service.GetDistributionVhdSize(&distroGuid));
+        }
+        else
+        {
+            THROW_HR_WITH_USER_ERROR(
+                WSL_E_INVALID_USAGE, wsl::shared::Localization::MessageInvalidCommandLine(getProperty->c_str(), WSL_BINARY_NAME));
+        }
+
+        return 0;
     }
 
     if (setProperty.has_value())
@@ -916,8 +961,7 @@ int Manage(_In_ std::wstring_view commandLine)
         if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_SPARSE))
         {
             auto parsed = wsl::shared::string::ParseBool(setValue->c_str());
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, wsl::shared::Localization::MessageInvalidBoolean(setValue->c_str()), !parsed.has_value());
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, wsl::shared::Localization::MessageInvalidBoolean(setValue->c_str()), !parsed.has_value());
             sparse = parsed.value();
         }
         else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_DEFAULT_USER))
@@ -933,15 +977,13 @@ int Manage(_In_ std::wstring_view commandLine)
         else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_SIZE))
         {
             auto parsed = wsl::shared::string::ParseMemorySize(setValue->c_str());
-            THROW_HR_WITH_USER_ERROR_IF(
-                E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(setValue->c_str()), !parsed.has_value());
+            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(setValue->c_str()), !parsed.has_value());
             resize = parsed.value();
         }
         else
         {
             THROW_HR_WITH_USER_ERROR(
-                WSL_E_INVALID_USAGE,
-                wsl::shared::Localization::MessageInvalidCommandLine(setProperty->c_str(), WSL_BINARY_NAME));
+                WSL_E_INVALID_USAGE, wsl::shared::Localization::MessageInvalidCommandLine(setProperty->c_str(), WSL_BINARY_NAME));
         }
     }
 

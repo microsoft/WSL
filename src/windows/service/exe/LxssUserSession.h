@@ -236,6 +236,26 @@ public:
     IFACEMETHOD(MoveDistribution)(_In_ LPCGUID DistroGuid, _In_ LPCWSTR Location, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Returns the folder containing the distribution's VHD (matches what --move sets). WSL2 only.
+    /// </summary>
+    IFACEMETHOD(GetDistributionVhdLocation)(_In_ LPCGUID DistroGuid, _Out_ LPWSTR* VhdLocation, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Returns the virtual disk size in bytes for a distribution. WSL2 only.
+    /// </summary>
+    IFACEMETHOD(GetDistributionVhdSize)(_In_ LPCGUID DistroGuid, _Out_ ULONG64* VhdSize, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Returns whether the distribution's VHD has the sparse file attribute. WSL2 only.
+    /// </summary>
+    IFACEMETHOD(GetDistributionSparse)(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN* Sparse, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Returns the configured default UID for a distribution.
+    /// </summary>
+    IFACEMETHOD(GetDistributionDefaultUid)(_In_ LPCGUID DistroGuid, _Out_ ULONG* DefaultUid, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Terminates all running instances and the Linux utility vm.
     /// </summary>
     IFACEMETHOD(Shutdown)() override;
@@ -442,6 +462,26 @@ public:
         _Out_ LPWSTR* MountName);
 
     HRESULT MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCWSTR Location);
+
+    /// <summary>
+    /// Returns the folder containing the distribution's VHD (matches what --move sets). WSL2 only.
+    /// </summary>
+    HRESULT GetDistributionVhdLocation(_In_ LPCGUID DistroGuid, _Out_ std::wstring& VhdLocation);
+
+    /// <summary>
+    /// Returns the virtual disk size (max size, set by ResizeDistribution) in bytes. WSL2 only.
+    /// </summary>
+    HRESULT GetDistributionVhdSize(_In_ LPCGUID DistroGuid, _Out_ ULONG64& VhdSize);
+
+    /// <summary>
+    /// Returns whether the distribution's VHD has the sparse file attribute. WSL2 only.
+    /// </summary>
+    HRESULT GetDistributionSparse(_In_ LPCGUID DistroGuid, _Out_ BOOLEAN& Sparse);
+
+    /// <summary>
+    /// Returns the configured default UID for a distribution.
+    /// </summary>
+    HRESULT GetDistributionDefaultUid(_In_ LPCGUID DistroGuid, _Out_ ULONG& DefaultUid);
 
     HRESULT MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name);
 
