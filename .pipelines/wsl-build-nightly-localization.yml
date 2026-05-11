@@ -43,6 +43,7 @@ steps:
     cultureMappingType: 'None'
 
 - task: PipAuthenticate@1
+  condition: and(succeeded(), in(variables['Build.Reason'], 'Schedule', 'Manual'))
   inputs:
     artifactFeeds: 'wsl'
 
