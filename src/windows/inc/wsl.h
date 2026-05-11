@@ -68,8 +68,6 @@ Abstract:
 #define WSL_LIST_HEADER_VERSION L"VERSION"
 #define WSL_MANAGE_ARG L"--manage"
 #define WSL_MANAGE_ARG_ALLOW_UNSAFE L"--allow-unsafe"
-#define WSL_MANAGE_ARG_SET_OPTION_LONG L"--set"
-#define WSL_MANAGE_ARG_GET_OPTION_LONG L"--get"
 #define WSL_MANAGE_ARG_MOVE_OPTION L'm'
 #define WSL_MANAGE_ARG_MOVE_OPTION_LONG L"--move"
 #define WSL_MANAGE_ARG_RESIZE_OPTION L'r'
@@ -77,10 +75,12 @@ Abstract:
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION L's'
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L"--set-sparse"
 #define WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG L"--set-default-user"
-#define WSL_MANAGE_PROPERTY_SPARSE L"sparse"
-#define WSL_MANAGE_PROPERTY_DEFAULT_USER L"default-user"
-#define WSL_MANAGE_PROPERTY_LOCATION L"location"
-#define WSL_MANAGE_PROPERTY_DISK_SIZE L"disk-size"
+#define WSL_MANAGE_ARG_SET_LOCATION_OPTION_LONG L"--set-location"
+#define WSL_MANAGE_ARG_GET_LOCATION_OPTION_LONG L"--get-location"
+#define WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG L"--get-sparse"
+#define WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG L"--get-default-user"
+#define WSL_MANAGE_ARG_SET_DISK_SIZE_OPTION_LONG L"--set-disk-size"
+#define WSL_MANAGE_ARG_GET_DISK_SIZE_OPTION_LONG L"--get-disk-size"
 #define WSL_MOUNT_ARG L"--mount"
 #define WSL_MOUNT_ARG_VHD_OPTION_LONG L"--vhd"
 #define WSL_MOUNT_ARG_BARE_OPTION_LONG L"--bare"

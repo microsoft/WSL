@@ -1247,12 +1247,6 @@ class UnitTests
                 L"false_ is not a valid boolean, <true|false>",
                 L"Wsl/E_INVALIDARG");
 
-            // Same case using the new `--set <property> <value>` syntax.
-            ValidateErrorMessage(
-                WSL_MANAGE_ARG L" " LXSS_DISTRO_NAME_TEST L" " WSL_MANAGE_ARG_SET_OPTION_LONG L" " WSL_MANAGE_PROPERTY_SPARSE L" false_",
-                L"false_ is not a valid boolean, <true|false>",
-                L"Wsl/E_INVALIDARG");
-
             const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
             {
                 // Create a distro registration pointing to a vhdx that doesn't exist and validate that the error message reports that correctly.
@@ -1311,9 +1305,9 @@ class UnitTests
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
 
-            // Same case using the new `--set disk-size` syntax.
+            // Same case using the new `--set-disk-size` syntax.
             ValidateErrorMessage(
-                L"--manage test_distro --set disk-size 10GB",
+                L"--manage test_distro --set-disk-size 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
@@ -1348,13 +1342,18 @@ class UnitTests
 
         ValidateErrorMessage(L"--manage test_distro --resize foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
 
-        // Same coverage using the new `--set <property> <value>` syntax.
+        // Same coverage using the new `--set-disk-size` / `--get-disk-size` syntax.
         ValidateErrorMessage(
-            L"--manage DoesNotExist --set disk-size 10GB",
+            L"--manage DoesNotExist --set-disk-size 10GB",
             L"There is no distribution with the supplied name.",
             L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
-        ValidateErrorMessage(L"--manage test_distro --set disk-size foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
+        ValidateErrorMessage(L"--manage test_distro --set-disk-size foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
+
+        ValidateErrorMessage(
+            L"--manage DoesNotExist --get-disk-size",
+            L"There is no distribution with the supplied name.",
+            L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
         ValidateErrorMessage(
             L"--install --distribution debian --no-distribution",
@@ -1574,14 +1573,32 @@ Arguments for managing Windows Subsystem for Linux:
             --move <Location>
                 Move the distribution to a new location.
 
+            --set-location <Location>
+                Alias for --move.
+
+            --get-location
+                Get the location of the distribution.
+
             --set-sparse, -s <true|false>
                 Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+
+            --get-sparse
+                Get whether the VHD of the distro is set to be sparse.
 
             --set-default-user <Username>
                 Set the default user of the distribution.
 
+            --get-default-user
+                Get the default user of the distribution.
+
             --resize <MemoryString>
                 Resize the disk of the distribution to the specified size.
+
+            --set-disk-size <MemoryString>
+                Alias for --resize.
+
+            --get-disk-size
+                Get the size of the distribution's disk in bytes.
 
     --mount <Disk>
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -6008,117 +6025,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             VERIFY_IS_TRUE(a);
             VERIFY_ARE_EQUAL(pos, L"-");
         }
-
-        // Multi-value option: happy path. --set <property> <value>
-        {
-            ArgumentParser parser(L"--set sparse true pos-value", entryPoint, 0);
-            std::wstring property;
-            std::wstring value;
-            std::wstring pos;
-
-            parser.AddMultiArgument(L"--set", '\0', property, value);
-            parser.AddPositionalArgument(pos, 0);
-
-            parse(parser);
-
-            VERIFY_ARE_EQUAL(property, L"sparse");
-            VERIFY_ARE_EQUAL(value, L"true");
-            VERIFY_ARE_EQUAL(pos, L"pos-value");
-        }
-
-        // Multi-value option mixed with another flag after it.
-        {
-            ArgumentParser parser(L"--set sparse true --allow-unsafe", entryPoint, 0);
-            std::wstring property;
-            std::wstring value;
-            bool allowUnsafe{};
-
-            parser.AddMultiArgument(L"--set", '\0', property, value);
-            parser.AddArgument(allowUnsafe, L"--allow-unsafe");
-
-            parse(parser);
-
-            VERIFY_ARE_EQUAL(property, L"sparse");
-            VERIFY_ARE_EQUAL(value, L"true");
-            VERIFY_IS_TRUE(allowUnsafe);
-        }
-
-        // Multi-value option with a typed child consumer (ParsedBool).
-        {
-            ArgumentParser parser(L"--set sparse true", entryPoint, 0);
-            std::wstring property;
-            std::optional<bool> value;
-
-            parser.AddMultiArgument(L"--set", '\0', property, ParsedBool(value));
-
-            parse(parser);
-
-            VERIFY_ARE_EQUAL(property, L"sparse");
-            VERIFY_IS_TRUE(value.has_value());
-            VERIFY_IS_TRUE(value.value());
-        }
-
-        // Multi-value option missing the second value.
-        {
-            ArgumentParser parser(L"--set sparse", entryPoint, 0);
-            std::wstring property;
-            std::wstring value;
-
-            parser.AddMultiArgument(L"--set", '\0', property, value);
-
-            parse(
-                parser,
-                std::format(
-                    L"Command line argument --set requires a value.\n"
-                    "Please use '{} --help' to get a list of supported arguments.",
-                    entryPoint)
-                    .c_str());
-        }
-
-        // Multi-value option with no values at all.
-        {
-            ArgumentParser parser(L"--set", entryPoint, 0);
-            std::wstring property;
-            std::wstring value;
-
-            parser.AddMultiArgument(L"--set", '\0', property, value);
-
-            parse(
-                parser,
-                std::format(
-                    L"Command line argument --set requires a value.\n"
-                    "Please use '{} --help' to get a list of supported arguments.",
-                    entryPoint)
-                    .c_str());
-        }
-
-        // Three-value option to verify variadic parameter pack.
-        {
-            ArgumentParser parser(L"--triple a b c", entryPoint, 0);
-            std::wstring v1, v2, v3;
-
-            parser.AddMultiArgument(L"--triple", '\0', v1, v2, v3);
-
-            parse(parser);
-
-            VERIFY_ARE_EQUAL(v1, L"a");
-            VERIFY_ARE_EQUAL(v2, L"b");
-            VERIFY_ARE_EQUAL(v3, L"c");
-        }
-
-        // Multi-value option specified twice: last one wins (consistent with single-value).
-        {
-            ArgumentParser parser(L"--set a b --set c d", entryPoint, 0);
-            std::wstring property;
-            std::wstring value;
-
-            parser.AddMultiArgument(L"--set", '\0', property, value);
-
-            parse(parser);
-
-            VERIFY_ARE_EQUAL(property, L"c");
-            VERIFY_ARE_EQUAL(value, L"d");
-        }
     }
 
     TEST_METHOD(CaseSensitivity)
@@ -6787,9 +6693,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
     WSL2_TEST_METHOD(ManageGetSetRoundTrip)
     {
-        auto manageGetProperty = [](LPCWSTR property) -> std::wstring {
-            auto [output, err] = LxsstuLaunchWslAndCaptureOutput(
-                std::format(L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_GET_OPTION_LONG, property));
+        auto manageGet = [](LPCWSTR getOption) -> std::wstring {
+            auto [output, err] =
+                LxsstuLaunchWslAndCaptureOutput(std::format(L"{} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, getOption));
             while (!output.empty() && (output.back() == L'\r' || output.back() == L'\n'))
             {
                 output.pop_back();
@@ -6797,15 +6703,14 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             return output;
         };
 
-        // ----- location: --set location <folder> -> --get location must echo the
-        // same folder (with the trailing path component normalized by std::filesystem). The
-        // setter physically moves the VHD; we move it to a temp folder and back.
+        // ----- location: --set-location <folder> -> --get-location must echo the same folder.
+        // The setter physically moves the VHD; we move it to a temp folder and back.
         {
-            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_LOCATION);
+            const auto original = manageGet(WSL_MANAGE_ARG_GET_LOCATION_OPTION_LONG);
             VERIFY_IS_FALSE(original.empty());
 
-            // Two consecutive --get calls must agree.
-            const auto repeated = manageGetProperty(WSL_MANAGE_PROPERTY_LOCATION);
+            // Two consecutive --get-location calls must agree.
+            const auto repeated = manageGet(WSL_MANAGE_ARG_GET_LOCATION_OPTION_LONG);
             VERIFY_ARE_EQUAL(original, repeated);
 
             // Set up a sibling temp folder for the move.
@@ -6816,47 +6721,46 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
                 WslShutdown();
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} \"{}\"", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_LOCATION, original));
+                    L"{} {} {} \"{}\"", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_LOCATION_OPTION_LONG, original));
                 std::filesystem::remove_all(destination);
             });
 
-            // Move requires the utility VM to be fully shut down so the VHD detaches;
-            // a per-distro terminate is not enough.
+            // Move requires the utility VM to be fully shut down so the VHD detaches.
             WslShutdown();
 
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} \"{}\"",
+                    L"{} {} {} \"{}\"",
                     WSL_MANAGE_ARG,
                     LXSS_DISTRO_NAME_TEST_L,
-                    WSL_MANAGE_ARG_SET_OPTION_LONG,
-                    WSL_MANAGE_PROPERTY_LOCATION,
+                    WSL_MANAGE_ARG_SET_LOCATION_OPTION_LONG,
                     destination.wstring())),
                 (DWORD)0);
 
-            // Compare via std::filesystem::equivalent to absorb path-string normalization
-            // differences (trailing slash, casing, \\?\ prefix).
-            const auto reported = std::filesystem::path(manageGetProperty(WSL_MANAGE_PROPERTY_LOCATION));
+            const auto reported = std::filesystem::path(manageGet(WSL_MANAGE_ARG_GET_LOCATION_OPTION_LONG));
             std::error_code ec;
             VERIFY_IS_TRUE(std::filesystem::equivalent(reported, destination, ec));
         }
 
-        // ----- sparse: --set sparse <bool> -> --get sparse must echo the same bool.
-        // We round-trip through both states. Restore to the original value at the end.
+        // ----- sparse: --set-sparse <bool> -> --get-sparse must echo the same bool.
         {
-            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_SPARSE);
+            const auto original = manageGet(WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG);
             VERIFY_IS_TRUE(original == L"true" || original == L"false");
 
             auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
                 if (original == L"true")
                 {
                     LxsstuLaunchWsl(std::format(
-                        L"{} {} {} {} true {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE, WSL_MANAGE_ARG_ALLOW_UNSAFE));
+                        L"{} {} {} true {}",
+                        WSL_MANAGE_ARG,
+                        LXSS_DISTRO_NAME_TEST_L,
+                        WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG,
+                        WSL_MANAGE_ARG_ALLOW_UNSAFE));
                 }
                 else
                 {
                     LxsstuLaunchWsl(std::format(
-                        L"{} {} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE));
+                        L"{} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG));
                 }
             });
 
@@ -6864,60 +6768,59 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             // the VHD with GENERIC_WRITE (which fails while it is attached to the VM).
             TerminateDistribution();
 
-            // false -> get returns false.
-            VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(L"{} {} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE)),
-                (DWORD)0);
-            VERIFY_ARE_EQUAL(manageGetProperty(WSL_MANAGE_PROPERTY_SPARSE), std::wstring{L"false"});
-
-            // true -> get returns true. Enabling sparse requires --allow-unsafe.
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} true {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE, WSL_MANAGE_ARG_ALLOW_UNSAFE)),
+                    L"{} {} {} false", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG)),
                 (DWORD)0);
-            VERIFY_ARE_EQUAL(manageGetProperty(WSL_MANAGE_PROPERTY_SPARSE), std::wstring{L"true"});
+            VERIFY_ARE_EQUAL(manageGet(WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG), std::wstring{L"false"});
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} true {}",
+                    WSL_MANAGE_ARG,
+                    LXSS_DISTRO_NAME_TEST_L,
+                    WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG,
+                    WSL_MANAGE_ARG_ALLOW_UNSAFE)),
+                (DWORD)0);
+            VERIFY_ARE_EQUAL(manageGet(WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG), std::wstring{L"true"});
         }
 
-        // ----- disk-size: --set disk-size <bytes> -> --get disk-size must echo the same byte count.
-        // We grow the VHD by 1 GiB to avoid any shrink-side complications, then resize back.
+        // ----- disk-size: --set-disk-size <bytes> -> --get-disk-size must echo the same byte count.
         {
-            const auto originalStr = manageGetProperty(WSL_MANAGE_PROPERTY_DISK_SIZE);
+            const auto originalStr = manageGet(WSL_MANAGE_ARG_GET_DISK_SIZE_OPTION_LONG);
             VERIFY_IS_FALSE(originalStr.empty());
             const auto original = std::stoull(originalStr);
 
-            // Restore the original size at the end of the test.
             auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DISK_SIZE, original));
+                    L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DISK_SIZE_OPTION_LONG, original));
             });
 
-            // Grow by 1 GiB and read back. The byte count printed by --get must match exactly.
             const ULONG64 grown = original + (1ULL << 30);
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DISK_SIZE, grown)),
+                    L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DISK_SIZE_OPTION_LONG, grown)),
                 (DWORD)0);
 
-            const auto afterStr = manageGetProperty(WSL_MANAGE_PROPERTY_DISK_SIZE);
+            const auto afterStr = manageGet(WSL_MANAGE_ARG_GET_DISK_SIZE_OPTION_LONG);
             VERIFY_ARE_EQUAL(std::stoull(afterStr), grown);
         }
 
-        // ----- default-user: --set default-user <name> -> --get default-user must echo the same name.
-        // We toggle to root (always present) and back to the original user.
+        // ----- default-user: --set-default-user <name> -> --get-default-user must echo the same name.
         {
-            const auto original = manageGetProperty(WSL_MANAGE_PROPERTY_DEFAULT_USER);
+            const auto original = manageGet(WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG);
             VERIFY_IS_FALSE(original.empty());
 
             auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DEFAULT_USER, original));
+                    L"{} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG, original));
             });
 
-            // Set to root.
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(L"{} {} {} {} root", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DEFAULT_USER)),
+                LxsstuLaunchWsl(std::format(
+                    L"{} {} {} root", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG)),
                 (DWORD)0);
-            VERIFY_ARE_EQUAL(manageGetProperty(WSL_MANAGE_PROPERTY_DEFAULT_USER), std::wstring{L"root"});
+            VERIFY_ARE_EQUAL(manageGet(WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG), std::wstring{L"root"});
         }
     }
 

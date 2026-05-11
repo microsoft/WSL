@@ -144,51 +144,6 @@ class SimpleTests
             0);
 
         VerifySparse(vhdPath.c_str(), false);
-
-        // Same flow exercised through the new `--set sparse <value>` syntax.
-        // Without --allow-unsafe, enabling sparse should still be rejected.
-        ValidateOutput(
-            std::format(
-                L"{} {} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_SPARSE, L"true")
-                .c_str(),
-            L"Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-            L"To force a distribution to use a sparse VHD, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\nError code: Wsl/Service/E_INVALIDARG\r\n",
-            L"",
-            -1);
-
-        VerifySparse(vhdPath.c_str(), false);
-
-        ValidateOutput(
-            std::format(
-                L"{} {} {} {} {} {}",
-                WSL_MANAGE_ARG,
-                tempDistro,
-                WSL_MANAGE_ARG_SET_OPTION_LONG,
-                WSL_MANAGE_PROPERTY_SPARSE,
-                L"true",
-                WSL_MANAGE_ARG_ALLOW_UNSAFE)
-                .c_str(),
-            L"The operation completed successfully. \r\n",
-            L"",
-            0);
-
-        VerifySparse(vhdPath.c_str(), true);
-
-        ValidateOutput(
-            std::format(
-                L"{} {} {} {} {}",
-                WSL_MANAGE_ARG,
-                tempDistro,
-                WSL_MANAGE_ARG_SET_OPTION_LONG,
-                WSL_MANAGE_PROPERTY_SPARSE,
-                L"false")
-                .c_str(),
-            L"The operation completed successfully. \r\n",
-            L"",
-            0);
-
-        VerifySparse(vhdPath.c_str(), false);
     }
 
     TEST_METHOD(StringHelpers)

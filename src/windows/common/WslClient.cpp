@@ -887,19 +887,24 @@ int Manage(_In_ std::wstring_view commandLine)
     std::optional<std::wstring> defaultUser;
     std::optional<uint64_t> resize;
     bool allowUnsafe = false;
-    std::optional<std::wstring> setProperty;
-    std::optional<std::wstring> setValue;
-    std::optional<std::wstring> getProperty;
+    bool getLocation = false;
+    bool getSparse = false;
+    bool getDefaultUser = false;
+    bool getDiskSize = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME, 0);
     parser.AddPositionalArgument(distribution, 0);
     parser.AddArgument(ParsedBool(sparse), WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, WSL_MANAGE_ARG_SET_SPARSE_OPTION);
     parser.AddArgument(AbsolutePath(move), WSL_MANAGE_ARG_MOVE_OPTION_LONG, WSL_MANAGE_ARG_MOVE_OPTION);
+    parser.AddArgument(AbsolutePath(move), WSL_MANAGE_ARG_SET_LOCATION_OPTION_LONG);
     parser.AddArgument(defaultUser, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG);
     parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_RESIZE_OPTION_LONG, WSL_MANAGE_ARG_RESIZE_OPTION);
+    parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_SET_DISK_SIZE_OPTION_LONG);
     parser.AddArgument(allowUnsafe, WSL_MANAGE_ARG_ALLOW_UNSAFE);
-    parser.AddMultiArgument(WSL_MANAGE_ARG_SET_OPTION_LONG, L'\0', setProperty, setValue);
-    parser.AddArgument(getProperty, WSL_MANAGE_ARG_GET_OPTION_LONG);
+    parser.AddArgument(getLocation, WSL_MANAGE_ARG_GET_LOCATION_OPTION_LONG);
+    parser.AddArgument(getSparse, WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG);
+    parser.AddArgument(getDefaultUser, WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG);
+    parser.AddArgument(getDiskSize, WSL_MANAGE_ARG_GET_DISK_SIZE_OPTION_LONG);
     parser.Parse();
 
     THROW_HR_IF(WSL_E_INVALID_USAGE, distribution == nullptr);
@@ -907,84 +912,13 @@ int Manage(_In_ std::wstring_view commandLine)
     wsl::windows::common::SvcComm service;
     auto distroGuid = service.GetDistributionId(distribution);
 
-    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() + setProperty.has_value() +
-            getProperty.has_value() !=
+    // Exactly one operation must be selected.
+    if (static_cast<int>(sparse.has_value()) + static_cast<int>(move.has_value()) + static_cast<int>(defaultUser.has_value()) +
+            static_cast<int>(resize.has_value()) + static_cast<int>(getLocation) + static_cast<int>(getSparse) +
+            static_cast<int>(getDefaultUser) + static_cast<int>(getDiskSize) !=
         1)
     {
         THROW_HR(WSL_E_INVALID_USAGE);
-    }
-
-    if (getProperty.has_value())
-    {
-        if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_SPARSE))
-        {
-            wprintf(L"%ls\n", service.GetDistributionSparse(&distroGuid) ? L"true" : L"false");
-        }
-        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_DEFAULT_USER))
-        {
-            const auto uid = service.GetDistributionDefaultUid(&distroGuid);
-
-            auto wslExe = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
-            auto subCommandLine = std::format(
-                L"\"{}\" {} -u root /usr/bin/getent passwd {}", wslExe, wsl::shared::string::GuidToString<wchar_t>(distroGuid), uid);
-
-            wsl::windows::common::SubProcess process{wslExe.c_str(), subCommandLine.c_str()};
-            auto result = process.RunAndCaptureOutput(INFINITE, GetStdHandle(STD_ERROR_HANDLE));
-            if (result.ExitCode != 0)
-            {
-                return result.ExitCode;
-            }
-
-            const auto colon = result.Stdout.find(L':');
-            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), colon == std::wstring::npos);
-            wprintf(L"%ls\n", result.Stdout.substr(0, colon).c_str());
-        }
-        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_LOCATION))
-        {
-            wprintf(L"%ls\n", service.GetDistributionVhdLocation(&distroGuid).c_str());
-        }
-        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_DISK_SIZE))
-        {
-            wprintf(L"%llu\n", service.GetDistributionVhdSize(&distroGuid));
-        }
-        else
-        {
-            THROW_HR_WITH_USER_ERROR(
-                WSL_E_INVALID_USAGE, wsl::shared::Localization::MessageInvalidCommandLine(getProperty->c_str(), WSL_BINARY_NAME));
-        }
-
-        return 0;
-    }
-
-    if (setProperty.has_value())
-    {
-        if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_SPARSE))
-        {
-            auto parsed = wsl::shared::string::ParseBool(setValue->c_str());
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, wsl::shared::Localization::MessageInvalidBoolean(setValue->c_str()), !parsed.has_value());
-            sparse = parsed.value();
-        }
-        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_DEFAULT_USER))
-        {
-            defaultUser = std::move(setValue);
-        }
-        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_LOCATION))
-        {
-            std::wstring resolved;
-            AbsolutePath{resolved}(setValue->c_str());
-            move = std::move(resolved);
-        }
-        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_DISK_SIZE))
-        {
-            auto parsed = wsl::shared::string::ParseMemorySize(setValue->c_str());
-            THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(setValue->c_str()), !parsed.has_value());
-            resize = parsed.value();
-        }
-        else
-        {
-            THROW_HR_WITH_USER_ERROR(
-                WSL_E_INVALID_USAGE, wsl::shared::Localization::MessageInvalidCommandLine(setProperty->c_str(), WSL_BINARY_NAME));
-        }
     }
 
     if (sparse)
@@ -1029,8 +963,42 @@ int Manage(_In_ std::wstring_view commandLine)
     {
         THROW_IF_FAILED(service.ResizeDistribution(&distroGuid, resize.value()));
     }
+    else if (getSparse)
+    {
+        wprintf(L"%ls\n", service.GetDistributionSparse(&distroGuid) ? L"true" : L"false");
+    }
+    else if (getDefaultUser)
+    {
+        const auto uid = service.GetDistributionDefaultUid(&distroGuid);
 
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+        auto wslExe = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
+        auto subCommandLine = std::format(
+            L"\"{}\" {} -u root /usr/bin/getent passwd {}", wslExe, wsl::shared::string::GuidToString<wchar_t>(distroGuid), uid);
+
+        wsl::windows::common::SubProcess process{wslExe.c_str(), subCommandLine.c_str()};
+        auto result = process.RunAndCaptureOutput(INFINITE, GetStdHandle(STD_ERROR_HANDLE));
+        if (result.ExitCode != 0)
+        {
+            return result.ExitCode;
+        }
+
+        const auto colon = result.Stdout.find(L':');
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), colon == std::wstring::npos);
+        wprintf(L"%ls\n", result.Stdout.substr(0, colon).c_str());
+    }
+    else if (getLocation)
+    {
+        wprintf(L"%ls\n", service.GetDistributionVhdLocation(&distroGuid).c_str());
+    }
+    else if (getDiskSize)
+    {
+        wprintf(L"%llu\n", service.GetDistributionVhdSize(&distroGuid));
+    }
+
+    if (!getSparse && !getDefaultUser && !getLocation && !getDiskSize)
+    {
+        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    }
     return 0;
 }
 

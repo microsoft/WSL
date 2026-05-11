@@ -464,14 +464,32 @@ Arguments for managing Windows Subsystem for Linux:
             --move &lt;Location&gt;
                 Move the distribution to a new location.
 
+            --set-location &lt;Location&gt;
+                Alias for --move.
+
+            --get-location
+                Get the location of the distribution.
+
             --set-sparse, -s &lt;true|false&gt;
                 Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
+
+            --get-sparse
+                Get whether the VHD of the distro is set to be sparse.
 
             --set-default-user &lt;Username&gt;
                 Set the default user of the distribution.
 
+            --get-default-user
+                Get the default user of the distribution.
+
             --resize &lt;MemoryString&gt;
                 Resize the disk of the distribution to the specified size.
+
+            --set-disk-size &lt;MemoryString&gt;
+                Alias for --resize.
+
+            --get-disk-size
+                Get the size of the distribution's disk in bytes.
 
     --mount &lt;Disk&gt;
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
@@ -591,7 +609,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-location "}{Locked="--get-location"}{Locked="--get-sparse"}{Locked="--get-default-user"}{Locked="--set-disk-size "}{Locked="--get-disk-size"}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
