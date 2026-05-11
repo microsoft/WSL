@@ -1247,6 +1247,12 @@ class UnitTests
                 L"false_ is not a valid boolean, <true|false>",
                 L"Wsl/E_INVALIDARG");
 
+            // Same case using the new `--set <property> <value>` syntax.
+            ValidateErrorMessage(
+                WSL_MANAGE_ARG L" " LXSS_DISTRO_NAME_TEST L" " WSL_MANAGE_ARG_SET_OPTION_LONG L" " WSL_MANAGE_PROPERTY_SPARSE L" false_",
+                L"false_ is not a valid boolean, <true|false>",
+                L"Wsl/E_INVALIDARG");
+
             const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
             {
                 // Create a distro registration pointing to a vhdx that doesn't exist and validate that the error message reports that correctly.
@@ -1304,6 +1310,12 @@ class UnitTests
                 L"--manage test_distro --resize 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
+
+            // Same case using the new `--set vhd-size` syntax.
+            ValidateErrorMessage(
+                L"--manage test_distro --set vhd-size 10GB",
+                L"This operation is only supported by WSL2.",
+                L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
 
         ValidateErrorMessage(
@@ -1335,6 +1347,14 @@ class UnitTests
             L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
         ValidateErrorMessage(L"--manage test_distro --resize foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
+
+        // Same coverage using the new `--set <property> <value>` syntax.
+        ValidateErrorMessage(
+            L"--manage DoesNotExist --set vhd-size 10GB",
+            L"There is no distribution with the supplied name.",
+            L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
+
+        ValidateErrorMessage(L"--manage test_distro --set vhd-size foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
 
         ValidateErrorMessage(
             L"--install --distribution debian --no-distribution",

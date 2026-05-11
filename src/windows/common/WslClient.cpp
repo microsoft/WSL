@@ -888,6 +888,8 @@ int Manage(_In_ std::wstring_view commandLine)
     std::optional<std::wstring> defaultUser;
     std::optional<uint64_t> resize;
     bool allowUnsafe = false;
+    std::optional<std::wstring> setProperty;
+    std::optional<std::wstring> setValue;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME, 0);
     parser.AddPositionalArgument(distribution, 0);
@@ -896,6 +898,7 @@ int Manage(_In_ std::wstring_view commandLine)
     parser.AddArgument(defaultUser, WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG);
     parser.AddArgument(SizeString(resize), WSL_MANAGE_ARG_RESIZE_OPTION_LONG, WSL_MANAGE_ARG_RESIZE_OPTION);
     parser.AddArgument(allowUnsafe, WSL_MANAGE_ARG_ALLOW_UNSAFE);
+    parser.AddMultiArgument(WSL_MANAGE_ARG_SET_OPTION_LONG, L'\0', setProperty, setValue);
     parser.Parse();
 
     THROW_HR_IF(WSL_E_INVALID_USAGE, distribution == nullptr);
@@ -903,9 +906,43 @@ int Manage(_In_ std::wstring_view commandLine)
     wsl::windows::common::SvcComm service;
     auto distroGuid = service.GetDistributionId(distribution);
 
-    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() != 1)
+    if (sparse.has_value() + move.has_value() + defaultUser.has_value() + resize.has_value() + setProperty.has_value() != 1)
     {
         THROW_HR(WSL_E_INVALID_USAGE);
+    }
+
+    if (setProperty.has_value())
+    {
+        if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_SPARSE))
+        {
+            auto parsed = wsl::shared::string::ParseBool(setValue->c_str());
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, wsl::shared::Localization::MessageInvalidBoolean(setValue->c_str()), !parsed.has_value());
+            sparse = parsed.value();
+        }
+        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_DEFAULT_USER))
+        {
+            defaultUser = std::move(setValue);
+        }
+        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_LOCATION))
+        {
+            std::wstring resolved;
+            AbsolutePath{resolved}(setValue->c_str());
+            move = std::move(resolved);
+        }
+        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_SIZE))
+        {
+            auto parsed = wsl::shared::string::ParseMemorySize(setValue->c_str());
+            THROW_HR_WITH_USER_ERROR_IF(
+                E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(setValue->c_str()), !parsed.has_value());
+            resize = parsed.value();
+        }
+        else
+        {
+            THROW_HR_WITH_USER_ERROR(
+                WSL_E_INVALID_USAGE,
+                wsl::shared::Localization::MessageInvalidCommandLine(setProperty->c_str(), WSL_BINARY_NAME));
+        }
     }
 
     if (sparse)
