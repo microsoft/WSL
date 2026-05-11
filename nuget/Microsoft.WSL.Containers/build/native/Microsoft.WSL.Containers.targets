@@ -55,7 +55,10 @@
     <Target Name="_WslcWriteSingleTlog"
             DependsOnTargets="_WslcCollectSources;_WslcResolveSavePath">
         <PropertyGroup>
-            <_WslcTlogToolPath>$([System.IO.Path]::GetFullPath('$(WslcCliPath)'))</_WslcTlogToolPath>
+            <!-- Tool path is just a marker for FUTDC; use WslcCliPath as-is.
+                 GetFullPath would mis-resolve the default bare 'wslc' to
+                 <projdir>\wslc (not a real file). -->
+            <_WslcTlogToolPath>$(WslcCliPath)</_WslcTlogToolPath>
             <_WslcTarFullPath>$([System.IO.Path]::GetFullPath('$(_WslcTarPath)'))</_WslcTarFullPath>
         </PropertyGroup>
 

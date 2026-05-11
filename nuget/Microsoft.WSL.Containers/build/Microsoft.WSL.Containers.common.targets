@@ -52,12 +52,13 @@
                Text="WslcImage '%(WslcImage.Identity)' is missing required Context metadata." />
 
         <!-- Check for characters invalid in Windows file names: / \ : * ? " < > |
-             The Identity (= the value of the Include attribute) is used internally
-             as the build marker filename, so it must be a valid file name.
+             The Identity (= the value of the Include attribute) is used as the
+             default tar filename and in .tlog filenames, so it must be a valid
+             file name.
              XML entities: &quot; = "  &lt; = <  &gt; = >  -->
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
-               Text="WslcImage with Include='%(WslcImage.Identity)' contains a character invalid for use as a build marker filename (one of / \ : * ? &quot; &lt; &gt; |). Use a simple identity in Include (e.g. Include=&quot;my-image&quot;) and put the registry/org/tag in the Image metadata." />
+               Text="WslcImage with Include='%(WslcImage.Identity)' contains a character invalid for filesystem names (one of / \ : * ? &quot; &lt; &gt; |). The Identity is used as the default tar filename and in .tlog filenames. Use a simple identity in Include (e.g. Include=&quot;my-image&quot;) and put the registry/org/tag in the Image metadata." />
     </Target>
 
     <!-- Dispatch each WslcImage via MSBuild task instead of batching directly because:
@@ -125,9 +126,8 @@
     <!-- Inner target: build + save a single image atomically. Per-image atomicity
          (rather than batched build-all-then-save-all) means a failure mid-list
          leaves a coherent state — never "image N is in the daemon but its tar is
-         missing". The tar is the canonical incremental output (no separate stamp
-         file); save writes <tar>.tmp and Moves on success so a failed save can't
-         leave a partial tar that would mislead later incremental checks. -->
+         missing". Save writes <tar>.tmp and Moves on success so a failed save
+         can't leave a partial tar that would mislead later incremental checks. -->
     <Target Name="_WslcBuildAndSaveSingleImage"
             DependsOnTargets="_WslcCollectSources;_WslcResolveImageRef;_WslcResolveSavePath"
             Inputs="@(_WslcSourceFiles)"
@@ -161,7 +161,8 @@
     </Target>
 
     <!-- Clean container artifacts. ContinueOnError so a transient file lock
-         (AV scanner, downstream consumer) doesn't block the rest of clean. -->
+         (AV scanner, downstream consumer) doesn't block the rest of clean.
+         .tmp variants are removed too — a failed save can leave one behind. -->
     <Target Name="WslcClean"
             AfterTargets="Clean"
             Condition="'@(WslcImage)' != ''">
@@ -170,7 +171,15 @@
                 Condition="'%(WslcImage.TarLocation)' != ''"
                 ContinueOnError="WarnAndContinue" />
 
+        <Delete Files="%(WslcImage.TarLocation).tmp"
+                Condition="'%(WslcImage.TarLocation)' != ''"
+                ContinueOnError="WarnAndContinue" />
+
         <Delete Files="$(OutDir)%(WslcImage.Identity).tar"
+                Condition="'%(WslcImage.TarLocation)' == ''"
+                ContinueOnError="WarnAndContinue" />
+
+        <Delete Files="$(OutDir)%(WslcImage.Identity).tar.tmp"
                 Condition="'%(WslcImage.TarLocation)' == ''"
                 ContinueOnError="WarnAndContinue" />
     </Target>
