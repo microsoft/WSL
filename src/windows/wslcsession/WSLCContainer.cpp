@@ -306,41 +306,8 @@ WSLCContainerNetworkType DockerNetworkModeToWSLCNetworkType(const std::string& m
 std::uint64_t ParseDockerTimestamp(const std::string& timestamp)
 {
     // Docker timestamps are UTC ISO 8601, e.g. "2026-03-05T10:30:00.123456789Z".
-    // This function returns epoch seconds, so strip optional fractional seconds before parsing.
-    std::string normalizedTimestamp = timestamp;
-
-    const auto timeSeparator = normalizedTimestamp.find('T');
-    if (timeSeparator != std::string::npos)
-    {
-        const auto fractionalSeparator = normalizedTimestamp.find('.', timeSeparator + 1);
-        const auto zuluPos = normalizedTimestamp.find('Z', timeSeparator + 1);
-        const auto plusOffsetPos = normalizedTimestamp.find('+', timeSeparator + 1);
-        const auto minusOffsetPos = normalizedTimestamp.find('-', timeSeparator + 1);
-
-        auto timezonePos = std::string::npos;
-        if (zuluPos != std::string::npos)
-        {
-            timezonePos = zuluPos;
-        }
-        if (plusOffsetPos != std::string::npos && (timezonePos == std::string::npos || plusOffsetPos < timezonePos))
-        {
-            timezonePos = plusOffsetPos;
-        }
-        if (minusOffsetPos != std::string::npos && (timezonePos == std::string::npos || minusOffsetPos < timezonePos))
-        {
-            timezonePos = minusOffsetPos;
-        }
-
-        if (fractionalSeparator != std::string::npos && (timezonePos == std::string::npos || fractionalSeparator < timezonePos))
-        {
-            normalizedTimestamp.erase(
-                fractionalSeparator,
-                (timezonePos == std::string::npos) ? std::string::npos : (timezonePos - fractionalSeparator));
-        }
-    }
-
     std::chrono::sys_seconds utcSeconds;
-    std::istringstream stream(normalizedTimestamp);
+    std::istringstream stream(timestamp);
     stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
     THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
 
@@ -858,9 +825,7 @@ void WSLCContainerImpl::Stop(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill)
 
     // Don't wait for the container to stop if we're not sending SIGKILL, since it may not stop the container.
     // N.B. If the signal was SIGTERM for instance, we'll receive the stop notification via OnEvent().
-    // When Kill is true but the requested signal is not SIGKILL, do not wait synchronously for stop.
-    const bool isKillSignal = (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
-    const bool waitForStop = !Kill || isKillSignal;
+    bool waitForStop = !Kill || (SignalArg.value_or(WSLCSignalSIGKILL) == WSLCSignalSIGKILL);
 
     try
     {
@@ -1013,7 +978,7 @@ void WSLCContainerImpl::Export(WSLCHandle OutHandle) const
     }
 
     // Release the lock so the container can still be interacted with while the export is in progress.
-    // Past this point, no member variables can be accessed.
+    // Passed this point, no member variables can be accessed.
     lock.reset();
 
     io.Run({});
@@ -1830,7 +1795,7 @@ void WSLCContainerImpl::MapPorts()
         if (!e.VmMapping.VmPort)
         {
             // Reuse existing vm port allocation when possible.
-            // This is required because the same container can bind the port number for different families or protocols.
+            // This is required because the same container can be bind the port number for different families or protocols.
             auto existing = allocatedPorts.find(e.ContainerPort);
             if (existing != allocatedPorts.end())
             {
