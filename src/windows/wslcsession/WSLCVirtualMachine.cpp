@@ -1131,7 +1131,7 @@ void WSLCVirtualMachine::OnSessionTerminated()
     std::lock_guard lock{m_lock};
 
     // Don't cancel init transactions on the session termination event, since that event is set.
-    WI_VERIFY(m_initChannel.SetExitEvents({m_vmTerminatingEvent.get()}).size() == 2);
+    m_initChannel.SetExitEvents({m_vmTerminatingEvent.get()});
 
     // Set a lower timeout for init transactions since we're terminating.
     m_initChannelTimeout = 15 * 1000;

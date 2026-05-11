@@ -2027,7 +2027,7 @@ int WSLCSession::StopProcess(ServiceRunningProcess& Process, DWORD TerminateTime
     auto signalResult = Process.Get().Signal(WSLCSignalSIGTERM);
     if (FAILED(signalResult))
     {
-        LOG_HR_MSG(signalResult, "Failed to kill process %i", Process.Get().GetPid());
+        LOG_HR_MSG(signalResult, "Failed to terminate process %i", Process.Get().GetPid());
         return -1;
     }
 
