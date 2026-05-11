@@ -81,13 +81,15 @@ void LifetimeManager::ClearCallbacks()
             if (callback.timer)
             {
                 callback.CancelTimer();
-                timers.emplace_back(callback.timer.release());
+                wil::unique_threadpool_timer scopedTimer{callback.timer.release()};
+                timers.push_back(std::move(scopedTimer));
             }
 
             for (auto& child : callback.clientProcesses)
             {
                 child.CancelWait();
-                waits.emplace_back(child.terminationWait.release());
+                wil::unique_threadpool_wait scopedWait{child.terminationWait.release()};
+                waits.push_back(std::move(scopedWait));
             }
 
             callbacks.emplace_back(std::move(callback));
@@ -187,13 +189,15 @@ bool LifetimeManager::RemoveCallback(_In_ ULONG64 ClientKey)
         if (oldClient.timer)
         {
             oldClient.CancelTimer();
-            timers.emplace_back(oldClient.timer.release());
+            wil::unique_threadpool_timer scopedTimer{oldClient.timer.release()};
+            timers.push_back(std::move(scopedTimer));
         }
 
         for (auto& process : oldClient.clientProcesses)
         {
             process.CancelWait();
-            waits.emplace_back(process.terminationWait.release());
+            wil::unique_threadpool_wait scopedWait{process.terminationWait.release()};
+            waits.push_back(std::move(scopedWait));
         }
     }
 
