@@ -231,7 +231,7 @@ Return Value:
         }
 
         snprintf(ExpectedOptions, sizeof(ExpectedOptions), "rw,%s", Options);
-        snprintf(ExpectedCombinedOptions, sizeof(ExpectedOptions), "rw,noatime,%s", Options);
+        snprintf(ExpectedCombinedOptions, sizeof(ExpectedCombinedOptions), "rw,noatime,%s", Options);
 
         LxtCheckResult(MountCheckIsMount(Target, ParentId, Source, "drvfs", MountRoot, "rw,noatime", ExpectedOptions, ExpectedCombinedOptions, 0));
     }
