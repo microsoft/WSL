@@ -40,7 +40,7 @@ EXTERN_C_START
 #define WSLC_E_SDK_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 11)         /* 0x8004060B */
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 96
+#define WSLC_SESSION_OPTIONS_SIZE 88
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -89,9 +89,6 @@ typedef enum WslcVhdRequirementsFlags
     // When set, WslcVhdRequirements::uid and gid are honored. When clear,
     // those fields are ignored and the volume is left owned by root:root.
     WSLC_VHD_REQ_FLAG_OWNER = 0x00000001,
-    // When set, WslcVhdRequirements::mode is honored. When clear, the field
-    // is ignored and the volume keeps the default mkfs.ext4 mode (0755).
-    WSLC_VHD_REQ_FLAG_MODE = 0x00000002,
 } WslcVhdRequirementsFlags;
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcVhdRequirementsFlags);
@@ -105,10 +102,8 @@ typedef struct WslcVhdRequirements
     // The remaining fields are only honored by WslcCreateSessionVhdVolume.
     // WslcSetSessionSettingsVhd rejects non-NONE flags with E_INVALIDARG.
     _In_ WslcVhdRequirementsFlags flags;
-    _In_ uint32_t uid;  // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
-    _In_ uint32_t gid;  // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
-    _In_ uint32_t mode; // octal mode (e.g. 0750), non-zero and <= 07777,
-                        // honored iff (flags & WSLC_VHD_REQ_FLAG_MODE)
+    _In_ uint32_t uid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
+    _In_ uint32_t gid; // honored iff (flags & WSLC_VHD_REQ_FLAG_OWNER)
 } WslcVhdRequirements;
 
 typedef enum WslcSessionFeatureFlags

@@ -477,10 +477,25 @@ std::pair<ULONG, std::string> WSLCVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     return {Lun, Device};
 }
 
-void WSLCVirtualMachine::Ext4Format(const std::string& Device)
+void WSLCVirtualMachine::Ext4Format(const std::string& Device, std::optional<uint32_t> Uid, std::optional<uint32_t> Gid)
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
-    ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
+
+    // -E root_owner=UID:GID sets the ownership of the root inode at format
+    // time, so a non-root container can write to the volume without us having
+    // to spawn a separate chown helper after mount. ext4 has no uid/gid mount
+    // option, so on-disk inode ownership is the only persistent knob.
+    std::vector<std::string> args = {mkfsPath};
+    std::string rootOwner;
+    if (Uid.has_value() && Gid.has_value())
+    {
+        rootOwner = std::format("root_owner={}:{}", *Uid, *Gid);
+        args.push_back("-E");
+        args.push_back(rootOwner);
+    }
+    args.push_back(Device);
+
+    ServiceProcessLauncher launcher(mkfsPath, std::move(args));
     auto result = launcher.Launch(*this).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());

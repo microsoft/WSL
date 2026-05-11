@@ -42,14 +42,13 @@ public:
     // Parses a required unsigned integer value. Throws E_INVALIDARG with
     // MessageWslcMissingVolumeOption if Key is absent, or
     // MessageWslcInvalidVolumeOption if the value is empty, has a leading
-    // sign, contains non-digit (for the given Base) characters, overflows, or
-    // exceeds Max.
+    // sign, contains non-digit characters, overflows, or exceeds Max.
     template <typename T>
-    T Required(std::string_view Key, T Max = (std::numeric_limits<T>::max)(), int Base = 10);
+    T Required(std::string_view Key, T Max = (std::numeric_limits<T>::max)());
 
     // Same validation as Required, but returns nullopt when the key is absent.
     template <typename T>
-    std::optional<T> Optional(std::string_view Key, T Max = (std::numeric_limits<T>::max)(), int Base = 10);
+    std::optional<T> Optional(std::string_view Key, T Max = (std::numeric_limits<T>::max)());
 
     // Parses an optional boolean using wsl::shared::string::ParseBool semantics
     // (accepts "0"/"1"/"true"/"false", case-insensitive). Throws on unknown
@@ -69,14 +68,14 @@ private:
     [[noreturn]] static void ThrowMissing(std::string_view Key);
 
     template <typename T>
-    static T ParseUnsignedValue(std::string_view Key, const std::string& Value, T Max, int Base);
+    static T ParseUnsignedValue(std::string_view Key, const std::string& Value, T Max);
 
     const std::map<std::string, std::string>& m_options;
     std::set<std::string, std::less<>> m_consumed;
 };
 
 template <typename T>
-inline T OptionParser::Required(std::string_view Key, T Max, int Base)
+inline T OptionParser::Required(std::string_view Key, T Max)
 {
     const auto* value = Find(Key);
     if (value == nullptr)
@@ -84,11 +83,11 @@ inline T OptionParser::Required(std::string_view Key, T Max, int Base)
         ThrowMissing(Key);
     }
 
-    return ParseUnsignedValue<T>(Key, *value, Max, Base);
+    return ParseUnsignedValue<T>(Key, *value, Max);
 }
 
 template <typename T>
-inline std::optional<T> OptionParser::Optional(std::string_view Key, T Max, int Base)
+inline std::optional<T> OptionParser::Optional(std::string_view Key, T Max)
 {
     const auto* value = Find(Key);
     if (value == nullptr)
@@ -96,11 +95,11 @@ inline std::optional<T> OptionParser::Optional(std::string_view Key, T Max, int 
         return std::nullopt;
     }
 
-    return ParseUnsignedValue<T>(Key, *value, Max, Base);
+    return ParseUnsignedValue<T>(Key, *value, Max);
 }
 
 template <typename T>
-inline T OptionParser::ParseUnsignedValue(std::string_view Key, const std::string& Value, T Max, int Base)
+inline T OptionParser::ParseUnsignedValue(std::string_view Key, const std::string& Value, T Max)
 {
     static_assert(std::is_unsigned_v<T>, "OptionParser numeric accessors only support unsigned integer types");
 
@@ -116,7 +115,7 @@ inline T OptionParser::ParseUnsignedValue(std::string_view Key, const std::strin
 
     errno = 0;
     char* end = nullptr;
-    const auto parsed = wsl::shared::string::ToUInt64(Value.c_str(), &end, Base);
+    const auto parsed = wsl::shared::string::ToUInt64(Value.c_str(), &end, 10);
     // Capture errno immediately so any subsequent call (debug allocators,
     // logging hooks, etc.) cannot stomp on it before we inspect it.
     const int parseErrno = errno;

@@ -2022,18 +2022,17 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcDeleteSessionVhdVolume(session.get(), c_fixedVolumeName, &deleteErr));
         }
 
-        // Positive: owner + mode flags are honored — chown/chmod applied to
-        // the volume root. Verify by stat-ing the mount inside a container.
+        // Positive: owner flags are honored — uid/gid baked into the volume root
+        // inode at mkfs time. Verify by stat-ing the mount inside a container.
         {
             constexpr auto c_ownedVolumeName = "wslc-sdk-vhd-owned";
             WslcVhdRequirements vhd{};
             vhd.name = c_ownedVolumeName;
             vhd.sizeBytes = c_vhdSizeBytes;
             vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-            vhd.flags = WSLC_VHD_REQ_FLAG_OWNER | WSLC_VHD_REQ_FLAG_MODE;
+            vhd.flags = WSLC_VHD_REQ_FLAG_OWNER;
             vhd.uid = 65534; // nobody
             vhd.gid = 65534; // nogroup
-            vhd.mode = 0750;
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
 
@@ -2042,7 +2041,7 @@ class WslcSdkTests
 
             WslcProcessSettings procSettings;
             VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
-            const char* argv[] = {"/usr/bin/stat", "-c", "%u %g %a", "/data"};
+            const char* argv[] = {"/usr/bin/stat", "-c", "%u %g", "/data"};
             VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
 
             WslcContainerSettings containerSettings;
@@ -2056,29 +2055,7 @@ class WslcSdkTests
             VERIFY_SUCCEEDED(WslcSetContainerSettingsNamedVolumes(&containerSettings, &namedVol, 1));
 
             auto output = RunContainerAndCapture(session.get(), containerSettings);
-            VERIFY_ARE_EQUAL(output.stdoutOutput, "65534 65534 750\n");
-        }
-
-        // Negative: out-of-range mode (> 07777) is rejected.
-        {
-            WslcVhdRequirements vhd{};
-            vhd.name = c_volumeName;
-            vhd.sizeBytes = c_vhdSizeBytes;
-            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-            vhd.flags = WSLC_VHD_REQ_FLAG_MODE;
-            vhd.mode = 0x10000;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
-        }
-
-        // Negative: mode=0 (chmod 0 = inaccessible root) is rejected.
-        {
-            WslcVhdRequirements vhd{};
-            vhd.name = c_volumeName;
-            vhd.sizeBytes = c_vhdSizeBytes;
-            vhd.type = WSLC_VHD_TYPE_DYNAMIC;
-            vhd.flags = WSLC_VHD_REQ_FLAG_MODE;
-            vhd.mode = 0;
-            VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(output.stdoutOutput, "65534 65534\n");
         }
 
         // Negative: unknown flag bits are rejected.
@@ -2091,7 +2068,7 @@ class WslcSdkTests
             VERIFY_ARE_EQUAL(WslcCreateSessionVhdVolume(session.get(), &vhd, nullptr), E_INVALIDARG);
         }
 
-        // Positive: flags=NONE silently ignores uid/gid/mode (volume defaults to root:root).
+        // Positive: flags=NONE silently ignores uid/gid (volume defaults to root:root).
         {
             constexpr auto c_unflaggedVolumeName = "wslc-sdk-vhd-unflagged";
             WslcVhdRequirements vhd{};
@@ -2101,7 +2078,6 @@ class WslcSdkTests
             vhd.flags = WSLC_VHD_REQ_FLAG_NONE;
             vhd.uid = 1000;
             vhd.gid = 1000;
-            vhd.mode = 0750;
             wil::unique_cotaskmem_string errorMsg;
             VERIFY_SUCCEEDED(WslcCreateSessionVhdVolume(session.get(), &vhd, &errorMsg));
 

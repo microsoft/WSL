@@ -495,22 +495,16 @@ try
     RETURN_HR_IF(E_INVALIDARG, options->sizeBytes == 0);
 
     // Reject unknown flag bits so future additions can't be silently ignored.
-    constexpr WslcVhdRequirementsFlags c_knownFlags = WSLC_VHD_REQ_FLAG_OWNER | WSLC_VHD_REQ_FLAG_MODE;
+    constexpr WslcVhdRequirementsFlags c_knownFlags = WSLC_VHD_REQ_FLAG_OWNER;
     RETURN_HR_IF(E_INVALIDARG, (options->flags & ~c_knownFlags) != WSLC_VHD_REQ_FLAG_NONE);
 
-    if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_MODE))
-    {
-        // chmod 0 makes the volume root inaccessible; > 07777 isn't a valid POSIX mode.
-        RETURN_HR_IF(E_INVALIDARG, options->mode == 0 || options->mode > 07777);
-    }
-
-    // uid/gid/mode are documented as "honored iff their flag is set", so materialize
-    // their strings only inside the flag-guarded blocks below. Holders live at function
-    // scope so the c_str() pointers stored in driverOpts stay valid through CreateVolume.
+    // uid/gid are documented as "honored iff their flag is set", so materialize
+    // their strings only inside the flag-guarded block below. Holders live at
+    // function scope so the c_str() pointers stored in driverOpts stay valid
+    // through CreateVolume.
     const auto sizeStr = std::to_string(options->sizeBytes);
     std::string uidStr;
     std::string gidStr;
-    std::string modeStr;
 
     std::vector<WSLCDriverOption> driverOpts;
     driverOpts.push_back({"SizeBytes", sizeStr.c_str()});
@@ -530,12 +524,6 @@ try
         gidStr = std::to_string(options->gid);
         driverOpts.push_back({"Uid", uidStr.c_str()});
         driverOpts.push_back({"Gid", gidStr.c_str()});
-    }
-
-    if (WI_IsFlagSet(options->flags, WSLC_VHD_REQ_FLAG_MODE))
-    {
-        modeStr = std::format("{:o}", options->mode);
-        driverOpts.push_back({"Mode", modeStr.c_str()});
     }
 
     WSLCVolumeOptions volumeOptions{};

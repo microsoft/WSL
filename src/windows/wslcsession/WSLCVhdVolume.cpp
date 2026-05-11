@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "DockerHTTPClient.h"
 #include "OptionParser.h"
-#include "ServiceProcessLauncher.h"
 #include "WSLCVhdVolume.h"
 #include "WSLCVirtualMachine.h"
 #include "WSLCVolumeMetadata.h"
@@ -32,10 +31,6 @@ namespace {
     constexpr auto c_fixedOpt = "Fixed";
     constexpr auto c_uidOpt = "Uid";
     constexpr auto c_gidOpt = "Gid";
-    constexpr auto c_modeOpt = "Mode";
-
-    // Maximum valid file mode bits: setuid | setgid | sticky | rwxrwxrwx == 07777.
-    constexpr uint32_t c_maxModeBits = 07777;
 
     struct VhdVolumeOptions
     {
@@ -43,7 +38,6 @@ namespace {
         bool Fixed{false};
         std::optional<uint32_t> Uid;
         std::optional<uint32_t> Gid;
-        std::optional<uint32_t> Mode;
 
         static VhdVolumeOptions Parse(const std::map<std::string, std::string>& DriverOpts)
         {
@@ -64,13 +58,6 @@ namespace {
             {
                 const auto* missing = opts.Uid.has_value() ? c_gidOpt : c_uidOpt;
                 THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcMissingVolumeOption(missing));
-            }
-
-            // chmod 0 makes the volume root inaccessible to the container's non-root user.
-            opts.Mode = parser.Optional<uint32_t>(c_modeOpt, c_maxModeBits, 8);
-            if (opts.Mode.has_value() && *opts.Mode == 0)
-            {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidVolumeOption(c_modeOpt, DriverOpts.at(c_modeOpt)));
             }
 
             parser.RejectUnknown();
@@ -95,13 +82,6 @@ namespace {
         }
 
         return name;
-    }
-
-    void RunVmCommand(WSLCVirtualMachine& VirtualMachine, const std::string& Executable, const std::vector<std::string>& Arguments, const char* FailureContext)
-    {
-        ServiceProcessLauncher launcher(Executable, Arguments);
-        auto result = launcher.Launch(VirtualMachine).WaitAndCaptureOutput();
-        THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs: %hs", FailureContext, launcher.FormatResult(result).c_str());
     }
 
 } // namespace
@@ -156,29 +136,17 @@ std::unique_ptr<WSLCVhdVolumeImpl> WSLCVhdVolumeImpl::Create(
     auto [lun, device] = VirtualMachine.AttachDisk(hostPath.c_str(), false);
     auto attachCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.DetachDisk(lun); });
 
-    VirtualMachine.Ext4Format(device);
+    // Owner is baked into the ext4 root inode at format time via -E root_owner
+    // so a non-root container user can write to the volume without any
+    // post-mount chown step. For a fresh filesystem the root inode is the
+    // only user-visible inode, so this is sufficient: anything the container
+    // later creates inherits its own uid/gid.
+    VirtualMachine.Ext4Format(device, opts.Uid, opts.Gid);
 
     auto virtualMachinePath = std::format("/mnt/wslc-volumes/{}", name);
     VirtualMachine.Mount(device.c_str(), virtualMachinePath.c_str(), "ext4", "", 0);
 
     auto mountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VirtualMachine.Unmount(virtualMachinePath.c_str()); });
-
-    // Apply ownership and mode to the volume root if requested. These are
-    // persisted on disk in the ext4 root inode and survive remount/recovery,
-    // so they are only applied at create time. Parse() guarantees Uid and Gid
-    // are either both present or both absent.
-    if (opts.Uid.has_value())
-    {
-        const auto owner = std::format("{}:{}", *opts.Uid, *opts.Gid);
-        RunVmCommand(VirtualMachine, "/bin/chown", {"/bin/chown", owner, virtualMachinePath}, "Failed to set volume ownership");
-    }
-
-    if (opts.Mode.has_value())
-    {
-        const auto modeStr = std::format("{:04o}", *opts.Mode);
-        RunVmCommand(
-            VirtualMachine, "/bin/chmod", {"/bin/chmod", modeStr, virtualMachinePath}, "Failed to set volume permissions");
-    }
 
     WSLCVolumeMetadata metadata;
     metadata.Driver = WSLCVhdVolumeDriver;

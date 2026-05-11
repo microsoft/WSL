@@ -47,18 +47,6 @@ void VhdRequirements::SetOwner(uint32_t uid, uint32_t gid)
     m_vhdRequirements.flags = m_vhdRequirements.flags | WSLC_VHD_REQ_FLAG_OWNER;
 }
 
-void VhdRequirements::SetMode(uint32_t mode)
-{
-    // Match the IDL contract: chmod 0 makes the root inaccessible and POSIX modes are bounded by 07777.
-    if (mode == 0 || mode > 07777)
-    {
-        throw winrt::hresult_invalid_argument(L"mode must be non-zero and <= 07777");
-    }
-
-    m_vhdRequirements.mode = mode;
-    m_vhdRequirements.flags = m_vhdRequirements.flags | WSLC_VHD_REQ_FLAG_MODE;
-}
-
 WslcVhdRequirements* VhdRequirements::ToStructPointer()
 {
     return &m_vhdRequirements;

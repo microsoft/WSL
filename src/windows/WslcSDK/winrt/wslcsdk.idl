@@ -56,14 +56,9 @@ namespace Microsoft.WSL.Containers
         UInt64 SizeInBytes { get; };
         VhdType Type { get; };
 
-        // Sets POSIX owner uid/gid (chowned to the volume root). Owner/mode
-        // are only supported on named volumes — assigning to the session
-        // rootfs VHD will fail Session creation with E_INVALIDARG.
+        // Sets POSIX owner uid/gid on the volume root inode (baked in at mkfs
+        // time via -E root_owner). Only supported on named volumes — assigning
+        // to the session rootfs VHD will fail Session creation with E_INVALIDARG.
         void SetOwner(UInt32 uid, UInt32 gid);
-
-        // Sets POSIX mode bits (e.g. 0o750). Must be non-zero and <= 07777
-        // (rejected at the setter with E_INVALIDARG). Owner/mode are only
-        // supported on named volumes.
-        void SetMode(UInt32 mode);
     };
 }

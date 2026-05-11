@@ -4152,29 +4152,6 @@ class WSLCTests
         WSLCDriverOption gidOnly[] = {{"SizeBytes", "1073741824"}, {"Gid", "1000"}};
         validateInvalidOptionsFailure(gidOnly, ARRAYSIZE(gidOnly), E_INVALIDARG, L"Missing required option: 'Uid'");
 
-        // Invalid Mode values.
-        WSLCDriverOption invalidMode[] = {{"SizeBytes", "1073741824"}, {"Mode", "0888"}}; // 8 is not octal
-        validateInvalidOptionsFailure(
-            invalidMode, ARRAYSIZE(invalidMode), E_INVALIDARG, L"Invalid value for option 'Mode': '0888'");
-
-        WSLCDriverOption nonOctalMode[] = {{"SizeBytes", "1073741824"}, {"Mode", "0x755"}};
-        validateInvalidOptionsFailure(
-            nonOctalMode, ARRAYSIZE(nonOctalMode), E_INVALIDARG, L"Invalid value for option 'Mode': '0x755'");
-
-        WSLCDriverOption tooLargeMode[] = {{"SizeBytes", "1073741824"}, {"Mode", "10000"}}; // > 07777
-        validateInvalidOptionsFailure(
-            tooLargeMode, ARRAYSIZE(tooLargeMode), E_INVALIDARG, L"Invalid value for option 'Mode': '10000'");
-
-        WSLCDriverOption signedMode[] = {{"SizeBytes", "1073741824"}, {"Mode", "+755"}};
-        validateInvalidOptionsFailure(signedMode, ARRAYSIZE(signedMode), E_INVALIDARG, L"Invalid value for option 'Mode': '+755'");
-
-        WSLCDriverOption emptyMode[] = {{"SizeBytes", "1073741824"}, {"Mode", ""}};
-        validateInvalidOptionsFailure(emptyMode, ARRAYSIZE(emptyMode), E_INVALIDARG, L"Invalid value for option 'Mode': ''");
-
-        // Mode=0 (chmod 0 = inaccessible root) is rejected by Parse().
-        WSLCDriverOption zeroMode[] = {{"SizeBytes", "1073741824"}, {"Mode", "0"}};
-        validateInvalidOptionsFailure(zeroMode, ARRAYSIZE(zeroMode), E_INVALIDARG, L"Invalid value for option 'Mode': '0'");
-
         // Unknown options are rejected (catches typos and unsupported keys).
         WSLCDriverOption unknownOpt[] = {{"SizeBytes", "1073741824"}, {"Bogus", "value"}};
         validateInvalidOptionsFailure(
@@ -4183,15 +4160,15 @@ class WSLCTests
 
     WSLC_TEST_METHOD(NamedVolumesVhdOwnership)
     {
-        // Verify that Uid/Gid/Mode driver options are applied to the VHD volume
-        // root, allowing a non-root container user to read/write the volume.
+        // Verify that Uid/Gid driver options are baked into the volume root inode
+        // at mkfs time, allowing a non-root container user to read/write the volume.
         const std::string volumeName = "wslc-test-vhd-ownership";
 
         LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str()));
         auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(m_defaultSession->DeleteVolume(volumeName.c_str())); });
 
         // nobody/nogroup are typically uid=65534 / gid=65534 on Debian.
-        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}, {"Uid", "65534"}, {"Gid", "65534"}, {"Mode", "0750"}};
+        WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}, {"Uid", "65534"}, {"Gid", "65534"}};
 
         WSLCVolumeOptions volumeOptions{};
         volumeOptions.Name = volumeName.c_str();
@@ -4214,15 +4191,15 @@ class WSLCTests
             ValidateProcessOutput(writerProcess, {});
         }
 
-        // Verify the file is owned by the same uid/gid and the directory has mode 0750.
+        // Verify the file is owned by the same uid/gid as the volume root.
         {
             WSLCContainerLauncher checker(
-                "debian:latest", "vhd-ownership-checker", {"/bin/sh", "-c", "stat -c '%u %g %a' /data && cat /data/marker.txt"});
+                "debian:latest", "vhd-ownership-checker", {"/bin/sh", "-c", "stat -c '%u %g' /data && cat /data/marker.txt"});
             checker.AddNamedVolume(volumeName, "/data", true);
 
             auto checkerContainer = checker.Launch(*m_defaultSession);
             auto checkerProcess = checkerContainer.GetInitProcess();
-            ValidateProcessOutput(checkerProcess, {{1, "65534 65534 750\nnon-root\n"}});
+            ValidateProcessOutput(checkerProcess, {{1, "65534 65534\nnon-root\n"}});
         }
     }
 
