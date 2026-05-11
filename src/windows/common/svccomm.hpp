@@ -89,14 +89,12 @@ public:
     HRESULT
     ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ ULONG64 NewSize) const;
 
+    ULONG64 GetDistributionSize(_In_ LPCGUID DistroGuid) const;
+
     void SetDefaultDistribution(_In_ LPCGUID DistroGuid) const;
 
     HRESULT
     SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOL Sparse, _In_ BOOL AllowUnsafe) const;
-
-    std::wstring GetDistributionLocation(_In_ LPCGUID DistroGuid) const;
-
-    ULONG64 GetDistributionSize(_In_ LPCGUID DistroGuid) const;
 
     bool GetSparse(_In_ LPCGUID DistroGuid) const;
 
@@ -115,6 +113,8 @@ public:
     void UnregisterDistribution(_In_ LPCGUID DistroGuid) const;
 
     void MoveDistribution(_In_ const GUID& DistroGuid, _In_ LPCWSTR Location) const;
+
+    std::wstring GetDistributionLocation(_In_ LPCGUID DistroGuid) const;
 
 private:
     wil::com_ptr<ILxssUserSession> m_userSession;

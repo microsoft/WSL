@@ -74,11 +74,11 @@ Abstract:
 #define WSL_MANAGE_ARG_RESIZE_OPTION_LONG L"--resize"
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION L's'
 #define WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L"--set-sparse"
+#define WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG L"--get-sparse"
 #define WSL_MANAGE_ARG_SET_DEFAULT_USER_OPTION_LONG L"--set-default-user"
+#define WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG L"--get-default-user"
 #define WSL_MANAGE_ARG_SET_LOCATION_OPTION_LONG L"--set-location"
 #define WSL_MANAGE_ARG_GET_LOCATION_OPTION_LONG L"--get-location"
-#define WSL_MANAGE_ARG_GET_SPARSE_OPTION_LONG L"--get-sparse"
-#define WSL_MANAGE_ARG_GET_DEFAULT_USER_OPTION_LONG L"--get-default-user"
 #define WSL_MANAGE_ARG_SET_SIZE_OPTION_LONG L"--set-size"
 #define WSL_MANAGE_ARG_GET_SIZE_OPTION_LONG L"--get-size"
 #define WSL_MOUNT_ARG L"--mount"

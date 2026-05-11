@@ -557,6 +557,14 @@ void wsl::windows::common::SvcComm::MoveDistribution(_In_ const GUID& DistroGuid
     THROW_IF_FAILED(m_userSession->MoveDistribution(&DistroGuid, Location, context.OutError()));
 }
 
+std::wstring wsl::windows::common::SvcComm::GetDistributionLocation(_In_ LPCGUID DistroGuid) const
+{
+    ClientExecutionContext context;
+    wil::unique_cotaskmem_string vhdLocation;
+    THROW_IF_FAILED(m_userSession->GetDistributionLocation(DistroGuid, &vhdLocation, context.OutError()));
+    return std::wstring{vhdLocation.get()};
+}
+
 std::pair<GUID, wil::unique_cotaskmem_string> wsl::windows::common::SvcComm::RegisterDistribution(
     _In_ LPCWSTR Name,
     _In_ ULONG Version,
@@ -632,22 +640,6 @@ wsl::windows::common::SvcComm::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOL Spar
     RETURN_HR(m_userSession->SetSparse(DistroGuid, Sparse, AllowUnsafe, context.OutError()));
 }
 
-std::wstring wsl::windows::common::SvcComm::GetDistributionLocation(_In_ LPCGUID DistroGuid) const
-{
-    ClientExecutionContext context;
-    wil::unique_cotaskmem_string vhdLocation;
-    THROW_IF_FAILED(m_userSession->GetDistributionLocation(DistroGuid, &vhdLocation, context.OutError()));
-    return std::wstring{vhdLocation.get()};
-}
-
-ULONG64 wsl::windows::common::SvcComm::GetDistributionSize(_In_ LPCGUID DistroGuid) const
-{
-    ClientExecutionContext context;
-    ULONG64 vhdSize{};
-    THROW_IF_FAILED(m_userSession->GetDistributionSize(DistroGuid, &vhdSize, context.OutError()));
-    return vhdSize;
-}
-
 bool wsl::windows::common::SvcComm::GetSparse(_In_ LPCGUID DistroGuid) const
 {
     ClientExecutionContext context;
@@ -674,6 +666,14 @@ wsl::windows::common::SvcComm::ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ 
     outputRelay.Sync();
 
     RETURN_HR(result);
+}
+
+ULONG64 wsl::windows::common::SvcComm::GetDistributionSize(_In_ LPCGUID DistroGuid) const
+{
+    ClientExecutionContext context;
+    ULONG64 vhdSize{};
+    THROW_IF_FAILED(m_userSession->GetDistributionSize(DistroGuid, &vhdSize, context.OutError()));
+    return vhdSize;
 }
 
 HRESULT
