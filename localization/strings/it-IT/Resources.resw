@@ -2765,7 +2765,7 @@ Alla prima esecuzione crea il file con tutte le impostazioni commentate come pre
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
-    <value>CID file '{}' already exists</value>
+    <value>Il file CID '{}' esiste già</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">

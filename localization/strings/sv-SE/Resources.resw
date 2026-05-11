@@ -2759,7 +2759,7 @@ Vid den första körningen skapas filen med alla inställningar kommenterade som
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
-    <value>CID file '{}' already exists</value>
+    <value>CID-filen {} finns redan</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">

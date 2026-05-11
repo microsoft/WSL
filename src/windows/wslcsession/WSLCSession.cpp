@@ -2248,7 +2248,7 @@ try
 
     const auto& entry = it->second;
 
-    wslc_schema::InspectNetwork result;
+    wslc_schema::Network result;
     result.Id = entry.Id;
     result.Name = name;
     result.Driver = entry.Driver;
@@ -2262,7 +2262,7 @@ try
         auto& configs = result.IPAM.Config.emplace();
         for (const auto& cfg : *entry.IPAM.Config)
         {
-            wslc_schema::InspectIPAMConfig inspectCfg;
+            wslc_schema::IPAMConfig inspectCfg;
             inspectCfg.Subnet = cfg.Subnet;
             inspectCfg.Gateway = cfg.Gateway;
             configs.push_back(std::move(inspectCfg));

@@ -89,14 +89,23 @@ if (-not $HasUserSelection)
     $teArgList += "/select:`"@WSLVersion='$Version' or not(@WSLVersion='*')`""
 }
 
-$teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
-
 if ($AttachDebugger)
 {
+    $teProcess = Start-Process -FilePath "te.exe" -ArgumentList $teArgList -PassThru -NoNewWindow
+
     # /inproc is always added above, so attach directly to TE.exe.
     Write-Host "Launching WinDbgX attached to TE.exe (PID: $($teProcess.Id))..."
     Start-Process "WinDbgX.exe" -ArgumentList "-p $($teProcess.Id)"
+
+    $teProcess | Wait-Process
+    exit $teProcess.ExitCode
+}
+else
+{
+    te.exe $teArgList
+    if (!$?)
+    {
+        exit 1
+    }
 }
 
-$teProcess | Wait-Process
-exit $teProcess.ExitCode

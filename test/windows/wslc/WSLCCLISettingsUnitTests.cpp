@@ -69,7 +69,7 @@ static void WriteFile(const std::filesystem::path& path, std::string_view conten
 
 class WSLCCLISettingsUnitTests
 {
-    WSL_TEST_CLASS(WSLCCLISettingsUnitTests)
+    WSLC_TEST_CLASS(WSLCCLISettingsUnitTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
