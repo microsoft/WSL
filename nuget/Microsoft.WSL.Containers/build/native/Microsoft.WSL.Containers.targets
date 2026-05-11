@@ -47,17 +47,13 @@
                  Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
     </Target>
 
-    <!-- Reuses _WslcCollectSources from common.targets to get @(_WslcSourceFiles)
-         and _WslcResolveSavePath to get $(_WslcTarPath). The tar is the sole
-         write output (build is now atomic with save — see _WslcBuildAndSaveSingleImage).
-         tlog format requires one path per line; build ItemGroups so WriteLinesToFile
-         emits each entry on its own line instead of joining with ';'. -->
+    <!-- tlog format requires one path per line; pass ItemGroups to WriteLinesToFile
+         so each entry is its own line (a single ';'-joined string would be one line). -->
     <Target Name="_WslcWriteSingleTlog"
             DependsOnTargets="_WslcCollectSources;_WslcResolveSavePath">
         <PropertyGroup>
-            <!-- Tool path is just a marker for FUTDC; use WslcCliPath as-is.
-                 GetFullPath would mis-resolve the default bare 'wslc' to
-                 <projdir>\wslc (not a real file). -->
+            <!-- Tool path is just a FUTDC group marker; don't GetFullPath
+                 (would mis-resolve bare 'wslc' to <projdir>\wslc). -->
             <_WslcTlogToolPath>$(WslcCliPath)</_WslcTlogToolPath>
             <_WslcTarFullPath>$([System.IO.Path]::GetFullPath('$(_WslcTarPath)'))</_WslcTarFullPath>
         </PropertyGroup>

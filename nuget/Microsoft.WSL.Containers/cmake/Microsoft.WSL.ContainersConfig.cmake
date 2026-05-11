@@ -136,14 +136,14 @@ function(wslc_add_image _target_name)
     if(NOT WSLC_CLI_PATH)
         find_program(WSLC_CLI_PATH wslc)
         if(NOT WSLC_CLI_PATH)
-            message(FATAL_ERROR "wslc CLI not found on PATH. Install WSL by running: wsl --install --no-distribution")
+            message(FATAL_ERROR "wslc CLI not found on PATH. Install WSL by running 'wsl --install --no-distribution', or set the WSLC_CLI_PATH variable to a specific wslc.exe path.")
         endif()
     endif()
 
-    # Validate target name
+    # Validate target name (used as CMake target id and default tar filename).
     string(REGEX MATCH "[^a-zA-Z0-9_.+-]" _bad_char "${_target_name}")
     if(_bad_char)
-        message(FATAL_ERROR "wslc_add_image: '${_target_name}' contains unsupported character '${_bad_char}'. Supported characters are letters, digits, '_', '.', '+', and '-'.")
+        message(FATAL_ERROR "wslc_add_image: '${_target_name}' contains unsupported character '${_bad_char}'. The target name is used as a CMake target identifier and as the default tar filename, so it must be limited to letters, digits, '_', '.', '+', and '-'.")
     endif()
 
     # Normalize paths to be independent of the build directory
@@ -159,10 +159,21 @@ function(wslc_add_image _target_name)
 
     get_filename_component(_tar_dir "${ARG_TAR_LOCATION}" DIRECTORY)
 
+    # Prune failure is swallowed by default (housekeeping); set
+    # WSLC_TREAT_PRUNE_FAILURE_AS_ERROR=ON to fail the build on prune failure.
     set(_prune_command "")
     set(_prune_comment "")
     if(ARG_PRUNE_AFTER_BUILD)
-        set(_prune_command COMMAND "${WSLC_CLI_PATH}" image prune)
+        if(WSLC_TREAT_PRUNE_FAILURE_AS_ERROR)
+            set(_prune_command COMMAND "${WSLC_CLI_PATH}" image prune)
+        else()
+            set(_prune_wrapper "${CMAKE_CURRENT_BINARY_DIR}/wslc_prune_ignore_failure.cmake")
+            if(NOT EXISTS "${_prune_wrapper}")
+                file(WRITE "${_prune_wrapper}"
+                    "execute_process(COMMAND \"\${WSLC}\" image prune)\n")
+            endif()
+            set(_prune_command COMMAND "${CMAKE_COMMAND}" "-DWSLC=${WSLC_CLI_PATH}" -P "${_prune_wrapper}")
+        endif()
         set(_prune_comment ", and pruning dangling images")
     endif()
 

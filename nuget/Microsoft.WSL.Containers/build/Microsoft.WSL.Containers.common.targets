@@ -51,11 +51,7 @@
                Code="WSLC0003"
                Text="WslcImage '%(WslcImage.Identity)' is missing required Context metadata." />
 
-        <!-- Check for characters invalid in Windows file names: / \ : * ? " < > |
-             The Identity (= the value of the Include attribute) is used as the
-             default tar filename and in .tlog filenames, so it must be a valid
-             file name.
-             XML entities: &quot; = "  &lt; = <  &gt; = >  -->
+        <!-- Identity is used as default tar filename and in .tlog filenames; reject filename-invalid chars. -->
         <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(WslcImage.Identity)', '[/\\:*?&quot;&lt;&gt;|]'))"
                Code="WSLC0004"
                Text="WslcImage with Include='%(WslcImage.Identity)' contains a character invalid for filesystem names (one of / \ : * ? &quot; &lt; &gt; |). The Identity is used as the default tar filename and in .tlog filenames. Use a simple identity in Include (e.g. Include=&quot;my-image&quot;) and put the registry/org/tag in the Image metadata." />
@@ -98,9 +94,8 @@
         </ItemGroup>
     </Target>
 
-    <!-- Resolve _WslcFullRef from _WslcImage (with Identity fallback). If the
-         resolved ref has no tag — i.e. no ':' after the last '/' (so registry-port
-         refs like localhost:5000/repo aren't mistaken for tagged) — append ':latest'. -->
+    <!-- Resolve _WslcFullRef. Falls back to Identity when Image unset; appends
+         ':latest' when no tag is present (':' after the last '/'). -->
     <Target Name="_WslcResolveImageRef">
         <PropertyGroup>
             <_WslcRawRef Condition="'$(_WslcImage)' != ''">$(_WslcImage)</_WslcRawRef>
@@ -123,11 +118,8 @@
         </PropertyGroup>
     </Target>
 
-    <!-- Inner target: build + save a single image atomically. Per-image atomicity
-         (rather than batched build-all-then-save-all) means a failure mid-list
-         leaves a coherent state — never "image N is in the daemon but its tar is
-         missing". Save writes <tar>.tmp and Moves on success so a failed save
-         can't leave a partial tar that would mislead later incremental checks. -->
+    <!-- Build + save one image atomically (per-image, so a mid-list failure
+         leaves a coherent state). Save writes <tar>.tmp and Moves on success. -->
     <Target Name="_WslcBuildAndSaveSingleImage"
             DependsOnTargets="_WslcCollectSources;_WslcResolveImageRef;_WslcResolveSavePath"
             Inputs="@(_WslcSourceFiles)"
@@ -150,14 +142,26 @@
 
         <Move SourceFiles="$(_WslcTarPath).tmp" DestinationFiles="$(_WslcTarPath)" />
 
-        <!-- Opt-in: <WslcPruneAfterBuild>true</WslcPruneAfterBuild> -->
+        <!-- Opt-in: WslcPruneAfterBuild=true. Prune failure is a Warning by default;
+             set WslcTreatPruneFailureAsError=true to fail the build instead. -->
         <Message Importance="high"
                  Text="WSLC: Pruning dangling images..."
                  Condition="'$(WslcPruneAfterBuild)' == 'true'" />
 
         <Exec Command="&quot;$(WslcCliPath)&quot; image prune"
               ConsoleToMSBuild="true"
-              Condition="'$(WslcPruneAfterBuild)' == 'true'" />
+              IgnoreExitCode="true"
+              Condition="'$(WslcPruneAfterBuild)' == 'true'">
+            <Output TaskParameter="ExitCode" PropertyName="_WslcPruneExitCode" />
+        </Exec>
+
+        <Error Condition="'$(WslcPruneAfterBuild)' == 'true' AND '$(WslcTreatPruneFailureAsError)' == 'true' AND '$(_WslcPruneExitCode)' != '0'"
+               Code="WSLC0007"
+               Text="wslc image prune failed (exit code $(_WslcPruneExitCode)). The image and tar were saved successfully; only the post-build prune failed." />
+
+        <Warning Condition="'$(WslcPruneAfterBuild)' == 'true' AND '$(WslcTreatPruneFailureAsError)' != 'true' AND '$(_WslcPruneExitCode)' != '0'"
+                 Code="WSLC0007"
+                 Text="wslc image prune failed (exit code $(_WslcPruneExitCode)). The image and tar were saved successfully; only the post-build prune was skipped. Set WslcTreatPruneFailureAsError=true to fail the build instead." />
     </Target>
 
     <!-- Clean container artifacts. ContinueOnError so a transient file lock
