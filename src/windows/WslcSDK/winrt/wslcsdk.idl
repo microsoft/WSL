@@ -58,7 +58,8 @@ namespace Microsoft.WSL.Containers
 
         // Sets POSIX owner uid/gid on the volume root inode (baked in at mkfs
         // time via -E root_owner). Only supported on named volumes — assigning
-        // to the session rootfs VHD will fail Session creation with E_INVALIDARG.
+        // a VhdRequirements with owner set to SessionSettings.VhdRequirements
+        // will fail at property-set time with E_INVALIDARG.
         void SetOwner(UInt32 uid, UInt32 gid);
     };
 }

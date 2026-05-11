@@ -560,7 +560,7 @@ try
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->sizeBytes == 0);
         RETURN_HR_IF(E_NOTIMPL, vhdRequirements->type != WSLC_VHD_TYPE_DYNAMIC);
 
-        // Owner / mode driver options are only honored on named volumes
+        // Owner driver options are only honored on named volumes
         // (WslcCreateSessionVhdVolume). Reject them here so callers don't
         // mistakenly believe they applied to the session rootfs VHD.
         RETURN_HR_IF(E_INVALIDARG, vhdRequirements->flags != WSLC_VHD_REQ_FLAG_NONE);
