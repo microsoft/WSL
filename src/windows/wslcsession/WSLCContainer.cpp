@@ -303,7 +303,7 @@ struct DockerNetworkMode
     std::optional<std::string> TargetId;
 };
 
-DockerNetworkMode DockerNetworkModeToWSLCNetworkType(const std::string& mode)
+DockerNetworkMode ParseDockerNetworkMode(const std::string& mode)
 {
     if (mode == "bridge")
     {
@@ -1756,7 +1756,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     labels.erase(metadataIt);
 
-    auto networkMode = DockerNetworkModeToWSLCNetworkType(dockerContainer.HostConfig.NetworkMode);
+    auto networkMode = ParseDockerNetworkMode(dockerContainer.HostConfig.NetworkMode);
     // Re-register recovered VM ports in the allocation pool to prevent conflicts.
     std::vector<ContainerPortMapping> ports;
     for (const auto& e : metadata.Ports)
