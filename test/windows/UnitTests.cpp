@@ -1311,9 +1311,9 @@ class UnitTests
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
 
-            // Same case using the new `--set vhd-size` syntax.
+            // Same case using the new `--set disk-size` syntax.
             ValidateErrorMessage(
-                L"--manage test_distro --set vhd-size 10GB",
+                L"--manage test_distro --set disk-size 10GB",
                 L"This operation is only supported by WSL2.",
                 L"Wsl/Service/WSL_E_WSL2_NEEDED");
         }
@@ -1350,11 +1350,11 @@ class UnitTests
 
         // Same coverage using the new `--set <property> <value>` syntax.
         ValidateErrorMessage(
-            L"--manage DoesNotExist --set vhd-size 10GB",
+            L"--manage DoesNotExist --set disk-size 10GB",
             L"There is no distribution with the supplied name.",
             L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
-        ValidateErrorMessage(L"--manage test_distro --set vhd-size foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
+        ValidateErrorMessage(L"--manage test_distro --set disk-size foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
 
         ValidateErrorMessage(
             L"--install --distribution debian --no-distribution",
@@ -6878,27 +6878,27 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             VERIFY_ARE_EQUAL(manageGetProperty(WSL_MANAGE_PROPERTY_SPARSE), std::wstring{L"true"});
         }
 
-        // ----- vhd-size: --set vhd-size <bytes> -> --get vhd-size must echo the same byte count.
+        // ----- disk-size: --set disk-size <bytes> -> --get disk-size must echo the same byte count.
         // We grow the VHD by 1 GiB to avoid any shrink-side complications, then resize back.
         {
-            const auto originalStr = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_SIZE);
+            const auto originalStr = manageGetProperty(WSL_MANAGE_PROPERTY_DISK_SIZE);
             VERIFY_IS_FALSE(originalStr.empty());
             const auto original = std::stoull(originalStr);
 
             // Restore the original size at the end of the test.
             auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_VHD_SIZE, original));
+                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DISK_SIZE, original));
             });
 
             // Grow by 1 GiB and read back. The byte count printed by --get must match exactly.
             const ULONG64 grown = original + (1ULL << 30);
             VERIFY_ARE_EQUAL(
                 LxsstuLaunchWsl(std::format(
-                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_VHD_SIZE, grown)),
+                    L"{} {} {} {} {}", WSL_MANAGE_ARG, LXSS_DISTRO_NAME_TEST_L, WSL_MANAGE_ARG_SET_OPTION_LONG, WSL_MANAGE_PROPERTY_DISK_SIZE, grown)),
                 (DWORD)0);
 
-            const auto afterStr = manageGetProperty(WSL_MANAGE_PROPERTY_VHD_SIZE);
+            const auto afterStr = manageGetProperty(WSL_MANAGE_PROPERTY_DISK_SIZE);
             VERIFY_ARE_EQUAL(std::stoull(afterStr), grown);
         }
 

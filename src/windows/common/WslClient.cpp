@@ -943,7 +943,7 @@ int Manage(_In_ std::wstring_view commandLine)
         {
             wprintf(L"%ls\n", service.GetDistributionVhdLocation(&distroGuid).c_str());
         }
-        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_SIZE))
+        else if (wsl::shared::string::IsEqual(getProperty->c_str(), WSL_MANAGE_PROPERTY_DISK_SIZE))
         {
             wprintf(L"%llu\n", service.GetDistributionVhdSize(&distroGuid));
         }
@@ -974,7 +974,7 @@ int Manage(_In_ std::wstring_view commandLine)
             AbsolutePath{resolved}(setValue->c_str());
             move = std::move(resolved);
         }
-        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_VHD_SIZE))
+        else if (wsl::shared::string::IsEqual(setProperty->c_str(), WSL_MANAGE_PROPERTY_DISK_SIZE))
         {
             auto parsed = wsl::shared::string::ParseMemorySize(setValue->c_str());
             THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, wsl::shared::Localization::MessageInvalidSize(setValue->c_str()), !parsed.has_value());
