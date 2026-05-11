@@ -22,7 +22,7 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
-target_include_directories(wsltests PRIVATE ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK ${CMAKE_SOURCE_DIR}/src/windows/wslcsession)
+target_include_directories(wsltests PRIVATE ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK)
 target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests

@@ -1203,6 +1203,7 @@ WslcInspectContainer WSLCContainerImpl::BuildInspectContainer(const DockerInspec
 
 std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     const WSLCContainerOptions& containerOptions,
+    const std::string& containerName,
     WSLCSession& wslcSession,
     WSLCVirtualMachine& virtualMachine,
     const std::unordered_map<std::string, std::unique_ptr<IWSLCVolume>>& sessionVolumes,
@@ -1489,8 +1490,7 @@ std::unique_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
-    auto result =
-        DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
+    auto result = DockerClient.CreateContainer(request, containerName);
 
     // Clean up the Docker container if anything below fails.
     // N.B. The container ID is captured by value since it is moved into the WSLCContainerImpl constructor below.

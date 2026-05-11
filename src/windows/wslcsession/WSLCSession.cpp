@@ -117,17 +117,17 @@ using wsl::windows::service::wslc::c_mountains;
 // When retry > 0, appends a random digit (0-9) to reduce collisions.
 std::string GenerateContainerName(int retry)
 {
-    static std::mt19937 s_gen(std::random_device{}());
+    std::mt19937 gen(std::random_device{}());
 
     std::uniform_int_distribution<size_t> leftDist(0, c_descriptors.size() - 1);
     std::uniform_int_distribution<size_t> rightDist(0, c_mountains.size() - 1);
 
-    auto name = std::string(c_descriptors[leftDist(s_gen)]) + "_" + c_mountains[rightDist(s_gen)];
+    auto name = std::format("{}_{}", c_descriptors[leftDist(gen)], c_mountains[rightDist(gen)]);
 
     if (retry > 0)
     {
         std::uniform_int_distribution<int> digitDist(0, 9);
-        name += std::to_string(digitDist(s_gen));
+        name += std::to_string(digitDist(gen));
     }
 
     return name;
@@ -1661,40 +1661,37 @@ try
         std::scoped_lock lock(m_containersLock, m_volumesLock, m_networksLock);
 
         // Generate a unique container name if the user didn't provide one.
-        std::string generatedName;
-        auto options = *containerOptions;
-        if (options.Name == nullptr || options.Name[0] == '\0')
+        std::string containerName;
+        if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
         {
-            std::unordered_set<std::string> existingNames;
-            for (const auto& c : m_containers)
-            {
-                existingNames.insert(c->Name());
-            }
-
+            containerName = containerOptions->Name;
+        }
+        else
+        {
             constexpr int c_maxNameRetries = 6;
             for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
             {
                 auto randomName = GenerateContainerName(attempt);
-                if (!existingNames.contains(randomName))
+                if (std::ranges::none_of(m_containers, [&](const auto& c) { return c->Name() == randomName; }))
                 {
-                    generatedName = randomName;
+                    containerName = randomName;
                     break;
                 }
             }
 
-            // Fallback to a GUID name
-            if (generatedName.empty())
+            // Fallback to a GUID name.
+            if (containerName.empty())
             {
+                WSL_LOG("GenerateGuidContainerName");
                 GUID guid{};
                 THROW_IF_FAILED(CoCreateGuid(&guid));
-                generatedName = wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
+                containerName = wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
             }
-
-            options.Name = generatedName.c_str();
         }
 
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
-            options,
+            *containerOptions,
+            containerName,
             *this,
             m_virtualMachine.value(),
             m_volumes,
