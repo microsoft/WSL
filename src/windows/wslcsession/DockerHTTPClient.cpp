@@ -297,22 +297,15 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const PruneImagesF
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneImageResult>(verb::post, url);
 }
 
-std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all, int limit, const ListContainersFilters& filters)
+std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all, int limit, std::map<std::string, std::vector<std::string>> filters)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);
+    url.SetParameter("limit", std::to_string(limit));
 
-    // Match docker's client behavior: only forward `limit` to the daemon
-    // when > 0. The CLI passes the user's `-n` value verbatim, so 0 and
-    // negative values intentionally collapse to "no limit query param".
-    if (limit > 0)
+    if (!filters.empty())
     {
-        url.SetParameter("limit", std::to_string(limit));
-    }
-
-    if (!filters.entries.empty())
-    {
-        nlohmann::json filtersJson = filters.entries;
+        nlohmann::json filtersJson = filters;
         url.SetParameter("filters", filtersJson.dump());
     }
 

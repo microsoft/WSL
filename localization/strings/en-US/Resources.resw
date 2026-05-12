@@ -2571,10 +2571,6 @@ On first run, creates the file with all settings commented out at their defaults
     <value>Invalid argument "{}" for "-f, --filter" flag: bad format of filter (expected name=value)</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--filter"}{Locked="name=value"}Command line arguments and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_UnrecognisedFilterValueError" xml:space="preserve">
-    <value>Unrecognised filter value for {}: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FollowArgDescription" xml:space="preserve">
     <value>Follow log output</value>
   </data>

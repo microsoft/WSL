@@ -94,8 +94,7 @@ void GetContainers(CLIExecutionContext& context)
         limit = 1;
     }
 
-    // Filter syntax (`key=value`) is enforced upstream by ValidateFilter; here
-    // we just split on the first '='.
+    // Filter syntax (`key=value`) is enforced upstream; here we just split on the first '='.
     std::vector<std::pair<std::string, std::string>> filters;
     if (context.Args.Contains(ArgType::Filter))
     {
@@ -103,6 +102,8 @@ void GetContainers(CLIExecutionContext& context)
         {
             std::string raw = WideToMultiByte(wideValue);
             const auto eq = raw.find('=');
+            WI_ASSERT(eq != std::string::npos);
+
             filters.emplace_back(raw.substr(0, eq), raw.substr(eq + 1));
         }
     }

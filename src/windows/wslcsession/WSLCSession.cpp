@@ -1731,7 +1731,7 @@ try
 
     bool all = false;
     int limit = -1;
-    DockerHTTPClient::ListContainersFilters filters;
+    std::map<std::string, std::vector<std::string>> filters;
 
     if (Options != nullptr)
     {
@@ -1747,7 +1747,7 @@ try
                 THROW_HR_IF_MSG(E_POINTER, Options->Filters[i].Key == nullptr, "Filter key cannot be null (index %lu)", i);
                 THROW_HR_IF_MSG(E_POINTER, Options->Filters[i].Value == nullptr, "Filter value cannot be null (index %lu)", i);
 
-                filters.entries[Options->Filters[i].Key].emplace_back(Options->Filters[i].Value);
+                filters[Options->Filters[i].Key].emplace_back(Options->Filters[i].Value);
             }
         }
     }

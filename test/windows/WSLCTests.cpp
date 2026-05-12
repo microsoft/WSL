@@ -5147,7 +5147,7 @@ class WSLCTests
                 wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
                 VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
-                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                    nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
                 VERIFY_ARE_EQUAL(containers.size(), 1);
                 runningStateChangedAt = containers[0].StateChangedAt;
                 runningCreatedAt = containers[0].CreatedAt;
@@ -5176,7 +5176,7 @@ class WSLCTests
                 wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
                 wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
                 VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
-                    &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                    nullptr, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
                 VERIFY_ARE_EQUAL(containers.size(), 1);
 
                 auto now = static_cast<ULONGLONG>(time(nullptr));
@@ -5419,12 +5419,25 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ContainerListFilter)
     {
-        // Helper: list containers with a populated WSLCListContainersOptions and return the names.
-        auto listNames = [&](const WSLCListContainersOptions* options) {
+        // Lists containers with the given filter options and returns the names as a set.
+        auto listContainers = [&](DWORD flags, std::initializer_list<std::pair<std::string, std::string>> filterPairs) {
+            std::vector<std::pair<std::string, std::string>> storage(filterPairs.begin(), filterPairs.end());
+            std::vector<WSLCFilter> filters;
+            filters.reserve(storage.size());
+            for (const auto& [k, v] : storage)
+            {
+                filters.push_back({.Key = k.c_str(), .Value = v.c_str()});
+            }
+
+            WSLCListContainersOptions options;
+            options.Flags = flags;
+            options.Filters = filters.data();
+            options.FiltersCount = static_cast<ULONG>(filters.size());
+
             wil::unique_cotaskmem_array_ptr<WSLCContainerEntry> containers;
             wil::unique_cotaskmem_array_ptr<WSLCContainerPortMapping> ports;
             VERIFY_SUCCEEDED(m_defaultSession->ListContainers(
-                options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
+                &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
             std::set<std::string> names;
             for (const auto& c : containers)
@@ -5433,6 +5446,11 @@ class WSLCTests
             }
             return names;
         };
+
+        auto expectContainers =
+            [&](DWORD flags, std::initializer_list<std::pair<std::string, std::string>> filterPairs, std::set<std::string> expected) {
+                VERIFY_ARE_EQUAL(expected, listContainers(flags, filterPairs));
+            };
 
         // Set up: one running container, one exited container, one created container.
         WSLCContainerLauncher runningLauncher("debian:latest", "filter-running", {"sleep", "99999"});
@@ -5458,120 +5476,42 @@ class WSLCTests
             LOG_IF_FAILED(createdContainer.Get().Delete(WSLCDeleteFlagsForce));
         });
 
-        // Helper: build an options struct with --all and a list of {key, value}
-        // filter entries. Returns the names matched. Filter strings are stored
-        // in the captured vector so the WSLCFilter pointers stay valid.
-        auto listWithFilters = [&](DWORD flags, std::initializer_list<std::pair<std::string, std::string>> filterPairs) {
-            std::vector<std::pair<std::string, std::string>> storage(filterPairs.begin(), filterPairs.end());
-            std::vector<WSLCFilter> filters;
-            filters.reserve(storage.size());
-            for (const auto& [k, v] : storage)
-            {
-                filters.push_back({.Key = k.c_str(), .Value = v.c_str()});
-            }
-
-            WSLCListContainersOptions options{};
-            options.Flags = flags;
-            if (!filters.empty())
-            {
-                options.Filters = filters.data();
-                options.FiltersCount = static_cast<ULONG>(filters.size());
-            }
-
-            return listNames(&options);
-        };
-
-        // Default (no options) -> only running containers visible.
-        {
-            auto names = listNames(nullptr);
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-            VERIFY_IS_FALSE(names.contains("filter-exited"));
-            VERIFY_IS_FALSE(names.contains("filter-created"));
-        }
+        // Default (Flags=None, no filters) -> only running containers visible.
+        expectContainers(WSLCListContainersFlagsNone, {}, {"filter-running"});
 
         // --all (Flags=All, no filters) -> all three visible.
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {});
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-            VERIFY_IS_TRUE(names.contains("filter-exited"));
-            VERIFY_IS_TRUE(names.contains("filter-created"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {}, {"filter-running", "filter-exited", "filter-created"});
 
         // status=exited
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"status", "exited"}});
-            VERIFY_IS_TRUE(names.contains("filter-exited"));
-            VERIFY_IS_FALSE(names.contains("filter-running"));
-            VERIFY_IS_FALSE(names.contains("filter-created"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {{"status", "exited"}}, {"filter-exited"});
 
         // status=running OR status=created (multiple values for the same key are OR'd by Docker).
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"status", "running"}, {"status", "created"}});
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-            VERIFY_IS_TRUE(names.contains("filter-created"));
-            VERIFY_IS_FALSE(names.contains("filter-exited"));
-        }
+        expectContainers(
+            WSLCListContainersFlagsAll, {{"status", "running"}, {"status", "created"}}, {"filter-running", "filter-created"});
 
         // name=filter-running
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"name", "filter-running"}});
-            VERIFY_ARE_EQUAL(names.size(), 1u);
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {{"name", "filter-running"}}, {"filter-running"});
 
         // id prefix match
-        {
-            std::string idPrefix = runningId.substr(0, 12);
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"id", idPrefix}});
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-            VERIFY_IS_FALSE(names.contains("filter-exited"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {{"id", runningId.substr(0, 12)}}, {"filter-running"});
 
-        // label=filter.test (key-only).
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"label", "filter.test"}});
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-            VERIFY_IS_TRUE(names.contains("filter-exited"));
-            VERIFY_IS_FALSE(names.contains("filter-created"));
-        }
+        // label=filter.test (key-only) matches running and exited (both have the label).
+        expectContainers(WSLCListContainersFlagsAll, {{"label", "filter.test"}}, {"filter-running", "filter-exited"});
 
-        // label=filter.role=primary (key=value).
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"label", "filter.role=primary"}});
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-            VERIFY_IS_FALSE(names.contains("filter-exited"));
-        }
+        // label=filter.role=primary (key=value) matches only the running container.
+        expectContainers(WSLCListContainersFlagsAll, {{"label", "filter.role=primary"}}, {"filter-running"});
 
         // Multiple keys are AND'd: status=exited AND label=filter.test.
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"status", "exited"}, {"label", "filter.test"}});
-            VERIFY_IS_TRUE(names.contains("filter-exited"));
-            VERIFY_IS_FALSE(names.contains("filter-running"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {{"status", "exited"}, {"label", "filter.test"}}, {"filter-exited"});
 
         // before=filter-exited -> only containers created before filter-exited are visible.
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"before", "filter-exited"}});
-            VERIFY_IS_TRUE(names.contains("filter-running"));
-            VERIFY_IS_FALSE(names.contains("filter-exited"));
-            VERIFY_IS_FALSE(names.contains("filter-created"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {{"before", "filter-exited"}}, {"filter-running"});
 
         // since=filter-running -> only containers created after filter-running are visible.
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"since", "filter-running"}});
-            VERIFY_IS_FALSE(names.contains("filter-running"));
-            VERIFY_IS_TRUE(names.contains("filter-exited"));
-            VERIFY_IS_TRUE(names.contains("filter-created"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {{"since", "filter-running"}}, {"filter-exited", "filter-created"});
 
         // exited=0 -> only the exited container that completed successfully.
-        {
-            auto names = listWithFilters(WSLCListContainersFlagsAll, {{"exited", "0"}});
-            VERIFY_IS_TRUE(names.contains("filter-exited"));
-            VERIFY_IS_FALSE(names.contains("filter-running"));
-        }
+        expectContainers(WSLCListContainersFlagsAll, {{"exited", "0"}}, {"filter-exited"});
 
         // Limit caps the result count.
         {
@@ -5585,7 +5525,7 @@ class WSLCTests
                 &options, &containers, containers.size_address<ULONG>(), &ports, ports.size_address<ULONG>()));
 
             // Docker returns at most one container; we intersect with the
-            // session list so the actual count is also at most one.
+            // session list so the actual count should also be at most one.
             VERIFY_IS_TRUE(containers.size() <= 1u);
         }
     }

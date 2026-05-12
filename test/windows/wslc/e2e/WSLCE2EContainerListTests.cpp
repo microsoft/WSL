@@ -202,30 +202,27 @@ class WSLCE2EContainerListTests
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_InvalidKey)
     {
-        // Unknown filter keys are not validated by the CLI; they are forwarded
-        // to the Docker daemon, which rejects them with its native error.
+        // Filter keys are validated by the Docker daemon, which rejects unknown keys.
         const auto result = RunWslc(L"container list --filter color=blue");
         VERIFY_ARE_EQUAL(1, result.ExitCode);
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"color"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter 'color'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_MalformedValue)
     {
         // Filter values must be of the form key=value; bare keys are rejected by the CLI.
         const auto result = RunWslc(L"container list --filter status");
-        VERIFY_ARE_EQUAL(1, result.ExitCode);
-        VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"Invalid filter"));
+        result.Verify({.Stdout = GetHelpMessage(), .Stderr = Localization::WSLCCLI_InvalidFilterError(L"status") + L"\r\n", .ExitCode = 1});
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_InvalidStatusValue)
     {
-        // Status values are not validated by the CLI either; the daemon rejects them.
+        // Status values are validated by the Docker daemon, which rejects unknown values.
         const auto result = RunWslc(L"container list --filter status=bogus");
         VERIFY_ARE_EQUAL(1, result.ExitCode);
         VERIFY_IS_TRUE(result.Stderr.has_value());
-        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"bogus"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring::npos, result.Stderr->find(L"invalid filter 'status=bogus'"));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_Name)
@@ -241,13 +238,12 @@ class WSLCE2EContainerListTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId2 = result.GetStdoutOneLine();
 
-        // name= is a substring match in Docker. Filter to the first name and verify only it shows.
-        result = RunWslc(std::format(L"container list --all --format json --filter name={}", WslcContainerName));
+        result = RunWslc(std::format(L"container list --all --format json --filter name={}", WslcContainerName2));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto containers = wsl::shared::FromJson<std::vector<ContainerInformation>>(result.Stdout.value().c_str());
         VERIFY_ARE_EQUAL(1U, containers.size());
-        VERIFY_ARE_EQUAL(WideToMultiByte(WslcContainerName), std::string(containers[0].Name));
+        VERIFY_ARE_EQUAL(WideToMultiByte(WslcContainerName2), std::string(containers[0].Name));
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Container_List_Filter_Status)
@@ -275,21 +271,21 @@ class WSLCE2EContainerListTests
             return names;
         };
 
-        // status=created -> only the created container.
+        // status=created
         {
             const auto names = listNames(L"--filter status=created");
             VERIFY_IS_TRUE(names.contains(WideToMultiByte(WslcContainerName)));
             VERIFY_IS_FALSE(names.contains(WideToMultiByte(WslcContainerName2)));
         }
 
-        // status=running -> only the running container.
+        // status=running
         {
             const auto names = listNames(L"--filter status=running");
             VERIFY_IS_FALSE(names.contains(WideToMultiByte(WslcContainerName)));
             VERIFY_IS_TRUE(names.contains(WideToMultiByte(WslcContainerName2)));
         }
 
-        // Multiple --filter status= values are OR'd by the daemon.
+        // Multiple --filter status= values are OR'd.
         {
             const auto names = listNames(L"--filter status=created --filter status=running");
             VERIFY_IS_TRUE(names.contains(WideToMultiByte(WslcContainerName)));

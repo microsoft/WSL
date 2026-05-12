@@ -684,13 +684,7 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListContainersFlags);")
 
 typedef struct _WSLCListContainersOptions
 {
-    DWORD Flags;
-
-    // Maximum number of containers to return. -1 means "not specified"
-    // (no `limit` query parameter sent to the Docker daemon). Mirrors
-    // `docker ps -n / --last`, which uses -1 as its CLI default. Any
-    // value <= 0 is treated as "not specified" by the Docker engine
-    // (the `limit` query parameter is only sent when Limit > 0).
+    DWORD Flags; // WSLCListContainersFlags
     LONG Limit;
 
     [unique, size_is(FiltersCount)] const WSLCFilter* Filters;
