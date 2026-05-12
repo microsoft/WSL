@@ -256,7 +256,7 @@ def validate_adml(adml_folder: str, baseline_language: str) -> bool:
 
     return result
 
-def run(resource_folder: str, baseline_language: str, fix: bool):
+def run(resource_folder: str, baseline_language: str, fix: bool, adml_folder: str):
     baseline_file = f'{resource_folder}/{baseline_language}/Resources.resw'
 
     strings = get_strings_from_file(baseline_file, True)
@@ -268,7 +268,7 @@ def run(resource_folder: str, baseline_language: str, fix: bool):
         print(f'Validating inserts in {path}')
         result &= validate_resource(baseline, path)
 
-    result &= validate_adml(ADML_FOLDER, baseline_language)
+    result &= validate_adml(adml_folder, baseline_language)
 
     if fix and comments:
         fix_comments(comments, baseline_file, strings)
@@ -277,16 +277,18 @@ def run(resource_folder: str, baseline_language: str, fix: bool):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 3: # Hack to work around pip install errors in the build pipeline
-        run(sys.argv[1], sys.argv[2], False)
+    if len(sys.argv) in (3, 4): # Hack to work around pip install errors in the build pipeline
+        adml = sys.argv[3] if len(sys.argv) == 4 else ADML_FOLDER
+        run(sys.argv[1], sys.argv[2], False, adml)
     else:
         import click
 
         @click.command()
         @click.argument('resource-folder', default='localization/strings')
         @click.argument('baseline-language', default='en-us')
+        @click.argument('adml-folder', default=ADML_FOLDER)
         @click.option('--fix', is_flag=True)
-        def main(resource_folder: str, baseline_language: str, fix: bool):
-            run(resource_folder, baseline_language, fix)
-        
+        def main(resource_folder: str, baseline_language: str, adml_folder: str, fix: bool):
+            run(resource_folder, baseline_language, fix, adml_folder)
+
         main()
