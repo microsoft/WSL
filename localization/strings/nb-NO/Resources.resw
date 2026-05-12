@@ -2462,10 +2462,10 @@ For personverninformasjon om dette produktet kan du gå til https://aka.ms/priva
     <value>Administrer registerlegitimasjon, inkludert pålogging til og fra beholderregistre.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Systemnivåkommandoer</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Administrasjonskommandoer på systemnivå.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Merk et bilde.</value>

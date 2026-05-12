@@ -2468,10 +2468,10 @@ Para obtener información de privacidad sobre este producto, visita https://aka.
     <value>Administre las credenciales del registro, incluido el inicio y cierre de sesión en los registros de contenedor.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Comandos de nivel de sistema</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Comandos de administración de nivel de sistema.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Etiquetar una imagen.</value>
