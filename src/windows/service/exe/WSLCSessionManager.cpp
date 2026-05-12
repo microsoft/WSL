@@ -106,6 +106,8 @@ private:
         // TODO: Add a config setting to opt-out of GPU support.
         Settings.FeatureFlags = WslcFeatureFlagsGPU;
         WI_SetFlagIf(Settings.FeatureFlags, WslcFeatureFlagsDnsTunneling, userSettings.Get<settings::Setting::SessionDnsTunneling>());
+        WI_SetFlagIf(Settings.FeatureFlags, WslcFeatureFlagsOpenVmm, userSettings.Get<settings::Setting::SessionOpenVmm>());
+        WI_SetFlagIf(Settings.FeatureFlags, WslcFeatureFlagsOpenVmmTtrpc, userSettings.Get<settings::Setting::SessionOpenVmmTtrpc>());
         WI_SetFlagIf(
             Settings.FeatureFlags,
             WslcFeatureFlagsVirtioFs,
@@ -213,8 +215,7 @@ void WSLCSessionManagerImpl::CreateSession(const WSLCSessionSettings* Settings, 
         // Create the VM in the SYSTEM service (privileged).
         // Select VMM backend: set WSLC_USE_OPENVMM=1 to use OpenVMM instead of HCS.
         Microsoft::WRL::ComPtr<IWSLCVirtualMachine> vm;
-        wchar_t envBuffer[2]{};
-        const bool useOpenVmm = GetEnvironmentVariableW(L"WSLC_USE_OPENVMM", envBuffer, ARRAYSIZE(envBuffer)) > 0 && envBuffer[0] == L'1';
+        const bool useOpenVmm = WI_IsFlagSet(Settings->FeatureFlags, WslcFeatureFlagsOpenVmm);
 
         // For OpenVMM, disable unsupported features before creating the VM and session.
         // The copy must outlive all uses of Settings below (CreateSessionSettings, etc.).

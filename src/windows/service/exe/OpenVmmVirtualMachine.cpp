@@ -49,6 +49,12 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     WI_ClearFlag(m_featureFlags, WslcFeatureFlagsGPU);      // No GPU passthrough on WHP
     WI_ClearFlag(m_featureFlags, WslcFeatureFlagsVirtioFs);  // No VirtioFS hot-add yet
 
+    // Select configuration mode based on feature flag.
+    // When WslcFeatureFlagsOpenVmmTtrpc is set, VM configuration is sent via
+    // ttrpc RPCs (CreateVM, ResumeVM, ModifyResource). Otherwise, all
+    // configuration is passed as CLI arguments to openvmm.exe.
+    m_useTtrpc = WI_IsFlagSet(m_featureFlags, WslcFeatureFlagsOpenVmmTtrpc);
+
     m_networkingMode = Settings->NetworkingMode;
     m_bootTimeoutMs = Settings->BootTimeoutMs;
     m_cpuCount = Settings->CpuCount;
@@ -179,6 +185,43 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
     attachBootDisk(m_rootVhdPath.c_str());
     attachBootDisk(m_modulesVhdPath.c_str());
 
+    // In CLI mode, pre-attach the storage VHD at boot since runtime
+    // hot-add via ttrpc is not available.
+    if (!m_useTtrpc && !m_storageVhdPath.empty())
+    {
+        const ULONG lun = AllocateLun();
+        DiskInfo disk{m_storageVhdPath.c_str(), false};
+        m_attachedDisks.emplace(lun, std::move(disk));
+
+        // Pre-create and pre-attach the swap VHD. In CLI mode, disks cannot
+        // be hot-added at runtime, so the swap disk must exist before boot.
+        // The swap size matches memory size (same as WSLCSessionManager logic).
+        // The VHD is ephemeral — deleted and recreated each session.
+        if (m_memoryMb > 0)
+        {
+            m_swapVhdPath = m_storageVhdPath.parent_path() / L"swap.vhdx";
+            DeleteFileW(m_swapVhdPath.c_str()); // Remove stale swap from prior run
+
+            VIRTUAL_STORAGE_TYPE swapStorageType{VIRTUAL_STORAGE_TYPE_DEVICE_VHDX, VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT};
+            CREATE_VIRTUAL_DISK_PARAMETERS swapCreateParams{};
+            swapCreateParams.Version = CREATE_VIRTUAL_DISK_VERSION_2;
+            swapCreateParams.Version2.MaximumSize = static_cast<ULONGLONG>(m_memoryMb) * 1024ULL * 1024ULL;
+            HANDLE swapDiskHandle = INVALID_HANDLE_VALUE;
+            THROW_IF_WIN32_ERROR_MSG(CreateVirtualDisk(
+                &swapStorageType, m_swapVhdPath.c_str(), VIRTUAL_DISK_ACCESS_NONE,
+                nullptr, CREATE_VIRTUAL_DISK_FLAG_NONE, 0, &swapCreateParams, nullptr, &swapDiskHandle),
+                "Failed to create swap VHDX: %ls", m_swapVhdPath.c_str());
+            if (swapDiskHandle != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(swapDiskHandle);
+            }
+
+            const ULONG swapLun = AllocateLun();
+            DiskInfo swapDisk{m_swapVhdPath.c_str(), false};
+            m_attachedDisks.emplace(swapLun, std::move(swapDisk));
+        }
+    }
+
     // Create the Unix domain socket listener for the init connection BEFORE
     // launching openvmm. The guest's mini_init will connect to vsock port
     // 50000 immediately on boot, and OpenVMM's hybrid_vsock bridge will relay
@@ -233,18 +276,78 @@ OpenVmmVirtualMachine::OpenVmmVirtualMachine(_In_ const WSLCSessionSettings* Set
 
 std::wstring OpenVmmVirtualMachine::BuildCommandLine() const
 {
-    // Build the openvmm.exe command line.
-    //
-    // In ttrpc orchestration mode, the command line only specifies the ttrpc
-    // socket path. All VM configuration (kernel, disks, memory, networking,
-    // etc.) is sent via the CreateVM RPC after the ttrpc server is ready.
-    // This matches the Kata Containers / vmservice workflow.
-
     std::wstring cmd = std::format(L"\"{}\"", m_openvmmPath.wstring());
 
-    // ttrpc server mode — OpenVMM will listen on this Unix domain socket
-    // for vmservice RPCs (CreateVM, ResumeVM, ModifyResource, etc.).
-    cmd += std::format(L" --ttrpc \"{}\"", m_ttrpcSocketPath.wstring());
+    if (m_useTtrpc)
+    {
+        // ttrpc server mode — all VM configuration is sent via the CreateVM
+        // RPC after the ttrpc server is ready. Only pass the socket path here.
+        cmd += std::format(L" --ttrpc \"{}\"", m_ttrpcSocketPath.wstring());
+    }
+    else
+    {
+        // CLI mode — pass all VM configuration as command line arguments.
+
+        // Linux direct boot: kernel and initrd.
+        cmd += std::format(L" --kernel \"{}\"", m_kernelPath.wstring());
+        cmd += std::format(L" --initrd \"{}\"", m_initrdPath.wstring());
+
+        // Kernel command line.
+        cmd += std::format(L" --cmdline \"{}\"", m_kernelCmdLine);
+
+        // Memory (ensure 2MB granularity, cap at 4GB for PoC).
+        constexpr ULONG maxMemoryMbPoC = 4096;
+        ULONG memoryMb = std::min(m_memoryMb, maxMemoryMbPoC) & ~0x1;
+        cmd += std::format(L" --memory {}M", memoryMb);
+
+        // Processor count.
+        cmd += std::format(L" --processors {}", m_cpuCount);
+
+        // Enable Hyper-V enlightenments and WHP hypervisor.
+        cmd += L" --hv";
+        cmd += L" --hypervisor whp";
+
+        // Halt on guest reset instead of rebooting (prevents panic reboot loops).
+        cmd += L" --halt-on-reset";
+
+        // HvSocket bridge via hybrid vsock path.
+        cmd += std::format(L" --vmbus-vsock-path \"{}\"", m_vsockPath.wstring());
+
+        // Boot disks (SCSI). Each --disk adds a SCSI LUN in order.
+        // Must use the file: prefix so the path's drive letter colon (e.g. C:\...)
+        // is not misinterpreted as a disk kind delimiter.
+        for (const auto& [lun, disk] : m_attachedDisks)
+        {
+            if (disk.ReadOnly)
+            {
+                cmd += std::format(L" --disk \"file:{},ro\"", disk.Path);
+            }
+            else
+            {
+                cmd += std::format(L" --disk \"file:{}\"", disk.Path);
+            }
+        }
+
+        // Networking: use virtio-net frontend with consomme NAT backend.
+        // consomme provides a self-contained userspace TCP/IP stack with DHCP —
+        // no host-side GNS daemon or network setup needed.
+        if (m_networkingMode == WSLCNetworkingModeConsomme)
+        {
+            cmd += L" --virtio-net consomme";
+        }
+
+        // Serial COM1 for early boot console (earlycon output).
+        // In CLI mode, OpenVMM's --com1 only supports listen= (server mode),
+        // but DmesgCollector also creates a server pipe. Use stderr instead —
+        // it's already redirected to the log file by LaunchOpenVmm.
+        cmd += L" --com1 stderr";
+
+        // Virtio console (/dev/hvc0) for post-boot kernel output.
+        // Same pipe conflict as COM1 — skip in CLI mode. Kernel output is
+        // captured via COM1/stderr (earlycon) and the log file.
+        // TODO: Add a client-connect pipe mode to OpenVMM CLI to support
+        // DmesgCollector pipes directly.
+    }
 
     return cmd;
 }
@@ -352,32 +455,34 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
     // Start a thread to watch for openvmm process exit.
     m_processWatchThread = std::thread(&OpenVmmVirtualMachine::WatchProcessExit, this);
 
-    // Connect the ttrpc client. In --ttrpc mode, the server is ready almost
-    // immediately (it only binds the socket, no VM setup yet). Connect()
-    // retries with backoff internally.
-    m_ttrpcClient = std::make_unique<TtrpcClient>();
-    THROW_IF_FAILED_MSG(
-        m_ttrpcClient->Connect(m_ttrpcSocketPath.wstring(), 30000),
-        "Failed to connect to OpenVMM ttrpc server");
+    if (m_useTtrpc)
+    {
+        // Connect the ttrpc client. In --ttrpc mode, the server is ready almost
+        // immediately (it only binds the socket, no VM setup yet). Connect()
+        // retries with backoff internally.
+        m_ttrpcClient = std::make_unique<TtrpcClient>();
+        THROW_IF_FAILED_MSG(
+            m_ttrpcClient->Connect(m_ttrpcSocketPath.wstring(), 30000),
+            "Failed to connect to OpenVMM ttrpc server");
 
-    // Send CreateVM with the full VM configuration (kernel, disks, memory, etc.).
-    auto vmConfig = BuildVmConfig();
-    THROW_IF_FAILED_MSG(
-        m_ttrpcClient->CreateVm(vmConfig),
-        "Failed to create VM via ttrpc CreateVM");
+        // Send CreateVM with the full VM configuration (kernel, disks, memory, etc.).
+        auto vmConfig = BuildVmConfig();
+        THROW_IF_FAILED_MSG(
+            m_ttrpcClient->CreateVm(vmConfig),
+            "Failed to create VM via ttrpc CreateVM");
 
-    // Resume the VM — CreateVM leaves it in a paused state.
-    THROW_IF_FAILED_MSG(
-        m_ttrpcClient->ResumeVm(),
-        "Failed to resume VM via ttrpc ResumeVM");
+        // Resume the VM — CreateVM leaves it in a paused state.
+        THROW_IF_FAILED_MSG(
+            m_ttrpcClient->ResumeVm(),
+            "Failed to resume VM via ttrpc ResumeVM");
 
-    // Start a thread that calls WaitVM to detect when the guest halts.
-    // This is analogous to HCS's OnVmExitCallback — when the guest performs
-    // an ACPI S5 power-down, WaitVM returns and we signal m_vmExitEvent.
-    // Uses a separate ttrpc connection because WaitVM blocks indefinitely and
-    // SendRequest holds the client lock for the entire send+recv — a single
-    // connection would deadlock all other RPCs (AttachDisk, etc.).
-    m_waitVmThread = std::thread([this]() {
+        // Start a thread that calls WaitVM to detect when the guest halts.
+        // This is analogous to HCS's OnVmExitCallback — when the guest performs
+        // an ACPI S5 power-down, WaitVM returns and we signal m_vmExitEvent.
+        // Uses a separate ttrpc connection because WaitVM blocks indefinitely and
+        // SendRequest holds the client lock for the entire send+recv — a single
+        // connection would deadlock all other RPCs (AttachDisk, etc.).
+        m_waitVmThread = std::thread([this]() {
         TtrpcClient waitClient;
         auto hr = waitClient.Connect(m_ttrpcSocketPath.wstring(), 30000);
         if (SUCCEEDED(hr))
@@ -398,6 +503,7 @@ void OpenVmmVirtualMachine::LaunchOpenVmm()
 
         m_vmExitEvent.SetEvent();
     });
+    } // end if (m_useTtrpc)
 }
 
 void OpenVmmVirtualMachine::WatchProcessExit()
@@ -535,9 +641,10 @@ try
     WI_ASSERT(m_networkingMode == WSLCNetworkingModeConsomme);
     THROW_HR_IF(E_INVALIDARG, m_networkingMode != WSLCNetworkingModeConsomme);
 
-    // In ttrpc orchestration mode, consomme networking is configured
-    // server-side via the ConsommeBackend in NICConfig. No host-side
-    // networking engine is needed — this call is a no-op.
+    // In both CLI and ttrpc modes, consomme networking is self-contained:
+    // - CLI mode: configured via --net consomme CLI argument at boot time.
+    // - ttrpc mode: configured server-side via ConsommeBackend in NICConfig.
+    // No host-side networking engine is needed — this call is a no-op.
     return S_OK;
 }
 CATCH_RETURN()
@@ -548,6 +655,39 @@ try
     RETURN_HR_IF(E_POINTER, Path == nullptr || Lun == nullptr);
 
     std::lock_guard lock(m_lock);
+
+    // In CLI mode, disks must be pre-attached at boot time since runtime
+    // hot-add via ttrpc is not available. Check if this disk was already
+    // attached (e.g., storage.vhdx) and return the pre-allocated LUN.
+    if (!m_useTtrpc)
+    {
+        std::filesystem::path requestedPath(Path);
+        for (const auto& [lun, disk] : m_attachedDisks)
+        {
+            if (std::filesystem::weakly_canonical(requestedPath) == std::filesystem::weakly_canonical(std::filesystem::path(disk.Path)))
+            {
+                WSL_LOG(
+                    "OpenVmmAttachDiskPreAttached",
+                    TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
+                    TraceLoggingValue(Path, "Path"),
+                    TraceLoggingValue(lun, "Lun"));
+
+                *Lun = lun;
+                return S_OK;
+            }
+        }
+
+        // Disk was not pre-attached and runtime hot-add is not available.
+        WSL_LOG(
+            "OpenVmmAttachDiskNotSupported",
+            TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
+            TraceLoggingValue(Path, "Path"),
+            TraceLoggingValue(ReadOnly, "ReadOnly"));
+
+        return E_NOTIMPL;
+    }
+
+    // Runtime disk hot-add via ttrpc.
 
     THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
         "ttrpc client not connected for disk hot-add");
@@ -577,6 +717,17 @@ try
 
     auto it = m_attachedDisks.find(Lun);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_attachedDisks.end());
+
+    // Runtime disk hot-remove requires the ttrpc interface.
+    if (!m_useTtrpc)
+    {
+        WSL_LOG(
+            "OpenVmmDetachDiskNotSupported",
+            TraceLoggingValue(m_vmIdString.c_str(), "VmId"),
+            TraceLoggingValue(Lun, "Lun"));
+
+        return E_NOTIMPL;
+    }
 
     THROW_HR_IF_MSG(E_FAIL, !m_ttrpcClient || !m_ttrpcClient->IsConnected(),
         "ttrpc client not connected for disk hot-remove");

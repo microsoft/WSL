@@ -41,6 +41,8 @@ enum class Setting : size_t
     SessionNetworkingMode,
     SessionHostFileShareMode,
     SessionDnsTunneling,
+    SessionOpenVmm,
+    SessionOpenVmmTtrpc,
     CredentialStore,
 
     Max
@@ -88,6 +90,8 @@ namespace details {
     DEFINE_SETTING_MAPPING(SessionNetworkingMode,    std::string, WSLCNetworkingMode,  WSLCNetworkingModeVirtioProxy, "session.networkingMode")
     DEFINE_SETTING_MAPPING(SessionHostFileShareMode, std::string, HostFileShareMode,   HostFileShareMode::VirtioFs,   "session.hostFileShareMode")
     DEFINE_SETTING_MAPPING(SessionDnsTunneling,      bool,        bool,                true,                          "session.dnsTunneling")
+    DEFINE_SETTING_MAPPING(SessionOpenVmm,           bool,        bool,                false,                         "session.openVmm")
+    DEFINE_SETTING_MAPPING(SessionOpenVmmTtrpc,      bool,        bool,                false,                         "session.openVmmTtrpc")
     DEFINE_SETTING_MAPPING(CredentialStore,          std::string, CredentialStoreType, CredentialStoreType::WinCred,  "credentialStore")
 
 #undef DEFINE_SETTING_MAPPING
