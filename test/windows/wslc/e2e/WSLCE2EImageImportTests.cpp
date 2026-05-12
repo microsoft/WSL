@@ -72,6 +72,7 @@ class WSLCE2EImageImportTests
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_WithoutTag)
     {
+        // TODO: http://task.ms/62249460
         SKIP_TEST_UNSTABLE();
 
         // Save image as a tarball
@@ -81,6 +82,12 @@ class WSLCE2EImageImportTests
         // Import without specifying an image name
         auto importResult = RunWslc(std::format(L"image import \"{}\"", SavedArchivePath.wstring()));
         importResult.Verify({.Stderr = L"", .ExitCode = 0});
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Image_Import_FromStdin_Success)
+    {
+        // TODO: http://task.ms/62246732
+        SKIP_TEST_NOT_IMPL();
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Image_Import_InvalidPath)
