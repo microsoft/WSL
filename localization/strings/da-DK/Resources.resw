@@ -2462,10 +2462,10 @@ Du kan finde oplysninger om beskyttelse af personlige oplysninger for dette prod
     <value>Administrer legitimationsoplysninger til registreringsdatabaser, herunder log på og log ud af objektbeholderregistreringsdatabaser.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Kommandoer på systemniveau</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Administrationskommandoer på systemniveau.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Marker et billede.</value>
