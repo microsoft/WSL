@@ -44,7 +44,26 @@ steps:
     resourceFilePath: |
       localization\strings\en-US\Resources.resw;O:localization\strings\
       storebroker\PDPs\en-us\PDP.xml;O:storebroker\PDPs\
-      intune\en-US\WSL.adml;O:intune\
+    localizationTarget: true
+    pseudoSetting: 'Excluded'
+    cultureMappingType: 'None'
+
+# Touchdown handles ADML files via a separate task invocation with
+# relativePathRoot/outputDirectoryRoot rather than the per-file ';O:' mapping
+# syntax used above. The combined block silently drops .adml entries (no
+# TDBuildCall is issued, no warning is emitted). Pattern matches
+# microsoft/winget-cli's azure-pipelines.loc.yml.
+- task: TouchdownBuildTask@5
+  displayName: Touchdown Build ADML Localization
+  inputs:
+    environment: 'PRODEXT'
+    teamId: '38646'
+    authType: 'FederatedIdentity'
+    FederatedIdentityServiceConnection: 'Azure-Connection'
+    isPreview: false
+    relativePathRoot: intune\en-US
+    resourceFilePath: '*.adml'
+    outputDirectoryRoot: intune\
     localizationTarget: true
     pseudoSetting: 'Excluded'
     cultureMappingType: 'None'
