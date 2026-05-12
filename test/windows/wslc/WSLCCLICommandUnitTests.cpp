@@ -22,6 +22,7 @@ Abstract:
 #include "RootCommand.h"
 #include "ContainerCommand.h"
 #include "SessionCommand.h"
+#include "SystemCommand.h"
 #include "VersionCommand.h"
 
 using namespace wsl::windows::wslc;
@@ -65,10 +66,26 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // Test: Verify SessionCommand has subcommands
+    // Test: Verify SystemCommand has subcommands
+    TEST_METHOD(SystemCommand_HasSubcommands)
+    {
+        auto cmd = SystemCommand(L"system");
+        auto subcommands = cmd.GetCommands();
+
+        // Verify it has subcommands
+        VERIFY_IS_TRUE(subcommands.size() > 0);
+        LogComment(L"SystemCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
+
+        for (const auto& subcmd : subcommands)
+        {
+            VERIFY_IS_NOT_NULL(subcmd.get());
+        }
+    }
+
+    // Test: Verify SessionCommand has subcommands (now under system)
     TEST_METHOD(SessionCommand_HasSubcommands)
     {
-        auto cmd = SessionCommand(L"session");
+        auto cmd = SessionCommand(L"system session");
         auto subcommands = cmd.GetCommands();
 
         // Verify it has subcommands
@@ -85,7 +102,7 @@ class WSLCCLICommandUnitTests
     // Test: Verify SessionEnterCommand has the expected arguments
     TEST_METHOD(SessionEnterCommand_HasExpectedArguments)
     {
-        auto cmd = SessionEnterCommand(L"session");
+        auto cmd = SessionEnterCommand(L"system session");
         auto args = cmd.GetArguments();
 
         // Should have 2 arguments: storage-path (positional, required) and name (value, optional)
@@ -107,7 +124,7 @@ class WSLCCLICommandUnitTests
     // Test: Verify SessionEnterCommand descriptions are not empty
     TEST_METHOD(SessionEnterCommand_HasDescriptions)
     {
-        auto cmd = SessionEnterCommand(L"session");
+        auto cmd = SessionEnterCommand(L"system session");
 
         VERIFY_IS_FALSE(cmd.ShortDescription().empty());
         VERIFY_IS_FALSE(cmd.LongDescription().empty());

@@ -2684,7 +2684,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Arbeitsverzeichnis im Container</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Schreibt die Container-ID in den angegebenen Pfad.</value>
+    <value>Schreibt die Container-ID in den angegebenen Pfad</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-Adresse des DNS-Nameservers in resolv.conf</value>
@@ -2765,7 +2765,7 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
   </data>
   <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
-    <value>CID file '{}' already exists</value>
+    <value>Die CID-Datei „{}“ ist bereits vorhanden</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">

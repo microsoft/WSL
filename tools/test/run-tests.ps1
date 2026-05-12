@@ -12,7 +12,7 @@
 .PARAMETER TestDataPath
     Path to test data folder. Defaults to ".\test_data".
 .PARAMETER Package
-    Path to the wsl.msix package to install. Defaults to ".\wsl.msix".
+    Path to the wsl.msix package to install. Defaults to ".\installer.msix".
 .PARAMETER UnitTestsPath
     Path to the linux/unit_tests directory to copy and install the unit tests.
 .PARAMETER PullRequest
@@ -70,24 +70,8 @@ if ($TeArgs -and ($TeArgs -icontains '/attachdebugger'))
     }
 }
 
-# If the user provided a /name: or /select: filter, don't add automatic version filtering.
-$HasUserSelection = $false
-foreach ($arg in $TeArgs)
-{
-    if ($arg -like '/name:*' -or $arg -like '/select:*' -or $arg -like '-name:*' -or $arg -like '-select:*')
-    {
-        $HasUserSelection = $true
-        break
-    }
-}
-
 $teArgList = @($TestDllPath, "/p:SetupScript=$SetupScript", "/p:Version=$Version", "/p:DistroPath=$DistroPath", "/p:TestDataPath=$TestDataPath",
     "/p:Package=$Package", "/p:UnitTestsPath=$UnitTestsPath", "/p:PullRequest=$PullRequest", "/p:AllowUnsigned=1") + $TeArgs
-
-if (-not $HasUserSelection)
-{
-    $teArgList += "/select:`"@WSLVersion='$Version' or not(@WSLVersion='*')`""
-}
 
 if ($AttachDebugger)
 {
@@ -103,9 +87,9 @@ if ($AttachDebugger)
 else
 {
     te.exe $teArgList
-    if (!$?)
+    if ($LASTEXITCODE -ne 0)
     {
-        exit 1
+        exit $LASTEXITCODE
     }
 }
 
