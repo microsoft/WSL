@@ -2468,6 +2468,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Управляйте учетными данными реестра, включая вход и выход из реестров контейнеров.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Системные команды</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Системные команды управления.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Добавьте тег к изображению.</value>
   </data>
@@ -2638,10 +2644,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Удалить контейнер после его остановки</value>
   </data>
   <data name="WSLCCLI_StopSignalArgDescription" xml:space="preserve">
-    <value>Signal to stop the container</value>
+    <value>Сигнал для остановки контейнера</value>
   </data>
   <data name="WSLCCLI_ShmSizeArgDescription" xml:space="preserve">
-    <value>Size of /dev/shm (e.g. 64M, 1G)</value>
+    <value>Размер /dev/shm (например, 64M, 1G)</value>
     <comment>{Locked="/dev/shm"}Command line arguments should not be translated</comment>
   </data>
   <data name="WSLCCLI_SessionIdPositionalArgDescription" xml:space="preserve">
@@ -2651,7 +2657,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Путь к хранилищу сеанса</value>
   </data>
   <data name="WSLCCLI_SignalArgDescription" xml:space="preserve">
-    <value>Signal to send</value>
+    <value>Сигнал для отправки</value>
   </data>
   <data name="WSLCCLI_SourceArgDescription" xml:space="preserve">
     <value>Текущая или существующая ссылка на изображение в формате image-name[:tag]</value>
@@ -2685,7 +2691,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>Рабочий каталог внутри контейнера</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Запись идентификатора контейнера по указанному пути.</value>
+    <value>Записать идентификатор контейнера по указанному пути</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-адрес сервера доменных имен DNS в resolv.conf</value>
@@ -2764,6 +2770,10 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Недопустимое значение аргумента {}: "{}". Ожидается объем памяти (например, 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID-файл "{}" уже существует</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Образ '{}' не найден, выполняется загрузка</value>

@@ -31,4 +31,64 @@
     <Target Name="WslcValidatePlatform" BeforeTargets="PrepareForBuild" Condition="'$(_wslcIsInvalidPlatform)' == 'true'">
         <Error Text="wslcsdk.dll could not be copied because platform '$(WslcPlatform)' is not supported. Only x64 and arm64 platforms are supported. You can override the detected platform by setting the property WslcPlatform." />
     </Target>
+
+    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.Containers.common.targets" />
+
+    <!-- ================================================================== -->
+    <!-- C++ specific: Write .tlog files for VS Fast Up-to-Date Check       -->
+    <!-- ================================================================== -->
+
+    <Target Name="_WslcWriteAllTlogs"
+            AfterTargets="WslcBuildAllImages"
+            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != '' AND '$(DesignTimeBuild)' != 'true'">
+
+        <MSBuild Projects="$(MSBuildProjectFullPath)"
+                 Targets="_WslcWriteSingleTlog"
+                 Properties="Configuration=$(Configuration);Platform=$(Platform);_WslcName=%(WslcImage.Identity);_WslcDockerfile=%(WslcImage.Dockerfile);_WslcContext=%(WslcImage.Context);_WslcSourceDir=$([MSBuild]::Escape('%(WslcImage.Sources)'));_WslcIntDir=$(_WslcIntDir);_WslcTarLocation=%(WslcImage.TarLocation);_WslcOutDir=$(OutDir);_WslcTlogDir=$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))" />
+    </Target>
+
+    <!-- tlog format requires one path per line; pass ItemGroups to WriteLinesToFile
+         so each entry is its own line (a single ';'-joined string would be one line). -->
+    <Target Name="_WslcWriteSingleTlog"
+            DependsOnTargets="_WslcCollectSources;_WslcResolveSavePath">
+        <PropertyGroup>
+            <!-- Tool path is just a FUTDC group marker; don't GetFullPath
+                 (would mis-resolve bare 'wslc' to <projdir>\wslc). -->
+            <_WslcTlogToolPath>$(WslcCliPath)</_WslcTlogToolPath>
+            <_WslcTarFullPath>$([System.IO.Path]::GetFullPath('$(_WslcTarPath)'))</_WslcTarFullPath>
+        </PropertyGroup>
+
+        <ItemGroup>
+            <_WslcTlogReadLines Include="^$(_WslcTlogToolPath)" />
+            <_WslcTlogReadLines Include="@(_WslcSourceFiles->'%(FullPath)')" />
+            <_WslcTlogWriteLines Include="^$(_WslcTlogToolPath)" />
+            <_WslcTlogWriteLines Include="$(_WslcTarFullPath)" />
+        </ItemGroup>
+
+        <WriteLinesToFile
+            File="$(_WslcTlogDir)wslc.$(_WslcName).read.1.tlog"
+            Lines="@(_WslcTlogReadLines)"
+            Overwrite="true"
+            Encoding="Unicode" />
+
+        <WriteLinesToFile
+            File="$(_WslcTlogDir)wslc.$(_WslcName).write.1.tlog"
+            Lines="@(_WslcTlogWriteLines)"
+            Overwrite="true"
+            Encoding="Unicode" />
+    </Target>
+
+    <!-- Clean tlog files -->
+    <Target Name="_WslcCleanTlogs"
+            AfterTargets="WslcClean"
+            Condition="'@(WslcImage)' != '' AND '$(TLogLocation)' != ''">
+        <PropertyGroup>
+            <_WslcTlogDir>$([MSBuild]::EnsureTrailingSlash('$(TLogLocation)'))</_WslcTlogDir>
+        </PropertyGroup>
+        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).read.1.tlog"
+                ContinueOnError="WarnAndContinue" />
+        <Delete Files="$(_WslcTlogDir)wslc.%(WslcImage.Identity).write.1.tlog"
+                ContinueOnError="WarnAndContinue" />
+    </Target>
+
 </Project>

@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCContainerLauncher.h"
 #include "WslCoreFilesystem.h"
 #include "hcs.hpp"
+#include "ContainerNameGenerator.h"
 #include <nlohmann/json.hpp>
 
 using namespace std::literals::chrono_literals;
@@ -240,6 +241,29 @@ class WSLCTests
         VERIFY_ARE_EQUAL(version.Major, WSL_PACKAGE_VERSION_MAJOR);
         VERIFY_ARE_EQUAL(version.Minor, WSL_PACKAGE_VERSION_MINOR);
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
+    }
+
+    WSLC_TEST_METHOD(IsClientVersionSupported)
+    {
+        wil::com_ptr<IWSLCSessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+
+        BOOL isSupported = FALSE;
+
+        // The current version should always be supported.
+        const WSLCVersion currentVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
+        VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&currentVersion, &isSupported));
+        VERIFY_IS_TRUE(isSupported);
+
+        // A very old version should not be supported.
+        const WSLCVersion oldVersion{1, 0, 0};
+        VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&oldVersion, &isSupported));
+        VERIFY_IS_FALSE(isSupported);
+
+        // A very high version should be supported.
+        const WSLCVersion futureVersion{99, 0, 0};
+        VERIFY_SUCCEEDED(sessionManager->IsClientVersionSupported(&futureVersion, &isSupported));
+        VERIFY_IS_TRUE(isSupported);
     }
 
     static RunningWSLCProcess::ProcessResult RunCommand(IWSLCSession* session, const std::vector<std::string>& command, int timeout = 600000)
@@ -875,69 +899,94 @@ class WSLCTests
 
         LogInfo("Test: Before/Since filters");
         {
-            // Get all images to find their IDs
+            // Get all images to find their IDs and creation times
             wil::unique_cotaskmem_array_ptr<WSLCImageInformation> allImages;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
 
             std::string debianId, pythonId;
+            LONGLONG debianCreated = 0, pythonCreated = 0;
             for (const auto& image : allImages)
             {
                 std::string imageName = image.Image;
                 if (imageName == "debian:latest")
                 {
                     debianId = image.Hash;
+                    debianCreated = image.Created;
                 }
                 else if (imageName == "python:3.12-alpine")
                 {
                     pythonId = image.Hash;
+                    pythonCreated = image.Created;
                 }
             }
 
             VERIFY_IS_FALSE(debianId.empty());
             VERIFY_IS_FALSE(pythonId.empty());
 
-            // Test 'since' filter - images created after debian
+            // Both Created timestamps must be populated and distinct so that the since/before
+            // boundaries are unambiguous. Equal timestamps would make Docker's filter behavior
+            // ambiguous and could reintroduce flakiness.
+            VERIFY_IS_GREATER_THAN(debianCreated, 0LL);
+            VERIFY_IS_GREATER_THAN(pythonCreated, 0LL);
+            VERIFY_ARE_NOT_EQUAL(debianCreated, pythonCreated);
+
+            // Determine which image is older/newer based on actual creation timestamps.
+            // Image creation times come from the registry and can change independently.
+            const bool debianIsOlder = debianCreated < pythonCreated;
+            const auto& olderId = debianIsOlder ? debianId : pythonId;
+            const auto& newerId = debianIsOlder ? pythonId : debianId;
+            const auto* olderName = debianIsOlder ? "debian:latest" : "python:3.12-alpine";
+            const auto* newerName = debianIsOlder ? "python:3.12-alpine" : "debian:latest";
+
+            LogInfo(
+                "Older image: %hs (Created: %lld), Newer image: %hs (Created: %lld)",
+                olderName,
+                debianIsOlder ? debianCreated : pythonCreated,
+                newerName,
+                debianIsOlder ? pythonCreated : debianCreated);
+
+            // Test 'since' filter - images created after the older image
             {
                 WSLCListImageOptions options{};
                 options.Flags = WSLCListImagesFlagsNone;
-                options.Since = debianId.c_str();
+                options.Since = olderId.c_str();
 
                 wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
 
-                bool foundPython = false;
+                bool foundNewer = false;
                 for (const auto& image : images)
                 {
                     LogInfo("Image: %hs, Hash: %hs, Created: %lld", image.Image, image.Hash, image.Created);
-                    if (std::string{image.Image} == "python:3.12-alpine")
+                    if (std::string{image.Image} == newerName)
                     {
-                        foundPython = true;
+                        foundNewer = true;
                     }
                 }
 
-                VERIFY_IS_TRUE(foundPython);
+                VERIFY_IS_TRUE(foundNewer);
             }
 
-            // Test 'before' filter - images created before python
+            // Test 'before' filter - images created before the newer image
             {
                 WSLCListImageOptions options{};
                 options.Flags = WSLCListImagesFlagsNone;
-                options.Before = pythonId.c_str();
+                options.Before = newerId.c_str();
                 wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
 
-                bool foundDebian = false;
+                bool foundOlder = false;
                 for (const auto& image : images)
                 {
-                    if (std::string{image.Image} == "debian:latest")
+                    if (std::string{image.Image} == olderName)
                     {
-                        foundDebian = true;
+                        foundOlder = true;
                     }
                 }
 
-                VERIFY_IS_TRUE(foundDebian);
+                VERIFY_IS_TRUE(foundOlder);
             }
         }
 
@@ -1030,12 +1079,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(LoadImage)
     {
-        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
-        // TODO: Remove once the fix is available.
-        if (IsWindowsServer())
-        {
-            SKIP_TEST_UNSTABLE();
-        }
+        SKIP_TEST_SERVER();
 
         std::filesystem::path imageTar = GetTestImagePath("hello-world:latest");
         wil::unique_handle imageTarFileHandle{
@@ -1126,12 +1170,7 @@ class WSLCTests
 
     WSLC_TEST_METHOD(ImportImage)
     {
-        // This test case is hanging on Windows Server SKUs. Skip the test until the issue is resolved.
-        // TODO: Remove once the fix is available.
-        if (IsWindowsServer())
-        {
-            SKIP_TEST_UNSTABLE();
-        }
+        SKIP_TEST_SERVER();
 
         auto cleanup =
             wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow("my-hello-world:test", WSLCDeleteImageFlagsNone).first); });
@@ -2760,6 +2799,8 @@ class WSLCTests
 
     WSLC_TEST_METHOD(BuildImageStuckCallbackCancellation)
     {
+        SKIP_TEST_SERVER();
+
         class StuckBuildProgressCallback
             : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback>
         {
@@ -3156,7 +3197,7 @@ class WSLCTests
             else
             {
                 return std::format(
-                    "/win-path*9p*{},relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
+                    "/win-path*9p*{},relatime,aname=*,cache=0x5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
             }
         };
 
@@ -3353,7 +3394,7 @@ class WSLCTests
             ExpectMount(
                 session.get(),
                 "/usr/lib/wsl/drivers",
-                "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+                "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=0x5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
 
             ExpectMount(
                 session.get(),
@@ -4424,7 +4465,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
         VERIFY_ARE_EQUAL(1u, inspect.IPAM.Config->size());
         VERIFY_ARE_EQUAL(std::string("172.31.0.0/16"), inspect.IPAM.Config->at(0).Subnet);
@@ -4524,7 +4565,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, networkName);
         VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
         VERIFY_IS_FALSE(inspect.Id.empty());
@@ -4552,7 +4593,7 @@ class WSLCTests
         VERIFY_SUCCEEDED(m_defaultSession->InspectNetwork(networkName.c_str(), &output));
         VERIFY_IS_NOT_NULL(output.get());
 
-        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectNetwork>(output.get());
+        auto inspect = wsl::shared::FromJson<wsl::windows::common::wslc_schema::Network>(output.get());
         VERIFY_ARE_EQUAL(inspect.Name, networkName);
         VERIFY_ARE_EQUAL(inspect.Driver, std::string("bridge"));
         VERIFY_IS_TRUE(inspect.IPAM.Config.has_value());
@@ -7900,6 +7941,124 @@ class WSLCTests
         }
     }
 
+    WSLC_TEST_METHOD(ContainerStats_RunningContainer)
+    {
+        // Start a long-lived detached container on a bridged network so network stats are populated.
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
+
+        auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats", &container));
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(container->Stats(&output));
+        VERIFY_IS_NOT_NULL(output.get());
+        VERIFY_IS_FALSE(std::string(output.get()).empty());
+
+        const auto stats = wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+
+        // cpu_stats
+        // The VM has been running so system_cpu_usage is non-zero.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.system_cpu_usage, 0ull);
+
+        // The container process itself has consumed some CPU.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.cpu_usage.total_usage, 0ull);
+
+        // Kernel + user time together must not exceed total CPU time.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(
+            stats.cpu_stats.cpu_usage.usage_in_kernelmode + stats.cpu_stats.cpu_usage.usage_in_usermode, stats.cpu_stats.cpu_usage.total_usage);
+
+        // The session was created with 4 CPUs.
+        VERIFY_IS_GREATER_THAN(stats.cpu_stats.online_cpus, 0u);
+
+        // precpu_stats
+        // precpu_stats is a prior snapshot; its total must not exceed the current total.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.precpu_stats.cpu_usage.total_usage, stats.cpu_stats.cpu_usage.total_usage);
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.precpu_stats.system_cpu_usage, stats.cpu_stats.system_cpu_usage);
+
+        // memory_stats
+        // Limit is the VM memory ceiling — must be non-zero.
+        VERIFY_IS_GREATER_THAN(stats.memory_stats.limit, 0ull);
+
+        // The sleep process occupies at least some memory.
+        VERIFY_IS_GREATER_THAN(stats.memory_stats.usage, 0ull);
+
+        // Usage must never exceed the reported limit.
+        VERIFY_IS_LESS_THAN_OR_EQUAL(stats.memory_stats.usage, stats.memory_stats.limit);
+
+        // pids_stats
+        // At minimum the sleep process itself must be counted.
+        VERIFY_IS_GREATER_THAN(stats.pids_stats.current, 0ull);
+
+        // networks
+        // A bridged container always has at least one network interface.
+        VERIFY_IS_TRUE(stats.networks.has_value());
+        VERIFY_IS_FALSE(stats.networks->empty());
+
+        // Every interface entry must have consistent packet/byte counts
+        // (bytes >= 0 is trivially true for unsigned, but packets imply bytes >= 0 too).
+        for (const auto& [iface, net] : *stats.networks)
+        {
+            VERIFY_IS_FALSE(iface.empty());
+
+            // If packets were received/sent, the byte count must also be non-zero.
+            if (net.rx_packets > 0)
+            {
+                VERIFY_IS_GREATER_THAN(net.rx_bytes, 0ull);
+            }
+            if (net.tx_packets > 0)
+            {
+                VERIFY_IS_GREATER_THAN(net.tx_bytes, 0ull);
+            }
+        }
+
+        // blkio_stats
+        // io_service_bytes_recursive may be absent for a container with no disk I/O,
+        // but if present every entry must have a non-empty operation name.
+        if (stats.blkio_stats.io_service_bytes_recursive.has_value())
+        {
+            for (const auto& entry : *stats.blkio_stats.io_service_bytes_recursive)
+            {
+                VERIFY_IS_FALSE(entry.op.empty());
+            }
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerStats_NullOutputPointer)
+    {
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats-null", {"sleep", "60"}, {}, WSLCContainerNetworkTypeBridged);
+        auto runningContainer = launcher.Launch(*m_defaultSession, WSLCContainerStartFlagsNone);
+        auto cleanup = wil::scope_exit([&]() { runningContainer.SetDeleteOnClose(true); });
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats-null", &container));
+
+        // Passing nullptr for Output must fail.
+        VERIFY_FAILED(container->Stats(nullptr));
+    }
+
+    WSLC_TEST_METHOD(ContainerStats_CreatedContainer_ReturnsZeroedStats)
+    {
+        // A created-but-not-started container returns zeroed stats from Docker rather than an error.
+        WSLCContainerLauncher launcher("debian:latest", "wslc-test-stats-created", {}, {}, WSLCContainerNetworkTypeBridged);
+        auto [result, runningContainer] = launcher.CreateNoThrow(*m_defaultSession);
+        VERIFY_SUCCEEDED(result);
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("wslc-test-stats-created", &container));
+        auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce)); });
+
+        wil::unique_cotaskmem_ansistring output;
+        VERIFY_SUCCEEDED(container->Stats(&output));
+        VERIFY_IS_NOT_NULL(output.get());
+
+        // A non-running container has no active processes.
+        auto stats = wsl::shared::FromJson<wsl::windows::common::docker_schema::ContainerStats>(output.get());
+        VERIFY_ARE_EQUAL(0ull, stats.pids_stats.current);
+    }
+
     WSLC_TEST_METHOD(InvalidNames)
     {
         auto expectInvalidArg = [&](const std::string& name) {
@@ -8109,7 +8268,7 @@ class WSLCTests
     WSLC_TEST_METHOD(ContainerNameGeneration)
     {
         {
-            // Create a container with a specific name
+            // Create a container with a specific name.
             auto container = WSLCContainerLauncher("debian:latest", "test-container-name").Create(*m_defaultSession.get());
 
             // Validate that the container name is correct.
@@ -8120,8 +8279,38 @@ class WSLCTests
             // Create a container without name.
             auto container = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
 
-            // Validate that the service generates a name for the container.
-            VERIFY_ARE_NOT_EQUAL(container.Name(), "");
+            // Validate that the service generates a name in the format "descriptor_mountain[digit]".
+            auto name = container.Name();
+            VERIFY_ARE_NOT_EQUAL(name, "");
+
+            auto underscore = name.find('_');
+            VERIFY_ARE_NOT_EQUAL(underscore, std::string::npos);
+
+            auto descriptor = name.substr(0, underscore);
+            auto mountain = name.substr(underscore + 1);
+
+            // Strip trailing retry digit if present.
+            if (!mountain.empty() && std::isdigit(mountain.back()))
+            {
+                mountain.pop_back();
+            }
+
+            using wsl::windows::service::wslc::c_descriptors;
+            using wsl::windows::service::wslc::c_mountains;
+
+            VERIFY_IS_TRUE(std::ranges::find(c_descriptors, descriptor) != c_descriptors.end());
+            VERIFY_IS_TRUE(std::ranges::find(c_mountains, mountain) != c_mountains.end());
+        }
+
+        {
+            // Create multiple containers without names and verify they get unique names.
+            auto container1 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+            auto container2 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+            auto container3 = WSLCContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+
+            VERIFY_ARE_NOT_EQUAL(container1.Name(), container2.Name());
+            VERIFY_ARE_NOT_EQUAL(container1.Name(), container3.Name());
+            VERIFY_ARE_NOT_EQUAL(container2.Name(), container3.Name());
         }
     }
 

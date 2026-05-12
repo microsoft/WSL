@@ -2461,6 +2461,12 @@ Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.</value>
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Beheer registerreferenties, inclusief aan- en afmelden bij containerregisters.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Een afbeelding taggen.</value>
   </data>
@@ -2678,7 +2684,7 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Werkmap binnen de container</value>
   </data>
   <data name="WSLCCLI_CIDFileArgDescription" xml:space="preserve">
-    <value>Schrijf de container-id naar het opgegeven pad.</value>
+    <value>De container-id naar het opgegeven pad schrijven</value>
   </data>
   <data name="WSLCCLI_DNSArgDescription" xml:space="preserve">
     <value>IP-adres van de DNS-nameserver in resolv.conf</value>
@@ -2757,6 +2763,10 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   <data name="WSLCCLI_InvalidMemorySizeError" xml:space="preserve">
     <value>Ongeldige {} argumentwaarde: {}. Er wordt een geheugengrootte verwacht (bijvoorbeeld 256M, 1G)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="256M"}{Locked="1G"}</comment>
+  </data>
+  <data name="WSLCCLI_CIDFileAlreadyExistsError" xml:space="preserve">
+    <value>CID-bestand {} bestaat al</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_ImageNotFoundPulling" xml:space="preserve">
     <value>Afbeelding {} niet gevonden, wordt opgehaald</value>

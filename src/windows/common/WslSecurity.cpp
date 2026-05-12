@@ -81,21 +81,11 @@ wil::unique_handle wsl::windows::common::security::CreateRestrictedToken(_In_ HA
     THROW_IF_WIN32_BOOL_FALSE(::CreateRestrictedToken(newToken.get(), DISABLE_MAX_PRIVILEGE, 0, NULL, 0, NULL, 0, NULL, &restrictedToken));
 
     // Drop the token down to medium integrity level.
-    union
-    {
-        SID sid;
-        BYTE buffer[SECURITY_SID_SIZE(1)];
-    } sidBuffer;
-    SID_IDENTIFIER_AUTHORITY systemSidAuthority = SECURITY_MANDATORY_LABEL_AUTHORITY;
-    THROW_IF_NTSTATUS_FAILED(::RtlInitializeSidEx(&sidBuffer.sid, &systemSidAuthority, 1, SECURITY_MANDATORY_MEDIUM_RID));
-
-    // Set the integrity level to untrusted.
+    auto [sid, sidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_MANDATORY_LABEL_AUTHORITY, SECURITY_MANDATORY_MEDIUM_RID);
     TOKEN_MANDATORY_LABEL tokenLabel{};
     tokenLabel.Label.Attributes = SE_GROUP_INTEGRITY;
-    tokenLabel.Label.Sid = &sidBuffer.sid;
-    THROW_IF_WIN32_BOOL_FALSE(::SetTokenInformation(
-        restrictedToken.get(), TokenIntegrityLevel, &tokenLabel, (sizeof(tokenLabel) + ::GetLengthSid(&sidBuffer.sid))));
-
+    tokenLabel.Label.Sid = sid;
+    THROW_IF_WIN32_BOOL_FALSE(::SetTokenInformation(restrictedToken.get(), TokenIntegrityLevel, &tokenLabel, sizeof(tokenLabel)));
     return restrictedToken;
 }
 
@@ -172,7 +162,23 @@ wil::unique_handle wsl::windows::common::security::GetUserToken(_In_ TOKEN_TYPE 
 
     wil::unique_handle newToken;
     THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(
-        contextToken.get(), TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, nullptr, SecurityImpersonation, tokenType, &newToken));
+        contextToken.get(),
+        TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_DEFAULT,
+        nullptr,
+        SecurityImpersonation,
+        tokenType,
+        &newToken));
+
+    // If the token integrity level is system, reduce it to high integrity level. The VM worker process runs at
+    // high integrity level and objects created with a higher integrity level token may be inaccessible.
+    if (GetUserBasicIntegrityLevel(newToken.get()) == SECURITY_MANDATORY_SYSTEM_RID)
+    {
+        auto [sid, sidBuffer] = wsl::windows::common::security::CreateSid(SECURITY_MANDATORY_LABEL_AUTHORITY, SECURITY_MANDATORY_HIGH_RID);
+        TOKEN_MANDATORY_LABEL tokenLabel{};
+        tokenLabel.Label.Attributes = SE_GROUP_INTEGRITY;
+        tokenLabel.Label.Sid = sid;
+        THROW_IF_WIN32_BOOL_FALSE(::SetTokenInformation(newToken.get(), TokenIntegrityLevel, &tokenLabel, sizeof(tokenLabel)));
+    }
 
     return newToken;
 }

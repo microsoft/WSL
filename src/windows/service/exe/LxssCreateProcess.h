@@ -85,11 +85,11 @@ public:
         wsl::shared::MessageWriter<CREATE_PROCESS_MESSAGE> message(LxInitCreateProcess);
         message.WriteString(message->PathIndex, Path);
         gsl::copy(as_bytes(gsl::span(ArgumentsData)), message.InsertBuffer(message->CommandLineIndex, ArgumentsData.size()));
-        auto transaction = channel.StartTransaction();
+        auto transaction = channel.StartTransaction(Timeout);
         transaction.Send<CREATE_PROCESS_MESSAGE>(message.Span());
 
         auto readResult = [&]() {
-            const auto& message = transaction.Receive<RESULT_MESSAGE<int32_t>>(nullptr, Timeout);
+            const auto& message = transaction.Receive<RESULT_MESSAGE<int32_t>>();
             return message.Result;
         };
 
