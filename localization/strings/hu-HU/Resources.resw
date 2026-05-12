@@ -2462,10 +2462,10 @@ További információ a termékről: https://aka.ms/privacy.</value>
     <value>A beállításjegyzék hitelesítő adatainak kezelése, beleértve a tárolóregisztrációs adatbázisokba való bejelentkezést és a tárolóregisztrációs adatbázisokból való kijelentkezéseket.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Rendszerszintű parancsok</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Rendszerszintű felügyeleti parancsok.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Kép címkézése.</value>
