@@ -831,6 +831,7 @@ void CreateWerReports()
         L"wsl.exe",
         L"wslhost.exe",
         L"wslrelay.exe",
+        L"wslpluginhost.exe",
         L"wslservice.exe",
         L"wslg.exe",
         L"vmcompute.exe",
@@ -1327,6 +1328,48 @@ void StopWslService()
     const wil::unique_schandle service{OpenService(manager.get(), L"wslservice", SERVICE_STOP | SERVICE_QUERY_STATUS)};
     VERIFY_IS_NOT_NULL(service);
     StopService(service.get());
+}
+
+DWORD GetWslServicePid()
+{
+    const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    VERIFY_IS_NOT_NULL(manager);
+
+    const wil::unique_schandle service{OpenService(manager.get(), L"wslservice", SERVICE_QUERY_STATUS | SERVICE_START)};
+    VERIFY_IS_NOT_NULL(service);
+
+    auto [state, pid] = GetServiceState(service.get());
+    if (state == SERVICE_STOPPED)
+    {
+        // The service is on-demand; start it so we can capture a stable PID.
+        if (!StartService(service.get(), 0, nullptr))
+        {
+            const auto error = GetLastError();
+            VERIFY_IS_TRUE(error == ERROR_SERVICE_ALREADY_RUNNING);
+        }
+    }
+
+    if (state != SERVICE_RUNNING)
+    {
+        WaitForServiceState(service.get(), SERVICE_RUNNING, 0);
+        std::tie(state, pid) = GetServiceState(service.get());
+    }
+
+    VERIFY_ARE_EQUAL(static_cast<DWORD>(SERVICE_RUNNING), state);
+    return pid;
+}
+
+DWORD GetWslServiceRunningPid()
+{
+    const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    VERIFY_IS_NOT_NULL(manager);
+
+    const wil::unique_schandle service{OpenService(manager.get(), L"wslservice", SERVICE_QUERY_STATUS)};
+    VERIFY_IS_NOT_NULL(service);
+
+    auto [state, pid] = GetServiceState(service.get());
+    VERIFY_ARE_EQUAL(static_cast<DWORD>(SERVICE_RUNNING), state);
+    return pid;
 }
 
 wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)

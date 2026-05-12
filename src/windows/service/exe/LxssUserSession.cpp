@@ -2635,13 +2635,18 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
                     registration.Write(Property::OsVersion, distributionInfo->Version);
                 }
 
-                // This needs to be done before plugins are notifed because they might try to run a command inside the distribution.
-                m_runningInstances[registration.Id()] = instance;
+                // This needs to be done before plugins are notified because they might try to run a command inside the distribution.
+                {
+                    std::unique_lock callbackLock(m_callbackLock);
+                    m_runningInstances[registration.Id()] = instance;
+                }
 
                 if (version == LXSS_WSL_VERSION_2)
                 {
-                    auto cleanupOnFailure =
-                        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_runningInstances.erase(registration.Id()); });
+                    auto cleanupOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                        std::unique_lock callbackLock(m_callbackLock);
+                        m_runningInstances.erase(registration.Id());
+                    });
                     m_pluginManager.OnDistributionStarted(&m_session, instance->DistributionInformation());
                     cleanupOnFailure.release();
                 }
@@ -2877,7 +2882,13 @@ void LxssUserSessionImpl::_CreateVm()
         m_vmId.store(vmId);
 
         // Create the utility VM and register for callbacks.
-        m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
+        // Publish m_utilityVm under m_callbackLock exclusive to honor the dual-lock
+        // invariant for mutations of m_utilityVm; this is uncontended here because
+        // no plugin callbacks can race against initial creation.
+        {
+            std::unique_lock callbackLock(m_callbackLock);
+            m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
+        }
 
         if (m_httpProxyStateTracker)
         {
@@ -3608,17 +3619,26 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
                     m_pluginManager.OnDistributionStopping(&m_session, wslcoreInstance->DistributionInformation());
                 }
 
-                instance->second->Stop();
-
-                const auto clientId = instance->second->GetClientId();
-                {
-                    auto lock = m_terminatedInstanceLock.lock_exclusive();
-                    m_terminatedInstances.push_back(std::move(instance->second));
-                }
-
                 m_lifetimeManager.RemoveCallback(clientKey);
 
-                m_runningInstances.erase(instance);
+                // Stop the instance and remove it from m_runningInstances atomically
+                // under m_callbackLock. This prevents plugin callbacks (which hold
+                // m_callbackLock shared) from finding a stopped-but-still-listed
+                // instance between Stop() and erase.
+                ULONG clientId;
+                {
+                    std::unique_lock callbackLock(m_callbackLock);
+
+                    instance->second->Stop();
+                    clientId = instance->second->GetClientId();
+
+                    {
+                        auto lock = m_terminatedInstanceLock.lock_exclusive();
+                        m_terminatedInstances.push_back(std::move(instance->second));
+                    }
+
+                    m_runningInstances.erase(instance);
+                }
 
                 // If the instance that was terminated was a WSL2 instance,
                 // check if the VM is now idle.
@@ -3646,7 +3666,10 @@ void LxssUserSessionImpl::_UpdateInit(_In_ const LXSS_DISTRO_CONFIGURATION& Conf
 
 HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
 {
-    std::lock_guard lock(m_instanceLock);
+    // Shared lock prevents _VmTerminate from destroying the VM while we use it.
+    // Do NOT acquire m_instanceLock — callbacks arrive on a different COM thread
+    // from the notification thread that holds m_instanceLock.
+    std::shared_lock lock(m_callbackLock);
     RETURN_HR_IF(E_NOT_VALID_STATE, !m_utilityVm);
 
     m_utilityVm->MountRootNamespaceFolder(HostPath, GuestPath, ReadOnly, Name);
@@ -3655,7 +3678,9 @@ HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In
 
 HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket)
 {
-    std::lock_guard lock(m_instanceLock);
+    // Shared lock prevents _VmTerminate from destroying the VM or instances
+    // while we use them. See MountRootNamespaceFolder for rationale.
+    std::shared_lock lock(m_callbackLock);
     RETURN_HR_IF(E_NOT_VALID_STATE, !m_utilityVm);
 
     if (Distro == nullptr)
@@ -3664,9 +3689,16 @@ HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In
     }
     else
     {
-        const auto distro = _RunningInstance(Distro);
-        THROW_HR_IF(WSL_E_VM_MODE_INVALID_STATE, !distro);
+        // Look up the running instance directly instead of calling _RunningInstance,
+        // which accesses m_lockedDistributions (guarded only by m_instanceLock).
+        // m_runningInstances is safe to read under m_callbackLock (shared).
+        // The _EnsureNotLocked check is unnecessary here: _ConversionBegin removes
+        // a distribution from m_runningInstances before adding it to m_lockedDistributions,
+        // so a locked distribution will never be found in this lookup.
+        const auto instance = m_runningInstances.find(*Distro);
+        THROW_HR_IF(WSL_E_VM_MODE_INVALID_STATE, instance == m_runningInstances.end());
 
+        const auto distro = instance->second;
         const auto wsl2Distro = dynamic_cast<WslCoreInstance*>(distro.get());
         THROW_HR_IF(WSL_E_WSL2_NEEDED, !wsl2Distro);
 
@@ -3904,7 +3936,12 @@ void LxssUserSessionImpl::_VmTerminate()
         m_telemetryThread.join();
     }
 
-    m_utilityVm.reset();
+    // Acquire exclusive callback lock to wait for any in-flight plugin callbacks
+    // (MountRootNamespaceFolder, CreateLinuxProcess) to complete before destroying the VM.
+    {
+        std::unique_lock callbackLock(m_callbackLock);
+        m_utilityVm.reset();
+    }
     m_vmId.store(GUID_NULL);
 
     // Reset the user's token since its lifetime is tied to the VM.

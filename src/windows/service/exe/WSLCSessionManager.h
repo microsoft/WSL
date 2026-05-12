@@ -91,9 +91,6 @@ public:
     void OpenSession(_In_ ULONG Id, _Out_ IWSLCSession** Session);
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLCSession** Session);
 
-    // Resolves a session by ID for plugin->API calls. Throws ERROR_NOT_FOUND if no session matches.
-    wil::com_ptr<IWSLCSession> FindSession(ULONG Id);
-
     static WSLCSessionManagerImpl* Instance() noexcept;
 
 private:
@@ -104,13 +101,16 @@ private:
     // Returns true if the name matches a reserved default session prefix.
     static bool IsReservedSessionName(LPCWSTR Name);
 
-    // Iterates over all sessions, cleaning up released sessions.
-    // The routine receives a SessionEntry& and can return an optional<T> to stop iteration.
+    // Iterates over all sessions, cleaning up released sessions. The CALLER
+    // MUST hold m_wslcSessionsLock. Sessions whose backing process is gone are
+    // moved out of tracking into `DeadSessions` so the caller can dispatch
+    // their OnWslcSessionStopping plugin notification (via DispatchSessionStopping)
+    // AFTER releasing the lock — the notification is an out-of-process call and
+    // must not run under the lock. The routine receives a SessionEntry& and can
+    // return an optional<T> to stop iteration.
     template <typename T>
-    inline auto ForEachSession(const auto& Routine)
+    inline auto ForEachSessionLockHeld(const auto& Routine, std::vector<SessionEntry>& DeadSessions)
     {
-        std::lock_guard lock(m_wslcSessionsLock);
-
         // Enforce noexcept: remove_if leaves the container in an unspecified
         // (partially-moved) state if the predicate throws. Callers must handle
         // errors via return values, not exceptions.
@@ -128,8 +128,24 @@ private:
             wil::com_ptr<IWSLCSession> lockedSession;
             if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
-                // Session is gone: notify plugins (if not already), then drop persistent reference if any.
-                NotifySessionStoppingLockHeld(entry);
+                // Session is gone: move it out for deferred OnWslcSessionStopping
+                // dispatch (must happen outside the lock) and drop any persistent
+                // reference. The StoppingNotified flag is intentionally left
+                // untouched here; DispatchSessionStopping flips it so the
+                // notification fires exactly once.
+                try
+                {
+                    DeadSessions.push_back(std::move(entry));
+                }
+                catch (...)
+                {
+                    // Couldn't queue it for deferred stopping dispatch: keep it
+                    // tracked (the move above is noexcept, so entry is intact)
+                    // and reap it on a later pass rather than dropping it
+                    // without unregistering.
+                    LOG_CAUGHT_EXCEPTION();
+                    return false;
+                }
 
                 auto remove =
                     std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == entry.SessionId; });
@@ -166,15 +182,59 @@ private:
     }
 
     [[nodiscard]] wil::unique_handle CreateSessionProcessJob(_In_ IWSLCSessionFactory* Factory);
+
+    // Convenience wrapper that takes m_wslcSessionsLock internally and dispatches
+    // OnWslcSessionStopping for any dead sessions after releasing the lock. Use
+    // this from call sites that do NOT already hold the lock.
+    template <typename T>
+    inline auto ForEachSession(const auto& Routine)
+    {
+        std::vector<SessionEntry> deadSessions;
+
+        using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
+        TResult result{};
+
+        {
+            std::lock_guard lock(m_wslcSessionsLock);
+            if constexpr (std::is_same_v<T, void>)
+            {
+                ForEachSessionLockHeld<T>(Routine, deadSessions);
+            }
+            else
+            {
+                result = ForEachSessionLockHeld<T>(Routine, deadSessions);
+            }
+        }
+
+        // Safe to invoke plugin callbacks now that the lock is released.
+        for (auto& entry : deadSessions)
+        {
+            DispatchSessionStopping(entry);
+        }
+
+        if constexpr (std::is_same_v<T, void>)
+        {
+            return;
+        }
+        else
+        {
+            return result;
+        }
+    }
+
     WSLCSessionInitSettings CreateSessionSettings(
         _In_ ULONG SessionId, _In_ LPCWSTR CreatorProcessName, _In_ const WSLCSessionSettings* Settings, _In_ LPCWSTR ResolvedDisplayName);
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
     static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
 
-    void NotifySessionStoppingLockHeld(SessionEntry& entry) noexcept;
+    // Fires OnWslcSessionStopping for `entry` exactly once (guarded by
+    // entry.StoppingNotified) and then unregisters the session from the plugin
+    // session reference map. MUST be called WITHOUT m_wslcSessionsLock held —
+    // the plugin notification is dispatched out-of-process to wslpluginhost.exe.
+    void DispatchSessionStopping(SessionEntry& entry) noexcept;
 
     std::atomic<ULONG> m_nextSessionId{1};
-    std::recursive_mutex m_wslcSessionsLock;
+    std::mutex m_wslcSessionsLock;
 
     // All sessions tracked via SessionEntry (which holds weak refs and service-side security info).
     // Sessions are automatically cleaned up when the underlying session is released.

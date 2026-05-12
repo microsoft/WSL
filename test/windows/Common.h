@@ -120,6 +120,7 @@ using namespace std::chrono_literals;
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"WslServiceProxyStub.dll") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslhost.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslrelay.exe") \
+    TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslpluginhost.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslconfig.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wsl.exe") \
     TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
@@ -500,6 +501,13 @@ VOID __stdcall LxsstuWatchdogTimer(_Inout_ PTP_CALLBACK_INSTANCE Instance, _Inou
 std::vector<std::wstring> LxssSplitString(_In_ const std::wstring& string, _In_ const std::wstring& delim = L" ");
 
 void RestartWslService();
+
+DWORD GetWslServicePid();
+
+// Returns the PID of wslservice, asserting it is already RUNNING. Unlike
+// GetWslServicePid it never starts the service, so a crashed/stopped service
+// fails at capture instead of being silently restarted with a new PID.
+DWORD GetWslServiceRunningPid();
 
 wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type = TokenPrimary);
 

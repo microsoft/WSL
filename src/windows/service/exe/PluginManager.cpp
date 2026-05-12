@@ -9,6 +9,8 @@ Module Name:
 Abstract:
 
     This file contains the PluginManager helper class implementation.
+    Plugins are loaded in isolated wslpluginhost.exe processes via COM,
+    so a crashing plugin cannot take down the WSL service.
 
 --*/
 
@@ -16,330 +18,242 @@ Abstract:
 #include "install.h"
 #include "PluginManager.h"
 #include "WslPluginApi.h"
+#include "WslPluginHost.h"
 #include "LxssUserSessionFactory.h"
 #include "WSLCSessionManager.h"
 
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
+using wsl::windows::service::PluginHostCallbackImpl;
 using wsl::windows::service::PluginManager;
+
+// Acquire an apartment-local IWslPluginHost proxy for `plugin` (named `host`).
+// On a host-process crash, log it and `continue` the surrounding loop. On any
+// other failure to acquire (which would indicate a fundamental COM problem,
+// not a plugin-reported issue), log the HRESULT and `continue` so a single
+// busted plugin does not break the iteration for the others. Use only inside
+// the per-plugin loops in PluginManager hook methods.
+#define ACQUIRE_PLUGIN_HOST_OR_CONTINUE(plugin, host, stage) \
+    Microsoft::WRL::ComPtr<IWslPluginHost> host; \
+    { \
+        const HRESULT _acqHr = AcquireHostProxy((plugin), &(host)); \
+        if (FAILED(_acqHr)) \
+        { \
+            if (IsHostCrash(_acqHr)) \
+            { \
+                LogPluginHostCrash((plugin), _acqHr, stage "/AcquireHostProxy"); \
+            } \
+            else \
+            { \
+                LOG_HR_MSG(_acqHr, "Failed to acquire plugin host proxy for: '%ls'", (plugin).name.c_str()); \
+            } \
+            continue; \
+        } \
+    }
+
+// Same as ACQUIRE_PLUGIN_HOST_OR_CONTINUE, but for hook methods that surface a
+// plugin error to abort the guarded operation (e.g. OnVmStarted). A host crash
+// is still isolated (logged + `continue`), but any other acquisition failure is
+// thrown so it is surfaced exactly like a plugin-reported error would be, rather
+// than silently allowing the operation to proceed without consulting the plugin.
+#define ACQUIRE_PLUGIN_HOST_OR_THROW(plugin, host, stage) \
+    Microsoft::WRL::ComPtr<IWslPluginHost> host; \
+    { \
+        const HRESULT _acqHr = AcquireHostProxy((plugin), &(host)); \
+        if (FAILED(_acqHr)) \
+        { \
+            if (IsHostCrash(_acqHr)) \
+            { \
+                LogPluginHostCrash((plugin), _acqHr, stage "/AcquireHostProxy"); \
+                continue; \
+            } \
+            THROW_HR_MSG(_acqHr, "Failed to acquire plugin host proxy for: '%ls'", (plugin).name.c_str()); \
+        } \
+    }
 
 constexpr auto c_pluginPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins";
 
-constexpr WSLVersion Version = {wsl::shared::VersionMajor, wsl::shared::VersionMinor, wsl::shared::VersionRevision};
+// --- IWslPluginHostCallback implementation (service-side) ---
+// These methods handle API calls from the plugin host process.
 
-thread_local std::optional<std::wstring> g_pluginErrorMessage;
+// Returned to the plugin when a session cookie no longer resolves (the session
+// was torn down). Deliberately not an RPC_* status: a plugin that propagates
+// this from its hook must not be mistaken for a dead host by IsHostCrash.
+constexpr HRESULT c_pluginSessionNotFound = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
 
-extern "C" {
-HRESULT MountFolder(WSLSessionId Session, LPCWSTR WindowsPath, LPCWSTR LinuxPath, BOOL ReadOnly, LPCWSTR Name)
+STDMETHODIMP PluginHostCallbackImpl::MountFolder(_In_ DWORD SessionId, _In_ LPCWSTR WindowsPath, _In_ LPCWSTR LinuxPath, _In_ BOOL ReadOnly, _In_ LPCWSTR Name)
 try
 {
-    const auto session = FindSessionByCookie(Session);
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    RETURN_HR_IF(E_INVALIDARG, WindowsPath == nullptr || LinuxPath == nullptr || Name == nullptr);
+
+    WSL_LOG(
+        "PluginCallbackMountFolderBegin",
+        TraceLoggingValue(WindowsPath, "WindowsPath"),
+        TraceLoggingValue(SessionId, "SessionId"));
+    const auto session = FindSessionByCookie(SessionId);
+    RETURN_HR_IF(c_pluginSessionNotFound, !session);
 
     auto result = session->MountRootNamespaceFolder(WindowsPath, LinuxPath, ReadOnly, Name);
 
+    WSL_LOG("PluginCallbackMountFolderEnd", TraceLoggingValue(WindowsPath, "WindowsPath"), TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
+
+STDMETHODIMP PluginHostCallbackImpl::ExecuteBinary(
+    _In_ DWORD SessionId, _In_ LPCSTR Path, _In_ DWORD ArgumentCount, _In_reads_opt_(ArgumentCount) LPCSTR* Arguments, _Out_ HANDLE* Socket)
+try
+{
+    RETURN_HR_IF(E_POINTER, Socket == nullptr);
+    *Socket = nullptr;
+    RETURN_HR_IF(E_INVALIDARG, Path == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, ArgumentCount > 0 && Arguments == nullptr);
+
+    WSL_LOG("PluginCallbackExecuteBinaryBegin", TraceLoggingValue(Path, "Path"), TraceLoggingValue(SessionId, "SessionId"));
+    const auto session = FindSessionByCookie(SessionId);
     WSL_LOG(
-        "PluginMountFolderCall",
-        TraceLoggingValue(WindowsPath, "WindowsPath"),
-        TraceLoggingValue(LinuxPath, "LinuxPath"),
-        TraceLoggingValue(ReadOnly, "ReadOnly"),
-        TraceLoggingValue(Name, "Name"),
-        TraceLoggingValue(result, "Result"));
+        "PluginCallbackExecuteBinaryFoundSession",
+        TraceLoggingValue(Path, "Path"),
+        TraceLoggingValue(session != nullptr, "Found"));
+    RETURN_HR_IF(c_pluginSessionNotFound, !session);
+
+    // Build NULL-terminated argument array expected by CreateLinuxProcess.
+    std::vector<LPCSTR> args;
+    if (Arguments != nullptr)
+    {
+        args.assign(Arguments, Arguments + ArgumentCount);
+    }
+    args.push_back(nullptr);
+
+    WSL_LOG("PluginCallbackExecuteBinaryCallingCreateProcess", TraceLoggingValue(Path, "Path"));
+    wil::unique_socket sock;
+    auto result = session->CreateLinuxProcess(nullptr, Path, args.data(), &sock);
+
+    WSL_LOG("PluginCallbackExecuteBinaryEnd", TraceLoggingValue(Path, "Path"), TraceLoggingValue(result, "Result"));
+
+    if (SUCCEEDED(result))
+    {
+        // Return socket as HANDLE — COM's system_handle marshaling will
+        // duplicate it into the host process automatically.
+        *Socket = reinterpret_cast<HANDLE>(sock.release());
+    }
 
     return result;
 }
 CATCH_RETURN();
 
-HRESULT ExecuteBinary(WSLSessionId Session, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket)
+STDMETHODIMP PluginHostCallbackImpl::ExecuteBinaryInDistribution(
+    _In_ DWORD SessionId,
+    _In_ const GUID* DistributionId,
+    _In_ LPCSTR Path,
+    _In_ DWORD ArgumentCount,
+    _In_reads_opt_(ArgumentCount) LPCSTR* Arguments,
+    _Out_ HANDLE* Socket)
 try
 {
+    RETURN_HR_IF(E_POINTER, Socket == nullptr);
+    *Socket = nullptr;
+    RETURN_HR_IF(E_INVALIDARG, DistributionId == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, Path == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, ArgumentCount > 0 && Arguments == nullptr);
 
-    const auto session = FindSessionByCookie(Session);
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+    const auto session = FindSessionByCookie(SessionId);
+    RETURN_HR_IF(c_pluginSessionNotFound, !session);
 
-    auto result = session->CreateLinuxProcess(nullptr, Path, Arguments, Socket);
+    std::vector<LPCSTR> args;
+    if (Arguments != nullptr)
+    {
+        args.assign(Arguments, Arguments + ArgumentCount);
+    }
+    args.push_back(nullptr);
 
-    WSL_LOG("PluginExecuteBinaryCall", TraceLoggingValue(Path, "Path"), TraceLoggingValue(result, "Result"));
-    return result;
-}
-CATCH_RETURN();
-
-HRESULT PluginError(LPCWSTR UserMessage)
-try
-{
-    const auto* context = ExecutionContext::Current();
-    THROW_HR_IF(E_INVALIDARG, UserMessage == nullptr);
-    THROW_HR_IF_MSG(
-        E_ILLEGAL_METHOD_CALL, context == nullptr || WI_IsFlagClear(context->CurrentContext(), Context::Plugin), "Message: %ls", UserMessage);
-
-    // Logs when a WSL plugin hits an error and what that error message is
-    WSL_LOG_TELEMETRY("PluginError", PDT_ProductAndServicePerformance, TraceLoggingValue(UserMessage, "Message"));
-
-    THROW_HR_IF(E_ILLEGAL_STATE_CHANGE, g_pluginErrorMessage.has_value());
-
-    g_pluginErrorMessage.emplace(UserMessage);
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT ExecuteBinaryInDistribution(WSLSessionId Session, const GUID* Distro, LPCSTR Path, LPCSTR* Arguments, SOCKET* Socket)
-try
-{
-    THROW_HR_IF(E_INVALIDARG, Distro == nullptr);
-
-    const auto session = FindSessionByCookie(Session);
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-
-    auto result = session->CreateLinuxProcess(Distro, Path, Arguments, Socket);
+    wil::unique_socket sock;
+    auto result = session->CreateLinuxProcess(DistributionId, Path, args.data(), &sock);
 
     WSL_LOG("PluginExecuteBinaryInDistributionCall", TraceLoggingValue(Path, "Path"), TraceLoggingValue(result, "Result"));
 
-    return result;
-}
-CATCH_RETURN();
-}
-
-namespace {
-
-// Opaque wrapper around IWSLCProcess, handed out as WSLCProcessHandle to plugins.
-struct WslcProcessWrapper
-{
-    wil::com_ptr<IWSLCProcess> Process;
-};
-
-wil::com_ptr<IWSLCSession> ResolveWslcSession(WSLCSessionId Session)
-{
-    auto* mgr = wsl::windows::service::wslc::WSLCSessionManagerImpl::Instance();
-    THROW_HR_IF(RPC_E_DISCONNECTED, mgr == nullptr);
-
-    return mgr->FindSession(static_cast<ULONG>(Session));
-}
-
-} // namespace
-
-extern "C" {
-
-HRESULT WSLCMountFolder(WSLCSessionId Session, LPCWSTR WindowsPath, LPCSTR Mountpoint, BOOL ReadOnly)
-try
-{
-    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint isn't in use by another plugin.
-    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
-
-    auto session = ResolveWslcSession(Session);
-    auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly);
-
-    WSL_LOG(
-        "WslcPluginMountFolderCall",
-        TraceLoggingValue(Session, "SessionId"),
-        TraceLoggingValue(WindowsPath, "WindowsPath"),
-        TraceLoggingValue(Mountpoint, "Mountpoint"),
-        TraceLoggingValue(ReadOnly, "ReadOnly"),
-        TraceLoggingValue(result, "Result"));
-
-    return result;
-}
-CATCH_RETURN();
-
-HRESULT WSLCUnmountFolder(WSLCSessionId Session, LPCSTR Mountpoint)
-try
-{
-    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint is actually owned by the plugin.
-    RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
-
-    auto session = ResolveWslcSession(Session);
-
-    auto result = session->UnmountWindowsFolder(Mountpoint);
-
-    WSL_LOG(
-        "WslcPluginUnmountFolderCall",
-        TraceLoggingValue(Session, "SessionId"),
-        TraceLoggingValue(Mountpoint, "Mountpoint"),
-        TraceLoggingValue(result, "Result"));
-
-    return result;
-}
-CATCH_RETURN();
-
-HRESULT WSLCCreateProcess(WSLCSessionId Session, LPCSTR Executable, LPCSTR* Arguments, LPCSTR* Env, WSLCProcessHandle* Process, int* Errno)
-try
-{
-    RETURN_HR_IF(E_POINTER, Executable == nullptr || Process == nullptr);
-
-    *Process = nullptr;
-    if (Errno != nullptr)
+    if (SUCCEEDED(result))
     {
-        *Errno = 0;
+        *Socket = reinterpret_cast<HANDLE>(sock.release());
     }
 
-    auto session = ResolveWslcSession(Session);
+    return result;
+}
+CATCH_RETURN();
 
-    // Count NULL-terminated arrays.
-    auto countArray = [](LPCSTR* arr) -> ULONG {
-        if (arr == nullptr)
+// --- PluginManager implementation ---
+
+PluginManager::~PluginManager()
+{
+    // m_plugins should have been cleared by Shutdown() while COM was still
+    // initialized. Releasing GIT cookies and the GIT itself here (at global
+    // teardown, after CoUninitialize and after the proxy/stub DLL has been
+    // unloaded) crashes inside the marshaler. If anything is left here, leak
+    // it on purpose rather than dereferencing a torn-down proxy vtable.
+    if (!m_plugins.empty())
+    {
+        LOG_HR_MSG(E_UNEXPECTED, "PluginManager destroyed without Shutdown(); leaking %zu host registrations", m_plugins.size());
+        for (auto& e : m_plugins)
         {
-            return 0;
+            // Drop the cookie without revoking — calling GIT after CoUninitialize crashes.
+            e.hostCookie = 0;
+            (void)e.callback.Detach();
         }
-        ULONG count = 0;
-        while (arr[count] != nullptr)
+        m_plugins.clear();
+    }
+    if (m_git)
+    {
+        // Same reasoning: leak the GIT reference rather than releasing it after teardown.
+        (void)m_git.Detach();
+    }
+
+    // WSLC session references are COM proxies too. Shutdown() should have
+    // drained them while COM was still initialized; if any survive, detach
+    // (leak) them rather than releasing a torn-down proxy.
+    if (!m_wslcSessionRefs.empty())
+    {
+        LOG_HR_MSG(E_UNEXPECTED, "PluginManager destroyed with %zu WSLC session references still registered", m_wslcSessionRefs.size());
+        for (auto& [id, ref] : m_wslcSessionRefs)
         {
-            ++count;
+            (void)ref.detach();
         }
-        return count;
-    };
-
-    WSLCProcessOptions options{};
-    options.CommandLine.Values = Arguments;
-    options.CommandLine.Count = countArray(Arguments);
-    options.Environment.Values = Env;
-    options.Environment.Count = countArray(Env);
-    options.Flags = WSLCProcessFlagsStdin;
-
-    wil::com_ptr<IWSLCProcess> process;
-    int errnoValue = 0;
-    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, &process, &errnoValue);
-
-    if (Errno != nullptr)
-    {
-        *Errno = errnoValue;
+        m_wslcSessionRefs.clear();
     }
-
-    if (FAILED(result))
-    {
-        WSL_LOG(
-            "WslcPluginCreateProcessCall",
-            TraceLoggingValue(Session, "SessionId"),
-            TraceLoggingValue(Executable, "Executable"),
-            TraceLoggingValue(result, "Result"),
-            TraceLoggingValue(errnoValue, "Errno"));
-        return result;
-    }
-
-    auto wrapper = std::make_unique<WslcProcessWrapper>();
-    wrapper->Process = std::move(process);
-    *Process = wrapper.release();
-
-    WSL_LOG(
-        "WslcPluginCreateProcessCall",
-        TraceLoggingValue(Session, "SessionId"),
-        TraceLoggingValue(Executable, "Executable"),
-        TraceLoggingValue(*Process, "Process"),
-        TraceLoggingValue(S_OK, "Result"));
-
-    return S_OK;
+    m_jobObject.reset();
 }
-CATCH_RETURN();
 
-HRESULT WSLCProcessGetFd(WSLCProcessHandle Process, WSLCProcessFd Fd, HANDLE* Handle)
-try
+void PluginManager::Shutdown()
 {
-    RETURN_HR_IF(E_POINTER, Process == nullptr || Handle == nullptr);
-
-    *Handle = nullptr;
-
-    auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
-
-    WSLCFD wslcFd{};
-    switch (Fd)
+    // Must be called while COM is still initialized. Revoking each GIT cookie
+    // releases the underlying marshaled IWslPluginHost reference, which causes
+    // the wslpluginhost.exe processes to exit; the job object below makes that
+    // guaranteed even if a revoke fails.
+    if (m_git)
     {
-    case WSLCProcessFdStdin:
-        wslcFd = WSLCFDStdin;
-        break;
-    case WSLCProcessFdStdout:
-        wslcFd = WSLCFDStdout;
-        break;
-    case WSLCProcessFdStderr:
-        wslcFd = WSLCFDStderr;
-        break;
-    default:
-        WSL_LOG(
-            "WslcPluginProcessGetFd", TraceLoggingValue(static_cast<int>(Fd), "Fd"), TraceLoggingValue(E_INVALIDARG, "Result"));
-        return E_INVALIDARG;
+        for (auto& e : m_plugins)
+        {
+            if (e.hostCookie != 0)
+            {
+                LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(e.hostCookie));
+                e.hostCookie = 0;
+            }
+        }
+        m_git.Reset();
+    }
+    m_plugins.clear();
+
+    // Release any remaining WSLC session references while COM is still
+    // initialized. By this point all sessions should already have been torn
+    // down (and thus unregistered), but drain defensively so we never release
+    // these proxies from the destructor after CoUninitialize.
+    {
+        std::lock_guard lock(m_wslcSessionRefLock);
+        m_wslcSessionRefs.clear();
     }
 
-    WSLCHandle handle{};
-    auto result = wrapper->Process->GetStdHandle(wslcFd, &handle);
-
-    WSL_LOG(
-        "WslcPluginProcessGetFd",
-        TraceLoggingValue(static_cast<int>(Fd), "Fd"),
-        TraceLoggingValue(handle.Handle.Socket, "Handle"),
-        TraceLoggingValue(result, "Result"));
-
-    RETURN_IF_FAILED(result);
-    WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
-
-    *Handle = handle.Handle.Socket;
-    return S_OK;
+    m_jobObject.reset();
 }
-CATCH_RETURN();
-
-HRESULT WSLCProcessGetExitEvent(WSLCProcessHandle Process, HANDLE* ExitEvent)
-try
-{
-    RETURN_HR_IF(E_POINTER, Process == nullptr || ExitEvent == nullptr);
-
-    *ExitEvent = nullptr;
-
-    auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
-    auto result = wrapper->Process->GetExitEvent(ExitEvent);
-
-    WSL_LOG("WslcPluginProcessGetExitEvent", TraceLoggingValue(*ExitEvent, "ExitEvent"), TraceLoggingValue(result, "Result"));
-
-    return result;
-}
-CATCH_RETURN();
-
-HRESULT WSLCProcessGetExitCode(WSLCProcessHandle Process, int* ExitCode)
-try
-{
-    RETURN_HR_IF(E_POINTER, Process == nullptr || ExitCode == nullptr);
-
-    *ExitCode = -1;
-    auto* wrapper = static_cast<WslcProcessWrapper*>(Process);
-
-    WSLCProcessState state{};
-    auto result = wrapper->Process->GetState(&state, ExitCode);
-
-    if (SUCCEEDED(result) && state != WslcProcessStateExited && state != WslcProcessStateSignalled)
-    {
-        result = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
-    }
-
-    WSL_LOG(
-        "WslcPluginProcessGetExitCode",
-        TraceLoggingValue(*ExitCode, "ExitCode"),
-        TraceLoggingValue(static_cast<int>(state), "State"),
-        TraceLoggingValue(result, "Result"));
-
-    return result;
-}
-CATCH_RETURN();
-
-void WSLCReleaseProcess(WSLCProcessHandle Process)
-{
-    if (Process != nullptr)
-    {
-        WSL_LOG("WslcPluginReleaseProcess", TraceLoggingValue(Process, "Process"));
-        delete static_cast<WslcProcessWrapper*>(Process);
-    }
-}
-
-} // extern "C"
-
-static constexpr WSLPluginAPIV1 ApiV1 = {
-    Version,
-    &MountFolder,
-    &ExecuteBinary,
-    &PluginError,
-    &ExecuteBinaryInDistribution,
-    &WSLCMountFolder,
-    &WSLCUnmountFolder,
-    &WSLCCreateProcess,
-    &WSLCProcessGetFd,
-    &WSLCProcessGetExitEvent,
-    &WSLCProcessGetExitCode,
-    &WSLCReleaseProcess};
 
 void PluginManager::LoadPlugins()
 {
@@ -365,190 +279,531 @@ void PluginManager::LoadPlugins()
             continue;
         }
 
-        auto loadResult = wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&]() { LoadPlugin(e.first.c_str(), path.c_str()); });
+        // Record the plugin for deferred activation. The actual COM host process
+        // is created in EnsureInitialized(), which runs after the service's COM
+        // initialization is complete (CoInitializeSecurity must happen first).
+        OutOfProcPlugin plugin{};
+        plugin.name = e.first;
+        plugin.path = path;
+        m_plugins.emplace_back(std::move(plugin));
 
-        // Logs when a WSL plugin is loaded, used for evaluating plugin populations
+        // Discovery-only event. The plugin DLL is no longer loaded into
+        // wslservice.exe — actual load happens out-of-process via COM
+        // activation in EnsureInitialized(). See "PluginLoad" emitted from
+        // that path for the real load result.
         WSL_LOG_TELEMETRY(
-            "PluginLoad",
+            "PluginDiscovered",
             PDT_ProductAndServiceUsage,
             TraceLoggingValue(e.first.c_str(), "Name"),
-            TraceLoggingValue(path.c_str(), "Path"),
-            TraceLoggingValue(loadResult, "Result"));
-
-        if (FAILED(loadResult))
-        {
-            // If this plugin reported an error, record it to display it to the user
-            m_pluginError.emplace(PluginError{e.first, loadResult});
-        }
+            TraceLoggingValue(path.c_str(), "Path"));
     }
 }
 
-void PluginManager::LoadPlugin(LPCWSTR Name, LPCWSTR ModulePath)
+PluginManager::ScopedComInit::ScopedComInit() : initHr(::CoInitializeEx(nullptr, COINIT_MULTITHREADED))
 {
-    // Validate the plugin signature before loading it.
-    // The handle to the module is kept open after validating the signature so the file can't be written to
-    // after the signature check.
-    wil::unique_hfile pluginHandle;
-    if constexpr (wsl::shared::OfficialBuild)
+}
+
+PluginManager::ScopedComInit::~ScopedComInit()
+{
+    if (SUCCEEDED(initHr))
     {
-        pluginHandle = wsl::windows::common::install::ValidateFileSignature(ModulePath);
-        WI_ASSERT(pluginHandle.is_valid());
+        ::CoUninitialize();
+    }
+}
+
+PluginManager::ScopedComInit::ScopedComInit(ScopedComInit&& other) noexcept : initHr(other.initHr)
+{
+    // Suppress uninit in moved-from instance.
+    other.initHr = RPC_E_CHANGED_MODE;
+}
+
+HRESULT PluginManager::ScopedComInit::Result() const noexcept
+{
+    return (initHr == RPC_E_CHANGED_MODE) ? S_OK : initHr;
+}
+
+PluginManager::ScopedComInit PluginManager::EnsureInitialized()
+{
+    // Join the calling thread to the MTA for the duration of the dispatch. The
+    // returned guard must outlive any subsequent plugin host calls because
+    // those are cross-process COM calls that require an initialized apartment,
+    // and so does the GIT-based proxy acquisition below.
+    ScopedComInit coInit;
+    THROW_IF_FAILED(coInit.Result());
+
+    // Lazily create the process-wide Global Interface Table accessor. The GIT
+    // itself is a process-global COM-provided singleton; we just need an
+    // in-process accessor to register and look up cookies.
+    std::call_once(m_gitOnce, [this]() {
+        THROW_IF_FAILED(CoCreateInstance(CLSID_StdGlobalInterfaceTable, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_git)));
+    });
+
+    std::call_once(m_initOnce, [this]() {
+        for (auto& e : m_plugins)
+        {
+            auto loadResult = wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&]() { LoadPlugin(e); });
+
+            // Canonical "plugin was actually loaded" telemetry — matches the
+            // semantics of the pre-refactor PluginLoad event (emitted after
+            // the entry point ran). PluginHostActivation below is the more
+            // granular event covering the COM activation path specifically.
+            WSL_LOG_TELEMETRY(
+                "PluginLoad",
+                PDT_ProductAndServiceUsage,
+                TraceLoggingValue(e.name.c_str(), "Name"),
+                TraceLoggingValue(e.path.c_str(), "Path"),
+                TraceLoggingValue(loadResult, "Result"));
+
+            WSL_LOG_TELEMETRY(
+                "PluginHostActivation",
+                PDT_ProductAndServiceUsage,
+                TraceLoggingValue(e.name.c_str(), "Name"),
+                TraceLoggingValue(e.path.c_str(), "Path"),
+                TraceLoggingValue(loadResult, "Result"));
+
+            if (FAILED(loadResult))
+            {
+                // Treat host-process crashes and benign COM activation races (server is
+                // shutting down or its exec failed) as non-fatal — the plugin is simply
+                // unavailable for this session. All other failures, including registration
+                // errors (REGDB_E_CLASSNOTREG), access denials, and plugin-reported errors
+                // from Initialize, are treated as fatal plugin load failures so the user
+                // gets a clear error rather than a silently-disabled plugin.
+                if (IsHostCrash(loadResult) || loadResult == CO_E_SERVER_EXEC_FAILURE || loadResult == CO_E_SERVER_STOPPING)
+                {
+                    LOG_HR_MSG(loadResult, "Plugin host activation failed for: '%ls', skipping", e.name.c_str());
+                }
+                else
+                {
+                    m_pluginError.emplace(PluginError{e.name, loadResult});
+                }
+            }
+        }
+    });
+
+    return coInit;
+}
+
+void PluginManager::LoadPlugin(OutOfProcPlugin& plugin)
+{
+    // One callback object per plugin host so the WSLC process-cookie map is
+    // isolated per plugin. When the plugin host process is released, the
+    // callback's refcount drops and any unreleased IWSLCProcess refs are freed.
+    plugin.callback = Microsoft::WRL::Make<PluginHostCallbackImpl>(*this);
+    THROW_IF_NULL_ALLOC(plugin.callback);
+
+    // Activate the plugin host via COM. The LocalServer32 registration causes COM
+    // to spawn wslpluginhost.exe automatically.
+    Microsoft::WRL::ComPtr<IWslPluginHost> host;
+    HRESULT activationHr = CoCreateInstance(CLSID_WslPluginHost, nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&host));
+    WSL_LOG(
+        "PluginHostActivation",
+        TraceLoggingValue(plugin.name.c_str(), "Plugin"),
+        TraceLoggingValue(plugin.path.c_str(), "Path"),
+        TraceLoggingValue(activationHr, "CoCreateInstanceResult"));
+    THROW_IF_FAILED_MSG(activationHr, "Failed to create plugin host for: '%ls'", plugin.path.c_str());
+
+    // Join the host to our job object before Initialize runs plugin code, so any
+    // child processes the plugin spawns inherit the job and are killed when the
+    // service exits. A failure here is non-fatal: the host is still reaped via
+    // CoReleaseServerProcess on clean shutdown, just not on a service crash.
+    EnsureJobObjectCreated();
+    wil::unique_handle process;
+    const HRESULT getProcessHr = host->GetProcessHandle(&process);
+    LOG_IF_FAILED_MSG(getProcessHr, "Failed to get plugin host process handle for: '%ls'", plugin.path.c_str());
+    if (SUCCEEDED(getProcessHr))
+    {
+        LOG_IF_WIN32_BOOL_FALSE_MSG(
+            AssignProcessToJobObject(m_jobObject.get(), process.get()),
+            "Failed to assign plugin host to job object for: '%ls'",
+            plugin.path.c_str());
     }
 
-    LoadedPlugin plugin{};
-    plugin.name = Name;
+    THROW_IF_FAILED_MSG(
+        host->Initialize(plugin.callback.Get(), plugin.path.c_str(), plugin.name.c_str()),
+        "Plugin host failed to initialize: '%ls'",
+        plugin.path.c_str());
 
-    plugin.module.reset(LoadLibrary(ModulePath));
-    THROW_LAST_ERROR_IF_NULL(plugin.module);
+    // Stash the IWslPluginHost in the Global Interface Table. The proxy returned
+    // by CoCreateInstance is bound to the apartment of this thread (MTA, since
+    // EnsureInitialized() joined us to the MTA). Hook dispatch can arrive on
+    // threads in any apartment — in particular NTA-on-MTA, which is what wslservice's
+    // RPC dispatcher uses when the incoming call is via a WinRT-style interface
+    // (e.g. IWSLCSession). MTA-bound proxies are NOT callable from NTA, so storing
+    // the raw proxy here and reusing it cross-apartment fails with RPC_E_WRONG_THREAD.
+    // Storing in the GIT and re-unmarshaling per call yields an apartment-local
+    // proxy that works from any apartment.
+    DWORD cookie = 0;
+    THROW_IF_FAILED(m_git->RegisterInterfaceInGlobal(host.Get(), __uuidof(IWslPluginHost), &cookie));
 
-    const WSLPluginAPI_EntryPointV1 entryPoint =
-        reinterpret_cast<WSLPluginAPI_EntryPointV1>(GetProcAddress(plugin.module.get(), GSL_STRINGIFY(WSLPLUGINAPI_ENTRYPOINTV1)));
+    auto revokeOnFailure = wil::scope_exit([&] {
+        if (cookie != 0)
+        {
+            LOG_IF_FAILED(m_git->RevokeInterfaceFromGlobal(cookie));
+        }
+    });
 
-    THROW_LAST_ERROR_IF_NULL(entryPoint);
-    THROW_IF_FAILED_MSG(entryPoint(&ApiV1, &plugin.hooks), "Error returned by plugin: '%ls'", ModulePath);
+    // Drop the raw proxy — future access goes through the GIT to get an
+    // apartment-local proxy. The GIT keeps the underlying marshaled stream
+    // alive, so the host process stays running.
+    host.Reset();
 
-    m_plugins.emplace_back(std::move(plugin));
+    plugin.hostCookie = cookie;
+    cookie = 0;
+    revokeOnFailure.release();
+}
+
+HRESULT PluginManager::AcquireHostProxy(const OutOfProcPlugin& plugin, _COM_Outptr_ IWslPluginHost** host)
+{
+    *host = nullptr;
+    if (plugin.hostCookie == 0 || !m_git)
+    {
+        return E_NOT_VALID_STATE;
+    }
+    return m_git->GetInterfaceFromGlobal(plugin.hostCookie, __uuidof(IWslPluginHost), reinterpret_cast<void**>(host));
+}
+
+void PluginManager::EnsureJobObjectCreated()
+{
+    std::call_once(m_jobObjectOnce, [this]() {
+        m_jobObject.reset(CreateJobObjectW(nullptr, nullptr));
+        THROW_LAST_ERROR_IF(!m_jobObject);
+
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+        jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(m_jobObject.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+    });
+}
+
+std::vector<BYTE> PluginManager::SerializeSid(PSID Sid)
+{
+    const DWORD sidLength = GetLengthSid(Sid);
+    std::vector<BYTE> buffer(sidLength);
+    CopySid(sidLength, buffer.data(), Sid);
+    return buffer;
 }
 
 void PluginManager::OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSettings* Settings)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnVMStarted != nullptr)
+        if (e.hostCookie == 0)
         {
-            WSL_LOG(
-                "PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
-
-            SlowOperationWatcher slowOperation{"PluginOnVmStarted"};
-            ThrowIfPluginError(e.hooks.OnVMStarted(Session, Settings), e.name.c_str());
+            continue;
         }
+        WSL_LOG("PluginOnVmStartedCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
+
+        ACQUIRE_PLUGIN_HOST_OR_THROW(e, host, "OnVmStarted");
+
+        wil::unique_cotaskmem_string errorMessage;
+        SlowOperationWatcher slowOperation{"PluginOnVmStarted"};
+        WSL_LOG("PluginOnVmStartedBeginRpc", TraceLoggingValue(e.name.c_str(), "Plugin"));
+        HRESULT hr = host->OnVMStarted(
+            Session->SessionId,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.data(),
+            static_cast<DWORD>(Settings->CustomConfigurationFlags),
+            &errorMessage);
+        WSL_LOG("PluginOnVmStartedEndRpc", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(hr, "Result"));
+
+        if (IsHostCrash(hr))
+        {
+            LogPluginHostCrash(e, hr, "OnVmStarted");
+            continue;
+        }
+
+        ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
     }
 }
 
-void PluginManager::OnVmStopping(const WSLSessionInformation* Session) const
+void PluginManager::OnVmStopping(const WSLSessionInformation* Session)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnVMStopping != nullptr)
+        if (e.hostCookie == 0)
         {
-            WSL_LOG(
-                "PluginOnVmStoppingCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
-
-            const auto result = e.hooks.OnVMStopping(Session);
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG("PluginOnVmStoppingCall", TraceLoggingValue(e.name.c_str(), "Plugin"), TraceLoggingValue(Session->UserSid, "Sid"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnVmStopping");
+
+        const auto result = host->OnVMStopping(Session->SessionId, Session->UserToken, static_cast<DWORD>(sidData.size()), sidData.data());
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnVmStopping");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
 
 void PluginManager::OnDistributionStarted(const WSLSessionInformation* Session, const WSLDistributionInformation* Distribution)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnDistributionStarted != nullptr)
+        if (e.hostCookie == 0)
         {
-            WSL_LOG(
-                "PluginOnDistroStartedCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"),
-                TraceLoggingValue(Distribution->Id, "DistributionId"));
-
-            SlowOperationWatcher slowOperation{"PluginOnDistributionStarted"};
-            ThrowIfPluginError(e.hooks.OnDistributionStarted(Session, Distribution), e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnDistroStartedCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->UserSid, "Sid"),
+            TraceLoggingValue(Distribution->Id, "DistributionId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_THROW(e, host, "OnDistributionStarted");
+
+        wil::unique_cotaskmem_string errorMessage;
+        SlowOperationWatcher slowOperation{"PluginOnDistributionStarted"};
+        HRESULT hr = host->OnDistributionStarted(
+            Session->SessionId,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.data(),
+            &Distribution->Id,
+            Distribution->Name,
+            Distribution->PidNamespace,
+            Distribution->PackageFamilyName,
+            Distribution->InitPid,
+            Distribution->Flavor,
+            Distribution->Version,
+            &errorMessage);
+
+        if (IsHostCrash(hr))
+        {
+            LogPluginHostCrash(e, hr, "OnDistributionStarted");
+            continue;
+        }
+
+        ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
     }
 }
 
-void PluginManager::OnDistributionStopping(const WSLSessionInformation* Session, const WSLDistributionInformation* Distribution) const
+void PluginManager::OnDistributionStopping(const WSLSessionInformation* Session, const WSLDistributionInformation* Distribution)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnDistributionStopping != nullptr)
+        if (e.hostCookie == 0)
         {
-            WSL_LOG(
-                "PluginOnDistroStoppingCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"),
-                TraceLoggingValue(Distribution->Id, "DistributionId"));
-
-            const auto result = e.hooks.OnDistributionStopping(Session, Distribution);
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnDistroStoppingCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->UserSid, "Sid"),
+            TraceLoggingValue(Distribution->Id, "DistributionId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnDistributionStopping");
+
+        const auto result = host->OnDistributionStopping(
+            Session->SessionId,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.data(),
+            &Distribution->Id,
+            Distribution->Name,
+            Distribution->PidNamespace,
+            Distribution->PackageFamilyName,
+            Distribution->InitPid,
+            Distribution->Flavor,
+            Distribution->Version);
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnDistributionStopping");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
 
-void PluginManager::OnDistributionRegistered(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* Distribution) const
+void PluginManager::OnDistributionRegistered(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* Distribution)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnDistributionRegistered != nullptr)
+        if (e.hostCookie == 0)
         {
-            WSL_LOG(
-                "PluginOnDistributionRegisteredCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"),
-                TraceLoggingValue(Distribution->Id, "DistributionId"));
-
-            const auto result = e.hooks.OnDistributionRegistered(Session, Distribution);
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnDistributionRegisteredCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->UserSid, "Sid"),
+            TraceLoggingValue(Distribution->Id, "DistributionId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnDistributionRegistered");
+
+        const auto result = host->OnDistributionRegistered(
+            Session->SessionId,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.data(),
+            &Distribution->Id,
+            Distribution->Name,
+            Distribution->PackageFamilyName,
+            Distribution->Flavor,
+            Distribution->Version);
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnDistributionRegistered");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
 
-void PluginManager::OnDistributionUnregistered(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* Distribution) const
+void PluginManager::OnDistributionUnregistered(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* Distribution)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnDistributionUnregistered != nullptr)
+        if (e.hostCookie == 0)
         {
-            WSL_LOG(
-                "PluginOnDistributionUnregisteredCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->UserSid, "Sid"),
-                TraceLoggingValue(Distribution->Id, "DistributionId"));
-
-            const auto result = e.hooks.OnDistributionUnregistered(Session, Distribution);
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnDistributionUnregisteredCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->UserSid, "Sid"),
+            TraceLoggingValue(Distribution->Id, "DistributionId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnDistributionUnregistered");
+
+        const auto result = host->OnDistributionUnregistered(
+            Session->SessionId,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.data(),
+            &Distribution->Id,
+            Distribution->Name,
+            Distribution->PackageFamilyName,
+            Distribution->Flavor,
+            Distribution->Version);
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnDistributionUnregistered");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
 
-void PluginManager::ThrowIfPluginError(HRESULT Result, LPCWSTR Plugin)
+void PluginManager::ThrowIfPluginError(HRESULT Result, LPWSTR ErrorMessage, WSLSessionId Session, LPCWSTR Plugin)
 {
-    const auto message = std::move(g_pluginErrorMessage);
-    g_pluginErrorMessage.reset(); // std::move() doesn't clear the previous std::optional
+    // If the host process crashed, don't propagate as a fatal plugin error —
+    // log it and let the caller decide. The plugin is already dead.
+    if (IsHostCrash(Result))
+    {
+        LOG_HR_MSG(Result, "Plugin host process crashed for plugin: '%ls'", Plugin);
+        return;
+    }
 
     if (FAILED(Result))
     {
-        if (message.has_value())
+        if (ErrorMessage != nullptr && ErrorMessage[0] != L'\0')
         {
-            THROW_HR_WITH_USER_ERROR(Result, wsl::shared::Localization::MessageFatalPluginErrorWithMessage(Plugin, message->c_str()));
+            THROW_HR_WITH_USER_ERROR(Result, wsl::shared::Localization::MessageFatalPluginErrorWithMessage(Plugin, ErrorMessage));
         }
         else
         {
             THROW_HR_WITH_USER_ERROR(Result, wsl::shared::Localization::MessageFatalPluginError(Plugin));
         }
     }
-    else if (message.has_value())
+    else if (ErrorMessage != nullptr && ErrorMessage[0] != L'\0')
     {
         THROW_HR_MSG(E_ILLEGAL_STATE_CHANGE, "Plugin '%ls' emitted an error message but returned success", Plugin);
     }
 }
 
-void PluginManager::ThrowIfFatalPluginError() const
+bool PluginManager::IsHostCrash(HRESULT hr)
+{
+    // Each of these unambiguously indicates the COM server process has gone
+    // away. RPC_E_CALL_REJECTED is deliberately excluded: it means a busy
+    // server rejected the call, not that the server died — treating it as a
+    // crash would silently disable the plugin for the rest of the session.
+    switch (hr)
+    {
+    case RPC_E_DISCONNECTED:
+    case RPC_E_SERVER_DIED:
+    case RPC_E_SERVER_DIED_DNE:
+    case CO_E_OBJNOTCONNECTED:
+    case HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE):
+    case HRESULT_FROM_WIN32(RPC_S_CALL_FAILED):
+    case HRESULT_FROM_WIN32(RPC_S_CALL_FAILED_DNE):
+        return true;
+    default:
+        return false;
+    }
+}
+
+void PluginManager::LogPluginHostCrash(OutOfProcPlugin& plugin, HRESULT result, const char* stage)
+{
+    LOG_HR_MSG(result, "Plugin host crashed at %hs for: '%ls'", stage, plugin.name.c_str());
+
+    // Fire telemetry only on first observation per plugin: a dead plugin will
+    // hit this path on every subsequent VM/distro lifecycle event, and we
+    // don't want to flood the telemetry channel with duplicates.
+    if (!plugin.crashTelemetryFired.exchange(true))
+    {
+        // Release any WSLC processes the dead host created so they don't leak
+        // until service shutdown.
+        if (plugin.callback)
+        {
+            plugin.callback->DrainProcesses();
+        }
+
+        WSL_LOG_TELEMETRY(
+            "PluginHostCrash",
+            PDT_ProductAndServiceUsage,
+            TraceLoggingValue(plugin.name.c_str(), "Name"),
+            TraceLoggingValue(plugin.path.c_str(), "Path"),
+            TraceLoggingValue(result, "Result"),
+            TraceLoggingValue(stage, "Stage"));
+    }
+}
+
+void PluginManager::ThrowIfFatalPluginError()
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
     if (!m_pluginError.has_value())
     {
@@ -565,129 +820,547 @@ void PluginManager::ThrowIfFatalPluginError() const
     }
 }
 
+void PluginManager::RegisterWslcSession(ULONG SessionId, IWSLCSessionReference* Reference)
+{
+    THROW_HR_IF(E_POINTER, Reference == nullptr);
+
+    std::lock_guard lock(m_wslcSessionRefLock);
+    m_wslcSessionRefs[SessionId] = Reference;
+}
+
+void PluginManager::UnregisterWslcSession(ULONG SessionId)
+{
+    std::lock_guard lock(m_wslcSessionRefLock);
+    m_wslcSessionRefs.erase(SessionId);
+}
+
+wil::com_ptr<IWSLCSession> PluginManager::ResolveWslcSession(ULONG SessionId)
+{
+    wil::com_ptr<IWSLCSessionReference> reference;
+    {
+        std::lock_guard lock(m_wslcSessionRefLock);
+        auto it = m_wslcSessionRefs.find(SessionId);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_wslcSessionRefs.end());
+        reference = it->second;
+    }
+
+    // OpenSession() is called OUTSIDE m_wslcSessionRefLock: the reference is a
+    // weak handle, so opening it can fail or block and must not hold the lock.
+    wil::com_ptr<IWSLCSession> session;
+    const auto hr = reference->OpenSession(&session);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), FAILED(hr) || session == nullptr);
+
+    return session;
+}
+
 void PluginManager::OnWslcSessionCreated(const WSLCSessionInformation* Session)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnSessionCreated != nullptr)
+        if (e.hostCookie == 0)
         {
-            auto result = e.hooks.OnSessionCreated(Session);
-            WSL_LOG(
-                "PluginOnWslcSessionCreatedCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(Session->DisplayName, "DisplayName"),
-                TraceLoggingValue(result, "Result"));
-
-            ThrowIfPluginError(result, e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnWslcSessionCreatedCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->SessionId, "SessionId"),
+            TraceLoggingValue(Session->DisplayName, "DisplayName"));
+
+        ACQUIRE_PLUGIN_HOST_OR_THROW(e, host, "OnWslcSessionCreated");
+
+        wil::unique_cotaskmem_string errorMessage;
+        HRESULT hr = host->OnWslcSessionCreated(
+            Session->SessionId,
+            Session->DisplayName,
+            Session->ApplicationPid,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.empty() ? nullptr : sidData.data(),
+            &errorMessage);
+
+        if (IsHostCrash(hr))
+        {
+            LogPluginHostCrash(e, hr, "OnWslcSessionCreated");
+            continue;
+        }
+
+        ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
     }
 }
 
-void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session) const
+void PluginManager::OnWslcSessionStopping(const WSLCSessionInformation* Session)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.OnSessionStopping != nullptr)
+        if (e.hostCookie == 0)
         {
-            const auto result = e.hooks.OnSessionStopping(Session);
-            WSL_LOG(
-                "PluginOnWslcSessionStoppingCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(result, "Result"));
-
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnWslcSessionStoppingCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->SessionId, "SessionId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnWslcSessionStopping");
+
+        const auto result = host->OnWslcSessionStopping(
+            Session->SessionId,
+            Session->DisplayName,
+            Session->ApplicationPid,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.empty() ? nullptr : sidData.data());
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnWslcSessionStopping");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
 
-HRESULT PluginManager::OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+HRESULT PluginManager::OnWslcContainerStarted(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 try
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.ContainerStarted != nullptr)
+        if (e.hostCookie == 0)
         {
-            // Failure here aborts the container creation. Surface the first error.
-            const auto result = e.hooks.ContainerStarted(Session, InspectJson);
-            WSL_LOG(
-                "PluginOnWslcContainerStartedCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(result, "Result"));
-
-            ThrowIfPluginError(result, e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnWslcContainerStartedCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->SessionId, "SessionId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_THROW(e, host, "OnWslcContainerStarted");
+
+        // Failure here aborts the container creation. Surface the first error.
+        wil::unique_cotaskmem_string errorMessage;
+        const HRESULT hr = host->OnWslcContainerStarted(
+            Session->SessionId,
+            Session->DisplayName,
+            Session->ApplicationPid,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.empty() ? nullptr : sidData.data(),
+            InspectJson,
+            &errorMessage);
+
+        if (IsHostCrash(hr))
+        {
+            LogPluginHostCrash(e, hr, "OnWslcContainerStarted");
+            continue;
+        }
+
+        ThrowIfPluginError(hr, errorMessage.get(), Session->SessionId, e.name.c_str());
     }
     return S_OK;
 }
 CATCH_RETURN()
 
-void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId) const
+void PluginManager::OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.ContainerStopping != nullptr)
+        if (e.hostCookie == 0)
         {
-
-            const auto result = e.hooks.ContainerStopping(Session, ContainerId);
-            WSL_LOG(
-                "PluginOnWslcContainerStoppingCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(ContainerId, "ContainerId"),
-                TraceLoggingValue(result, "Result"));
-
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnWslcContainerStoppingCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->SessionId, "SessionId"),
+            TraceLoggingValue(ContainerId, "ContainerId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnWslcContainerStopping");
+
+        const auto result = host->OnWslcContainerStopping(
+            Session->SessionId,
+            Session->DisplayName,
+            Session->ApplicationPid,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.empty() ? nullptr : sidData.data(),
+            ContainerId);
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnWslcContainerStopping");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
 
-void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson) const
+void PluginManager::OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.ImageCreated != nullptr)
+        if (e.hostCookie == 0)
         {
-            const auto result = e.hooks.ImageCreated(Session, InspectJson);
-            WSL_LOG(
-                "PluginOnWslcImageCreatedCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(result, "Result"));
-
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnWslcImageCreatedCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->SessionId, "SessionId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnWslcImageCreated");
+
+        const auto result = host->OnWslcImageCreated(
+            Session->SessionId,
+            Session->DisplayName,
+            Session->ApplicationPid,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.empty() ? nullptr : sidData.data(),
+            InspectJson);
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnWslcImageCreated");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
 
-void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId) const
+void PluginManager::OnWslcImageDeleted(const WSLCSessionInformation* Session, LPCSTR ImageId)
 {
     ExecutionContext context(Context::Plugin);
+    auto coInit = EnsureInitialized();
 
-    for (const auto& e : m_plugins)
+    auto sidData = SerializeSid(Session->UserSid);
+
+    for (auto& e : m_plugins)
     {
-        if (e.hooks.ImageDeleted != nullptr)
+        if (e.hostCookie == 0)
         {
-            const auto result = e.hooks.ImageDeleted(Session, ImageId);
-            WSL_LOG(
-                "PluginOnWslcImageDeletedCall",
-                TraceLoggingValue(e.name.c_str(), "Plugin"),
-                TraceLoggingValue(Session->SessionId, "SessionId"),
-                TraceLoggingValue(ImageId, "ImageId"),
-                TraceLoggingValue(result, "Result"));
-            LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
+            continue;
         }
+        WSL_LOG(
+            "PluginOnWslcImageDeletedCall",
+            TraceLoggingValue(e.name.c_str(), "Plugin"),
+            TraceLoggingValue(Session->SessionId, "SessionId"),
+            TraceLoggingValue(ImageId, "ImageId"));
+
+        ACQUIRE_PLUGIN_HOST_OR_CONTINUE(e, host, "OnWslcImageDeleted");
+
+        const auto result = host->OnWslcImageDeleted(
+            Session->SessionId,
+            Session->DisplayName,
+            Session->ApplicationPid,
+            Session->UserToken,
+            static_cast<DWORD>(sidData.size()),
+            sidData.empty() ? nullptr : sidData.data(),
+            ImageId);
+
+        if (IsHostCrash(result))
+        {
+            LogPluginHostCrash(e, result, "OnWslcImageDeleted");
+            continue;
+        }
+
+        LOG_IF_FAILED_MSG(result, "Error thrown from plugin: '%ls'", e.name.c_str());
     }
 }
+
+// --- IWslPluginHostCallback WSLC implementations (service-side) ---
+
+DWORD PluginHostCallbackImpl::InsertProcessLocked(wil::com_ptr<IWSLCProcess> process)
+{
+    std::lock_guard lock(m_processLock);
+
+    // Reserve a cookie that's neither 0 nor already in use. Wraparound is fine.
+    THROW_HR_IF(E_OUTOFMEMORY, m_processes.size() >= std::numeric_limits<DWORD>::max() - 1);
+
+    DWORD cookie = m_nextCookie;
+    while (cookie == 0 || m_processes.find(cookie) != m_processes.end())
+    {
+        ++cookie;
+    }
+    m_nextCookie = cookie + 1;
+    m_processes.emplace(cookie, std::move(process));
+    return cookie;
+}
+
+wil::com_ptr<IWSLCProcess> PluginHostCallbackImpl::FindProcess(DWORD cookie) const
+{
+    std::lock_guard lock(m_processLock);
+
+    auto it = m_processes.find(cookie);
+    return (it == m_processes.end()) ? nullptr : it->second;
+}
+
+wil::com_ptr<IWSLCProcess> PluginHostCallbackImpl::RemoveProcess(DWORD cookie)
+{
+    std::lock_guard lock(m_processLock);
+
+    auto it = m_processes.find(cookie);
+    if (it == m_processes.end())
+    {
+        return nullptr;
+    }
+    auto process = std::move(it->second);
+    m_processes.erase(it);
+    return process;
+}
+
+void PluginHostCallbackImpl::DrainProcesses() noexcept
+try
+{
+    std::unordered_map<DWORD, wil::com_ptr<IWSLCProcess>> processes;
+    {
+        std::lock_guard lock(m_processLock);
+        processes.swap(m_processes);
+    }
+
+    // Release outside the lock: a process Release() may run teardown that
+    // re-enters this callback.
+}
+CATCH_LOG()
+
+STDMETHODIMP PluginHostCallbackImpl::WslcMountFolder(_In_ DWORD SessionId, _In_ LPCWSTR WindowsPath, _In_ LPCSTR Mountpoint, _In_ BOOL ReadOnly)
+try
+{
+    // TODO: Once plugins are out of proc, add logic to validate that the mountpoint isn't in use by another plugin.
+    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || Mountpoint == nullptr);
+
+    auto session = m_owner.ResolveWslcSession(SessionId);
+
+    auto result = session->MountWindowsFolder(WindowsPath, Mountpoint, ReadOnly);
+
+    WSL_LOG(
+        "WslcPluginMountFolderCall",
+        TraceLoggingValue(SessionId, "SessionId"),
+        TraceLoggingValue(WindowsPath, "WindowsPath"),
+        TraceLoggingValue(Mountpoint, "Mountpoint"),
+        TraceLoggingValue(ReadOnly, "ReadOnly"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
+
+STDMETHODIMP PluginHostCallbackImpl::WslcUnmountFolder(_In_ DWORD SessionId, _In_ LPCSTR Mountpoint)
+try
+{
+    RETURN_HR_IF(E_POINTER, Mountpoint == nullptr);
+
+    auto session = m_owner.ResolveWslcSession(SessionId);
+    auto result = session->UnmountWindowsFolder(Mountpoint);
+
+    WSL_LOG(
+        "WslcPluginUnmountFolderCall",
+        TraceLoggingValue(SessionId, "SessionId"),
+        TraceLoggingValue(Mountpoint, "Mountpoint"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
+
+STDMETHODIMP PluginHostCallbackImpl::WslcCreateProcess(
+    _In_ DWORD SessionId,
+    _In_ LPCSTR Executable,
+    _In_ DWORD ArgumentCount,
+    _In_reads_opt_(ArgumentCount) LPCSTR* Arguments,
+    _In_ DWORD EnvCount,
+    _In_reads_opt_(EnvCount) LPCSTR* Environment,
+    _Out_ DWORD* ProcessCookie,
+    _Out_ int* Errno)
+try
+{
+    RETURN_HR_IF(E_POINTER, Executable == nullptr || ProcessCookie == nullptr || Errno == nullptr);
+    *ProcessCookie = 0;
+    *Errno = 0;
+    RETURN_HR_IF(E_INVALIDARG, (ArgumentCount > 0 && Arguments == nullptr) || (EnvCount > 0 && Environment == nullptr));
+
+    auto session = m_owner.ResolveWslcSession(SessionId);
+
+    // Build NULL-terminated argument/env arrays expected by CreateRootNamespaceProcess.
+    std::vector<LPCSTR> argsTerminated;
+    if (Arguments != nullptr)
+    {
+        argsTerminated.assign(Arguments, Arguments + ArgumentCount);
+    }
+    argsTerminated.push_back(nullptr);
+
+    std::vector<LPCSTR> envTerminated;
+    if (Environment != nullptr)
+    {
+        envTerminated.assign(Environment, Environment + EnvCount);
+        envTerminated.push_back(nullptr);
+    }
+
+    WSLCProcessOptions options{};
+    options.CommandLine.Values = argsTerminated.data();
+    options.CommandLine.Count = ArgumentCount;
+    if (!envTerminated.empty())
+    {
+        options.Environment.Values = envTerminated.data();
+        options.Environment.Count = EnvCount;
+    }
+    options.Flags = WSLCProcessFlagsStdin;
+
+    wil::com_ptr<IWSLCProcess> process;
+    int errnoValue = 0;
+    auto result = session->CreateRootNamespaceProcess(Executable, &options, 0, 0, &process, &errnoValue);
+    *Errno = errnoValue;
+
+    if (FAILED(result))
+    {
+        WSL_LOG(
+            "WslcPluginCreateProcessCall",
+            TraceLoggingValue(SessionId, "SessionId"),
+            TraceLoggingValue(Executable, "Executable"),
+            TraceLoggingValue(result, "Result"),
+            TraceLoggingValue(errnoValue, "Errno"));
+        return result;
+    }
+
+    *ProcessCookie = InsertProcessLocked(std::move(process));
+
+    WSL_LOG(
+        "WslcPluginCreateProcessCall",
+        TraceLoggingValue(SessionId, "SessionId"),
+        TraceLoggingValue(Executable, "Executable"),
+        TraceLoggingValue(*ProcessCookie, "ProcessCookie"),
+        TraceLoggingValue(S_OK, "Result"));
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDMETHODIMP PluginHostCallbackImpl::WslcProcessGetFd(_In_ DWORD ProcessCookie, _In_ DWORD Fd, _Out_ HANDLE* Handle)
+try
+{
+    RETURN_HR_IF(E_POINTER, Handle == nullptr);
+    *Handle = nullptr;
+
+    auto process = FindProcess(ProcessCookie);
+    RETURN_HR_IF(E_INVALIDARG, !process);
+
+    WSLCFD wslcFd{};
+    switch (static_cast<WSLCProcessFd>(Fd))
+    {
+    case WSLCProcessFdStdin:
+        wslcFd = WSLCFDStdin;
+        break;
+    case WSLCProcessFdStdout:
+        wslcFd = WSLCFDStdout;
+        break;
+    case WSLCProcessFdStderr:
+        wslcFd = WSLCFDStderr;
+        break;
+    default:
+        WSL_LOG(
+            "WslcPluginProcessGetFd", TraceLoggingValue(static_cast<int>(Fd), "Fd"), TraceLoggingValue(E_INVALIDARG, "Result"));
+        return E_INVALIDARG;
+    }
+
+    WSLCHandle handle{};
+    auto result = process->GetStdHandle(wslcFd, &handle);
+
+    WSL_LOG(
+        "WslcPluginProcessGetFd",
+        TraceLoggingValue(static_cast<int>(Fd), "Fd"),
+        TraceLoggingValue(handle.Handle.Socket, "Handle"),
+        TraceLoggingValue(result, "Result"));
+
+    RETURN_IF_FAILED(result);
+    WI_ASSERT(handle.Type == WSLCHandleTypeSocket);
+
+    // Pass through as HANDLE; COM's system_handle(sh_socket) marshaling will duplicate
+    // it into the host process which then surfaces it to the plugin.
+    *Handle = handle.Handle.Socket;
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDMETHODIMP PluginHostCallbackImpl::WslcProcessGetExitEvent(_In_ DWORD ProcessCookie, _Out_ HANDLE* ExitEvent)
+try
+{
+    RETURN_HR_IF(E_POINTER, ExitEvent == nullptr);
+    *ExitEvent = nullptr;
+
+    auto process = FindProcess(ProcessCookie);
+    RETURN_HR_IF(E_INVALIDARG, !process);
+
+    auto result = process->GetExitEvent(ExitEvent);
+
+    WSL_LOG("WslcPluginProcessGetExitEvent", TraceLoggingValue(*ExitEvent, "ExitEvent"), TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
+
+STDMETHODIMP PluginHostCallbackImpl::WslcProcessGetExitCode(_In_ DWORD ProcessCookie, _Out_ int* ExitCode)
+try
+{
+    RETURN_HR_IF(E_POINTER, ExitCode == nullptr);
+    *ExitCode = -1;
+
+    auto process = FindProcess(ProcessCookie);
+    RETURN_HR_IF(E_INVALIDARG, !process);
+
+    WSLCProcessState state{};
+    auto result = process->GetState(&state, ExitCode);
+
+    if (SUCCEEDED(result) && state != WslcProcessStateExited && state != WslcProcessStateSignalled)
+    {
+        result = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
+    }
+
+    WSL_LOG(
+        "WslcPluginProcessGetExitCode",
+        TraceLoggingValue(*ExitCode, "ExitCode"),
+        TraceLoggingValue(static_cast<int>(state), "State"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
+
+STDMETHODIMP PluginHostCallbackImpl::WslcReleaseProcess(_In_ DWORD ProcessCookie)
+try
+{
+    auto process = RemoveProcess(ProcessCookie);
+    WSL_LOG(
+        "WslcPluginReleaseProcess",
+        TraceLoggingValue(ProcessCookie, "ProcessCookie"),
+        TraceLoggingValue(process != nullptr, "Found"));
+    return S_OK;
+}
+CATCH_RETURN();
