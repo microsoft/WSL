@@ -23,6 +23,73 @@ using wsl::shared::Localization;
 
 namespace wsl::windows::service::wslc {
 
+namespace {
+    auto ParseListFilters(const WSLCListVolumesOptions* Options)
+        -> std::tuple<std::vector<std::string>, std::vector<std::regex>, std::vector<std::pair<std::string, std::optional<std::string>>>>
+    {
+        std::vector<std::string> drivers;
+        std::vector<std::regex> nameRegexes;
+        std::vector<std::pair<std::string, std::optional<std::string>>> labels;
+
+        if (Options == nullptr)
+        {
+            return {std::move(drivers), std::move(nameRegexes), std::move(labels)};
+        }
+
+        THROW_HR_IF(E_INVALIDARG, Options->FiltersCount > 0 && Options->Filters == nullptr);
+
+        for (ULONG i = 0; i < Options->FiltersCount; ++i)
+        {
+            const auto& filter = Options->Filters[i];
+            THROW_HR_IF_NULL(E_POINTER, filter.Key);
+
+            const std::string_view key{filter.Key};
+            const char* const value = filter.Value;
+
+            if (key == "driver")
+            {
+                THROW_HR_IF_NULL(E_POINTER, value);
+                drivers.emplace_back(value);
+            }
+            else if (key == "name")
+            {
+                THROW_HR_IF_NULL(E_POINTER, value);
+                try
+                {
+                    nameRegexes.emplace_back(value);
+                }
+                catch (const std::regex_error&)
+                {
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(value));
+                }
+            }
+            else if (key == "label")
+            {
+                // label=<key> or label=<key>=<value>
+                THROW_HR_IF_NULL(E_POINTER, value);
+                const std::string_view labelExpr{value};
+                const auto eq = labelExpr.find('=');
+
+                if (eq == std::string_view::npos)
+                {
+                    labels.emplace_back(std::string{labelExpr}, std::nullopt);
+                }
+                else
+                {
+                    labels.emplace_back(std::string{labelExpr.substr(0, eq)}, std::string{labelExpr.substr(eq + 1)});
+                }
+            }
+            else
+            {
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidFilter(key));
+            }
+        }
+
+        return {std::move(drivers), std::move(nameRegexes), std::move(labels)};
+    }
+
+} // namespace
+
 WSLCVolumes::WSLCVolumes(
     DockerHTTPClient& dockerClient, WSLCVirtualMachine& virtualMachine, DockerEventTracker& eventTracker, const std::filesystem::path& storagePath) :
     m_dockerClient(dockerClient), m_virtualMachine(virtualMachine), m_storagePath(storagePath)
@@ -142,50 +209,17 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
 
 std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCListVolumesOptions* Options) const
 {
-    std::string driver;
-    std::optional<std::regex> nameRegex;
-    std::span<const WSLCLabel> labels;
+    const auto [drivers, nameRegexes, labels] = ParseListFilters(Options);
 
-    if (Options != nullptr)
-    {
-        THROW_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLCListVolumesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLCListVolumesFlagsDanglingFalse));
-        THROW_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(static_cast<WSLCListVolumesFlags>(Options->Flags), ~WSLCListVolumesFlagsValid));
-        THROW_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
+    auto matchLabel = [](const std::map<std::string, std::string>& volLabels, const std::pair<std::string, std::optional<std::string>>& f) {
+        const auto it = volLabels.find(f.first);
 
-        for (ULONG i = 0; i < Options->LabelsCount; ++i)
-        {
-            THROW_HR_IF_NULL(E_POINTER, Options->Labels[i].Key);
-        }
-
-        if (Options->Driver != nullptr)
-        {
-            driver = Options->Driver;
-        }
-
-        if (Options->Name != nullptr)
-        {
-            try
-            {
-                nameRegex.emplace(Options->Name);
-            }
-            catch (const std::regex_error&)
-            {
-                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(Options->Name));
-            }
-        }
-
-        labels = std::span(Options->Labels, Options->LabelsCount);
-    }
-
-    auto matchLabel = [](const std::map<std::string, std::string>& labels, const WSLCLabel& f) {
-        const auto it = labels.find(f.Key);
-
-        if (it == labels.end())
+        if (it == volLabels.end())
         {
             return false;
         }
 
-        return f.Value == nullptr || it->second == f.Value;
+        return !f.second.has_value() || it->second == *f.second;
     };
 
     auto lock = m_lock.lock_shared();
@@ -195,18 +229,18 @@ std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCListVolume
 
     for (const auto& [name, vol] : m_volumes)
     {
-        if (!driver.empty() && driver != vol->Driver())
+        if (!drivers.empty() && std::ranges::find(drivers, vol->Driver()) == drivers.end())
         {
             continue;
         }
 
-        if (nameRegex.has_value() && !std::regex_search(name, *nameRegex))
+        if (!nameRegexes.empty() && !std::ranges::any_of(nameRegexes, [&](const auto& r) { return std::regex_search(name, r); }))
         {
             continue;
         }
 
         const auto& volLabels = vol->Labels();
-        if (!std::ranges::all_of(labels, [&](const WSLCLabel& f) { return matchLabel(volLabels, f); }))
+        if (!std::ranges::all_of(labels, [&](const auto& f) { return matchLabel(volLabels, f); }))
         {
             continue;
         }

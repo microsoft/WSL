@@ -155,6 +155,7 @@ typedef struct _KeyValuePair
 
 typedef KeyValuePair WSLCLabel;
 typedef KeyValuePair WSLCDriverOption;
+typedef KeyValuePair WSLCFilter;
 
 typedef KeyValuePairInformation WSLCLabelInformation;
 typedef KeyValuePairInformation WSLCDriverOptionInformation;
@@ -606,24 +607,10 @@ typedef struct _WSLCVolumeInformation
     char Driver[WSLC_MAX_VOLUME_DRIVER_LENGTH + 1];
 } WSLCVolumeInformation;
 
-typedef enum _WSLCListVolumesFlags
-{
-    WSLCListVolumesFlagsNone = 0,
-    WSLCListVolumesFlagsDanglingTrue = 1,
-    WSLCListVolumesFlagsDanglingFalse = 2,
-} WSLCListVolumesFlags;
-
-cpp_quote("#define WSLCListVolumesFlagsValid (WSLCListVolumesFlagsDanglingTrue | WSLCListVolumesFlagsDanglingFalse)")
-
-cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCListVolumesFlags);")
-
 typedef struct _WSLCListVolumesOptions
 {
-    DWORD Flags;
-    [unique] LPCSTR Driver;
-    [unique] LPCSTR Name;
-    [unique, size_is(LabelsCount)] const WSLCLabel* Labels;
-    ULONG LabelsCount;
+    [unique, size_is(FiltersCount)] const WSLCFilter* Filters;
+    ULONG FiltersCount;
 } WSLCListVolumesOptions;
 
 typedef struct _WSLCNetworkOptions
