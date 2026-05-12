@@ -37,6 +37,7 @@ steps:
   inputs:
     environment: 'PRODEXT'
     teamId: '38646'
+    serviceTreeId: 'd8846bef-e9b5-4542-bcfc-98ebabac8a7b'
     authType: 'FederatedIdentity'
     FederatedIdentityServiceConnection: 'Azure-Connection'
     isPreview: false
