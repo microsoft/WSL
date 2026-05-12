@@ -174,7 +174,108 @@ def fix_comments(comments: dict, path: str, strings: dict):
     click.secho(f'Updated file: {path}. {missed} comments need manual changes', fg='green' if missed == 0 else 'yellow', bold=True)
 
 
-def run(resource_folder: str, baseline_language: str, fix: bool):
+ADML_NS = '{http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions}'
+RESOURCE_FOLDER = 'localization/strings'
+BASELINE_LANGUAGE = 'en-US'
+ADML_FOLDER = 'intune'
+ADML_FILENAME = 'WSL.adml'
+
+def get_adml_entries(path: str) -> tuple[dict, set]:
+    """Parse an .adml file.
+
+    Returns ({string_id: (value, [locked_tokens])}, {presentation_id, ...}).
+    Locked tokens are extracted from XML comments of the form
+    `<!-- {Locked="..."}{Locked="..."} -->` placed immediately before a
+    `<string>` element. Non-Locked comments are ignored.
+    """
+    # Parse with a TreeBuilder that preserves comments so we can associate
+    # {Locked="..."} tokens with the <string> element that follows them.
+    parser = xml.etree.ElementTree.XMLParser(
+        target=xml.etree.ElementTree.TreeBuilder(insert_comments=True))
+    root = xml.etree.ElementTree.parse(path, parser=parser).getroot()
+
+    string_table = root.find(f'.//{ADML_NS}stringTable')
+    if string_table is None:
+        raise RuntimeError(f'error: {path} is missing the required <stringTable> element')
+
+    strings = {}
+    pending_tokens = []
+    for child in string_table:
+        if child.tag is xml.etree.ElementTree.Comment:
+            pending_tokens.extend(re.findall(r'\{Locked="([^"]*)"\}', child.text or ''))
+        elif child.tag == f'{ADML_NS}string':
+            sid = child.get('id')
+            if sid is not None:
+                strings[sid] = (child.text or '', pending_tokens)
+            pending_tokens = []
+        else:
+            pending_tokens = []
+
+    presentation_table = root.find(f'.//{ADML_NS}presentationTable')
+    if presentation_table is None:
+        raise RuntimeError(f'error: {path} is missing the required <presentationTable> element')
+
+    presentations = {p.get('id') for p in presentation_table.findall(f'{ADML_NS}presentation') if p.get('id')}
+
+    return strings, presentations
+
+def validate_adml(adml_folder: str, baseline_language: str) -> bool:
+    baseline_path = f'{adml_folder}/{baseline_language}/{ADML_FILENAME}'
+    if not os.path.isfile(baseline_path):
+        print(f'info: ADML baseline not found at {baseline_path}, skipping ADML validation')
+        return True
+
+    print(f'Validating ADML baseline {baseline_path}')
+    baseline, baseline_presentations = get_adml_entries(baseline_path)
+    baseline_ids = set(baseline.keys())
+
+    result = True
+    for sid, (value, tokens) in baseline.items():
+        for tok in tokens:
+            if tok not in value:
+                print(f'error: locked token "{tok}" not found in baseline ADML string {sid}: {value}')
+                result = False
+
+    if not os.path.isdir(adml_folder):
+        return result
+
+    for entry in sorted(os.listdir(adml_folder)):
+        locale_path = f'{adml_folder}/{entry}/{ADML_FILENAME}'
+        if entry == baseline_language or not os.path.isfile(locale_path):
+            continue
+
+        print(f'Validating ADML {locale_path}')
+        translated, translated_presentations = get_adml_entries(locale_path)
+
+        missing = baseline_ids - set(translated.keys())
+        extra = set(translated.keys()) - baseline_ids
+        if missing:
+            print(f'error: ADML {locale_path} is missing string ids: {sorted(missing)}')
+            result = False
+        if extra:
+            print(f'error: ADML {locale_path} has unexpected string ids: {sorted(extra)}')
+            result = False
+
+        missing_p = baseline_presentations - translated_presentations
+        extra_p = translated_presentations - baseline_presentations
+        if missing_p:
+            print(f'error: ADML {locale_path} is missing presentation ids: {sorted(missing_p)}')
+            result = False
+        if extra_p:
+            print(f'error: ADML {locale_path} has unexpected presentation ids: {sorted(extra_p)}')
+            result = False
+
+        for sid in baseline_ids & set(translated.keys()):
+            _, tokens = baseline[sid]
+            tvalue, _ = translated[sid]
+            for tok in tokens:
+                if tok not in tvalue:
+                    print(f'error: locked token "{tok}" not found in {locale_path} string {sid}: {tvalue}')
+                    result = False
+
+    return result
+
+def run(resource_folder: str, baseline_language: str, fix: bool, adml_folder: str):
     baseline_file = f'{resource_folder}/{baseline_language}/Resources.resw'
 
     strings = get_strings_from_file(baseline_file, True)
@@ -186,6 +287,8 @@ def run(resource_folder: str, baseline_language: str, fix: bool):
         print(f'Validating inserts in {path}')
         result &= validate_resource(baseline, path)
 
+    result &= validate_adml(adml_folder, baseline_language)
+
     if fix and comments:
         fix_comments(comments, baseline_file, strings)
 
@@ -193,16 +296,17 @@ def run(resource_folder: str, baseline_language: str, fix: bool):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 3: # Hack to work around pip install errors in the build pipeline
-        run(sys.argv[1], sys.argv[2], False)
+    if len(sys.argv) == 1: # Avoid pulling in click for the default (CI) invocation
+        run(RESOURCE_FOLDER, BASELINE_LANGUAGE, False, ADML_FOLDER)
     else:
         import click
 
         @click.command()
-        @click.argument('resource-folder', default='localization/strings')
-        @click.argument('baseline-language', default='en-us')
+        @click.option('--resource-folder', default=RESOURCE_FOLDER, show_default=True)
+        @click.option('--baseline-language', default=BASELINE_LANGUAGE, show_default=True)
+        @click.option('--adml-folder', default=ADML_FOLDER, show_default=True)
         @click.option('--fix', is_flag=True)
-        def main(resource_folder: str, baseline_language: str, fix: bool):
-            run(resource_folder, baseline_language, fix)
-        
+        def main(resource_folder: str, baseline_language: str, adml_folder: str, fix: bool):
+            run(resource_folder, baseline_language, fix, adml_folder)
+
         main()

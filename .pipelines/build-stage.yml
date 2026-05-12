@@ -104,7 +104,7 @@ stages:
           pool: ${{ parameters.pool }}
 
         steps:
-          - script: python tools/devops/validate-localization.py localization/strings en-US
+          - script: python tools/devops/validate-localization.py
             displayName: Validate localization resources
 
           - script: python tools\devops\validate-copyright-headers.py src
