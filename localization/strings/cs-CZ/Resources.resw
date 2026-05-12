@@ -2462,10 +2462,10 @@ Informace o ochraně osobních údajů k tomuto produktu najdete na stránce htt
     <value>Spravujte přihlašovací údaje registru, včetně přihlašování a odhlašování v registrech kontejnerů.</value>
   </data>
   <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
-    <value>System-level commands</value>
+    <value>Příkazy na úrovni systému</value>
   </data>
   <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
-    <value>System-level management commands.</value>
+    <value>Příkazy pro správu na úrovni systému.</value>
   </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Označit obrázek.</value>
