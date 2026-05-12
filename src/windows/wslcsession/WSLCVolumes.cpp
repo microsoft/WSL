@@ -38,22 +38,22 @@ namespace {
             THROW_HR_IF_NULL(E_POINTER, filter.Key);
             THROW_HR_IF_NULL(E_POINTER, filter.Value);
 
-            const std::string_view key{filter.Key};
-            const std::string_view value{filter.Value};
+            std::string key{filter.Key};
+            std::string value{filter.Value};
 
             if (key == "driver")
             {
-                drivers.emplace_back(value);
+                drivers.push_back(value);
             }
             else if (key == "name")
             {
                 try
                 {
-                    nameRegexes.emplace_back(value.begin(), value.end());
+                    nameRegexes.emplace_back(value);
                 }
                 catch (const std::regex_error&)
                 {
-                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(std::string{value}));
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(value));
                 }
             }
             else if (key == "label")
@@ -61,13 +61,13 @@ namespace {
                 // label=<key> or label=<key>=<value>
                 const auto eq = value.find('=');
 
-                if (eq == std::string_view::npos)
+                if (eq == std::string::npos)
                 {
-                    labels.emplace_back(std::string{value}, std::nullopt);
+                    labels.emplace_back(value, std::nullopt);
                 }
                 else
                 {
-                    labels.emplace_back(std::string{value.substr(0, eq)}, std::string{value.substr(eq + 1)});
+                    labels.emplace_back(value.substr(0, eq), value.substr(eq + 1));
                 }
             }
             else
