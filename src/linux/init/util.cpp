@@ -3470,7 +3470,7 @@ int ProcessCreateProcessMessage(wsl::shared::Transaction& Transaction, gsl::span
     return 0;
 }
 
-#define RECLAIM_PATH "/sys/fs/cgroup/memory.reclaim"
+#define RECLAIM_PATH CGROUP_MOUNTPOINT "/memory.reclaim"
 
 static long long int GetUserCpuTime()
 
@@ -3500,7 +3500,7 @@ Return Value:
 
     char Buffer[32];
     int Result = TEMP_FAILURE_RETRY(read(Fd.get(), Buffer, (sizeof(Buffer) - 1)));
-    if (Result < 0)
+    if (Result <= 0)
     {
         LOG_ERROR("read failed {}", errno);
         return -1;
@@ -3514,7 +3514,19 @@ Return Value:
     Buffer[Result] = '\0';
     char* Sp1;
     char* Info = strtok_r(Buffer, " \n", &Sp1);
+    if (Info == nullptr)
+    {
+        LOG_ERROR("/proc/stat first line missing cpu label");
+        return -1;
+    }
+
     Info = strtok_r(nullptr, " \n", &Sp1);
+    if (Info == nullptr)
+    {
+        LOG_ERROR("/proc/stat first line missing cpu counter");
+        return -1;
+    }
+
     return strtoll(Info, nullptr, 10);
 }
 

@@ -89,7 +89,6 @@ Abstract:
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
 #define RESOLV_CONF_PATH ETC_PATH "/" RESOLV_CONF_FILE
-#define RECLAIM_PATH "/sys/fs/cgroup/memory.reclaim"
 #define SCSI_DEVICE_PATH "/sys/bus/scsi/devices"
 #define SCSI_DEVICE_NAME_PREFIX "0:0:0:"
 #define SCSI_DEVICE_PREFIX SCSI_DEVICE_PATH "/" SCSI_DEVICE_NAME_PREFIX
