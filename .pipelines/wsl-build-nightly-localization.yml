@@ -17,8 +17,13 @@ schedules:
     - "master"
   always: true
 
+# Build.SourceBranchName is only the leaf segment of the ref (e.g.
+# 'loc-pipeline-debug' for refs/heads/user/benhill/loc-pipeline-debug), which
+# fails GitHub's pulls API with a 422 'base invalid' when the branch name
+# contains slashes. Strip 'refs/heads/' from the full ref instead so the PR
+# targets the actual branch the pipeline ran against.
 variables:
-  targetBranch: ${{ variables['Build.SourceBranchName'] }}
+  targetBranch: $[ replace(variables['Build.SourceBranch'], 'refs/heads/', '') ]
 
 pool:
   vmImage: 'windows-latest'
