@@ -1797,18 +1797,7 @@ try
         all = WI_IsFlagSet(Options->Flags, WSLCListContainersFlagsAll);
         limit = static_cast<int>(Options->Limit);
 
-        if (Options->FiltersCount > 0)
-        {
-            RETURN_HR_IF(E_POINTER, Options->Filters == nullptr);
-
-            for (ULONG i = 0; i < Options->FiltersCount; ++i)
-            {
-                THROW_HR_IF_MSG(E_POINTER, Options->Filters[i].Key == nullptr, "Filter key cannot be null (index %lu)", i);
-                THROW_HR_IF_MSG(E_POINTER, Options->Filters[i].Value == nullptr, "Filter value cannot be null (index %lu)", i);
-
-                filters[Options->Filters[i].Key].emplace_back(Options->Filters[i].Value);
-            }
-        }
+        filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Options->Filters, Options->FiltersCount);
     }
 
     auto lock = m_lock.lock_shared();
@@ -1892,7 +1881,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneContainers(_In_opt_ WSLCPruneLabelFilter* Filters, _In_ DWORD FiltersCount, _In_ ULONGLONG Until, _Out_ WSLCPruneContainersResults* Result)
+HRESULT WSLCSession::PruneContainers(_In_opt_ const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCPruneContainersResults* Result)
 try
 {
     COMServiceExecutionContext context;
@@ -1900,38 +1889,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Result);
     ZeroMemory(Result, sizeof(*Result));
 
-    DockerHTTPClient::PruneContainersFilters filters;
-
-    if (FiltersCount > 0)
-    {
-        THROW_HR_IF(E_POINTER, FiltersCount > 0 && Filters == nullptr);
-
-        for (DWORD i = 0; i < FiltersCount; ++i)
-        {
-            THROW_HR_IF_MSG(E_POINTER, Filters[i].Key == nullptr, "Filter key cannot be null (index %lu)", i);
-            std::string labelFilter = Filters[i].Key;
-
-            if (Filters[i].Value != nullptr)
-            {
-                labelFilter += '=';
-                labelFilter += Filters[i].Value;
-            }
-
-            if (Filters[i].Present)
-            {
-                filters.presentLabels.emplace_back(std::move(labelFilter));
-            }
-            else
-            {
-                filters.absentLabels.emplace_back(std::move(labelFilter));
-            }
-        }
-    }
-
-    if (Until > 0)
-    {
-        filters.until = Until;
-    }
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
 
     auto lock = m_lock.lock_shared();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());

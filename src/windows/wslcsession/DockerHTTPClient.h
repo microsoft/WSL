@@ -122,13 +122,6 @@ public:
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
     // Container management.
-    struct PruneContainersFilters
-    {
-        std::optional<std::uint64_t> until;
-        std::vector<std::string> presentLabels;
-        std::vector<std::string> absentLabels;
-    };
-
     std::vector<common::docker_schema::ContainerInfo> ListContainers(
         bool all = false, int limit = -1, std::map<std::string, std::vector<std::string>> filters = {});
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
@@ -143,7 +136,7 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
-    common::docker_schema::PruneContainerResult PruneContainers(const PruneContainersFilters& filters = {});
+    common::docker_schema::PruneContainerResult PruneContainers(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Volume management.
     common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);

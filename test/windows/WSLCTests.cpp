@@ -102,7 +102,7 @@ class WSLCTests
         }
 
         PruneResult result;
-        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+        VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
         if (result.result.ContainersCount > 0)
         {
             LogInfo("Pruned %lu containers", result.result.ContainersCount);
@@ -3954,7 +3954,7 @@ class WSLCTests
         // Prune containers on exit so this test doesn't leak "wslc-test-container-vhd" on exit.
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             PruneResult result;
-            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
         });
 
         WSLCVolumeOptions volumeOptions{};
@@ -8492,7 +8492,7 @@ class WSLCTests
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             PruneResult result;
-            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, 0, &result.result));
+            LOG_IF_FAILED(m_defaultSession->PruneContainers(nullptr, 0, &result.result));
         });
 
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
@@ -8609,19 +8609,19 @@ class WSLCTests
     {
         auto expectPrune = [this](
                                const std::vector<std::string>& expectedIds = {},
-                               const std::map<std::string, std::pair<const char*, bool>>& labels = {},
-                               uint64_t until = 0,
+                               const std::vector<std::pair<std::string, std::string>>& filterPairs = {},
                                const std::source_location& source = std::source_location::current()) {
             PruneResult result;
 
-            std::vector<WSLCPruneLabelFilter> labelsFilter;
-            for (const auto& e : labels)
+            std::vector<WSLCFilter> filters;
+            filters.reserve(filterPairs.size());
+            for (const auto& [key, value] : filterPairs)
             {
-                labelsFilter.push_back({e.first.c_str(), e.second.first, e.second.second});
+                filters.push_back({key.c_str(), value.c_str()});
             }
 
             VERIFY_SUCCEEDED(m_defaultSession->PruneContainers(
-                labels.empty() ? nullptr : labelsFilter.data(), static_cast<DWORD>(labelsFilter.size()), until, &result.result));
+                filters.empty() ? nullptr : filters.data(), static_cast<ULONG>(filters.size()), &result.result));
 
             std::vector<std::string> prunedContainers;
             for (size_t i = 0; i < result.result.ContainersCount; i++)
@@ -8685,16 +8685,16 @@ class WSLCTests
             auto testPrune4 = RunAndWait(testPrune4Launcher);
 
             // Expect testPrune1 to be selected via key=value.
-            expectPrune({testPrune1.Id()}, {{"key", {"value", true}}});
+            expectPrune({testPrune1.Id()}, {{"label", "key=value"}});
 
             // Expect testPrune2 to be selected via key being present.
-            expectPrune({testPrune2.Id()}, {{"key", {nullptr, true}}});
+            expectPrune({testPrune2.Id()}, {{"label", "key"}});
 
             // Prune by absence of 'anotherKey' label.
-            expectPrune({testPrune4.Id()}, {{"anotherKey", {nullptr, false}}});
+            expectPrune({testPrune4.Id()}, {{"label!", "anotherKey"}});
 
             // Prune by label inequality.
-            expectPrune({testPrune3.Id()}, {{"anotherKey", {"someValue", false}}});
+            expectPrune({testPrune3.Id()}, {{"label!", "anotherKey=someValue"}});
         }
 
         // Validate that the 'until' filter works.
@@ -8705,17 +8705,17 @@ class WSLCTests
 
             auto now = time(nullptr);
 
-            expectPrune({}, {}, now - 3600);
-            expectPrune({container.Id()}, {}, now + 3600);
+            expectPrune({}, {{"until", std::to_string(now - 3600)}});
+            expectPrune({container.Id()}, {{"until", std::to_string(now + 3600)}});
         }
 
         // Validate error paths.
         {
-            WSLCPruneLabelFilter filter{.Key = nullptr, .Value = nullptr, .Present = false};
+            WSLCFilter filter{.Key = nullptr, .Value = nullptr};
             PruneResult result;
 
-            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, &result.result), E_POINTER);
-            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, 0, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, &result.result), E_POINTER);
+            VERIFY_ARE_EQUAL(m_defaultSession->PruneContainers(&filter, 1, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
         }
     }
 
