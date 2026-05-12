@@ -43,6 +43,7 @@ steps:
     cultureMappingType: 'None'
 
 - task: PipAuthenticate@1
+  condition: and(succeeded(), in(variables['Build.Reason'], 'Schedule', 'Manual'))
   inputs:
     artifactFeeds: 'wsl'
 
@@ -51,6 +52,7 @@ steps:
             python tools/devops/create-change.py . "$env:token" "WSL localization"  "Localization change from build: $env:buildId" "user/localization/$env:buildId" "$env:targetBranch"
 
   displayName: Create pull request
+  condition: and(succeeded(), in(variables['Build.Reason'], 'Schedule', 'Manual'))
   env:
       token: $(GithubPRToken)
       buildId: $(Build.BuildId)

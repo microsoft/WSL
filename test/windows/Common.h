@@ -40,25 +40,23 @@ using namespace std::chrono_literals;
 
 //
 // Test method declaration macros that tag tests with TAEF metadata for version-based selection.
-// Use these instead of TEST_METHOD() for tests that only apply to a specific WSL version.
-// When run via run-tests.ps1 or CloudTest, inapplicable tests are excluded from the run
-// entirely (no "skipped" noise) via TAEF /select: queries.
+// If the test version doesn't match the version passed to te.exe, the test is ignored.
 //
 #define WSL1_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"1") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=1)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSL2_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 
 #define WSLC_TEST_METHOD(_name) \
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(_name) \
-    TEST_METHOD_PROPERTY(L"WSLVersion", L"2") \
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true") \
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE() \
     TEST_METHOD(_name)
 

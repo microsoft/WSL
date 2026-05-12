@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCSession.h"
 #include "WSLCContainer.h"
 #include "WSLCNetworkMetadata.h"
+#include "ContainerNameGenerator.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
@@ -29,6 +30,7 @@ using wsl::windows::service::wslc::WSLCVirtualMachine;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
 constexpr auto c_containerdSocket = "/run/containerd/containerd.sock";
+constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
 constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
@@ -107,6 +109,29 @@ wslc_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
     }
 
     return wslcInspect;
+}
+
+using wsl::windows::service::wslc::c_descriptors;
+using wsl::windows::service::wslc::c_mountains;
+
+// Generate a random container name in the format "descriptor_mountain".
+// When retry > 0, appends a random digit (0-9) to reduce collisions.
+std::string GenerateContainerName(int retry)
+{
+    std::mt19937 gen(std::random_device{}());
+
+    std::uniform_int_distribution<size_t> leftDist(0, c_descriptors.size() - 1);
+    std::uniform_int_distribution<size_t> rightDist(0, c_mountains.size() - 1);
+
+    auto name = std::format("{}_{}", c_descriptors[leftDist(gen)], c_mountains[rightDist(gen)]);
+
+    if (retry > 0)
+    {
+        std::uniform_int_distribution<int> digitDist(0, 9);
+        name += std::to_string(digitDist(gen));
+    }
+
+    return name;
 }
 
 } // namespace
@@ -422,8 +447,6 @@ try
     {
         return;
     }
-
-    constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 
     std::string entry = {Buffer.begin(), Buffer.end()};
     WSL_LOG(
@@ -1223,7 +1246,7 @@ try
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
-    auto entries = std::accumulate<decltype(images.begin()), size_t>(images.begin(), images.end(), 0, [](auto sum, const auto& e) {
+    auto entries = std::accumulate(images.begin(), images.end(), size_t{0}, [](auto sum, const auto& e) {
         return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
     });
 
@@ -1624,7 +1647,7 @@ try
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient);
 
     // Validate that name & images are valid.
-    if (containerOptions->Name != nullptr)
+    if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
     {
         ValidateName(containerOptions->Name, WSLC_MAX_CONTAINER_NAME_LENGTH);
     }
@@ -1637,8 +1660,38 @@ try
     {
         std::scoped_lock lock(m_containersLock, m_networksLock);
 
+        // Generate a unique container name if the user didn't provide one.
+        std::string containerName;
+        if (containerOptions->Name != nullptr && containerOptions->Name[0] != '\0')
+        {
+            containerName = containerOptions->Name;
+        }
+        else
+        {
+            constexpr int c_maxNameRetries = 6;
+            for (int attempt = 0; attempt < c_maxNameRetries; attempt++)
+            {
+                auto randomName = GenerateContainerName(attempt);
+                if (std::ranges::none_of(m_containers, [&](const auto& c) { return c->Name() == randomName; }))
+                {
+                    containerName = randomName;
+                    break;
+                }
+            }
+
+            // Fallback to a GUID name.
+            if (containerName.empty())
+            {
+                WSL_LOG("GenerateGuidContainerName");
+                GUID guid{};
+                THROW_IF_FAILED(CoCreateGuid(&guid));
+                containerName = wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
+            }
+        }
+
         auto& it = m_containers.emplace_back(WSLCContainerImpl::Create(
             *containerOptions,
+            containerName,
             *this,
             m_virtualMachine.value(),
             m_networks,

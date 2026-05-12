@@ -851,6 +851,7 @@ void WSLCVirtualMachine::LaunchPortRelay()
 
     wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
     process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
+    process.InheritHandle(m_vmTerminatingEvent.get());
     process.Start();
 
     readPipe.release();
