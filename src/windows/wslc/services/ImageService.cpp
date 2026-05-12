@@ -89,14 +89,12 @@ InputSource OpenImageInput(const std::wstring& input)
     {
         result.File.reset(CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
         THROW_LAST_ERROR_IF(!result.File);
-
-        LARGE_INTEGER fileSize{};
-        THROW_LAST_ERROR_IF(!GetFileSizeEx(result.File.get(), &fileSize));
-
         result.Handle = result.File.get();
-        result.ContentLength = fileSize.QuadPart;
     }
 
+    LARGE_INTEGER fileSize{};
+    THROW_LAST_ERROR_IF(!GetFileSizeEx(result.Handle, &fileSize));
+    result.ContentLength = fileSize.QuadPart;
     return result;
 }
 
