@@ -2468,6 +2468,12 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Управляйте учетными данными реестра, включая вход и выход из реестров контейнеров.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Системные команды</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Системные команды управления.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Добавьте тег к изображению.</value>
   </data>

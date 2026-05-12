@@ -2461,6 +2461,12 @@ Para obter informações de privacidade sobre este produto, visite https://aka.m
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Gira credenciais de registo, o que inclui iniciar e terminar sessão em registos de contentor.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>Comandos ao nível do sistema</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>Comandos de gestão ao nível do sistema.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Etiquetar uma imagem.</value>
   </data>

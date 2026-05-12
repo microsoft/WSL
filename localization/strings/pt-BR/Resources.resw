@@ -2468,6 +2468,12 @@ Para obter informações sobre a privacidade desse produto, visite https://aka.m
   <data name="WSLCCLI_RegistryCommandLongDesc" xml:space="preserve">
     <value>Gerencie credenciais de registro, incluindo logon e logoff de registros de contêiner.</value>
   </data>
+  <data name="WSLCCLI_SystemCommandDesc" xml:space="preserve">
+    <value>System-level commands</value>
+  </data>
+  <data name="WSLCCLI_SystemCommandLongDesc" xml:space="preserve">
+    <value>System-level management commands.</value>
+  </data>
   <data name="WSLCCLI_ImageTagDesc" xml:space="preserve">
     <value>Marque uma imagem.</value>
   </data>
