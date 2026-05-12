@@ -411,6 +411,12 @@ struct PortRelay
         {
             THROW_WIN32(WSAGetLastError());
         }
+
+        // Set the accept context to mark the socket as connected.
+        const SOCKET listenSocket = ListenSocket.get();
+        THROW_LAST_ERROR_IF(
+            setsockopt(PendingSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) ==
+            SOCKET_ERROR);
     }
 
     bool ScheduleAccept()
@@ -429,6 +435,11 @@ struct PortRelay
             return false;
         }
 
+        // Set the accept context to mark the socket as connected.
+        const SOCKET listenSocket = ListenSocket.get();
+        THROW_LAST_ERROR_IF(
+            setsockopt(PendingSocket.get(), SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<const char*>(&listenSocket), sizeof(listenSocket)) ==
+            SOCKET_ERROR);
         return true;
     }
 };
