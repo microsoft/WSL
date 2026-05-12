@@ -24,59 +24,50 @@ using wsl::shared::Localization;
 namespace wsl::windows::service::wslc {
 
 namespace {
-    auto ParseListFilters(const WSLCListVolumesOptions* Options)
-        -> std::tuple<std::vector<std::string>, std::vector<std::regex>, std::vector<std::pair<std::string, std::optional<std::string>>>>
+    auto ParseListFilters(_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, ULONG FiltersCount)
     {
         std::vector<std::string> drivers;
         std::vector<std::regex> nameRegexes;
         std::vector<std::pair<std::string, std::optional<std::string>>> labels;
 
-        if (Options == nullptr)
-        {
-            return {std::move(drivers), std::move(nameRegexes), std::move(labels)};
-        }
+        THROW_HR_IF(E_POINTER, FiltersCount > 0 && Filters == nullptr);
 
-        THROW_HR_IF(E_INVALIDARG, Options->FiltersCount > 0 && Options->Filters == nullptr);
-
-        for (ULONG i = 0; i < Options->FiltersCount; ++i)
+        for (ULONG i = 0; i < FiltersCount; ++i)
         {
-            const auto& filter = Options->Filters[i];
+            const auto& filter = Filters[i];
             THROW_HR_IF_NULL(E_POINTER, filter.Key);
+            THROW_HR_IF_NULL(E_POINTER, filter.Value);
 
             const std::string_view key{filter.Key};
-            const char* const value = filter.Value;
+            const std::string_view value{filter.Value};
 
             if (key == "driver")
             {
-                THROW_HR_IF_NULL(E_POINTER, value);
                 drivers.emplace_back(value);
             }
             else if (key == "name")
             {
-                THROW_HR_IF_NULL(E_POINTER, value);
                 try
                 {
-                    nameRegexes.emplace_back(value);
+                    nameRegexes.emplace_back(value.begin(), value.end());
                 }
                 catch (const std::regex_error&)
                 {
-                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(value));
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslcInvalidName(std::string{value}));
                 }
             }
             else if (key == "label")
             {
                 // label=<key> or label=<key>=<value>
-                THROW_HR_IF_NULL(E_POINTER, value);
-                const std::string_view labelExpr{value};
-                const auto eq = labelExpr.find('=');
+                const auto eq = value.find('=');
 
                 if (eq == std::string_view::npos)
                 {
-                    labels.emplace_back(std::string{labelExpr}, std::nullopt);
+                    labels.emplace_back(std::string{value}, std::nullopt);
                 }
                 else
                 {
-                    labels.emplace_back(std::string{labelExpr.substr(0, eq)}, std::string{labelExpr.substr(eq + 1)});
+                    labels.emplace_back(std::string{value.substr(0, eq)}, std::string{value.substr(eq + 1)});
                 }
             }
             else
@@ -85,7 +76,7 @@ namespace {
             }
         }
 
-        return {std::move(drivers), std::move(nameRegexes), std::move(labels)};
+        return std::make_tuple(std::move(drivers), std::move(nameRegexes), std::move(labels));
     }
 
 } // namespace
@@ -207,9 +198,9 @@ void WSLCVolumes::DeleteVolume(LPCSTR Name)
     m_expectedEvents.emplace_back(Name, VolumeEvent::Destroy);
 }
 
-std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCListVolumesOptions* Options) const
+std::vector<WSLCVolumeInformation> WSLCVolumes::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount) const
 {
-    const auto [drivers, nameRegexes, labels] = ParseListFilters(Options);
+    const auto [drivers, nameRegexes, labels] = ParseListFilters(Filters, FiltersCount);
 
     auto matchLabel = [](const std::map<std::string, std::string>& volLabels, const std::pair<std::string, std::optional<std::string>>& f) {
         const auto it = volLabels.find(f.first);
@@ -267,46 +258,11 @@ bool WSLCVolumes::ContainsVolume(const std::string& Name) const
     return m_volumes.contains(Name);
 }
 
-WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const WSLCPruneVolumesOptions* Options)
+WSLCVolumes::PruneVolumesResult WSLCVolumes::PruneVolumes(const std::map<std::string, std::vector<std::string>>& Filters)
 {
-    DockerHTTPClient::PruneVolumesFilters filters;
-
-    if (Options != nullptr)
-    {
-        if (Options->All)
-        {
-            filters.all = true;
-        }
-
-        THROW_HR_IF(E_INVALIDARG, Options->LabelsCount > 0 && Options->Labels == nullptr);
-
-        for (ULONG i = 0; i < Options->LabelsCount; ++i)
-        {
-            const auto& filter = Options->Labels[i];
-
-            THROW_HR_IF_NULL(E_POINTER, filter.Key);
-
-            std::string labelFilter = filter.Key;
-            if (filter.Value != nullptr)
-            {
-                labelFilter += '=';
-                labelFilter += filter.Value;
-            }
-
-            if (filter.Present)
-            {
-                filters.presentLabels.emplace_back(std::move(labelFilter));
-            }
-            else
-            {
-                filters.absentLabels.emplace_back(std::move(labelFilter));
-            }
-        }
-    }
-
     auto lock = m_lock.lock_exclusive();
 
-    auto dockerResult = m_dockerClient.PruneVolumes(filters);
+    auto dockerResult = m_dockerClient.PruneVolumes(Filters);
 
     PruneVolumesResult result{};
     result.SpaceReclaimed = dockerResult.SpaceReclaimed;

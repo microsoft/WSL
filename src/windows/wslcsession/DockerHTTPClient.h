@@ -144,18 +144,11 @@ public:
     common::docker_schema::PruneContainerResult PruneContainers(const PruneContainersFilters& filters = {});
 
     // Volume management.
-    struct PruneVolumesFilters
-    {
-        std::optional<bool> all;
-        std::vector<std::string> presentLabels;
-        std::vector<std::string> absentLabels;
-    };
-
     common::docker_schema::Volume CreateVolume(const common::docker_schema::CreateVolume& Request);
     common::docker_schema::Volume InspectVolume(const std::string& Name);
     void RemoveVolume(const std::string& Name);
     std::vector<common::docker_schema::Volume> ListVolumes();
-    common::docker_schema::PruneVolumeResult PruneVolumes(const PruneVolumesFilters& filters = {});
+    common::docker_schema::PruneVolumeResult PruneVolumes(const std::map<std::string, std::vector<std::string>>& filters = {});
 
     // Network management.
     common::docker_schema::CreateNetworkResponse CreateNetwork(const common::docker_schema::CreateNetwork& Request);

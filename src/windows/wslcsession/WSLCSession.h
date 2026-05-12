@@ -124,11 +124,16 @@ public:
     // Volume management.
     IFACEMETHOD(CreateVolume)(_In_ const WSLCVolumeOptions* Options, _Out_ WSLCVolumeInformation* VolumeInfo) override;
     IFACEMETHOD(DeleteVolume)(_In_ LPCSTR Name) override;
-    IFACEMETHOD(ListVolumes)(_In_opt_ const WSLCListVolumesOptions* Options, _Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count) override;
+    IFACEMETHOD(ListVolumes)
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters, _In_ ULONG FiltersCount, _Out_ WSLCVolumeInformation** Volumes, _Out_ ULONG* Count)
+        override;
     IFACEMETHOD(InspectVolume)(_In_ LPCSTR Name, _Out_ LPSTR* Output) override;
     IFACEMETHOD(PruneVolumes)
-    (_In_opt_ const WSLCPruneVolumesOptions* Options, _Out_ WSLCVolumeName** Volumes, _Out_ ULONG* VolumesCount, _Out_ ULONGLONG* SpaceReclaimed)
-        override;
+    (_In_reads_opt_(FiltersCount) const WSLCFilter* Filters,
+     _In_ ULONG FiltersCount,
+     _Out_ WSLCVolumeName** Volumes,
+     _Out_ ULONG* VolumesCount,
+     _Out_ ULONGLONG* SpaceReclaimed) override;
 
     // Network management.
     IFACEMETHOD(CreateNetwork)(_In_ const WSLCNetworkOptions* Options) override;

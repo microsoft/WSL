@@ -454,14 +454,13 @@ std::vector<docker_schema::Volume> DockerHTTPClient::ListVolumes()
     return response.Volumes;
 }
 
-docker_schema::PruneVolumeResult DockerHTTPClient::PruneVolumes(const PruneVolumesFilters& filters)
+docker_schema::PruneVolumeResult DockerHTTPClient::PruneVolumes(const std::map<std::string, std::vector<std::string>>& filters)
 {
     auto url = URL::Create("/volumes/prune");
 
-    auto filtersJson = PruneFiltersToJson(filters);
-    if (!filtersJson.empty())
+    if (!filters.empty())
     {
-        url.SetParameter("filters", filtersJson.dump());
+        url.SetParameter("filters", nlohmann::json(filters).dump());
     }
 
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneVolumeResult>(verb::post, url);

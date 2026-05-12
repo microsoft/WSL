@@ -1960,7 +1960,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::ListVolumes(const WSLCListVolumesOptions* Options, WSLCVolumeInformation** Volumes, ULONG* Count)
+HRESULT WSLCSession::ListVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeInformation** Volumes, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -1974,7 +1974,7 @@ try
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
-    auto volumeList = m_volumes->ListVolumes(Options);
+    auto volumeList = m_volumes->ListVolumes(Filters, FiltersCount);
 
     if (volumeList.empty())
     {
@@ -2016,7 +2016,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLCSession::PruneVolumes(const WSLCPruneVolumesOptions* Options, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
+HRESULT WSLCSession::PruneVolumes(const WSLCFilter* Filters, ULONG FiltersCount, WSLCVolumeName** Volumes, ULONG* VolumesCount, ULONGLONG* SpaceReclaimed)
 try
 {
     COMServiceExecutionContext context;
@@ -2028,13 +2028,15 @@ try
     *VolumesCount = 0;
     *SpaceReclaimed = 0;
 
+    auto filters = wsl::windows::common::wslutil::ParseKeyMultiValuePairs(Filters, FiltersCount);
+
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_volumes);
 
     WSLCVolumes::PruneVolumesResult pruneResult;
     try
     {
-        pruneResult = m_volumes->PruneVolumes(Options);
+        pruneResult = m_volumes->PruneVolumes(filters);
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to prune volumes");
 

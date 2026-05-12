@@ -568,12 +568,11 @@ class WSLCTests
             filters.push_back({.Key = key.c_str(), .Value = value.has_value() ? value->c_str() : nullptr});
         }
 
-        WSLCListVolumesOptions options{};
-        options.Filters = filters.empty() ? nullptr : filters.data();
-        options.FiltersCount = static_cast<ULONG>(filters.size());
+        const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
+        const ULONG filtersCount = static_cast<ULONG>(filters.size());
 
         wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
-        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(&options, volumes.addressof(), volumes.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(filtersPtr, filtersCount, volumes.addressof(), volumes.size_address<ULONG>()));
 
         std::set<std::string> names;
         for (const auto& v : volumes)
@@ -2102,7 +2101,7 @@ class WSLCTests
             auto volumeCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
                 ULONGLONG spaceReclaimed = 0;
-                LOG_IF_FAILED(m_defaultSession->PruneVolumes(nullptr, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+                LOG_IF_FAILED(m_defaultSession->PruneVolumes(nullptr, 0, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
             });
 
             VERIFY_ARE_EQUAL(ListVolumes("guest", {}, anonymousVolumeLabels).size(), 1u);
@@ -4262,12 +4261,12 @@ class WSLCTests
         CreateNamedVolume(emptyValVol, "guest", {{.Key = "marker", .Value = ""}});
 
         auto verifyListVolumesFails = [&](HRESULT expected, const std::vector<WSLCFilter>& filters) {
-            WSLCListVolumesOptions options{};
-            options.Filters = filters.empty() ? nullptr : filters.data();
-            options.FiltersCount = static_cast<ULONG>(filters.size());
+            const WSLCFilter* filtersPtr = filters.empty() ? nullptr : filters.data();
+            const ULONG filtersCount = static_cast<ULONG>(filters.size());
 
             wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
-            VERIFY_ARE_EQUAL(expected, m_defaultSession->ListVolumes(&options, volumes.addressof(), volumes.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(
+                expected, m_defaultSession->ListVolumes(filtersPtr, filtersCount, volumes.addressof(), volumes.size_address<ULONG>()));
         };
 
         const std::set<std::string> all{vhdA, vhdB, guestA, guestB, otherName, emptyValVol};
@@ -4345,15 +4344,14 @@ class WSLCTests
 
     WSLC_TEST_METHOD(PruneVolumesTest)
     {
-        auto pruneVolumes = [&](bool All = false, const std::vector<WSLCPruneLabelFilter>& Labels = {}) {
-            WSLCPruneVolumesOptions options{};
-            options.All = All ? TRUE : FALSE;
-            options.Labels = Labels.empty() ? nullptr : Labels.data();
-            options.LabelsCount = static_cast<ULONG>(Labels.size());
+        auto pruneVolumes = [&](const std::vector<WSLCFilter>& Filters = {}) {
+            const WSLCFilter* filtersPtr = Filters.empty() ? nullptr : Filters.data();
+            const ULONG filtersCount = static_cast<ULONG>(Filters.size());
 
             wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
             ULONGLONG spaceReclaimed = 0;
-            VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(&options, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+            VERIFY_SUCCEEDED(m_defaultSession->PruneVolumes(
+                filtersPtr, filtersCount, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
 
             return deleted;
         };
@@ -4369,17 +4367,17 @@ class WSLCTests
 
         // Prune with no eligible volumes (none created yet) returns an empty set.
         {
-            auto deleted = pruneVolumes(true);
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}});
             expectDeleted(deleted, {});
         }
 
-        // Default (no All) only prunes anonymous volumes; with none present, returns empty.
+        // Default (no all=true) only prunes anonymous volumes; with none present, returns empty.
         {
             auto deleted = pruneVolumes();
             expectDeleted(deleted, {});
         }
 
-        // All=true prunes unused named guest volumes.
+        // all=true prunes unused named guest volumes.
         {
             const std::string a = "wslc-prune-guest-a";
             const std::string b = "wslc-prune-guest-b";
@@ -4392,7 +4390,7 @@ class WSLCTests
             CreateNamedVolume(a, "guest");
             CreateNamedVolume(b, "guest");
 
-            auto deleted = pruneVolumes(true);
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}});
             expectDeleted(deleted, {a, b});
 
             auto volumes = ListVolumes();
@@ -4411,7 +4409,7 @@ class WSLCTests
             launcher.AddNamedVolume(name, "/data", false);
             auto container = launcher.Launch(*m_defaultSession);
 
-            auto deleted = pruneVolumes(true);
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}});
 
             expectDeleted(deleted, {});
             VERIFY_IS_TRUE(ListVolumes().contains(name));
@@ -4432,7 +4430,7 @@ class WSLCTests
             CreateNamedVolume(labeled, "guest", {{.Key = "wslc-prune-test", .Value = "yes"}});
             CreateNamedVolume(unlabeled, "guest");
 
-            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-test", .Value = "yes", .Present = TRUE}});
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}, {.Key = "label", .Value = "wslc-prune-test=yes"}});
             expectDeleted(deleted, {labeled});
         }
 
@@ -4449,8 +4447,8 @@ class WSLCTests
             CreateNamedVolume(labeled, "guest", {{.Key = "wslc-prune-keyonly", .Value = "anything"}});
             CreateNamedVolume(unlabeled, "guest");
 
-            // Value=nullptr matches any volume with the key (Docker `label=key`).
-            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keyonly", .Value = nullptr, .Present = TRUE}});
+            // Value without '=' matches any volume with the key (Docker `label=key`).
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}, {.Key = "label", .Value = "wslc-prune-keyonly"}});
             expectDeleted(deleted, {labeled});
         }
 
@@ -4467,8 +4465,8 @@ class WSLCTests
             CreateNamedVolume(keep, "guest", {{.Key = "wslc-prune-keep", .Value = "yes"}});
             CreateNamedVolume(drop, "guest");
 
-            // Value=nullptr filters by key only (Docker `label!=key`).
-            auto deleted = pruneVolumes(true, {{.Key = "wslc-prune-keep", .Value = nullptr, .Present = FALSE}});
+            // `label!` filters out volumes that have the key (Docker `label!=key`).
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}, {.Key = "label!", .Value = "wslc-prune-keep"}});
             expectDeleted(deleted, {drop});
         }
 
@@ -4485,7 +4483,7 @@ class WSLCTests
             CreateNamedVolume(vhdName, "vhd", {}, {{"SizeBytes", "1073741824"}});
             CreateNamedVolume(guestName, "guest");
 
-            auto deleted = pruneVolumes(true);
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}});
             expectDeleted(deleted, {guestName});
 
             VERIFY_IS_TRUE(ListVolumes().contains(vhdName));
@@ -4496,22 +4494,33 @@ class WSLCTests
             const std::string name = "wslc-prune-listsync";
             CreateNamedVolume(name, "guest");
 
-            auto deleted = pruneVolumes(true);
+            auto deleted = pruneVolumes({{.Key = "all", .Value = "true"}});
             expectDeleted(deleted, {name});
             VERIFY_IS_FALSE(ListVolumes().contains(name));
         }
 
-        // Label with null Key rejected.
+        // Filter with null Key rejected.
         {
-            WSLCPruneLabelFilter labels[] = {{.Key = nullptr, .Value = "", .Present = TRUE}};
-            WSLCPruneVolumesOptions options{};
-            options.Labels = labels;
-            options.LabelsCount = ARRAYSIZE(labels);
+            WSLCFilter filters[] = {{.Key = nullptr, .Value = "true"}};
 
             wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
             ULONGLONG spaceReclaimed = 0;
 
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->PruneVolumes(&options, deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+            VERIFY_ARE_EQUAL(
+                E_POINTER,
+                m_defaultSession->PruneVolumes(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
+        }
+
+        // Filter with null Value rejected.
+        {
+            WSLCFilter filters[] = {{.Key = "label", .Value = nullptr}};
+
+            wil::unique_cotaskmem_array_ptr<WSLCVolumeName> deleted;
+            ULONGLONG spaceReclaimed = 0;
+
+            VERIFY_ARE_EQUAL(
+                E_POINTER,
+                m_defaultSession->PruneVolumes(filters, ARRAYSIZE(filters), deleted.addressof(), deleted.size_address<ULONG>(), &spaceReclaimed));
         }
     }
 

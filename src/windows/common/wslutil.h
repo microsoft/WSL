@@ -342,5 +342,6 @@ std::string BuildRegistryAuthHeader(const std::string& username, const std::stri
 std::string BuildRegistryAuthHeader(const std::string& identityToken);
 
 std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
+std::map<std::string, std::vector<std::string>> ParseKeyMultiValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count);
 
 } // namespace wsl::windows::common::wslutil
