@@ -4141,9 +4141,7 @@ class WSLCTests
         });
 
         // Verify empty list is returned when no volumes exist.
-        wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
-        VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(nullptr, 0, volumes.addressof(), volumes.size_address<ULONG>()));
-        VERIFY_ARE_EQUAL(0u, volumes.size());
+        VERIFY_IS_TRUE(ListVolumes().empty());
 
         // Create a VHD volume and verify list returns one entry.
         WSLCDriverOption driverOpts[] = {{"SizeBytes", "1073741824"}};
@@ -4157,6 +4155,7 @@ class WSLCTests
         WSLCVolumeInformation volInfo{};
         VERIFY_SUCCEEDED(m_defaultSession->CreateVolume(&vhdOptions, &volInfo));
 
+        wil::unique_cotaskmem_array_ptr<WSLCVolumeInformation> volumes;
         VERIFY_SUCCEEDED(m_defaultSession->ListVolumes(nullptr, 0, volumes.addressof(), volumes.size_address<ULONG>()));
         VERIFY_ARE_EQUAL(1u, volumes.size());
         VERIFY_ARE_EQUAL(std::string(volumes[0].Name), vhdVolumeName);
